@@ -304,6 +304,107 @@ describe("InfoTooltip", () => {
     });
   });
 
+  describe("auto-flip near viewport top (Fix #1021 / UX-L2)", () => {
+    it("flips to bottom when position is unset (default 'top') and the trigger sits near the top of the viewport (rect.top < 120)", () => {
+      render(<InfoTooltip content="Flip test" id="tt-flip-default" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        top: 50,
+        right: 116,
+        bottom: 74,
+        width: 16,
+        height: 24,
+        x: 100,
+        y: 50,
+        toJSON: () => {},
+      });
+
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      // Flipped below: anchors off rect.bottom (+8), not rect.top (-8).
+      expect(tooltip.style.top).toBe("82px");
+      expect(tooltip.style.transform).toContain("translate(-50%, 0)");
+      expect(tooltip.style.transform).not.toContain("-100%");
+    });
+
+    it("flips to bottom when position is explicitly 'top' and the trigger sits near the top of the viewport", () => {
+      render(
+        <InfoTooltip content="Flip test explicit" id="tt-flip-explicit" position="top" />,
+      );
+      const button = screen.getByRole("button", { name: "More information" });
+
+      vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        top: 40,
+        right: 116,
+        bottom: 64,
+        width: 16,
+        height: 24,
+        x: 100,
+        y: 40,
+        toJSON: () => {},
+      });
+
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.style.top).toBe("72px");
+      expect(tooltip.style.transform).toContain("translate(-50%, 0)");
+    });
+
+    it("does not flip (stays above) when the trigger is not near the top of the viewport (rect.top >= 120)", () => {
+      render(<InfoTooltip content="No flip" id="tt-no-flip" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        top: 300,
+        right: 116,
+        bottom: 324,
+        width: 16,
+        height: 24,
+        x: 100,
+        y: 300,
+        toJSON: () => {},
+      });
+
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.style.top).toBe("292px");
+      expect(tooltip.style.transform).toContain("translate(-50%, -100%)");
+    });
+
+    it("does not auto-flip an explicit position='bottom' override even near the viewport top", () => {
+      render(
+        <InfoTooltip content="Explicit bottom" id="tt-explicit-bottom" position="bottom" />,
+      );
+      const button = screen.getByRole("button", { name: "More information" });
+
+      vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        top: 40,
+        right: 116,
+        bottom: 64,
+        width: 16,
+        height: 24,
+        x: 100,
+        y: 40,
+        toJSON: () => {},
+      });
+
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      // Explicit "bottom" always anchors off rect.bottom, regardless of rect.top.
+      expect(tooltip.style.top).toBe("72px");
+      expect(tooltip.style.transform).toContain("translate(-50%, 0)");
+    });
+  });
+
   describe("portal rendering (UX-L1: #958 — safe inside CSS-transformed ancestors)", () => {
     it("uses createPortal to render outside transformed ancestor", () => {
       // InfoTooltip is used inside DimensionCard which has animate-fade-in-up

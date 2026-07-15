@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-06-21 | Audit: v42
+> Last reviewed: 2026-07-15 | Audit: v42
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -52,6 +52,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** Admin access requires both a valid authenticated session AND the user's GitHub handle being present in the `ADMIN_HANDLES` environment variable. Component-level protection is functionally equivalent to middleware protection -- unauthorized requests are rejected before any admin data is returned. The admin surface is small (one dashboard page, one API route) and does not handle destructive operations.
 - **Severity:** Low
 - **Future improvement:** Add `middleware.ts` with admin route matching when Next.js middleware stabilizes further or if the admin surface area grows significantly.
+
+## Stateless session cookie has no server-side revocation mechanism (SE-L2, #1038)
+
+- **Risk:** `chapa_session` is a fully stateless, AES-256-GCM-encrypted cookie (see `createSessionCookie`/`readSessionCookie` in `apps/web/lib/auth/github.ts:355-465`) whose only expiry check is the embedded `iat` timestamp, enforced against a 24h `SESSION_MAX_AGE_SECONDS` window on every read. There is no server-side session store or revocation list. `POST /api/auth/logout` (`apps/web/app/api/auth/logout/route.ts`) only clears the cookie client-side (`clearSessionCookie()`, `Max-Age=0`) — it does not and cannot invalidate a copy of the cookie value that has already been exfiltrated. A compromised `chapa_session` value remains valid until its 24h `iat`-based expiry elapses, regardless of logout. The only mass-invalidation lever is rotating `NEXTAUTH_SECRET`, which logs out every user on the platform.
+- **Why accepted rather than fixed:** Adding real revocation (e.g., a per-user `sessionEpoch` checked in Redis on every request) would couple auth availability to Redis uptime on every single authenticated request — a new, permanent outage dependency for a system that today treats Redis as best-effort everywhere else. Making that check fail-open (to avoid introducing that outage vector, consistent with this project's existing fail-open rate-limiter philosophy — see the "Rate limiter fail-open (#398)" entry above) would silently defeat the very guarantee revocation exists to provide: during an active incident (the exact moment revocation matters most), a Redis blip would make the "revoked" session pass anyway. A fix that only works when the dependency it avoids coupling to happens to be up is not an improvement to the failure mode that matters.
+- **Mitigating factors:** The 24h window bounds the blast radius of any single exfiltrated cookie — there is no indefinite-lifetime token in play. `NEXTAUTH_SECRET` rotation remains available as a full mass-invalidation escape hatch for a severe incident (e.g., confirmed credential-store compromise), at the cost of logging out all users.
+- **Severity:** Low
+- **See:** `apps/web/lib/auth/github.ts`, `apps/web/app/api/auth/logout/route.ts` — pre-launch audit finding SE-L2.
+- **Accepted:** 2026-07-15
 
 ## ~~MPL-2.0 / LGPL-3.0 dependency (sharp/libvips) (#450)~~ — Resolved
 
@@ -113,7 +122,47 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** Low
 - **Accepted:** 2026-06-21
 
+## axe-core MPL-2.0 license (dev-only)
+
+- **Risk:** `axe-core` (pulled in transitively for accessibility testing) is licensed under MPL-2.0, which is not in our stated license policy (MIT, Apache-2.0, BSD, ISC).
+- **Accepted because:** `axe-core` is a `devDependency` used only by the a11y test suite — it is never imported by application code and never bundled into the production build. No MPL-licensed code is distributed to end users.
+- **Mitigation:** None required. Confirmed dev-only via `pnpm audit`/license scan in every security agent cycle.
+- **Severity:** None (dev-only)
+- **Accepted:** 2026-07-15
+
+## CC-BY-4.0 dependency (caniuse-lite) (#1012)
+
+- **Risk:** `caniuse-lite` (transitive, via `browserslist` → Next.js/`styled-jsx`/`@babel/helper-compilation-targets`, and via `eslint-plugin-react-hooks` in dev) is licensed CC-BY-4.0 (Creative Commons Attribution), not in our stated license policy.
+- **Accepted because:** CC-BY-4.0 is an attribution-only content license (not copyleft — it imposes no share-alike or source-disclosure obligation). `caniuse-lite` ships a static browser-support data table, not application logic; it's consumed at build time by Autoprefixer/Browserslist and is not modified or redistributed as a standalone work by Chapa.
+- **Mitigation:** None required. Excluded from the license-compliance allowlist gate (`scripts/check-licenses.ts`, `DEFAULT_EXCLUDED_PACKAGES`).
+- **Severity:** None
+- **Accepted:** 2026-07-15
+
+## Unlicense dependency (fast-sha256) (#1012)
+
+- **Risk:** `fast-sha256` (transitive, via `resend`/`svix` → `standardwebhooks`, used for webhook HMAC signing) is released under the Unlicense — a public-domain dedication, not in our stated license policy.
+- **Accepted because:** The Unlicense places the work in the public domain with no conditions whatsoever (no attribution, no share-alike, no restriction on use or redistribution) — strictly more permissive than MIT, which is already on the allowlist. There is no meaningful compliance risk.
+- **Mitigation:** None required. Excluded from the license-compliance allowlist gate (`scripts/check-licenses.ts`, `DEFAULT_EXCLUDED_PACKAGES`).
+- **Severity:** None
+- **Accepted:** 2026-07-15
+
+## MIT-0 dependency (postal-mime) (#1012)
+
+- **Risk:** `postal-mime` (transitive, via `resend`, used for email parsing) is released under MIT-0 (MIT No Attribution), not in our stated license policy.
+- **Accepted because:** MIT-0 is textually identical to MIT with the attribution clause removed — it is a strict subset of MIT's already-minimal obligations. No meaningful compliance difference from the allowlisted MIT license.
+- **Mitigation:** None required. Excluded from the license-compliance allowlist gate (`scripts/check-licenses.ts`, `DEFAULT_EXCLUDED_PACKAGES`).
+- **Severity:** None
+- **Accepted:** 2026-07-15
+
 ## Infrastructure
+
+## GitHub Advanced Security (code scanning + secret scanning) unavailable on repo tier
+
+- **Risk:** Native GitHub code scanning (CodeQL) and secret scanning are disabled on this repository (`403`/`404` from the respective alert APIs) — GitHub Advanced Security is not licensed for private repositories on this plan tier, so these alert surfaces cannot be enabled without a paid upgrade.
+- **Accepted because:** Equivalent coverage already runs in CI on every PR: the `Secret Scanning` workflow runs Gitleaks, and the `Security Scan` workflow runs `pnpm audit` (dependency vulnerabilities) and a license-compliance check. Weekly security-agent cycles independently re-verify secrets, dependency vulnerabilities, and license compliance against live source. Dependabot security alerts (a separate, unaffected feature) remain enabled with 0 open alerts.
+- **Mitigation:** None required today. Re-evaluate if the repo tier changes or if GHAS becomes available for private repos on the current plan.
+- **Severity:** Low
+- **Accepted:** 2026-07-15
 
 ## `packages/shared` has no build step (#450)
 
@@ -192,12 +241,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** None (resolved)
 - **Accepted:** 2026-05-02 | **Updated:** 2026-06-19
 
-## Static content pages render at DEFAULT\_LOCALE; non-default locale applied client-side (2026-06-19)
+## ~~Static content pages render at DEFAULT_LOCALE; non-default locale applied client-side (2026-06-19)~~ — Resolved
 
-- **Risk:** Content pages (about, archetypes, privacy, terms, etc.) are CDN-cached at `DEFAULT_LOCALE` (`es`). A user whose `chapa-locale` cookie is `en` receives Spanish server-rendered HTML and sees a brief locale flash on mount as the client applies the English dictionary.
-- **Mitigation:** Intentional tradeoff to keep content pages CDN-cacheable (ISR). The flash is short (<100 ms on fast connections) and affects only users who have explicitly switched to English. Full per-locale SSR would require per-locale route segments (e.g., `/en/about`) — a significant routing change deferred to a future milestone. The badge SVG endpoint (`/u/:handle/badge.svg`) and share page are unaffected.
-- **Severity:** Low
-- **Accepted:** 2026-06-19
+- **Risk:** Content pages (about, archetypes, privacy, terms, etc.) were CDN-cached at `DEFAULT_LOCALE` (`es`). A user whose `chapa-locale` cookie was `en` received Spanish server-rendered HTML and saw a brief locale flash on mount as the client applied the English dictionary.
+- **Resolution:** The deferred "future milestone" this entry anticipated shipped as #1023 (FE-H1): the 9 content pages moved to per-locale route segments (`app/[locale]/...`), with a narrowly-scoped `apps/web/proxy.ts` rewriting the canonical unprefixed URL to the internal locale route. Both `en`/`es` variants are pre-rendered at build time, so the rewrite always resolves to a cache hit — no client-side re-render, no flash, and ISR/CDN caching is preserved. See `docs/decisions/2026-07-15-i18n-middleware-carve-out.md`. The shared nav/command-bar chrome (not the page bodies) still renders via the client `LanguageProvider` and may show a brief flash on non-default-locale loads — a much narrower, accepted residual, out of scope for #1023.
+- **Severity:** None (resolved for the 9 content pages)
+- **Accepted:** 2026-06-19 | **Resolved:** 2026-07-15
 
 ---
 

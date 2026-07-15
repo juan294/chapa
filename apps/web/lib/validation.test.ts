@@ -311,6 +311,69 @@ describe("isValidStatsShape", () => {
       expect(isValidStatsShape({ ...validStats, totalWatchers: 1_000_001 })).toBe(false);
     });
   });
+
+  // #984: optional numeric fields also flow into computeImpactV6 and persist
+  // into snapshots/history, so they need the same non-negative + range guards.
+  describe("optional numeric field caps (#984)", () => {
+    it("accepts realistic medianPrLeadTimeHours", () => {
+      expect(isValidStatsShape({ ...validStats, medianPrLeadTimeHours: 36 })).toBe(true);
+    });
+
+    it("accepts medianPrLeadTimeHours at the upper bound (100_000)", () => {
+      expect(isValidStatsShape({ ...validStats, medianPrLeadTimeHours: 100_000 })).toBe(true);
+    });
+
+    it("rejects medianPrLeadTimeHours exceeding 100_000", () => {
+      expect(isValidStatsShape({ ...validStats, medianPrLeadTimeHours: 100_001 })).toBe(false);
+    });
+
+    it("rejects negative medianPrLeadTimeHours", () => {
+      expect(isValidStatsShape({ ...validStats, medianPrLeadTimeHours: -1 })).toBe(false);
+    });
+
+    it("rejects non-finite medianPrLeadTimeHours", () => {
+      expect(isValidStatsShape({ ...validStats, medianPrLeadTimeHours: Infinity })).toBe(false);
+    });
+
+    it("accepts realistic primaryReviewsSubmittedCount", () => {
+      expect(isValidStatsShape({ ...validStats, primaryReviewsSubmittedCount: 42 })).toBe(true);
+    });
+
+    it("accepts primaryReviewsSubmittedCount at the upper bound (50_000)", () => {
+      expect(isValidStatsShape({ ...validStats, primaryReviewsSubmittedCount: 50_000 })).toBe(true);
+    });
+
+    it("rejects primaryReviewsSubmittedCount exceeding 50_000", () => {
+      expect(isValidStatsShape({ ...validStats, primaryReviewsSubmittedCount: 50_001 })).toBe(false);
+    });
+
+    it("rejects negative primaryReviewsSubmittedCount", () => {
+      expect(isValidStatsShape({ ...validStats, primaryReviewsSubmittedCount: -1 })).toBe(false);
+    });
+
+    for (const field of [
+      "batchSizeScore",
+      "prDescriptionRate",
+      "featureBranchRate",
+      "issueLinkageRate",
+    ] as const) {
+      it(`accepts ${field} within the 0..1 range`, () => {
+        expect(isValidStatsShape({ ...validStats, [field]: 0.5 })).toBe(true);
+      });
+
+      it(`rejects ${field} above 1`, () => {
+        expect(isValidStatsShape({ ...validStats, [field]: 1.01 })).toBe(false);
+      });
+
+      it(`rejects negative ${field}`, () => {
+        expect(isValidStatsShape({ ...validStats, [field]: -0.1 })).toBe(false);
+      });
+
+      it(`rejects absurdly large ${field}`, () => {
+        expect(isValidStatsShape({ ...validStats, [field]: 1e12 })).toBe(false);
+      });
+    }
+  });
 });
 
 describe("isValidBadgeConfig", () => {

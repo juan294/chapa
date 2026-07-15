@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimitStrict } from "@/lib/cache/redis";
 import {
@@ -89,6 +89,11 @@ export const POST = withErrorCapture("/api/challenge", async (request: NextReque
   const { success } = await sendChallengeEmail(handle, trimmedReason);
   if (!success) {
     console.error(`[challenge] email send failed for handle=${handle}`);
+    void captureServerError({
+      route: "/api/challenge",
+      statusCode: 200,
+      error: new Error(`Challenge dispute email send failed for handle=${handle}`),
+    });
   }
 
   return NextResponse.json({ success: true });

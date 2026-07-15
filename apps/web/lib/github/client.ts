@@ -157,6 +157,25 @@ async function _enrichWithLogins(
 }
 
 /** Internal: fetch from GitHub, merge Bitbucket + Codeberg + supplemental, cache. */
+/**
+ * Serve last-known-good `stale` data and, unless read-only, refresh only the
+ * primary key with it (6h TTL) so a sustained upstream problem doesn't cause
+ * a refetch on every subsequent request. The protected stale key itself is
+ * left untouched. Shared by both the total-fetch-failure and #1002
+ * degraded-fetch call sites below — same anti-thrash invariant, different
+ * trigger.
+ */
+async function _serveStaleAndReCache(
+  cacheKey: string,
+  stale: StatsData,
+  readOnly: boolean | undefined,
+): Promise<StatsData> {
+  if (!readOnly) {
+    await cacheSet(cacheKey, stale, CACHE_TTL);
+  }
+  return stale;
+}
+
 async function _fetchAndCache(
   handle: string,
   lowerHandle: string,
@@ -175,7 +194,7 @@ async function _fetchAndCache(
     // API failed (rate limit, network error, etc.) — serve stale if available
     if (stale) {
       console.warn(`[cache] serving stale data for ${lowerHandle} (API unavailable)`);
-      return stale;
+      return _serveStaleAndReCache(cacheKey, stale, options.readOnly);
     }
     return null;
   }
@@ -306,13 +325,7 @@ async function _fetchAndCache(
         }),
       () => undefined,
     );
-    if (!options.readOnly) {
-      // Refresh only the primary key with the good data so we serve fast and
-      // avoid refetch-thrash while upstream stays degraded. The stale key —
-      // the protected last-known-good — is left untouched.
-      await cacheSet(cacheKey, stale!, CACHE_TTL);
-    }
-    return stale!;
+    return _serveStaleAndReCache(cacheKey, stale!, options.readOnly);
   }
 
   if (options.readOnly) {

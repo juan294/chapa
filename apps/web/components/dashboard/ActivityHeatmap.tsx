@@ -8,6 +8,7 @@ import { formatIsoDate } from "@/lib/utils/date";
 import { seededRandom } from "@/lib/utils/prng";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { DIMENSION_COLORS } from "@/lib/utils/dimension-colors";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -24,13 +25,6 @@ export interface ActivityHeatmapProps {
 
 const WEEKS = 13;
 const DAYS = 7;
-
-const DIMENSION_COLORS: Record<Dimension, string> = {
-  delivery: "var(--color-dimension-delivery)",
-  quality: "var(--color-dimension-quality)",
-  consistency: "var(--color-dimension-consistency)",
-  breadth: "var(--color-dimension-breadth)",
-};
 
 const DIMENSION_LABELS: Record<Dimension, string> = {
   delivery: "Delivery",

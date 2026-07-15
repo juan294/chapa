@@ -21,6 +21,12 @@ export function InfoTooltip({
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
+  // Resolved placement after the top→bottom auto-flip guard below. Only
+  // matters when `position` is unset/"top" — an explicit "bottom" override
+  // is never flipped.
+  const [resolvedPosition, setResolvedPosition] = useState<"top" | "bottom">(
+    position,
+  );
   const wrapperRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -34,9 +40,16 @@ export function InfoTooltip({
 
     const update = () => {
       const rect = buttonRef.current!.getBoundingClientRect();
+      // Auto-flip below the trigger when it sits near the top of the
+      // viewport, so the tooltip never renders off-screen above it —
+      // matching ActivityHeatmap's ChartTooltip flip rule. An explicit
+      // position="bottom" is never overridden.
+      const flipped: "top" | "bottom" =
+        position === "bottom" ? "bottom" : rect.top < 120 ? "bottom" : "top";
+      setResolvedPosition(flipped);
       setCoords({
         x: rect.left + rect.width / 2,
-        y: position === "top" ? rect.top : rect.bottom,
+        y: flipped === "top" ? rect.top : rect.bottom,
       });
     };
 
@@ -86,8 +99,8 @@ export function InfoTooltip({
       className="fixed z-[99999] w-max max-w-[240px] rounded-lg bg-card/95 backdrop-blur-xl shadow-card p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none"
       style={{
         left: coords.x,
-        top: position === "top" ? coords.y - 8 : coords.y + 8,
-        transform: position === "top"
+        top: resolvedPosition === "top" ? coords.y - 8 : coords.y + 8,
+        transform: resolvedPosition === "top"
           ? "translate(-50%, -100%)"
           : "translate(-50%, 0)",
       }}

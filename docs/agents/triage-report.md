@@ -1,54 +1,55 @@
 # Triage Report
-> Generated on 2026-07-07 | 7 reports processed | 2 action items | 1 Dependabot PR
+> Generated on 2026-07-10 | 4 reports processed | 2 action items | 1 Dependabot PR
 
 ## Agent Failures
-| Agent | Error | Log File |
-|-------|-------|----------|
-None — all agents ran successfully in the last 24h.
+None — all agents ran successfully (no `logs/*.error.log` modified in the last 24h).
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cost-analyst-report.md | Cost Analyst | GREEN | 0 (P2-1 carried, monitor-only) |
-| 2 | coverage-report.md | Coverage | GREEN | 2 (telemetry branch coverage, packages/shared exclude) |
-| 3 | qa-report.md | QA | GREEN | 0 |
-| 4 | performance-report.md | Performance | GREEN | 0 (both prior P3s already resolved) |
-| 5 | documentation-report.md | Documentation | GREEN | 0 (flagged JSDoc gap verified already resolved — stale finding) |
-| 6 | security-report.md | Security | GREEN | 0 |
-| 7 | cc-rpi-update-report.md | cc-rpi Update | GREEN | 0 (no-op, already at v1.25.0) |
+| 1 | cost-analyst-report.md | Cost Analyst | GREEN | 0 (P2-1/P3-2 both agent-justified monitor-only carries) |
+| 2 | performance-report.md | Performance | GREEN | 0 ("None blocking"; P3s deferred to next cycle / future threshold) |
+| 3 | coverage-report.md | Coverage | GREEN | 2 (of 3 recommended — 1 was a stale/false claim, verified and skipped) |
+| 4 | cc-rpi-update-report.md | cc-rpi Update | no-op | 0 (already up to date as of v1.25.0) |
+
+`triage-report.md` also matched the `-newer` mtime scan but is last cycle's own output, not a new agent report — excluded from processing.
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | `apps/web/app/api/telemetry/route.ts` branch coverage 43.6% → 100% — added tests for `client_api_error` event, full optional-field truncation (`stack`/`digest`/`path`/`source`), non-Error fire-and-forget rejection, non-object JSON bodies, and isolated per-handle rate-limit failure | coverage-report.md (P2) | 9 | Done |
-| 2 | Excluded `packages/shared/{package.json,tsconfig*.json,eslint.config.mjs}` from vitest v8 coverage collection — module now correctly reports 100% instead of the 89.7% config-file-noise figure | coverage-report.md (P3, carried 2 cycles) | — (config-only) | Done |
+| 1 | Closed branch-coverage gaps on `apps/web/components/GlobalCommandBarLazy.tsx` (60%→100% stmts) and `apps/web/components/SharePageOwnerContentLazy.tsx` (66.66%→100% stmts) — both had an uncovered `next/dynamic` loader `.then()` mapper, since no test in either file invoked the loader (`next/dynamic` was fully mocked). Followed the precedent established for `ClientInstrumentation.tsx` in commit `9386cf65`. | coverage-report.md | 2 new tests | Done |
+| 2 | `/simplify` reuse finding: the loader-capture-and-resolve assertion block was now duplicated 3x (`ClientInstrumentation`, `GlobalCommandBarLazy`, `SharePageOwnerContentLazy`). Extracted a shared `resolveDynamicLoader()` helper into `apps/web/lib/test-helpers/dynamic-mock.ts` and refactored all 3 call sites onto it. | `/simplify` (reuse agent) | 1 new helper file, 3 files refactored | Done |
 
-`/simplify` review (single-agent, scoped to the small diff) flagged two minor items:
-- Collapsed the 4 separate `packages/shared/*` exclude lines into one glob (`packages/shared/{package.json,tsconfig*.json,eslint.config.mjs}`), consistent with existing glob style in the same list. Applied.
-- Suggested converting the Error-rejection and non-Error-rejection telemetry tests into a single `it.each` — **skipped**: the file doesn't use `it.each` anywhere else, so introducing it for one extra case would be an inconsistent pattern for low value.
+## Stale Finding (verified, not re-fixed)
+`coverage-report.md` claimed `apps/web/app/admin/agents/agents-dashboard.tsx` is at **0% coverage** and recommended a smoke render test. Verified directly with a targeted `vitest --coverage` run before acting: actual coverage is **98.24% stmts / 90.47% branches** — two sibling test files (`agents-dashboard.test.ts`, `agents-dashboard.test.tsx`) have existed since February/March 2026. The claim is stale/false. No action taken, consistent with the "verify before re-flagging" precedent set in the 2026-07-09 cycle for a similar `ClientInstrumentation.tsx` claim.
 
-**Verified, no action needed:** `documentation-report.md`'s claim that `apps/web/lib/db/campaigns/types.ts` lacks JSDoc on 5 exports + schema was checked directly against current HEAD — JSDoc has been present on every type, interface, and schema export since commit `9a0bdd1b`, before that report's own run. Stale finding; will not be re-flagged.
+## Deferred to a New Issue (out of diff scope)
+The `/simplify` reuse agent independently discovered a 4th, pre-existing instance of the same `next/dynamic` loader coverage gap in `apps/web/components/KeyboardShortcutsListener.test.tsx` (mocks `next/dynamic` with a plain, non-`vi.fn` factory that never invokes the loader). This is outside the scope of the reviewed diff (a different component, not part of this cycle's coverage-report recommendation), so per Rule #58's "concrete, justified reason" exception it was filed as **[#1006](https://github.com/juan294/chapa/issues/1006)** rather than blind-fixed in the same commit.
 
 ## GitHub Security & Quality Alerts
 | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
 |---|------|----------|--------------|---------------|----------|--------|-------|
-| — | Code scanning | — | GHAS (CodeQL) | — | repo-wide | Disabled (403) | Not available on this repo's tier — accepted permanent limitation, confirmed unchanged |
+| — | Code scanning | — | GHAS (CodeQL) | — | repo-wide | Disabled (403) | Not available on this repo's tier — accepted permanent limitation, re-confirmed unchanged |
 | — | Secret scanning | — | GHAS | — | repo-wide | Disabled (404) | Same as above |
 | — | Dependabot security | — | — | — | — | 0 open | Query succeeded (`[]`) |
 
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 924 | `chore(deps): bump actions/checkout from 6 to 7` | Major | Deferred (unchanged) | CI green, `mergeStateStatus: BEHIND` (not conflicting), but major version bump requires human review per policy. Deferred across 5+ prior cycles. |
+| 924 | `chore(deps): bump actions/checkout from 6 to 7` | Major | Deferred | Unchanged across 7+ cycles — already fully explained in PR comments (2026-06-24, 2026-06-25). CI green, but major bumps always defer per policy regardless of CI status. No new comment added this cycle (existing explanation still current). |
 
 ## Verification
-- [x] All tests passing — 8,193/8,193 (up from 8,174 pre-cycle; +19 telemetry tests)
+- [x] All tests passing (8,335/8,335, up from 8,333 — 2 new tests)
 - [x] Typecheck clean
 - [x] Lint clean
-- [ ] CI green — pushed, monitoring
+- [x] CI green on `develop` (`bef4fa6f`) — all 5 workflows passed (CI, Security Scan, Secret Scanning, Bundle Size Analysis, Dead Code Detection)
 
-## Carried Items (for next cycle)
-- **Cost Analyst P2-1** (monitor-only, unchanged): `dbGetCampaignStats` 4-parallel-COUNT in `lib/db/campaigns/sends.ts` — threshold-gated, admin-only surface, revisit only if campaign volume grows.
-- **Dependabot #924**: `actions/checkout` 6→7 major bump remains deferred; revisit at next convenient dependency-upgrade window.
+## Process Notes
+- Verified one report claim against live code/coverage before acting rather than trusting report text: coverage-report's "`agents-dashboard.tsx` is 0%" claim was stale/false (actual 98.24%, sibling tests exist since Feb/Mar 2026).
+- Ran `/simplify` (4 parallel reuse/simplification/efficiency/altitude agents) on the diff before committing. Applied: extracted `resolveDynamicLoader()` shared helper (reuse finding, confirmed correct altitude by the altitude agent — not a coverage-config bandaid, since the uncovered line is project-authored binding logic, not `next/dynamic` internals). Rejected the simplification agent's "redundant import" finding as a false positive — it matches the established `ClientInstrumentation.render.test.tsx` precedent exactly (defensive re-import for test-order independence). Efficiency agent found nothing (module-cache makes repeat dynamic imports free). Filed issue #1006 for a 4th occurrence of the same gap discovered by the reuse agent, out of scope for this diff.
+- cost-analyst and performance reports required zero code changes — both explicitly "no blocking action" with all carried items either agent-justified monitor-only or deferred to a future threshold/cycle by the agent's own recommendation.
+
+## Carried Items
+None outstanding requiring action. Carried monitor-only items (cost-analyst P2-1 `dbGetCampaignStats`, P3-2 `reconcileSnapshotWrite` dedup marker; performance's `"use client"` count watch at ~140, currently 125) all have explicit agent-stated justification for not acting yet.

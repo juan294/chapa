@@ -10,7 +10,7 @@ on:
 
 jobs:
   audit:
-    name: pnpm audit
+    name: Vulnerability scan (osv-scanner)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -20,7 +20,20 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --prod
+      # `pnpm audit` relies on npm's legacy audit endpoint
+      # (/-/npm/v1/security/audits), which npm retired (HTTP 410) -- the
+      # step always failed regardless of whether the lockfile had
+      # vulnerabilities. osv-scanner queries the OSV.dev database directly
+      # against the lockfile and is installed as a standalone binary here
+      # (rather than via a Docker-based Action) so the wrapper script below
+      # can post-process its JSON output and apply a severity/fix threshold.
+      - name: Install osv-scanner
+        run: |
+          curl -sSL "https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64" -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+          osv-scanner --version
+      - name: Run vulnerability gate (fails only on HIGH/CRITICAL with a fix available)
+        run: pnpm run check:vulnerabilities pnpm-lock.yaml
 
   license-check:
     name: License compliance
@@ -33,4 +46,13 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm dlx license-checker --production --start apps/web --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
+      # `license-checker` reads only the top-level `dependencies` field of
+      # package.json and doesn't follow pnpm's symlinked node_modules layout
+      # into transitive dependencies -- it silently scanned ~16 direct
+      # dependencies of apps/web instead of the ~90 production packages
+      # actually shipped. `pnpm licenses list` is pnpm's own reporter and
+      # understands the real dependency graph it resolved; the wrapper
+      # script below turns its report into an allowlist gate (previously a
+      # 3-item denylist that passed almost everything, including
+      # unlicensed/undocumented packages).
+      - run: pnpm run check:licenses

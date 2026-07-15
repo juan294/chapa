@@ -51,6 +51,9 @@ vi.mock("@/lib/auth/gitlab", () => ({
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
+  // Connect uses rateLimitStrict (fail-closed, #1027 BE-M3) — same spy so
+  // existing assertions against mockRateLimit still hold.
+  rateLimitStrict: mockRateLimit,
   rateLimit: mockRateLimit,
   // Stub required by platform-oauth.ts (not used in connect flow)
   cacheDel: vi.fn(),

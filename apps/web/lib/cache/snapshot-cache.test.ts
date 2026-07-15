@@ -134,11 +134,11 @@ describe("getCachedLatestSnapshot", () => {
 // ---------------------------------------------------------------------------
 
 describe("updateSnapshotCache", () => {
-  it("updates the cache with the new snapshot", async () => {
+  it("updates the cache with the new snapshot and reports success", async () => {
     const snapshot = makeSnapshot();
     vi.mocked(cacheSet).mockResolvedValueOnce(true);
 
-    await updateSnapshotCache("TestUser", snapshot);
+    await expect(updateSnapshotCache("TestUser", snapshot)).resolves.toBe(true);
 
     expect(cacheSet).toHaveBeenCalledWith(
       `snapshot:${CACHE_VERSION}:latest:testuser`,
@@ -160,14 +160,15 @@ describe("updateSnapshotCache", () => {
     );
   });
 
-  it("does not throw when Redis fails (fire-and-forget safe)", async () => {
-    vi.mocked(cacheSet).mockRejectedValueOnce(
-      new Error("Connection refused"),
-    );
+  it("reports failure (false) when the cache write does not land", async () => {
+    // cacheSet never throws — it returns false when Redis is unavailable or
+    // the write fails. updateSnapshotCache surfaces that so callers can
+    // reconcile a durable-vs-cache divergence (#975).
+    vi.mocked(cacheSet).mockResolvedValueOnce(false);
 
     await expect(
       updateSnapshotCache("testuser", makeSnapshot()),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
   });
 });
 

@@ -22,6 +22,8 @@ const mockCacheSetNxStatus = vi.fn();
 const mockClearStatsDirty = vi.fn();
 const mockCaptureServerEvent =
   vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
+const mockCaptureServerError =
+  vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
 
 vi.mock("./materialize-profile", () => ({
   materializeProfile: (...args: unknown[]) => mockMaterializeProfile(...args),
@@ -63,6 +65,7 @@ vi.mock("@/lib/db/users", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
+  captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
 }));
 
 function makeMaterializedProfile(): MaterializedProfile {
@@ -182,9 +185,9 @@ describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () =>
   beforeEach(() => {
     vi.clearAllMocks();
     mockCacheSetNxStatus.mockResolvedValue("acquired");
-    mockDbInsertSnapshot.mockResolvedValue(true);
+    mockDbInsertSnapshot.mockResolvedValue("inserted");
     mockDbReplaceSnapshot.mockResolvedValue(true);
-    mockUpdateSnapshotCache.mockResolvedValue(undefined);
+    mockUpdateSnapshotCache.mockResolvedValue(true);
     mockClearStatsDirty.mockResolvedValue(undefined);
   });
 
@@ -242,6 +245,51 @@ describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () =>
     expect(result).toBe(true);
     expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
   });
+
+  // -------------------------------------------------------------------------
+  // #1009 — badge-path snapshot writes escalate genuine failures, but never
+  // benign insert-mode duplicates (which would flood the alert webhook on
+  // every repeat CDN-miss hit for an already-snapshotted handle).
+  // -------------------------------------------------------------------------
+
+  describe("#1009 failure escalation", () => {
+    it("returns false and escalates via captureServerError when the durable write genuinely fails", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("failed");
+      const materialized = makeMaterializedProfile();
+
+      const result = await persistProfileSnapshot("testuser", materialized);
+
+      expect(result).toBe(false);
+      expect(mockCaptureServerError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: "lib/profile/public-profile",
+          error: expect.objectContaining({
+            message: expect.stringContaining("testuser"),
+          }),
+        }),
+      );
+    });
+
+    it("does NOT escalate for a benign insert-mode duplicate (critical regression guard against alert flooding)", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("duplicate");
+      const materialized = makeMaterializedProfile();
+
+      const result = await persistProfileSnapshot("testuser", materialized);
+
+      expect(result).toBe(true);
+      expect(mockCaptureServerError).not.toHaveBeenCalled();
+    });
+
+    it("does NOT escalate on a genuinely fresh insert", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("inserted");
+      const materialized = makeMaterializedProfile();
+
+      const result = await persistProfileSnapshot("testuser", materialized);
+
+      expect(result).toBe(true);
+      expect(mockCaptureServerError).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("runPublicProfileSideEffects", () => {
@@ -249,8 +297,8 @@ describe("runPublicProfileSideEffects", () => {
     vi.clearAllMocks();
     mockTrackBadgeGenerated.mockResolvedValue(undefined);
     mockNotifyFirstBadge.mockResolvedValue(undefined);
-    mockDbInsertSnapshot.mockResolvedValue(true);
-    mockUpdateSnapshotCache.mockResolvedValue(undefined);
+    mockDbInsertSnapshot.mockResolvedValue("inserted");
+    mockUpdateSnapshotCache.mockResolvedValue(true);
     mockDbUpsertUser.mockResolvedValue(undefined);
     mockStoreVerificationRecord.mockResolvedValue(undefined);
     mockGenerateVerificationCode.mockReturnValue({ hash: "abc123", date: "2026-04-17" });
@@ -282,9 +330,9 @@ describe("runPublicProfileSideEffects", () => {
     });
   });
 
-  it("skips snapshot cache writes when the snapshot was not inserted", async () => {
+  it("skips snapshot cache writes when the snapshot write genuinely failed", async () => {
     const materialized = makeMaterializedProfile();
-    mockDbInsertSnapshot.mockResolvedValue(false);
+    mockDbInsertSnapshot.mockResolvedValue("failed");
 
     await runPublicProfileSideEffects("testuser", materialized);
 

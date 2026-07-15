@@ -37,7 +37,7 @@ export type { Platform, LinkedPlatform } from "./platforms";
 export { CONTRIBUTION_QUERY } from "./github-query";
 export { buildStatsFromRaw, normalizeStats } from "./stats-aggregation";
 export { computePlatformStats } from "./platform-stats";
-export type { PlatformStatsInput, NormalizedRepo } from "./platform-stats";
+export type { PlatformStatsInput, NormalizedRepo, NormalizedMergedPr } from "./platform-stats";
 export { computePrWeight } from "./scoring";
 export { formatCompact } from "./format";
 export {
@@ -51,6 +51,7 @@ export {
   BATCH_SIZE_MIN,
   BATCH_SIZE_MAX,
   BURST_ACTIVITY_THRESHOLD,
+  DAILY_COMMIT_SPIKE_THRESHOLD,
   MICRO_COMMIT_THRESHOLD,
   SINGLE_REPO_CONCENTRATION,
   LEAD_TIME_CAPS,

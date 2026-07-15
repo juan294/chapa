@@ -11,7 +11,7 @@ import {
   computeLeadTimeModifier,
 } from "./v6";
 import type { StatsData, DimensionScores, RawContributionData } from "@chapa/shared";
-import { buildStatsFromRaw } from "@chapa/shared";
+import { buildStatsFromRaw, SOLO_REVIEW_RATIO_THRESHOLD } from "@chapa/shared";
 import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
@@ -1013,6 +1013,52 @@ describe("detectProfileType(stats)", () => {
   it("returns 'collaborative' at the threshold (ratio = 0.15)", () => {
     // 3/20 = 0.15, at threshold → collaborative (>= comparison)
     expect(detectProfileType(makeStats({ reviewsSubmittedCount: 3, prsMergedCount: 20 }))).toBe("collaborative");
+  });
+
+  // Pinning tests for the exact SOLO_REVIEW_RATIO_THRESHOLD pivot (#1032).
+  //
+  // The comparison in detectProfileType is `ratio < SOLO_REVIEW_RATIO_THRESHOLD
+  // ? "solo" : "collaborative"` (strict less-than), so a ratio exactly equal to
+  // the threshold is NOT solo — it's collaborative. These three cases sit
+  // immediately astride the pivot so a `<` vs `<=` inversion would flip one of
+  // them and fail CI. Counts are derived from the constant itself (scaled by
+  // 100, which keeps everything integer for a 0.15 threshold) rather than a
+  // bare literal, so the intent survives even if the threshold value changes.
+  describe("exact SOLO_REVIEW_RATIO_THRESHOLD boundary", () => {
+    const PR_COUNT = 100;
+    // SOLO_REVIEW_RATIO_THRESHOLD * 100 is exact in IEEE-754 double precision
+    // for the current 0.15 value (0.15 * 100 === 15), so this stays an integer.
+    const EXACT_REVIEWS = SOLO_REVIEW_RATIO_THRESHOLD * PR_COUNT;
+
+    it("returns 'collaborative' when ratio === SOLO_REVIEW_RATIO_THRESHOLD exactly", () => {
+      // reviews/PR_COUNT === SOLO_REVIEW_RATIO_THRESHOLD exactly (not just below
+      // it), so the strict `<` comparison in detectProfileType falls through to
+      // "collaborative".
+      expect(EXACT_REVIEWS / PR_COUNT).toBe(SOLO_REVIEW_RATIO_THRESHOLD);
+      expect(
+        detectProfileType(makeStats({ reviewsSubmittedCount: EXACT_REVIEWS, prsMergedCount: PR_COUNT })),
+      ).toBe("collaborative");
+    });
+
+    it("returns 'solo' one review below SOLO_REVIEW_RATIO_THRESHOLD", () => {
+      // (EXACT_REVIEWS - 1)/PR_COUNT is strictly less than the threshold → solo.
+      const reviews = EXACT_REVIEWS - 1;
+      expect(reviews / PR_COUNT).toBeLessThan(SOLO_REVIEW_RATIO_THRESHOLD);
+      expect(
+        detectProfileType(makeStats({ reviewsSubmittedCount: reviews, prsMergedCount: PR_COUNT })),
+      ).toBe("solo");
+    });
+
+    it("returns 'collaborative' one review above SOLO_REVIEW_RATIO_THRESHOLD", () => {
+      // (EXACT_REVIEWS + 1)/PR_COUNT is strictly greater than the threshold →
+      // collaborative (was already true under `<`, but pins the "clearly above"
+      // side of the pivot so all three cases live together).
+      const reviews = EXACT_REVIEWS + 1;
+      expect(reviews / PR_COUNT).toBeGreaterThan(SOLO_REVIEW_RATIO_THRESHOLD);
+      expect(
+        detectProfileType(makeStats({ reviewsSubmittedCount: reviews, prsMergedCount: PR_COUNT })),
+      ).toBe("collaborative");
+    });
   });
 
   it("uses primaryReviewsSubmittedCount for profile detection when present", () => {

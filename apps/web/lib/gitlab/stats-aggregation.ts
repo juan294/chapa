@@ -1,5 +1,5 @@
-import type { HeatmapDay, StatsData } from "@chapa/shared";
-import { computePlatformStats, computePrWeight, PR_WEIGHT_AGG_CAP } from "@chapa/shared";
+import type { HeatmapDay, NormalizedMergedPr, StatsData } from "@chapa/shared";
+import { computePlatformStats } from "@chapa/shared";
 import type { RawGitlabData } from "./types";
 
 /**
@@ -13,13 +13,14 @@ import type { RawGitlabData } from "./types";
  * Platform-specific steps handled here:
  *   1. Heatmap: pre-bucketed — sort ascending, pass through as HeatmapDay[]
  *   2. commitsTotal: sum of heatmap counts
- *   4. PR diffstat: additions/deletions/changed_files already parsed per MR
+ *   4. PR diffstat → per-MR {additions, deletions, changedFiles} (already
+ *      parsed; weight/cap/line-sum aggregation delegated to computePlatformStats)
  *   5. Review counting: raw.reviewsCount passthrough
  *   6. issuesClosedCount passthrough
  *  10. Social metrics: GitLab has stars + forks (no accessible watchers)
  *
- * Invariant steps (active days, repo depth, top-repo share, maxCommitsIn10Min)
- * are delegated to computePlatformStats().
+ * Invariant steps — active days, repo depth, top-repo share, maxCommitsIn10Min,
+ * and PR-weight aggregation — are delegated to computePlatformStats().
  */
 export function buildStatsFromGitlab(raw: RawGitlabData): StatsData {
   // 1. Heatmap is already date-bucketed; sort ascending for determinism.
@@ -30,21 +31,13 @@ export function buildStatsFromGitlab(raw: RawGitlabData): StatsData {
   // 2. Commit count from heatmap totals
   const commitsTotal = heatmapData.reduce((sum, d) => sum + d.count, 0);
 
-  // 4. PR metrics — additions/deletions/changedFiles already parsed per MR
-  const prsMergedCount = raw.mergedPRs.length;
-  let prsMergedWeight = 0;
-  let linesAdded = 0;
-  let linesDeleted = 0;
-  for (const pr of raw.mergedPRs) {
-    linesAdded += pr.additions;
-    linesDeleted += pr.deletions;
-    prsMergedWeight += computePrWeight({
-      additions: pr.additions,
-      deletions: pr.deletions,
-      changedFiles: pr.changed_files,
-    });
-  }
-  prsMergedWeight = Math.min(prsMergedWeight, PR_WEIGHT_AGG_CAP);
+  // 4. PR metrics — additions/deletions/changedFiles already parsed per MR.
+  //    Weight/cap/line-sum aggregation is owned by computePlatformStats().
+  const mergedPrs: NormalizedMergedPr[] = raw.mergedPRs.map((pr) => ({
+    additions: pr.additions,
+    deletions: pr.deletions,
+    changedFiles: pr.changed_files,
+  }));
 
   // 5. Reviews — count of others' MRs the user approved (queries layer filters)
   const reviewsSubmittedCount = raw.reviewsCount;
@@ -65,10 +58,7 @@ export function buildStatsFromGitlab(raw: RawGitlabData): StatsData {
     avatarUrl: raw.avatarUrl,
     heatmapData,
     commitsTotal,
-    prsMergedCount,
-    prsMergedWeight,
-    linesAdded,
-    linesDeleted,
+    mergedPrs,
     reviewsSubmittedCount,
     issuesClosedCount,
     repos: raw.repos, // { fullName, commitCount, isOwned } — subset of GitlabRepo

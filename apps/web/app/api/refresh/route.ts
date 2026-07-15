@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheDel, rateLimit } from "@/lib/cache/redis";
+import { cacheDel, rateLimitStrict } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
@@ -47,7 +47,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
 
   // Rate limit: 5 refreshes per handle per hour (normalize key)
   const normalizedHandle = handle.toLowerCase();
-  const rl = await rateLimit(`ratelimit:refresh:${normalizedHandle}`, 5, 3600);
+  const rl = await rateLimitStrict(`ratelimit:refresh:${normalizedHandle}`, 5, 3600);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many refreshes. Please try again later." },

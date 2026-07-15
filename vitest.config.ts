@@ -50,6 +50,44 @@ export default defineConfig({
         branches: 70,
         functions: 65,
         lines: 75,
+        // Per-path floors for the highest-risk areas (#1028): the global
+        // floor above is ~22 points below actual measured coverage, which
+        // would let a regression gut the scoring pipeline's tests without
+        // failing CI. These are set a few points below currently-measured
+        // coverage (impact/**: ~99.6/98.7/100/99.5 stmts/branches/fn/lines;
+        // stats-integrity.ts: 100/100/100/100 as of #1028) — tight enough to
+        // catch a large regression, loose enough that a legitimate refactor
+        // removing a branch doesn't trip the gate.
+        //
+        // CI SHARDING CAVEAT: ci.yml's per-shard `vitest run --shard=N/2`
+        // invocation only ever sees a subset of test files, so no single
+        // shard can satisfy a full-suite floor for any path — that's exactly
+        // why the per-shard step zeroes the *global* thresholds via
+        // `--coverage.thresholds.lines=0` etc. Those CLI flags only override
+        // vitest's top-level threshold keys, not glob-keyed nested entries
+        // like the two below, so without this guard a sharded run still
+        // enforced these floors against its own partial coverage and failed
+        // every time (caught in CI, not locally, since local `test:coverage`
+        // always runs the full unsharded suite). `VITEST_SHARD_RUN` is set
+        // only on the per-shard CI step (ci.yml); the merge/aggregator step
+        // that actually owns enforcement (`vitest run --merge-reports
+        // --coverage`, no shard flag, no env var) still gets the real floors.
+        ...(process.env.VITEST_SHARD_RUN
+          ? {}
+          : {
+              "apps/web/lib/impact/**": {
+                statements: 95,
+                branches: 90,
+                functions: 95,
+                lines: 95,
+              },
+              "apps/web/lib/github/stats-integrity.ts": {
+                statements: 90,
+                branches: 85,
+                functions: 90,
+                lines: 90,
+              },
+            }),
       },
     },
   },

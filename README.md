@@ -62,7 +62,7 @@ Supports `--insecure` for corporate networks with TLS interception and `--verbos
 
 ### Bilingual UI (ES / EN)
 
-Chapa's interface is available in Spanish (default) and English. A language picker (globe icon, next to the theme toggle in the nav bar) saves your preference in a cookie. The default locale is auto-detected from your browser's `Accept-Language` header.
+Chapa's interface is available in Spanish (default) and English. A language picker (globe icon, next to the theme toggle in the nav bar) saves your preference in a cookie. The default locale is auto-detected from your browser's `Accept-Language` header. The main content pages (landing, about, privacy, terms, archetype guides) are server-rendered per locale — both languages are pre-built, so there's no flash of the wrong language while the page loads.
 
 ### Admin Dashboard (`/admin`)
 
@@ -93,8 +93,10 @@ pnpm run dev
 ```
 chapa/
 ├── apps/web/              # Next.js 16 app (App Router)
+│   ├── proxy.ts           # Narrow locale rewrite for the 9 content pages below (no visible URL prefix)
 │   ├── app/               # Pages and API routes
 │   │   ├── api/           # Auth, refresh, verify, health, CLI, cron, admin endpoints
+│   │   ├── [locale]/      # Landing, about, privacy, terms, archetypes — server-rendered per locale
 │   │   ├── admin/         # Admin dashboard (protected)
 │   │   ├── u/[handle]/    # Share page + badge.svg route
 │   │   ├── studio/        # Creator Studio
@@ -151,7 +153,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | Email | Resend |
 | CLI | Node.js, tsup, device auth flow |
 | Hosting | Vercel |
-| Testing | Vitest, 456+ test files, 7,800+ tests, TDD workflow |
+| Testing | Vitest, 496+ test files, 8,479+ tests, TDD workflow |
 
 ## Environment Variables
 

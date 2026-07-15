@@ -61,9 +61,8 @@ function chainBuilder() {
     return chain;
   };
   chain.upsert = (...args: unknown[]) => {
-    const result = mockUpsert(...args);
-    const options = args[1] as { ignoreDuplicates?: boolean } | undefined;
-    return options?.ignoreDuplicates ? result : chain;
+    mockUpsert(...args);
+    return chain;
   };
   // Terminal — resolves as a thenable
   chain.then = undefined;
@@ -165,13 +164,13 @@ function makeRow(overrides: Record<string, unknown> = {}) {
 // ---------------------------------------------------------------------------
 
 describe("dbInsertSnapshot", () => {
-  it("calls upsert with snake_case row data", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+  it("calls upsert with snake_case row data and selects id for presence-based detection (#1016)", async () => {
+    terminalResolve = { data: [{ id: 1 }], error: null };
     const snapshot = makeSnapshot();
 
     const result = await dbInsertSnapshot("TestUser", snapshot);
 
-    expect(result).toBe(true);
+    expect(result).toBe("inserted");
     expect(mockFrom).toHaveBeenCalledWith("metrics_snapshots");
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -183,31 +182,35 @@ describe("dbInsertSnapshot", () => {
       }),
       { onConflict: "handle,date", ignoreDuplicates: true },
     );
+    expect(mockSelect).toHaveBeenCalledWith("id");
   });
 
-  it("returns false for duplicate (status 200)", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 200 });
+  it("returns 'duplicate' when the row already existed (empty data array, not a status code)", async () => {
+    terminalResolve = { data: [], error: null };
     const result = await dbInsertSnapshot("testuser", makeSnapshot());
-    expect(result).toBe(false);
+    expect(result).toBe("duplicate");
   });
 
-  it("returns false when DB is unavailable", async () => {
+  it("returns 'duplicate' when data is null (defensive — no error, no rows)", async () => {
+    terminalResolve = { data: null, error: null };
+    const result = await dbInsertSnapshot("testuser", makeSnapshot());
+    expect(result).toBe("duplicate");
+  });
+
+  it("returns 'failed' when DB is unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
     const result = await dbInsertSnapshot("testuser", makeSnapshot());
-    expect(result).toBe(false);
+    expect(result).toBe("failed");
   });
 
-  it("returns false on error without throwing", async () => {
-    mockUpsert.mockResolvedValue({
-      error: new Error("conflict"),
-      status: 409,
-    });
+  it("returns 'failed' on error without throwing", async () => {
+    terminalResolve = { data: null, error: new Error("conflict") };
     const result = await dbInsertSnapshot("testuser", makeSnapshot());
-    expect(result).toBe(false);
+    expect(result).toBe("failed");
   });
 
   it("does not send captured_at when inserting — DB default populates it", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot("testuser", makeSnapshot());
 
@@ -608,7 +611,7 @@ describe("dbCleanOldSnapshots", () => {
 describe("snapshotToRow edge cases", () => {
   it("serializes confidencePenalties to non-null when present", async () => {
     const penalties = [{ flag: "low_activity", penalty: 10 }];
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot(
       "testuser",
@@ -622,7 +625,7 @@ describe("snapshotToRow edge cases", () => {
   });
 
   it("serializes confidencePenalties to null when empty array", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot(
       "testuser",
@@ -634,7 +637,7 @@ describe("snapshotToRow edge cases", () => {
   });
 
   it("serializes confidencePenalties to null when undefined", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot(
       "testuser",
@@ -646,7 +649,7 @@ describe("snapshotToRow edge cases", () => {
   });
 
   it("serializes microCommitRatio when present", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot(
       "testuser",
@@ -658,7 +661,7 @@ describe("snapshotToRow edge cases", () => {
   });
 
   it("serializes microCommitRatio to null when undefined", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot("testuser", makeSnapshot());
 
@@ -667,7 +670,7 @@ describe("snapshotToRow edge cases", () => {
   });
 
   it("serializes docsOnlyPrRatio when present", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot(
       "testuser",
@@ -679,7 +682,7 @@ describe("snapshotToRow edge cases", () => {
   });
 
   it("serializes docsOnlyPrRatio to null when undefined", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot("testuser", makeSnapshot());
 
@@ -694,7 +697,7 @@ describe("snapshotToRow edge cases", () => {
 
 describe("craft dimension persistence", () => {
   it("serializes craft score to row when present", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot(
       "testuser",
@@ -706,7 +709,7 @@ describe("craft dimension persistence", () => {
   });
 
   it("serializes craft to null when undefined", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: [{ id: 1 }], error: null };
 
     await dbInsertSnapshot("testuser", makeSnapshot());
 

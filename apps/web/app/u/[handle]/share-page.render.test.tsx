@@ -19,6 +19,7 @@ const {
   mockGetServerLocale,
   mockReadBadgeSvgCache,
   mockWriteBadgeSvgCache,
+  mockGetTrendData,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockGetServerLocale: vi.fn(),
   mockReadBadgeSvgCache: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
+  mockGetTrendData: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -90,6 +92,10 @@ vi.mock("@/lib/render/badge-svg-cache", () => ({
   buildBadgeSvgCacheKey: (h: string, d: string) => `badge:${h}:${d}`,
   readBadgeSvgCache: (...args: unknown[]) => mockReadBadgeSvgCache(...args),
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+}));
+
+vi.mock("@/lib/history/get-trend-data", () => ({
+  getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
 }));
 
 vi.mock("@/components/CommandBarHint", () => ({
@@ -168,6 +174,7 @@ beforeEach(() => {
   mockGetServerLocale.mockResolvedValue("en");
   mockReadBadgeSvgCache.mockResolvedValue(null);
   mockWriteBadgeSvgCache.mockResolvedValue(undefined);
+  mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
 });
 
 describe("Phase 4d — Share page i18n", () => {

@@ -1,14 +1,13 @@
-import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import {
-  dbInsertSnapshot,
-  dbReplaceSnapshot,
-} from "@/lib/db/snapshots";
 import {
   materializeProfile,
   type MaterializedProfile,
 } from "./materialize-profile";
+import {
+  reconcileSnapshotWrite,
+  type SnapshotPersistenceMode,
+} from "./snapshot-write";
 
-export type SnapshotPersistenceMode = "insert" | "replace";
+export type { SnapshotPersistenceMode };
 
 export async function materializeOrchestratedProfile(
   handle: string,
@@ -32,13 +31,15 @@ export async function persistOrchestratedSnapshot(
   materialized: MaterializedProfile,
   options: { mode: SnapshotPersistenceMode },
 ): Promise<boolean> {
-  const persisted = options.mode === "replace"
-    ? await dbReplaceSnapshot(handle, materialized.snapshot)
-    : await dbInsertSnapshot(handle, materialized.snapshot);
-
-  if (persisted) {
-    await updateSnapshotCache(handle, materialized.snapshot);
-  }
+  // The durable Supabase write and the Redis cache mirror are reconciled as
+  // one envelope: a partial failure (durable ok, cache stale) emits an
+  // operational alert rather than being swallowed (#975). Callers branch on
+  // durable persistence, which is what governs the user-facing success path.
+  const { persisted } = await reconcileSnapshotWrite(
+    handle,
+    materialized.snapshot,
+    { mode: options.mode },
+  );
 
   return persisted;
 }

@@ -72,8 +72,8 @@
 
 ### 5) Footer
 - "Forged from purpose. Driven by curiosity." text + dynamic platform logos (behind `includeBranding` flag)
-- Platform logos shown: GitHub always, plus Bitbucket/Codeberg if user has linked them
-- Demo badges show all 3 platform logos regardless of linked status
+- Platform logos shown: GitHub always, plus Bitbucket/Codeberg/GitLab if user has linked them
+- Demo badges show all 4 platform logos regardless of linked status
 - Branding isolated in `BadgeBranding` component
 - If disabled, layout stays balanced
 
@@ -86,7 +86,7 @@
 ## Badge branding
 - `includeBranding: boolean`
 - Branding isolated in `apps/web/lib/render/BadgeBranding.tsx`
-- Shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg)
+- Shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg, GitLab)
 - If disabled, layout should still look balanced (no big empty gap).
 
 ## Theme tokens (Warm Amber)

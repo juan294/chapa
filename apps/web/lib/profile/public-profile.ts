@@ -1,9 +1,7 @@
-import { captureServerEvent } from "@/lib/analytics/server-errors";
+import { captureServerError, captureServerEvent } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
-import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { dbInsertSnapshot, dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { dbUpsertUser } from "@/lib/db/users";
 import { notifyFirstBadge } from "@/lib/email/notifications";
 import { generateVerificationCode } from "@/lib/verification/hmac";
@@ -13,6 +11,7 @@ import {
   materializeProfile,
   type MaterializedProfile,
 } from "./materialize-profile";
+import { reconcileSnapshotWrite } from "./snapshot-write";
 
 export interface PublicVerificationCode {
   hash: string;
@@ -128,18 +127,35 @@ export async function persistProfileSnapshot(
   if (guardStatus === "exists" && !materialized.inputsChanged) return false;
 
   // #826 — replace today's row when inputs changed; otherwise insert and
-  // let the UNIQUE(handle, date) constraint dedupe.
-  const persisted = materialized.inputsChanged
-    ? await dbReplaceSnapshot(handle, materialized.snapshot)
-    : await dbInsertSnapshot(handle, materialized.snapshot);
-  if (persisted) {
-    await updateSnapshotCache(handle, materialized.snapshot);
-    if (materialized.inputsChanged) {
-      await clearStatsDirty(handle);
-    }
+  // let the UNIQUE(handle, date) constraint dedupe. The durable Supabase write
+  // and its Redis cache mirror are reconciled as one envelope so a partial
+  // failure (durable ok, cache stale) surfaces an operational alert (#975).
+  const { persisted, writeOutcome } = await reconcileSnapshotWrite(
+    handle,
+    materialized.snapshot,
+    { mode: materialized.inputsChanged ? "replace" : "insert" },
+  );
+
+  // #1009 — This is the badge-path snapshot write; every other write endpoint
+  // (/api/insights, /api/refresh, /api/recalculate) already escalates a
+  // persist failure via captureServerError. A "duplicate" outcome is benign
+  // (row already existed) and must NOT alert — only a genuine "failed"
+  // outcome is worth escalating, and the tri-state from #1015/#1016 lets us
+  // distinguish the two here unambiguously. Fire-and-forget: never blocks or
+  // fails the badge response.
+  if (writeOutcome === "failed") {
+    void captureServerError({
+      route: "lib/profile/public-profile",
+      statusCode: 200,
+      error: new Error(`Failed to persist profile snapshot for handle: ${handle}`),
+    });
   }
 
-  return true;
+  if (persisted && materialized.inputsChanged) {
+    await clearStatsDirty(handle);
+  }
+
+  return persisted;
 }
 
 export async function deferProfileCacheWork(

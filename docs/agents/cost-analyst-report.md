@@ -1,51 +1,44 @@
 # Cost Analyst Report
-> Generated: 2026-07-08 | Health status: green
+> Generated: 2026-07-15 | Health status: green
 
 ## Executive Summary
-Cost surface remains healthy at HEAD `3b953903` (v2.17.0 release prep in tree). The large delta since the last cycle (`29d2b524`, 23 commits — the #1001–#1004 scoring-integrity batch) was audited call-by-call and is **cost-neutral**: the new authoritative merged-PR count rides inside the existing GitHub GraphQL POST (no extra HTTP request), all new cache writes carry explicit TTLs, and the only new steady-state cost is one extra Redis GET per uncached stats fetch. Estimated monthly cost at 10K users remains **~$50–75/mo**.
+Zero cost-surface delta for the fourth consecutive cycle — HEAD remains `9bfb9a6c` with no commits since 2026-07-10 and only uncommitted `docs/agents/*.md` report edits in the working tree. All cost guardrails (TTL coverage, SWR caching, fail-closed rate limiters, cron time budgets, landing-page ISR) re-verified against live source and intact; estimated cost at 10K users holds at ~$50–75/mo.
 
 ## Redis Usage
-- Key patterns (from source scan; runtime counts unavailable — no prod Redis access from this environment):
-  - `stats:<handle>` (6h) / `stats:stale:<handle>` (7d last-known-good) / `stats:dirty:<handle>` (1h) — per-user, bounded
-  - `svg:<handle>:<theme>` (24h + 0–2h jitter), `history:<handle>`, `supplemental:<handle>` (24h), `craft:*`, `snapshot:*`, `avatar:*` — per-user, bounded
-  - `rateLimit:*` — short TTLs, self-expiring
-  - `cron:lastrun:<name>` heartbeats (TTL'd), `cron:warm-cache:offset` (intentional TTL-0 rotation cursor, overwrite-in-place)
-  - `stats:badges_generated` (INCR counter) + `stats:unique_badges` (HLL, ~12 KB fixed) — 2 bounded persistent singletons
-- TTL coverage: **35 non-redis-module `cacheSet()` call sites, 34/35 (97%) explicit positive TTL**; the 1 exception is the intentional TTL-0 cursor above. The `cacheSet` signature itself defaults to 21,600s (`redis.ts:69`), so even an omitted TTL is bounded.
-- **New this cycle**: `client.ts:313` — degraded-fetch path refreshes the primary key with last-known-good at `CACHE_TTL` (explicitly anti-thrash, cost-reducing). Cached `StatsData` gains a `fetchScope` tag (#1004 phase 2) — a few bytes per entry, negligible.
-- Growth risk: **LOW** — all per-user keys TTL'd, persistent keys bounded.
+- Key patterns: `stats:<handle>` + `stats:stale:<handle>` (GitHub stats, 6h/7d), `svg:*` badge cache (24h + 0–2h jitter), `history:*` (24h), `rateLimit:*`/`ratelimit:*` (window-scoped, 1h–24h), `supplemental:<handle>` (24h), `stats:dirty:<handle>` (1h), `cron:warm-cache:offset` (persistent cursor), `stats:badges_generated` (INCR counter) + `stats:unique_badges` (HLL, ~12 KB cap)
+- Cache-write call sites: **38 non-test, non-module** (`cacheSet`/`cacheIncr`/`cacheReserveQuota`/`cacheSetNx`) across 22 files — 78 total occurrences including tests and the redis module itself. Identical to the 2026-07-13 count.
+- TTL coverage: default TTL 21,600s enforced in `cacheSet()` signature (`apps/web/lib/cache/redis.ts:82`). Exactly **1 intentional TTL-0** key: `cron:warm-cache:offset` rotation cursor (`apps/web/app/api/cron/warm-cache/route.ts:148`) — a single O(1) integer, by design. Warm-cache heartbeat carries its own TTL (`route.ts:231`).
+- Growth risk: **LOW** — every per-user key expires within 7 days; the two persistent singletons are O(1)-bounded.
 
 ## Database Usage
-- Tables: **11 tables + 2 views, 28 migrations** (unchanged since 2026-07-05; all 11 tables ENABLE + FORCE RLS per security agent).
-- Query patterns: no N+1. The one DB-code change this cycle (`admin-users.ts`, +9 lines) restores OR semantics in the admin search filter — same single view query, no new round-trips. `materializeProfile`'s new `statsComplete` gate (#1003) *skips* snapshot writes for poisoned stats — a small write-volume reduction. `dbGetCampaignStats` 4-parallel-COUNT (P2-1) carried, monitor-only (threshold-gated, admin-only).
-- Connection management: lazy singleton (`lib/db/supabase.ts:15-34`), `server-only`, `persistSession: false`, `withTimeout` wrapper. Unchanged.
+- Tables: **11 tables + 2 views**, 28 migrations (latest `028_grant_service_role_access.sql`; no new tables this cycle)
+- Query patterns: no N+1 patterns. The one known parallel-COUNT hotspot, `dbGetCampaignStats` (4 parallel COUNTs in `lib/db/campaigns/sends.ts`), remains bounded, admin-only, and threshold-gated — carried as P2-1, monitor-only.
+- Connection management: **lazy singleton** (`apps/web/lib/db/supabase.ts:14`, `let _client` + `getSupabase()`), `server-only` import guard, `persistSession:false`, all queries wrapped in `withTimeout` (5s). Graceful null degradation when env vars absent.
 
 ## External API Calls
 | Route | External Service | Cached | Rate Limited | Risk |
 |-------|-----------------|--------|-------------|------|
-| `/u/:handle/badge.svg` | GitHub GraphQL | 6h + 7d SWR + in-flight dedup + Redis lock + CDN s-maxage=21600 | CDN-shielded | Low |
-| `/api/refresh`, `/api/generate`, `/api/recalculate` | GitHub GraphQL | Same stats cache | Yes | Low |
-| `/api/cron/warm-cache` | GitHub GraphQL (server token) | Writes cache; #1002 guard blocks good→bad overwrite | CRON_SECRET, daily | Low |
-| Platform fetches (Bitbucket/Codeberg/GitLab) | REST/GraphQL | 6h/1h | Via parent routes | Low |
-| `/api/health` | GitHub probe | 60s | Yes | Low |
-| `/api/challenge` | Resend | n/a (email) | `rateLimitStrict` IP 5/hr + handle 3/day | Low |
-| Server events (`captureServerEvent`) | PostHog | Fire-and-forget | n/a | Low (see P3-1) |
+| `/u/:handle/badge.svg` | GitHub GraphQL | 6h `CACHE_TTL` + 7d `STALE_TTL` SWR + in-flight dedup + Redis lock | CDN `s-maxage=21600` | Low |
+| `/api/refresh` | GitHub GraphQL | Same `getStats()` path | Per-handle rate limit | Low |
+| `/api/cron/warm-cache` | GitHub GraphQL | Rotation cursor bounds batch size | `CRON_SECRET` bearer | Low |
+| `/api/cron/latency-check` | Own badge endpoint | n/a (synthetic probe) | `CRON_SECRET` bearer, 60s budget | Low |
+| `/api/challenge` | Resend | n/a (transactional email) | IP 5/hr + handle 3/day, both `rateLimitStrict()` (`route.ts:24,81`) | Low |
+| `/api/cron/sync-audience`, `/api/cron/process-campaigns` | Resend | Batch processors | `CRON_SECRET` bearer, 300s budget | Low |
+| PostHog server events | PostHog | Fire-and-forget | Incident-bounded | Low |
 
-- **GitHub GraphQL delta (#1002/#1004)**: the authoritative `search(is:merged)` count is a new **field in the existing query** (`queries.ts:31-70`) — same single POST, marginally higher per-query rate-limit point cost, negligible against 5,000 pts/hr.
-- **New Redis read**: `_fetchAndCache` re-reads the primary key immediately before writing (`client.ts:334`) to close the public/authenticated downgrade race — +1 Upstash command per *uncached* fetch (~1/user/day). Negligible.
-- 3 new PostHog server events: `github_degraded_pr_fetch`, `stats_fetch_rejected`, `snapshot_skipped_incomplete_stats` — all fire-and-forget, all bounded by degraded-fetch frequency (see P3-1).
+- Uncached external calls: **0**. `_serveStaleAndReCache()` (`lib/github/client.ts:168`, `readOnly`-guarded) anti-thrash intact for both total-failure and degraded-fetch (#1002, `client.ts:311`) stale-serve paths — a sustained GitHub outage cannot cause refetch churn.
 
 ## Resource Management
-- No leaks found. `inflightBadgeRenders` Map self-clears per request (documented accepted risk); all `setInterval` usages are client components with cleanup.
-- `scripts/heal-poisoned-stats.ts` (#1004 phase 4, 376 lines) is an **operator-run repair script**, not a deployed route — Redis SCAN + Supabase reads run locally on demand, no serverless cost.
-- **P3-1 (new, monitor-only)**: asymmetric anti-thrash between the two integrity guards. The `isDegradedPrFetch` path re-caches stale into the primary key for 6h (`client.ts:313`), but the raw-integrity rejection path (`assessRawFetchIntegrity` → `fetchStats` returns null → `client.ts:174-181`) serves stale **without** refreshing the primary key. During a transient GitHub partial-degradation incident, each origin request for an affected uncached handle re-triggers a full GraphQL fetch + one `stats_fetch_rejected` PostHog event until GitHub heals. Bounded by CDN s-maxage, in-flight dedup, and the transient nature of the trigger shapes — but consider mirroring the 6h stale re-cache (or a short negative-cache) on this path.
+- No resource leaks found. Supabase client is a module-level singleton (no per-request connections); Redis is Upstash REST (stateless HTTP, nothing to close); in-flight badge render dedup uses a Map that deletes entries on settle.
+- No unbounded in-memory buffers. The HLL unique-badges structure is capped ~12 KB by algorithm.
 
-## Vercel
-- `maxDuration`: badge route 35s; 4 routes at 300s (bulk-recalculate + 3 crons). Unchanged.
-- Badge headers: success `s-maxage=21600 / SWR=86400`, error `300/600`. Unchanged.
-- Bundle: **zero client-bundle delta** — the entire 23-commit batch touches server-side lib code, scripts, and tests only (`apps/web/components`: 0 files; only app-dir change is a test file). Carry **2,079 KB raw / 659 KB gzipped**, below the 2,300 KB `ANALYZE=true` trigger.
+## Vercel Cost Factors
+- Function budgets verified in source + `vercel.json`: badge route `maxDuration=35`; `warm-cache`/`sync-audience`/`process-campaigns` = 300; `latency-check` = 60; `bulk-recalculate` = 300 (admin-only). 4 daily crons scheduled.
+- Landing `/` is `force-static` + `revalidate: 3600` (`app/page.tsx:10-11`) — the highest-traffic route is CDN/ISR-served, so it contributes zero function invocations (#982 win holding).
+- Badge responses ride `s-maxage=21600 / stale-while-revalidate=86400` — the majority of embed traffic never reaches a function.
+- Bundle: 2,128 KB raw / 672 KB gzipped (2026-07-09 performance baseline). **Zero client-bundle delta** this cycle (no production code changed); below the 2,300 KB `ANALYZE=true` trigger.
 
 ## Recommendations
-1. **P3-1**: mirror the 6h stale re-cache (or add a short negative-cache TTL, e.g. 5–15 min) on the `fetchStats`-null rejection path in `client.ts` so a transient GitHub degradation incident can't cause per-request refetch + PostHog event churn for uncached handles. One-file change, low urgency.
-2. **P2-1 (carried)**: `dbGetCampaignStats` 4-parallel-COUNT — monitor-only until campaign volume grows.
-3. Watch the first production week of `stats_fetch_rejected` / `github_degraded_pr_fetch` event volume in PostHog — if either fires more than a handful of times per day, P3-1 graduates to a real fix.
+1. **(P2-1, carried — monitor only)** `dbGetCampaignStats` 4-parallel-COUNT: convert to a single `GROUP BY status` aggregate only if campaign volume grows; bounded and admin-only today, no action trigger this cycle.
+2. **(P3-2, carried — monitor only)** `reconcileSnapshotWrite` dedup marker: not worth building preemptively per prior triage decision; re-evaluate only if duplicate snapshot writes appear in telemetry.
+3. No new items. Four consecutive zero-delta cycles — if the codebase stays frozen, the next cycle can remain a fast verification pass.

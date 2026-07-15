@@ -1,5 +1,9 @@
 # Chapa Reliability-Hardening Playbook — Catching Seam Bugs Before Real Users Do
 
+> **Status: Implemented.** All five phases below have shipped — this doc now
+> serves as the reference for how the payload-matrix harness, write-registration
+> gate, cron heartbeats, and client-error canaries work, not a pending proposal.
+
 > A Chapa-specific plan for making an app that "passes all its tests" actually
 > stop shipping user-facing 5xx **and silent data loss**. Adapted from a portable
 > reliability playbook written after a real incident cluster on a Next.js +

@@ -39,16 +39,19 @@
       <mxGeometry x="40" y="255" width="880" height="140" as="geometry"/>
     </mxCell>
     <mxCell id="ghauth" value="GitHub OAuth" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="oauth">
-      <mxGeometry x="20" y="35" width="180" height="45" as="geometry"/>
+      <mxGeometry x="20" y="35" width="155" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="bbauth" value="Bitbucket OAuth" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="oauth">
-      <mxGeometry x="230" y="35" width="180" height="45" as="geometry"/>
+      <mxGeometry x="183" y="35" width="155" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="cbauth" value="Codeberg OAuth" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="oauth">
-      <mxGeometry x="440" y="35" width="180" height="45" as="geometry"/>
+      <mxGeometry x="346" y="35" width="155" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="glauth" value="GitLab OAuth" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="oauth">
+      <mxGeometry x="509" y="35" width="155" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="cliauth" value="CLI Device Auth" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="oauth">
-      <mxGeometry x="650" y="35" width="180" height="45" as="geometry"/>
+      <mxGeometry x="672" y="35" width="155" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="session" value="Session Mgmt&#10;lib/auth/session" style="rounded=1;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="oauth">
       <mxGeometry x="20" y="90" width="195" height="38" as="geometry"/>
@@ -107,7 +110,7 @@
     <mxCell id="dims" value="5 Dimensions:&#10;Delivery · Quality&#10;Consistency · Breadth · Craft" style="rounded=1;whiteSpace=wrap;fillColor=#edf7ed;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
       <mxGeometry x="20" y="103" width="160" height="45" as="geometry"/>
     </mxCell>
-    <mxCell id="platforms" value="Platform Clients&#10;(lib/github/, lib/bitbucket/,&#10;lib/codeberg/) · supplemental merge" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
+    <mxCell id="platforms" value="Platform Clients&#10;(lib/github/, lib/bitbucket/,&#10;lib/codeberg/, lib/gitlab/) · supplemental merge" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
       <mxGeometry x="210" y="103" width="200" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="dbmod" value="Database CRUD&#10;(lib/db/)&#10;snapshots · supplemental · users" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
@@ -167,14 +170,17 @@
     <mxCell id="cbapi" value="Codeberg API" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="ext">
       <mxGeometry x="20" y="145" width="200" height="40" as="geometry"/>
     </mxCell>
-    <mxCell id="resend" value="Resend (Email)" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="ext">
+    <mxCell id="glapi" value="GitLab API" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="ext">
       <mxGeometry x="20" y="205" width="200" height="40" as="geometry"/>
     </mxCell>
+    <mxCell id="resend" value="Resend (Email)" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="ext">
+      <mxGeometry x="20" y="265" width="200" height="40" as="geometry"/>
+    </mxCell>
     <mxCell id="posthog" value="PostHog (Analytics)" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="ext">
-      <mxGeometry x="20" y="255" width="200" height="40" as="geometry"/>
+      <mxGeometry x="20" y="325" width="200" height="40" as="geometry"/>
     </mxCell>
     <mxCell id="vercelext" value="Vercel (Hosting)" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="ext">
-      <mxGeometry x="20" y="315" width="200" height="40" as="geometry"/>
+      <mxGeometry x="20" y="385" width="200" height="40" as="geometry"/>
     </mxCell>
     <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999;fontSize=9;" edge="1" parent="1" source="frontend" target="oauth">
       <mxGeometry relative="1" as="geometry"/>

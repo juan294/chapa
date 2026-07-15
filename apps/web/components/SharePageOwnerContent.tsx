@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { TrendSummary } from "@/lib/history/trend";
+import type { SnapshotDiff } from "@/lib/history/diff";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { ScoreExplanationPanel } from "@/components/dashboard/ScoreExplanationPanel";
@@ -89,6 +91,8 @@ interface SharePageOwnerContentProps {
   stats: StatsData | null;
   impact: ImpactV6Result | null;
   craftResult?: CraftResult | null;
+  trend?: TrendSummary | null;
+  diff?: SnapshotDiff | null;
 }
 
 export function SharePageOwnerContent({
@@ -96,6 +100,8 @@ export function SharePageOwnerContent({
   stats,
   impact,
   craftResult = null,
+  trend = null,
+  diff = null,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -134,6 +140,8 @@ export function SharePageOwnerContent({
             stats={stats}
             handle={handle}
             craftResult={craftResult}
+            trend={trend}
+            diff={diff}
           />
         </section>
       ) : (

@@ -1,11 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["du"],
+  "ignoreBinaries": ["du", "supabase", "osv-scanner"],
   "ignore": [
     "test/stubs/server-only.ts",
-    "apps/web/test/contract/**",
-    "**/*.contract.test.ts"
+    "apps/web/test/contract/**"
   ],
   "workspaces": {
     ".": {
@@ -27,18 +26,7 @@
         "scripts/**/*.ts"
       ],
       "project": ["**/*.{ts,tsx}"],
-      "ignoreDependencies": [
-        "tsx",
-        "@resvg/resvg-js",
-        "@vercel/analytics",
-        "@vercel/speed-insights",
-        "canvas-confetti",
-        "next-themes",
-        "posthog-js",
-        "resend",
-        "server-only",
-        "svix"
-      ]
+      "ignoreDependencies": ["tsx"]
     },
     "packages/shared": {
       "project": ["src/**/*.ts"]

@@ -6,6 +6,10 @@ import {
   MAX_CHALLENGE_REASON_LENGTH,
 } from "@/lib/challenge/validation";
 
+const { mockCaptureServerError } = vi.hoisted(() => ({
+  mockCaptureServerError: vi.fn(),
+}));
+
 vi.mock("@/lib/auth/require-session", () => ({
   requireSession: vi.fn(),
 }));
@@ -22,6 +26,13 @@ vi.mock("@/lib/email/challenge", () => ({
 vi.mock("@/lib/validation", () => ({
   isValidHandle: vi.fn(() => true),
 }));
+vi.mock("@/lib/analytics/server-errors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/analytics/server-errors")>();
+  return {
+    ...actual,
+    captureServerError: mockCaptureServerError,
+  };
+});
 
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimitStrict } from "@/lib/cache/redis";
@@ -46,6 +57,8 @@ describe("POST /api/challenge", () => {
     vi.mocked(rateLimitStrict).mockResolvedValue({ allowed: true, current: 1, limit: 3 });
     vi.mocked(sendChallengeEmail).mockResolvedValue({ success: true });
     vi.mocked(isValidHandle).mockReturnValue(true);
+    mockCaptureServerError.mockClear();
+    mockCaptureServerError.mockResolvedValue(undefined);
   });
 
   it("returns 401 when no session", async () => {
@@ -236,7 +249,7 @@ describe("POST /api/challenge", () => {
     );
   });
 
-  it("returns 200 { success: true } even when email send fails", async () => {
+  it("returns 200 { success: true } even when email send fails, but captures the failure", async () => {
     vi.mocked(sendChallengeEmail).mockResolvedValue({ success: false });
     const req = makeRequest({
       handle: "octocat",
@@ -246,5 +259,28 @@ describe("POST /api/challenge", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ success: true });
+    expect(mockCaptureServerError).toHaveBeenCalledTimes(1);
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/challenge",
+        statusCode: 200,
+        error: expect.any(Error),
+      }),
+    );
+    const capturedArg = mockCaptureServerError.mock.calls[0]![0];
+    expect((capturedArg.error as Error).message).toMatch(/handle=octocat/);
+  });
+
+  it("does not capture a server error when the email send succeeds", async () => {
+    const req = makeRequest({
+      handle: "octocat",
+      reason: "My delivery score seems off because all my PRs were merged in March.",
+    });
+
+    await POST(req);
+
+    expect(mockCaptureServerError).not.toHaveBeenCalled();
   });
 });

@@ -1,54 +1,72 @@
-The audit is complete. Here's the summary.
+# Documentation Report
+> Generated: 2026-07-10 | Branch: `develop` | HEAD `9bfb9a6c` | Health status: **green**
 
-## Documentation Audit — 2026-07-03 · Health: 🟢 GREEN
+## Executive Summary
+Documentation is fully in sync with the codebase: all 90 filesystem routes are documented in CLAUDE.md, all 38 color tokens match `globals.css` bidirectionally, every required spec doc is present and non-empty, and there are zero environment-variable mismatches. No stale or missing documentation found.
 
-The documentation is in its strongest state on record. All nine audit steps passed clean.
+## Route Documentation
+90 filesystem routes total (34 `page.tsx` + 50 `api/**/route.ts` + 6 non-API `route.ts`). All are documented in CLAUDE.md. Representative coverage below; experiment pages are covered by the documented `GET /experiments/*` wildcard.
 
-| Check | Result |
-|-------|--------|
-| **Routes vs CLAUDE.md** | **88/88 documented** (34 pages + 54 route.ts). The `/api/challenge` gap from prior cycles is now closed. |
-| **Design tokens vs globals.css** | **38/38 exact match**, bidirectional — zero drift, zero orphans. |
-| **Required docs exist & non-empty** | ✅ impact-v4/v5/v6, svg-design, design-system, README all present. |
-| **API routes documented** | ✅ every route group has a description in CLAUDE.md. |
-| **JSDoc on complex logic** | ✅ all functions documented (v6.ts 9/9, redis.ts 14/14, BadgeSvg full). One cosmetic P3: `campaigns/types.ts` type-only exports. |
-| **Env vars vs code** | **Zero mismatches** — 26 server vars via `lib/env.ts` + 10 `NEXT_PUBLIC_*` + `ANALYZE`, all documented; all documented vars used. |
-| **shared-context freshness** | ✅ fresh entries through today. |
-| **Doc-referencing TODOs** | 0 real (1 false positive = this prompt's own template text). |
-| **README setup** | ✅ Quick Start with clone → pnpm install → env → dev. |
+| Route | Documented in CLAUDE.md | Has API docs | Status |
+|-------|------------------------|-------------|--------|
+| `GET /` | yes | n/a (page) | OK |
+| `GET /studio` | yes | n/a (page) | OK |
+| `GET /admin` | yes | n/a (page) | OK |
+| `GET /u/[handle]` | yes | n/a (page) | OK |
+| `GET /u/[handle]/badge.svg` | yes | yes | OK |
+| `GET /u/[handle]/og-image` | yes | yes | OK |
+| `GET /verify/[hash]` | yes | n/a (page) | OK |
+| `GET /archetypes/{7 types}` | yes (all 7) | n/a (page) | OK |
+| `GET /experiments/*` (13 pages) | yes (wildcard) | n/a (page) | OK |
+| `GET /cli/authorize` | yes | n/a (page) | OK |
+| `POST /api/challenge` | yes | yes | OK |
+| `GET /api/cron/latency-check` | yes | yes | OK |
+| `POST /api/telemetry` | yes | yes | OK |
+| `GET /api/admin/engagement-flags` | yes | yes | OK |
+| `GET\|POST /api/admin/campaigns` (+`[id]`, preview, send, test) | yes | yes | OK |
+| `GET /api/notifications/unsubscribe` | yes | yes | OK |
+| `POST /api/webhooks/resend` | yes | yes | OK |
+| `GET /.well-known/security.txt` | yes | yes | OK |
+| `GET /llms.txt`, `/llms-full.txt` | yes | yes | OK |
+| `GET /og-image` | yes | yes | OK |
+| _(all remaining 60 routes)_ | yes | yes | OK |
 
-**Notable findings:**
-- The 3 odd env tokens a naive `process.env.` grep surfaces (`X`, `UPPERCASE`, `NEXT_PUBLIC_X`) are ESLint-rule literal examples inside `lib/env.ts` doc-comments — not real variables. Not flagged.
-- Only actionable item is a **cosmetic P3**: add one-line JSDoc to the 5 Zod type exports in `apps/web/lib/db/campaigns/types.ts` for parity with the rest of `lib/db`. No runtime or accuracy impact.
+**Undocumented routes:** none. **Documented-but-missing routes:** none.
 
-**Deliverables written:**
-- `docs/agents/documentation-report.md` (full report)
-- New `documentation` entry appended to `docs/agents/shared-context.md` (pruned the oldest 2026-06-12 entry to keep the 3-per-agent cap)
-
-No blockers, no stale docs, no missing docs, no env mismatches.
-system.md` match `apps/web/styles/globals.css` bidirectionally — zero drift, zero orphans.
-- **Required spec docs** all present and non-empty: `impact-v4.md` (131), `impact-v5.md` (152), `impact-v6.md` (289, current truth), `svg-design.md` (173), `design-system.md` (236), `README.md` (228).
-- **`shared-context.md`** (442 lines) has fresh entries through **2026-07-03** (coverage_agent 00:03, cost-analyst 03:00).
+## Stale Documentation
+None. Specifically verified this cycle:
+- **Design tokens** — 38/38 `--color-*` tokens in `docs/design-system.md` match `apps/web/styles/globals.css` exactly (both `comm` directions empty: zero drift, zero orphans).
+- **Route table** — CLAUDE.md route list matches the filesystem; the two routes that were doc-lag risks in prior cycles (`POST /api/challenge`, `GET /api/cron/latency-check`) are both present.
+- **JSDoc P3 carry closed** — `apps/web/lib/db/campaigns/types.ts` now carries 15 JSDoc blocks over its Zod-derived exports (was the last outstanding P3); no longer a gap.
 
 ## Missing Documentation
-None material.
-- **JSDoc (P3 carry, cosmetic)**: `apps/web/lib/db/campaigns/types.ts` — 5 exported Zod-derived type aliases + schema have no JSDoc. Self-explanatory type declarations; a sibling `types.test.ts` now exercises them (added 2026-07-01 triage). All *functions* in complex modules are documented: `lib/impact/v6.ts` 9/9, `lib/cache/redis.ts` 14/14, `lib/render/BadgeSvg.tsx` fully documented.
-- **TODO/FIXME doc-gap scan**: 0 real findings. Sole hit is `lib/agents/agent-config.ts:283` — this auditor prompt's own template text (false positive, unchanged from prior cycles).
+None.
+- **Required spec docs** all present & non-empty: `impact-v4.md` (131), `impact-v5.md` (152), `impact-v6.md` (307, current truth), `svg-design.md` (173), `design-system.md` (236), `README.md` (228).
+- **README** has setup instructions: `## Quick Start` (prerequisites → install → env copy → dev server on port 3001), plus `## Environment Variables`, `## Scripts`, `## Key Endpoints`.
+- **`docs/agents/shared-context.md`** present (454 lines), fresh through 2026-07-10 (triage and cost-analyst entries dated today).
+- **Complex-logic JSDoc** — scoring (`lib/impact`), cache (`lib/cache/redis.ts`), and render (`lib/render`) exports remain fully documented per prior cycles; no new undocumented complex exports observed.
 
 ## Environment Variables
-Every server var read through `lib/env.ts` is documented; every documented var maps to real usage. **Zero mismatches.**
+Zero mismatches. Every documented var maps to real usage; every server var flows through `lib/env.ts`. Direct `process.env.*` reads outside `lib/env.ts` are all either test/e2e infrastructure or client-component build-time inlining (both permitted).
 
-| Variable class | In CLAUDE.md | Used in code | Status |
-|----------------|-------------|-------------|--------|
-| 26 server vars via `lib/env.ts` (OAuth GitHub/GitLab/Bitbucket/Codeberg, Upstash, Supabase, Resend, admin, cron, verification, alert webhook) | Yes | Yes (`lib/env.ts`) | OK |
-| 10 `NEXT_PUBLIC_*` (direct client reads: BASE_URL, POSTHOG_KEY/HOST, STUDIO/EXPERIMENTS/INSIGHTS/BITBUCKET/CODEBERG/GITLAB_ENABLED) | Yes | Yes | OK (build-time inlined) |
-| `ANALYZE` (build-only, `next.config.ts`) | Yes | Yes | OK |
-| `NODE_ENV`, `CI`, `VERCEL_*` (standard build vars) | Intentionally omitted (noted in CLAUDE.md) | Yes | OK |
-| `TESTPLATFORM_*`, `PLAYWRIGHT_BASE_URL`, `DEPLOYMENT_SMOKE_STRICT` (test-only) | Intentionally omitted | test/e2e only | OK |
+| Variable | In CLAUDE.md | Used in code | Status |
+|----------|-------------|-------------|--------|
+| All `lib/env.ts`-brokered server vars (GITHUB_*, SUPABASE_*, UPSTASH_*, RESEND_*, ADMIN_*, CRON_SECRET, CHAPA_*, platform OAuth, etc.) | yes | yes (via `env.ts`) | OK |
+| `NEXT_PUBLIC_POSTHOG_KEY` / `_HOST` | yes | yes direct in `components/PostHogProvider.tsx` (client, build-time inline) | OK — acceptable |
+| `NEXTAUTH_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (direct) | yes | only in `test/contract/invoke.ts` + `e2e/journey.spec.ts` | OK — test infra |
+| `ANALYZE` | yes | `next.config.ts` | OK |
+| `NODE_ENV`, `CI`, `VERCEL_*` | intentionally omitted | standard build vars | OK — documented as omitted |
+| `PLAYWRIGHT_BASE_URL`, `DEPLOYMENT_SMOKE_STRICT` | omitted | test/smoke only | OK — test-only |
+| `process.env.X`, `process.env.UPPERCASE` | n/a | ESLint doc-comment literals in `env.ts` | OK — not real vars |
 
-Note: `X` / `UPPERCASE` / `NEXT_PUBLIC_X` appearing in a raw `process.env.` grep are ESLint-rule literal examples in `lib/env.ts` doc-comments and `env.test.ts` — not real variables. `PostHogProvider.tsx` reads `NEXT_PUBLIC_POSTHOG_*` directly (client component, build-time inlining) — acceptable per policy.
+## TODO/FIXME Doc-Gap Scan
+1 match, a false positive: `apps/web/lib/agents/agent-config.ts:283` is this documentation agent's own prompt template ("Look for TODO/FIXME comments that reference missing documentation"), not a real gap. No actionable doc-referencing TODOs.
 
 ## Recommendations
-1. **(P3, optional)** Add one-line JSDoc to the 5 type exports + schema in `apps/web/lib/db/campaigns/types.ts` for parity with the rest of `lib/db`. Purely cosmetic — no runtime or accuracy impact.
-2. **(Housekeeping, cross-agent relay)** Coverage agent (2026-07-03) noted `packages/shared` config files (tsconfig/eslint/package.json) leak into the coverage map at 0% — add them to the vitest coverage `exclude`. Not a docs issue.
+No blocking or high-priority documentation actions this cycle. The codebase and docs are in sync.
 
-No blockers. Documentation health is **GREEN** — matching the strongest state on record.
+- **(P4, optional)** Consider enumerating the 13 individual `/experiments/*` pages in the CLAUDE.md route list instead of the wildcard, if per-page discoverability ever matters. The current wildcard is accurate and intentional — no action needed now.
+
+---
+
+_Verification commands run: filesystem route enumeration (`find … page.tsx|route.ts`), `comm`-based token diff (globals.css ↔ design-system.md), `process.env.*` grep vs `lib/env.ts`, required-doc line counts, TODO/FIXME doc-reference grep, README heading scan._

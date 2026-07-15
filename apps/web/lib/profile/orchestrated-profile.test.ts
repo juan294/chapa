@@ -87,9 +87,9 @@ describe("materializeOrchestratedProfile", () => {
 describe("persistOrchestratedSnapshot", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDbInsertSnapshot.mockResolvedValue(true);
+    mockDbInsertSnapshot.mockResolvedValue("inserted");
     mockDbReplaceSnapshot.mockResolvedValue(true);
-    mockUpdateSnapshotCache.mockResolvedValue(undefined);
+    mockUpdateSnapshotCache.mockResolvedValue(true);
   });
 
   it("inserts and caches the canonical snapshot for warm-cache flows", async () => {

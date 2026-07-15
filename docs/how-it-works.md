@@ -352,6 +352,13 @@ Step 2: Next badge request merges the data automatically
 > so a request that can't see a user's private-repo merges can return zero merged PRs. Rather
 > than cache that corrupt result, Chapa detects the collapse and serves the last-known-good
 > stats, so the score never drops on a partial fetch.
+>
+> **Scoring-data integrity contract (#1004):** a further three-boundary defense sits on top of
+> #1002. An authoritative merged-PR count (a separate `search(is:merged)` query) catches a
+> degraded fetch at the source — with no prior cached result required. Cache writes are
+> scope-aware and never downgrading, so a public/cron fetch can't overwrite a signed-in user's
+> richer cached data. And snapshot history plus the badge's verification hash are only ever
+> written from complete stats, so a bad fetch can't poison permanent history or be cryptographically attested.
 
 ### How stats are merged
 
@@ -445,7 +452,7 @@ Chapa captures daily snapshots of each user's metrics and stores them permanentl
 ### How snapshots are captured
 
 Snapshots are recorded automatically in three places:
-1. **Cron warm-cache** — a scheduled job that refreshes active users daily
+1. **Cron warm-cache** — a scheduled job that refreshes active users on a round-robin rotation, running hourly (#1010; was daily) to shrink the staleness gap as the user base scales past the 50-handle/run ceiling
 2. **Badge route** — after rendering a badge SVG, a snapshot is captured via `after()`
 3. **Refresh endpoint** — when a manual refresh is triggered
 

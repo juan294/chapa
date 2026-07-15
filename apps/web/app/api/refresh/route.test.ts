@@ -6,6 +6,7 @@ const {
   mockRequireSession,
   mockCacheDel,
   mockRateLimit,
+  mockRateLimitStrict,
   mockIsValidHandle,
   mockCaptureServerError,
   mockRevalidatePath,
@@ -18,6 +19,7 @@ const {
   mockRequireSession: vi.fn(),
   mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockRateLimitStrict: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockRevalidatePath: vi.fn(),
@@ -35,6 +37,7 @@ vi.mock("@/lib/auth/require-session", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheDel: (...args: unknown[]) => mockCacheDel(...args),
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
+  rateLimitStrict: (...args: unknown[]) => mockRateLimitStrict(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -125,6 +128,7 @@ describe("POST /api/refresh", () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     mockCacheDel.mockResolvedValue(undefined);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     mockUpdateCraftCache.mockResolvedValue(undefined);
@@ -159,7 +163,28 @@ describe("POST /api/refresh", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 6, limit: 5 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 6, limit: 5 });
+
+    const res = await POST(makeRequest("testuser"));
+    expect(res.status).toBe(429);
+  });
+
+  it("uses the fail-closed rate limiter (not the fail-open variant)", async () => {
+    await POST(makeRequest("testuser"));
+
+    expect(mockRateLimitStrict).toHaveBeenCalledWith(
+      "ratelimit:refresh:testuser",
+      5,
+      3600,
+    );
+    expect(mockRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("rejects the request when Redis is unavailable (fails closed)", async () => {
+    // Simulate a Redis outage: the fail-open limiter would allow the request,
+    // but the fail-closed limiter blocks it. An auth-critical route must block.
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 0, limit: 5 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 0, limit: 5 });
 
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(429);

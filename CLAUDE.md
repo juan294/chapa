@@ -73,7 +73,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/verify/:hash` Badge verification endpoint
 - GET `/api/profile/:handle` Public impact profile snapshot (rate-limited, CORS-enabled)
 - GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
-- GET `/api/health` Health check (Redis dbsize + Supabase query + GitHub API probe, rate-limited; returns "skipped" for unconfigured services)
+- GET `/api/health` Health check (Redis dbsize + Supabase query + GitHub API probe + cron heartbeat staleness for warm-cache/sync-audience/process-campaigns/latency-check, rate-limited; returns "skipped" for unconfigured services)
 - GET `/api/feature-flags` Public feature flag values
 - GET `/u/:handle/og-image` OG image for share page (dynamic, cached)
 - GET `/og-image` Default OG image
@@ -110,9 +110,10 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ### Webhooks & Cron
 - POST `/api/webhooks/resend` Resend email webhook (HMAC verified)
-- GET `/api/cron/warm-cache` Daily cache warming (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/warm-cache` Hourly cache warming (bearer auth via `CRON_SECRET`; #1010 — was daily, bumped to hourly to shrink the per-handle staleness gap at the 50-handle/run ceiling)
 - GET `/api/cron/sync-audience` Daily Resend audience sync (bearer auth via `CRON_SECRET`)
-- GET `/api/cron/process-campaigns` Daily campaign batch processor (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/process-campaigns` Daily campaign batch processor (bearer auth via `CRON_SECRET`; #1035 — round-robins across all active campaigns per run within the time/quota budget, was previously limited to the first active campaign)
+- GET `/api/cron/latency-check` Daily badge-route latency SLO synthetic monitor (bearer auth via `CRON_SECRET`); times `/u/:handle/badge.svg` and raises a P2 alert via `CHAPA_ALERT_WEBHOOK_URL` on p95 budget breach
 - POST `/api/telemetry` Client telemetry ingestion
 
 ## Data & types
@@ -147,17 +148,20 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Avatar placeholder (when no user photo) shows the Chapa shield icon
 
 ## Caching rules
-- Cache computed stats + impact per user/day (TTL 24h)
+- Cache computed stats + impact per user/day (TTL 6h primary, 7-day stale-fallback tier)
 - Cache SVG output per user/day + theme (TTL 24h + per-handle jitter of 0–2h to spread UTC-midnight recompute spikes)
 - **Lifetime metrics**: `MetricsSnapshot` records stored in Supabase `metrics_snapshots` table — permanent history. Max 1 snapshot per user per day (UNIQUE constraint on handle+date). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
 - **Supplemental EMU stats**: durably stored in Supabase `supplemental_stats` table (one row per `target_handle`). Redis (`supplemental:<handle>`, 24h TTL) is the hot read path; on miss, `getStats()` falls back to Supabase and rehydrates Redis via fire-and-forget. A missed CLI upload day no longer drops EMU data from scores.
 - **Same-day refresh signal**: a CLI supplemental upload sets `stats:dirty:<handle>` in Redis (1h TTL). `materializeProfile` reads the marker and threads `inputsChanged` so `applyImpactScorePolicy` bypasses the same-day EMA lock; `runPublicProfileSideEffects` then routes today's snapshot through `dbReplaceSnapshot` (UPSERT) and clears the marker. Since #1001 the **displayed headline is always the fresh score**, so this bypass now governs only the persisted trend snapshot (whether today's snapshot absorbs the new inputs same-day) — not what the user sees. Default behavior (no dirty marker) preserves the existing feedback-loop protection for the snapshot.
 - **Display vs. trend smoothing (#1001)**: the live headline (`adjustedComposite` on the badge, share page, dashboard, verification record, JSON-LD, emails) is the **fresh** score from `computeImpactV6`, always consistent with the dimensions shown beside it. EMA smoothing (and the same-day lock / #826 dirty bypass / #930 `ignoreSnapshot`) is retained **only** for the persisted trend snapshot and the day-over-day EMA prior. In `materializeImpactState`, `displayImpact = rawImpact` (fresh) while the snapshot is built from a separately-computed smoothed impact.
 - **Degraded-fetch protection (#1002)**: GitHub's `contributionsCollection` is scoped to the authenticating token, so a fetch that can't see a user's private-repo merges (the warm-cache cron's server `GITHUB_TOKEN`, or an anonymous badge hit) returns `prsMergedCount: 0` even for users with many merged PRs. `isDegradedPrFetch()` (`apps/web/lib/github/stats-integrity.ts`) detects this collapse; `getStats()` then serves last-known-good, does **not** overwrite the `stats:stale:<handle>` key (preserving the fallback), refreshes only the primary key, and emits a `github_degraded_pr_fetch` telemetry event. The guard only blocks good→bad, so the next authenticated fetch heals the data and it sticks. Only the user's own OAuth token can repopulate private-repo PRs (cron/bulk-recalculate use the server token and cannot).
+- **Scoring-data integrity contract (#1004)**: a three-boundary defense on top of #1002 that ends the "degraded fetch collapses a score" class of bug at its root. Fetch boundary: an authoritative `search(is:merged)` merged-PR count plus `assessRawFetchIntegrity` rejects a structurally-valid-but-degraded payload before it's scored, cached, or persisted — with no prior baseline needed. Cache boundary: scope-aware, non-downgrading writes so a public/cron `GITHUB_TOKEN` fetch can never clobber a user's authenticated (private-inclusive) cache entry, and `stats:stale` only ever holds complete data. Persist boundary: snapshot history and the HMAC verification record are gated on stats completeness. `stats_fetch_rejected` / `snapshot_skipped_incomplete_stats` telemetry surface degradation in production; `heal-poisoned-stats` (maintenance script) repairs already-poisoned cache keys and snapshot rows.
+- **Snapshot-write reconciliation**: `reconcileSnapshotWrite` (`apps/web/lib/profile/snapshot-write.ts`) wraps the Supabase `metrics_snapshots` write and its Redis mirror as one saga, tracking a tri-state write outcome (`inserted` / `duplicate` / `failed`, #1015/#1016 — detected via row presence on the upsert response, not the PostgREST HTTP status code). A benign same-day `duplicate` still gets an opportunistic cache refresh rather than being treated as a failure; only a genuine `failed` write emits a structured P2 operational alert (suppressed when Redis is unconfigured). The public badge path (`persistProfileSnapshot`) escalates a genuine failure via `captureServerError` instead of silently discarding it (#1009) — satisfying the "durable write failure must be observable" rule below. Note: the saga only observes a single call's own outcome — it has no visibility into a race between concurrent producers (badge route, warm-cache cron, refresh, recalculate); this is an accepted, self-healing (via the next warm-cache pass) risk, not solved with locking.
 - **Feature flags**: Async DB-backed flag reads live in `apps/web/lib/feature-flags.ts` (server-only). Synchronous client-safe helpers (`isStudioEnabledSync`, etc.) live in `apps/web/lib/feature-flags-sync.ts` — use the sync module in client components and middleware; use the async module in server actions and API routes.
-- **Rate-limit fail-open**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) intentionally allows all requests when Redis is unavailable (fail-open). This is an availability-first design — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement. GitHub's own API limits and CDN caching provide secondary protection. See `redis.ts` for the full rationale.
+- **Rate-limit fail-open (with fail-closed exceptions)**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) allows all requests when Redis is unavailable (fail-open) on public reads — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement, and GitHub's own API limits + CDN caching provide secondary protection. Auth-critical and write routes use `rateLimitStrict` (fail-closed) instead: `/api/auth/session`, `/api/refresh`, and — since #1027 — all platform OAuth connect/callback/disconnect routes (Bitbucket/Codeberg/GitLab), which also share GitHub's single-use replay-consume nonce via a per-platform `chapa_<provider>_oauth_state_store` cookie. See `redis.ts` for the full fail-open rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`
+- **Badge latency SLO (#974)**: the badge route (`/u/:handle/badge.svg`) has a defined p95 latency budget — **800ms cache-hit**, **3000ms cache-miss** — enforced in `apps/web/lib/monitoring/latency-slo.ts`. Every badge response carries a `Server-Timing` header (`cache;desc="hit"` on warm hits, `cache;desc="cache-timeout"` when a Redis read exceeds its deadline (#1014), `materialize` + `render` breakdown on cold misses; always a `total`) so per-request latency is inspectable. The `/api/cron/latency-check` daily synthetic monitor times the live endpoint, writes its own heartbeat (monitored by `/api/health`, #1018), and raises a P2 `badge_latency_slo_breach` operational alert via `CHAPA_ALERT_WEBHOOK_URL` when the budget is exceeded (or the probe fails). Against this budget: the SVG cache-read deadline is 500ms (#1014, was 250ms — too tight, misclassified genuine hits as misses under Redis tail latency), the render-lock loser's poll budget is ~950ms (#1029, was ~2000ms), the avatar fetch is capped at 1000ms and skips the shared cache write on timeout (#1029/PE-L1), and the durable snapshot persist runs in `after()` rather than blocking the response (#1013).
 
 ## Code ownership areas
 - OAuth: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
@@ -170,8 +174,10 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Data access (Supabase): `apps/web/lib/db/*`
 - Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
 - Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
-- Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx`
-- i18n: `apps/web/lib/i18n/*` (dictionaries, detection, server/client translation, locale cookie)
+- Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx` (portal-rendered, viewport-fixed, auto-flip near the top of viewport — #1021)
+- Navigation: `apps/web/components/NavbarShell.tsx` (shared presentational markup), `apps/web/components/Navbar.tsx` (server variant, non-ISR pages), `apps/web/components/NavbarClient.tsx` (client variant, ISR pages) — #1025
+- Dimension/intensity colors (client-rendered heatmap/tooltip surfaces): `apps/web/lib/utils/dimension-colors.ts` (#1040) — deliberately separate from the server-rendered badge SVG's own literals in `apps/web/lib/render/theme.ts`
+- i18n: `apps/web/lib/i18n/*` (dictionaries, detection, server/client translation, locale cookie, `tArray`/`tObject` typed accessors — use these, not an unchecked `t() as string[]` cast, #1026); `apps/web/proxy.ts` (locale-segmented content-page rewrite, #1023); `apps/web/app/[locale]/*` (the 9 locale-segmented content pages)
 - Dashboard components: `apps/web/lib/dashboard/generate-insights.ts`, `apps/web/components/dashboard/DimensionCard.tsx`, `apps/web/components/dashboard/InsightCard.tsx`, `apps/web/components/dashboard/SubMetricPanel.tsx`
 - Share toolbar: `apps/web/components/BadgeToolbar.tsx`
 
@@ -222,8 +228,8 @@ The app supports two locales: `es` (Spanish, default) and `en` (English). All pu
 ### Architecture
 - **Dictionaries**: `apps/web/lib/i18n/dictionaries/en.ts` and `es.ts` — both must be kept in sync (650+ leaf keys each). Run `pnpm run test` to verify key parity via `dictionaries/parity.test.ts`.
 - **Locale detection**: `apps/web/lib/i18n/detect.ts` — reads the `chapa-locale` cookie first, then `Accept-Language` header, falls back to `DEFAULT_LOCALE` ('es').
-- **Static rendering**: The root layout renders statically at `DEFAULT_LOCALE` (`es`) and ships only the active locale's dictionary to the client. Non-default locale dictionaries are loaded client-side on demand (after hydration) when the `chapa-locale` cookie indicates a different locale. This keeps content pages CDN-cacheable (ISR) at the cost of a brief locale flash for non-default-locale users.
-- **Server components**: `import { getServerT } from '@/lib/i18n/server'` — pass the `locale` from params/cookies.
+- **Static rendering — locale-segmented content pages (#1023 / FE-H1)**: The 9 public content pages (`/`, `/about`, `/about/scoring`, `/about/verification`, `/privacy`, `/terms`, and the 7 `/archetypes/*` pages) are real React Server Components under `app/[locale]/...`. `apps/web/proxy.ts` (Next.js 16's root proxy file, formerly "middleware") rewrites the canonical, unprefixed request (e.g. `/about`) to the internal `/[locale]/about` route, resolving `locale` from the `chapa-locale` cookie first, then `Accept-Language`, falling back to `DEFAULT_LOCALE` — the same priority order as `getServerT`/`detect.ts`. `app/[locale]/layout.tsx`'s `generateStaticParams` pre-renders BOTH `/en/...` and `/es/...` variants at build time, so the rewrite always resolves to a cache hit: translated copy renders correctly on the very first response, with **no locale flash and no client-side re-render** for these 9 pages. The public URL never carries a locale prefix (no redirects — only rewrites); see `docs/decisions/2026-07-15-i18n-middleware-carve-out.md` for the narrow `proxy.ts` matcher and its relationship to the earlier no-middleware ADR. **Unaffected by this migration**: `/u/[handle]`, `/u/[handle]/badge.svg`, `/studio`, `/admin`, `/cli/authorize`, and all other non-migrated routes keep whatever i18n behavior they had before — the root layout still renders its shared client chrome (nav, `LanguageSwitcher`, `GlobalCommandBar`) statically at `DEFAULT_LOCALE` via the client `LanguageProvider`/`useTranslation()` context described below, so those small, shared components (not the 9 migrated pages' bodies) may still show a brief flash on non-default-locale loads — an accepted, out-of-scope trade for keeping the root layout free of per-request cookie/header reads.
+- **Server components**: `import { getServerT } from '@/lib/i18n/server'` — pass the `locale` from params/cookies. On the 9 migrated content pages, `locale` comes from the route's `[locale]` segment param (via `await params`), not from `DEFAULT_LOCALE` or `getServerLocale()`.
 - **Client components**: `import { useTranslation } from '@/lib/i18n'` — returns `{ locale, t, setLocale }`. Always wraps in `LanguageProvider` on any real page.
 - **Key resolution**: `t('section.key')` returns a string (or subtree for intermediate keys). Leaf keys always return `string` — cast with `as string` when TypeScript needs it for HTML attrs.
 - **Locale switching**: `LanguageSwitcher` component calls `setLocale()`, which sets the `chapa-locale` cookie and soft-reloads via `router.refresh()`.
@@ -268,7 +274,6 @@ Go directly to these paths -- never search for them.
 | Agent logs | `logs/<name>.log`, `<name>.error.log` | Gitignored. Read alongside reports to diagnose failures |
 | Agent scripts | `scripts/agents/` | Gitignored. Standalone bash files invoking Claude CLI headless |
 | ADRs | `docs/decisions/` | Architecture decision records |
-| PR descriptions | `docs/prs/{number}_description.md` | |
 | Research docs | `docs/research/YYYY-MM-DD-description.md` | |
 | Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
 | Reliability playbooks | `docs/playbooks/reliability-hardening-playbook.md` | Seam-bug hardening reference |
@@ -318,10 +323,14 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 
 ### CI Gates (enforced in CI, must pass locally too)
 - **Circular dependency check**: `pnpm run check:circular` (via `madge`) — no circular imports allowed.
-- **`no-process-env` ESLint rule**: direct `process.env` access is banned outside `apps/web/lib/env.ts` (allowlisted). All env reads go through the centralized env module.
+- **`no-process-env` ESLint rule**: direct `process.env` access is banned outside `apps/web/lib/env.ts` (allowlisted). All env reads go through the centralized env module. Catches both `process.env.X` member access and a bare `process.env` reference (e.g. `{ ...process.env }`, #1017).
 - **`packages/shared` import boundary**: application code may not import from `packages/shared` via relative paths — use the workspace alias (`@chapa/shared`).
 - **Bundle-size budget**: the largest JS chunk must stay under 350 KB (checked in CI via build output analysis).
-- **Coverage thresholds**: configured in `vitest.config.ts` — CI fails if coverage drops below defined per-module thresholds.
+- **Coverage thresholds**: configured in `vitest.config.ts` — a global floor, plus tighter per-module floors for `apps/web/lib/impact/**` (95/90/95/95 stmt/branch/fn/line) and `apps/web/lib/github/stats-integrity.ts` (90/85/90/90) so a regression can't strip tests from the scoring pipeline or the degraded-fetch guard and still pass on the strength of the rest of the codebase's coverage (#1028).
+- **Contract-test job runs on Node 24**: the rest of CI (and local dev) targets Node 20+, but the `ci.yml` contract-test job pins Node 24 specifically — match that version if debugging that job locally. Run it locally via `pnpm run test:contract:local` (wraps `supabase status -o env`, never reads `.env.local`, #1036).
+- **Vulnerability scan**: `pnpm run check:vulnerabilities` (`scripts/check-vulnerabilities.ts`, via `osv-scanner`) — fails only on HIGH/CRITICAL vulnerabilities with a published fix. Replaced `pnpm audit`, which had been silently scanning zero packages after npm retired its legacy audit endpoint (#1008).
+- **License compliance**: `pnpm run check:licenses` (`scripts/check-licenses.ts`) — an explicit allowlist (MIT, Apache-2.0, BSD-2/3-Clause, ISC, 0BSD, CC0-1.0) with documented per-package exceptions in `docs/accepted-risks.md`, rather than a denylist that missed most non-allowlisted licenses (#1012).
+- **Pending-migrations check**: `pnpm run check:pending-migrations` (`scripts/check-pending-migrations.ts`) — runs on PRs targeting `main`, fails if the linked production Supabase project has schema drift from `supabase/migrations/` (#1011).
 
 ## Test Conventions
 
@@ -340,8 +349,9 @@ pnpm run typecheck      # Check types
 pnpm run lint           # Check linting
 
 # Testing
-pnpm run test:watch     # Watch mode
-pnpm run test:coverage  # Coverage report
+pnpm run test:watch          # Watch mode
+pnpm run test:coverage       # Coverage report
+pnpm run test:contract:local # Contract suite against local Supabase (run `supabase start` first)
 
 # Development
 pnpm run dev            # Local dev server (port 3001)
@@ -418,7 +428,7 @@ const token = process.env.GITHUB_CLIENT_SECRET?.trim();
 ## Development Guardrails
 
 1. **No secrets in code** — Use env vars. Never commit tokens, keys, or credentials.
-2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC only.
+2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC, 0BSD, CC0-1.0 only, enforced by `pnpm run check:licenses` (an allowlist, not a denylist). A dependency outside this list needs an explicit, documented exception in `docs/accepted-risks.md` (see the existing CC-BY-4.0/Unlicense/MIT-0 entries) — never a silent pass.
 3. **Escape user input in SVG** — Any user-controlled text (handle, display name) must be escaped before rendering into SVG markup. This prevents XSS in embeddable badges.
 4. **Health endpoint** — `/api/health` should exist for monitoring. Don't break it.
 5. **No dead code** — Remove unused exports, imports, and files. Clean as you go.

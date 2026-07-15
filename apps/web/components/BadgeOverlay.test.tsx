@@ -209,6 +209,24 @@ describe("BadgeOverlay — rendering", () => {
     expect(panel).not.toBeNull();
     expect(panel!.style.transform).toBe("translate(-50%, 0%)");
   });
+
+  // Fix #1021 (UX-M1 pass): the desktop leader-line annotation panel must use
+  // the mandated z-99999 tooltip layering rule so it can layer above a modal
+  // or sticky header if ever needed, matching every other tooltip surface.
+  it("desktop leader-line panel uses z-index 99999, not z-20", () => {
+    const { container } = render(<BadgeOverlay />);
+    const archetypeHotspot = screen
+      .getAllByRole("group")
+      .find((el) => el.getAttribute("aria-label") === "archetype info");
+    expect(archetypeHotspot).toBeDefined();
+
+    fireEvent.mouseEnter(archetypeHotspot!);
+
+    const panel = container.querySelector('[role="tooltip"]') as HTMLElement | null;
+    expect(panel).not.toBeNull();
+    expect(panel!.className).toContain("z-[99999]");
+    expect(panel!.className).not.toContain("z-20");
+  });
 });
 
 // ---------------------------------------------------------------------------

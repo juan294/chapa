@@ -770,7 +770,7 @@ describe("getStats", () => {
       );
     });
 
-    it("does NOT re-cache stale data with a fresh TTL", async () => {
+    it("re-caches stale data into the primary key (not the stale key) to bound refetch churn", async () => {
       const stale = makeStats({ commitsTotal: 42 });
       mockCacheGet
         .mockResolvedValueOnce(null) // merged miss
@@ -779,7 +779,32 @@ describe("getStats", () => {
 
       await getStats("test-user");
 
-      // cacheSet should NOT have been called — stale data stays as-is
+      // Mirrors the #1002 degraded-fetch anti-thrash pattern: refresh only
+      // the primary key with the last-known-good data so a sustained GitHub
+      // outage doesn't cause a refetch on every subsequent request. The
+      // protected stale key itself is left untouched.
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        stale,
+        21600,
+      );
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:stale:test-user",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("does not re-cache stale data in read-only mode", async () => {
+      const stale = makeStats({ commitsTotal: 42 });
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged miss
+        .mockResolvedValueOnce(stale); // stale hit
+      mockFetchStatsData.mockResolvedValue(null); // API failure
+
+      const result = await getStats("test-user", undefined, { readOnly: true });
+
+      expect(result).toEqual(stale);
       expect(mockCacheSet).not.toHaveBeenCalled();
     });
 

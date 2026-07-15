@@ -1,5 +1,5 @@
-import type { HeatmapDay, StatsData } from "@chapa/shared";
-import { computePlatformStats, computePrWeight, PR_WEIGHT_AGG_CAP } from "@chapa/shared";
+import type { HeatmapDay, NormalizedMergedPr, StatsData } from "@chapa/shared";
+import { computePlatformStats } from "@chapa/shared";
 import type { RawBitbucketData } from "./types";
 
 /**
@@ -9,13 +9,14 @@ import type { RawBitbucketData } from "./types";
  * Platform-specific steps handled here:
  *   1. Heatmap construction from commit timestamp strings (YYYY-MM-DDT...)
  *   2. commitsTotal from raw commit array length
- *   4. PR diffstat parsing (lines_added/lines_removed arrays per PR)
+ *   4. PR diffstat parsing → per-PR {additions, deletions, changedFiles}
+ *      (weight/cap/line-sum aggregation delegated to computePlatformStats)
  *   5. Review counting (approvals + change_requests, not plain comments)
  *   6. issuesClosedCount passthrough
  *  10. Social metrics (Bitbucket has forks only; no stars, no watchers)
  *
- * Invariant steps 1 (active days), 7 (repo depth), 8 (top-repo share), and
- * 9 (maxCommitsIn10Min heuristic) are delegated to computePlatformStats().
+ * Invariant steps — active days, repo depth, top-repo share, maxCommitsIn10Min,
+ * and PR-weight aggregation — are delegated to computePlatformStats().
  */
 export function buildStatsFromBitbucket(raw: RawBitbucketData): StatsData {
   // 1. Build heatmap from commit timestamps (aggregate by date)
@@ -31,20 +32,13 @@ export function buildStatsFromBitbucket(raw: RawBitbucketData): StatsData {
   // 2. Total commits (Bitbucket: raw commit array length, not heatmap sum)
   const commitsTotal = raw.commits.length;
 
-  // 4. PR metrics — compute weight using shared computePrWeight()
-  const prsMergedCount = raw.mergedPRs.length;
-  let prsMergedWeight = 0;
-  let linesAdded = 0;
-  let linesDeleted = 0;
-  for (const { diffstat } of raw.mergedPRs) {
-    const additions = diffstat.reduce((sum, d) => sum + d.lines_added, 0);
-    const deletions = diffstat.reduce((sum, d) => sum + d.lines_removed, 0);
-    const changedFiles = diffstat.length;
-    linesAdded += additions;
-    linesDeleted += deletions;
-    prsMergedWeight += computePrWeight({ additions, deletions, changedFiles });
-  }
-  prsMergedWeight = Math.min(prsMergedWeight, PR_WEIGHT_AGG_CAP);
+  // 4. PR metrics — extract per-PR change sizes from Bitbucket diffstat arrays.
+  //    Weight/cap/line-sum aggregation is owned by computePlatformStats().
+  const mergedPrs: NormalizedMergedPr[] = raw.mergedPRs.map(({ diffstat }) => ({
+    additions: diffstat.reduce((sum, d) => sum + d.lines_added, 0),
+    deletions: diffstat.reduce((sum, d) => sum + d.lines_removed, 0),
+    changedFiles: diffstat.length,
+  }));
 
   // 5. Reviews — count approvals and change requests by this user (not comments)
   const reviewsSubmittedCount = raw.reviewActivities.filter(
@@ -66,10 +60,7 @@ export function buildStatsFromBitbucket(raw: RawBitbucketData): StatsData {
     avatarUrl: raw.avatarUrl,
     heatmapData,
     commitsTotal,
-    prsMergedCount,
-    prsMergedWeight,
-    linesAdded,
-    linesDeleted,
+    mergedPrs,
     reviewsSubmittedCount,
     issuesClosedCount,
     repos: raw.repos, // { fullName, commitCount, isOwned } — subset of BitbucketRepo

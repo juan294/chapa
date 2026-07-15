@@ -148,6 +148,7 @@ export const POST = withErrorCapture("/api/admin/agents/run", async (request: Ne
 
   const child = spawn("bash", [scriptPath], {
     cwd: projectRoot,
+    // eslint-disable-next-line no-restricted-syntax -- child process needs full parent env, gated by ALLOW_AGENT_RUN + admin auth
     env: { ...process.env },
     stdio: ["ignore", "pipe", "pipe"],
   });

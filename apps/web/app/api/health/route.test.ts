@@ -196,6 +196,23 @@ describe("GET /api/health", () => {
     expect(captureOperationalAlert).toHaveBeenCalled();
   });
 
+  it("returns 503 when the latency-check cron heartbeat is stale (#1018)", async () => {
+    const twentySevenHoursAgo = Date.now() - 27 * 60 * 60 * 1000;
+    vi.mocked(cacheGetCronLastRun).mockImplementation(async (name: string) =>
+      name === "latency-check" ? twentySevenHoursAgo : Date.now(),
+    );
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.cronHeartbeats["latency-check"].stale).toBe(true);
+    expect(captureOperationalAlert).toHaveBeenCalled();
+  });
+
   it("does not degrade during the missing-heartbeat grace window", async () => {
     vi.mocked(cacheGetCronLastRun).mockResolvedValue(null);
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");

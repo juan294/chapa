@@ -10,11 +10,15 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run",
     "test:contract": "vitest run -c vitest.config.contract.ts",
+    "test:contract:local": "tsx scripts/test-contract-local.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @chapa/web test:e2e",
     "validate:migrations": "tsx scripts/validate-migrations.ts",
     "check:write-registration": "tsx scripts/check-write-registration.ts --max-unregistered=0",
+    "check:licenses": "tsx scripts/check-licenses.ts",
+    "check:vulnerabilities": "tsx scripts/check-vulnerabilities.ts",
+    "check:pending-migrations": "tsx scripts/check-pending-migrations.ts",
     "delete-user": "tsx scripts/delete-user.ts",
     "heal-poisoned-stats": "tsx scripts/heal-poisoned-stats.ts",
     "check:circular": "pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/ packages/shared/src/",
@@ -22,12 +26,12 @@
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.10",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "tsx": "^4.22.4",
-    "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "tsx": "^4.23.1",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -47,7 +51,7 @@
       "picomatch": ">=4.0.4",
       "brace-expansion": ">=5.0.6",
       "protobufjs": ">=7.5.5",
-      "vite": ">=8.0.8",
+      "vite": ">=8.1.4",
       "typescript-eslint": ">=8.58.0",
       "@typescript-eslint/eslint-plugin": ">=8.58.0",
       "@typescript-eslint/parser": ">=8.58.0",

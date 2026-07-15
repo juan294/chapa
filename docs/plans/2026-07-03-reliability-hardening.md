@@ -1,6 +1,9 @@
 # Implementation Plan — Chapa Reliability-Hardening Playbook
 
-> **Status:** Ready to implement. RPI plan phase output.
+> **Status:** Implemented. Payload-matrix harness (`apps/web/test/contract/payload-matrix.ts`),
+> `check:write-registration` CI gate, cron heartbeat keys, client-error telemetry stream
+> (`docs/runbooks/client-error-alerts.md`), and mobile E2E coverage are all live in the
+> codebase — see `docs/playbooks/reliability-hardening-playbook.md` for per-phase detail.
 > **Research input:** `docs/playbooks/reliability-hardening-playbook.md` (contains
 > the full codebase investigation with `file:line` references — treat it as the
 > research doc).

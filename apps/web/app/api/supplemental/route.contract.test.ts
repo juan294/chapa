@@ -173,6 +173,43 @@ describe("POST /api/supplemental contract", () => {
         includeNull: true,
         typical: 0.2,
       }),
+      // #984: optional numeric fields that feed scoring — boundary + out-of-range.
+      declareField("stats.medianPrLeadTimeHours", {
+        candidates: [36, 0, 100000, 100001, -1],
+        includeAbsent: true,
+        includeNull: true,
+        typical: 36,
+      }),
+      declareField("stats.primaryReviewsSubmittedCount", {
+        candidates: [4, 0, 50000, 50001, -1],
+        includeAbsent: true,
+        includeNull: true,
+        typical: 4,
+      }),
+      declareField("stats.batchSizeScore", {
+        candidates: [0.6, 0, 1, 1.1],
+        includeAbsent: true,
+        includeNull: true,
+        typical: 0.6,
+      }),
+      declareField("stats.prDescriptionRate", {
+        candidates: [0.5, 0, 1, 1.1],
+        includeAbsent: true,
+        includeNull: true,
+        typical: 0.5,
+      }),
+      declareField("stats.featureBranchRate", {
+        candidates: [0.5, 0, 1, 1.1],
+        includeAbsent: true,
+        includeNull: true,
+        typical: 0.5,
+      }),
+      declareField("stats.issueLinkageRate", {
+        candidates: [0.5, 0, 1, 1.1],
+        includeAbsent: true,
+        includeNull: true,
+        typical: 0.5,
+      }),
       declareField("stats.heatmapData", {
         candidates: [
           stats.heatmapData,
