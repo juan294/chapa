@@ -103,9 +103,18 @@ describe("NavbarClient", () => {
 
   // ─── Logged-out state ─────────────────────────────────────────────────
 
-  it("renders login link when session is loading", () => {
+  it("renders a neutral placeholder (not the login link) while session is loading (#1025 / FE-L2)", () => {
     mockUseSession.mockReturnValue({ session: null, loading: true, invalidate: vi.fn() });
     render(<NavbarClient />);
+    expect(screen.getByTestId("navbar-auth-placeholder")).toBeDefined();
+    expect(screen.queryByText("login")).toBeNull();
+    expect(screen.queryByTestId("user-menu")).toBeNull();
+  });
+
+  it("swaps the placeholder for the login link once loading resolves with no session", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+    render(<NavbarClient />);
+    expect(screen.queryByTestId("navbar-auth-placeholder")).toBeNull();
     const loginLink = screen.getByText("login");
     expect(loginLink.closest("a")?.getAttribute("href")).toBe(
       "/api/auth/login",
