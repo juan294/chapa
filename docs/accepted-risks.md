@@ -121,6 +121,30 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** None (dev-only)
 - **Accepted:** 2026-07-15
 
+## CC-BY-4.0 dependency (caniuse-lite) (#1012)
+
+- **Risk:** `caniuse-lite` (transitive, via `browserslist` → Next.js/`styled-jsx`/`@babel/helper-compilation-targets`, and via `eslint-plugin-react-hooks` in dev) is licensed CC-BY-4.0 (Creative Commons Attribution), not in our stated license policy.
+- **Accepted because:** CC-BY-4.0 is an attribution-only content license (not copyleft — it imposes no share-alike or source-disclosure obligation). `caniuse-lite` ships a static browser-support data table, not application logic; it's consumed at build time by Autoprefixer/Browserslist and is not modified or redistributed as a standalone work by Chapa.
+- **Mitigation:** None required. Excluded from the license-compliance allowlist gate (`scripts/check-licenses.ts`, `DEFAULT_EXCLUDED_PACKAGES`).
+- **Severity:** None
+- **Accepted:** 2026-07-15
+
+## Unlicense dependency (fast-sha256) (#1012)
+
+- **Risk:** `fast-sha256` (transitive, via `resend`/`svix` → `standardwebhooks`, used for webhook HMAC signing) is released under the Unlicense — a public-domain dedication, not in our stated license policy.
+- **Accepted because:** The Unlicense places the work in the public domain with no conditions whatsoever (no attribution, no share-alike, no restriction on use or redistribution) — strictly more permissive than MIT, which is already on the allowlist. There is no meaningful compliance risk.
+- **Mitigation:** None required. Excluded from the license-compliance allowlist gate (`scripts/check-licenses.ts`, `DEFAULT_EXCLUDED_PACKAGES`).
+- **Severity:** None
+- **Accepted:** 2026-07-15
+
+## MIT-0 dependency (postal-mime) (#1012)
+
+- **Risk:** `postal-mime` (transitive, via `resend`, used for email parsing) is released under MIT-0 (MIT No Attribution), not in our stated license policy.
+- **Accepted because:** MIT-0 is textually identical to MIT with the attribution clause removed — it is a strict subset of MIT's already-minimal obligations. No meaningful compliance difference from the allowlisted MIT license.
+- **Mitigation:** None required. Excluded from the license-compliance allowlist gate (`scripts/check-licenses.ts`, `DEFAULT_EXCLUDED_PACKAGES`).
+- **Severity:** None
+- **Accepted:** 2026-07-15
+
 ## Infrastructure
 
 ## GitHub Advanced Security (code scanning + secret scanning) unavailable on repo tier
