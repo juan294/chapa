@@ -10,6 +10,7 @@ import {
   buildBadgeSvgCacheKey,
   handleCacheJitterSeconds,
   readBadgeSvgCache,
+  readBadgeSvgCacheWithStatus,
   writeBadgeSvgCache,
 } from "./badge-svg-cache";
 import * as redis from "@/lib/cache/redis";
@@ -52,6 +53,67 @@ describe("badge-svg-cache", () => {
       cacheGet.mockRejectedValueOnce(new Error("redis down"));
       const result = await readBadgeSvgCache("badge:v2:octocat:warm-amber:2026-05-01");
       expect(result).toBeNull();
+    });
+  });
+
+  // #1014 — a 250ms read deadline misclassified genuine cache-hits as misses
+  // under Redis tail latency, forcing an unnecessary full materialize+render.
+  // The deadline was raised to give real reads more room while staying well
+  // under the 800ms cache-hit SLO, and reads that DO exceed the deadline are
+  // now distinguishable from a genuine miss via `readBadgeSvgCacheWithStatus`.
+  describe("readBadgeSvgCacheWithStatus (#1014)", () => {
+    it("treats a read that resolves in ~300ms as a HIT, not a miss", async () => {
+      cacheGet.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve("<svg>cached</svg>"), 300);
+          }),
+      );
+
+      const result = await readBadgeSvgCacheWithStatus(
+        "badge:v2:octocat:warm-amber:2026-05-01",
+      );
+
+      expect(result.svg).toBe("<svg>cached</svg>");
+      expect(result.timedOut).toBe(false);
+    });
+
+    it("marks the read as timed-out (not a genuine miss) when it exceeds the deadline", async () => {
+      cacheGet.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve("<svg>too-late</svg>"), 5000);
+          }),
+      );
+
+      const result = await readBadgeSvgCacheWithStatus(
+        "badge:v2:octocat:warm-amber:2026-05-01",
+      );
+
+      expect(result.svg).toBeNull();
+      expect(result.timedOut).toBe(true);
+    });
+
+    it("a genuine cache miss is NOT reported as timed-out", async () => {
+      cacheGet.mockResolvedValueOnce(null);
+
+      const result = await readBadgeSvgCacheWithStatus(
+        "badge:v2:nope:warm-amber:2026-05-01",
+      );
+
+      expect(result.svg).toBeNull();
+      expect(result.timedOut).toBe(false);
+    });
+
+    it("a Redis error is NOT reported as timed-out (fail-open, distinct from deadline breach)", async () => {
+      cacheGet.mockRejectedValueOnce(new Error("redis down"));
+
+      const result = await readBadgeSvgCacheWithStatus(
+        "badge:v2:octocat:warm-amber:2026-05-01",
+      );
+
+      expect(result.svg).toBeNull();
+      expect(result.timedOut).toBe(false);
     });
   });
 
