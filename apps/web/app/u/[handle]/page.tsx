@@ -27,6 +27,7 @@ import {
   materializePublicProfile,
   persistProfileSnapshot,
 } from "@/lib/profile/public-profile";
+import { getTrendData } from "@/lib/history/get-trend-data";
 import { getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -116,7 +117,17 @@ export async function SharePageContent({
   // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
-  const materialized = await materializePublicProfile(handle, { readOnly });
+  // #1034 — fetch trend/diff history alongside profile materialization
+  // (rather than in a client `useEffect` post-hydration) so the dashboard
+  // renders with this data on first paint instead of a client fetch waterfall.
+  // getTrendData() already degrades gracefully (returns nulls) on any
+  // history-store failure; the `.catch()` here is a belt-and-suspenders
+  // guard so a future regression in that contract still can't fail the
+  // whole share page render — a 500 here would be a bug (CLAUDE.md).
+  const [materialized, trendData] = await Promise.all([
+    materializePublicProfile(handle, { readOnly }),
+    getTrendData(handle).catch(() => ({ trend: null, diff: null })),
+  ]);
   const stats = materialized?.stats ?? null;
   const impact = materialized?.displayImpact ?? null;
   const craftResult = materialized?.craftResult ?? null;
@@ -273,6 +284,8 @@ export async function SharePageContent({
           stats={stats}
           impact={impact}
           craftResult={craftResult}
+          trend={trendData.trend}
+          diff={trendData.diff}
         />
       </div>
     </>
