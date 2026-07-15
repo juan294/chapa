@@ -1,4 +1,4 @@
-import { captureServerEvent } from "@/lib/analytics/server-errors";
+import { captureServerError, captureServerEvent } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
@@ -130,16 +130,32 @@ export async function persistProfileSnapshot(
   // let the UNIQUE(handle, date) constraint dedupe. The durable Supabase write
   // and its Redis cache mirror are reconciled as one envelope so a partial
   // failure (durable ok, cache stale) surfaces an operational alert (#975).
-  const { persisted } = await reconcileSnapshotWrite(
+  const { persisted, writeOutcome } = await reconcileSnapshotWrite(
     handle,
     materialized.snapshot,
     { mode: materialized.inputsChanged ? "replace" : "insert" },
   );
+
+  // #1009 — This is the badge-path snapshot write; every other write endpoint
+  // (/api/insights, /api/refresh, /api/recalculate) already escalates a
+  // persist failure via captureServerError. A "duplicate" outcome is benign
+  // (row already existed) and must NOT alert — only a genuine "failed"
+  // outcome is worth escalating, and the tri-state from #1015/#1016 lets us
+  // distinguish the two here unambiguously. Fire-and-forget: never blocks or
+  // fails the badge response.
+  if (writeOutcome === "failed") {
+    void captureServerError({
+      route: "lib/profile/public-profile",
+      statusCode: 200,
+      error: new Error(`Failed to persist profile snapshot for handle: ${handle}`),
+    });
+  }
+
   if (persisted && materialized.inputsChanged) {
     await clearStatsDirty(handle);
   }
 
-  return true;
+  return persisted;
 }
 
 export async function deferProfileCacheWork(
