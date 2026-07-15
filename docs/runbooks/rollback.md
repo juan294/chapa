@@ -52,6 +52,17 @@ curl -I https://chapa.thecreativetoken.com/u/<handle>/badge.svg
 curl -I https://chapa.thecreativetoken.com | grep x-vercel-deployment-url
 ```
 
+## Schema Changes Are Not Covered by This Runbook
+
+Everything above rolls back **application code** — it does not touch the
+database. If the incident involves a destructive Supabase migration that was
+already applied to production (dropped column/table, narrowed type, removed
+constraint), rolling back code alone will not fix it: the restored code
+expects a schema that no longer exists. See "Reversing a Migration" in
+`docs/runbooks/migrations.md` for the paired reverse-SQL-script procedure —
+schema rollback and code rollback must be coordinated, not treated as the same
+action.
+
 ## Post-Rollback
 
 1. Open a GitHub issue describing the incident (use `type: bug`, `priority: critical`).

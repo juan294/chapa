@@ -15,6 +15,7 @@
     "test:e2e": "pnpm --filter @chapa/web test:e2e",
     "validate:migrations": "tsx scripts/validate-migrations.ts",
     "check:write-registration": "tsx scripts/check-write-registration.ts --max-unregistered=0",
+    "check:pending-migrations": "tsx scripts/check-pending-migrations.ts",
     "delete-user": "tsx scripts/delete-user.ts",
     "heal-poisoned-stats": "tsx scripts/heal-poisoned-stats.ts",
     "check:circular": "pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/ packages/shared/src/",

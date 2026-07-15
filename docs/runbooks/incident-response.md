@@ -44,7 +44,7 @@ This is a solo project. Escalation means:
 
 ### P1 — Critical
 
-1. **Assess:** Check `/api/health`, Vercel deployment logs, recent commits (`git log main --oneline -10`).
+1. **Assess:** Check `/api/health`, Vercel deployment logs, recent commits (`git log main --oneline -10`). When grepping the repo for the offending code, exclude `apps/web/.next/` (gitignored build output) — it can return megabytes of compiled-chunk noise that obscures real signal (e.g. `grep -r --exclude-dir=.next ...`).
 2. **Isolate:** Identify whether the issue is in code, config, or a dependency.
 3. **Roll back if needed:** See `docs/runbooks/rollback.md`.
 4. **Communicate:** If the project has public users, add a status note.
