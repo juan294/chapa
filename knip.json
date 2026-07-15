@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["du"],
+  "ignoreBinaries": ["du", "supabase", "osv-scanner"],
   "ignore": [
     "test/stubs/server-only.ts",
     "apps/web/test/contract/**"

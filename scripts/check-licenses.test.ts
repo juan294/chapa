@@ -50,6 +50,22 @@ describe("findLicenseViolations", () => {
     expect(findLicenseViolations(report)).toEqual([]);
   });
 
+  it("covers the Linux platform variants of @resvg/resvg-js and sharp-libvips (CI runs on Linux, not just macOS)", () => {
+    const report: PnpmLicenseReport = {
+      "MPL-2.0": [
+        { name: "@resvg/resvg-js-linux-x64-gnu", versions: ["2.6.2"], license: "MPL-2.0" },
+      ],
+      "LGPL-3.0-or-later": [
+        { name: "@img/sharp-libvips-linux-x64", versions: ["1.2.4"], license: "LGPL-3.0-or-later" },
+      ],
+    };
+
+    // Uses the default exclusion list (no `excluded` option passed). Only the
+    // darwin-arm64 variants were previously listed, which is exactly what
+    // let this pass locally on macOS but fail on the Linux CI runner.
+    expect(findLicenseViolations(report)).toEqual([]);
+  });
+
   it("resolves an SPDX OR expression as passing if any alternative license is allowed", () => {
     const report: PnpmLicenseReport = {
       "(MPL-2.0 OR Apache-2.0)": [

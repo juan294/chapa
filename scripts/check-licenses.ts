@@ -67,11 +67,17 @@ export const DEFAULT_ALLOWED_LICENSES: readonly string[] = [
  */
 export const DEFAULT_EXCLUDED_PACKAGES: readonly ExcludedPackage[] = [
   // MPL-2.0 -- accepted-risks.md "MPL-2.0 dependency (@resvg/resvg-js) (#464, #596)"
+  // pnpm resolves a platform-specific optional binary package alongside the
+  // base package; darwin-arm64 covers local macOS dev, linux-x64-gnu covers
+  // the GitHub Actions Ubuntu runner CI actually installs on.
   { name: "@resvg/resvg-js" },
   { name: "@resvg/resvg-js-darwin-arm64" },
+  { name: "@resvg/resvg-js-linux-x64-gnu" },
   // LGPL-3.0-or-later, dynamically linked -- accepted-risks.md
-  // "LGPL-3.0 dependency (@img/sharp-libvips-darwin-arm64) (#676)"
+  // "LGPL-3.0 dependency (@img/sharp-libvips-darwin-arm64) (#676)". Same
+  // platform-binary split as resvg-js above.
   { name: "@img/sharp-libvips-darwin-arm64" },
+  { name: "@img/sharp-libvips-linux-x64" },
   // Unlicense (public domain) -- accepted-risks.md
   // "Unlicense dependency (fast-sha256) (#1012)"
   { name: "fast-sha256" },
