@@ -677,6 +677,41 @@ describe("GET /api/cron/warm-cache", () => {
     });
   });
 
+  // #1010: cron frequency was bumped from daily to hourly to shrink the
+  // per-handle staleness gap, WITHOUT raising MAX_HANDLES — this test guards
+  // that decision by asserting the per-run processed count (and therefore the
+  // batch count / worst-case duration against maxDuration=300s) stays capped
+  // regardless of how large the active-user population grows.
+  describe("timeout-safety: per-run ceiling stays bounded as population grows (#1010)", () => {
+    it("caps processedCount at MAX_HANDLES (50) even with a 500-user population", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 500 }, (_, index) => user(`user${index}`)),
+      );
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.processedCount).toBe(50);
+      // Batch count is processedCount / BATCH_SIZE (5) = 10 batches regardless
+      // of total population — this is what keeps worst-case duration bounded
+      // under the 300s maxDuration budget as the user base scales.
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(50);
+    });
+
+    it("caps processedCount at MAX_HANDLES (50) even with a 5000-user population", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 5000 }, (_, index) => user(`user${index}`)),
+      );
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.processedCount).toBe(50);
+    });
+  });
+
   // DO-S1 (#773): P2 alert when active handles approach or exceed the per-run ceiling
   describe("DO-S1: warm-cache ceiling operational alert", () => {
     it("emits a P2 ceiling alert when active handle count exceeds MAX_HANDLES", async () => {
@@ -735,6 +770,29 @@ describe("GET /api/cron/warm-cache", () => {
           properties: expect.objectContaining({
             totalUsers: 60,
             ceiling: 50,
+          }),
+        }),
+      );
+    });
+
+    // #1010: the alert predates the hourly cadence bump — rotationHours makes
+    // the actual (now much smaller) staleness bound explicit for on-call,
+    // instead of leaving them to assume the old once-daily blast radius.
+    it("includes rotationHours reflecting the hourly cadence, not the old daily one", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 125 }, (_, index) => user(`user${index}`)),
+      );
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_ceiling_approached",
+          summary: expect.stringContaining("~3h"),
+          properties: expect.objectContaining({
+            totalUsers: 125,
+            ceiling: 50,
+            rotationHours: 3, // ceil(125 / 50)
           }),
         }),
       );

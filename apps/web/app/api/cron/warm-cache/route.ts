@@ -30,7 +30,27 @@ import {
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
 
-/** Maximum handles to warm per cron invocation (stay within GitHub rate limits). */
+/**
+ * Maximum handles to warm per cron invocation (stay within GitHub rate
+ * limits and the maxDuration budget above).
+ *
+ * #1010 — rate-limit math: each handle warm makes at most one GitHub
+ * GraphQL call (contribution data + the authoritative merged-PR search are
+ * both fields on a single `fetchContributionData` request — see
+ * `lib/github/queries.ts`), and only on a stats-cache miss (6h TTL, see
+ * `lib/github/client.ts`'s CACHE_TTL) — a warm re-run inside that window is
+ * a cache hit and makes zero GitHub calls. Since the Vercel cron schedule
+ * (`vercel.json`) was bumped from once daily to hourly, worst case this cron
+ * now makes up to MAX_HANDLES GraphQL calls *per hour* instead of per day —
+ * at 50/hour that's ~1,200/day, still ~4% of GitHub's 5,000/hr authenticated
+ * budget (`GITHUB_TOKEN`), leaving ample headroom for real user traffic
+ * hitting `getStats()` on the same token pool. MAX_HANDLES was deliberately
+ * left unchanged rather than raised alongside the frequency bump — the
+ * per-run batch count (MAX_HANDLES / BATCH_SIZE) is what bounds worst-case
+ * duration against `maxDuration`, and hourly cadence alone already shrinks
+ * the full-rotation gap ~24x (see the `warm_cache_ceiling_approached` alert
+ * below for what that gap now means).
+ */
 const MAX_HANDLES = 50;
 
 /** Number of handles to process concurrently per batch. */
@@ -53,7 +73,8 @@ interface HandleResult {
  *
  * Vercel Cron endpoint that pre-warms the stats cache for all known users.
  * Reads the user list from Supabase, and calls getStats() for each to
- * refresh their 6-hour cache window.
+ * refresh their 6-hour cache window. Runs hourly (#1010; was once daily) —
+ * see MAX_HANDLES above for the GitHub rate-limit math behind that cadence.
  *
  * Handles are processed in parallel batches of 5 for throughput while
  * staying gentle on GitHub rate limits. Individual failures are isolated
@@ -181,17 +202,29 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   }
 
   // DO-S1 (#773): P2 alert when total active users are at or above the per-run ceiling.
-  // When allHandles.length >= MAX_HANDLES, only a subset is warmed per run and cache
-  // staleness risk grows with each new user beyond the ceiling. Alert early so the team
-  // can act before staleness spreads. (Full fix — staggered crons / tiered freshness —
-  // is tracked as a follow-up infra task.)
+  // When allHandles.length >= MAX_HANDLES, only a subset is warmed per run and a full
+  // round-robin rotation takes ceil(totalUsers / MAX_HANDLES) *runs* to cover everyone.
+  //
+  // #1010 — this alert predates the hourly cadence and was written when a "run" meant
+  // a day: at 50 users/run daily, exceeding the ceiling meant some handles went DAYS
+  // between proactive warms (and, since warmHandle also records the daily lifetime-
+  // history snapshot, days of gapped history). Now that the cron runs hourly (see
+  // MAX_HANDLES above), the same numeric threshold means a full rotation takes
+  // ceil(totalUsers / MAX_HANDLES) HOURS instead of days — a ~24x smaller worst-case
+  // gap for the same active-user count. The threshold and severity are left as-is
+  // (still worth knowing when not every handle is covered every run), but
+  // `rotationHours` is now included so on-call can see the actual staleness bound
+  // rather than assuming the old daily-cadence blast radius. (Full fix — tiered
+  // freshness by popularity, or decoupling snapshot recording from warm rotation
+  // entirely — is tracked as a follow-up infra task.)
   if (allHandles.length >= MAX_HANDLES) {
+    const rotationHours = Math.ceil(allHandles.length / MAX_HANDLES);
     void captureOperationalAlert({
       signal: "warm_cache_ceiling_approached",
       severity: "P2",
-      summary: `warm-cache ceiling: ${allHandles.length} active users vs ${MAX_HANDLES}/run — some handles may not be warmed each cycle`,
+      summary: `warm-cache ceiling: ${allHandles.length} active users vs ${MAX_HANDLES}/run (hourly) — full rotation takes ~${rotationHours}h`,
       route: "/api/cron/warm-cache",
-      properties: { totalUsers: allHandles.length, ceiling: MAX_HANDLES },
+      properties: { totalUsers: allHandles.length, ceiling: MAX_HANDLES, rotationHours },
     });
   }
 
