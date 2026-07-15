@@ -12,8 +12,11 @@ const {
   mockCacheDel,
   mockMarkStatsDirty,
   mockRateLimit,
+  mockRateLimitStrict,
   mockGetClientIp,
   mockComputeTokenExpiry,
+  mockIssueOauthState,
+  mockConsumeOauthState,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockDbUpsertLinkedPlatform: vi.fn(),
@@ -22,8 +25,11 @@ const {
   mockCacheDel: vi.fn(),
   mockMarkStatsDirty: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockRateLimitStrict: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockComputeTokenExpiry: vi.fn(),
+  mockIssueOauthState: vi.fn(),
+  mockConsumeOauthState: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -38,6 +44,10 @@ vi.mock("@/lib/db/user-platforms", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheDel: mockCacheDel,
+  // Connect/callback/disconnect use rateLimitStrict (fail-closed, #1027
+  // BE-M3); status stays on rateLimit (fail-open). Kept as distinct spies so
+  // the wiring tests below can prove each handler calls the correct variant.
+  rateLimitStrict: mockRateLimitStrict,
   rateLimit: mockRateLimit,
 }));
 
@@ -51,6 +61,11 @@ vi.mock("@/lib/http/client-ip", () => ({
 
 vi.mock("@/lib/auth/bitbucket", () => ({
   computeTokenExpiry: mockComputeTokenExpiry,
+}));
+
+vi.mock("@/lib/auth/oauth-state", () => ({
+  issueOauthState: mockIssueOauthState,
+  consumeOauthState: mockConsumeOauthState,
 }));
 
 vi.mock("next/cache", () => ({
@@ -170,8 +185,9 @@ describe("createConnectHandler", () => {
     vi.clearAllMocks();
     config = makeMockConfig();
     GET = createConnectHandler(config);
-    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockGetClientIp.mockReturnValue("1.2.3.4");
+    mockIssueOauthState.mockResolvedValue("shared");
     allowSession();
     setEnvVars();
   });
@@ -189,17 +205,32 @@ describe("createConnectHandler", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
 
     const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
     const res = await GET(req);
     expect(res.status).toBe(429);
   });
 
-  it("uses platform-specific rate limit key", async () => {
+  it("uses platform-specific rate limit key via the fail-closed limiter (#1027 BE-M3)", async () => {
     const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
     await GET(req);
-    expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:tp:connect:1.2.3.4", 10, 900);
+    expect(mockRateLimitStrict).toHaveBeenCalledWith("ratelimit:tp:connect:1.2.3.4", 10, 900);
+    // Connect must NOT use the fail-open limiter — that would silently
+    // re-open the auth route during a Redis outage.
+    expect(mockRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("rejects the request when the rate limiter reports unavailable, simulating a Redis outage (#1027 BE-M3)", async () => {
+    // rateLimitStrict fails closed on a Redis outage (see redis.test.ts) —
+    // assert the connect handler actually surfaces that as a 429 rather than
+    // silently proceeding, which is what the old fail-open `rateLimit` wiring
+    // would have done.
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 0, limit: 10 });
+
+    const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
+    const res = await GET(req);
+    expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -263,6 +294,40 @@ describe("createConnectHandler", () => {
       "test-state-token",
     );
   });
+
+  // -------------------------------------------------------------------------
+  // #1027 SE-L1 — single-use replay-resistant nonce
+  // -------------------------------------------------------------------------
+
+  it("registers a single-use nonce for the generated state via issueOauthState", async () => {
+    const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
+    await GET(req);
+
+    expect(mockIssueOauthState).toHaveBeenCalledWith("test-state-token");
+  });
+
+  it("sets a per-platform state-store-mode cookie reflecting issueOauthState's result", async () => {
+    mockIssueOauthState.mockResolvedValue("shared");
+
+    const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
+    const res = await GET(req);
+
+    const setCookies = res.headers.getSetCookie();
+    const storeCookie = setCookies.find((c) => c.startsWith("chapa_tp_oauth_state_store="));
+    expect(storeCookie).toBeDefined();
+    expect(storeCookie).toContain("chapa_tp_oauth_state_store=shared");
+  });
+
+  it("falls back to a 'fallback' state-store-mode cookie when issueOauthState can't reach Redis", async () => {
+    mockIssueOauthState.mockResolvedValue("fallback");
+
+    const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
+    const res = await GET(req);
+
+    const setCookies = res.headers.getSetCookie();
+    const storeCookie = setCookies.find((c) => c.startsWith("chapa_tp_oauth_state_store="));
+    expect(storeCookie).toContain("chapa_tp_oauth_state_store=fallback");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -277,8 +342,11 @@ describe("createCallbackHandler", () => {
     code?: string;
     state?: string;
     cookie?: string;
+    baseUrl?: string;
   }): NextRequest {
-    const url = new URL("https://chapa.thecreativetoken.com/api/auth/testplatform/callback");
+    const url = new URL(
+      params?.baseUrl ?? "https://chapa.thecreativetoken.com/api/auth/testplatform/callback",
+    );
     if (params?.code) url.searchParams.set("code", params.code);
     if (params?.state) url.searchParams.set("state", params.state);
     const headers: Record<string, string> = {};
@@ -290,8 +358,9 @@ describe("createCallbackHandler", () => {
     vi.clearAllMocks();
     config = makeMockConfig();
     GET = createCallbackHandler(config);
-    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockGetClientIp.mockReturnValue("1.2.3.4");
+    mockConsumeOauthState.mockResolvedValue(true);
     allowSession();
     setEnvVars();
     mockComputeTokenExpiry.mockReturnValue(new Date("2026-03-01T00:00:00Z"));
@@ -311,7 +380,21 @@ describe("createCallbackHandler", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
+    expect(res.status).toBe(429);
+  });
+
+  it("uses the fail-closed limiter, not the fail-open one (#1027 BE-M3)", async () => {
+    await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
+
+    expect(mockRateLimitStrict).toHaveBeenCalledWith("ratelimit:tp:callback:1.2.3.4", 10, 900);
+    expect(mockRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("rejects the request when the rate limiter reports unavailable, simulating a Redis outage (#1027 BE-M3)", async () => {
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 0, limit: 10 });
 
     const res = await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
     expect(res.status).toBe(429);
@@ -473,6 +556,95 @@ describe("createCallbackHandler", () => {
 
     expect(config.mockFetchUser).toHaveBeenCalledWith("tp_access_123");
   });
+
+  // -------------------------------------------------------------------------
+  // #1027 SE-L1 — single-use replay-resistant nonce (shared factory, reuses
+  // GitHub's issueOauthState/consumeOauthState and its Upstash
+  // read-your-writes retry/fallback behavior as-is; see oauth-state.ts).
+  // -------------------------------------------------------------------------
+
+  it("consumes the state value server-side and rejects replay when the connect step marked the nonce as shared", async () => {
+    mockConsumeOauthState
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const first = await GET(
+      makeCallbackRequest({
+        code: "valid-code",
+        state: "state-abc",
+        cookie: "test_cookie=state-abc; chapa_tp_oauth_state_store=shared",
+      }),
+    );
+    expect(first.status).toBe(307);
+
+    const second = await GET(
+      makeCallbackRequest({
+        code: "valid-code",
+        state: "state-abc",
+        cookie: "test_cookie=state-abc; chapa_tp_oauth_state_store=shared",
+      }),
+    );
+    expect(second.status).toBe(400);
+    await expect(second.json()).resolves.toEqual({ error: "state_already_used" });
+    expect(mockConsumeOauthState).toHaveBeenCalledWith("state-abc");
+  });
+
+  it("skips shared-store replay enforcement when the connect step marked the nonce as fallback-only", async () => {
+    const res = await GET(
+      makeCallbackRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: "test_cookie=valid-state; chapa_tp_oauth_state_store=fallback",
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(mockConsumeOauthState).not.toHaveBeenCalled();
+  });
+
+  it("skips shared-store replay enforcement when no state-store-mode cookie is present (legacy/no-cookie request)", async () => {
+    const res = await GET(
+      makeCallbackRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: "test_cookie=valid-state",
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(mockConsumeOauthState).not.toHaveBeenCalled();
+  });
+
+  it("skips shared-store replay enforcement on localhost during local dev", async () => {
+    mockConsumeOauthState.mockResolvedValue(false);
+
+    const res = await GET(
+      makeCallbackRequest({
+        baseUrl: "http://localhost:3001/api/auth/testplatform/callback",
+        code: "valid-code",
+        state: "valid-state",
+        cookie: "test_cookie=valid-state; chapa_tp_oauth_state_store=shared",
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(mockConsumeOauthState).not.toHaveBeenCalled();
+  });
+
+  it("clears the per-platform state-store-mode cookie on success", async () => {
+    const res = await GET(
+      makeCallbackRequest({
+        code: "abc",
+        state: "xyz",
+        cookie: "test_cookie=xyz; chapa_tp_oauth_state_store=shared",
+      }),
+    );
+
+    const setCookies = res.headers.getSetCookie();
+    const storeCookie = setCookies.find((c) => c.startsWith("chapa_tp_oauth_state_store="));
+    expect(storeCookie).toBeDefined();
+    expect(storeCookie).toContain("Max-Age=0");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -487,7 +659,7 @@ describe("createDisconnectHandler", () => {
     vi.clearAllMocks();
     config = makeMockConfig();
     POST = createDisconnectHandler(config);
-    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockGetClientIp.mockReturnValue("1.2.3.4");
     allowSession();
     mockDbDeleteLinkedPlatform.mockResolvedValue(true);
@@ -509,7 +681,21 @@ describe("createDisconnectHandler", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(429);
+  });
+
+  it("uses the fail-closed limiter, not the fail-open one (#1027 BE-M3)", async () => {
+    await POST(makeRequest());
+
+    expect(mockRateLimitStrict).toHaveBeenCalledWith("ratelimit:tp:disconnect:1.2.3.4", 10, 900);
+    expect(mockRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("rejects the request when the rate limiter reports unavailable, simulating a Redis outage (#1027 BE-M3)", async () => {
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 0, limit: 10 });
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(429);
@@ -630,6 +816,15 @@ describe("createStatusHandler", () => {
   it("uses status-specific rate limit (120 per 15 min)", async () => {
     await GET(makeRequest());
     expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:tp:status:1.2.3.4", 120, 900);
+  });
+
+  it("stays fail-open (rateLimit), intentionally NOT switched to rateLimitStrict (#1027 BE-M3)", async () => {
+    // Status is a read-only navbar check — per redis.ts's documented policy,
+    // public/read-only routes must preserve availability during a Redis
+    // outage rather than block. Unlike connect/callback/disconnect, this
+    // handler must keep using the fail-open limiter.
+    await GET(makeRequest());
+    expect(mockRateLimitStrict).not.toHaveBeenCalled();
   });
 
   it("returns 401 when not authenticated", async () => {
