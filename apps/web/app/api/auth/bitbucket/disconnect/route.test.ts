@@ -46,6 +46,9 @@ vi.mock("@/lib/db/user-platforms", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheDel: mockCacheDel,
+  // Disconnect uses rateLimitStrict (fail-closed, #1027 BE-M3) — same spy so
+  // existing assertions against mockRateLimit still hold.
+  rateLimitStrict: mockRateLimit,
   rateLimit: mockRateLimit,
 }));
 

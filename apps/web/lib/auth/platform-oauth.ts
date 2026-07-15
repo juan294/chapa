@@ -15,12 +15,50 @@ import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth/require-session";
 import { getBaseUrl } from "@/lib/env";
 import { dbUpsertLinkedPlatform, dbDeleteLinkedPlatform, dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
-import { cacheDel, rateLimit } from "@/lib/cache/redis";
+import { cacheDel, rateLimit, rateLimitStrict } from "@/lib/cache/redis";
 import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeTokenExpiry } from "@/lib/auth/bitbucket";
 import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
+import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
+import { issueOauthState, consumeOauthState } from "@/lib/auth/oauth-state";
+
+function cookieFlags(): string {
+  return buildAuthCookieFlags(getBaseUrl());
+}
+
+function isLocalDevRequest(request: NextRequest): boolean {
+  const hostname = request.nextUrl.hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+/**
+ * Per-platform cookie name that tracks whether {@link issueOauthState} wrote
+ * the CSRF nonce to the shared Redis store ("shared") or fell back to local
+ * in-memory storage ("fallback"). Mirrors the GitHub login/callback flow's
+ * `chapa_oauth_state_store` cookie (see `app/api/auth/login/route.ts` and
+ * `app/api/auth/callback/route.ts`), namespaced per platform so concurrent
+ * connect flows for different providers never collide.
+ */
+function stateStoreCookieName(config: PlatformOAuthConfig): string {
+  return `chapa_${config.rateLimitPrefix}_oauth_state_store`;
+}
+
+function readStateStoreCookie(
+  cookieHeader: string | null,
+  config: PlatformOAuthConfig,
+): "shared" | "fallback" | null {
+  if (!cookieHeader) return null;
+  const name = stateStoreCookieName(config);
+  const match = cookieHeader
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${name}=`));
+  if (!match) return null;
+  const value = match.slice(`${name}=`.length);
+  return value === "shared" || value === "fallback" ? value : null;
+}
 
 /**
  * Invalidate the same-day rendered badge SVG cache so a newly linked or
@@ -132,7 +170,8 @@ export interface PlatformOAuthConfig {
  * Create a GET handler for the OAuth connect route.
  *
  * Flow: feature flag -> rate limit -> require session -> validate env ->
- *       create state cookie -> build auth URL -> redirect
+ *       create state cookie -> issue single-use nonce -> build auth URL ->
+ *       redirect
  */
 export function createConnectHandler(config: PlatformOAuthConfig) {
   return async function GET(request: NextRequest) {
@@ -141,9 +180,14 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // 2. Rate limit: 10 requests per IP per 15 minutes
+    // 2. Rate limit: 10 requests per IP per 15 minutes.
+    // Fail-closed (rateLimitStrict): connect is an auth route that kicks off
+    // token exchange and a subsequent user_platforms write, so per redis.ts's
+    // documented policy ("auth and write routes where losing rate-limit
+    // enforcement during a Redis outage is unacceptable"), it must fail
+    // closed rather than fail open (#1027 BE-M3).
     const ip = getClientIp(request);
-    const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:connect:${ip}`, 10, 900);
+    const rl = await rateLimitStrict(`ratelimit:${config.rateLimitPrefix}:connect:${ip}`, 10, 900);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -163,8 +207,13 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
       );
     }
 
-    // 5. Generate CSRF state + cookie
+    // 5. Generate CSRF state + cookie, and register a single-use,
+    // replay-resistant nonce in the shared oauth-state store (#1027 SE-L1).
+    // Reuses the exact same issue/consume helpers GitHub's login/callback
+    // flow uses, including their Upstash read-your-writes retry/fallback
+    // behavior — see oauth-state.ts.
     const { state, cookie } = config.createStateCookie();
+    const stateStoreMode = await issueOauthState(state);
     const baseUrl = getBaseUrl();
     const redirectUri = `${baseUrl}/api/auth/${config.platform}/callback`;
     const authUrl = config.buildAuthUrl(clientId, redirectUri, state);
@@ -172,6 +221,10 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
     // 6. Redirect to platform
     const response = NextResponse.redirect(authUrl);
     response.headers.append("Set-Cookie", cookie);
+    response.headers.append(
+      "Set-Cookie",
+      `${stateStoreCookieName(config)}=${stateStoreMode}; ${cookieFlags()}; Max-Age=600`,
+    );
     return response;
   };
 }
@@ -180,8 +233,9 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
  * Create a GET handler for the OAuth callback route.
  *
  * Flow: feature flag -> rate limit -> require session -> validate code ->
- *       validate CSRF -> validate env -> exchange code -> fetch user ->
- *       store tokens -> invalidate cache -> clear cookie -> redirect
+ *       validate CSRF (cookie double-submit) -> consume single-use nonce ->
+ *       validate env -> exchange code -> fetch user -> store tokens ->
+ *       invalidate cache -> clear cookie -> redirect
  */
 export function createCallbackHandler(config: PlatformOAuthConfig) {
   return async function GET(request: NextRequest) {
@@ -190,9 +244,11 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // 2. Rate limit: 10 requests per IP per 15 minutes
+    // 2. Rate limit: 10 requests per IP per 15 minutes.
+    // Fail-closed (rateLimitStrict) — see createConnectHandler comment above
+    // and redis.ts's documented fail-open/fail-closed policy (#1027 BE-M3).
     const ip = getClientIp(request);
-    const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:callback:${ip}`, 10, 900);
+    const rl = await rateLimitStrict(`ratelimit:${config.rateLimitPrefix}:callback:${ip}`, 10, 900);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -215,13 +271,32 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
       );
     }
 
-    // 5. Validate CSRF state
+    // 5. Validate CSRF state (cookie double-submit)
     const queryState = request.nextUrl.searchParams.get("state");
     const cookieHeader = request.headers.get("cookie");
     if (!config.validateState(cookieHeader, queryState)) {
       return NextResponse.redirect(
         new URL(`${errorRedirectBase}?error=${config.platform}_invalid_state`, request.url),
       );
+    }
+
+    // 5b. Consume the single-use nonce (#1027 SE-L1). This makes a captured
+    // (state cookie + state param) pair unreplayable even within the CSRF
+    // window, mirroring the GitHub callback exactly (same issue/consume
+    // helpers, same "shared" vs "fallback" store-mode gate, same local-dev
+    // exemption). CRITICAL: do not reimplement a simpler consume — a naive
+    // hard-consume caused the "state_already_used on first legitimate link"
+    // production incident (2026-05-01) because Upstash's read-your-writes
+    // consistency is client-scoped in serverless environments. The retry
+    // loop that fixes this lives in oauth-state.ts and is reused as-is here.
+    const stateStoreMode = readStateStoreCookie(cookieHeader, config);
+    const mustConsumeSharedState =
+      !isLocalDevRequest(request) && stateStoreMode === "shared";
+    const consumed = mustConsumeSharedState && queryState
+      ? await consumeOauthState(queryState)
+      : true;
+    if (mustConsumeSharedState && !consumed) {
+      return NextResponse.json({ error: "state_already_used" }, { status: 400 });
     }
 
     // 6. Validate env vars
@@ -275,11 +350,15 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
     ]);
     revalidateSharePage(handle);
 
-    // 11. Clear state cookie and redirect to share page
+    // 11. Clear state cookies and redirect to share page
     const response = NextResponse.redirect(
       new URL(`/u/${handle}?${config.platform}=linked`, request.url),
     );
     response.headers.append("Set-Cookie", config.clearStateCookie());
+    response.headers.append(
+      "Set-Cookie",
+      `${stateStoreCookieName(config)}=; ${cookieFlags()}; Max-Age=0`,
+    );
     return response;
   };
 }
@@ -297,9 +376,12 @@ export function createDisconnectHandler(config: PlatformOAuthConfig) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // 2. Rate limit: 10 requests per IP per 15 minutes
+    // 2. Rate limit: 10 requests per IP per 15 minutes.
+    // Fail-closed (rateLimitStrict) — disconnect mutates user_platforms, so
+    // per redis.ts's documented policy this is a write route that must not
+    // silently lose rate-limit enforcement during a Redis outage (#1027 BE-M3).
     const ip = getClientIp(request);
-    const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:disconnect:${ip}`, 10, 900);
+    const rl = await rateLimitStrict(`ratelimit:${config.rateLimitPrefix}:disconnect:${ip}`, 10, 900);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -346,7 +428,11 @@ export function createStatusHandler(config: PlatformOAuthConfig) {
       return NextResponse.json({ enabled: false });
     }
 
-    // 2. Rate limit: 120 requests per IP per 15 minutes (navbar status check — read-only)
+    // 2. Rate limit: 120 requests per IP per 15 minutes (navbar status
+    // check — read-only). Stays fail-open (rateLimit): per redis.ts's
+    // documented policy, public/read-only routes must preserve availability
+    // over rate-limit enforcement during a Redis outage (#1027 BE-M3 — this
+    // route is intentionally NOT switched to rateLimitStrict).
     const ip = getClientIp(request);
     const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:status:${ip}`, 120, 900);
     if (!rl.allowed) {
