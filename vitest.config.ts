@@ -50,6 +50,26 @@ export default defineConfig({
         branches: 70,
         functions: 65,
         lines: 75,
+        // Per-path floors for the highest-risk areas (#1028): the global
+        // floor above is ~22 points below actual measured coverage, which
+        // would let a regression gut the scoring pipeline's tests without
+        // failing CI. These are set a few points below currently-measured
+        // coverage (impact/**: ~99.6/98.7/100/99.5 stmts/branches/fn/lines;
+        // stats-integrity.ts: 100/100/100/100 as of #1028) — tight enough to
+        // catch a large regression, loose enough that a legitimate refactor
+        // removing a branch doesn't trip the gate.
+        "apps/web/lib/impact/**": {
+          statements: 95,
+          branches: 90,
+          functions: 95,
+          lines: 95,
+        },
+        "apps/web/lib/github/stats-integrity.ts": {
+          statements: 90,
+          branches: 85,
+          functions: 90,
+          lines: 90,
+        },
       },
     },
   },
