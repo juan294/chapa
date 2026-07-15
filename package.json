@@ -10,6 +10,7 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run",
     "test:contract": "vitest run -c vitest.config.contract.ts",
+    "test:contract:local": "tsx scripts/test-contract-local.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @chapa/web test:e2e",
