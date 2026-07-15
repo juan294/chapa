@@ -53,6 +53,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** Low
 - **Future improvement:** Add `middleware.ts` with admin route matching when Next.js middleware stabilizes further or if the admin surface area grows significantly.
 
+## Stateless session cookie has no server-side revocation mechanism (SE-L2, #1038)
+
+- **Risk:** `chapa_session` is a fully stateless, AES-256-GCM-encrypted cookie (see `createSessionCookie`/`readSessionCookie` in `apps/web/lib/auth/github.ts:355-465`) whose only expiry check is the embedded `iat` timestamp, enforced against a 24h `SESSION_MAX_AGE_SECONDS` window on every read. There is no server-side session store or revocation list. `POST /api/auth/logout` (`apps/web/app/api/auth/logout/route.ts`) only clears the cookie client-side (`clearSessionCookie()`, `Max-Age=0`) — it does not and cannot invalidate a copy of the cookie value that has already been exfiltrated. A compromised `chapa_session` value remains valid until its 24h `iat`-based expiry elapses, regardless of logout. The only mass-invalidation lever is rotating `NEXTAUTH_SECRET`, which logs out every user on the platform.
+- **Why accepted rather than fixed:** Adding real revocation (e.g., a per-user `sessionEpoch` checked in Redis on every request) would couple auth availability to Redis uptime on every single authenticated request — a new, permanent outage dependency for a system that today treats Redis as best-effort everywhere else. Making that check fail-open (to avoid introducing that outage vector, consistent with this project's existing fail-open rate-limiter philosophy — see the "Rate limiter fail-open (#398)" entry above) would silently defeat the very guarantee revocation exists to provide: during an active incident (the exact moment revocation matters most), a Redis blip would make the "revoked" session pass anyway. A fix that only works when the dependency it avoids coupling to happens to be up is not an improvement to the failure mode that matters.
+- **Mitigating factors:** The 24h window bounds the blast radius of any single exfiltrated cookie — there is no indefinite-lifetime token in play. `NEXTAUTH_SECRET` rotation remains available as a full mass-invalidation escape hatch for a severe incident (e.g., confirmed credential-store compromise), at the cost of logging out all users.
+- **Severity:** Low
+- **See:** `apps/web/lib/auth/github.ts`, `apps/web/app/api/auth/logout/route.ts` — pre-launch audit finding SE-L2.
+- **Accepted:** 2026-07-15
+
 ## ~~MPL-2.0 / LGPL-3.0 dependency (sharp/libvips) (#450)~~ — Resolved
 
 - **Risk:** The `sharp` image processing library was MPL-2.0 licensed and depends on `libvips` which is LGPL-3.0 (dynamically linked).
