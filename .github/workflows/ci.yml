@@ -51,6 +51,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Test shard with coverage (blob report)
+        env:
+          # Tells vitest.config.ts to omit the per-path coverage thresholds
+          # (apps/web/lib/impact/**, stats-integrity.ts) for this run — a
+          # single shard only sees a subset of test files and can never
+          # satisfy a full-suite floor on its own. Real enforcement (global
+          # AND per-path) happens once, on the merged report, in the `test`
+          # job below. Must NOT be set there.
+          VITEST_SHARD_RUN: "true"
         run: |
           # blob feeds the merge gate; github reporter surfaces failing tests as
           # inline annotations (blob alone prints nothing per-test on failure).
