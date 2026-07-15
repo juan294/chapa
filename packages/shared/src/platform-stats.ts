@@ -1,7 +1,7 @@
 import type { HeatmapDay, StatsData } from "./types";
 import { normalizeStats } from "./stats-aggregation";
 import { computePrWeight } from "./scoring";
-import { PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
+import { PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD, DAILY_COMMIT_SPIKE_THRESHOLD } from "./constants";
 
 /**
  * Normalized repo entry — common shape across all platform aggregators.
@@ -76,7 +76,8 @@ export interface PlatformStatsInput {
  *   Step 1 (active days): derived from heatmapData.filter(d => d.count > 0)
  *   Step 2 (repos depth filter): activeRepos (commitCount >= REPO_DEPTH_THRESHOLD)
  *   Step 3 (top repo share): max(commitCount) / sum(commitCount) across active repos
- *   Step 4 (maxCommitsIn10Min heuristic): maxDailyCount >= 30 ? maxDailyCount : 0
+ *   Step 4 (maxCommitsIn10Min heuristic): maxDailyCount >= DAILY_COMMIT_SPIKE_THRESHOLD ? maxDailyCount : 0
+ *           (GitHub's buildStatsFromRaw uses the same shared constant — #1024)
  *   Step 5 (PR metrics): prsMergedCount, prsMergedWeight (aggregate-capped),
  *           linesAdded and linesDeleted derived from the normalized mergedPrs.
  *
@@ -131,9 +132,11 @@ export function computePlatformStats(input: PlatformStatsInput): StatsData {
       : 0;
 
   // Invariant step 4: maxCommitsIn10Min approximation from daily spikes
-  // (same heuristic as GitHub — daily counts ≥ 30 signal burst activity)
+  // (same heuristic as GitHub — daily counts >= DAILY_COMMIT_SPIKE_THRESHOLD
+  // signal burst activity; shared constant per #1024 so this can never
+  // silently drift from GitHub's own copy of the same heuristic)
   const maxDailyCount = Math.max(...heatmapData.map((d) => d.count), 0);
-  const maxCommitsIn10Min = maxDailyCount >= 30 ? maxDailyCount : 0;
+  const maxCommitsIn10Min = maxDailyCount >= DAILY_COMMIT_SPIKE_THRESHOLD ? maxDailyCount : 0;
 
   return normalizeStats({
     handle,
