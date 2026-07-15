@@ -437,3 +437,46 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+  # WHY scoped to the release PR only (#1011): this check confirms
+  # supabase/migrations/ has actually been applied to the linked production
+  # project. That question only matters right before a develop -> main
+  # release merges — running it on every push to develop would be noise (and
+  # would burn Management API calls against production for no reason).
+  pending-migrations-check:
+    name: Pending Migrations Check (release PR)
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    env:
+      # SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF do not exist as repo
+      # secrets yet — see docs/runbooks/migrations.md "Automated CI Gate
+      # (#1011)". Until a human adds them, this job logs a clear skip
+      # message below instead of failing every release PR.
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - name: Skip when Supabase production credentials are not configured
+        if: env.SUPABASE_ACCESS_TOKEN == '' || env.SUPABASE_PROJECT_REF == ''
+        run: |
+          echo "::notice::SUPABASE_ACCESS_TOKEN and/or SUPABASE_PROJECT_REF secrets are not configured — skipping the automated pending-migrations check for this release PR. Confirm manually via the 'Pre-Deploy Migration Check' steps in docs/runbooks/migrations.md before merging."
+
+      - uses: actions/checkout@v6
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+      - uses: pnpm/action-setup@v5
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+      - uses: actions/setup-node@v6
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+
+      - uses: supabase/setup-cli@v1
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+        with:
+          version: latest
+
+      - name: Check for pending migrations against linked production project
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+        run: pnpm run check:pending-migrations

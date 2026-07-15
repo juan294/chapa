@@ -269,7 +269,7 @@ describe("POST /api/challenge", () => {
         error: expect.any(Error),
       }),
     );
-    const [[capturedArg]] = mockCaptureServerError.mock.calls;
+    const capturedArg = mockCaptureServerError.mock.calls[0]![0];
     expect((capturedArg.error as Error).message).toMatch(/handle=octocat/);
   });
 
