@@ -70,6 +70,6 @@ curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/rate_limit
 3. If the fallback `GITHUB_TOKEN` is rate-limited: it's a shared token — authenticated users have independent limits. Consider generating a new PAT with higher rate limits.
 4. Check `GITHUB_TOKEN` in Vercel env vars is set and not expired (PATs can have expiry dates).
 
-**Cache is the primary protection.** The daily warm-cache cron (`/api/cron/warm-cache`) keeps priority handles fresh. Handles in `WARM_CACHE_PRIORITY_HANDLES` are always refreshed first.
+**Cache is the primary protection.** The hourly warm-cache cron (`/api/cron/warm-cache`; #1010 — was daily) keeps priority handles fresh. Handles in `WARM_CACHE_PRIORITY_HANDLES` are always refreshed first.
 
 **No rollback needed** for transient rate limiting.
