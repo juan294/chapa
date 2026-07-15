@@ -10,6 +10,7 @@ import {
   evaluateBadgeLatency,
   serverTimingIndicatesCacheHit,
 } from "@/lib/monitoring/latency-slo";
+import { cacheSet } from "@/lib/cache/redis";
 
 /** Synthetic probe should never run long — the SLO ceiling is 3s. */
 export const maxDuration = 60;
@@ -19,6 +20,9 @@ const DEFAULT_PROBE_HANDLE = "octocat";
 
 /** Abort the probe well beyond the cache-miss SLO so a hang still reports. */
 const PROBE_TIMEOUT_MS = 10_000;
+
+const HEARTBEAT_KEY = "cron:lastrun:latency-check";
+const HEARTBEAT_TTL_SECONDS = 60 * 60 * 48;
 
 /**
  * GET /api/cron/latency-check
@@ -91,6 +95,8 @@ export const GET = withErrorCapture(
         },
       });
     }
+
+    await cacheSet(HEARTBEAT_KEY, Date.now(), HEARTBEAT_TTL_SECONDS);
 
     return NextResponse.json({
       status: !ok ? "error" : breached ? "breached" : "ok",

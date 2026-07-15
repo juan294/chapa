@@ -76,7 +76,7 @@ Once logs are flowing, set up saved queries for the signals the app already emit
 | `[db] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing` | `lib/db/supabase.ts` `console.warn` | DB silently disabled in prod (misconfiguration) |
 | 5xx on `/u/:handle/badge.svg` | function logs | Core public flow broken (P1) — also alerts via webhook |
 | 5xx on `/api/auth/callback` | function logs | OAuth login broken (P1) |
-| 5xx / non-200 on `/api/cron/*` | function logs | Cron job failing (warm-cache, sync-audience, process-campaigns) |
+| 5xx / non-200 on `/api/cron/*` | function logs | Cron job failing (warm-cache, sync-audience, process-campaigns, latency-check) |
 | `/api/health` returning `degraded` / 503 | function logs | Dependency outage (Redis/Supabase/GitHub) |
 | Rate-limiter fallback (Redis unavailable) | `lib/cache/redis.ts` warnings | Fail-open in effect — secondary protection only |
 | Post-response side-effect rejections | badge route `after()` path | Missed snapshots/analytics (low severity, but track trends) |

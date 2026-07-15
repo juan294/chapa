@@ -6,11 +6,13 @@ const {
   mockCaptureOperationalAlert,
   mockGetBaseUrl,
   mockGetWarmCachePriorityHandles,
+  mockCacheSet,
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockCaptureOperationalAlert: vi.fn(),
   mockGetBaseUrl: vi.fn(),
   mockGetWarmCachePriorityHandles: vi.fn(),
+  mockCacheSet: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cron", () => ({
@@ -27,6 +29,10 @@ vi.mock("@/lib/env", () => ({
   getBaseUrl: (...args: unknown[]) => mockGetBaseUrl(...args),
   getWarmCachePriorityHandles: (...args: unknown[]) =>
     mockGetWarmCachePriorityHandles(...args),
+}));
+
+vi.mock("@/lib/cache/redis", () => ({
+  cacheSet: (...args: unknown[]) => mockCacheSet(...args),
 }));
 
 import { GET } from "./route";
@@ -51,6 +57,7 @@ describe("GET /api/cron/latency-check", () => {
     mockCaptureOperationalAlert.mockResolvedValue(undefined);
     mockGetBaseUrl.mockReturnValue("https://chapa.thecreativetoken.com");
     mockGetWarmCachePriorityHandles.mockReturnValue(["octocat"]);
+    mockCacheSet.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -68,6 +75,7 @@ describe("GET /api/cron/latency-check", () => {
 
     expect(res.status).toBe(401);
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 
   it("reports ok and does not alert when a cache-hit response is within budget", async () => {
@@ -84,6 +92,11 @@ describe("GET /api/cron/latency-check", () => {
     expect(body.status).toBe("ok");
     expect(body.cacheHit).toBe(true);
     expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:latency-check",
+      expect.any(Number),
+      172800,
+    );
   });
 
   it("alerts P2 when the measured latency breaches the cache-hit budget", async () => {
@@ -113,6 +126,11 @@ describe("GET /api/cron/latency-check", () => {
         severity: "P2",
       }),
     );
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:latency-check",
+      expect.any(Number),
+      172800,
+    );
   });
 
   it("alerts when the probe fails to reach the badge route", async () => {
@@ -127,6 +145,15 @@ describe("GET /api/cron/latency-check", () => {
     expect(body.status).toBe("error");
     expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
       expect.objectContaining({ signal: "badge_latency_slo_breach" }),
+    );
+    // The cron itself still completed its run (the probe failure is business
+    // data, not a handler crash), so the heartbeat must still be written —
+    // otherwise /api/health would flip to degraded on every probe failure
+    // in addition to the P2 alert already raised above.
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:latency-check",
+      expect.any(Number),
+      172800,
     );
   });
 
