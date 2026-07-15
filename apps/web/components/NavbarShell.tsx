@@ -59,7 +59,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2">
           <span className="font-heading text-lg tracking-tight text-text-primary">
-            Chapa<span className="text-amber animate-cursor-blink">_</span>
+            Chapa<span className="text-amber-dark animate-cursor-blink">_</span>
           </span>
         </Link>
 
@@ -109,7 +109,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
               // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a
                 href="/api/auth/login"
-                className="font-heading text-sm text-terminal-dim transition-colors hover:text-amber"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-2 font-heading text-sm text-text-secondary transition-colors hover:text-amber"
               >
                 <span className="text-amber/50">/</span> {t('common.login') as string}
               </a>

@@ -156,12 +156,21 @@ describe("NavbarShell", () => {
       expect(SOURCE).toContain("max-w-7xl");
     });
 
-    it("login link uses terminal-dim color", () => {
-      expect(SOURCE).toContain("text-terminal-dim");
+    it("login link uses text-secondary color for WCAG AA contrast in light theme, not terminal-dim (#1043)", () => {
+      expect(SOURCE).toContain('text-text-secondary transition-colors hover:text-amber"');
     });
 
     it("login link uses amber/50 prefix slash", () => {
       expect(SOURCE).toContain("text-amber/50");
+    });
+
+    it("login link has a padded touch target meeting the 24x24 minimum (#1043)", () => {
+      expect(SOURCE).toMatch(/href="\/api\/auth\/login"\s*\n\s*className="[^"]*px-2[^"]*py-2[^"]*"/);
+    });
+
+    it("logo cursor uses amber-dark for WCAG AA contrast in light theme, not amber (#1043)", () => {
+      expect(SOURCE).toContain('className="text-amber-dark animate-cursor-blink"');
+      expect(SOURCE).not.toContain('className="text-amber animate-cursor-blink"');
     });
 
     it("right controls container uses tighter gap on mobile (gap-1 sm:gap-2, #240)", () => {
