@@ -2,6 +2,7 @@ import Link from "next/link";
 import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { getServerT } from "@/lib/i18n/server";
+import { tArray } from "@/lib/i18n/typed-accessors";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
 
@@ -55,7 +56,7 @@ export default async function AboutPage({
           </h1>
 
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
-            {(t('about.index.intro') as string[]).map((p, i) => (
+            {tArray<string>(t, 'about.index.intro').map((p, i) => (
               <p key={i}>{p}</p>
             ))}
 

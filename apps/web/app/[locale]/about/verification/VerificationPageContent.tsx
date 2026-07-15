@@ -185,7 +185,7 @@ export function VerificationPageContent({ t }: { t: TFunction }) {
               {t('about.verification.whatIntro') as string}
             </p>
             <Table
-              headers={t('about.verification.whatTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.verification.whatTableHeaders')}
               rows={tArray<string[]>(t, 'about.verification.whatTableRows')}
             />
             <p>
@@ -279,7 +279,7 @@ export function VerificationPageContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             <SectionHeading>{t('about.verification.sectionDesign') as string}</SectionHeading>
             <Table
-              headers={t('about.verification.designTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.verification.designTableHeaders')}
               rows={tArray<string[]>(t, 'about.verification.designTableRows')}
             />
 
