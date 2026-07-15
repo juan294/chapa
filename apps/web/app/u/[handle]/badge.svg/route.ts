@@ -13,6 +13,7 @@ import {
 import {
   buildBadgeSvgCacheKey,
   readBadgeSvgCache,
+  readBadgeSvgCacheWithStatus,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { CACHE_VERSION } from "@/lib/cache/version";
@@ -36,7 +37,21 @@ export const maxDuration = 35;
 const BADGE_RENDER_LOCK_TTL_SECONDS = 30;
 const BADGE_CACHE_DEADLINE_MS = 250;
 const BADGE_RATE_LIMIT_DEADLINE_MS = 150;
-const BADGE_RENDER_WAIT_SCHEDULE_MS = [50, 75, 100, 125, 150, 200, 250, 300, 350, 400];
+// #1029 — previously summed to 2000ms. A render-lock loser with no stale SVG
+// to fall back on polls this full schedule before falling through to a full
+// materialize+render of its own; the old total risked exceeding the 3000ms
+// cache-miss SLO budget in the worst case (poll timeout + full render). The
+// schedule is truncated (not re-paced) to ~950ms so the common case — the
+// winner finishes within the first few short ticks — is unaffected, while the
+// worst case now leaves comfortable margin under the budget.
+const BADGE_RENDER_WAIT_SCHEDULE_MS = [50, 75, 100, 125, 150, 200, 250];
+// #1029 (PE-L1) — soft deadline for the avatar fetch race, mirroring the
+// share page's pattern (#800). The underlying fetch in lib/render/avatar.ts
+// still has its own longer internal abort (2000ms) so a fast-but-not-instant
+// CDN response can still populate the Redis avatar cache in the background
+// for the next request — this deadline only bounds how long THIS response
+// waits before rendering the placeholder instead.
+const AVATAR_RACE_DEADLINE_MS = 1000;
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
 type BadgeRenderResult = {
   svg: string;
@@ -190,12 +205,19 @@ export async function GET(
   const today = toDateString(new Date());
   const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
   const cacheReadStart = Date.now();
-  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
-  if (cachedSvg) {
-    return badgeSvgResponse(cachedSvg, CACHE_HEADERS, startedAt, [
+  const primaryCacheRead = await readBadgeSvgCacheWithStatus(svgCacheKey);
+  if (primaryCacheRead.svg) {
+    return badgeSvgResponse(primaryCacheRead.svg, CACHE_HEADERS, startedAt, [
       { name: "cache", desc: "hit", durMs: Date.now() - cacheReadStart },
     ]);
   }
+  // #1014 — a read that exceeded the deadline is NOT a genuine miss: the
+  // underlying Redis read may still complete after we gave up waiting on it.
+  // Surface this distinctly (rather than silently falling through as if it
+  // were a normal miss) so the failure mode is observable in production.
+  const cacheTimeoutMetric: ServerTimingEntry[] = primaryCacheRead.timedOut
+    ? [{ name: "cache-timeout", durMs: Date.now() - cacheReadStart }]
+    : [];
 
   // Cache miss: apply rate limit before triggering the expensive render path.
   // Rate limit: 100 requests per IP+handle per 60 seconds
@@ -218,7 +240,7 @@ export async function GET(
       shared.svg,
       shared.headers,
       startedAt,
-      [{ name: "coalesced", durMs: Date.now() - startedAt }],
+      [...cacheTimeoutMetric, { name: "coalesced", durMs: Date.now() - startedAt }],
       shared.status,
     );
   }
@@ -259,6 +281,7 @@ export async function GET(
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
+          ...cacheTimeoutMetric,
           { name: "cache", desc: "stale", durMs: Date.now() - startedAt },
         ]);
       }
@@ -271,6 +294,7 @@ export async function GET(
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
+          ...cacheTimeoutMetric,
           { name: "cache", desc: "poll", durMs: Date.now() - startedAt },
         ]);
       }
@@ -292,21 +316,51 @@ export async function GET(
       } satisfies BadgeRenderResult;
       deferred.resolve(fallbackResult);
       return badgeSvgResponse(fallbackResult.svg, fallbackResult.headers, startedAt, [
+        ...cacheTimeoutMetric,
         { name: "materialize", durMs: materializeMs },
       ]);
     }
 
-    const avatarDataUri = !readOnly && materialized.stats.avatarUrl
-      ? await getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
-      : undefined;
+    // #1029 (PE-L1) — race the avatar fetch against a tight deadline instead
+    // of awaiting it in full, mirroring the share page's pattern (#800). A
+    // slow CDN response renders with the placeholder rather than consuming
+    // most of the cache-miss latency budget. `avatarResolved` gates the SVG
+    // cache write below: a timed-out/failed fetch must NOT poison the shared
+    // cache with the placeholder for up to 24h — the next request gets a
+    // fresh chance to fetch (and cache) the real avatar.
+    let avatarDataUri: string | undefined;
+    let avatarResolved = false;
+    if (!readOnly) {
+      const avatarPromise = materialized.stats.avatarUrl
+        ? getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
+        : Promise.resolve(undefined);
+      avatarDataUri = await Promise.race([
+        avatarPromise,
+        new Promise<undefined>((resolve) =>
+          setTimeout(() => resolve(undefined), AVATAR_RACE_DEADLINE_MS),
+        ),
+      ]);
+      avatarResolved = avatarDataUri !== undefined;
+    }
     const verification = getPublicProfileVerification(materialized);
 
-    const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
-      readOnly,
-    });
+    // #1013 — persistProfileSnapshot is a durable Supabase write with nothing
+    // in the response depending on its result; it must not block (or, on
+    // failure, retroactively invalidate) an otherwise-successful render. Both
+    // it and the already-deferred cache work now run in after().
     after(() => {
-      if (!shouldRunDeferred) return;
-      return deferProfileCacheWork(handle, materialized, { verification, readOnly });
+      return persistProfileSnapshot(handle, materialized, { readOnly })
+        .then((shouldRunDeferred) => {
+          if (!shouldRunDeferred) return;
+          return deferProfileCacheWork(handle, materialized, { verification, readOnly });
+        })
+        .catch((err) => {
+          fireAndForget(() => captureServerError({
+            route: `/u/${handle}/badge.svg`,
+            statusCode: 500,
+            error: err,
+          }));
+        });
     });
 
     const renderStart = Date.now();
@@ -319,12 +373,13 @@ export async function GET(
       disableAnimation: true,
     });
     const renderMs = Date.now() - renderStart;
-    if (!readOnly) {
+    if (!readOnly && avatarResolved) {
       await writeBadgeSvgCache(svgCacheKey, svg, handle);
     }
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return badgeSvgResponse(successResult.svg, successResult.headers, startedAt, [
+      ...cacheTimeoutMetric,
       { name: "materialize", durMs: materializeMs },
       { name: "render", durMs: renderMs },
     ]);
@@ -346,7 +401,7 @@ export async function GET(
       fallbackResult.svg,
       fallbackResult.headers,
       startedAt,
-      [],
+      cacheTimeoutMetric,
       fallbackResult.status,
     );
   } finally {

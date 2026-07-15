@@ -18,6 +18,7 @@ const {
   mockCacheSet,
   mockCacheSetNx,
   mockCacheDel,
+  mockAfter,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -34,6 +35,7 @@ const {
   mockCacheSet: vi.fn(),
   mockCacheSetNx: vi.fn(),
   mockCacheDel: vi.fn(),
+  mockAfter: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -92,15 +94,27 @@ vi.mock("@/lib/render/escape", () => ({
       .replace(/"/g, "&quot;"),
 }));
 
+// #1013 — `after()` callbacks are captured (not auto-invoked) so tests can
+// assert the route's response resolves without waiting on them, and can
+// deterministically flush them via `flushAfterCallbacks()` below to assert
+// on their effects (e.g. persistProfileSnapshot / deferProfileCacheWork).
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
   return {
     ...actual,
-    after: (cb: () => void | Promise<void>) => { void cb(); },
+    after: (cb: () => void | Promise<void>) => { mockAfter(cb); },
   };
 });
 
 import { GET } from "./route";
+
+/** Invoke and await every `after()` callback registered so far by the route. */
+async function flushAfterCallbacks(): Promise<void> {
+  const callbacks = mockAfter.mock.calls.map(
+    (call) => call[0] as () => void | Promise<void>,
+  );
+  await Promise.all(callbacks.map((cb) => cb()));
+}
 
 const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
 
@@ -231,6 +245,9 @@ describe("GET /u/[handle]/badge.svg", () => {
   it("runs centralized public side effects with the same verification payload", async () => {
     const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
     await GET(req, ctx);
+    // #1013 — persist + deferred cache work now run inside after(), so they
+    // must be explicitly flushed before asserting on them.
+    await flushAfterCallbacks();
 
     expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
       "testuser",
@@ -255,6 +272,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       "?__chapa_smoke=1",
     );
     await GET(req, ctx);
+    await flushAfterCallbacks();
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: undefined,
@@ -284,6 +302,71 @@ describe("GET /u/[handle]/badge.svg", () => {
     );
   });
 
+  // #1013 — persistProfileSnapshot is a durable Supabase write with nothing in
+  // the response depending on its result. It must run in after() so it can
+  // never block (or, hypothetically, fail and destroy) an otherwise-successful
+  // render.
+  describe("deferred durable persistence (#1013)", () => {
+    it("returns the response without waiting for persistProfileSnapshot to resolve", async () => {
+      // Never resolves — if the route still awaited this inline on the
+      // critical path (the pre-fix behavior), `await GET(...)` below would
+      // hang forever and this test would time out.
+      mockPersistProfileSnapshot.mockImplementation(
+        () => new Promise<boolean>(() => undefined),
+      );
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(FAKE_SVG);
+      // Not called on the synchronous path — only after() has scheduled it.
+      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+    });
+
+    it("schedules persistProfileSnapshot inside after(), not on the synchronous path", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      // Not called yet — only after() has been registered with the work.
+      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockAfter).toHaveBeenCalledWith(expect.any(Function));
+
+      await flushAfterCallbacks();
+
+      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED,
+        { readOnly: false },
+      );
+    });
+
+    it("still captures/alerts via the existing error-handling path when the deferred work rejects", async () => {
+      const persistError = new Error("supabase write failed");
+      mockPersistProfileSnapshot.mockRejectedValue(persistError);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      // The response already succeeded — a deferred-work failure must not
+      // retroactively turn a good render into an error response.
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(FAKE_SVG);
+      expect(mockCaptureServerError).not.toHaveBeenCalled();
+
+      await flushAfterCallbacks();
+
+      // The existing captureServerError path (already used elsewhere in this
+      // route for failures) still fires once the deferred work is flushed.
+      expect(mockCaptureServerError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: "/u/testuser/badge.svg",
+          error: persistError,
+        }),
+      );
+    });
+  });
+
   it("returns a cacheable fallback when public materialization returns null", async () => {
     mockMaterializePublicProfile.mockResolvedValue(null);
 
@@ -306,6 +389,71 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     expect(res.status).toBe(500);
     expect(mockCaptureServerError).toHaveBeenCalled();
+  });
+
+  // #1029 (PE-L1) — a slow avatar CDN response was previously awaited in full
+  // (up to the underlying fetch's own 2s abort), which could consume most of
+  // the 3000ms cache-miss budget. The route now races the avatar fetch against
+  // a tight deadline and renders with the placeholder rather than block,
+  // mirroring the share page's existing pattern (#800) — including skipping
+  // the shared SVG cache write so a later request can still pick up the real
+  // avatar instead of poisoning the cache with the placeholder for 24h.
+  describe("avatar fetch race (#1029 / PE-L1)", () => {
+    it("returns well within 1s and renders the placeholder when the avatar fetch stalls past the deadline", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        const res = await responsePromise;
+
+        expect(res.status).toBe(200);
+        expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+          FAKE_MATERIALIZED.stats,
+          FAKE_MATERIALIZED.displayImpact,
+          expect.objectContaining({ avatarDataUri: undefined }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("skips the shared SVG cache write when the avatar fetch timed out (does not poison the cache with a placeholder)", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await responsePromise;
+
+        expect(mockCacheSet).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("still writes the SVG cache when the avatar resolves within the deadline", async () => {
+      mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+    });
   });
 
   describe("SVG full-response cache (#717)", () => {
@@ -413,6 +561,40 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });
 
+    // #1029 — a render-lock loser with no stale SVG to fall back on used to
+    // poll for the full 2000ms schedule before falling through to a full
+    // materialize+render of its own, risking the 3000ms cache-miss SLO budget
+    // in the worst case (poll timeout + full render). The poll budget was
+    // reduced so this worst case still comfortably fits under budget.
+    it("loser falls through to its own render comfortably under the 3000ms budget when poll is exhausted and no stale SVG exists", async () => {
+      vi.useFakeTimers();
+      mockCacheSetNx.mockResolvedValue(false); // another instance holds the render lock
+      // No stale (yesterday) SVG and no SVG produced by the winner during our
+      // poll window — every cache read (primary, stale, and every poll tick)
+      // misses, simulating a brand-new handle with a slow concurrent winner.
+      mockCacheGet.mockResolvedValue(null);
+
+      try {
+        const [req, ctx] = makeRequest("brandnewhandle", { "x-forwarded-for": "9.9.9.9" });
+        const startedAt = Date.now();
+        const responsePromise = GET(req, ctx);
+
+        // Advancing only 1000ms (comfortably less than the old 2000ms poll
+        // schedule) is now enough for the loser to exhaust its poll budget
+        // AND complete its own fallback materialize+render.
+        await vi.advanceTimersByTimeAsync(1000);
+        const res = await responsePromise;
+        const elapsedMs = Date.now() - startedAt;
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe(FAKE_SVG);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+        expect(elapsedMs).toBeLessThan(3000);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("keeps polling long enough to reuse SVG produced by another renderer", async () => {
       vi.useFakeTimers();
       let cacheReads = 0;
@@ -447,11 +629,39 @@ describe("GET /u/[handle]/badge.svg", () => {
         const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
         const responsePromise = GET(req, ctx);
 
-        await vi.advanceTimersByTimeAsync(400);
+        // #1014 — the read deadline was raised from 250ms to 500ms, so the
+        // fail-open must be observed past the new deadline.
+        await vi.advanceTimersByTimeAsync(600);
         const res = await responsePromise;
 
         expect(res.status).toBe(200);
         expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // #1014 — a read that exceeds the deadline is a timeout, not a genuine
+    // miss, and must be surfaced distinctly in Server-Timing so it doesn't
+    // silently look like normal cache churn in production.
+    it("emits a distinguishable cache-timeout marker (not a plain miss) when the read exceeds the deadline", async () => {
+      vi.useFakeTimers();
+      mockCacheGet.mockImplementationOnce(
+        () => new Promise<string | null>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(600);
+        const res = await responsePromise;
+
+        const timing = res.headers.get("Server-Timing");
+        expect(timing).toMatch(/cache-timeout;dur=\d+/);
+        // Must NOT be misclassified as a cache-hit by the latency-check
+        // synthetic monitor's serverTimingIndicatesCacheHit (/\bcache;/).
+        expect(timing).not.toMatch(/\bcache;/);
       } finally {
         vi.useRealTimers();
       }
