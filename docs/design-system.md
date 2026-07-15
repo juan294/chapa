@@ -165,6 +165,10 @@ hover:border-amber/20 hover:text-text-primary
 - CTA: `/ login` text link (no button), hover to `text-amber`
 - **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), shows `ES | EN` pill menu on click. Uses `aria-expanded`, `role="menu"`, `role="menuitem"`. Active locale highlighted with `text-amber font-semibold`. Closes on outside click via `useDropdownMenu`. Sits between ThemeToggle and login CTA in the nav bar.
 
+### Tooltips (mandatory pattern)
+
+Every tooltip/popover must be portal-rendered to `document.body` with `position: fixed`, viewport-relative coordinates (from `getBoundingClientRect()`), `z-index: 99999`, and `pointer-events: none`. Add a flip-below rule when the trigger is near the top of the viewport (`rect.top < 120`) so the tooltip doesn't clip off-screen. Never use `position: absolute` inside a scrollable/animated container — an ancestor with a CSS `transform` breaks `position: fixed` positioning unless the tooltip is portaled out of that subtree entirely (#1021). Reference implementations: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/dashboard/ActivityHeatmap.tsx`'s `ChartTooltip`, `apps/web/lib/effects/heatmap/HeatmapGrid.tsx`.
+
 ### Terminal components
 
 - **TerminalOutput**: `role="log" aria-live="polite"`, monospace, color-coded by line type

@@ -93,8 +93,18 @@ alert path. The app already does active alerting independently:
 - `CHAPA_ALERT_WEBHOOK_URL` (documented in `CLAUDE.md` and
   `docs/runbooks/incident-response.md`) receives **P1/P2 alerts** for
   `health_degraded`, `badge_5xx`, `oauth_callback_failure`, `cron_failure`,
-  `warm_cache_high_failure_rate`, and `warm_cache_ceiling_approached`. Alert
-  payloads are JSON with secrets scrubbed.
+  `warm_cache_high_failure_rate`, `warm_cache_ceiling_approached`, and
+  `badge_latency_slo_breach` (#974, raised by the daily `latency-check` cron
+  when the badge route's p95 latency budget is exceeded or the probe fails).
+  Alert payloads are JSON with secrets scrubbed.
+- **Cron heartbeats**: `warm-cache`, `sync-audience`, `process-campaigns`, and
+  `latency-check` each write a `cron:lastrun:<name>` key to Redis on
+  completion (#1018 added `latency-check` to this set — it previously had no
+  heartbeat and was invisible to health monitoring). `/api/health` checks each
+  key's staleness against a grace window and reports `degraded` (with a
+  `health_degraded` alert) if a cron hasn't run recently — this is how a
+  silently-broken cron (e.g. a Vercel scheduling misconfiguration) gets
+  caught even though the cron itself never returns a 5xx.
 
 So the two layers are complementary:
 

@@ -241,12 +241,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** None (resolved)
 - **Accepted:** 2026-05-02 | **Updated:** 2026-06-19
 
-## Static content pages render at DEFAULT\_LOCALE; non-default locale applied client-side (2026-06-19)
+## ~~Static content pages render at DEFAULT_LOCALE; non-default locale applied client-side (2026-06-19)~~ — Resolved
 
-- **Risk:** Content pages (about, archetypes, privacy, terms, etc.) are CDN-cached at `DEFAULT_LOCALE` (`es`). A user whose `chapa-locale` cookie is `en` receives Spanish server-rendered HTML and sees a brief locale flash on mount as the client applies the English dictionary.
-- **Mitigation:** Intentional tradeoff to keep content pages CDN-cacheable (ISR). The flash is short (<100 ms on fast connections) and affects only users who have explicitly switched to English. Full per-locale SSR would require per-locale route segments (e.g., `/en/about`) — a significant routing change deferred to a future milestone. The badge SVG endpoint (`/u/:handle/badge.svg`) and share page are unaffected.
-- **Severity:** Low
-- **Accepted:** 2026-06-19
+- **Risk:** Content pages (about, archetypes, privacy, terms, etc.) were CDN-cached at `DEFAULT_LOCALE` (`es`). A user whose `chapa-locale` cookie was `en` received Spanish server-rendered HTML and saw a brief locale flash on mount as the client applied the English dictionary.
+- **Resolution:** The deferred "future milestone" this entry anticipated shipped as #1023 (FE-H1): the 9 content pages moved to per-locale route segments (`app/[locale]/...`), with a narrowly-scoped `apps/web/proxy.ts` rewriting the canonical unprefixed URL to the internal locale route. Both `en`/`es` variants are pre-rendered at build time, so the rewrite always resolves to a cache hit — no client-side re-render, no flash, and ISR/CDN caching is preserved. See `docs/decisions/2026-07-15-i18n-middleware-carve-out.md`. The shared nav/command-bar chrome (not the page bodies) still renders via the client `LanguageProvider` and may show a brief flash on non-default-locale loads — a much narrower, accepted residual, out of scope for #1023.
+- **Severity:** None (resolved for the 9 content pages)
+- **Accepted:** 2026-06-19 | **Resolved:** 2026-07-15
 
 ---
 
