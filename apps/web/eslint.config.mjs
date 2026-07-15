@@ -27,6 +27,18 @@ const eslintConfig = [
           message:
             "Access env vars through @/lib/env getters instead of process.env directly.",
         },
+        {
+          // Catches bare/whole-object reads (e.g. `{ ...process.env }` or
+          // `const e = process.env`) that the 3-level selector above misses,
+          // since those are 2-level MemberExpressions with no trailing
+          // `.SOME_VAR` property access. Excludes the case where this node is
+          // itself the `.object` of a further property access (`process.env.X`),
+          // since that 3-level chain is already reported by the selector above.
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']:not(* > MemberExpression.object)",
+          message:
+            "Access env vars through @/lib/env getters instead of process.env directly.",
+        },
       ],
     },
   },
