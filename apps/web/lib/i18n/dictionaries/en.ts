@@ -253,6 +253,10 @@ export const en: Translations = {
       title: 'Something went wrong',
       description: "We couldn't load this profile. Please try again.",
     },
+    admin: {
+      title: 'Admin Dashboard Error',
+      description: 'Something went wrong loading the admin dashboard. Please try again.',
+    },
     tryAgain: 'Try again',
     goHome: 'Go home',
   },
