@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-07-16
+
+### Fixed
+
+- **Scoring integrity: re-armed the degraded-fetch guards that #1004 disarmed (#1045, #1046).**
+  A scope-blinded GitHub fetch was being scored, cached, and persisted, collapsing an
+  affected profile's Delivery from 100 to 58 and composite from 79 to 68 while
+  `stats:stale` still held the correct data.
+
+  #1004 was built on the premise that `search(is:merged)` is not token-scoped and could
+  serve as an authoritative cross-check against the token-scoped `pullRequestContributions`
+  sample. That premise is false — GitHub search returns only what the authenticating token
+  can see (verified: 987 merged PRs authenticated vs 140 anonymous for the same user).
+  Because every guard triggered only on `prsMergedCount === 0`, sourcing that count from
+  search replaced the 0 with a plausible-but-wrong positive number and made the trigger
+  unreachable. Nothing validated `linesAdded` (59 across 140 merged PRs), `linesDeleted`,
+  or `prsMergedWeight` — which is 70% of Delivery.
+
+  - `isDegradedPrFetch` now flags a lower-scoped fetch reporting a disproportionate
+    shortfall against a better-scoped baseline, not only a collapse to exactly zero. Gated
+    on crossing a scope boundary so an equally-scoped decline (real window eviction) still
+    writes through.
+  - `assessRawFetchIntegrity` now rejects a sample returning far fewer nodes than its own
+    `totalCount` claims — the shape scope loss actually produces, since PR objects come back
+    null for unreadable repos and are filtered while `totalCount` keeps counting them. Keyed
+    on the payload's internal shape, so it needs no baseline and catches a handle's first
+    degraded fetch.
+  - The non-downgrading cache write rule now judges against `stats:stale` (the durable
+    record of the best scope seen) instead of a primary key that `getStats` has already
+    proven is a miss — which made the check a no-op on every non-racing call.
+  - Corrected the "not token-scoped" comments that encoded the false premise.
+
+  Guards remain strictly good-to-bad: an improving fetch always writes through, so a
+  well-scoped fetch heals the data and it sticks.
+
+- **Health: a missing cron heartbeat is now reported as stale (#1047).** The previous grace
+  window was measured from process start; on serverless every cold start reloads the module,
+  so a lambda never survived the 2h grace and the null branch — the most degraded state a
+  cron has — was the one state the check could never report.
+
+  **Operational note:** `/api/health` will begin returning `503 degraded` immediately after
+  this deploy, because all four cron heartbeats are currently null and null is now correctly
+  stale. This is accurate reporting of a pre-existing condition, not a regression. The
+  underlying cause (why the crons record no heartbeat) remains under investigation in #1047.
+  `CHAPA_ALERT_WEBHOOK_URL` is unconfigured, so this surfaces in the endpoint only.
+
+- Closed coverage gaps from overnight triage: `KeyboardShortcutsListener` next/dynamic loader,
+  `lib/github/stats.ts` `fetchStats` error closure, admin campaigns `?type=` branch (#1006).
+
+### Changed
+
+- Pinned `knip` at 6.27.0 and bumped `vite` 8.1.4 to 8.1.5 (devDependencies only).
+- Synced agent reports and shared context from the overnight triage cycle.
+
+### Known issues
+
+- **#1050 — OAuth login lacks `repo` scope.** A user's own refresh sees only their public
+  PRs and `fetchScope` labels that blinded fetch as `"authenticated"`, letting it outrank
+  complete server-token data. In this release only `assessRawFetchIntegrity`'s sample check
+  covers that path. Unresolved; needs a design decision.
+- **#1049 — poisoned snapshots** for the affected handle (2026-07-14 to 07-16) are not yet
+  healed; healing is deferred until #1050 lands.
+
 ## [2.18.0] - 2026-07-15
 
 ### Added
