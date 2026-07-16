@@ -295,19 +295,54 @@ describe("getStats", () => {
       mockCacheGet
         .mockResolvedValueOnce(null) // cacheKey miss
         .mockResolvedValueOnce(authenticatedStale) // staleKey hit -> authenticated
-        .mockResolvedValueOnce(null) // supplemental miss
-        .mockResolvedValueOnce(null); // re-read cacheKey -> no existing merged entry
+        .mockResolvedValueOnce(null); // supplemental miss
+      // No re-read of cacheKey: 3 merged PRs against an authenticated baseline
+      // of 904 is a scope shortfall, so `isDegradedPrFetch` (#1045) now returns
+      // early via _serveStaleAndReCache and never reaches the write rule.
       mockFetchStatsData.mockResolvedValue(publicFetch);
 
-      await getStats("test-user");
+      const result = await getStats("test-user");
 
       expect(mockCacheSet).not.toHaveBeenCalledWith(
         "stats:stale:test-user",
         expect.anything(),
         expect.anything(),
       );
-      // The merged key has no existing entry, so it still writes normally.
+      // #1045/#1046: previously this asserted the merged key "still writes
+      // normally" with the public data, because getStats confirms a miss on
+      // cacheKey before fetching — so the write rule's re-read was null by
+      // construction and the downgrade check was a no-op. That is exactly how
+      // juan294's badge came to serve Delivery 58 / composite 68 off a
+      // scope-blinded fetch while stats:stale held the real numbers. The
+      // merged key must receive the last-known-good, never the downgrade.
       expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "authenticated", prsMergedCount: 904 }),
+        expect.any(Number),
+      );
+      expect(result!.prsMergedCount).toBe(904);
+    });
+
+    it("#1046: a mild public downgrade still cannot overwrite the authenticated merged key", async () => {
+      // Below #1045's shortfall threshold (800 vs 904 is not a collapse), so
+      // isDegradedPrFetch allows it through and the write rule is the only
+      // thing standing between a scope downgrade and the primary cache key.
+      // It must compare against the durable scope record (stats:stale), not a
+      // cacheKey that getStats already proved is a miss.
+      const authenticatedStale = makeStats({ fetchScope: "authenticated", prsMergedCount: 904 });
+      const publicFetch = makeStats({ prsMergedCount: 800 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // cacheKey miss
+        .mockResolvedValueOnce(authenticatedStale) // staleKey hit -> authenticated
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(null); // re-read cacheKey -> null by construction
+
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
         "stats:v2:merged:test-user",
         expect.objectContaining({ fetchScope: "public" }),
         expect.any(Number),

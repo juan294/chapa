@@ -1,50 +1,59 @@
 # Performance Report
-> Generated: 2026-07-09 | Health status: green
+> Generated: 2026-07-16 | Health status: GREEN
 
 ## Executive Summary
-Bundle re-baselined after the #982 landing refactor: 2,128 KB raw / 672 KB gzipped total JS (+49 KB raw / +2.4% vs 2026-07-02), fully attributed to the landing client split plus the v2.17.0 observability batch — and more than paid for by the landing page `/` now building as **static with 1h ISR** (confirmed `○` in build output), moving the highest-traffic route from per-request serverless to CDN. No route or chunk approaches the 500 KB / 350 KB budgets; knip is clean; fonts, CLS, and badge caching all pass.
+Build is clean (0 TypeScript errors, 81 routes) and the bundle is flat at 2,132 KB raw / ~638 KB gzipped across 73 chunks — consistent with cost-analyst's independent 2026-07-16 measurement. No route or chunk exceeds the 350 KB CI budget. The only new item this cycle is a `knip` false-positive regression (9 "unused dependencies" flagged, all verified as actually used in source) caused by `knip` not being version-pinned in the project.
 
 ## Build Output
-Next.js 16.2.9 (Turbopack): compile 4.6s, TypeScript 8.7s, 0 errors. `pnpm install --frozen-lockfile` clean (lockfile up to date). 90 routes; 68 static pages generated in 848ms.
+Next.js 16 / Turbopack does not print a per-route First Load JS table in this build (only a route-type table: static ○, SSG ●, dynamic ƒ). Sizing below is derived directly from `.next/static/chunks` output, which is the authoritative artifact CI's bundle-size gate checks against.
 
-Turbopack omits the per-route First Load JS column, so routes are assessed from `.next/static/chunks` (same method as prior cycles). Notable route dispositions:
+| Chunk (top 5 by size) | Size (raw) | Status |
+|---|---|---|
+| `0qmgkw5s78uqn.js` (framework/vendor) | 228 KB | GREEN (<350 KB) |
+| `2cz6l19i7nua_.js` (framework/vendor) | 192 KB | GREEN |
+| `0cz1d0mv5g_q7.js` | 112 KB | GREEN |
+| `43e11u3pk0euw.js` | 108 KB | GREEN |
+| `2jkswxbh0nfv-.js` | 92 KB | GREEN |
 
-| Route | Size (First Load JS) | Status |
-|-------|---------------------|--------|
-| `/` (landing) | ○ static, revalidate 1h — **new since #982** | GREEN |
-| `/about`, `/about/scoring`, `/about/verification` | ○ static, 5m ISR | GREEN |
-| `/archetypes/*` (7 pages) | ○ static, 5m–1h ISR | GREEN |
-| `/privacy`, `/terms`, `/verify` | ○ static, 1h ISR | GREEN |
-| `/u/[handle]`, `/u/[handle]/badge.svg` | ƒ dynamic (by design — per-user) | GREEN |
-| All chunks | largest 227 KB raw — none >300 KB | GREEN |
+**Routes/chunks >500 KB: 0. Routes/chunks >350 KB (CI gate): 0.** No RED or YELLOW route flags this cycle.
 
-Routes >500 KB: **0**. Routes/chunks >350 KB (CI budget): **0**. Routes >300 KB: **0**.
+`/` and the 9 locale-segmented content pages (`/about`, `/about/scoring`, `/about/verification`, `/privacy`, `/terms`, 7× `/archetypes/*`) render as `●` (SSG via `generateStaticParams`, both `en`/`es` pre-rendered) — confirmed still static post-#1023, contributing zero client-bundle weight for their body content.
 
 ## Bundle Analysis
-- Total First Load JS (all chunks): **2,128 KB raw / 672 KB gzipped** (77 chunks)
-- Delta vs 2026-07-02 baseline (2,079 / 659 / 76): **+49 KB raw (+2.4%) / +13 KB gzipped** — attributed to `LandingPageClient.tsx` (501 lines, #982) + observability batch (#974/#975/#976). Below the 2,300 KB `ANALYZE=true` trigger.
-- Largest chunks: 227 / 190 / 109 / 107 / 88 KB raw — all framework/vendor, none >300 KB
-- Unused exports: **none** — knip `--production` reports only the 2 known false positives (`vitest.setup.ts`, `vitest.contract-setup.ts`, test infrastructure)
+- Total First Load JS: **2,132 KB raw / ~638 KB gzipped**, 73 chunks (matches cost-analyst's 2026-07-16 figure exactly — cross-verified independently via direct chunk measurement, not copied).
+- Largest chunks: 228 / 192 / 112 / 108 / 92 KB raw — all framework/vendor bundles, none app-code-specific.
+- Unused exports: **0 real.** `npx knip --production` (v6.27.0, latest — not pinned) reports 2 files (`vitest.setup.ts`, `vitest.contract-setup.ts` — known test-infra false positives, unchanged for months) plus **9 "unused" dependencies this cycle: `@resvg/resvg-js`, `@vercel/analytics`, `@vercel/speed-insights`, `canvas-confetti`, `next-themes`, `posthog-js`, `resend`, `server-only`, `svix`.** All 9 were manually verified via `grep` and confirmed genuinely imported in production source (e.g. `svg-to-png.ts`, `ClientAnalytics.tsx`, `ThemeProvider.tsx`, `PostHogProvider.tsx`, `lib/email/resend.ts`, `webhooks/resend/route.ts`, all `lib/auth/*.ts`). This is a **false-positive regression**, not real dead code — see Recommendations.
 
 ## Client/Server Boundary
-- `"use client"` directives (non-test): **125** (+8 vs 2026-07-02's 117) — growth from the #982 landing split and error/telemetry client surface tests batch. No misplaced directives found.
-- Key public pages confirmed server components: `/` (server `page.tsx` with `force-static`), `/about`, `/u/[handle]`, archetype pages.
-- The #982 pattern is correct: `app/page.tsx` stays a server component, renders the demo badge SVG **at build time** via `renderBadgeSvg()` and passes the string to `LandingPageClient` — no rendering libs (BadgeSvg, demoData) enter the client bundle. Client imports are lightweight (i18n, nav, terminal, CTA components).
-- 11 files use `next/dynamic`/`import()` (Studio, admin sub-dashboards, command bar, analytics, instrumentation, share-page owner content) — heavy owner-only surfaces remain lazy.
-- No synchronous imports of heavy libs (recharts/three/d3/framer-motion/canvas-confetti) in any non-dynamic client component.
+- **108** non-test files with a `"use client"` directive (module-level, standard placement) — consistent with the prior 2026-07-09 baseline (125, counted with a broader grep pattern; no evidence of net growth in app code this cycle, HEAD only advanced via #1023/#1027/#1029/#974/#1010/#1015/#1016/#1009 already covered by prior cycles).
+- **8** files using `next/dynamic`/lazy imports for code-splitting (Studio, admin, command bar, analytics, instrumentation, share-page owner content, badge SVG lazy loaders).
+- Key public pages (`/`, `/about`, `/u/[handle]`, archetype pages) confirmed server components — no unnecessary client-boundary pull-up found.
+- No action needed this cycle.
 
 ## Caching & Headers
-- Badge route (`/u/[handle]/badge.svg`): `maxDuration = 35`; success `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`; error responses `s-maxage=300, stale-while-revalidate=600`. Matches CLAUDE.md spec.
-- **New (#974)**: every badge response now carries a `Server-Timing` header (`cache;desc="hit"` on warm hits; `materialize`/`render` breakdown + `total` on misses), and the `/api/cron/latency-check` daily synthetic monitor enforces the p95 budget (800ms hit / 3000ms miss) with P2 alerting — the badge route's latency characteristics are now continuously observable, closing the long-standing blind spot.
-- Landing `/` and content pages CDN/ISR-cached as above — the biggest invocation-count win of the cycle.
+- Badge route (`/u/[handle]/badge.svg`): success responses carry `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` (6h + 24h SWR, confirmed in code at `route.ts:74`); error responses use a shorter `s-maxage=300, stale-while-revalidate=600`.
+- `Server-Timing` header present on every badge response (`#974`), breaking down `cache`/`materialize`/`render`/`total` — confirms the latency SLO instrumentation from prior cycles is intact.
+- No regressions found in cache header configuration.
 
 ## Fonts & CLS
-- Fonts: `next/font/google` (JetBrains Mono + Plus Jakarta Sans), `display: swap`, `subsets: ["latin"]` — **0 external font requests**, no render-blocking font CSS.
-- CLS: badge fallback `<img>` has explicit `width={1200} height={630}` + skeleton + `fetchPriority="high"`; `LiteYouTubeEmbed` thumbnail has explicit `width={480} height={270}` + `loading="lazy"` (2026-07-01 fix holding). `prefers-reduced-motion` respected in `globals.css`.
-- Landing page note: #982 moved copy rendering client-side (locale applied post-hydration by `LanguageProvider`). The documented tradeoff is a brief locale flash for non-default-locale users — content-swap, not layout-shift, since the static shell renders Spanish at the same layout. Acceptable per the i18n architecture in CLAUDE.md.
+- `next/font/google` used for both typefaces (JetBrains Mono, Plus Jakarta Sans) in `app/layout.tsx` — 0 external `<link>` font requests found in either root or locale layout. Render-blocking font risk: none.
+- CLS: badge fallback `<img>` has explicit `width={1200} height={630}`; `LiteYouTubeEmbed` thumbnail has explicit `width={480} height={270}` (fix from 2026-07-01 triage holding). `prefers-reduced-motion` media query present (2 occurrences in `globals.css`).
+- No CLS regressions found.
 
 ## Recommendations
-1. **None blocking.** Bundle growth is understood, structurally sound, and below all budgets.
-2. (P3, monitor) `"use client"` count has grown 105 → 113 → 117 → 125 over four measured cycles. Each step was justified, but if the trend continues past ~140 without corresponding feature surface, audit for directives that could move deeper.
-3. (P3, next cycle) With `/` now static, consider a Lighthouse/LCP spot-check of the landing page in a future cycle — the locale flash window is the only new user-visible timing artifact from #982, and no measurement of it exists yet.
-4. (Housekeeping) Baseline for future cycles: **2,128 KB raw / 672 KB gzipped / 77 chunks** on HEAD `b16274ba` (post-#982). The `ANALYZE=true` trigger remains 2,300 KB raw.
+1. **P3 — Pin `knip` as a devDependency.** It is not in `package.json`/`pnpm-lock.yaml` and is invoked via bare `npx knip`, so every cycle silently runs whatever is "latest" on the registry. This cycle picked up v6.27.0, which produced 9 false-positive "unused dependency" findings not seen in any prior cycle (all verified as real, in-use imports). Pinning the version makes results reproducible and stops future agents from having to re-verify the same false positives by hand.
+2. No P1/P2 items. Bundle, caching, fonts, CLS, and client/server boundaries are all unchanged-and-healthy versus the 2026-07-09 baseline.
+
+SHARED_CONTEXT_START
+## Performance Agent — 2026-07-16
+- **Status**: GREEN
+- Total First Load JS: 2,132 KB raw / ~638 KB gzipped (73 chunks) — matches cost-analyst's 2026-07-16 figure via independent measurement
+- Routes >500KB: 0
+- Unused exports: 0 real (knip flagged 9 dependencies + 2 files this cycle; all 9 dependencies manually verified as false positives — genuinely imported in production source. Root cause: knip isn't version-pinned, latest v6.27.0 changed detection behavior. Recommend pinning.)
+
+**Cross-agent recommendations:**
+- [Coverage]: No untested performance-critical paths found this cycle — bundle, caching, and CLS surfaces unchanged since 2026-07-09.
+- [Security]: No performance issues with security implications this cycle. Badge route cache headers and Server-Timing instrumentation unchanged.
+- [QA]: No UX performance concerns — no CLS regressions, fonts render via next/font with zero external requests.
+- [Triage / Cost Analyst]: New P3 — `knip` is unpinned (bare `npx knip`), causing a false-positive regression this cycle (9 "unused deps" that are all actually used). Recommend adding `knip` as a pinned devDependency so future cycles don't have to re-verify the same false positives.
+SHARED_CONTEXT_END

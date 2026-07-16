@@ -89,6 +89,24 @@ describe("GET /api/admin/campaigns", () => {
     expect(res.status).toBe(200);
     expect(body.campaigns).toEqual([]);
   });
+
+  it("filters by a valid ?type= query param", async () => {
+    vi.mocked(dbGetCampaigns).mockResolvedValue([]);
+    const req = new NextRequest("https://example.com/api/admin/campaigns?type=announcement", {
+      headers: { cookie: "session=x" },
+    });
+    await GET(req);
+    expect(dbGetCampaigns).toHaveBeenCalledWith(undefined, "announcement");
+  });
+
+  it("ignores an invalid ?type= query param", async () => {
+    vi.mocked(dbGetCampaigns).mockResolvedValue([]);
+    const req = new NextRequest("https://example.com/api/admin/campaigns?type=bogus", {
+      headers: { cookie: "session=x" },
+    });
+    await GET(req);
+    expect(dbGetCampaigns).toHaveBeenCalledWith(undefined, undefined);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -349,11 +349,29 @@ async function _fetchAndCache(
   // immediately before the write, catches that race: if the authenticated
   // fetch already wrote its better-scoped entry by the time this call
   // reaches its write, this read sees it and skips the downgrade.
+  //
+  // #1046: that re-read closes the race but cannot carry the rule on its own —
+  // because `cacheKey` is a confirmed miss by construction, `existingMerged`
+  // is null on every non-racing call and the check silently degraded to a
+  // no-op, letting a scope-blinded fetch write the primary key unopposed. The
+  // 6h primary TTL then made it self-renewing: every anonymous badge hit after
+  // expiry re-poisoned it. `stats:stale` is the durable record of the best
+  // scope ever seen for this handle (7-day TTL, and the write below refuses to
+  // downgrade it), so it — not the just-missed primary key — is the honest
+  // baseline to judge a downgrade against. Both are consulted: whichever is
+  // better-scoped wins.
   const existingMerged = await cacheGet<StatsData>(cacheKey);
-  const mergedIsDowngrade =
-    existingMerged != null && scopeRank(stats.fetchScope) < scopeRank(existingMerged.fetchScope);
+  const bestKnownScopeRank = Math.max(
+    scopeRank(existingMerged?.fetchScope),
+    scopeRank(stale?.fetchScope),
+  );
+  const mergedIsDowngrade = scopeRank(stats.fetchScope) < bestKnownScopeRank;
   if (!mergedIsDowngrade) {
     await cacheSet(cacheKey, stats, CACHE_TTL);
+  } else if (stale != null) {
+    // Serve-and-cache the better-scoped last-known-good rather than leaving the
+    // primary key empty, which would re-fetch (and re-reject) on every hit.
+    await cacheSet(cacheKey, stale, CACHE_TTL);
   }
 
   // `stale` (the protected 7-day last-known-good) was already read at the

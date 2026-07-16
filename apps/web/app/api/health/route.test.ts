@@ -213,7 +213,17 @@ describe("GET /api/health", () => {
     expect(captureOperationalAlert).toHaveBeenCalled();
   });
 
-  it("does not degrade during the missing-heartbeat grace window", async () => {
+  it("#1047: degrades when a heartbeat is missing entirely", async () => {
+    // Previously a missing heartbeat was excused by a grace window measured
+    // from PROCESS_STARTED_AT (module load). On Vercel every cold start
+    // reloads the module, so a lambda essentially never lives long enough for
+    // a 2h process-uptime grace to elapse — the null case was excused forever
+    // and reported `stale: false`. Production on 2026-07-16 showed all four
+    // heartbeats null, all `stale: false`, overall `status: "ok"`, while the
+    // scoring pipeline was actively persisting corrupt data (#1045).
+    //
+    // Heartbeats live in Redis and survive deploys, so a null genuinely means
+    // "never ran, or older than the 26h TTL" — which is degraded, not new.
     vi.mocked(cacheGetCronLastRun).mockResolvedValue(null);
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
@@ -221,9 +231,11 @@ describe("GET /api/health", () => {
     const response = await GET(makeRequest());
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.status).toBe("ok");
-    expect(body.dependencies.cronHeartbeats["warm-cache"].stale).toBe(false);
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.cronHeartbeats["warm-cache"].stale).toBe(true);
+    expect(body.dependencies.cronHeartbeats["latency-check"].stale).toBe(true);
+    expect(captureOperationalAlert).toHaveBeenCalled();
   });
 
   it("always returns a valid timestamp", async () => {
