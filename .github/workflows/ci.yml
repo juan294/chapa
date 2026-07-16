@@ -24,6 +24,8 @@ jobs:
       - run: pnpm run validate:migrations
       - name: Craft propagation guard (#680)
         run: bash scripts/check-craft-propagation.sh
+      - name: Vercel config location guard (#1052)
+        run: pnpm run check:vercel-config
 
   # WHY sharded (#ci-perf): the unit+coverage suite is a CPU-bound ~5.5min
   # `vitest run --coverage` on a 2-core runner. Splitting it across 2 shards
