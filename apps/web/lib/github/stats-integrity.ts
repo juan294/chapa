@@ -1,24 +1,50 @@
 import type { RawContributionData, StatsData } from "@chapa/shared";
 
 /**
+ * The fraction of a better-scoped baseline's merged-PR count below which a
+ * lower-scoped fetch is treated as scope-blinded rather than as a real
+ * decline. juan294's incident sat at 140/953 ≈ 0.15; a rolling 365-day window
+ * advancing a day (or even the stale key's 7-day TTL) cannot evict half a
+ * user's merged PRs at once, so anything under half is not a window effect.
+ */
+const SCOPE_SHORTFALL_RATIO = 0.5;
+
+/**
  * Detects a GitHub fetch that lost merged-PR visibility relative to
- * last-known-good data. See #1002.
+ * last-known-good data. See #1002, extended by #1045.
  *
- * The GitHub `contributionsCollection` GraphQL block is scoped to the
- * *authenticating* token: a token that cannot see a user's private-repo
- * merges (e.g. the server `GITHUB_TOKEN` used by the warm-cache cron, or an
- * anonymous badge request) returns `prsMergedCount: 0` even when the user has
- * hundreds of merged PRs. That zero-PR result looks structurally valid, so it
- * previously overwrote good cached stats — collapsing the Delivery dimension
- * (merged-PR weight is 70% of Delivery) and flipping `profileType` to
- * "collaborative" (`detectProfileType` divides by `max(prsMergedCount, 1)`).
+ * GitHub's `contributionsCollection` GraphQL block — *and* the `search()`
+ * query #1004 added — are both scoped to the *authenticating* token. A token
+ * that cannot see a user's private-repo merges (the server `GITHUB_TOKEN`, or
+ * an anonymous badge request) reports only what is public. That result looks
+ * structurally valid, so it previously overwrote good cached stats —
+ * collapsing the Delivery dimension (merged-PR weight is 70% of Delivery) and
+ * flipping `profileType` to "collaborative" (`detectProfileType` divides by
+ * `max(prsMergedCount, 1)`).
  *
- * This predicate is intentionally conservative: it only flags the unambiguous
- * corruption signature — merged PRs collapsing to exactly zero while the fetch
- * still reports other activity (commits or issues) and last-known-good had
- * merged PRs. A genuinely new/empty account (no commits, no issues, no PRs)
- * and a legitimate no-PR reviewer (last-known-good also had zero PRs) are both
- * allowed through unchanged.
+ * Two distinct signatures are flagged:
+ *
+ * 1. **Total collapse** (the original #1002 case): merged PRs fall to exactly
+ *    zero while other activity remains.
+ *
+ * 2. **Scope shortfall** (#1045): a `public`-scope fetch reports a small
+ *    *fraction* of an `authenticated` baseline. #1004 sourced the count from
+ *    `search(is:merged)` believing it was not token-scoped — it is — so a
+ *    blinded fetch began returning a plausible positive number (juan294: 140
+ *    public vs 987 authenticated) instead of 0. That made signature (1)
+ *    unreachable: #1004 disarmed the very tripwire it was built on top of.
+ *
+ * Both are gated on the fresh fetch still showing other activity, so a
+ * genuinely reset account is left alone. Signature (2) additionally requires
+ * the fresh fetch to be *lower-scoped* than the baseline. Comparing only
+ * across a scope boundary is what keeps this precise: two equally-scoped
+ * fetches disagreeing is a real decline (window eviction) and must write
+ * through, because this guard also suppresses the stale write — blocking a
+ * real decline would freeze that profile behind a stale value indefinitely.
+ *
+ * The guard is strictly good→bad: a fetch that *improves* on a poisoned
+ * baseline always writes through, so the next authenticated fetch heals the
+ * data and it sticks.
  *
  * @param fresh    The just-fetched (possibly merged) stats about to be cached.
  * @param lastGood The last-known-good stats (the `stats:stale:<handle>` value),
@@ -32,34 +58,73 @@ export function isDegradedPrFetch(
   // No baseline to compare against — cannot judge, so accept the fetch.
   if (!lastGood) return false;
 
-  // Fresh fetch has merged PRs — not a collapse.
-  if (fresh.prsMergedCount > 0) return false;
-
-  // Baseline also had no merged PRs — a legitimate no-PR profile, not a loss.
+  // Baseline had no merged PRs — a legitimate no-PR profile, or a poisoned
+  // baseline this fetch may be healing. Either way, nothing to protect.
   if (lastGood.prsMergedCount <= 0) return false;
 
-  // Fresh reports zero merged PRs while last-known-good had them. Only treat
-  // this as a degraded (partial-visibility) fetch when the fresh result still
-  // shows other activity; a fetch that is entirely empty is indistinguishable
-  // from a genuinely reset account and is left alone.
-  return fresh.commitsTotal > 0 || fresh.issuesClosedCount > 0;
+  // A fetch that is entirely empty is indistinguishable from a genuinely
+  // reset account, so it is left alone.
+  const hasOtherActivity = fresh.commitsTotal > 0 || fresh.issuesClosedCount > 0;
+  if (!hasOtherActivity) return false;
+
+  // (1) The original #1002 signature: merged PRs collapsed to exactly zero.
+  if (fresh.prsMergedCount === 0) return true;
+
+  // (2) The #1045 signature: a lower-scoped fetch reporting a disproportionate
+  // shortfall against a better-scoped baseline.
+  const isLowerScoped =
+    fresh.fetchScope === "public" && lastGood.fetchScope === "authenticated";
+
+  return (
+    isLowerScoped &&
+    fresh.prsMergedCount < lastGood.prsMergedCount * SCOPE_SHORTFALL_RATIO
+  );
 }
+
+/**
+ * The GraphQL page size of the `pullRequestContributions` sample
+ * (`packages/shared/src/github-query.ts:33`), so a payload reporting
+ * `totalCount: N` yields at most `min(N, PR_SAMPLE_PAGE_SIZE)` nodes.
+ */
+const PR_SAMPLE_PAGE_SIZE = 100;
+
+/**
+ * The fraction of the expected page a sample must fill to be trusted.
+ *
+ * Not 1.0, because `queries.ts` legitimately drops nodes whose `pullRequest`
+ * is null (deleted or otherwise unreadable repos), so a healthy sample can sit
+ * a little under its page size — 96/100 against a totalCount of 143 is a real,
+ * healthy juan294 payload.
+ *
+ * That same null-filter is what makes this check work: `totalCount` counts
+ * contributions, but the nested `pullRequest` object is null for every repo the
+ * token cannot read. Under scope loss the nodes are filtered away while
+ * `totalCount` keeps counting them — which is precisely the 07-14 shape
+ * (totalCount 143, ~2 surviving nodes, ratio 0.02). The threshold sits well
+ * clear of both.
+ */
+const PR_SAMPLE_MIN_FILL_RATIO = 0.25;
 
 /**
  * Assesses whether a raw GitHub fetch is internally consistent enough to
  * trust, *without requiring a last-known-good baseline*. See #1002's
- * follow-up (the 2026-07-07 scoring-integrity-contract): the authoritative
- * `search(is:merged)` count (`raw.mergedPrTotalCount`) is fetched
- * independently of the token-scoped, 100-node-capped
- * `pullRequestContributions` sample, so a divergence between the two — the
- * search sees merged PRs but the sample came back empty — is the signature
- * of a degraded/partial fetch (token-scope loss or a partial GraphQL error),
- * not a genuinely empty account.
+ * follow-up (the 2026-07-07 scoring-integrity-contract), corrected by #1045.
  *
- * This complements `isDegradedPrFetch`: that predicate needs a trusted prior
- * value to compare against and is blind on a cold or already-poisoned
- * baseline; this one judges the payload on its own internal consistency, so
- * it also catches the very first degraded fetch for a handle.
+ * NOTE (#1045): the original contract was built on the premise that
+ * `search(is:merged)` (`raw.mergedPrTotalCount`) is *not* token-scoped, and
+ * could therefore serve as an authoritative cross-check against the
+ * token-scoped `pullRequestContributions` sample. **That premise is false.**
+ * GitHub's search only returns what the authenticating token can see, so a
+ * blinded fetch under-reports *both* sides consistently and the cross-check
+ * silently agrees with itself. Verified against the live API for juan294:
+ * authenticated → 987 merged PRs, anonymous → 140.
+ *
+ * The checks below therefore never treat `mergedPrTotalCount` as ground truth.
+ * They test only the payload's *internal* shape — specifically that the sample
+ * carries as many nodes as its own `totalCount` claims — which holds
+ * regardless of token scope and needs no baseline, so it also catches the very
+ * first degraded fetch for a handle. Cross-scope comparison is
+ * `isDegradedPrFetch`'s job, and it has a real baseline to do it with.
  *
  * @param raw The raw contribution payload, before `buildStatsFromRaw`.
  * @returns `{ ok: true }` when the payload is internally consistent, or
@@ -74,10 +139,10 @@ export function assessRawFetchIntegrity(
 
   const mergedNodeCount = raw.pullRequests.nodes.filter((n) => n.merged).length;
 
-  // The juan294 signature: search sees merged PRs, but the sample came back
-  // completely empty. Independent of whether pullRequestContributions was
-  // null (defaulted to empty by queries.ts) or merely returned an empty
-  // nodes array — either way, the sample cannot be trusted for this fetch.
+  // Search reports merged PRs but the sample came back completely empty.
+  // Independent of whether pullRequestContributions was null (defaulted to
+  // empty by queries.ts) or merely returned an empty nodes array — either way
+  // the sample cannot be trusted for this fetch.
   if (raw.mergedPrTotalCount > 0 && mergedNodeCount === 0) {
     return { ok: false, reason: "pr_nodes_empty_but_search_positive" };
   }
@@ -87,6 +152,20 @@ export function assessRawFetchIntegrity(
   // distinct from a genuinely empty account (which reports totalCount: 0).
   if (raw.pullRequests.totalCount > 0 && raw.pullRequests.nodes.length === 0) {
     return { ok: false, reason: "pr_totalcount_positive_but_nodes_empty" };
+  }
+
+  // #1045: the sample returned *some* nodes, but far fewer than its own
+  // totalCount says exist. This is what let juan294's 07-14 fetch through: the
+  // sample carried ~2 tiny nodes against a totalCount of 143, so every
+  // `=== 0` check above passed while prsMergedWeight (70% of Delivery)
+  // collapsed 120 → 3.38 and linesAdded read 59 across 140 merged PRs.
+  //
+  // Keyed on node count vs totalCount — never on *merged*-node count vs the
+  // search total, since the page is filled with PR contributions of any state:
+  // a user with many open PRs can legitimately have few merged nodes.
+  const expectedNodes = Math.min(raw.pullRequests.totalCount, PR_SAMPLE_PAGE_SIZE);
+  if (raw.pullRequests.nodes.length < expectedNodes * PR_SAMPLE_MIN_FILL_RATIO) {
+    return { ok: false, reason: "pr_sample_disproportionate_to_total" };
   }
 
   return { ok: true };

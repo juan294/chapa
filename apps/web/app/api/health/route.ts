@@ -16,8 +16,6 @@ interface GitHubRateLimit {
 
 const GITHUB_RATE_LIMIT_FLOOR = 500;
 const CRON_HEARTBEAT_TTL_MS = 26 * 60 * 60 * 1000;
-const MISSING_HEARTBEAT_GRACE_MS = 2 * 60 * 60 * 1000;
-const PROCESS_STARTED_AT = Date.now();
 const CRON_HEARTBEATS = [
   "warm-cache",
   "sync-audience",
@@ -81,8 +79,6 @@ async function getCronHeartbeatStatuses(): Promise<
   Record<(typeof CRON_HEARTBEATS)[number], CronHeartbeatStatus>
 > {
   const now = Date.now();
-  const missingHeartbeatIsStale =
-    now - PROCESS_STARTED_AT > MISSING_HEARTBEAT_GRACE_MS;
   const entries = await Promise.all(
     CRON_HEARTBEATS.map(async (name) => {
       const lastRun = await cacheGetCronLastRun(name);
@@ -92,10 +88,22 @@ async function getCronHeartbeatStatuses(): Promise<
         {
           lastRun,
           ageMs,
-          stale:
-            lastRun == null
-              ? missingHeartbeatIsStale
-              : ageMs !== null && ageMs > CRON_HEARTBEAT_TTL_MS,
+          // #1047: a missing heartbeat is stale, full stop.
+          //
+          // This was previously excused by a grace window measured from
+          // PROCESS_STARTED_AT (module load). That is coherent for a
+          // long-lived server and meaningless here: on Vercel every cold start
+          // reloads the module, so a lambda never survives the 2h grace and
+          // `missingHeartbeatIsStale` was effectively a constant `false`. The
+          // null branch — the most degraded state a cron has — was the one
+          // state the check could never report.
+          //
+          // No grace is needed to replace it. Heartbeats are stored in Redis
+          // and survive deploys, and CRON_HEARTBEAT_TTL_MS (26h) already
+          // spans the slowest cron's daily cadence, so a null means the cron
+          // has never run or has been silent past its window. Both are worth
+          // waking someone for.
+          stale: lastRun == null || ageMs! > CRON_HEARTBEAT_TTL_MS,
         },
       ] as const;
     }),
