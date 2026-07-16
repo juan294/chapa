@@ -212,6 +212,36 @@ describe("fetchStats", () => {
     expect(mockedServerErrors.captureServerEvent).not.toHaveBeenCalled();
   });
 
+  it("swallows a captureServerEvent rejection on the degraded-fetch reporting path", async () => {
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockedServerErrors.captureServerEvent.mockRejectedValue(new Error("telemetry down"));
+    // Non-empty nodes with none merged: still triggers the same rejection
+    // reason (mergedNodeCount === 0) but exercises the `.filter((n) => n.merged)`
+    // callback against real elements, rather than an empty array short-circuit.
+    const data = makeContribData({
+      mergedPrTotalCount: 904,
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 10, deletions: 2, changedFiles: 1, merged: false, body: null, headRefName: "wip/a", closingIssuesCount: 0 },
+          { additions: 20, deletions: 4, changedFiles: 2, merged: false, body: null, headRefName: "wip/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    mockedQueries.fetchContributionData.mockResolvedValue(data);
+
+    const stats = await fetchStats("test-user", "gho_token");
+
+    expect(stats).toBeNull();
+    await vi.waitFor(() => {
+      expect(mockedServerErrors.captureServerEvent).toHaveBeenCalledWith(
+        "stats_fetch_rejected",
+        expect.objectContaining({ mergedNodeCount: 0 }),
+      );
+    });
+    consoleSpy.mockRestore();
+  });
+
   it("counts active days from heatmap (days with count > 0)", async () => {
     const weeks = Array.from({ length: 13 }, () => ({
       contributionDays: Array.from({ length: 7 }, () => ({
