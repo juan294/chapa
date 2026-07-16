@@ -50,15 +50,28 @@ interface CronHeartbeatStatus {
   ageMs: number | null;
 }
 
-/** Probe GitHub's rate_limit API to verify reachability.
+/** Probe GitHub's rate_limit API to verify reachability AND token capability.
+ *
+ * Reachability alone is not enough. The scoring pipeline's `fetchScope` logic
+ * (`lib/github/client.ts`, #1050) treats a tokenless fetch as private-inclusive
+ * *because* the server GITHUB_TOKEN carries `repo` scope. If that token is ever
+ * rotated to one without `repo`, every badge silently reverts to a public-only
+ * view of its user: juan294 saw 140 of 987 merged PRs that way, `prsMergedWeight`
+ * collapsed 120 -> 3.38, and Delivery fell 100 -> 58 — with no error raised
+ * anywhere, because a scope-blind token is a perfectly valid token.
+ *
+ * This probe therefore asserts the capability the pipeline depends on, rather
+ * than merely that GitHub answered.
  *
  * Returns:
- * - "skipped" — GITHUB_TOKEN not configured (no probe attempted)
- * - "ok"      — API reachable; rateLimit data attached
- * - "error"   — request failed or non-2xx response
+ * - "skipped"             — GITHUB_TOKEN not configured (no probe attempted)
+ * - "ok"                  — API reachable, token authenticates and holds `repo`
+ * - "insufficient_scope"  — token works but lacks `repo`: stats would be blinded
+ * - "error"               — request failed, or non-2xx (a 401 means the token
+ *                           does not authenticate at all)
  */
 async function pingGitHub(): Promise<{
-  status: "ok" | "error" | "skipped";
+  status: "ok" | "error" | "skipped" | "insufficient_scope";
   rateLimit?: GitHubRateLimit;
 }> {
   const token = getGithubToken();
@@ -78,13 +91,21 @@ async function pingGitHub(): Promise<{
     const data = (await response.json()) as {
       rate: { remaining: number; limit: number };
     };
-    return {
-      status: "ok",
-      rateLimit: {
-        remaining: data.rate.remaining,
-        limit: data.rate.limit,
-      },
-    };
+    const rateLimit = { remaining: data.rate.remaining, limit: data.rate.limit };
+
+    // GitHub reports the token's granted scopes on every authenticated REST
+    // response. Absent header => a fine-grained PAT or GitHub App token, whose
+    // permissions this header cannot express; don't claim insufficiency we
+    // cannot actually observe (a false alarm here would page on every check).
+    const scopeHeader = response.headers.get("x-oauth-scopes");
+    if (scopeHeader !== null) {
+      const scopes = scopeHeader.split(",").map((s) => s.trim());
+      if (!scopes.includes("repo")) {
+        return { status: "insufficient_scope", rateLimit };
+      }
+    }
+
+    return { status: "ok", rateLimit };
   } catch {
     return { status: "error" };
   }

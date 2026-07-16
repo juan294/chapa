@@ -220,6 +220,47 @@ describe("GET /api/health", () => {
     expect(captureOperationalAlert).toHaveBeenCalled();
   });
 
+  it("#1047/#1050: degrades when the server token has lost `repo` scope", async () => {
+    // The scoring pipeline's fetchScope logic (client.ts, #1050) treats a
+    // tokenless fetch as private-inclusive precisely because the server
+    // GITHUB_TOKEN carries `repo`. If that ever stops being true, every badge
+    // silently reverts to a public-only view of its user — juan294 saw 140 of
+    // 987 merged PRs that way, and Delivery fell 100 -> 58 with no error
+    // anywhere. That assumption must be monitored, not assumed.
+    vi.stubEnv("GITHUB_TOKEN", "server-pat");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "x-oauth-scopes": "gist, read:org, workflow" }), // no repo
+      json: async () => ({ rate: { remaining: 4000, limit: 5000 } }),
+    });
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.github).toBe("insufficient_scope");
+  });
+
+  it("#1047/#1050: stays ok when the server token carries `repo` scope", async () => {
+    vi.stubEnv("GITHUB_TOKEN", "server-pat");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "x-oauth-scopes": "gist, read:org, repo, workflow" }),
+      json: async () => ({ rate: { remaining: 4000, limit: 5000 } }),
+    });
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.dependencies.github).toBe("ok");
+  });
+
   it("#1052: does NOT degrade for a missing heartbeat inside the durable grace window", async () => {
     // A freshly-registered cron has not run yet. sync-audience/latency-check/
     // process-campaigns are daily, so after a deploy that first registers them
