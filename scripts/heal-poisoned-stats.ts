@@ -18,13 +18,25 @@
  *      deletes `snapshot:v2:latest:<handle>` (forces a cache rebuild) when
  *      either stats key was poisoned, and deletes the corrupt snapshot rows.
  *
- * IMPORTANT — this script does NOT itself repopulate good data. The GitHub
- * server token used by cron/bulk-recalculate cannot see a user's private-repo
- * merges (see #1002), so it cannot heal the data on its own. Healing
- * completes when the user's next **authenticated** visit (or `/api/refresh`)
- * repopulates good, Phase-1/2-protected data — this script only clears the
- * poison so that next good fetch sticks instead of being discarded as a
- * "downgrade" of the (corrupt) cached value.
+ * IMPORTANT — this script does NOT itself repopulate good data; it only
+ * clears the poison so the next good fetch sticks instead of being discarded
+ * as a "downgrade" of the (corrupt) cached value.
+ *
+ * NOTE (#1050 correction): this header previously claimed the server token
+ * cannot see private merges and that only the user's authenticated visit
+ * heals. That was exactly backwards. The OAuth app requests no `repo` scope,
+ * so the USER'S session token is the blind one; the server `GITHUB_TOKEN`
+ * holds `repo` and sees everything. Post-purge, healing completes via any
+ * tokenless fetch (anonymous badge hit, warm-cache cron) — both resolve to
+ * the server token.
+ *
+ * #1049: detection covers TWO corruption shapes, because #1004 changed what
+ * poison looks like. `isPoisonedStats` catches the #1002 era (count collapsed
+ * to exactly 0); `isScopeBlindedStats` catches the #1045 era (a
+ * plausible-but-wrong POSITIVE count from the token-scoped search, with the
+ * sample-derived fields — prsMergedWeight, linesAdded/Deleted — collapsed).
+ * juan294's 2026-07-14 rows are the second shape: 140 PRs, weight 3.38,
+ * +59/-10 lines. The original zero-only filter was blind to them.
  *
  * Usage:
  *   tsx scripts/heal-poisoned-stats.ts <handle> [<handle>...]           # DRY RUN (default, safe)
@@ -47,7 +59,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isPoisonedStats } from "../apps/web/lib/github/stats-integrity";
+import { isPoisonedStats, isScopeBlindedStats } from "../apps/web/lib/github/stats-integrity";
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-tested in heal-poisoned-stats.test.ts)
@@ -168,14 +180,23 @@ async function redis(cfg: Config, cmd: string[]): Promise<unknown> {
   return (await res.json()).result;
 }
 
-/** Parse a raw Redis GET result into the subset of StatsData isPoisonedStats needs, or null. */
-function parseStatsValue(
-  raw: unknown,
-): { prsMergedCount: number; commitsTotal: number; issuesClosedCount: number } | null {
+/** Parsed subset of StatsData that the two poison predicates need. */
+interface ParsedStats {
+  prsMergedCount: number;
+  commitsTotal: number;
+  issuesClosedCount: number;
+  prsMergedWeight?: number;
+  linesAdded?: number;
+  linesDeleted?: number;
+}
+
+/** Parse a raw Redis GET result into the fields the poison predicates need, or null. */
+function parseStatsValue(raw: unknown): ParsedStats | null {
   if (raw === null || raw === undefined) return null;
   const obj = typeof raw === "string" ? JSON.parse(raw) : raw;
   if (typeof obj !== "object" || obj === null) return null;
-  const { prsMergedCount, commitsTotal, issuesClosedCount } = obj as Record<string, unknown>;
+  const { prsMergedCount, commitsTotal, issuesClosedCount, prsMergedWeight, linesAdded, linesDeleted } =
+    obj as Record<string, unknown>;
   if (
     typeof prsMergedCount !== "number" ||
     typeof commitsTotal !== "number" ||
@@ -183,45 +204,124 @@ function parseStatsValue(
   ) {
     return null;
   }
-  return { prsMergedCount, commitsTotal, issuesClosedCount };
+  return {
+    prsMergedCount,
+    commitsTotal,
+    issuesClosedCount,
+    ...(typeof prsMergedWeight === "number" && { prsMergedWeight }),
+    ...(typeof linesAdded === "number" && { linesAdded }),
+    ...(typeof linesDeleted === "number" && { linesDeleted }),
+  };
+}
+
+/**
+ * Is this cached stats value poisoned under EITHER corruption shape?
+ *
+ * The blindness check requires the sample-derived fields; a legacy value
+ * without them can only be judged by the zero-shape — the proof standard for
+ * a destructive purge is "demonstrably corrupt", never "cannot be shown
+ * clean".
+ */
+function statsValueIsPoisoned(s: ParsedStats): boolean {
+  if (isPoisonedStats(s)) return true;
+  if (
+    typeof s.prsMergedWeight === "number" &&
+    typeof s.linesAdded === "number" &&
+    typeof s.linesDeleted === "number"
+  ) {
+    return isScopeBlindedStats({
+      prsMergedCount: s.prsMergedCount,
+      prsMergedWeight: s.prsMergedWeight,
+      linesAdded: s.linesAdded,
+      linesDeleted: s.linesDeleted,
+    });
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
 // Supabase PostgREST
 // ---------------------------------------------------------------------------
 
-function poisonedSnapshotFilter(handle: string): string {
-  return `handle=eq.${handle}&prs_merged_count=eq.0&commits_total=gt.${SNAPSHOT_COMMITS_THRESHOLD}`;
+/** Snapshot row as PostgREST returns it (snake_case), sample fields nullable on legacy rows. */
+export interface SnapshotRow {
+  date: string;
+  prs_merged_count: number;
+  prs_merged_weight: number | null;
+  lines_added: number | null;
+  lines_deleted: number | null;
+  commits_total: number;
+  issues_closed_count: number;
 }
 
-async function supaCountPoisonedSnapshots(
-  cfg: Config,
-  handle: string,
-): Promise<number> {
+const SNAPSHOT_ROW_COLUMNS =
+  "date,prs_merged_count,prs_merged_weight,lines_added,lines_deleted,commits_total,issues_closed_count";
+
+/**
+ * Select the dates of demonstrably-corrupt snapshot rows, under either shape.
+ *
+ * Evaluated in TS rather than SQL so the heal script and the persist-boundary
+ * gate share ONE set of predicates (`stats-integrity.ts`) — the previous
+ * SQL-side `prs_merged_count=eq.0` filter silently diverged from what
+ * "poisoned" meant after #1004, which is how juan294's 140-count rows became
+ * undetectable (#1049).
+ *
+ * Zero-shape rows keep the extra `commits_total > SNAPSHOT_COMMITS_THRESHOLD`
+ * conservatism the SQL filter had. Legacy rows with null sample fields can
+ * only be judged by the zero shape — the standard for deletion is
+ * "demonstrably corrupt", never "cannot be shown clean".
+ */
+export function selectPoisonedSnapshotDates(rows: SnapshotRow[]): string[] {
+  const dates: string[] = [];
+  for (const row of rows) {
+    const zeroShape =
+      isPoisonedStats({
+        prsMergedCount: row.prs_merged_count,
+        commitsTotal: row.commits_total,
+        issuesClosedCount: row.issues_closed_count,
+      }) && row.commits_total > SNAPSHOT_COMMITS_THRESHOLD;
+
+    const blindedShape =
+      row.prs_merged_weight !== null &&
+      row.lines_added !== null &&
+      row.lines_deleted !== null &&
+      isScopeBlindedStats({
+        prsMergedCount: row.prs_merged_count,
+        prsMergedWeight: row.prs_merged_weight,
+        linesAdded: row.lines_added,
+        linesDeleted: row.lines_deleted,
+      });
+
+    if (zeroShape || blindedShape) dates.push(row.date);
+  }
+  return dates.sort();
+}
+
+async function supaFetchSnapshotRows(cfg: Config, handle: string): Promise<SnapshotRow[]> {
   const res = await fetch(
-    `${cfg.supaUrl}/rest/v1/metrics_snapshots?${poisonedSnapshotFilter(handle)}&select=handle`,
+    `${cfg.supaUrl}/rest/v1/metrics_snapshots?handle=eq.${handle}&select=${SNAPSHOT_ROW_COLUMNS}`,
     {
-      method: "HEAD",
       headers: {
         apikey: cfg.supaKey,
         Authorization: `Bearer ${cfg.supaKey}`,
-        Prefer: "count=exact",
       },
     },
   );
   if (!res.ok) {
-    throw new Error(`count metrics_snapshots: ${res.status} ${await res.text()}`);
+    throw new Error(`fetch metrics_snapshots: ${res.status} ${await res.text()}`);
   }
-  const range = res.headers.get("content-range"); // "*/<total>"
-  return range ? Number(range.split("/")[1]) : 0;
+  return (await res.json()) as SnapshotRow[];
 }
 
-async function supaDeletePoisonedSnapshots(
+/** Delete exactly the reviewed dates — never a broad filter (#1049). */
+async function supaDeleteSnapshotsByDate(
   cfg: Config,
   handle: string,
+  dates: string[],
 ): Promise<number> {
+  if (dates.length === 0) return 0;
   const res = await fetch(
-    `${cfg.supaUrl}/rest/v1/metrics_snapshots?${poisonedSnapshotFilter(handle)}`,
+    `${cfg.supaUrl}/rest/v1/metrics_snapshots?handle=eq.${handle}&date=in.(${dates.join(",")})`,
     {
       method: "DELETE",
       headers: {
@@ -251,6 +351,8 @@ export interface HealResult {
   mergedPoisoned: boolean;
   stalePoisoned: boolean;
   poisonedSnapshotRows: number;
+  /** Exact dates queued for deletion — printed in dry-run for operator review. */
+  poisonedSnapshotDates: string[];
   deletedRedisKeys: string[];
   deletedSnapshotRows: number;
 }
@@ -270,10 +372,12 @@ export async function healHandle(
   const mergedStats = parseStatsValue(mergedRaw);
   const staleStats = parseStatsValue(staleRaw);
 
-  const mergedPoisoned = mergedStats !== null && isPoisonedStats(mergedStats);
-  const stalePoisoned = staleStats !== null && isPoisonedStats(staleStats);
+  const mergedPoisoned = mergedStats !== null && statsValueIsPoisoned(mergedStats);
+  const stalePoisoned = staleStats !== null && statsValueIsPoisoned(staleStats);
 
-  const poisonedSnapshotRows = await supaCountPoisonedSnapshots(cfg, handle);
+  const snapshotRows = await supaFetchSnapshotRows(cfg, handle);
+  const poisonedSnapshotDates = selectPoisonedSnapshotDates(snapshotRows);
+  const poisonedSnapshotRows = poisonedSnapshotDates.length;
 
   const deletedRedisKeys: string[] = [];
   let deletedSnapshotRows = 0;
@@ -291,8 +395,8 @@ export async function healHandle(
       await redis(cfg, ["DEL", snapshotKey(handle)]);
       deletedRedisKeys.push(snapshotKey(handle));
     }
-    if (poisonedSnapshotRows > 0) {
-      deletedSnapshotRows = await supaDeletePoisonedSnapshots(cfg, handle);
+    if (poisonedSnapshotDates.length > 0) {
+      deletedSnapshotRows = await supaDeleteSnapshotsByDate(cfg, handle, poisonedSnapshotDates);
     }
   }
 
@@ -301,6 +405,7 @@ export async function healHandle(
     mergedPoisoned,
     stalePoisoned,
     poisonedSnapshotRows,
+    poisonedSnapshotDates,
     deletedRedisKeys,
     deletedSnapshotRows,
   };
@@ -326,7 +431,10 @@ export async function run(rawArgs: string[]): Promise<void> {
     console.log(`  ${mergedStatsKey(result.handle).padEnd(30)} poisoned: ${result.mergedPoisoned}`);
     console.log(`  ${staleStatsKey(result.handle).padEnd(30)} poisoned: ${result.stalePoisoned}`);
     console.log(
-      `  metrics_snapshots poisoned rows (prs_merged_count=0 AND commits_total>${SNAPSHOT_COMMITS_THRESHOLD}): ${result.poisonedSnapshotRows}`,
+      `  metrics_snapshots poisoned rows (zero-shape or scope-blinded): ${result.poisonedSnapshotRows}` +
+        (result.poisonedSnapshotDates.length > 0
+          ? ` -> [${result.poisonedSnapshotDates.join(", ")}]`
+          : ""),
     );
     if (apply) {
       if (result.deletedRedisKeys.length > 0) {
@@ -355,8 +463,9 @@ export async function run(rawArgs: string[]): Promise<void> {
     }
   } else {
     console.log(
-      `\nHealing complete. The next AUTHENTICATED visit (or /api/refresh) for each ` +
-        `handle repopulates good data — this script does not fetch fresh data itself.`,
+      `\nHealing complete. The next tokenless fetch (anonymous badge hit or the ` +
+        `hourly warm-cache cron) repopulates good data via the repo-scoped server ` +
+        `GITHUB_TOKEN — this script does not fetch fresh data itself.`,
     );
   }
 }

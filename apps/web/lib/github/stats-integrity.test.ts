@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type { RawContributionData } from "@chapa/shared";
-import { isDegradedPrFetch, assessRawFetchIntegrity, isPoisonedStats } from "./stats-integrity";
+import {
+  isDegradedPrFetch,
+  assessRawFetchIntegrity,
+  isPoisonedStats,
+  isScopeBlindedStats,
+  MIN_PRS_FOR_BLINDNESS_CHECK,
+  MIN_WEIGHT_PER_SAMPLED_PR,
+} from "./stats-integrity";
 import { makeStats } from "../test-helpers/fixtures";
 
 function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionData {
@@ -251,6 +258,108 @@ describe("assessRawFetchIntegrity — #1045 disproportionate sample", () => {
       pullRequests: { totalCount: 60, nodes: Array.from({ length: 60 }, (_, i) => prNode(i < 4)) },
     });
     expect(assessRawFetchIntegrity(raw)).toEqual({ ok: true });
+  });
+});
+
+describe("isScopeBlindedStats (#1049)", () => {
+  // Why isPoisonedStats cannot cover this: it requires prsMergedCount === 0,
+  // the #1002-era signature. #1004's search-derived count replaced that zero
+  // with a plausible positive number (juan294: 140), which disarmed the guard
+  // (#1045) AND the heal script's detection — for the same reason. This
+  // predicate detects the #1045 shape: a positive count whose sample-derived
+  // fields (prsMergedWeight, linesAdded/Deleted) collapsed because the PR
+  // objects were null for unreadable repos and got filtered away.
+  //
+  // The weight bound is provable, not heuristic: computePrWeight gives every
+  // non-empty merged PR at least ~0.169 (a 1-line, 1-file PR), so a FULL
+  // sample of n nodes cannot weigh less than 0.169·n. Weight below 0.15·n
+  // therefore proves the sample was truncated — the scope-blind signature.
+
+  it("flags the exact juan294 2026-07-14 production payload", () => {
+    expect(
+      isScopeBlindedStats({
+        prsMergedCount: 140,
+        prsMergedWeight: 3.37828,
+        linesAdded: 59,
+        linesDeleted: 10,
+      }),
+    ).toBe(true);
+  });
+
+  it("passes the healthy juan294 2026-07-13 payload (weight at the 120 agg cap)", () => {
+    // The agg cap matters: 953 PRs × 0.15 = 143 > 120, so a naive
+    // weight-vs-count ratio would false-positive every prolific user whose
+    // weight sits at PR_WEIGHT_AGG_CAP. Bounding by the SAMPLE size
+    // (min(count, 100) × 0.15 = 15 < 120) is what makes this safe.
+    expect(
+      isScopeBlindedStats({
+        prsMergedCount: 953,
+        prsMergedWeight: 120,
+        linesAdded: 101313,
+        linesDeleted: 54996,
+      }),
+    ).toBe(false);
+  });
+
+  it("passes a mass-tiny-PR account (full sample of 1-line PRs)", () => {
+    // 100 sampled 1-line PRs weigh ≈ 16.9 — above the 15 threshold precisely
+    // because the per-node floor (0.169) exceeds MIN_WEIGHT_PER_SAMPLED_PR
+    // (0.15). A full sample can never be flagged, by construction.
+    expect(
+      isScopeBlindedStats({
+        prsMergedCount: 2000,
+        prsMergedWeight: 16.9,
+        linesAdded: 100,
+        linesDeleted: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("requires BOTH signals: truncated weight alone is not enough", () => {
+    // Weight low but lines plentiful — e.g. a sample of 2 large PRs would
+    // carry thousands of lines. Ambiguous, so not flagged: this predicate
+    // gates a destructive history rewrite and is deliberately biased toward
+    // false negatives (which now self-heal via #1050 + warm-cache) over
+    // false positives (which destroy good history).
+    expect(
+      isScopeBlindedStats({
+        prsMergedCount: 140,
+        prsMergedWeight: 6.0,
+        linesAdded: 4000,
+        linesDeleted: 900,
+      }),
+    ).toBe(false);
+  });
+
+  it("ignores small accounts below the count floor", () => {
+    expect(
+      isScopeBlindedStats({
+        prsMergedCount: MIN_PRS_FOR_BLINDNESS_CHECK - 1,
+        prsMergedWeight: 0,
+        linesAdded: 0,
+        linesDeleted: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not overlap isPoisonedStats: zero-count is the other predicate's job", () => {
+    expect(
+      isScopeBlindedStats({
+        prsMergedCount: 0,
+        prsMergedWeight: 0,
+        linesAdded: 0,
+        linesDeleted: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("threshold sits strictly below the provable per-node weight floor", () => {
+    // computePrWeight for the smallest possible non-empty PR (1 addition,
+    // 1 changed file): totalChanges=2 → multiplier 0.2, raw = 0.5 + 0.25·ln2
+    // + 0.25·ln2 ≈ 0.8466 → weight ≈ 0.1693. The threshold must stay below
+    // it or full samples of tiny PRs become flaggable.
+    const perNodeFloor = Math.min(1, 2 / 10) * (0.5 + 0.25 * Math.log(2) + 0.25 * Math.log(2));
+    expect(MIN_WEIGHT_PER_SAMPLED_PR).toBeLessThan(perNodeFloor);
   });
 });
 

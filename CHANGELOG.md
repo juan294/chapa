@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`heal-poisoned-stats` can now detect the #1045 corruption shape (#1049).** The
+  script's detection — and the persist-boundary gate — keyed only on
+  `prsMergedCount === 0`, the #1002-era signature. #1004's token-scoped search replaced
+  that zero with a plausible positive count (140 of 987), which disarmed the repair tool
+  for the same reason it disarmed the guard: three poisoned snapshot rows persisted and
+  were undetectable. A new `isScopeBlindedStats` predicate catches the positive-count
+  shape via a provable bound (a full PR sample of *n* nodes cannot weigh less than
+  0.169·*n*, so weight below 0.15·*n* proves node truncation) corroborated by a
+  lines-per-PR impossibility check. Snapshot-row selection moved from a SQL-side zero
+  filter into the same shared TS predicates (single source of truth), rows are deleted by
+  an exact reviewed date list, and `statsLookComplete` now gates both shapes so this can
+  never persist again. Also corrected the script's inverted healing note (post-#1050 the
+  `repo`-scoped server token is the healer, not the user's session token).
+
 ## [2.19.0] - 2026-07-16
 
 ### Fixed

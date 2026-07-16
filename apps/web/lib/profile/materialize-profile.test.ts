@@ -219,6 +219,40 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
 
     expect(result.statsComplete).toBe(false);
   });
+
+  it("is false for the #1049 scope-blinded shape: positive count, collapsed sample", () => {
+    // The exact juan294 2026-07-14 payload that DID persist and poison three
+    // snapshot rows: prsMergedCount 140 sails past the zero-check, while the
+    // fields Delivery actually scores on (weight is 70% of it) collapsed.
+    const stats = makeFullStats({
+      prsMergedCount: 140,
+      prsMergedWeight: 3.37828,
+      linesAdded: 59,
+      linesDeleted: 10,
+      commitsTotal: 16292,
+      issuesClosedCount: 5208,
+    });
+
+    const result = materializeImpactState(stats);
+
+    expect(result.statsComplete).toBe(false);
+  });
+
+  it("stays true for a prolific user whose weight sits at the aggregation cap", () => {
+    // The healthy juan294 07-13 shape — must never be gated.
+    const stats = makeFullStats({
+      prsMergedCount: 953,
+      prsMergedWeight: 120,
+      linesAdded: 101313,
+      linesDeleted: 54996,
+      commitsTotal: 16187,
+      issuesClosedCount: 608,
+    });
+
+    const result = materializeImpactState(stats);
+
+    expect(result.statsComplete).toBe(true);
+  });
 });
 
 describe("materializeProfile", () => {
