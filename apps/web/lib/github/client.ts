@@ -1,6 +1,8 @@
 import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
 import { isDegradedPrFetch } from "./stats-integrity";
+import { OAUTH_GRANTS_PRIVATE_REPO_ACCESS } from "@/lib/auth/github";
+import { getGithubToken } from "@/lib/env";
 import { captureServerEvent } from "@/lib/analytics/server-errors";
 import { cacheGet, cacheSet } from "../cache/redis";
 import { dbUpsertUser } from "@/lib/db/users";
@@ -294,9 +296,52 @@ async function _fetchAndCache(
   }
 
   // Tag the fetch's scope so the non-downgrading cache-write rule below can
-  // refuse to let a lower-scope (public) fetch overwrite a higher-scope
-  // (authenticated) entry already cached for this handle. See #1004.
-  stats.fetchScope = token ? "authenticated" : "public";
+  // refuse to let a lower-scope fetch overwrite a higher-scope entry already
+  // cached for this handle (#1004), corrected by #1050.
+  //
+  // `fetchScope` means "was this fetch private-inclusive?", NOT "was a token
+  // object present?". #1004 conflated the two — `token ? "authenticated" :
+  // "public"` — and that inverted the ranking against reality:
+  //
+  //   anonymous badge hit -> no session token -> queries.ts falls back to the
+  //     server GITHUB_TOKEN, which holds `repo` scope -> sees private merges
+  //     -> was labelled "public"        (rank 1)
+  //   user's own refresh -> session OAuth token, scoped `read:user user:email`
+  //     with NO `repo` -> cannot see private repos at all
+  //     -> was labelled "authenticated" (rank 2)
+  //
+  // Since scopeRank ranks authenticated above public, the blinded fetch
+  // outranked the complete one and overwrote it. Verified against the live
+  // API: 987 merged PRs with `repo`, 140 without. A user clicking Refresh on
+  // their own profile collapsed their own Delivery 100 -> 58.
+  //
+  // Corrected mapping — label by what the fetch could actually see:
+  //
+  //   session token + OAuth grants `repo`  -> private-inclusive
+  //     Today OAUTH_SCOPES omits `repo`, so this is false. Derived from the
+  //     same constant rather than restated, so adding `repo` to the OAuth app
+  //     updates this in the same edit instead of drifting.
+  //
+  //   no session token + server GITHUB_TOKEN configured -> private-inclusive
+  //     queries.ts resolves `token ?? getGithubToken()`, so a tokenless call
+  //     authenticates as the server PAT, which holds `repo`. GitHub's GraphQL
+  //     API rejects unauthenticated requests outright (403), so a fetch that
+  //     returned data without a session token necessarily used this token.
+  //     `/api/health` asserts that token still carries `repo` (#1047), so this
+  //     assumption is monitored rather than assumed silently.
+  //
+  //   neither -> public
+  //
+  // This keeps the ranking meaningful and correctly oriented: a scope-blind
+  // session fetch (140 PRs) is now "public" and can no longer outrank or
+  // overwrite the server token's complete view (987 PRs) held as
+  // "authenticated" — and isDegradedPrFetch's #1045 shortfall check now fires
+  // on exactly the refresh path that corrupted juan294's profile.
+  const usedPrivateInclusiveServerToken = !token && Boolean(getGithubToken());
+  stats.fetchScope =
+    (token && OAUTH_GRANTS_PRIVATE_REPO_ACCESS) || usedPrivateInclusiveServerToken
+      ? "authenticated"
+      : "public";
 
   // #1002 — Guard against a viewer-scoped fetch that lost merged-PR visibility.
   // The GitHub contributionsCollection is scoped to the authenticating token:

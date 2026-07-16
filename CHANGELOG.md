@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-07-16
+
+### Fixed
+
+- **All four cron jobs had never run — not once, since the project was created (#1052).**
+  The Vercel project's Root Directory is `apps/web`, and Vercel resolves `vercel.json`
+  relative to it. The file lived at the repository root, so it was never read.
+
+  Nothing failed. There is no error for configuration that is simply never loaded: it
+  looked correct in review, in git, and in a passing test. Confirmed two ways —
+  `/api/health` reported `lastRun: null` for all four heartbeats despite a 48h write TTL
+  and an hourly schedule, and Vercel's dashboard showed the "Get Started with Cron Jobs"
+  onboarding, which only renders for a project with **zero** registered crons (feature
+  Enabled, team on Pro, so neither gating applied).
+
+  Never ran: `warm-cache` (hourly), `sync-audience`, `process-campaigns`, `latency-check`.
+  The `functions` block was ignored on the same grounds, including the `maxDuration: 300`
+  that #942 documented as a Pro requirement. Several past commits were silent no-ops —
+  `b24d9033` ("bump warm-cache cron from daily to hourly") changed nothing at all.
+
+  This explains more than the crons: `warm-cache` is what re-fetches stats with the
+  `repo`-scoped server token, so with it dead the badge cache was only ever populated by
+  whichever request arrived first after a TTL expiry. The self-healing mechanism the
+  caching design assumes did not exist in production — which is why the #1045 poisoning
+  sat there for three days. The #974/#1018 badge latency SLO monitor has likewise never
+  fired once.
+
+  `vercel.json` now lives at `apps/web/vercel.json` (contents unchanged; its paths were
+  already relative to `apps/web`). A new CI gate, `pnpm run check:vercel-config`, asserts
+  the *location* — the part a contents test structurally cannot cover — plus that every
+  `crons[].path` maps to a route file and every `functions` key matches a real file. See
+  `docs/decisions/2026-07-16-vercel-json-must-live-in-root-directory.md`.
+
+- **A user's own refresh was corrupting their own score, and the cache preferred the
+  corrupt result (#1050).** `fetchScope` was assigned from token *presence* rather than
+  from what the token could *see*:
+
+  | path | token actually used | sees | was labelled |
+  |---|---|---|---|
+  | anonymous badge hit | server `GITHUB_TOKEN` (**has `repo`**) | **987 PRs** | `"public"` (rank 1) |
+  | user's own refresh | session OAuth token (**no `repo`**) | **140 PRs** | `"authenticated"` (rank 2) |
+
+  Since `scopeRank` ranks authenticated above public, the blinded fetch outranked and
+  overwrote the complete one. #1004's non-downgrading rule was not merely bypassed — it
+  was pointed backwards, actively preferring the corrupt data. Clicking Refresh collapsed
+  the user's own Delivery 100 → 58.
+
+  `fetchScope` now means "was this fetch private-inclusive?", derived from the same
+  `OAUTH_SCOPES` constant the login URL uses, so adding `repo` to the OAuth app would
+  update the pipeline's trust in session tokens in the same edit. This also makes
+  `isDegradedPrFetch`'s #1045 shortfall check fire on exactly the refresh path that
+  caused the corruption, where previously it could never fire at all.
+
+- **`/api/health` now asserts the server token still carries `repo` scope (#1047),**
+  returning `insufficient_scope` if not. The `fetchScope` logic above depends on that
+  capability, and a token rotated without `repo` would silently blind every badge — a
+  scope-blind token is a perfectly valid token and raises no error. A missing
+  `x-oauth-scopes` header (fine-grained PAT / App token) is not treated as insufficient.
+
+- **The missing-heartbeat grace window is restored, anchored durably (#1052).** A
+  freshly-registered daily cron legitimately has no heartbeat for ~24h, and degrading then
+  would report a fix as an outage. The anchor (`cron:health:first-seen`) lives in Redis, so
+  unlike the `PROCESS_STARTED_AT` version removed in 2.18.1 — which could never elapse on
+  serverless — this window genuinely expires and the check can still fail.
+
+### Added
+
+- `pnpm run check:vercel-config` CI gate (#1052), wired into `Lint & Typecheck`.
+
+### Known issues
+
+- **#1049** — poisoned snapshots for the affected handle (2026-07-14 → 07-16) are not yet
+  healed. Healing is safe only once this release is deployed; before that, the next refresh
+  would re-poison them.
+- The OAuth app still requests no `repo` scope. Asking every user for full private-repo
+  access to render a badge is a product decision, not a bug fix. This release makes the
+  pipeline correct under the current, narrower scopes.
+
 ## [2.18.1] - 2026-07-16
 
 ### Fixed

@@ -5,6 +5,8 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheGetCronLastRun: vi.fn(),
   pingRedis: vi.fn(),
   rateLimit: vi.fn(),
+  cacheGet: vi.fn(),
+  cacheSet: vi.fn(),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -39,7 +41,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 import { GET } from "./route";
-import { cacheGetCronLastRun, pingRedis, rateLimit } from "@/lib/cache/redis";
+import { cacheGetCronLastRun, pingRedis, rateLimit, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
@@ -63,6 +65,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 30 });
   vi.mocked(cacheGetCronLastRun).mockResolvedValue(Date.now());
+  // #1052 grace anchor: default to a long-elapsed window so existing tests
+  // exercise the post-grace behavior (a null heartbeat is stale). Tests that
+  // care about the grace window itself override this.
+  vi.mocked(cacheGet).mockResolvedValue(Date.now() - 48 * 60 * 60 * 1000);
+  vi.mocked(cacheSet).mockResolvedValue(true);
   vi.mocked(getOptionalRequestSession).mockReturnValue(null);
   vi.mocked(isAdminHandle).mockReturnValue(false);
   // Default: GITHUB_TOKEN not set — skipped
@@ -213,6 +220,89 @@ describe("GET /api/health", () => {
     expect(captureOperationalAlert).toHaveBeenCalled();
   });
 
+  it("#1047/#1050: degrades when the server token has lost `repo` scope", async () => {
+    // The scoring pipeline's fetchScope logic (client.ts, #1050) treats a
+    // tokenless fetch as private-inclusive precisely because the server
+    // GITHUB_TOKEN carries `repo`. If that ever stops being true, every badge
+    // silently reverts to a public-only view of its user — juan294 saw 140 of
+    // 987 merged PRs that way, and Delivery fell 100 -> 58 with no error
+    // anywhere. That assumption must be monitored, not assumed.
+    vi.stubEnv("GITHUB_TOKEN", "server-pat");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "x-oauth-scopes": "gist, read:org, workflow" }), // no repo
+      json: async () => ({ rate: { remaining: 4000, limit: 5000 } }),
+    });
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.github).toBe("insufficient_scope");
+  });
+
+  it("#1047/#1050: stays ok when the server token carries `repo` scope", async () => {
+    vi.stubEnv("GITHUB_TOKEN", "server-pat");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "x-oauth-scopes": "gist, read:org, repo, workflow" }),
+      json: async () => ({ rate: { remaining: 4000, limit: 5000 } }),
+    });
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.dependencies.github).toBe("ok");
+  });
+
+  it("#1052: does NOT degrade for a missing heartbeat inside the durable grace window", async () => {
+    // A freshly-registered cron has not run yet. sync-audience/latency-check/
+    // process-campaigns are daily, so after a deploy that first registers them
+    // (#1052) their heartbeats are legitimately null for up to ~24h. Degrading
+    // then would report a real fix as an outage.
+    //
+    // The grace is anchored to a DURABLE first-seen marker in Redis, not to
+    // process uptime — the mistake #1047 removed. PROCESS_STARTED_AT resets on
+    // every serverless cold start, so its window could never elapse; a Redis
+    // anchor survives cold starts and deploys, so the window genuinely expires.
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    vi.mocked(cacheGet).mockResolvedValue(twoHoursAgo);
+    vi.mocked(cacheGetCronLastRun).mockResolvedValue(null);
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("ok");
+    expect(body.dependencies.cronHeartbeats["warm-cache"].stale).toBe(false);
+  });
+
+  it("#1052: sets the durable anchor on first observation and grants grace", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(null); // no anchor yet
+    vi.mocked(cacheGetCronLastRun).mockResolvedValue(null);
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.dependencies.cronHeartbeats["warm-cache"].stale).toBe(false);
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cron:health:first-seen",
+      expect.any(Number),
+      expect.any(Number),
+    );
+  });
+
   it("#1047: degrades when a heartbeat is missing entirely", async () => {
     // Previously a missing heartbeat was excused by a grace window measured
     // from PROCESS_STARTED_AT (module load). On Vercel every cold start
@@ -222,8 +312,12 @@ describe("GET /api/health", () => {
     // heartbeats null, all `stale: false`, overall `status: "ok"`, while the
     // scoring pipeline was actively persisting corrupt data (#1045).
     //
-    // Heartbeats live in Redis and survive deploys, so a null genuinely means
-    // "never ran, or older than the 26h TTL" — which is degraded, not new.
+    // Heartbeats live in Redis and survive deploys, so once the grace window
+    // has genuinely elapsed a null means "never ran, or older than the 26h
+    // TTL" — degraded, not new. Anchor is 48h old: every cron (slowest is
+    // daily) has had a chance to run.
+    const fortyEightHoursAgo = Date.now() - 48 * 60 * 60 * 1000;
+    vi.mocked(cacheGet).mockResolvedValue(fortyEightHoursAgo);
     vi.mocked(cacheGetCronLastRun).mockResolvedValue(null);
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("ok");

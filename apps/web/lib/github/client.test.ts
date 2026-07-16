@@ -37,6 +37,13 @@ const {
   mockCaptureServerEvent: vi.fn(() => Promise.resolve()),
 }));
 
+// #1050: fetchScope depends on whether a tokenless fetch would resolve to the
+// server GITHUB_TOKEN (queries.ts: `token ?? getGithubToken()`). Default to
+// configured, matching production.
+vi.mock("@/lib/env", () => ({
+  getGithubToken: vi.fn(() => "server-pat-with-repo-scope"),
+}));
+
 vi.mock("./stats", () => ({
   fetchStats: mockFetchStatsData,
 }));
@@ -81,6 +88,7 @@ vi.mock("@/lib/analytics/server-errors", () => ({
 }));
 
 import { getStats, _resetInflight } from "./client";
+import { getGithubToken } from "@/lib/env";
 import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
@@ -243,7 +251,11 @@ describe("getStats", () => {
   // (authenticated) entry already cached for this handle.
   // ---------------------------------------------------------------------------
   describe("scope-aware non-downgrading cache writes (#1004 phase 2)", () => {
-    it("tags a fetch made without a token as public scope", async () => {
+    it("tags a fetch as public when there is no session token AND no server token", async () => {
+      // Genuinely unauthenticated: nothing to fall back to. (In production
+      // GitHub's GraphQL API would reject this outright with a 403 — see
+      // #1050 — so this is the defensive branch, not a live code path.)
+      vi.mocked(getGithubToken).mockReturnValueOnce(undefined);
       const fresh = makeStats({ prsMergedCount: 10 });
       setupCacheMiss(fresh);
 
@@ -252,13 +264,30 @@ describe("getStats", () => {
       expect(result!.fetchScope).toBe("public");
     });
 
-    it("tags a fetch made with a token as authenticated scope", async () => {
+    it("tags a tokenless fetch as authenticated — it uses the `repo`-scoped server token", async () => {
+      // #1050: fetchScope means "was this private-inclusive?", not "was a token
+      // argument present?". A tokenless call resolves to the server
+      // GITHUB_TOKEN (queries.ts: `token ?? getGithubToken()`), which holds
+      // `repo` and sees private merges — so it is the *more* trustworthy fetch,
+      // despite passing no token here.
       const fresh = makeStats({ prsMergedCount: 10 });
       setupCacheMiss(fresh);
 
-      const result = await getStats("test-user", "auth-token");
+      const result = await getStats("test-user");
 
       expect(result!.fetchScope).toBe("authenticated");
+    });
+
+    it("tags a session-token fetch as public — the OAuth app grants no `repo` scope", async () => {
+      // The inverse of the above, and the #1050 bug: this used to be tagged
+      // "authenticated" purely because a token object was passed, letting a
+      // scope-blind refresh outrank the server token's complete data.
+      const fresh = makeStats({ prsMergedCount: 10 });
+      setupCacheMiss(fresh);
+
+      const result = await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      expect(result!.fetchScope).toBe("public");
     });
 
     it("a public fetch does NOT overwrite an authenticated stats:v2:merged entry", async () => {
@@ -276,7 +305,9 @@ describe("getStats", () => {
         .mockResolvedValueOnce(authenticatedEntry); // re-read cacheKey before write: race
       mockFetchStatsData.mockResolvedValue(publicFetch);
 
-      const result = await getStats("test-user");
+      // #1050: the session-token path is the public-scoped one — OAuth grants
+      // no `repo`, so this fetch cannot see private repos.
+      const result = await getStats("test-user", "gho_session_token_no_repo_scope");
 
       // The caller still gets its own freshly-fetched (public) data.
       expect(result!.fetchScope).toBe("public");
@@ -301,7 +332,10 @@ describe("getStats", () => {
       // early via _serveStaleAndReCache and never reaches the write rule.
       mockFetchStatsData.mockResolvedValue(publicFetch);
 
-      const result = await getStats("test-user");
+      // #1050: this is the real juan294 shape — a user's own refresh (session
+      // token, no `repo`) seeing a fraction of what the server token already
+      // established. It must not overwrite the last-known-good.
+      const result = await getStats("test-user", "gho_session_token_no_repo_scope");
 
       expect(mockCacheSet).not.toHaveBeenCalledWith(
         "stats:stale:test-user",
@@ -323,6 +357,33 @@ describe("getStats", () => {
       expect(result!.prsMergedCount).toBe(904);
     });
 
+    it("#1050: a session-token fetch is NOT labelled authenticated (OAuth lacks `repo`)", async () => {
+      // The inversion this fixes: fetchScope was assigned from token PRESENCE,
+      // not from what the token could SEE.
+      //
+      //   anonymous badge hit -> falls back to server GITHUB_TOKEN (has `repo`)
+      //                       -> saw 987 merged PRs -> was labelled "public"
+      //   user's own refresh  -> session OAuth token (no `repo`)
+      //                       -> saw 140 merged PRs -> was labelled "authenticated"
+      //
+      // scopeRank puts authenticated(2) above public(1), so the BLINDED fetch
+      // outranked and overwrote the COMPLETE one. The non-downgrading rule from
+      // #1004 was not merely bypassed here — it was pointed backwards, actively
+      // preferring the corrupt data. This is what collapsed juan294's Delivery
+      // 100 -> 58 the moment he clicked Refresh on his own profile.
+      const publicFetch = makeStats({ prsMergedCount: 140 });
+      mockCacheGet
+        .mockResolvedValueOnce(null) // cacheKey miss
+        .mockResolvedValueOnce(null) // staleKey miss
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(null); // re-read cacheKey
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      const result = await getStats("test-user", "gho_session_token_without_repo_scope");
+
+      expect(result!.fetchScope).toBe("public");
+    });
+
     it("#1046: a mild public downgrade still cannot overwrite the authenticated merged key", async () => {
       // Below #1045's shortfall threshold (800 vs 904 is not a collapse), so
       // isDegradedPrFetch allows it through and the write rule is the only
@@ -340,7 +401,8 @@ describe("getStats", () => {
 
       mockFetchStatsData.mockResolvedValue(publicFetch);
 
-      await getStats("test-user");
+      // #1050: a session token is the public-scoped path (OAuth lacks `repo`).
+      await getStats("test-user", "gho_session_token_no_repo_scope");
 
       expect(mockCacheSet).not.toHaveBeenCalledWith(
         "stats:v2:merged:test-user",
@@ -360,7 +422,10 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null); // re-read cacheKey -> no existing merged entry
       mockFetchStatsData.mockResolvedValue(authedFetch);
 
-      await getStats("test-user", "auth-token");
+      // #1050: no session token — this is the server-GITHUB_TOKEN path, which
+      // is the private-inclusive ("authenticated") one. Healing a poisoned
+      // public baseline must still write through.
+      await getStats("test-user");
 
       expect(mockCacheSet).toHaveBeenCalledWith(
         "stats:stale:test-user",
@@ -378,7 +443,9 @@ describe("getStats", () => {
       const fresh = makeStats({ prsMergedCount: 10 });
       setupCacheMiss(fresh); // no 4th queued cacheGet response -> falls through to undefined
 
-      await getStats("test-user");
+      // #1050: session token -> public scope. With nothing cached at either
+      // key there is no better-scoped entry to protect, so it writes through.
+      await getStats("test-user", "gho_session_token_no_repo_scope");
 
       expect(mockCacheSet).toHaveBeenCalledWith(
         "stats:v2:merged:test-user",
@@ -403,7 +470,9 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null); // re-read cacheKey -> no existing merged entry
       mockFetchStatsData.mockResolvedValue(publicFetch);
 
-      await getStats("test-user");
+      // #1050: session token -> public scope. An untagged legacy entry ranks as
+      // public too, so this is an equal-scope write and must not be blocked.
+      await getStats("test-user", "gho_session_token_no_repo_scope");
 
       expect(mockCacheSet).toHaveBeenCalledWith(
         "stats:stale:test-user",
