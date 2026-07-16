@@ -17,11 +17,27 @@ test.describe("Smoke tests — core routes", () => {
     const body = await response.json();
 
     if (strictDeploymentSmoke) {
-      expect(response.status()).toBe(200);
-      expect(body.status).toBe("ok");
+      // Assert what a DEPLOYMENT smoke test can meaningfully assert: that this
+      // deployment came up and its own dependencies resolve.
+      //
+      // Deliberately NOT asserting `status === "ok"` / HTTP 200 (#1052). Those
+      // also flip on cron-heartbeat staleness, which is a property of the
+      // *environment's background jobs*, not of the deployment under test. That
+      // coupling produced a gate that could only be satisfied by the change it
+      // was blocking: when all four crons were dead, /api/health correctly
+      // returned 503, this required check failed, and the deploy that would
+      // have registered the crons could not merge. A gate that blocks its own
+      // fix is broken by construction.
+      //
+      // This does not weaken cron monitoring. /api/health still reports
+      // `degraded` + 503 on stale heartbeats, and that remains the signal for
+      // alerting — it is simply no longer a merge gate. Core-dependency
+      // regressions (Redis/Supabase/GitHub down, or the server token losing
+      // `repo` scope, which reports `insufficient_scope`) still fail here.
       expect(body.dependencies.redis).toBe("ok");
       expect(body.dependencies.supabase).toBe("ok");
       expect(body.dependencies.github).toBe("ok");
+      expect(body).toHaveProperty("status");
       return;
     }
 
