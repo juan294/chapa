@@ -118,7 +118,7 @@ interface SnapshotRowLike {
   lines_added: number | null;
   lines_deleted: number | null;
   commits_total: number;
-  issues_closed_count: number;
+  issues_closed: number;
 }
 
 const blindedRow: SnapshotRowLike = {
@@ -128,7 +128,7 @@ const blindedRow: SnapshotRowLike = {
   lines_added: 59,
   lines_deleted: 10,
   commits_total: 16292,
-  issues_closed_count: 5208,
+  issues_closed: 5208,
 };
 
 const zeroShapeRow: SnapshotRowLike = {
@@ -138,7 +138,7 @@ const zeroShapeRow: SnapshotRowLike = {
   lines_added: 0,
   lines_deleted: 0,
   commits_total: 15533,
-  issues_closed_count: 5096,
+  issues_closed: 5096,
 };
 
 const healthyRow: SnapshotRowLike = {
@@ -148,7 +148,7 @@ const healthyRow: SnapshotRowLike = {
   lines_added: 101313,
   lines_deleted: 54996,
   commits_total: 16187,
-  issues_closed_count: 608,
+  issues_closed: 608,
 };
 
 interface FetchScenario {

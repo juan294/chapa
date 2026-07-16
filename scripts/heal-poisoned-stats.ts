@@ -251,11 +251,11 @@ export interface SnapshotRow {
   lines_added: number | null;
   lines_deleted: number | null;
   commits_total: number;
-  issues_closed_count: number;
+  issues_closed: number;
 }
 
 const SNAPSHOT_ROW_COLUMNS =
-  "date,prs_merged_count,prs_merged_weight,lines_added,lines_deleted,commits_total,issues_closed_count";
+  "date,prs_merged_count,prs_merged_weight,lines_added,lines_deleted,commits_total,issues_closed";
 
 /**
  * Select the dates of demonstrably-corrupt snapshot rows, under either shape.
@@ -278,7 +278,7 @@ export function selectPoisonedSnapshotDates(rows: SnapshotRow[]): string[] {
       isPoisonedStats({
         prsMergedCount: row.prs_merged_count,
         commitsTotal: row.commits_total,
-        issuesClosedCount: row.issues_closed_count,
+        issuesClosedCount: row.issues_closed,
       }) && row.commits_total > SNAPSHOT_COMMITS_THRESHOLD;
 
     const blindedShape =
