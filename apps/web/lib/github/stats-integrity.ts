@@ -188,3 +188,73 @@ export function isPoisonedStats(s: {
 }): boolean {
   return s.prsMergedCount === 0 && (s.commitsTotal > 0 || s.issuesClosedCount > 0);
 }
+
+/**
+ * Accounts below this merged-PR count are never flagged as scope-blinded:
+ * with a handful of PRs the sample-derived fields are too noisy to prove
+ * anything, and the cost of a false positive (destroying history) dwarfs the
+ * cost of a false negative (self-heals via #1050 + the warm-cache cron).
+ */
+export const MIN_PRS_FOR_BLINDNESS_CHECK = 20;
+
+/**
+ * The provable floor for `prsMergedWeight` per sampled merged PR is ~0.169:
+ * `computePrWeight` for the smallest non-empty PR (1 line, 1 file) is
+ * `min(1, 2/10) · (0.5 + 0.25·ln2 + 0.25·ln2) ≈ 0.1693`. A FULL sample of n
+ * merged nodes therefore cannot weigh less than 0.169·n, so total weight
+ * below 0.15·n proves nodes were dropped — which is exactly what a
+ * scope-blind fetch produces (`queries.ts` filters nodes whose `pullRequest`
+ * is null for unreadable repos, while counts keep counting them).
+ */
+export const MIN_WEIGHT_PER_SAMPLED_PR = 0.15;
+
+/**
+ * Detects the #1045 corruption shape that `isPoisonedStats` structurally
+ * cannot: a POSITIVE merged-PR count whose sample-derived fields collapsed.
+ *
+ * `isPoisonedStats` keys on `prsMergedCount === 0` — the #1002-era signature.
+ * #1004 sourced the count from `search(is:merged)`, which is token-scoped, so
+ * a scope-blind fetch began reporting a plausible-but-wrong positive count
+ * (juan294: 140 public of 987 total) instead of 0. That disarmed the guard
+ * (#1045) and the `heal-poisoned-stats` repair script alike, for the same
+ * reason. The resulting stats carried `prsMergedWeight: 3.38` and
+ * `linesAdded: 59` against 140 merged PRs — collapsing Delivery (weight is
+ * 70% of it) from 100 to 58.
+ *
+ * Two corroborating signals are required, both bounded by the EXPECTED SAMPLE
+ * size `min(count, PR_SAMPLE_PAGE_SIZE)` rather than the raw count — a
+ * prolific user's weight legitimately sits at the 120 aggregation cap, far
+ * below `count × 0.15` for count ≳ 800, so a count-based ratio would flag
+ * every heavy user:
+ *
+ *  1. Total weight below the provable full-sample floor (see
+ *     {@link MIN_WEIGHT_PER_SAMPLED_PR}) — mathematically impossible unless
+ *     nodes were dropped.
+ *  2. Fewer than one changed line per sampled merged PR — implausible for
+ *     real merges and, more importantly, inconsistent with signal 1's
+ *     alternative explanation (a legitimately tiny sample of LARGE PRs
+ *     carries thousands of lines and is deliberately NOT flagged).
+ *
+ * This predicate gates a destructive history repair, so it is biased toward
+ * false negatives: an evasive case (e.g. a blinded sample of two big public
+ * PRs) is left alone and self-heals through the now-correct pipeline, whereas
+ * a false positive would delete good history. Known residual: an account
+ * whose sampled PRs are ALL zero-change (weight 0, lines 0) is flagged
+ * despite being "real" — accepted, because such stats are meaningless anyway
+ * and the heal script only ever touches handles an operator explicitly names.
+ */
+export function isScopeBlindedStats(s: {
+  prsMergedCount: number;
+  prsMergedWeight: number;
+  linesAdded: number;
+  linesDeleted: number;
+}): boolean {
+  if (s.prsMergedCount < MIN_PRS_FOR_BLINDNESS_CHECK) return false;
+
+  const expectedSample = Math.min(s.prsMergedCount, PR_SAMPLE_PAGE_SIZE);
+  const weightProvesTruncation =
+    s.prsMergedWeight < expectedSample * MIN_WEIGHT_PER_SAMPLED_PR;
+  const linesCorroborate = s.linesAdded + s.linesDeleted < expectedSample;
+
+  return weightProvesTruncation && linesCorroborate;
+}

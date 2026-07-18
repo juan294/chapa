@@ -345,12 +345,13 @@ async function _fetchAndCache(
 
   // #1002 — Guard against a viewer-scoped fetch that lost merged-PR visibility.
   // The GitHub contributionsCollection is scoped to the authenticating token:
-  // a token that cannot see a user's private-repo merges (server GITHUB_TOKEN
-  // in the warm-cache cron, or an anonymous badge request) returns
-  // prsMergedCount=0 even when the user has hundreds of merged PRs. Caching
-  // that result collapses Delivery (PR weight is 70% of it) and flips
-  // profileType to "collaborative". If the fresh result lost PR data relative
-  // to last-known-good, serve the good stale data and do NOT overwrite the
+  // a token that cannot see a user's private-repo merges (per the corrected
+  // #1050 model above, that's the user's own session token — OAUTH_SCOPES
+  // omits `repo` — not the server GITHUB_TOKEN) returns prsMergedCount=0 even
+  // when the user has hundreds of merged PRs. Caching that result collapses
+  // Delivery (PR weight is 70% of it) and flips profileType to
+  // "collaborative". If the fresh result lost PR data relative to
+  // last-known-good, serve the good stale data and do NOT overwrite the
   // stale key — otherwise a corrupt zero poisons the very fallback meant to
   // protect against it.
   if (isDegradedPrFetch(stats, stale)) {

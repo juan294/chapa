@@ -1,56 +1,54 @@
 ```markdown
 # Coverage Report
-> Generated: 2026-07-16 | Health status: green
+> Generated: 2026-07-18 | Health status: green
 
 ## Executive Summary
-The suite is in excellent health: 8,483/8,483 tests passing across 496 files with 96.7% statement / 92.79% branch coverage overall, and every critical-path module (scoring, rendering, API routes, database) sits at 84%+ across all metrics — well above CI's enforced floors.
+Full suite passes clean — **8,525 tests across 498 files, 0 failures, 0 skips** — with overall coverage of **96.72% statements / 92.85% branches / 95.61% functions / 97.92% lines** (up from 96.31% stmts on the 2026-06-30 baseline). All four critical paths remain well above the 80% bar; the previously largest gap (`lib/gitlab/queries.ts`, 24 missed branches) is now closed at 100% stmts / 97.2% branches, and the only new gap is the small `app/[locale]/layout.tsx` (0% stmts, 36 lines) introduced by the #1023 i18n RSC migration.
 
 ## Coverage by Module
-| Module | Coverage (stmts / branches / funcs / lines) | Status |
-|--------|----------------------------------------------|--------|
-| `apps/web/lib/impact/` (scoring) | 99.6% / 98.7% / 100.0% / 99.5% | 🟢 Green |
-| `apps/web/lib/render/` (SVG rendering) | 100.0% / 93.5% / 100.0% / 100.0% | 🟢 Green |
-| `apps/web/app/api/` (API routes, 52 files) | 97.3% / 93.9% / 96.3% / 97.6% | 🟢 Green |
-| `apps/web/lib/db/` (database layer, 17 files) | 97.2% / 94.5% / 100.0% / 100.0% | 🟢 Green |
-| `apps/web/lib/github/` | 96.3% / 97.1% / 86.0% / 97.8% | 🟢 Green (fn gap below) |
-| `apps/web/lib/auth/` | 97.4% / 94.8% / 99.1% / 98.7% | 🟢 Green |
-| `apps/web/lib/cache/` | 97.1% / 92.9% / 94.1% / 97.4% | 🟢 Green |
-| `apps/web/lib/codeberg/` | 92.8% / 86.8% / 92.6% / 98.4% | 🟢 Green |
-| `apps/web/lib/i18n/` | 98.4% / 92.5% / 97.0% / 99.1% | 🟢 Green |
-| `apps/web/components/` (61 files) | 96.5% / 91.0% / 96.7% / 98.3% | 🟢 Green |
-| `apps/web/app/` (177 files, pages/layouts) | 95.7% / 91.1% / 93.0% / 96.7% | 🟡 Yellow (5 outlier files) |
-| `packages/shared/` | 100.0% / 100.0% / 100.0% / 100.0% | 🟢 Green |
-| **Overall** | **96.7% / 92.79% / 95.55% / 97.9%** | 🟢 Green |
+| Module | Coverage | Status |
+|--------|----------|--------|
+| `apps/web/lib/impact` (scoring pipeline) | 99.6% stmts / 98.7% br / 100% fn | ✅ Green |
+| `apps/web/lib/render` (SVG rendering) | 100% stmts / 93.5% br / 100% fn | ✅ Green |
+| `apps/web/app/api` (API routes) | 97.3% stmts / 94.2% br / 95.6% fn | ✅ Green |
+| `apps/web/lib/db` (database layer) | 97.2% stmts / 94.5% br / 100% fn | ✅ Green |
+| `apps/web/lib/github` | 97.5% stmts / 97.3% br | ✅ Green |
+| `apps/web/lib/gitlab` | 100% stmts / 97.2% br | ✅ Green (was YELLOW — 24-branch gap closed) |
+| `apps/web/lib/auth` | 97.4% stmts / 94.8% br | ✅ Green |
+| `apps/web/lib/cache` | 97.1% stmts / 92.9% br | ✅ Green |
+| `apps/web/lib/profile` (incl. `reconcileSnapshotWrite`) | 96.9% stmts / 94.6% br | ✅ Green |
+| `apps/web/lib/history` | 98.4% stmts / 96.6% br | ✅ Green |
+| `apps/web/lib/i18n` | 98.4% stmts / 92.5% br | ✅ Green |
+| `apps/web/components` | 96.5% stmts / 91.0% br | ✅ Green |
+| `apps/web/app` (pages, incl. experiments) | 94.8% stmts / 89.3% br | 🟡 Yellow (experiments + new `[locale]/layout.tsx` drag) |
+| `packages/shared` | 100% across the board | ✅ Green |
+
+Cost-analyst's 2026-07-17 spot-check request is satisfied: `reconcileSnapshotWrite`'s tri-state outcome tracking (`lib/profile`, 96.9%) and the `latency-check` cron (within `app/api` at 97.3%) are both covered.
 
 ## Gaps & Recommendations
-
-**No files below 80% statement coverage exist anywhere in the critical paths** (`lib/impact/`, `lib/render/`, `app/api/`, `lib/db/`). All 5 sub-80%-statement files project-wide are known, previously-accepted non-critical carries:
-
-- `apps/web/app/[locale]/layout.tsx` — **0% stmts** (4 stmts). Hosts only `generateStaticParams`, a Next.js build-time-only export that never executes under Vitest/jsdom. Not testable by unit tests; not a real gap.
-- `apps/web/lib/effects/interactions/HolographicOverlay.tsx` — 50.0% stmts. Canvas/WebGL visual effect, established P3 carry.
-- `apps/web/app/experiments/glassmorphism/page.tsx` — 70.6% stmts (experiments surface, Canvas-dependent, known carry).
-- `apps/web/app/experiments/heatmap-wave/page.tsx` — 73.3% stmts (same category).
-- `apps/web/app/experiments/metallic-shimmer/page.tsx` — 78.1% stmts (same category).
-
-Minor branch-coverage items worth a follow-up test (none below CI thresholds, all P3):
-- `apps/web/lib/github/stats.ts` — 84.6% stmts, **50% funcs** (1 of 2 functions uncovered — an inline fallback closure in `fetchStats`). Small file (41 lines); add a test exercising the fallback path.
-- `apps/web/app/api/admin/campaigns/route.ts` — 100% stmts but 80.0% branches — one conditional branch uncovered.
-- `apps/web/lib/render/demoData.ts` and `apps/web/lib/render/archetypeDemoData.ts` — 100% stmts but 50.0% branches each (likely an unused default/fallback arm in demo-data generation).
-
-**Untested files**: none found in critical paths. `apps/web/lib/db/campaigns/{crud,sends,index}.ts` have no same-directory sibling `.test.ts` but are fully exercised (98.6–100% stmts) via `apps/web/lib/db/campaigns.test.ts` and `apps/web/lib/email/campaigns.test.ts` — not a real gap, just a naming convention difference.
+- **`apps/web/app/[locale]/layout.tsx` — 0% stmts (NEW, only actionable gap).** 36 lines from the #1023 i18n RSC migration; `generateStaticParams` and the layout body are never executed by any test. The sibling `page.test.ts` *mentions* it in a comment but doesn't render it. Recommend a small render/params test following the existing `page.render.test.tsx` pattern in the same directory. This is the exact shape the cost-analyst warned about ("a contents/adjacent test is not coverage") — the file that pre-renders both locales at build time has zero direct coverage.
+- **`lib/effects/interactions/HolographicOverlay.tsx` — 50% stmts.** Known P3 carry (Canvas/WebGL, JSDOM-limited). Accepted.
+- **Experiments pages** (`glassmorphism` 70.6%, `heatmap-wave` 73.3%, `metallic-shimmer` 78.1%, `particle-core.ts` 58% br) — known P3 carries, feature-flag-gated Canvas/WebGL surfaces. Accepted.
+- **`components/AuthorTypewriter.tsx` — 67.5% br (13 missed)** and **`lib/effects/backgrounds/ParticleBackground.tsx` — 68% br (16 missed):** timing/animation branches; low value, JSDOM-testable if desired.
+- **`lib/i18n/provider.tsx` — 69.2% br (4 missed):** long-standing JSDOM locale-switch carry, improved from 61.5%.
+- **`demoData.ts` / `archetypeDemoData.ts` 50% br:** documented accepted skip per 2026-07-16 triage (unreachable fallback in unexported builders) — not re-flagged.
+- **Untested-file scan:** all files lacking a sibling `.test.ts` are either type-only (`*/types.ts`, barrel `index.ts` files, `packages/shared/src/*` — 100% covered via consumers), dictionaries (covered by `parity.test.ts`), OAuth `config.ts` constants, or `db/campaigns/{crud,sends}.ts` (98–99% covered via the campaigns route/cron suites). No genuinely untested runtime logic outside `[locale]/layout.tsx` above.
+- **Config-assertion audit (cost-analyst 2026-07-17 ask):** noted — the `schedule.test.ts` lesson ("contents test ≠ coverage when placement determines effect") is now gated by `check:vercel-config`; `[locale]/layout.tsx` is the closest analogous case in this cycle and is flagged above.
 
 ## Flaky Tests
-None detected in the authoritative run (496/496 files, 8483/8483 tests passed cleanly, 320s). Note: an initial run under sustained background system load hit `[vitest-pool-runner]: Timeout waiting for worker to respond` on 8 unrelated test files (admin dashboard, experiments pages, dashboard components) — this is a resource-contention/worker-startup infra issue, not a code-level flake, and did not reproduce on a clean re-run.
+None detected
 ```
 
 SHARED_CONTEXT_START
-## Coverage Agent — 2026-07-16
+## Coverage Agent — 2026-07-18
 - **Status**: GREEN
-- Overall coverage: 96.7% stmts / 92.79% branches / 95.55% funcs / 97.9% lines (8483/8483 tests, 496/496 files passing)
-- Critical gaps: none in `lib/impact/`, `lib/render/`, `app/api/`, `lib/db/` (all ≥84% across every metric). Only 5 files project-wide <80% stmts, all known accepted P3 carries (locale layout `generateStaticParams`, HolographicOverlay, 3 experiments/Canvas pages). Minor P3 branch/func gaps: `lib/github/stats.ts` (50% funcs), `app/api/admin/campaigns/route.ts` (80% branches), `lib/render/{demoData,archetypeDemoData}.ts` (50% branches each).
-- Flaky tests: 0 confirmed. One transient `[vitest-pool-runner]` worker-timeout infra flake (8 files) on an initial run under system load; did not reproduce on clean re-run — infra, not code.
+- Overall coverage: 96.72% stmts / 92.85% br / 95.61% fn / 97.92% lines — HEAD `74bbcff0`, 498 files / 8,525 tests, all passing (98.9s, --maxWorkers=3). Up from 96.31% stmts (2026-06-30 baseline); suite grew 8,450 → 8,525 since QA's 2026-07-15 run.
+- Critical gaps: only 1 actionable — `apps/web/app/[locale]/layout.tsx` at **0% stmts** (36 lines, #1023 i18n migration; `generateStaticParams` never executed, sibling tests cover `page.tsx` only). Everything else sub-80% is a known accepted carry (HolographicOverlay 50%, 3 experiments Canvas/WebGL pages, demoData branch skips per 2026-07-16 triage). Former largest gap `lib/gitlab/queries.ts` (24 missed br) now CLOSED — lib/gitlab at 100% stmts / 97.2% br.
+- Critical paths: lib/impact 99.6/98.7, lib/render 100/93.5, app/api 97.3/94.2, lib/db 97.2/94.5 — all green. Cost-analyst's spot-check request satisfied: `reconcileSnapshotWrite` (lib/profile 96.9%) and `latency-check` cron (app/api) both covered.
+- Flaky tests: 0
 
 **Cross-agent recommendations:**
-- [Security]: No security-relevant coverage gaps. lib/auth 97.4% stmts, lib/render 100% stmts (all XSS-escape paths covered).
-- [QA]: Suite fully green at 8483/8483 across 496 files. If CI ever shows a `[vitest-pool-runner]: Timeout waiting for worker to respond` failure, treat as infra/resource flake and retry rather than a code regression — reproduced once under heavy concurrent background load, not on a clean run.
+- [Security]: No security-relevant coverage gaps — lib/auth 97.4%, lib/render 100% stmts (all escapeXml paths), lib/verification 100%, OAuth platform modules (bitbucket/codeberg/gitlab) all ≥92.8% stmts with gitlab now fully closed.
+- [QA]: One concrete new item: add a render/params test for `app/[locale]/layout.tsx` (0% stmts) following the existing `[locale]/page.render.test.tsx` pattern — it's the file that pre-renders both locales and currently matches the "adjacent test mentions it but never executes it" anti-pattern from the #1052 schedule.test.ts lesson.
+- [Triage]: Drop `lib/gitlab/queries.ts` (71.8% br) from carry lists — closed. Sole new P3: `[locale]/layout.tsx` test above.
 SHARED_CONTEXT_END

@@ -444,6 +444,34 @@ describe("GET /api/cron/warm-cache", () => {
     expect(warmedHandles).not.toContain("unknown-user");
   });
 
+  it("keeps total processed handles within MAX_HANDLES even when priority handles fall outside the rotation slice", async () => {
+    // 200 users, offset=0 → natural rotation slice is user0..user49 (50 handles,
+    // already at the ceiling). Priority handles sit entirely outside that slice,
+    // so appending them on top would push per-run work to 55 — the #1052-era
+    // bug: priority handles were merged AFTER the MAX_HANDLES slice instead of
+    // being reserved a seat within it.
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user100,user101,user102,user103,user104");
+    mockDbGetUsers.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => user(`user${index}`)),
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.processedCount).toBeLessThanOrEqual(50);
+    expect(mockMaterializeOrchestratedProfile.mock.calls.length).toBeLessThanOrEqual(50);
+
+    const warmedHandles = mockMaterializeOrchestratedProfile.mock.calls.map(
+      ([handle]) => handle,
+    );
+    expect(warmedHandles).toContain("user100");
+    expect(warmedHandles).toContain("user101");
+    expect(warmedHandles).toContain("user102");
+    expect(warmedHandles).toContain("user103");
+    expect(warmedHandles).toContain("user104");
+  });
+
   it("wraps around to the start of the handle list when offset + MAX_HANDLES exceeds total users", async () => {
     // 60 users, offset=40 → offset+MAX_HANDLES=90 > 60 → wrap-around
     mockCacheGet.mockResolvedValue(40);

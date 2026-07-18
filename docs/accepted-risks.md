@@ -259,6 +259,26 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## OAuth app requests no `repo` scope — user refresh cannot see private repos (2026-07-16)
+
+- **Risk:** The GitHub OAuth login requests only `read:user user:email` (`lib/auth/github.ts`, `OAUTH_SCOPES`). A user's session token therefore cannot read their private repositories, so `/api/refresh` sees only public merged PRs. GitHub offers no read-only classic scope for private repos — `repo` grants full read/write.
+- **Decision (owner, 2026-07-16):** keep the narrow scopes. Asking every user for full private-repo access to render a badge is a disproportionate trust demand, and existing users would all have to re-consent.
+- **Mitigation:** post-#1050, a scope-blind refresh is labeled `fetchScope: "public"` and can never outrank or overwrite the server token's complete data — it is *rejected* (last-known-good served), not corrupting. The hourly `warm-cache` cron (#1052) refreshes every score with the `repo`-scoped server `GITHUB_TOKEN`, so freshness no longer depends on user-initiated refreshes. `/api/health` asserts the server token retains `repo` (`insufficient_scope` otherwise, #1047). If `repo` is ever added to `OAUTH_SCOPES`, `fetchScope` updates automatically — it derives from the same constant.
+- **Severity:** Low (a private-heavy user's manual Refresh is a near-no-op; the cron covers freshness within the hour)
+- **Accepted:** 2026-07-16
+
+---
+
+## Consistency dimension weights window tenure three ways (2026-07-16)
+
+- **Risk / observation:** all three Consistency terms — streak (`sqrt(activeDays/365)`), evenness (CV over 52 weeks incl. pre-tenure zero-weeks), and weekCoverage (`activeWeeks/totalWeeks`) — penalize the same underlying fact for accounts younger than the 365-day window. A perfectly consistent 6-month developer (e.g. 180 active days, 100% coverage since starting) scores ~61, below an erratic 12-month one.
+- **Decision (owner, 2026-07-16):** working as intended. The product's stated claim is "Impact over the last 12 months"; sustaining activity across a full year *is* the thing being measured, and the score climbing as the window fills (verified: 23 → 41 → 61 over five months for a real profile) is what makes the number meaningful. The `Emerging` archetype exists precisely to represent newer accounts.
+- **Mitigation:** none needed. If this is ever revisited, it is a product redesign requiring an ADR and a recompute for all users (options documented in the 2026-07-16 session: scope evenness/weekCoverage to observed tenure with a minimum-window floor), not a bug fix.
+- **Severity:** None (documented design intent)
+- **Accepted:** 2026-07-16
+
+---
+
 ## Review schedule
 
 These accepted risks should be re-evaluated:

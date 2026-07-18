@@ -31,9 +31,10 @@ export async function fetchContributionData(
   const since = new Date(now);
   since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
-  // Authoritative merged-PR search window — `search(is:merged)` is not
-  // token-scoped/capped the way `pullRequestContributions` is (see #1002 /
-  // the 2026-07-07 scoring-integrity-contract research).
+  // Merged-PR search window. `search(is:merged)` is token-scoped just like
+  // `pullRequestContributions` — it is NOT an independent/authoritative
+  // cross-check (that premise was disproven by #1045; see
+  // `stats-integrity.ts`'s `assessRawFetchIntegrity` doc comment).
   const sinceDate = since.toISOString().slice(0, 10);
   const untilDate = now.toISOString().slice(0, 10);
   const mergedPrSearch = `author:${login} is:pr is:merged created:${sinceDate}..${untilDate}`;
@@ -110,9 +111,10 @@ export async function fetchContributionData(
         // Optional-chained: an empty/missing `pullRequestContributions` no
         // longer throws (which would mask the degradation as an ordinary
         // fetch failure) — it safely defaults to an empty sample, so
-        // `assessRawFetchIntegrity` (driven by the authoritative
-        // `mergedPrTotalCount` above) is the one place that decides whether
-        // this payload is trustworthy.
+        // `assessRawFetchIntegrity` is the one place that decides whether
+        // this payload is trustworthy. It does NOT use `mergedPrTotalCount`
+        // above as ground truth (#1045 — that field is token-scoped too);
+        // it checks only the sample's internal shape.
         totalCount: cc?.pullRequestContributions?.totalCount ?? 0,
         nodes: (cc?.pullRequestContributions?.nodes ?? [])
           .filter((n: { pullRequest: unknown } | null) => n != null && n.pullRequest != null)

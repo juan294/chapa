@@ -26,6 +26,7 @@ yarn-error.log*
 .idea/
 .cursor/
 .kiro/
+.codex/
 .agents/
 *.swp
 *.swo

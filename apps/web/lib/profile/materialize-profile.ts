@@ -11,7 +11,7 @@ import {
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { getStats } from "@/lib/github/client";
-import { isPoisonedStats } from "@/lib/github/stats-integrity";
+import { isPoisonedStats, isScopeBlindedStats } from "@/lib/github/stats-integrity";
 
 export interface MaterializeImpactStateOptions {
   craftResult?: CraftResult | null;
@@ -46,13 +46,20 @@ export interface MaterializedImpactState {
 }
 
 /**
- * Thin wrapper over the shared `isPoisonedStats` predicate (Phase 4) so
- * there's a single source of truth for "does this stats shape look
+ * Thin wrapper over the shared poison predicates (Phase 4, extended by #1049)
+ * so there's a single source of truth for "does this stats shape look
  * corrupted by the degraded-fetch bug" across the persist-boundary gate and
  * the `heal-poisoned-stats` repair script.
+ *
+ * Both corruption shapes are gated: the #1002 era (`isPoisonedStats`, count
+ * collapsed to exactly 0) and the #1045 era (`isScopeBlindedStats`, a
+ * plausible-but-wrong positive count from the token-scoped search with the
+ * sample-derived fields collapsed). The second shape persisted three
+ * poisoned snapshot rows for juan294 (2026-07-14 → 07-16) because only the
+ * zero-check guarded this boundary.
  */
 function statsLookComplete(stats: StatsData): boolean {
-  return !isPoisonedStats(stats);
+  return !isPoisonedStats(stats) && !isScopeBlindedStats(stats);
 }
 
 export interface MaterializeProfileOptions
