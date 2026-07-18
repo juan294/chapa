@@ -1,57 +1,52 @@
 # Cost Analyst Report
-> Generated: 2026-07-16 | Health status: green
+> Generated: 2026-07-18 | Health status: green
 
 ## Executive Summary
-Estimated infrastructure cost stays in the **~$50–75/mo bracket at 10K users**. This cycle covers a large delta (HEAD `9bfb9a6c` → `a45ae765`, 65 commits, v2.18.0 released) — including the warm-cache cron moving from daily to hourly (#1010), a new daily latency-check synthetic monitor (#974), badge critical-path perf work (#1029), OAuth fail-closed hardening (#1027), and a full i18n RSC rearchitecture (#1023) — but none of it moves the cost needle: the cron frequency change is explicitly rate-limit-budgeted in-code, and the RSC migration actually *reduced* the client bundle by shifting 9 pages to static rendering.
+Zero production delta since the 2026-07-17 cycle — HEAD is still `74bbcff0` (committed 2026-07-16 20:56 CEST); the working tree holds only `docs/agents/*.md` report edits and an untracked local `.codex/` tool-config dir (24 KB, gitignored territory, no cost surface). All cost surfaces were re-measured against live source this cycle rather than carried, and every figure held: 0 uncached external calls, 3 intentional no-TTL Redis keys (all fixed-cardinality singletons), 11/11 tables under ENABLE+FORCE RLS, and cron spend within the standing ~$50–75/mo estimate at 10K users. Both carried findings (P2 priority-handle ceiling bypass, P3 "~4%" comment) re-verified as still present and unfixed.
 
 ## Redis Usage
-- Key patterns: `stats:*` / `stats:stale:*` (6h/7d GitHub cache), `svg:*` (badge SVG cache), `history:*`, `rateLimit:*`, `avatar:*`, `supplemental:*`, `cli:device:*`, `cron:*:heartbeat` (4, one per cron), `cron:warm-cache:offset` (rotation cursor), `stats:dirty:*`, `notif:*`/dedup markers, `og:*`.
-- **43 non-test cache-write call sites across 22 production files** (`cacheSet`/`cacheIncr`/`cacheReserveQuota`/`cacheSetNx`) — up from 38/22 files on 2026-07-15, growth fully attributable to the new `latency-check` cron's heartbeat write and `process-campaigns` round-robin changes, not uncontrolled sprawl.
-- TTL coverage: default TTL 21,600s (`redis.ts:82`). **Exactly 1 intentional TTL-0 key** — `cron:warm-cache:offset` (`warm-cache/route.ts:169`), a small bounded rotation cursor (single integer), not unbounded growth. Every other write site passes an explicit TTL (avatar 6h, supplemental 24h, CLI device sessions bounded, cron heartbeats bounded, snapshot/craft/history caches all TTL'd).
-- Growth risk: **low, unchanged.** The hourly warm-cache bump (#1010) increases *cron invocation count* 24x/day but each run still writes/refreshes the same bounded per-handle key set (≤50 handles/run) — no new unbounded key pattern introduced.
+- Key patterns (from production write-site inventory, ~27 distinct patterns):
+  - `stats:<handle>` / `stats:stale:<handle>` — 6h primary / 7d stale tier (`client.ts:19-20`)
+  - `svg:<handle>:<theme>` — 24h + 0–2h per-handle jitter (badge SVG cache)
+  - `history:*` / snapshot mirror keys — bounded TTLs via `snapshot-cache.ts`
+  - `rateLimit:*` — short windows via `rateLimit()`/`rateLimitStrict()`
+  - `supplemental:<handle>` (24h), `stats:dirty:<handle>` (1h), OAuth state nonces (TTL'd, `oauth-state.ts:68`), cron heartbeats, CLI device-auth keys
+- Write sites: **42 production cache-write call sites** (`cacheSet`/`cacheIncr`/`cacheReserveQuota`/`cacheSetNx`) across **24 files** (tests and the cache module itself excluded). Prior cycle reported "44" — the small gap is counting methodology (this cycle's grep excludes `lib/cache/redis.ts` module-internal writes), not a code change; zero commits landed between the two measurements.
+- TTL coverage: **100% of per-handle/per-user keys carry TTLs ≤7d.** Default TTL 21,600s (`redis.ts:82`). Exactly **3 no-TTL keys**, all intentional fixed-cardinality singletons with no per-handle fanout:
+  1. `cron:warm-cache:offset` — rotation cursor (`warm-cache/route.ts:169`, explicit TTL 0)
+  2. `stats:badges_generated` — O(1) INCR counter (`redis.ts:295`)
+  3. `stats:unique_badges` — HyperLogLog, ~12 KB fixed (`redis.ts:296`)
+- Growth risk: **low.** No unbounded key patterns.
 
 ## Database Usage
-- Tables: **11 tables + 2 views, 28 migrations** (latest `028_grant_service_role_access.sql`) — unchanged since 2026-07-13; no new tables in this cycle's 65-commit delta.
-- Query patterns: no N+1 introduced. `dbGetCampaignStats` (`lib/db/campaigns/sends.ts`) 4-parallel-COUNT pattern carried as previously flagged — bounded, admin-only, threshold-gated (P2, unchanged).
-- Connection management: lazy singleton (`lib/db/supabase.ts:13`, `let _client`), `server-only`, `persistSession:false`, 5s `withTimeout` — unchanged.
-- Snapshot-write reliability (#1015/#1016/#1009): `reconcileSnapshotWrite` (`lib/profile/snapshot-write.ts`, 142 lines) tracks tri-state write outcomes (inserted/duplicate/failed) rather than adding new query volume — a correctness/observability change, not a cost driver.
+- Tables: **11** (+2 views), 28 migrations (latest `028_grant_service_role_access.sql`). **11/11 tables have both ENABLE and FORCE ROW LEVEL SECURITY** — re-verified this cycle with a schema-qualified grep (users, user_platforms, metrics_snapshots, verification_records, tool_insights, merge_operations, feature_flags, studio_configs, supplemental_stats, email_campaigns, campaign_sends).
+- Query patterns: no N+1 patterns in `apps/web/lib/db/`. `reconcileSnapshotWrite` remains 1 DB round trip per call. Carried P2: `dbGetCampaignStats` issues 4 parallel COUNTs per call from the `process-campaigns` cron batch path (`campaigns.ts:164,188,280`) — bounded/O(1) per invocation, and per the 2026-07-17 correction it is **not** admin-only or threshold-gated in code (the ~5,000-send threshold exists only in a docstring, `sends.ts:224-226`).
+- Connection management: lazy singleton (`lib/db/supabase.ts:13` `let _client`), `server-only` guard, `persistSession: false`, `withTimeout` wrapper. Upstash Redis is likewise a lazy singleton with retries disabled (`redis.ts:36`).
 
 ## External API Calls
 | Route | External Service | Cached | Rate Limited | Risk |
 |-------|-----------------|--------|-------------|------|
-| `/u/:handle/badge.svg` | GitHub | Yes (6h + 7d SWR, in-flight dedup, Redis lock) | fail-open (public read) | Low |
-| `/api/cron/warm-cache` | GitHub | Writes cache | CRON_SECRET, 50 handles/hr (#1010 math documented in-code) | Low |
-| `/api/cron/latency-check` | Internal badge route (synthetic) | N/A | CRON_SECRET | Low — new in this cycle, adds 1 lightweight daily HTTP call |
-| `/api/cron/sync-audience` | Resend | Cached contacts | CRON_SECRET | Low |
-| `/api/cron/process-campaigns` | Resend | N/A | CRON_SECRET | Low |
-| `/api/auth/callback`, `/api/auth/*/callback` (Bitbucket/Codeberg/GitLab) | GitHub/platform OAuth | N/A | **fail-closed** (`rateLimitStrict`, #1027) | Low |
-| `/api/challenge` | Resend (email) | N/A | fail-closed, IP 5/hr + handle 3/day | Low |
-| `/api/refresh`, `/api/auth/session`, `/api/insights`, `/api/supplemental` | GitHub / internal | Mixed | fail-closed (`rateLimitStrict`) | Low |
-| PostHog server events | PostHog | N/A | fire-and-forget | Low |
+| `/u/:handle/badge.svg` | GitHub GraphQL | Yes - 6h/7d SWR + SVG cache + in-process inflight dedup | CDN `s-maxage=21600` | Low |
+| `/api/refresh` | GitHub GraphQL | Yes - cache-first pipeline | Yes - `rateLimitStrict` | Low |
+| `/api/cron/warm-cache` | GitHub GraphQL | Yes - only fetches on stats-cache miss | CRON_SECRET; 50/run ceiling (**but see P2**) | Low-Med |
+| `/api/cron/latency-check` | Own badge endpoint + webhook | n/a (synthetic probe, 1/day) | CRON_SECRET | Low |
+| `/api/cron/sync-audience` | Resend | Yes - daily batch, quota-budgeted | CRON_SECRET | Low |
+| `/api/cron/process-campaigns` | Resend | Yes - daily batch, time/quota budget (`TIME_BUDGET_MS = maxDuration−30s`) | CRON_SECRET | Low |
+| `/api/challenge` | Resend | n/a (transactional) | Yes - `rateLimitStrict` IP 5/hr + handle 3/day | Low |
+| `/api/admin/bulk-recalculate` | GitHub GraphQL | Yes - cache pipeline | `ADMIN_SECRET` bearer | Low |
+| Client analytics | PostHog | fire-and-forget | n/a | Low |
 
-- **0 uncached external calls found.** All GitHub-facing paths route through `getStats()`'s cache-first + stale-fallback + in-flight-dedup pipeline.
+- **Uncached external calls: 0.** GitHub always flows through `getStats()` (6h `CACHE_TTL` + 7d `STALE_TTL`, `client.ts:19-20`) with in-process `_inflight` Map dedup (`client.ts:33`). Note the 2026-07-17 correction stands: there is **no cross-instance Redis lock on the GitHub fetch path** — the Redis lock is only in the badge render path.
+- GitHub budget: warm-cache worst case 50 handles/hr = 50 of 5,000/hr ≈ **1%** of the authenticated budget (1 GraphQL call per handle). The in-code comment claiming "~4%" (`warm-cache/route.ts:45`) is still unfixed — it divides a daily total by an hourly budget.
 
 ## Resource Management
-- No unclosed connections or missing cleanup found. Supabase client is a lazy module-level singleton reused across invocations.
-- Fire-and-forget writes (`fireAndForget`, `void cacheSet`) used in **18 files** for non-blocking cache refresh — all target TTL'd keys, no buildup risk.
-- Avatar fetch: `AbortSignal.timeout(2000)` (`lib/render/avatar.ts:33`) — **note:** CLAUDE.md's "Badge latency SLO" section states this is capped at 1000ms; the actual code (confirmed via `git log`, last touched by #961 `7dcf9aea`) uses a 2000ms ceiling. This is a doc/code mismatch, not a cost or leak issue — flagged for documentation agent, not actionable here.
-- No large in-memory buffers found; badge SVG/PNG rendering is per-request, discarded after response.
+- No leaks found. Redis and Supabase clients are lazy module singletons (correct for serverless — no per-request connections to close). `_inflight` Map self-cleans via `finally` and is size-bounded by concurrent-handle count. Durable snapshot persist runs in `after()` off the response path (#1013). Avatar fetch is deadline-raced (`AVATAR_RACE_DEADLINE_MS=1000`) with a hard 2000ms abort underneath — two intentional layers, not a mismatch (per triage 2026-07-16; this flag is formally dropped).
+- No unbounded in-memory buffers. The only unbounded-by-config input to a live job remains `WARM_CACHE_PRIORITY_HANDLES` (see P2 below).
 
 ## Recommendations
-1. **No action required this cycle** — the 65-commit delta (v2.18.0) is cost-neutral to cost-positive (bundle shrank via static RSC migration; warm-cache hourly bump was pre-budgeted against GitHub's rate limit in-code comments).
-2. **Doc fix (low priority, hand to documentation agent):** CLAUDE.md's badge-latency-SLO section says avatar fetch is capped at "1000ms" — actual value is 2000ms (`avatar.ts:33`, unchanged since #961). Update the doc line, no code change needed.
-3. Carry forward: `dbGetCampaignStats`'s 4-parallel-COUNT pattern (P2, bounded/admin-only) — convert to a single `GROUP BY status` aggregate only if this endpoint's traffic grows; not urgent.
+1. **P2 (carried, still open): cap `WARM_CACHE_PRIORITY_HANDLES` within the ceiling.** Priority handles are merged *after* the `MAX_HANDLES` slice (`warm-cache/route.ts:119-128`), so per-run work is `min(N,50) + |priority handles|`. Env-controlled and now live hourly. One-line fix: slice `toWarm` back to `MAX_HANDLES` after the merge, or reserve priority slots inside the ceiling.
+2. **P2 (carried): `dbGetCampaignStats` 4-parallel-COUNT** — convert to a single `GROUP BY status` aggregate when convenient; not urgent (bounded, cron-only), but the docstring's phantom threshold should either be implemented or deleted.
+3. **P3 (carried): fix the "~4%" comment** at `warm-cache/route.ts:45` to "~1% of the hourly budget (50/hr of 5,000/hr)". Documentation agent has independently confirmed this figure.
+4. **P3 (carried): bundle-baseline sync with performance agent.** No rebuild this cycle (zero client-surface commits); the standing figure is 2026-07-17's measured **1,993 KB raw / 580 KB gzipped, 73 chunks, largest 227 KB** (CI gate 350 KB). The 638→580 KB gzip discrepancy vs performance's 2026-07-16 number remains a methodology question, not a real shrink — one joint measurement would settle the baseline.
 
-SHARED_CONTEXT_START
-## Cost Analyst — 2026-07-16
-- **Status**: GREEN
-- Redis key growth risk: low
-- Uncached external calls: 0
-- Resource leak risks: 0
-
-**Cross-agent recommendations:**
-- [Performance]: Bundle actually **shrank** on gzip (672 KB → 638 KB, 77→73 chunks) despite the i18n RSC rearchitecture (#1023) landing 9 pages under `app/[locale]/...` with build-time `generateStaticParams` for both locales — worth confirming in your next bundle-size cycle since it contradicts the usual "more pages = bigger bundle" assumption (these pages moved server-side/static instead).
-- [Security]: OAuth platform connect/callback/disconnect routes (Bitbucket/Codeberg/GitLab) confirmed on fail-closed `rateLimitStrict()` post-#1027, alongside the existing replay-resistant per-platform state cookie — no cost-driven rate-limit gap found.
-- [Coverage]: No cost-critical path regressions found in this delta; `reconcileSnapshotWrite`'s tri-state outcome tracking and the new `latency-check` cron are both new surfaces worth a coverage spot-check if not already covered.
-- [Documentation]: CLAUDE.md's badge-latency-SLO section states the avatar fetch timeout is "1000ms" — actual code (`avatar.ts:33`) is 2000ms, unchanged since #961 (predates the #1029 doc language). One-line doc fix, no behavior change.
-SHARED_CONTEXT_END
+**Estimated monthly cost at 10K users: ~$50–75/mo — unchanged.** Cron spend (~810 invocations/mo) is real since 2026-07-16 (#1052) and within estimate.
