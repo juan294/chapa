@@ -7,11 +7,11 @@
 import { getSupabase } from "../supabase";
 import {
   CampaignSend,
-  CampaignSendStatus,
   CampaignSendRow,
   CampaignSendStats,
   CAMPAIGN_SEND_ROW_REQUIRED_KEYS,
   CLAIM_CLEAR_FIELDS,
+  isCampaignSendStatus,
   mapSendRow,
   parseRows,
 } from "./types";
@@ -219,14 +219,16 @@ export async function dbMarkSendsFailed(
 }
 
 /**
- * Aggregate send status counts for a campaign via bounded count queries.
+ * Aggregate send status counts for a campaign in a single round trip.
  *
- * Uses 4 parallel COUNT queries (one per status). This is efficient at normal
- * volumes; if a campaign exceeds ~5,000 sends, replace with a single GROUP BY
- * RPC to avoid the extra round-trips (tracked as cost P2-1).
+ * Fetches only the `status` column for every send row and reduces counts in
+ * JS. Previously issued 4 parallel COUNT queries (one per status) — this
+ * fetches once instead (cost P2-1). Callers are the `process-campaigns` cron
+ * batch path only, so row volume per call is bounded by a campaign's
+ * recipient list, not unbounded traffic.
  *
  * @param id - Campaign UUID
- * @returns Counts of sent, pending, and failed sends (defaults to 0)
+ * @returns Counts of sent, pending, processing, and failed sends (defaults to 0)
  */
 export async function dbGetCampaignStats(
   id: string,
@@ -235,32 +237,23 @@ export async function dbGetCampaignStats(
   if (!db) return { sent: 0, pending: 0, processing: 0, failed: 0 };
 
   try {
-    const countByStatus = async (
-      status: CampaignSendStatus,
-    ): Promise<number> => {
-      const { count, error } = await db
-        .from("campaign_sends")
-        .select("id", { count: "exact", head: true })
-        .eq("campaign_id", id)
-        .eq("status", status);
+    const { data, error } = await db
+      .from("campaign_sends")
+      .select("status")
+      .eq("campaign_id", id);
 
-      if (error) throw error;
-      return count ?? 0;
+    if (error) throw error;
+
+    const stats: CampaignSendStats = {
+      sent: 0,
+      pending: 0,
+      processing: 0,
+      failed: 0,
     };
-
-    const [sent, pending, processing, failed] = await Promise.all([
-      countByStatus("sent"),
-      countByStatus("pending"),
-      countByStatus("processing"),
-      countByStatus("failed"),
-    ]);
-
-    return {
-      sent,
-      pending,
-      processing,
-      failed,
-    };
+    for (const row of (data ?? []) as { status: string }[]) {
+      if (isCampaignSendStatus(row.status)) stats[row.status]++;
+    }
+    return stats;
   } catch (error) {
     console.error(
       "[db] dbGetCampaignStats failed:",

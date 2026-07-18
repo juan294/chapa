@@ -42,8 +42,9 @@ export const maxDuration = 300;
  * a cache hit and makes zero GitHub calls. Since the Vercel cron schedule
  * (`vercel.json`) was bumped from once daily to hourly, worst case this cron
  * now makes up to MAX_HANDLES GraphQL calls *per hour* instead of per day —
- * at 50/hour that's ~1,200/day, still ~4% of GitHub's 5,000/hr authenticated
- * budget (`GITHUB_TOKEN`), leaving ample headroom for real user traffic
+ * at 50/hour that's ~1,200/day, still only ~1% of GitHub's 5,000/hr
+ * authenticated budget (`GITHUB_TOKEN`; 50 ÷ 5,000, not the daily total
+ * compared against the hourly budget), leaving ample headroom for real user traffic
  * hitting `getStats()` on the same token pool. MAX_HANDLES was deliberately
  * left unchanged rather than raised alongside the frequency bump — the
  * per-run batch count (MAX_HANDLES / BATCH_SIZE) is what bounds worst-case
@@ -100,36 +101,48 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     ? storedOffset
     : 0;
 
-  // Priority handles: always included regardless of rotation (e.g. "juan294,alice")
+  // Priority handles: always included regardless of rotation (e.g. "juan294,alice").
+  // Reserve their seats WITHIN the MAX_HANDLES ceiling by shrinking the rotation
+  // slice first — merging them on top of a full-size slice would let per-run
+  // work exceed MAX_HANDLES (the #1052-era bug: real per-run work could reach
+  // min(N, MAX_HANDLES) + priorityHandles.length instead of staying capped).
   const priorityHandles = parsePriorityHandles(allHandles);
+  const rotationCeiling = Math.max(0, MAX_HANDLES - priorityHandles.length);
 
+  // Note: when rotationCeiling is 0 (priority handles alone fill or exceed
+  // the ceiling), the wrap-around/plain-slice branches below naturally yield
+  // an empty rotation slice (offset is always < allHandles.length, so the
+  // wrap-around guard is false, and `allHandles.slice(offset, offset)` is
+  // `[]`) — no separate branch needed.
   let toWarm: string[];
-  if (allHandles.length <= MAX_HANDLES) {
+  if (allHandles.length <= rotationCeiling) {
     // All users fit in one run — no rotation needed
-    toWarm = allHandles;
-  } else if (offset + MAX_HANDLES > allHandles.length) {
+    toWarm = [...allHandles];
+  } else if (offset + rotationCeiling > allHandles.length) {
     // Wraps around: take remaining + start from beginning
     const remaining = allHandles.slice(offset);
-    const fromStart = allHandles.slice(0, MAX_HANDLES - remaining.length);
+    const fromStart = allHandles.slice(0, rotationCeiling - remaining.length);
     toWarm = [...remaining, ...fromStart];
   } else {
-    toWarm = allHandles.slice(offset, offset + MAX_HANDLES);
+    toWarm = allHandles.slice(offset, offset + rotationCeiling);
   }
 
-  // Merge priority handles into the warm list (no duplicates)
+  // Merge priority handles into the warm list (no duplicates), staying within
+  // the MAX_HANDLES ceiling even if more priority handles are configured than
+  // the ceiling allows.
   if (priorityHandles.length > 0) {
     const warmSet = new Set(toWarm);
     for (const h of priorityHandles) {
-      if (!warmSet.has(h)) {
+      if (!warmSet.has(h) && toWarm.length < MAX_HANDLES) {
         toWarm.push(h);
         warmSet.add(h);
       }
     }
   }
 
-  const nextOffset = allHandles.length <= MAX_HANDLES
+  const nextOffset = allHandles.length <= rotationCeiling
     ? 0
-    : (offset + MAX_HANDLES) % allHandles.length;
+    : (offset + rotationCeiling) % allHandles.length;
 
   // Use fallback GitHub token for server-side fetches (no user session)
   const githubToken = getGithubToken();

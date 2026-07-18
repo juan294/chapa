@@ -667,34 +667,33 @@ describe("dbMarkSendsFailed", () => {
 });
 
 describe("dbGetCampaignStats", () => {
-  it("returns aggregate counts", async () => {
+  it("returns aggregate counts from a single status-only query", async () => {
     queryResults = [
-      { count: 2, error: null },
-      { count: 1, error: null },
-      { count: 3, error: null },
-      { count: 1, error: null },
+      {
+        data: [
+          { status: "sent" },
+          { status: "sent" },
+          { status: "pending" },
+          { status: "processing" },
+          { status: "processing" },
+          { status: "processing" },
+          { status: "failed" },
+        ],
+        error: null,
+      },
     ];
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 2, pending: 1, processing: 3, failed: 1 });
   });
 
-  it("uses count-only queries instead of loading campaign send rows", async () => {
-    queryResults = [
-      { count: 2, error: null },
-      { count: 1, error: null },
-      { count: 3, error: null },
-      { count: 1, error: null },
-    ];
+  it("issues exactly one round trip, selecting only the status column", async () => {
+    queryResults = [{ data: [{ status: "sent" }], error: null }];
 
     await dbGetCampaignStats("c-1");
 
-    expect(mockSelect).toHaveBeenCalledTimes(4);
-    for (const call of mockSelect.mock.calls) {
-      expect(call[0]).not.toContain("*");
-      expect(call[0]).toBe("id");
-      expect(call[1]).toEqual({ count: "exact", head: true });
-    }
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+    expect(mockSelect).toHaveBeenCalledWith("status");
   });
 
   it("returns zeros when DB unavailable", async () => {
@@ -704,12 +703,7 @@ describe("dbGetCampaignStats", () => {
   });
 
   it("returns zeros when data is null", async () => {
-    queryResults = [
-      { count: null, error: null },
-      { count: null, error: null },
-      { count: null, error: null },
-      { count: null, error: null },
-    ];
+    queryResults = [{ data: null, error: null }];
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
@@ -722,35 +716,30 @@ describe("dbGetCampaignStats", () => {
 
   it("counts all-sent data correctly", async () => {
     queryResults = [
-      { count: 3, error: null },
-      { count: 0, error: null },
-      { count: 0, error: null },
-      { count: 0, error: null },
+      {
+        data: [{ status: "sent" }, { status: "sent" }, { status: "sent" }],
+        error: null,
+      },
     ];
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 3, pending: 0, processing: 0, failed: 0 });
   });
 
-  it("returns the server-side counts exactly", async () => {
+  it("ignores rows with an unrecognized status instead of throwing", async () => {
     queryResults = [
-      { count: 1, error: null },
-      { count: 1, error: null },
-      { count: 0, error: null },
-      { count: 0, error: null },
+      {
+        data: [{ status: "sent" }, { status: "bogus-status" }],
+        error: null,
+      },
     ];
 
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 1, pending: 1, processing: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 1, pending: 0, processing: 0, failed: 0 });
   });
 
   it("returns zeros for empty data array", async () => {
-    queryResults = [
-      { count: 0, error: null },
-      { count: 0, error: null },
-      { count: 0, error: null },
-      { count: 0, error: null },
-    ];
+    queryResults = [{ data: [], error: null }];
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
