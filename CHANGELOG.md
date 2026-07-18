@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.1] - 2026-07-18
+
 ### Fixed
 
 - **`heal-poisoned-stats` can now detect the #1045 corruption shape (#1049).** The
@@ -21,7 +23,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filter into the same shared TS predicates (single source of truth), rows are deleted by
   an exact reviewed date list, and `statsLookComplete` now gates both shapes so this can
   never persist again. Also corrected the script's inverted healing note (post-#1050 the
-  `repo`-scoped server token is the healer, not the user's session token).
+  `repo`-scoped server token is the healer, not the user's session token). The dry run
+  itself caught one more bug before touching data: `metrics_snapshots`' real column is
+  `issues_closed`, not `issues_closed_count`.
+
+- **`warm-cache`'s priority-handle ceiling could be silently bypassed.**
+  `WARM_CACHE_PRIORITY_HANDLES` entries were merged into the per-run warm list *after* the
+  `MAX_HANDLES` (50) rotation slice, so real per-run GitHub-call volume could reach
+  `min(N, 50) + |priority handles|` instead of staying capped — a live risk once the cron
+  went hourly (#1010). Fixed by reserving priority handles a seat *within* the ceiling:
+  `rotationCeiling = MAX_HANDLES - priorityHandles.length` now sizes the rotation slice,
+  wrap-around, and next-offset calculation, so total per-run work never exceeds 50
+  regardless of how many priority handles are configured.
+
+- **`dbGetCampaignStats` cut from 4 round trips to 1.** The campaign-send-status aggregate
+  previously ran 4 parallel `COUNT` queries (one per status); it now fetches the `status`
+  column once and reduces counts in JS via the existing `isCampaignSendStatus` guard — same
+  result, a quarter of the database round trips on the `process-campaigns` cron's hot path.
 
 ## [2.19.0] - 2026-07-16
 

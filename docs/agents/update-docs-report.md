@@ -1,53 +1,37 @@
 # Documentation Update Report
 
-> Generated on 2026-07-15 | Branch: `develop` | Changes since `361d7326` (prior docs-sync commit) — the #1008–#1040 pre-launch remediation batch (46 commits, 33 issues)
+> Generated on 2026-07-18 | Branch: `develop` | Changes since `v2.19.0` (8175a8a0, 2026-07-16)
 
 ## Summary
 
-- **8 documents updated** (`CHANGELOG.md`, `CLAUDE.md`, `README.md`, `docs/accepted-risks.md`, `docs/design-system.md`, `docs/runbooks/observability.md`, plus 2 files touched by an unrelated concurrent scheduled QA agent)
-- **1 diagram checked, 0 updated** (`docs/chapa-architecture.drawio` — every change in this batch operates below the diagram's component-level granularity, consistent with how prior similarly-scoped changes were handled)
-- **1 accepted-risk entry resolved** (the 2026-06-19 "locale flash" entry — #1023 shipped the per-locale route segments it was waiting on)
-- **1 stale version/stat reference corrected** (README test count)
-- **1 out-of-scope bug filed separately** (#1041, `sitemap.ts` missing `/archetypes/artificer` — pre-existing, unrelated to this batch)
+- **1 document updated** (`CHANGELOG.md` — `[Unreleased]` section)
+- **0 diagrams updated** (0 exist in the repo — confirmed by dedicated discovery pass, nothing stale)
+- **0 version references corrected** (tag, `apps/web/package.json`, and `CHANGELOG.md`'s top released entry all agree at `v2.19.0`; README badges, cc-rpi blueprint marker, and CI Node pins all current)
+- **0 inline doc blocks updated** (no new/changed exported function signatures in this range needed a JSDoc refresh — `stats-integrity.ts`'s new `isScopeBlindedStats()` already carries full JSDoc from its own commit)
 - **0 items flagged [NEEDS REVIEW]**
 
-Discovery ran 4 parallel read-only agents (change-analyst, doc-inventory, diagram-analyzer, version-scanner) against the 46-commit remediation batch that closed all 33 findings from `docs/agents/pre-launch-report.md`. Given the user's standing approval for this pass, updates were implemented directly rather than gated on a separate plan-approval step.
+## Discovery
+
+Four parallel read-only agents (change-analyst, doc-inventory, diagram-analyzer, version-scanner) audited the 24-file/1084-insertion/434-deletion delta since `v2.19.0`. Net finding: the same-day triage cycle immediately prior to this pass (commit `d9a4525a`) had already corrected every doc-relevant gap it touched — CLAUDE.md's OAuth token-scoping model (#1002/#1004 sections), the `/api/health` `insufficient_scope` line, the CI Gates list (`check:vercel-config`), and the cron section's `vercel.json` Root Directory note. The only gap that survived that cycle was `CHANGELOG.md`, which is not part of the triage workflow's scope.
 
 ## Changes by File
 
 ### `CHANGELOG.md`
-The `[Unreleased]` section had zero entries for this batch despite 25 substantive commits. Added full `### Added`/`### Fixed`/`### Changed`/`### Docs` entries covering all 33 issues: the i18n locale-segmented rearchitecture (#1023) and its ADR carve-out, the CI vulnerability/license/pending-migrations gates (#1008/#1011/#1012), badge-route latency fixes (#1013/#1014/#1029), the snapshot-write tri-state model (#1009/#1015/#1016), OAuth fail-closed + replay-nonce hardening (#1027), warm-cache hourly cadence (#1010), the `?lang=` live-apply fix (#1020), translated error boundaries (#1022), tooltip portal fixes (#1021/#1040), Navbar consolidation (#1025), and the remaining smaller fixes (#1017, #1018, #1019, #1024, #1026, #1028, #1030–#1039).
 
-### `CLAUDE.md`
-- **CI Gates**: added `check:vulnerabilities`, `check:licenses`, `check:pending-migrations` (previously undocumented despite running in CI); noted the broadened `no-process-env` scope; noted the per-module coverage floors' exact values.
-- **Development Guardrails**: corrected the copyleft policy description to name the actual allowlist (including 0BSD/CC0-1.0) and the accepted-risk exception mechanism.
-- **Caching rules**: rewrote the snapshot-write reconciliation bullet for the tri-state (`inserted`/`duplicate`/`failed`) model and its cross-call-race caveat; rewrote the rate-limit fail-open bullet to note the OAuth fail-closed exception; updated the badge latency SLO bullet with the new timing budgets (500ms cache-read deadline, ~950ms poll budget, 1000ms avatar deadline, `after()`-deferred persist).
-- **Route table**: `/api/cron/process-campaigns` now describes round-robin multi-campaign processing; `/api/health` mentions cron-heartbeat staleness monitoring.
-- **Code ownership areas**: added Navbar/NavbarShell, `dimension-colors.ts`, and the `tArray`/`tObject` typed-accessor requirement.
+The `[Unreleased]` section documented only the `heal-poisoned-stats`/#1049 fix (`isScopeBlindedStats` detector for the #1045 corruption shape). Two shipped, unreleased fixes had no entry:
 
-### `README.md`
-Corrected the stale test-count stat (516+/8,000+ → 496+/8,479+); added a sentence to the bilingual-UI blurb noting per-locale server rendering (no flash); added `proxy.ts` and `app/[locale]/` to the project-structure tree.
+1. **Extended the existing #1049 entry** with one sentence noting the `metrics_snapshots` column-name bug (`issues_closed` vs `issues_closed_count`) the heal script's own dry-run caught same-day, before it touched any data — this was a same-day self-correction within the same fix, not a separate outstanding issue, so it's folded into the existing bullet rather than given its own.
+2. **Added a new entry** for the `warm-cache` `WARM_CACHE_PRIORITY_HANDLES` ceiling-bypass fix — a real correctness bug (per-run GitHub-call volume could exceed the documented 50-handle ceiling, live since the cron went hourly in #1010) closed this triage cycle after being carried as a cost-analyst P2 for 2 cycles.
+3. **Added a new entry** for the `dbGetCampaignStats` rewrite (4 parallel `COUNT` queries → 1 query + JS reduce) — closed this triage cycle after being carried as a cost-analyst P2 for 7+ cycles.
 
-### `docs/accepted-risks.md`
-Marked the 2026-06-19 "static content pages render at DEFAULT_LOCALE" entry `~~Resolved~~` — its own text anticipated exactly the fix #1023 shipped ("Full per-locale SSR would require per-locale route segments... deferred to a future milestone").
-
-### `docs/design-system.md`
-Added a "Tooltips (mandatory pattern)" subsection documenting the portal/fixed/z-99999/auto-flip requirement — this was previously enforced only via private agent memory, not the project's own canonical UI spec, and #1021's fix was exactly a violation of this pattern.
-
-### `docs/runbooks/observability.md`
-Added `badge_latency_slo_breach` to the alert-signal table (was missing despite existing since #974) and a new paragraph documenting the `cron:lastrun:*` heartbeat mechanism (#1018 added `latency-check` to the monitored set).
-
-### `docs/agents/qa-report.md`, `docs/agents/shared-context.md`
-Updated by the scheduled QA agent (unrelated automation running concurrently) — included in this commit since they were already staged when the sync landed; not authored by this pass.
-
-## Diagrams
-
-`docs/chapa-architecture.drawio` was checked and requires no change. Every change in this batch (the locale-segmented proxy, OAuth fail-closed + replay nonce, warm-cache cadence, snapshot-write saga hardening) is an internal-behavior or implementation-detail change within already-depicted components — consistent with how prior similarly-scoped changes (#825, #826, #1002) were represented only as annotations, never new nodes.
+All three entries match the existing bold-summary + explanatory-paragraph voice and cite the same technical details (issue numbers where they exist, file/function names, concrete before/after behavior) as the surrounding entries.
 
 ## Flagged for Review
 
-None. `docs/agents/pre-launch-report.md` itself now has a stale test-count snapshot (487/8,339) baked into its Executive Summary and Domain Model sections — left untouched, as it's a dated point-in-time audit record, not a living doc, consistent with how prior audit reports have been treated.
+None.
 
-## Out-of-Scope Finding
+## Notes
 
-While auditing `apps/web/app/sitemap.ts` for locale-migration impact (confirmed unaffected — URLs remain unprefixed), found its `ARCHETYPES` array omits `"artificer"`, a live, documented page — a pre-existing bug unrelated to this batch. Filed as [#1041](https://github.com/juan294/chapa/issues/1041) rather than folded into this release.
+- **Markdownlint**: no `.markdownlint*` config exists in this repo and no CI workflow runs markdownlint, so `npx markdownlint CHANGELOG.md` was run but its default-ruleset output (80-char line-length warnings, duplicate `### Fixed` heading warnings — both pre-existing and structurally expected in a Keep-a-Changelog file) was not treated as a real failure, consistent with this project's own policy of gating markdownlint on the presence of a project config.
+- **Version bump**: change-analyst noted this range (a real data-corruption detection/repair fix, a live cron rate-limit-ceiling fix, and a cost fix) looks like a legitimate `v2.19.1` or `v2.20.0` candidate. No version bump was made — that's `/release`'s decision, not `/update-docs`'s. Recommend running `/release` next if a new version is being prepared.
+- `/pre-launch` catches issues `/update-docs` does not (security, performance, accessibility) — not run as part of this pass.
