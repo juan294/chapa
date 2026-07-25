@@ -116,7 +116,7 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## DOMPurify transitive dependency license (PostHog toolbar)
 
-- **Risk:** `dompurify@3.4.11` appears in the lockfile through PostHog's transitive dependency graph, and is also pinned by a root `pnpm.overrides` security floor. Its license expression is `(MPL-2.0 OR Apache-2.0)`.
+- **Risk:** `dompurify@3.4.12` appears in the lockfile through PostHog's transitive dependency graph, and is also pinned by a root `pnpm.overrides` security floor. Its license expression is `(MPL-2.0 OR Apache-2.0)`.
 - **Accepted because:** Chapa does not import DOMPurify directly; it is pulled in by PostHog tooling. The package offers Apache-2.0 as an alternative license, which is already on the project allowlist. The override keeps the transitive package on the patched floor without adding a runtime sanitizer dependency to application code.
 - **Mitigation:** Keep the override until PostHog's dependency range guarantees the patched version. Re-check this entry during dependency upgrades and license audits.
 - **Severity:** Low
@@ -126,7 +126,7 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 - **Risk:** `axe-core` (pulled in transitively for accessibility testing) is licensed under MPL-2.0, which is not in our stated license policy (MIT, Apache-2.0, BSD, ISC).
 - **Accepted because:** `axe-core` is a `devDependency` used only by the a11y test suite — it is never imported by application code and never bundled into the production build. No MPL-licensed code is distributed to end users.
-- **Mitigation:** None required. Confirmed dev-only via `pnpm audit`/license scan in every security agent cycle.
+- **Mitigation:** None required. Confirmed dev-only via `pnpm -r why axe-core` and the license scan in security-agent cycles.
 - **Severity:** None (dev-only)
 - **Accepted:** 2026-07-15
 
@@ -159,7 +159,7 @@ Documented security, infrastructure, and performance decisions that were evaluat
 ## GitHub Advanced Security (code scanning + secret scanning) unavailable on repo tier
 
 - **Risk:** Native GitHub code scanning (CodeQL) and secret scanning are disabled on this repository (`403`/`404` from the respective alert APIs) — GitHub Advanced Security is not licensed for private repositories on this plan tier, so these alert surfaces cannot be enabled without a paid upgrade.
-- **Accepted because:** Equivalent coverage already runs in CI on every PR: the `Secret Scanning` workflow runs Gitleaks, and the `Security Scan` workflow runs `pnpm audit` (dependency vulnerabilities) and a license-compliance check. Weekly security-agent cycles independently re-verify secrets, dependency vulnerabilities, and license compliance against live source. Dependabot security alerts (a separate, unaffected feature) remain enabled with 0 open alerts.
+- **Accepted because:** Equivalent coverage already runs in CI on every PR: the `Secret Scanning` workflow runs Gitleaks, and the `Security Scan` workflow runs the OSV-backed `pnpm run check:vulnerabilities` gate plus `pnpm run check:licenses`. Weekly security-agent cycles independently re-verify secrets, dependency vulnerabilities, and license compliance against live source. Dependabot security alerts are a separate, unaffected surface and remain enabled.
 - **Mitigation:** None required today. Re-evaluate if the repo tier changes or if GHAS becomes available for private repos on the current plan.
 - **Severity:** Low
 - **Accepted:** 2026-07-15

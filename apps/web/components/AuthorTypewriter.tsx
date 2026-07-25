@@ -59,9 +59,13 @@ const AUTHOR_NAME = "Juan Gonz\u00e1lez";
 // ----------------------------------------------------------------
 // Timing constants (ms)
 // ----------------------------------------------------------------
+/** Per-character cadence: deliberate enough to read without making the cycle drag. */
 const CHAR_DELAY = 80;
+/** Brief cursor-only beat between erasing one message and typing the next. */
 const EMPTY_PAUSE = 300;
+/** Keep the signature visible most of the time; rotating messages are secondary. */
 const HOME_HOLD = 30_000;
+/** Give each rotating message enough dwell time to be read before erasing it. */
 const MSG_HOLD = 4_000;
 
 // ----------------------------------------------------------------

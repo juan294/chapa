@@ -134,6 +134,7 @@ describe("getStats", () => {
     mockIsGitlabEnabled.mockResolvedValue(false);
     mockDbGetLinkedPlatform.mockResolvedValue(null);
     mockDbGetSupplemental.mockResolvedValue(null);
+    vi.mocked(getGithubToken).mockReturnValue("server-pat-with-repo-scope");
     _resetInflight();
   });
 
@@ -148,8 +149,8 @@ describe("getStats", () => {
 
   // ---------------------------------------------------------------------------
   // #1002 — degraded-PR-fetch guard
-  // A viewer-scoped fetch that can't see private-repo merges returns
-  // prsMergedCount=0. That corrupt zero must not overwrite last-known-good.
+  // A viewer-scoped fetch that can't see private-repo merges returns zero or a
+  // severe shortfall. That degraded count must not overwrite last-known-good.
   // ---------------------------------------------------------------------------
   describe("degraded PR fetch guard (#1002)", () => {
     /** primary miss → stale=lastGood → supplemental miss, fetch returns `fresh`. */
@@ -255,7 +256,7 @@ describe("getStats", () => {
       // Genuinely unauthenticated: nothing to fall back to. (In production
       // GitHub's GraphQL API would reject this outright with a 403 — see
       // #1050 — so this is the defensive branch, not a live code path.)
-      vi.mocked(getGithubToken).mockReturnValueOnce(undefined);
+      vi.mocked(getGithubToken).mockReturnValue(undefined);
       const fresh = makeStats({ prsMergedCount: 10 });
       setupCacheMiss(fresh);
 
@@ -1060,41 +1061,41 @@ describe("getStats", () => {
       expect(mockFetchStatsData).toHaveBeenCalledTimes(1);
     });
 
-    it("does not let an authenticated request reuse a public inflight fetch", async () => {
-      const publicStats = makeStats({ commitsTotal: 11 });
-      const authedStats = makeStats({ commitsTotal: 22 });
+    it("does not let a private-inclusive server-token request reuse a scope-blind session fetch", async () => {
+      const sessionStats = makeStats({ commitsTotal: 11 });
+      const serverStats = makeStats({ commitsTotal: 22 });
 
-      let resolvePublicFetch!: (value: StatsData) => void;
-      let resolveAuthedFetch!: (value: StatsData) => void;
+      let resolveSessionFetch!: (value: StatsData) => void;
+      let resolveServerFetch!: (value: StatsData) => void;
       mockFetchStatsData
         .mockReturnValueOnce(
           new Promise<StatsData>((resolve) => {
-            resolvePublicFetch = resolve;
+            resolveSessionFetch = resolve;
           }),
         )
         .mockReturnValueOnce(
           new Promise<StatsData>((resolve) => {
-            resolveAuthedFetch = resolve;
+            resolveServerFetch = resolve;
           }),
         );
       mockCacheGet.mockResolvedValue(null);
 
-      const publicPromise = getStats("test-user");
-      const authedPromise = getStats("test-user", "auth-token");
+      const sessionPromise = getStats("test-user", "auth-token");
+      const serverPromise = getStats("test-user");
 
-      resolvePublicFetch(publicStats);
-      resolveAuthedFetch(authedStats);
+      resolveSessionFetch(sessionStats);
+      resolveServerFetch(serverStats);
 
-      const [publicResult, authedResult] = await Promise.all([
-        publicPromise,
-        authedPromise,
+      const [sessionResult, serverResult] = await Promise.all([
+        sessionPromise,
+        serverPromise,
       ]);
 
-      expect(publicResult).toEqual(publicStats);
-      expect(authedResult).toEqual(authedStats);
+      expect(sessionResult).toEqual(sessionStats);
+      expect(serverResult).toEqual(serverStats);
       expect(mockFetchStatsData).toHaveBeenCalledTimes(2);
-      expect(mockFetchStatsData).toHaveBeenNthCalledWith(1, "test-user", undefined);
-      expect(mockFetchStatsData).toHaveBeenNthCalledWith(2, "test-user", "auth-token");
+      expect(mockFetchStatsData).toHaveBeenNthCalledWith(1, "test-user", "auth-token");
+      expect(mockFetchStatsData).toHaveBeenNthCalledWith(2, "test-user", undefined);
     });
 
     // -----------------------------------------------------------------------
@@ -1159,31 +1160,31 @@ describe("getStats", () => {
       expect(result2!.commitsTotal).toBe(55);
     });
 
-    it("lets public callers reuse an authenticated inflight fetch", async () => {
-      const authedStats = makeStats({ commitsTotal: 22 });
+    it("lets a scope-blind session caller reuse a private-inclusive server-token fetch", async () => {
+      const serverStats = makeStats({ commitsTotal: 22 });
 
-      let resolveAuthedFetch!: (value: StatsData) => void;
+      let resolveServerFetch!: (value: StatsData) => void;
       mockFetchStatsData.mockReturnValueOnce(
         new Promise<StatsData>((resolve) => {
-          resolveAuthedFetch = resolve;
+          resolveServerFetch = resolve;
         }),
       );
       mockCacheGet.mockResolvedValue(null);
 
-      const authedPromise = getStats("test-user", "auth-token");
-      const publicPromise = getStats("test-user");
+      const serverPromise = getStats("test-user");
+      const sessionPromise = getStats("test-user", "auth-token");
 
-      resolveAuthedFetch(authedStats);
+      resolveServerFetch(serverStats);
 
-      const [authedResult, publicResult] = await Promise.all([
-        authedPromise,
-        publicPromise,
+      const [serverResult, sessionResult] = await Promise.all([
+        serverPromise,
+        sessionPromise,
       ]);
 
-      expect(authedResult).toEqual(authedStats);
-      expect(publicResult).toEqual(authedStats);
+      expect(serverResult).toEqual(serverStats);
+      expect(sessionResult).toEqual(serverStats);
       expect(mockFetchStatsData).toHaveBeenCalledTimes(1);
-      expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", "auth-token");
+      expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", undefined);
     });
   });
 

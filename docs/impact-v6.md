@@ -147,20 +147,20 @@ radar immediately while the number lagged for days. See `materializeImpactState`
 `apps/web/lib/profile/materialize-profile.ts`.
 
 **Degraded-fetch guard (#1002):** GitHub's `contributionsCollection` is scoped to the
-authenticating token, so a fetch that cannot see a user's private-repo merges (the warm-cache
-cron's server token, or an anonymous badge hit) returns `prsMergedCount: 0` even for users
-with many merged PRs — which would collapse Delivery (70% PR-weighted) and flip `profileType`
-to collaborative. `isDegradedPrFetch` (`apps/web/lib/github/stats-integrity.ts`) detects this
-and serves last-known-good instead of caching the zero (see CLAUDE.md → Caching rules).
+authenticating token. The GitHub OAuth app omits `repo`, so a user's session-token refresh is
+scope-blind and can under-report private-repo merges. Anonymous badge hits and the warm-cache
+cron fall back to the repo-scoped server `GITHUB_TOKEN`, which is private-inclusive.
+`isDegradedPrFetch` (`apps/web/lib/github/stats-integrity.ts`) detects a scope-blind collapse
+that would otherwise depress Delivery and serves last-known-good instead of caching it (see
+CLAUDE.md → Caching rules).
 
-**Scoring-data integrity contract (#1004):** #1002's guard only catches an *already-degraded*
-fetch after the fact. #1004 adds three boundaries so a degraded payload can't reach the scoring
-pipeline, cache, or persisted history at all: an authoritative `search(is:merged)` count plus
-`assessRawFetchIntegrity` rejects a structurally-valid-but-degraded payload at the fetch
-boundary (no prior baseline needed); scope-aware, non-downgrading cache writes mean a
-public/cron `GITHUB_TOKEN` fetch can never clobber a user's authenticated cache entry, and
-`stats:stale` only ever holds complete data; and snapshot history plus the HMAC verification
-record are gated on stats completeness. `stats_fetch_rejected` and
+**Scoring-data integrity contract (#1004, corrected #1045/#1050):** The fetch boundary uses
+`assessRawFetchIntegrity` to reject internally inconsistent payloads; `search(is:merged)` is
+token-scoped too and is not an independent authoritative count. At the cache boundary,
+scope-aware non-downgrading writes prevent a scope-blind user-session fetch (`public`) from
+clobbering the private-inclusive server-token entry (`authenticated`), and `stats:stale` only
+holds complete data. At the persist boundary, snapshot history and the HMAC verification record
+are gated on stats completeness. `stats_fetch_rejected` and
 `snapshot_skipped_incomplete_stats` telemetry surface degradation in production; the
 `heal-poisoned-stats` maintenance script repairs already-poisoned cache keys and snapshot rows.
 
