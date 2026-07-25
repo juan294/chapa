@@ -52,14 +52,20 @@ export function BadgeToolbar({
       );
       if (res.ok) {
         setRefreshStatus("success");
-        setTimeout(() => router.refresh(), 500);
+        setTimeout(() => {
+          if (mountedRef.current) router.refresh();
+        }, 500);
       } else {
         setRefreshStatus("error");
-        setTimeout(() => setRefreshStatus("idle"), 3000);
+        setTimeout(() => {
+          if (mountedRef.current) setRefreshStatus("idle");
+        }, 3000);
       }
     } catch {
       setRefreshStatus("error");
-      setTimeout(() => setRefreshStatus("idle"), 3000);
+      setTimeout(() => {
+        if (mountedRef.current) setRefreshStatus("idle");
+      }, 3000);
     }
   }
 
