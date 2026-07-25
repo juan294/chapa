@@ -561,8 +561,8 @@
 <!-- ENTRY:START agent=triage timestamp=2026-07-25T19:41:32Z -->
 ## Triage — 2026-07-25
 - **Reports processed**: 9
-- **Action items resolved**: 12
-- **Summary**: Patched all actionable dependency alerts, corrected the GitHub visibility model and its in-flight deduplication seam, hardened async UI teardown, refreshed affected documentation, and tracked the missing production alert destination in #1056.
+- **Action items resolved**: 13
+- **Summary**: Patched all actionable dependency alerts, corrected the GitHub visibility model and its in-flight deduplication seam, hardened async UI teardown, pinned the CI Knip invocation, refreshed affected documentation, and tracked the missing production alert destination in #1056.
 
 **Cross-agent recommendations:**
 - [Security]: Re-check Dependabot alerts #7/#8 after the `develop` rescan; use `check:vulnerabilities` as the authoritative local gate.

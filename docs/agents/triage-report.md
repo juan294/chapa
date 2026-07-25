@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-07-25 | 9 reports processed | 12 action items | 0 Dependabot PRs
+> Generated on 2026-07-25 | 9 reports processed | 13 action items | 0 Dependabot PRs
 
 ## Agent Failures
 None — no `logs/*.error.log` files modified in the last 24h.
@@ -19,7 +19,7 @@ None — no `logs/*.error.log` files modified in the last 24h.
 
 ## Overall Status: YELLOW
 
-All code, dependency, and documentation findings are resolved locally. The status remains YELLOW until the pushed `develop` commit is green in CI, GitHub rescans Dependabot alerts #7/#8, and the approved alert destination in issue #1056 is configured.
+All code, dependency, documentation, CI, and GitHub alert findings are resolved. The status remains YELLOW only because production alert delivery is still unconfigured and tracked in issue #1056.
 
 ## Action Items Completed
 | # | Item | Source | Tests Added | Status |
@@ -29,13 +29,14 @@ All code, dependency, and documentation findings are resolved locally. The statu
 | 3 | Verified `campaigns/types.ts` already documents its public types, DB row shapes, and validation constants; the optional “Zod schema” recommendation is stale because this module has no Zod schema. | documentation-report.md | — | Done |
 | 4 | Adopted the reproducible performance baseline of 1,996 KB raw / 638 KB gzip / 73 chunks and retired the cost report's unreproducible 580 KB figure for future comparisons. | cost-analyst-report.md + performance-report.md | — | Done |
 | 5 | Swept and corrected the token-visibility model in `stats-integrity.ts`, `impact-v6.md`, and `how-it-works.md`, including OAuth scopes, cache TTLs, and aggregate-data privacy wording. | Cross-report consistency sweep | Existing suite | Done |
-| 6 | Patched Dependabot alert #7 (`brace-expansion`) to 5.0.8 and bounded the override below the next major. | GitHub alert #7 | Vulnerability gate | Done; rescan pending |
-| 7 | Patched Dependabot alert #8 (`dompurify`) to 3.4.12, bounded the override, and updated its accepted-risk version. | GitHub alert #8 | Vulnerability + license gates | Done; rescan pending |
+| 6 | Patched Dependabot alert #7 (`brace-expansion`) to 5.0.8 and bounded the override below the next major. | GitHub alert #7 | Vulnerability gate | Done; GitHub closed |
+| 7 | Patched Dependabot alert #8 (`dompurify`) to 3.4.12, bounded the override, and updated its accepted-risk version. | GitHub alert #8 | Vulnerability + license gates | Done; GitHub closed |
 | 8 | Upgraded Next.js and its aligned tooling to 16.2.11; patched OSV findings in `js-yaml`, `postcss`, and `sharp`; pinned `sharp` 0.35.3 because it is beyond Next's declared optional range. | OSV vulnerability gate | Full build | Done |
 | 9 | Updated `accepted-risks.md` so the private-tier GHAS compensation names the actual OSV and license gates and no longer claims zero live alerts. | GitHub alert-surface review | — | Done |
 | 10 | Corrected in-flight request deduplication to rank effective private visibility rather than token presence, preventing a private-inclusive server-token request from reusing a scope-blind OAuth fetch. | `/simplify` quality pass | 2 rewritten regression tests | Done |
 | 11 | Filed issue #1056 after CLI discovery found no sanctioned `CHAPA_ALERT_WEBHOOK_URL`; the issue records live-health evidence and the configuration/test checklist. | Production alert-stream review | — | Tracked |
 | 12 | Hardened async UI teardown after the report-commit hook exposed a timing flake: the regenerate assertion now waits for React's resolved-fetch render, and delayed toolbar updates check the mounted guard before touching state or routing. | Pre-commit full-suite evidence | 65 focused tests + full suite | Done |
+| 13 | Fixed Dead Code Detection after run 30172649125 exposed that CI used unpinned `pnpm dlx knip` 6.29.0 instead of the repository's clean pinned 6.27.0 baseline; both workflow steps now use `pnpm exec knip`. | GitHub Actions | Both pinned Knip scans + full suite | Done |
 
 ## `/simplify` (3 independent read-only passes)
 - **Reuse:** found the duplicated, inverted cache-write comment; corrected it to reference effective visibility.
@@ -48,8 +49,8 @@ All code, dependency, and documentation findings are resolved locally. The statu
 |---|------|----------|--------------|---------------|----------|--------|-------|
 | 1 | Code scanning | — | GitHub Advanced Security | — | Repository | Accepted risk | API returned 403; private-tier limitation documented |
 | 2 | Secret scanning | — | GitHub Advanced Security | — | Repository | Accepted risk | API returned 404; CI Gitleaks compensating gate |
-| 7 | Dependabot | HIGH | brace-expansion 5.0.6 | GHSA-3jxr-9vmj-r5cp | pnpm-lock.yaml | Fixed locally | Resolves to 5.0.8; GitHub rescan pending |
-| 8 | Dependabot | LOW | dompurify 3.4.11 | GitHub advisory | pnpm-lock.yaml | Fixed locally | Resolves to 3.4.12; GitHub rescan pending |
+| 7 | Dependabot | HIGH | brace-expansion 5.0.6 | GHSA-3jxr-9vmj-r5cp | pnpm-lock.yaml | Closed | Resolves to 5.0.8; GitHub rescan confirmed |
+| 8 | Dependabot | LOW | dompurify 3.4.11 | GitHub advisory | pnpm-lock.yaml | Closed | Resolves to 3.4.12; GitHub rescan confirmed |
 
 ## Dependabot PRs
 None — no open Dependabot-authored PRs.
@@ -69,9 +70,9 @@ None — no open Dependabot-authored PRs.
 - [x] Lint — both workspaces clean
 - [x] Next 16.2.11 production build — 81/81 static pages generated
 - [x] `/simplify` — 3 passes, findings applied, full sequence rerun
-- [ ] CI green on pushed `develop` commit
-- [ ] Vercel preview verified for the exact pushed commit
-- [ ] Dependabot alerts #7/#8 closed by GitHub rescan
+- [x] CI green on `241521451b4b8a8f1735fec050278b17b91b0942`: CI 30172856571; Dead Code 30172856484; Security 30172856541; Secret Scanning 30172856488; Bundle Size 30172856539
+- [x] Exact-SHA Vercel preview `chapa-f1fhw2f2p-thecreativetoken.vercel.app` Ready; authenticated CLI checks returned HTTP 200 for `/` and `/api/health`
+- [x] Dependabot alerts #7/#8 closed by GitHub rescan (0 open)
 
 ## Carried Items
 - Issue #1056: choose and configure the approved production alert webhook destination, then exercise a safe test alert.
