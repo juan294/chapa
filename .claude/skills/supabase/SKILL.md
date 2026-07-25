@@ -1,5 +1,5 @@
 ---
-name: "Supabase"
+name: supabase
 description: "Supabase migration safety, local testing workflow, grant requirements, fallback observability, and health endpoint patterns."
 ---
 
@@ -21,6 +21,9 @@ supabase db reset                 # apply all migrations locally
 docker exec supabase_db_<project> psql -U postgres -c "SELECT * FROM new_table LIMIT 1;"
 supabase db push                  # only after local verification
 ```
+
+The local instance runs full Postgres with RLS and extensions enabled -- treat
+it as a UAT environment, not a lightweight mock.
 
 ## Table Grants
 

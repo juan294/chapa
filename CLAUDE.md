@@ -448,48 +448,7 @@ GitHub Issues is the single source of truth for planned work. Every issue gets *
 
 Reference issues in commits with `Fixes #N` or `Refs #N`.
 
-## Working Patterns
-
-<examples>
-<example name="push-sequence">
-Commit before pulling — hook blocks dirty pulls.
-
-```bash
-git add src/feature.ts && git commit -m "feat: add feature"
-git pull --rebase && git push
-```
-
-</example>
-
-<example name="worktree-cleanup">
-Remove worktrees before merging PRs. Use -D (uppercase) for branches.
-
-```bash
-git worktree remove --force ../feature-branch; git branch -D feature-branch
-```
-
-</example>
-
-<example name="file-paths">
-Use absolute paths in all file tools and worktree commands. Never use ~.
-
-```bash
-cd /Users/dev/project && pnpm run test
-```
-
-</example>
-</examples>
-
 Rules load from `.claude/rules/` and `.claude/skills/` automatically.
-
-## TDD Protocol
-
-All code changes follow Red-Green-Refactor:
-1. **Red** — Write a failing test FIRST
-2. **Green** — Minimum code to pass
-3. **Refactor** — Clean up with green tests
-
-No exceptions. Bug fixes need a regression test. Refactors need existing coverage. No "tests later."
 
 ## Agent Behavior
 
