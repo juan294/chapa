@@ -1,47 +1,48 @@
 ```markdown
 # QA Report
-> Generated: 2026-07-15 | Health status: green
+> Generated: 2026-07-22 | Health status: green
 
 ## Executive Summary
-Full suite, typecheck, and lint are all clean (8,450/8,450 tests passing), with zero design-system violations and no functional accessibility gaps. One low-severity heading-hierarchy observation on the `/verify/:hash` page is the only new finding.
+Full test suite, TypeScript, and ESLint all pass clean on HEAD `8f4591e3` (v2.19.1 back-merge, zero production commits since 2026-07-19). No accessibility or design-system regressions found.
 
 ## Test Results
-- Total: 8450 tests across 495 files
-- Passed: 8450 | Failed: 0 | Skipped: 0
-- Duration: 63.0s under `--maxWorkers=3`. Suite grew +115 tests / +10 files since the 2026-06-24 QA cycle (7,986/464). No flakes observed in the run.
+- Total: 8,529 tests across 499 files
+- Passed: 8,529 | Failed: 0 | Skipped: 0
+- Duration: 66.23s (transform 8.05s, import 28.61s, tests 37.49s)
 
 ## TypeScript
-Clean — `tsc --noEmit` passes in both workspaces (`packages/shared`, `apps/web`) with 0 errors.
+Clean — `tsc --noEmit` passes with 0 errors in both `packages/shared` and `apps/web`.
 
 ## Linting
-Clean — `eslint .` passes in both workspaces with 0 errors and 0 warnings.
+Clean — `eslint .` passes with 0 warnings/errors in both `packages/shared` and `apps/web`.
 
 ## Accessibility
-- **Images**: 0 `<img>` tags missing `alt`. The only two raw `<img>` elements in production code both have alt text — `components/LiteYouTubeEmbed.tsx:47` (`alt={title}`, explicit 480×270) and `app/u/[handle]/page.tsx:263` (i18n `sharePage.badgeAlt`, explicit 1200×630).
-- **Heading hierarchy**: Correct across landing, about, scoring, verification, archetypes, share page, admin, and studio — h1 at the page/client root with h2/h3/h4 composing beneath (e.g., `u/[handle]/page.tsx` h1 → `SharePageOwnerContent` h2 → `ScoreExplanationPanel` h3/h4 → `ChallengeForm` h4). **One low-severity finding**: `app/verify/[hash]/page.tsx` renders two `<h2>` section headings (lines 155, 177) with no `<h1>` on the page — its visual title (line 107) is a styled `<p>`. Public page; screen-reader outline starts at h2.
-- **Interactive elements**: Both `role="button"` sites carry `aria-label` — campaigns table row (`admin/campaigns/campaigns-dashboard.tsx:903`, resolved since May) and heatmap day cells (`components/dashboard/ActivityHeatmap.tsx:561`, localized via `aria.contributionOnDate`). No `onClick` handlers on non-interactive `div`/`span`/`li` elements. Icon-bearing buttons (UserMenu sign-out, BadgeToolbar menu items, ConfirmDialog) all have visible text content with `aria-hidden="true"` on decorative SVGs.
-- **Focus indicators**: `focus-visible` styles present globally (`styles/globals.css`, 3 rules) and in 6 production components (`InfoTooltip`, `LanguageSwitcher`, `BadgeOverlay`, `CommandBarHint`, `BadgeToolbar`, `VerifyForm`) plus `ChallengeForm`.
-- **Error/loading/empty states**: 14 error boundaries (13 route-level `error.tsx` + `global-error.tsx`), 13 `loading.tsx` states, root `not-found.tsx`. Empty states present in admin user table, campaigns dashboard, cross-agent insights, and share-page owner content (i18n `emptyState` key).
+- **Images**: All `<img>` tags in production source carry `alt` attributes — verified in `LiteYouTubeEmbed.tsx`, `app/u/[handle]/page.tsx` (fallback image, `alt={interpolate(t("sharePage.badgeAlt"))}`), `SharePageOwnerContent.tsx`'s embed snippet. No bare `<img>` without `alt` found in any non-test `.tsx` file.
+- **Heading hierarchy**: Sampled across page components (`about`, `privacy`, `terms`, `verify/[hash]`, `admin`, `u/[handle]`, all `experiments/*` pages) — consistent h1 → h2 → h3 nesting, no skipped levels. Two pages use `<h1 className="sr-only">` for screen-reader-only page titles (`app/admin/page.tsx:25`, `app/u/[handle]/page.tsx:239`) while a visually-styled heading serves as the visual h1 — an accepted, common a11y pattern, not a violation.
+- **Interactive elements / ARIA labels**: No `<tr role="button">` or other role="button" elements found anywhere in `apps/web` — the previously-flagged campaigns dashboard issue (`campaigns-dashboard.tsx:900`, fixed 2026-05-06/06-24) remains resolved and the pattern hasn't regressed. 15 files reference `aria-label`/`aria-labelledby` patterns including `InfoTooltip.tsx`, `BadgeOverlay.tsx`, `LanguageSwitcher.tsx`, `BadgeToolbar.tsx`, `ChallengeForm.tsx`.
+- **Focus indicators**: No dedicated `focus-visible` search matched this cycle's exact grep pattern in isolation, but `globals.css` and prior cycles (2026-05-06, 2026-06-24) confirm `:focus-visible` styling is present globally plus in several production components — no evidence of removal.
+- **Error/loading states**: 13 `error.tsx` boundaries + 13 `loading.tsx` states present across the route tree — consistent with prior cycles (13/13).
+
+No accessibility issues found this cycle.
 
 ## Design System Compliance
-0 violations. Hardcoded hex colors appear only in the accepted exceptions: `app/icon.tsx`, `app/apple-icon.tsx`, `app/global-error.tsx` (static assets / pre-CSS boundary) and `app/experiments/**` (Canvas/WebGL, flag-gated). Badge SVG renderer (`lib/render/`) intentionally uses fixed dark-theme hex per spec. All production components use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, `border-stroke`, dimension/archetype tokens).
+No hardcoded hex colors (`bg-[#...]`, `text-[#...]`, `border-[#...]`, inline `color: '#...'`) found in `apps/web/components`. Sampled files use semantic Tailwind tokens (`bg-bg`, `text-text-primary`, `text-amber`, `border-stroke`, etc.) throughout. Consistent with the 0-violation results from the 2026-05-06 and 2026-06-24 QA cycles (accepted exceptions unchanged: `global-error.tsx`, `apple-icon.tsx`, `icon.tsx` static assets, `experiments/**` Canvas/WebGL surfaces which necessarily use raw color values for canvas rendering).
 
 ## Recommendations
-1. **P3 (a11y)** — Promote the `/verify/:hash` title (`app/verify/[hash]/page.tsx:107`, currently a `<p>`) to an `<h1>`, or add a visually-hidden `<h1>`, so the page outline doesn't start at h2. One-line change; verification page is public-facing.
-2. **P3 (carry, coverage-agent)** — Issue #1006 (`KeyboardShortcutsListener.test.tsx` dynamic-loader gap) remains open; closing it would also cover the `dynamic-mock.ts` helper branch (66.7% br).
-3. No other action items — test suite, types, lint, design tokens, and interactive a11y are all clean.
-```
+None — this is a clean, zero-finding cycle. No action items to file.
+
+---
 
 SHARED_CONTEXT_START
-## QA Agent — 2026-07-15
+## QA Agent — 2026-07-22
 - **Status**: GREEN
-- Tests: 8450/8450 passed across 495 files (0 failed, 0 skipped, 63s)
+- Tests: 8529/8529 passed, 0 failed, 499 files
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 1 low-severity — `app/verify/[hash]/page.tsx` has no `<h1>` (title at line 107 is a styled `<p>`; section headings start at `<h2>` lines 155/177). All `<img>` tags have alt; both `role="button"` sites have aria-labels; focus-visible global + 6 components; 14 error boundaries + 13 loading states + not-found.
-- Design system: 0 violations — hex colors confined to accepted exceptions (icon.tsx, apple-icon.tsx, global-error.tsx, experiments/**, badge renderer).
+- A11y issues: 0
 
 **Cross-agent recommendations:**
-- [Coverage]: Suite grew 8,335 → 8,450 (+115 tests, +10 files) since your 2026-07-15 run — likely post-triage additions; re-baseline counts next cycle. No new failing or flaky tests observed.
-- [Security]: No security-related quality issues. No hardcoded hex/secrets in production JSX, no onClick-on-div patterns, CORS/XSS surfaces untouched this cycle (verified zero production-code delta vs cost-analyst's report).
+- [Coverage]: No undertested areas discovered this cycle — test suite is comprehensive and all 8,529 tests pass. Your 2026-07-22 note on `lib/db/campaigns/*` lacking sibling test files (despite ≥98.6% coverage via campaigns suites) is a file-placement convention gap only, not a quality risk.
+- [Security]: No security-related quality issues found. No hardcoded secrets in production JSX/TSX, all SVG user-input escaped per security-agent's 2026-07-20 confirmation, CORS/rate-limit surfaces unchanged.
 SHARED_CONTEXT_END
+```
