@@ -283,6 +283,7 @@ Go directly to these paths -- never search for them.
 | Reliability playbooks | `docs/playbooks/reliability-hardening-playbook.md` | Seam-bug hardening reference |
 | Reliability plan | `docs/plans/2026-07-03-reliability-hardening.md` | Contract matrix, canaries, process guarantees |
 | E2E Pro architecture | `docs/playbooks/e2e-pro-release-verification.md` | Comprehensive decisions and evidence semantics |
+| Production E2E verification | `.claude/commands/prodplaybook.md` | Standalone freshness audit and verification; never releases |
 | Production release procedure | `docs/release/release-playbook.md` | Single short ordering and authorization authority |
 
 ---

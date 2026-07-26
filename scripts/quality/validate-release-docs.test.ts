@@ -59,6 +59,19 @@ function compliantRoot(): string {
     ".claude/commands/explore-release.md",
     "Read docs/release/release-playbook.md. Never tag.",
   );
+  write(
+    root,
+    ".claude/commands/prodplaybook.md",
+    [
+      "Read docs/playbooks/e2e-pro-release-verification.md completely.",
+      "Use quality/release-required.json as requiredness authority.",
+      "Run the Release Coverage Freshness Audit.",
+      "Verify exact-SHA evidence and reject zero passes.",
+      "Use fresh context charters with all eight maneuvers.",
+      "Prove zero unexpected residue or report BLOCKED.",
+      "This command never versions, creates a release PR, merges, tags, or publishes.",
+    ].join("\n"),
+  );
   for (const file of delegatedFiles) {
     write(root, file, "Ordering: docs/release/release-playbook.md\n");
   }
@@ -95,6 +108,36 @@ describe("validateReleaseDocs", () => {
 
     expect(validateReleaseDocs(root)).toContain(
       ".claude/commands/release.md: must delegate to docs/release/release-playbook.md",
+    );
+  });
+
+  it("requires the standalone production verification command", () => {
+    const root = compliantRoot();
+    fs.rmSync(path.join(root, ".claude/commands/prodplaybook.md"));
+
+    expect(validateReleaseDocs(root)).toContain(
+      ".claude/commands/prodplaybook.md: missing",
+    );
+  });
+
+  it("rejects release mutations in the production verification command", () => {
+    const root = compliantRoot();
+    write(
+      root,
+      ".claude/commands/prodplaybook.md",
+      [
+        "Read docs/playbooks/e2e-pro-release-verification.md completely.",
+        "Use quality/release-required.json as requiredness authority.",
+        "Run the Release Coverage Freshness Audit.",
+        "Verify exact-SHA evidence and reject zero passes.",
+        "Use fresh context charters with all eight maneuvers.",
+        "Prove zero unexpected residue or report BLOCKED.",
+        "git tag -a vX.Y.Z mainCommit",
+      ].join("\n"),
+    );
+
+    expect(validateReleaseDocs(root)).toContain(
+      ".claude/commands/prodplaybook.md: verification-only command must not contain release mutations",
     );
   });
 
@@ -178,6 +221,10 @@ describe("repository release procedure", () => {
     path.join(repositoryRoot, ".claude/commands/explore-release.md"),
     "utf8",
   );
+  const prodplaybook = fs.readFileSync(
+    path.join(repositoryRoot, ".claude/commands/prodplaybook.md"),
+    "utf8",
+  );
 
   it("documents exact dispatch, evidence download, and final assembly", () => {
     expect(playbook.split(/\r?\n/).length).toBeLessThanOrEqual(200);
@@ -207,5 +254,23 @@ describe("repository release procedure", () => {
     expect(explore).toContain("pre-merge-evidence.json");
     expect(explore).toContain("manualObligationIds");
     expect(explore).toContain("issue-creation authorization");
+  });
+
+  it("keeps prodplaybook exhaustive, fresh, and verification-only", () => {
+    for (const required of [
+      "Release Coverage Freshness Audit",
+      "quality/release-required.json",
+      "zero passes",
+      "exact-SHA",
+      "fresh context",
+      "all eight maneuvers",
+      "zero unexpected residue",
+      "docs/agents/prodplaybook-report.md",
+    ]) {
+      expect(prodplaybook).toContain(required);
+    }
+    expect(prodplaybook).not.toMatch(
+      /\bgh\s+pr\s+(?:create|merge)\b|\bgit\s+tag\b|\bgh\s+release\s+create\b/i,
+    );
   });
 });

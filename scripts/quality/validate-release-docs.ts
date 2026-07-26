@@ -4,8 +4,10 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PLAYBOOK = "docs/release/release-playbook.md";
+const E2E_PLAYBOOK = "docs/playbooks/e2e-pro-release-verification.md";
 const RELEASE_COMMAND = ".claude/commands/release.md";
 const EXPLORE_COMMAND = ".claude/commands/explore-release.md";
+const PRODPLAYBOOK_COMMAND = ".claude/commands/prodplaybook.md";
 const DELEGATED_FILES = [
   "docs/runbooks/release-checklist.md",
   "docs/runbooks/deployment-smoke.md",
@@ -47,6 +49,7 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   const playbook = read(root, PLAYBOOK, errors);
   const releaseCommand = read(root, RELEASE_COMMAND, errors);
   const exploreCommand = read(root, EXPLORE_COMMAND, errors);
+  const prodplaybookCommand = read(root, PRODPLAYBOOK_COMMAND, errors);
 
   if (playbook && lineCount(playbook) > 200) {
     errors.push(`${PLAYBOOK}: exceeds 200 lines`);
@@ -108,6 +111,36 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   }
   if (!exploreCommand.includes(PLAYBOOK)) {
     errors.push(`${EXPLORE_COMMAND}: must delegate to ${PLAYBOOK}`);
+  }
+  if (!prodplaybookCommand.includes(E2E_PLAYBOOK)) {
+    errors.push(`${PRODPLAYBOOK_COMMAND}: must delegate to ${E2E_PLAYBOOK}`);
+  }
+
+  for (const contract of [
+    "quality/release-required.json",
+    "Release Coverage Freshness Audit",
+    "exact-SHA",
+    "zero passes",
+    "fresh context",
+    "eight maneuvers",
+    "zero unexpected residue",
+    "BLOCKED",
+  ]) {
+    requireText(
+      prodplaybookCommand,
+      PRODPLAYBOOK_COMMAND,
+      contract,
+      errors,
+    );
+  }
+  if (
+    /\bgh\s+pr\s+(?:create|merge)\b|\bgit\s+tag\b|\bgh\s+release\s+create\b/i.test(
+      prodplaybookCommand,
+    )
+  ) {
+    errors.push(
+      `${PRODPLAYBOOK_COMMAND}: verification-only command must not contain release mutations`,
+    );
   }
 
   for (const gate of [
