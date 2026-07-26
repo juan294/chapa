@@ -6,6 +6,7 @@ const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME?.trim();
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/*.test.ts",
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
   fullyParallel: true,
