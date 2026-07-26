@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const requiredEnvPresent = Boolean(
@@ -16,6 +17,13 @@ type Shape = {
   handle: string;
   craft: number | null;
   platform?: "bitbucket";
+};
+
+type FeatureFlagState = {
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  config: unknown;
 };
 
 const savedConfig = {
@@ -39,101 +47,221 @@ test.describe("full impact journey", () => {
     baseURL,
   }, testInfo) => {
     const projectName = testInfo.project.name.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+    const requestedRunId = process.env.E2E_PRO_RUN_ID || `local-${process.pid}`;
+    const evidenceRunId = requestedRunId
+      .replace(/[^a-z0-9._-]/gi, "-")
+      .toLowerCase();
+    const runId = `${evidenceRunId}-${testInfo.workerIndex}-${testInfo.retry}`
+      .replace(/[^a-z0-9-]/gi, "-")
+      .toLowerCase()
+      .slice(0, 14);
     const shapes: Shape[] = [
-      { kind: "craft", handle: `journey-${projectName}-craft`, craft: 78 },
-      { kind: "non-craft", handle: `journey-${projectName}-plain`, craft: null },
+      { kind: "craft", handle: `chapa-e2e-${runId}-${projectName.slice(0, 5)}-craft`, craft: 78 },
+      { kind: "non-craft", handle: `chapa-e2e-${runId}-${projectName.slice(0, 5)}-plain`, craft: null },
       {
         kind: "linked",
-        handle: `journey-${projectName}-linked`,
+        handle: `chapa-e2e-${runId}-${projectName.slice(0, 5)}-linked`,
         craft: 66,
         platform: "bitbucket",
       },
     ];
 
     const db = serviceClient();
-    await seedFeatureFlags(db);
-    await resetShapes(db, shapes);
-    await seedShapes(db, shapes);
+    const originalFeatureFlags = await readFeatureFlags(db);
+    const startedAt = new Date().toISOString();
+    let journeyPassed = false;
+    try {
+      await seedFeatureFlags(db);
+      await resetShapes(db, shapes);
+      await seedShapes(db, shapes);
 
-    for (const shape of shapes) {
-      await setSessionCookie(context, baseURL, shape.handle);
+      for (const shape of shapes) {
+        await setSessionCookie(context, baseURL, shape.handle);
 
-      const generating = await page.goto(`/generating/${shape.handle}`, {
-        waitUntil: "domcontentloaded",
-      });
-      expect(generating).not.toBeNull();
-      expect(generating!.status()).toBeLessThan(500);
-
-      const badge = await page.request.get(`/u/${shape.handle}/badge.svg`);
-      expect(badge.status()).toBe(200);
-      expect(badge.headers()["content-type"] ?? "").toContain("image/svg+xml");
-      const svg = await badge.text();
-      expect(svg).toContain("<svg");
-      expect(svg).toContain("</svg>");
-
-      await page.goto("/", { waitUntil: "domcontentloaded" });
-      const saveResult = await saveStudioConfigInBrowser(page, savedConfig);
-      expect(saveResult.status).toBe(200);
-
-      const share = await page.goto(`/u/${shape.handle}`, {
-        waitUntil: "domcontentloaded",
-      });
-      expect(share).not.toBeNull();
-      expect(share!.status()).toBeLessThan(500);
-      await expect(page.locator("body")).toContainText(shape.handle);
-      await expect(page.locator("body")).toContainText(/Markdown|HTML/);
-
-      await context.setOffline(true);
-      const offlineResult = await saveStudioConfigInBrowser(page, {
-        ...savedConfig,
-        background: "particles",
-      });
-      expect(offlineResult.status).toBe("offline");
-      expect(
-        await page.evaluate((key) => window.localStorage.getItem(key), pendingStorageKey),
-      ).toContain("particles");
-
-      await context.setOffline(false);
-      const queuedConfig = await page.evaluate((key) => {
-        const raw = window.localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : null;
-      }, pendingStorageKey);
-      expect(queuedConfig).not.toBeNull();
-      const flushResult = await saveStudioConfigInBrowser(page, queuedConfig);
-      expect(flushResult.status).toBe(200);
-      await page.evaluate((key) => window.localStorage.removeItem(key), pendingStorageKey);
-
-      const refresh = await page.request.post(`/api/refresh?handle=${shape.handle}`);
-      expect(refresh.status()).toBeLessThan(600);
-    }
-
-    for (const shape of shapes) {
-      const snapshot = await readSnapshot(db, shape.handle);
-      expect(snapshot).not.toBeNull();
-      expect(Number.isFinite(Number(snapshot!.commits_total))).toBe(true);
-      expect(Number.isFinite(Number(snapshot!.prs_merged_count))).toBe(true);
-      expect(Number.isFinite(Number(snapshot!.reviews_submitted))).toBe(true);
-      if (shape.kind === "non-craft") {
-        expect(snapshot!.craft).toBeNull();
-      } else {
-        expect(Number(snapshot!.craft)).toBeGreaterThan(0);
-      }
-
-      const config = await readStudioConfig(db, shape.handle);
-      expect(config).toMatchObject({ ...savedConfig, background: "particles" });
-
-      if (shape.platform) {
-        const platform = await readPlatform(db, shape.handle, shape.platform);
-        expect(platform).toMatchObject({
-          platform: shape.platform,
-          remote_login: `${shape.handle}-remote`,
-          access_token: `token-${shape.handle}`,
-          refresh_token: `refresh-${shape.handle}`,
+        const generating = await page.goto(`/generating/${shape.handle}`, {
+          waitUntil: "domcontentloaded",
         });
-      }
-    }
+        expect(generating).not.toBeNull();
+        expect(generating!.status()).toBeLessThan(500);
 
-    await resetShapes(db, shapes);
+        const badge = await page.request.get(`/u/${shape.handle}/badge.svg`);
+        expect(badge.status()).toBe(200);
+        expect(badge.headers()["content-type"] ?? "").toContain("image/svg+xml");
+        const svg = await badge.text();
+        expect(svg).toContain("<svg");
+        expect(svg).toContain("</svg>");
+
+        await page.goto("/", { waitUntil: "domcontentloaded" });
+        const saveResult = await saveStudioConfigInBrowser(page, savedConfig);
+        expect(saveResult.status).toBe(200);
+
+        const share = await page.goto(`/u/${shape.handle}`, {
+          waitUntil: "domcontentloaded",
+        });
+        expect(share).not.toBeNull();
+        expect(share!.status()).toBeLessThan(500);
+        await expect(page.locator("body")).toContainText(shape.handle);
+        await expect(page.locator("body")).toContainText(/Markdown|HTML/);
+
+        await context.setOffline(true);
+        const offlineResult = await saveStudioConfigInBrowser(page, {
+          ...savedConfig,
+          background: "particles",
+        });
+        expect(offlineResult.status).toBe("offline");
+        expect(
+          await page.evaluate((key) => window.localStorage.getItem(key), pendingStorageKey),
+        ).toContain("particles");
+
+        await context.setOffline(false);
+        const queuedConfig = await page.evaluate((key) => {
+          const raw = window.localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : null;
+        }, pendingStorageKey);
+        expect(queuedConfig).not.toBeNull();
+        const flushResult = await saveStudioConfigInBrowser(page, queuedConfig);
+        expect(flushResult.status).toBe(200);
+        await page.evaluate((key) => window.localStorage.removeItem(key), pendingStorageKey);
+
+        const refresh = await page.request.post(`/api/refresh?handle=${shape.handle}`);
+        expect(refresh.status()).toBeLessThan(600);
+      }
+
+      for (const shape of shapes) {
+        const snapshot = await readSnapshot(db, shape.handle);
+        expect(snapshot).not.toBeNull();
+        expect(Number.isFinite(Number(snapshot!.commits_total))).toBe(true);
+        expect(Number.isFinite(Number(snapshot!.prs_merged_count))).toBe(true);
+        expect(Number.isFinite(Number(snapshot!.reviews_submitted))).toBe(true);
+        if (shape.kind === "non-craft") {
+          expect(snapshot!.craft).toBeNull();
+        } else {
+          expect(Number(snapshot!.craft)).toBeGreaterThan(0);
+        }
+
+        const config = await readStudioConfig(db, shape.handle);
+        expect(config).toMatchObject({ ...savedConfig, background: "particles" });
+
+        if (shape.platform) {
+          const platform = await readPlatform(db, shape.handle, shape.platform);
+          expect(platform).toMatchObject({
+            platform: shape.platform,
+            remote_login: `${shape.handle}-remote`,
+            access_token: `token-${shape.handle}`,
+            refresh_token: `refresh-${shape.handle}`,
+          });
+        }
+      }
+
+      journeyPassed = true;
+    } finally {
+      await context.setOffline(false).catch(() => undefined);
+      const cleanupErrors: unknown[] = [];
+      await resetShapes(db, shapes).catch((error: unknown) => {
+        cleanupErrors.push(error);
+      });
+      await restoreFeatureFlags(db, originalFeatureFlags).catch((error: unknown) => {
+        cleanupErrors.push(error);
+      });
+      const remainingCount = await countShapeResidue(db, shapes).catch(
+        (error: unknown) => {
+          cleanupErrors.push(error);
+          return -1;
+        },
+      );
+      const featureFlagsRestored = await featureFlagsMatch(
+        db,
+        originalFeatureFlags,
+      ).catch((error: unknown) => {
+        cleanupErrors.push(error);
+        return false;
+      });
+      const cleanupStatus =
+        cleanupErrors.length === 0 &&
+        remainingCount === 0 &&
+        featureFlagsRestored
+          ? "removed"
+          : "present";
+      const evidencePath = testInfo.outputPath("release-evidence.json");
+      const evidenceReference = "release-evidence.json#cleanup";
+      const studioFixtures = [
+        {
+          id: `${evidenceRunId}-${projectName}-studio`,
+          cleanupStatus,
+          residueEvidence: evidenceReference,
+        },
+      ];
+      const snapshotFixtures = [
+        {
+          id: `${evidenceRunId}-${projectName}-snapshot`,
+          cleanupStatus,
+          residueEvidence: evidenceReference,
+        },
+      ];
+      await writeFile(
+        evidencePath,
+        `${JSON.stringify(
+          {
+            schemaVersion: 1,
+            runId: evidenceRunId,
+            fixtureIds: shapes.map((shape) => shape.handle),
+            results: [
+              {
+                scenarioId: "studio.config-persistence",
+                environment: "local-contract",
+                status: journeyPassed ? "passed" : "failed",
+                startedAt,
+                finishedAt: new Date().toISOString(),
+                runner: "playwright",
+                evidence: {
+                  ui: ["playwright:full-impact-journey"],
+                  http: [evidenceReference],
+                  datastore: [evidenceReference],
+                  cleanup: [evidenceReference],
+                },
+                fixtures: studioFixtures,
+              },
+              {
+                scenarioId: "profile.snapshot-integrity",
+                environment: "local-contract",
+                status: journeyPassed ? "passed" : "failed",
+                startedAt,
+                finishedAt: new Date().toISOString(),
+                runner: "playwright",
+                evidence: {
+                  http: [evidenceReference],
+                  datastore: [evidenceReference],
+                  cleanup: [evidenceReference],
+                },
+                fixtures: snapshotFixtures,
+              },
+            ],
+            cleanup: {
+              status: cleanupStatus,
+              remainingCount,
+              featureFlagsRestored,
+              errors: cleanupErrors.map((error) =>
+                error instanceof Error ? error.message : String(error),
+              ),
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      await testInfo.attach("release-evidence", {
+        path: evidencePath,
+        contentType: "application/json",
+      });
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, "journey cleanup failed");
+      }
+      expect(remainingCount, "run-owned journey fixtures must leave zero residue").toBe(0);
+      expect(
+        featureFlagsRestored,
+        "shared feature flags must be restored to their pre-test state",
+      ).toBe(true);
+    }
   });
 });
 
@@ -169,10 +297,29 @@ function serviceClient(): SupabaseClient {
 
 async function resetShapes(db: SupabaseClient, shapes: Shape[]): Promise<void> {
   const handles = shapes.map((shape) => shape.handle);
-  await db.from("user_platforms").delete().in("handle", handles);
-  await db.from("studio_configs").delete().in("handle", handles);
-  await db.from("metrics_snapshots").delete().in("handle", handles);
-  await db.from("users").delete().in("handle", handles);
+  const errors: string[] = [];
+  for (const table of ["user_platforms", "studio_configs", "metrics_snapshots", "users"]) {
+    const { error } = await db.from(table).delete().in("handle", handles);
+    if (error) errors.push(`${table}: ${error.message}`);
+  }
+  if (errors.length > 0) throw new Error(errors.join("; "));
+}
+
+async function countShapeResidue(
+  db: SupabaseClient,
+  shapes: Shape[],
+): Promise<number> {
+  const handles = shapes.map((shape) => shape.handle);
+  let remainingCount = 0;
+  for (const table of ["user_platforms", "studio_configs", "metrics_snapshots", "users"]) {
+    const { count, error } = await db
+      .from(table)
+      .select("*", { count: "exact", head: true })
+      .in("handle", handles);
+    expect(error).toBeNull();
+    remainingCount += count ?? 0;
+  }
+  return remainingCount;
 }
 
 async function seedShapes(db: SupabaseClient, shapes: Shape[]): Promise<void> {
@@ -223,6 +370,43 @@ async function seedFeatureFlags(db: SupabaseClient): Promise<void> {
     { onConflict: "key" },
   );
   expect(error).toBeNull();
+}
+
+const journeyFeatureFlagKeys = ["studio_enabled", "bitbucket_integration"];
+
+async function readFeatureFlags(db: SupabaseClient): Promise<FeatureFlagState[]> {
+  const { data, error } = await db
+    .from("feature_flags")
+    .select("key,enabled,description,config")
+    .in("key", journeyFeatureFlagKeys)
+    .order("key");
+  expect(error).toBeNull();
+  return (data ?? []) as FeatureFlagState[];
+}
+
+async function restoreFeatureFlags(
+  db: SupabaseClient,
+  original: FeatureFlagState[],
+): Promise<void> {
+  const { error: deleteError } = await db
+    .from("feature_flags")
+    .delete()
+    .in("key", journeyFeatureFlagKeys);
+  if (deleteError) throw deleteError;
+  if (original.length > 0) {
+    const { error: restoreError } = await db
+      .from("feature_flags")
+      .upsert(original, { onConflict: "key" });
+    if (restoreError) throw restoreError;
+  }
+}
+
+async function featureFlagsMatch(
+  db: SupabaseClient,
+  expected: FeatureFlagState[],
+): Promise<boolean> {
+  const actual = await readFeatureFlags(db);
+  return JSON.stringify(actual) === JSON.stringify(expected);
 }
 
 function snapshotRow(shape: Shape): Record<string, unknown> {

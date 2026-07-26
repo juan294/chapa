@@ -1,0 +1,76 @@
+import { expect, test } from "@playwright/test";
+import {
+  assertBadgeSvg,
+  assertCoreDependencies,
+  assertGitHubLoginRedirect,
+  assertSharePage,
+} from "./helpers/deployment-probes";
+import { releaseRequiredScenarioIds } from "./helpers/release-required-environments";
+
+const expectedCommit = process.env.EXPECTED_DEPLOYMENT_COMMIT?.trim();
+const expectedEnvironment = process.env.EXPECTED_DEPLOYMENT_ENV?.trim();
+const selectedScenarioIds = releaseRequiredScenarioIds(expectedEnvironment);
+
+function requireIdentityInputs(environment: "preview" | "production"): string {
+  expect(
+    expectedCommit,
+    `EXPECTED_DEPLOYMENT_COMMIT is required for ${environment} identity evidence`,
+  ).toMatch(/^[0-9a-f]{40}$/);
+  expect(expectedEnvironment).toBe(environment);
+  return expectedCommit!;
+}
+
+test.describe("release-required deployed read-only probes", () => {
+  if (expectedEnvironment === "production") {
+    test("@release-required deployment.production-identity", async ({ request }) => {
+      const commit = requireIdentityInputs("production");
+      const response = await request.get("/api/version");
+      expect(response.status()).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        commitSha: commit,
+        environment: "production",
+      });
+    });
+  } else {
+    test("@release-required deployment.preview-identity", async ({ request }) => {
+      const commit = requireIdentityInputs("preview");
+      const response = await request.get("/api/version");
+      expect(response.status()).toBe(200);
+      expect(response.headers()["cache-control"]).toContain("no-store");
+      await expect(response.json()).resolves.toEqual({
+        commitSha: commit,
+        environment: "preview",
+      });
+    });
+  }
+
+  test("@release-required health.core-dependencies", async ({ request }) => {
+    await assertCoreDependencies(request);
+  });
+
+  test("@release-required profile.public-badge-read", async ({ request }) => {
+    await assertBadgeSvg(request);
+  });
+
+  test("@release-required profile.public-share-read", async ({ page }) => {
+    await assertSharePage(page);
+  });
+
+  if (selectedScenarioIds.has("auth.github-login-redirect")) {
+    test("@release-required auth.github-login-redirect", async ({ request }) => {
+      await assertGitHubLoginRedirect(request);
+    });
+  }
+
+  if (selectedScenarioIds.has("auth.protected-write-denied")) {
+    test("@release-required auth.protected-write-denied", async ({ request }) => {
+      const response = await request.post("/api/generate", {
+        data: { handle: "release-probe-must-not-write" },
+      });
+      const body = await response.json();
+      expect(response.status()).toBe(401);
+      expect(body).toMatchObject({ error: expect.any(String) });
+      expect(body).not.toHaveProperty("success", true);
+    });
+  }
+});

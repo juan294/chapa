@@ -280,3 +280,8 @@ export function getNodeEnv(): string {
 export function getVercelEnv(): string | undefined {
   return readTrimmed("VERCEL_ENV");
 }
+
+/** Immutable source commit exposed by Vercel for the current deployment. */
+export function getVercelGitCommitSha(): string | undefined {
+  return readTrimmed("VERCEL_GIT_COMMIT_SHA");
+}

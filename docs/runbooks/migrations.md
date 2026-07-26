@@ -4,6 +4,11 @@
 
 Supabase migrations live in `supabase/migrations/`. They are plain SQL files applied manually via the Supabase dashboard or CLI. There is no automatic migration runner — migrations are applied deliberately, not on every deploy.
 
+`docs/release/release-playbook.md` is the sole release-ordering authority. This
+runbook owns migration creation, validation, application, evidence, and schema
+recovery detail. Reading migration state is not authorization to apply a
+production migration.
+
 ## Naming Convention
 
 All migration files must follow this pattern:
@@ -106,12 +111,16 @@ supabase db execute --file supabase/migrations/021_your_description.sql
 
 ## Before a Production Release
 
+Follow this section when the release playbook calls for migration evidence.
+
 1. Review any new migration files since the last release:
    ```bash
    git diff main..develop -- supabase/migrations/
    ```
 2. Run the validator: `pnpm run validate:migrations`
-3. Apply new migrations to the production Supabase project **before** the code deploy goes live (or simultaneously — the application is designed to degrade gracefully if new columns don't exist yet).
+3. If new migrations must be applied, stop for explicit production-operation
+   authorization. Apply them before the code that depends on them goes live;
+   never infer application authority from release preparation or analyzer PASS.
 4. Verify with a quick health check: `curl https://chapa.thecreativetoken.com/api/health`
 
 ## Pre-Deploy Migration Check
@@ -150,12 +159,20 @@ checklist below, it does not silently report success. See
 this repo, and confirm with `gh secret list` whether the check is actually
 active before relying on it as the sole gate.
 
-### Release Checklist Addition
+For E2E Pro, that CI skip is recorded as `skipped`, not `passed`. The required
+release obligation remains blocked until the operator attaches explicit manual
+drift evidence for the same candidate. PR creation therefore occurs before the
+pre-merge analyzer, while merge remains separately unauthorized until that
+evidence is complete.
 
-Add this step to your release checklist before promoting `develop → main`:
+### Release evidence handoff
+
+Record these results for the release playbook before promotion:
 
 - [ ] Run `git diff main..develop -- supabase/migrations/` — if any new migration files appear, confirm they have been applied to the production Supabase project before merging.
 - [ ] Confirm the `check:pending-migrations` CI step on the release PR passed (or, if it was skipped because the secret isn't configured yet, fall back to the manual check above).
+- [ ] Attach the release-PR run ID, exact head SHA, result, and manual evidence
+      reference when applicable to the E2E Pro run.
 
 ## Reversing a Migration
 

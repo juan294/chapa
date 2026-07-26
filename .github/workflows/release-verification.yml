@@ -1,0 +1,919 @@
+name: Release Verification
+run-name: Release evidence for ${{ inputs.developCommit }} (${{ inputs.runId }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      baselineTag:
+        description: Immutable baseline semantic-version tag or full commit
+        required: true
+        type: string
+      developCommit:
+        description: Full develop commit SHA deployed to the preview
+        required: true
+        type: string
+      candidateTreeDigest:
+        description: Full Git tree SHA for the candidate
+        required: true
+        type: string
+      previewUrl:
+        description: Immutable Vercel preview deployment URL
+        required: true
+        type: string
+      runId:
+        description: Stable path-safe evidence run identifier
+        required: true
+        type: string
+      releasePrRunId:
+        description: Exact completed CI workflow run for the develop-to-main release PR
+        required: true
+        type: string
+      releasePrRunAttempt:
+        description: Exact attempt of the release PR CI workflow run
+        required: true
+        type: string
+      preMergeEvidence:
+        description: Compact JSON with exploratoryCharters, manualObligations, and manualResult
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      baselineTag:
+        required: true
+        type: string
+      developCommit:
+        required: true
+        type: string
+      candidateTreeDigest:
+        required: true
+        type: string
+      previewUrl:
+        required: true
+        type: string
+      runId:
+        required: true
+        type: string
+      releasePrRunId:
+        required: true
+        type: string
+      releasePrRunAttempt:
+        required: true
+        type: string
+      preMergeEvidence:
+        required: true
+        type: string
+    outputs:
+      decision:
+        description: Analyzer decision for the collected release evidence
+        value: ${{ jobs.aggregate.outputs.decision }}
+      artifactName:
+        description: Durable final evidence artifact
+        value: ${{ jobs.aggregate.outputs.artifact-name }}
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: release-verification-${{ inputs.developCommit }}-${{ inputs.runId }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare Exact Candidate
+    runs-on: ubuntu-latest
+    outputs:
+      ci-run-id: ${{ steps.select-ci.outputs.run-id }}
+      ci-run-attempt: ${{ steps.select-ci.outputs.run-attempt }}
+      pr-run-id: ${{ steps.select-pr.outputs.run-id }}
+      pr-run-attempt: ${{ steps.select-pr.outputs.run-attempt }}
+    env:
+      BASELINE_TAG: ${{ inputs.baselineTag }}
+      DEVELOP_COMMIT: ${{ inputs.developCommit }}
+      CANDIDATE_TREE_DIGEST: ${{ inputs.candidateTreeDigest }}
+      PREVIEW_URL: ${{ inputs.previewUrl }}
+      E2E_PRO_RUN_ID: ${{ inputs.runId }}
+      RUN_DIRECTORY: quality/evidence/runs/${{ inputs.runId }}
+      RELEASE_PR_RUN_ID: ${{ inputs.releasePrRunId }}
+      RELEASE_PR_RUN_ATTEMPT: ${{ inputs.releasePrRunAttempt }}
+      PRE_MERGE_EVIDENCE: ${{ inputs.preMergeEvidence }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validate immutable input shape
+        run: |
+          set -euo pipefail
+          [[ "$DEVELOP_COMMIT" =~ ^[0-9a-f]{40}$ ]] ||
+            { echo "::error::developCommit must be a lowercase full SHA."; exit 1; }
+          [[ "$CANDIDATE_TREE_DIGEST" =~ ^[0-9a-f]{40}$ ]] ||
+            { echo "::error::candidateTreeDigest must be a lowercase full tree SHA."; exit 1; }
+          [[ "$E2E_PRO_RUN_ID" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] ||
+            { echo "::error::runId must be path-safe."; exit 1; }
+          [[ "$RELEASE_PR_RUN_ID" =~ ^[0-9]+$ ]] ||
+            { echo "::error::releasePrRunId must be numeric."; exit 1; }
+          [[ "$RELEASE_PR_RUN_ATTEMPT" =~ ^[0-9]+$ ]] ||
+            { echo "::error::releasePrRunAttempt must be numeric."; exit 1; }
+          node <<'NODE'
+          const url = new URL(process.env.PREVIEW_URL);
+          const immutableHost =
+            /^chapa-[a-z0-9]+-thecreativetoken\.vercel\.app$/.test(url.hostname);
+          if (
+            url.protocol !== "https:" ||
+            !immutableHost ||
+            url.hostname.includes("-git-") ||
+            url.pathname !== "/" ||
+            url.search ||
+            url.hash
+          ) {
+            throw new Error(
+              "previewUrl must be the immutable Chapa Vercel deployment URL, not a branch alias",
+            );
+          }
+          NODE
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.developCommit }}
+          fetch-depth: 1
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate evidence catalog and schemas
+        run: pnpm run quality:validate
+
+      - name: Fetch only the immutable baseline
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASELINE_TAG"
+          git rev-parse --verify 'FETCH_HEAD^{commit}' >/dev/null
+
+      - name: Verify checked-out source and tree identity
+        run: |
+          set -euo pipefail
+          ACTUAL_COMMIT="$(git rev-parse HEAD)"
+          ACTUAL_TREE="$(git rev-parse 'HEAD^{tree}')"
+          test "$ACTUAL_COMMIT" = "$DEVELOP_COMMIT" || {
+            echo "::error::Checked-out commit $ACTUAL_COMMIT does not match $DEVELOP_COMMIT."
+            exit 1
+          }
+          test "$ACTUAL_TREE" = "$CANDIDATE_TREE_DIGEST" || {
+            echo "::error::Candidate tree $ACTUAL_TREE does not match $CANDIDATE_TREE_DIGEST."
+            exit 1
+          }
+
+      - name: Prepare candidate-bound release run
+        run: |
+          pnpm run release:prepare-run -- \
+            --baseline-tag "$BASELINE_TAG" \
+            --develop-commit "$DEVELOP_COMMIT" \
+            --candidate-tree "$CANDIDATE_TREE_DIGEST" \
+            --preview-url "$PREVIEW_URL" \
+            --run-id "$E2E_PRO_RUN_ID" \
+            --output "$RUN_DIRECTORY/release-run.json"
+          jq \
+            --arg baselineTag "$BASELINE_TAG" \
+            --arg runId "$E2E_PRO_RUN_ID" \
+            '.candidate + {baselineTag: $baselineTag, runId: $runId,
+              authorization: {
+                environments: ["local-contract", "ci-build", "preview"],
+                operations: ["read-only", "synthetic-local-write",
+                  "authorized-preview-interaction"]
+              }}' \
+            "$RUN_DIRECTORY/release-run.json" \
+            > "$RUN_DIRECTORY/candidate.json"
+          printf '%s\n' "$PRE_MERGE_EVIDENCE" |
+            jq -e '
+              type == "object" and
+              (.exploratoryCharters | type == "array" and length > 0) and
+              (.manualObligations | type == "array" and length > 0) and
+              (.manualResult | type == "object") and
+              .manualResult.scenarioId == "release.manual-arcs"
+            ' > "$RUN_DIRECTORY/pre-merge-evidence.json"
+          jq -n \
+            --arg repository "${{ github.repository }}" \
+            --arg workflowRunId "${{ github.run_id }}" \
+            --arg workflowRunAttempt "${{ github.run_attempt }}" \
+            --arg workflowRef "${{ github.workflow_ref }}" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{repository: $repository, workflowRunId: $workflowRunId,
+              workflowRunAttempt: $workflowRunAttempt, workflowRef: $workflowRef,
+              generatedAt: $generatedAt}' \
+            > "$RUN_DIRECTORY/workflow-source.json"
+
+      - name: Select latest completed exact-SHA CI run attempt
+        id: select-ci
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUN_DIRECTORY/ci"
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${DEVELOP_COMMIT}&status=completed&per_page=100" \
+            > "$RUN_DIRECTORY/ci/workflow-runs.json"
+          jq --arg sha "$DEVELOP_COMMIT" '
+            [.workflow_runs[]
+              | select(
+                  .head_sha == $sha and
+                  .status == "completed" and
+                  .event == "push"
+                )]
+            | sort_by([.run_number, .run_attempt])
+            | last
+            | {
+                id,
+                run_attempt,
+                run_number,
+                event,
+                status,
+                conclusion,
+                head_sha,
+                html_url,
+                created_at,
+                updated_at
+              }
+          ' "$RUN_DIRECTORY/ci/workflow-runs.json" \
+            > "$RUN_DIRECTORY/ci/ci-source.json"
+          CI_RUN_ID="$(jq -r '.id // empty' "$RUN_DIRECTORY/ci/ci-source.json")"
+          CI_RUN_ATTEMPT="$(jq -r '.run_attempt // empty' "$RUN_DIRECTORY/ci/ci-source.json")"
+          CI_HEAD_SHA="$(jq -r '.head_sha // empty' "$RUN_DIRECTORY/ci/ci-source.json")"
+          test -n "$CI_RUN_ID" && test -n "$CI_RUN_ATTEMPT" || {
+            echo "::error::No completed push CI run exists for exact SHA $DEVELOP_COMMIT."
+            exit 1
+          }
+          test "$CI_HEAD_SHA" = "$DEVELOP_COMMIT" || {
+            echo "::error::Selected CI run is for $CI_HEAD_SHA, not $DEVELOP_COMMIT."
+            exit 1
+          }
+          echo "run-id=$CI_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "run-attempt=$CI_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
+      - name: Select exact release-PR CI run attempt
+        id: select-pr
+        run: |
+          set -euo pipefail
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${RELEASE_PR_RUN_ID}" \
+            > "$RUN_DIRECTORY/ci/release-pr-source.json"
+          jq -e \
+            --arg sha "$DEVELOP_COMMIT" \
+            --argjson attempt "$RELEASE_PR_RUN_ATTEMPT" '
+              .head_sha == $sha and
+              .path == ".github/workflows/ci.yml" and
+              .event == "pull_request" and
+              .status == "completed" and
+              .run_attempt == $attempt and
+              (.pull_requests |
+                any(.base.ref == "main" and .head.sha == $sha))
+            ' "$RUN_DIRECTORY/ci/release-pr-source.json" >/dev/null || {
+              echo "::error::releasePrRunId/releasePrRunAttempt is not a completed pull_request CI attempt for the exact candidate."
+              exit 1
+            }
+          echo "run-id=$RELEASE_PR_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "run-attempt=$RELEASE_PR_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload candidate bootstrap evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-bootstrap-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: |
+            quality/evidence/runs/${{ inputs.runId }}/candidate.json
+            quality/evidence/runs/${{ inputs.runId }}/release-run.json
+            quality/evidence/runs/${{ inputs.runId }}/pre-merge-evidence.json
+            quality/evidence/runs/${{ inputs.runId }}/workflow-source.json
+            quality/evidence/runs/${{ inputs.runId }}/ci/ci-source.json
+            quality/evidence/runs/${{ inputs.runId }}/ci/release-pr-source.json
+            scripts/quality/release-artifact-contract.json
+          if-no-files-found: error
+          retention-days: 30
+
+  import-ci:
+    name: Import Exact CI Attempt
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      DEVELOP_COMMIT: ${{ inputs.developCommit }}
+      CI_RUN_ID: ${{ needs.prepare.outputs.ci-run-id }}
+      CI_RUN_ATTEMPT: ${{ needs.prepare.outputs.ci-run-attempt }}
+      E2E_PRO_RUN_ID: ${{ inputs.runId }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.developCommit }}
+
+      - name: Download candidate bootstrap
+        uses: actions/download-artifact@v8
+        with:
+          name: release-bootstrap-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: bootstrap
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Read exact run jobs and artifact inventory
+        run: |
+          set -euo pipefail
+          mkdir -p imported-ci/artifacts
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/attempts/${CI_RUN_ATTEMPT}/jobs?per_page=100" \
+            > imported-ci/ci-jobs-pages.json
+          jq -s '{total_count: (map(.total_count) | add),
+            jobs: (map(.jobs) | add)}' imported-ci/ci-jobs-pages.json \
+            > imported-ci/ci-jobs.json
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}/artifacts?per_page=100" \
+            > imported-ci/ci-artifacts.json
+
+      - name: Download allowlisted evidence from the exact run
+        id: download-ci
+        continue-on-error: true
+        run: |
+          set -u
+          : > imported-ci/missing-artifacts.txt
+          while IFS= read -r slug; do
+            artifact="release-evidence-${CI_RUN_ID}-${CI_RUN_ATTEMPT}-${slug}"
+            destination="imported-ci/artifacts/${slug}"
+            mkdir -p "$destination"
+            if ! gh run download "$CI_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "$artifact" \
+              --dir "$destination"; then
+              printf '%s\n' "$artifact" >> imported-ci/missing-artifacts.txt
+            fi
+          done < <(
+            jq -r '.ciArtifacts[].slug' \
+              scripts/quality/release-artifact-contract.json
+          )
+
+      - name: Validate exact-SHA job and artifact imports
+        id: validate-import
+        continue-on-error: true
+        env:
+          CI_SOURCE_PATH: bootstrap/ci/ci-source.json
+        run: |
+          pnpm exec tsx scripts/quality/import-ci-evidence.ts \
+            --source "$CI_SOURCE_PATH" \
+            --jobs imported-ci/ci-jobs.json \
+            --inventory imported-ci/ci-artifacts.json \
+            --contract scripts/quality/release-artifact-contract.json \
+            --artifacts-root imported-ci/artifacts \
+            --run-id "$CI_RUN_ID" \
+            --run-attempt "$CI_RUN_ATTEMPT" \
+            --develop-commit "$DEVELOP_COMMIT" \
+            --repository "$GITHUB_REPOSITORY" \
+            --output imported-ci/ci-import-summary.json
+
+      - name: Upload imported exact-CI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-imported-ci-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: |
+            imported-ci/ci-jobs.json
+            imported-ci/ci-artifacts.json
+            imported-ci/ci-import-summary.json
+            imported-ci/artifacts/**/*.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce exact-CI import result
+        if: always()
+        run: |
+          test "${{ steps.download-ci.outcome }}" = "success" || {
+            echo "::error::One or more exact-run evidence artifacts could not be downloaded."
+            exit 1
+          }
+          test "${{ steps.validate-import.outcome }}" = "success" || {
+            echo "::error::Exact-SHA/run-attempt CI evidence validation blocked."
+            exit 1
+          }
+
+  import-release-pr:
+    name: Import Exact Release PR Attempt
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      DEVELOP_COMMIT: ${{ inputs.developCommit }}
+      PR_RUN_ID: ${{ needs.prepare.outputs.pr-run-id }}
+      PR_RUN_ATTEMPT: ${{ needs.prepare.outputs.pr-run-attempt }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download candidate bootstrap
+        uses: actions/download-artifact@v8
+        with:
+          name: release-bootstrap-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: bootstrap
+
+      - name: Read exact release-PR jobs and artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p imported-pr/artifacts
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${PR_RUN_ID}/attempts/${PR_RUN_ATTEMPT}/jobs?per_page=100" \
+            > imported-pr/pr-jobs-pages.json
+          jq -s '{total_count: (map(.total_count) | add),
+            jobs: (map(.jobs) | add)}' imported-pr/pr-jobs-pages.json \
+            > imported-pr/pr-jobs.json
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${PR_RUN_ID}/artifacts?per_page=100" \
+            > imported-pr/pr-artifacts.json
+
+      - name: Download exact pending-migration artifact
+        run: |
+          set -euo pipefail
+          slug="$(
+            jq -r '.releasePrArtifact.slug' \
+              bootstrap/release-artifact-contract.json
+          )"
+          artifact="release-evidence-${PR_RUN_ID}-${PR_RUN_ATTEMPT}-${slug}"
+          mkdir -p "imported-pr/artifacts/$slug"
+          gh run download "$PR_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$artifact" \
+            --dir "imported-pr/artifacts/$slug"
+
+      - name: Validate exact pending-migration evidence
+        run: |
+          set -euo pipefail
+          contract="bootstrap/release-artifact-contract.json"
+          slug="$(jq -r '.releasePrArtifact.slug' "$contract")"
+          basename="$(jq -r '.releasePrArtifact.basename' "$contract")"
+          job_name="$(jq -r '.releasePrArtifact.protectedJob' "$contract")"
+          scenario_id="$(jq -r '.releasePrArtifact.scenarioId' "$contract")"
+          environment="$(jq -r '.releasePrArtifact.environment' "$contract")"
+          artifact="release-evidence-${PR_RUN_ID}-${PR_RUN_ATTEMPT}-${slug}"
+          jq -e --arg artifact "$artifact" '
+            [.artifacts[] |
+              select(.name == $artifact and .expired == false)] |
+            length == 1
+          ' imported-pr/pr-artifacts.json >/dev/null || {
+            echo "::error::Expected one unexpired exact-attempt pending-migration artifact."
+            exit 1
+          }
+          fragment="$(
+            find "imported-pr/artifacts/$slug" -type f \
+              -name "$basename" -print
+          )"
+          test "$(printf '%s\n' "$fragment" | sed '/^$/d' | wc -l | tr -d ' ')" = "1" || {
+            echo "::error::Expected exactly one $basename."
+            exit 1
+          }
+          jq -e \
+            --arg sha "$DEVELOP_COMMIT" \
+            --arg runId "$PR_RUN_ID" \
+            --arg scenarioId "$scenario_id" \
+            --arg environment "$environment" '
+              .schemaVersion == 1 and
+              .runId == $runId and
+              .environment == $environment and
+              .candidateIdentity == $sha and
+              (.results | length == 1) and
+              .results[0].scenarioId == $scenarioId and
+              .results[0].environment == $environment and
+              .results[0].status == "passed"
+            ' "$fragment" >/dev/null || {
+              echo "::error::Pending-migration evidence is missing, skipped, failed, or candidate-mismatched."
+              exit 1
+            }
+          jq -e \
+            --arg jobName "$job_name" \
+            '.jobs[] | select(.name == $jobName) | .conclusion == "success"' \
+            imported-pr/pr-jobs.json >/dev/null || {
+              echo "::error::Exact release-PR pending-migration job did not pass."
+              exit 1
+            }
+          cp "$fragment" "imported-pr/$basename"
+
+      - name: Upload imported exact release-PR evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-imported-pr-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: |
+            imported-pr/pr-jobs.json
+            imported-pr/pr-artifacts.json
+            imported-pr/*.json
+          if-no-files-found: error
+          retention-days: 30
+
+  preview:
+    name: Probe Immutable Preview
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_DEPLOYMENT_COMMIT: ${{ inputs.developCommit }}
+      EXPECTED_DEPLOYMENT_ENV: "preview"
+      PLAYWRIGHT_BASE_URL: ${{ inputs.previewUrl }}
+      DEPLOYMENT_SMOKE_STRICT: "true"
+      E2E_PRO_RUN_ID: ${{ inputs.runId }}
+      PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/preview-evidence/playwright/preview-results.json
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.developCommit }}
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @chapa/web exec playwright install chromium --with-deps
+
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @chapa/web exec playwright install-deps chromium
+
+      - name: Download candidate bootstrap
+        uses: actions/download-artifact@v8
+        with:
+          name: release-bootstrap-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: preview-evidence/bootstrap
+
+      - name: Verify preview deployment identity
+        id: identity
+        continue-on-error: true
+        run: |
+          mkdir -p preview-evidence
+          pnpm exec tsx scripts/quality/verify-deployment-identity.ts \
+            --candidate preview-evidence/bootstrap/candidate.json \
+            --output preview-evidence/identity-evidence.json
+
+      - name: Run release-required preview probes
+        id: playwright
+        continue-on-error: true
+        run: |
+          mkdir -p preview-evidence/playwright
+          pnpm --filter @chapa/web exec playwright test \
+            e2e/release-required.spec.ts \
+            --grep @release-required \
+            --project=chromium
+
+      - name: Normalize Playwright preview evidence
+        id: normalize
+        if: always()
+        continue-on-error: true
+        run: |
+          pnpm exec tsx scripts/quality/collect-playwright-evidence.ts \
+            --results preview-evidence/playwright/preview-results.json \
+            --catalog quality/release-required.json \
+            --environment preview \
+            --run-id "$E2E_PRO_RUN_ID" \
+            --candidate-identity "$EXPECTED_DEPLOYMENT_COMMIT" \
+            --output preview-evidence/preview-fragment.json
+
+      - name: Record read-only cleanup proof
+        if: always()
+        run: |
+          jq -n \
+            --arg runId "$E2E_PRO_RUN_ID" \
+            --arg candidateIdentity "$EXPECTED_DEPLOYMENT_COMMIT" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, runId: $runId, candidateIdentity: $candidateIdentity,
+              fixtureMode: "read-only", fixtures: [], residue: "not-applicable-read-only",
+              generatedAt: $generatedAt}' \
+            > preview-evidence/cleanup-proof.json
+
+      - name: Upload raw preview evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-preview-evidence-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: |
+            preview-evidence/identity-evidence.json
+            preview-evidence/preview-fragment.json
+            preview-evidence/playwright/preview-results.json
+            preview-evidence/cleanup-proof.json
+            apps/web/test-results/
+            apps/web/playwright-report/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Enforce preview producer results
+        if: always()
+        run: |
+          test "${{ steps.identity.outcome }}" = "success" || {
+            echo "::error::Preview deployment identity did not match the exact candidate."
+            exit 1
+          }
+          test "${{ steps.playwright.outcome }}" = "success" || {
+            echo "::error::One or more release-required preview probes failed."
+            exit 1
+          }
+          test "${{ steps.normalize.outcome }}" = "success" || {
+            echo "::error::Playwright evidence normalization failed or was skipped."
+            exit 1
+          }
+
+  aggregate:
+    name: Release Evidence
+    needs: [prepare, import-ci, import-release-pr, preview]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.decision.outputs.decision }}
+      artifact-name: release-evidence-${{ inputs.runId }}-${{ github.run_attempt }}
+    env:
+      DEVELOP_COMMIT: ${{ inputs.developCommit }}
+      E2E_PRO_RUN_ID: ${{ inputs.runId }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.developCommit }}
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Download candidate bootstrap
+        id: download-bootstrap
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: release-bootstrap-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: aggregate/bootstrap
+
+      - name: Download exact-CI evidence
+        id: download-ci
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: release-imported-ci-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: aggregate/imported-ci
+
+      - name: Download preview evidence
+        id: download-preview
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: release-preview-evidence-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: aggregate/preview
+
+      - name: Download exact release-PR evidence
+        id: download-pr
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: release-imported-pr-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: aggregate/imported-pr
+
+      - name: Merge stable scenario evidence
+        id: merge
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p aggregate/final-evidence aggregate/raw-evidence
+          find_one() {
+            local root="$1"
+            local basename="$2"
+            mapfile -t matches < <(find "$root" -type f -name "$basename" -print | sort)
+            test "${#matches[@]}" = "1" || {
+              echo "::error::Expected exactly one $basename under $root; found ${#matches[@]}."
+              return 1
+            }
+            printf '%s\n' "${matches[0]}"
+          }
+          run_source="$(find_one aggregate/bootstrap release-run.json)"
+          candidate_source="$(find_one aggregate/bootstrap candidate.json)"
+          pre_merge_source="$(find_one aggregate/bootstrap pre-merge-evidence.json)"
+          preview_fragment="$(find_one aggregate/preview preview-fragment.json)"
+          preview_identity="$(find_one aggregate/preview identity-evidence.json)"
+          cleanup_proof="$(find_one aggregate/preview cleanup-proof.json)"
+          artifact_contract="scripts/quality/release-artifact-contract.json"
+          pending_basename="$(
+            jq -r '.releasePrArtifact.basename' "$artifact_contract"
+          )"
+          pending_fragment="$(find_one aggregate/imported-pr "$pending_basename")"
+          import_summary="$(find_one aggregate/imported-ci ci-import-summary.json)"
+          jq -e '.decision == "pass"' "$import_summary" >/dev/null
+
+          merge_command=(
+            pnpm exec tsx scripts/quality/merge-release-evidence.ts
+            --stage pre-merge
+            --run "$run_source"
+            --fragment "$pending_fragment"
+            --fragment "$preview_fragment"
+            --catalog quality/release-required.json
+            --pre-merge-evidence "$pre_merge_source"
+            --identity-evidence "$preview_identity"
+            --output aggregate/final-evidence/release-run.json
+            --manifest-output aggregate/final-evidence/evidence-manifest.json
+          )
+          while IFS= read -r basename; do
+            merge_command+=(
+              --fragment "$(find_one aggregate/imported-ci "$basename")"
+            )
+          done < <(
+            jq -r '.ciArtifacts[] | select(.mergeFragment) | .basename' \
+              "$artifact_contract"
+          )
+          journey_sidecar_basename="$(
+            jq -r '.journeySidecarBasename' "$artifact_contract"
+          )"
+          while IFS= read -r sidecar; do
+            merge_command+=(--journey-sidecar "$sidecar")
+          done < <(
+            find aggregate/imported-ci -type f \
+              -name "$journey_sidecar_basename" -print |
+              sort
+          )
+          "${merge_command[@]}"
+
+          cp "$candidate_source" aggregate/final-evidence/candidate.json
+          cp "$cleanup_proof" aggregate/final-evidence/cleanup-proof.json
+          cp "$import_summary" aggregate/final-evidence/ci-import-summary.json
+          cp "$import_summary" aggregate/raw-evidence/ci-import-summary.json
+          cp "$preview_fragment" aggregate/raw-evidence/preview-fragment.json
+          cp "$pending_fragment" aggregate/raw-evidence/pending-production-migrations.json
+
+      - name: Analyze merged release run
+        id: analyze
+        if: always()
+        continue-on-error: true
+        run: |
+          pnpm --silent run release:analyze -- \
+            --run aggregate/final-evidence/release-run.json \
+            --stage pre-merge \
+            > aggregate/final-evidence/analysis.json
+
+      - name: Render deterministic release report
+        id: render
+        if: always()
+        continue-on-error: true
+        run: |
+          pnpm run release:render-report -- \
+            --run aggregate/final-evidence/release-run.json \
+            --stage pre-merge \
+            --output aggregate/final-evidence/release-report.md
+
+      - name: Ensure durable blocked diagnostics exist
+        if: always()
+        run: |
+          mkdir -p aggregate/final-evidence aggregate/raw-evidence
+          if [ ! -f aggregate/final-evidence/candidate.json ]; then
+            jq -n \
+              --arg developCommit "${{ inputs.developCommit }}" \
+              --arg candidateTreeDigest "${{ inputs.candidateTreeDigest }}" \
+              --arg previewUrl "${{ inputs.previewUrl }}" \
+              --arg baselineTag "${{ inputs.baselineTag }}" \
+              --arg runId "${{ inputs.runId }}" \
+              '{developCommit: $developCommit, candidateTreeDigest: $candidateTreeDigest,
+                previewUrl: $previewUrl, baselineTag: $baselineTag, runId: $runId,
+                authorization: {
+                  environments: ["local-contract", "ci-build", "preview"],
+                  operations: ["read-only", "synthetic-local-write",
+                    "authorized-preview-interaction"]}}' \
+              > aggregate/final-evidence/candidate.json
+          fi
+          if [ ! -f aggregate/final-evidence/evidence-manifest.json ]; then
+            jq -n \
+              --arg runId "${{ inputs.runId }}" \
+              --arg developCommit "${{ inputs.developCommit }}" \
+              --arg candidateTreeDigest "${{ inputs.candidateTreeDigest }}" \
+              --arg previewUrl "${{ inputs.previewUrl }}" \
+              '{schemaVersion: 1, runId: $runId, stage: "pre-merge",
+                candidate: {developCommit: $developCommit,
+                  candidateTreeDigest: $candidateTreeDigest, previewUrl: $previewUrl},
+                results: [], exploratoryCharters: [], manualObligations: [],
+                exceptions: [],
+                rollbackReference: "missing", tagAuthorization: {status: "pending"}}' \
+              > aggregate/final-evidence/evidence-manifest.json
+          fi
+          if [ ! -f aggregate/final-evidence/release-run.json ]; then
+            jq -n \
+              --arg runId "${{ inputs.runId }}" \
+              --arg developCommit "${{ inputs.developCommit }}" \
+              --arg candidateTreeDigest "${{ inputs.candidateTreeDigest }}" \
+              --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{schemaVersion: 1, decision: "blocked", stage: "pre-merge",
+                reason: "release-run assembly failed; no release-run artifact was produced",
+                runId: $runId, developCommit: $developCommit,
+                candidateTreeDigest: $candidateTreeDigest, generatedAt: $generatedAt}' \
+              > aggregate/final-evidence/release-diagnostics.json
+          fi
+          if ! jq -e 'type == "object" and (.decision | type == "string")' \
+            aggregate/final-evidence/analysis.json >/dev/null 2>&1; then
+            printf '{"decision":"blocked","blockingReasons":["analysis did not complete"]}\n' \
+              > aggregate/final-evidence/analysis.json
+          fi
+          if [ ! -f aggregate/final-evidence/release-report.md ]; then
+            printf '# Release Evidence\n\nBLOCKED: evidence assembly or analysis did not complete.\n' \
+              > aggregate/final-evidence/release-report.md
+          fi
+          if [ ! -f aggregate/final-evidence/cleanup-proof.json ]; then
+            jq -n \
+              --arg runId "${{ inputs.runId }}" \
+              '{schemaVersion: 1, runId: $runId, fixtureMode: "unknown",
+                fixtures: [], residue: "missing"}' \
+              > aggregate/final-evidence/cleanup-proof.json
+          fi
+
+      - name: Upload durable final release evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: |
+            aggregate/final-evidence/candidate.json
+            aggregate/final-evidence/release-run.json
+            aggregate/final-evidence/release-diagnostics.json
+            aggregate/final-evidence/evidence-manifest.json
+            aggregate/final-evidence/release-report.md
+            aggregate/final-evidence/analysis.json
+            aggregate/final-evidence/cleanup-proof.json
+            aggregate/final-evidence/ci-import-summary.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload allowlisted raw release evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-raw-evidence-${{ inputs.runId }}-${{ github.run_attempt }}
+          path: |
+            aggregate/imported-ci/**/*.json
+            aggregate/imported-pr/**/*.json
+            aggregate/preview/**/preview-results.json
+            aggregate/preview/**/preview-fragment.json
+            aggregate/preview/**/identity-evidence.json
+            aggregate/preview/**/trace.zip
+            aggregate/preview/**/*.png
+            aggregate/raw-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Set aggregate decision
+        id: decision
+        if: always()
+        run: |
+          DECISION="$(jq -r '.decision // "blocked"' aggregate/final-evidence/analysis.json)"
+          echo "decision=$DECISION" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Release Evidence"
+            echo
+            echo "Decision: **${DECISION^^}**"
+            echo
+            jq -r '.blockingReasons[]? | "- " + .' \
+              aggregate/final-evidence/analysis.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce aggregate release decision
+        if: always()
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          IMPORT_RESULT: ${{ needs.import-ci.result }}
+          PR_IMPORT_RESULT: ${{ needs.import-release-pr.result }}
+          PREVIEW_RESULT: ${{ needs.preview.result }}
+          BOOTSTRAP_DOWNLOAD: ${{ steps.download-bootstrap.outcome }}
+          CI_DOWNLOAD: ${{ steps.download-ci.outcome }}
+          PR_DOWNLOAD: ${{ steps.download-pr.outcome }}
+          PREVIEW_DOWNLOAD: ${{ steps.download-preview.outcome }}
+          MERGE_STATUS: ${{ steps.merge.outcome }}
+          ANALYZER_STATUS: ${{ steps.analyze.outcome }}
+          RENDER_STATUS: ${{ steps.render.outcome }}
+        run: |
+          test "$PREPARE_RESULT" = "success" &&
+          test "$IMPORT_RESULT" = "success" &&
+          test "$PR_IMPORT_RESULT" = "success" &&
+          test "$PREVIEW_RESULT" = "success" &&
+          test "$BOOTSTRAP_DOWNLOAD" = "success" &&
+          test "$CI_DOWNLOAD" = "success" &&
+          test "$PR_DOWNLOAD" = "success" &&
+          test "$PREVIEW_DOWNLOAD" = "success" &&
+          test "$MERGE_STATUS" = "success" &&
+          test "$ANALYZER_STATUS" = "success" &&
+          test "$RENDER_STATUS" = "success" &&
+          test "${{ steps.decision.outputs.decision }}" = "pass" || {
+            echo "::error::Release Evidence is blocked; inspect the durable evidence artifact."
+            exit 1
+          }

@@ -74,6 +74,9 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/profile/:handle` Public impact profile snapshot (rate-limited, CORS-enabled)
 - GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
 - GET `/api/health` Health check (Redis dbsize + Supabase query + GitHub API probe + cron heartbeat staleness for warm-cache/sync-audience/process-campaigns/latency-check, rate-limited; returns "skipped" for unconfigured services; #1047 — asserts the server `GITHUB_TOKEN` still carries `repo` scope and returns a distinct `insufficient_scope` status if not, since that token silently losing `repo` would blind every badge to private-repo merges with no other signal)
+- GET `/api/version` Read-only deployment identity (`commitSha` + Vercel
+  environment, no-store); E2E Pro uses it to bind preview and production
+  evidence to the fixed release candidate
 - GET `/api/feature-flags` Public feature flag values
 - GET `/u/:handle/og-image` OG image for share page (dynamic, cached)
 - GET `/og-image` Default OG image
@@ -279,6 +282,8 @@ Go directly to these paths -- never search for them.
 | Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
 | Reliability playbooks | `docs/playbooks/reliability-hardening-playbook.md` | Seam-bug hardening reference |
 | Reliability plan | `docs/plans/2026-07-03-reliability-hardening.md` | Contract matrix, canaries, process guarantees |
+| E2E Pro architecture | `docs/playbooks/e2e-pro-release-verification.md` | Comprehensive decisions and evidence semantics |
+| Production release procedure | `docs/release/release-playbook.md` | Single short ordering and authorization authority |
 
 ---
 
@@ -290,7 +295,8 @@ Go directly to these paths -- never search for them.
 
 1. All development happens on `develop`
 2. Never commit directly to `main` — it represents what's deployed
-3. Release to production via PR: `develop` → `main`
+3. Release to production via `develop` → `main` squash PR, following
+   `docs/release/release-playbook.md`; PR, merge, and tag approvals are separate
 4. Always run checks before committing (pre-commit hooks enforce this)
 5. Always `git pull --rebase` before pushing
 6. Run verification sequentially with `;` or `&&`, never as parallel Bash calls
@@ -320,7 +326,9 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 ## Testing & CI
 - This project uses TDD. Always write tests before or alongside implementation.
 - All PRs must have CI green before merging. Run the full test suite locally before pushing.
-- After merging to develop, if production deployment is the goal, immediately create a PR from develop → main.
+- After merging to `develop`, production release work follows
+  `docs/release/release-playbook.md`. Do not infer release PR or merge
+  authorization from feature completion or green CI.
 
 ### CI Gates (enforced in CI, must pass locally too)
 - **Circular dependency check**: `pnpm run check:circular` (via `madge`) — no circular imports allowed.
@@ -354,6 +362,13 @@ pnpm run lint           # Check linting
 pnpm run test:watch          # Watch mode
 pnpm run test:coverage       # Coverage report
 pnpm run test:contract:local # Contract suite against local Supabase (run `supabase start` first)
+pnpm quality:validate        # Validate E2E Pro requiredness catalog
+pnpm run test:e2e -- --grep @release-required # Required deployed selectors
+
+# E2E Pro release evidence
+pnpm release:prepare-run -- --baseline-tag "$baselineTag" --develop-commit "$developCommit" --candidate-tree "$candidateTreeDigest" --preview-url "$previewUrl" --run-id "$runId" --output "quality/evidence/runs/$runId/release-run.json"
+pnpm release:analyze -- --run quality/evidence/runs/{runId}/release-run.json --stage final
+pnpm release:render-report -- --run quality/evidence/runs/{runId}/release-run.json --stage final
 
 # Development
 pnpm run dev            # Local dev server (port 3001)
@@ -415,6 +430,10 @@ ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer i
 ```
 
 > **Intentionally omitted:** `CI`, `NODE_ENV`, and `VERCEL_*` are standard Node/Vercel build vars and do not need to be configured manually. `TESTPLATFORM_CLIENT_ID` / `TESTPLATFORM_CLIENT_SECRET` are test-only mocks — not real credentials and not needed in any deployed environment.
+
+`/api/version` reads Vercel commit/environment identity through
+`apps/web/lib/env.ts`; route and test code must not introduce direct
+`process.env` access.
 
 ### Environment Variable Safety
 

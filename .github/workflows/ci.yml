@@ -25,7 +25,47 @@ jobs:
       - name: Craft propagation guard (#680)
         run: bash scripts/check-craft-propagation.sh
       - name: Vercel config location guard (#1052)
+        id: vercel-config
         run: pnpm run check:vercel-config
+
+      - name: Write lint and configuration evidence
+        if: always()
+        env:
+          PRODUCER_STATUS: ${{ job.status }}
+          VERCEL_CONFIG_STATUS: ${{ steps.vercel-config.outcome }}
+        run: |
+          mkdir -p .release-evidence
+          STATUS="$PRODUCER_STATUS"
+          REASON="Lint, typecheck, and configuration checks completed."
+          if [ "$STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="One or more lint, typecheck, or configuration checks failed."
+          else
+            STATUS="passed"
+          fi
+          EVIDENCE_URI="github-actions://${{ github.repository }}/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs/lint-and-typecheck"
+          jq -n \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg runId "${{ github.run_id }}" \
+            --arg commitSha "${{ github.sha }}" \
+            --arg evidenceUri "$EVIDENCE_URI" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, runId: $runId, environment: "ci-build", candidateIdentity: $commitSha,
+              results: [{scenarioId: "operations.vercel-cron-registration",
+                environment: "ci-build", status: $status,
+                startedAt: $generatedAt, finishedAt: $generatedAt, runner: "script",
+                evidence: {configuration: [$evidenceUri]}, fixtures: [], notes: $reason}]}' \
+            > .release-evidence/lint-and-vercel-config.json
+
+      - name: Upload lint and configuration evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-lint-and-typecheck
+          path: .release-evidence/lint-and-vercel-config.json
+          if-no-files-found: error
+          retention-days: 30
 
   # WHY sharded (#ci-perf): the unit+coverage suite is a CPU-bound ~5.5min
   # `vitest run --coverage` on a 2-core runner. Splitting it across 2 shards
@@ -202,6 +242,54 @@ jobs:
             echo "No scoring files changed — skipping integrity gate"
           fi
 
+      - name: Write aggregate unit and coverage evidence
+        if: always()
+        env:
+          PRODUCER_STATUS: ${{ job.status }}
+          SHARD_STATUS: ${{ needs.test-shard.result }}
+          MERGE_STATUS: ${{ steps.test.outcome }}
+          TEST_COUNT: ${{ steps.test.outputs.test_count }}
+          TESTS_PASSED: ${{ steps.test.outputs.tests_passed }}
+          TESTS_FAILED: ${{ steps.test.outputs.tests_failed }}
+        run: |
+          mkdir -p .release-evidence
+          STATUS="passed"
+          REASON="Aggregate unit tests and coverage thresholds passed."
+          if [ "$PRODUCER_STATUS" != "success" ] || [ "$SHARD_STATUS" != "success" ] || [ "$MERGE_STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="A unit-test shard, merged test run, or coverage threshold failed."
+          fi
+          jq -n \
+            --arg scenarioId "ci.unit-and-coverage" \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg repository "${{ github.repository }}" \
+            --arg runId "${{ github.run_id }}" \
+            --arg runAttempt "${{ github.run_attempt }}" \
+            --arg jobName "Test" \
+            --arg commitSha "${{ github.sha }}" \
+            --arg shardStatus "$SHARD_STATUS" \
+            --arg mergeStatus "$MERGE_STATUS" \
+            --arg testCount "${TEST_COUNT:-0}" \
+            --arg testsPassed "${TESTS_PASSED:-0}" \
+            --arg testsFailed "${TESTS_FAILED:-0}" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
+              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
+                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
+              details: {shardStatus: $shardStatus, mergeStatus: $mergeStatus, testCount: $testCount,
+                testsPassed: $testsPassed, testsFailed: $testsFailed}, generatedAt: $generatedAt}' \
+            > .release-evidence/unit-and-coverage.json
+
+      - name: Upload aggregate unit and coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-test
+          path: .release-evidence/unit-and-coverage.json
+          if-no-files-found: error
+          retention-days: 30
+
   contract:
     name: Contract (real DB)
     runs-on: ubuntu-latest
@@ -246,6 +334,7 @@ jobs:
           printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
       - run: supabase db reset
       - name: Contract tests
+        id: contract-tests
         run: pnpm run test:contract
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
@@ -253,7 +342,59 @@ jobs:
       - name: Build web for journey E2E
         run: pnpm --filter @chapa/web build
       - name: Journey E2E (desktop + mobile)
+        id: journey
+        env:
+          E2E_PRO_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: pnpm --filter @chapa/web exec playwright test e2e/journey.spec.ts --project=chromium --project=mobile
+
+      - name: Write contract and local journey evidence
+        if: always()
+        env:
+          PRODUCER_STATUS: ${{ job.status }}
+          CONTRACT_STATUS: ${{ steps.contract-tests.outcome }}
+          JOURNEY_STATUS: ${{ steps.journey.outcome }}
+        run: |
+          mkdir -p .release-evidence
+          STATUS="passed"
+          REASON="Contract tests and local-Supabase journey passed."
+          if [ "$PRODUCER_STATUS" != "success" ] || [ "$CONTRACT_STATUS" != "success" ] || [ "$JOURNEY_STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="Contract setup, contract tests, or local-Supabase journey did not pass."
+          fi
+          EVIDENCE_URI="github-actions://${{ github.repository }}/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/artifacts/release-evidence-contract"
+          jq -n \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg runId "${{ github.run_id }}" \
+            --arg commitSha "${{ github.sha }}" \
+            --arg evidenceUri "$EVIDENCE_URI" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, runId: $runId, environment: "local-contract",
+              candidateIdentity: $commitSha,
+              results: [
+                {scenarioId: "studio.config-persistence",
+                  environment: "local-contract", status: $status,
+                  startedAt: $generatedAt, finishedAt: $generatedAt, runner: "playwright",
+                  evidence: {ui: [$evidenceUri], http: [$evidenceUri], datastore: [$evidenceUri], cleanup: [$evidenceUri]},
+                  fixtures: [], notes: $reason},
+                {scenarioId: "profile.snapshot-integrity",
+                  environment: "local-contract", status: $status,
+                  startedAt: $generatedAt, finishedAt: $generatedAt, runner: "playwright",
+                  evidence: {http: [$evidenceUri], datastore: [$evidenceUri], cleanup: [$evidenceUri]},
+                  fixtures: [], notes: $reason}
+              ]}' \
+            > .release-evidence/contract-and-local-journey.json
+
+      - name: Upload contract and local journey evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-contract
+          path: |
+            .release-evidence/contract-and-local-journey.json
+            apps/web/test-results/**/release-evidence.json
+          if-no-files-found: error
+          retention-days: 30
 
   build:
     name: Build
@@ -279,7 +420,8 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - id: build
+        run: pnpm run build
 
       - name: Bundle size gate (350 KB per-chunk budget)
         run: bash scripts/check-bundle-size.sh 350
@@ -287,10 +429,51 @@ jobs:
       - name: Upload Next.js build
         uses: actions/upload-artifact@v7
         with:
-          name: nextjs-build
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.next/
           include-hidden-files: true
           retention-days: 1
+
+      - name: Write build evidence
+        if: always()
+        env:
+          PRODUCER_STATUS: ${{ job.status }}
+          BUILD_STATUS: ${{ steps.build.outcome }}
+        run: |
+          mkdir -p .release-evidence
+          STATUS="passed"
+          REASON="Candidate build and bundle-size gate passed."
+          if [ "$PRODUCER_STATUS" != "success" ] || [ "$BUILD_STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="Candidate build or bundle-size gate did not pass."
+          fi
+          jq -n \
+            --arg scenarioId "ci.build-artifact" \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg repository "${{ github.repository }}" \
+            --arg runId "${{ github.run_id }}" \
+            --arg runAttempt "${{ github.run_attempt }}" \
+            --arg jobName "Build" \
+            --arg commitSha "${{ github.sha }}" \
+            --arg buildStatus "$BUILD_STATUS" \
+            --arg artifactName "nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
+              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
+                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
+              details: {buildStatus: $buildStatus, artifactName: $artifactName},
+              generatedAt: $generatedAt}' \
+            > .release-evidence/build-artifact.json
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-build
+          path: .release-evidence/build-artifact.json
+          if-no-files-found: error
+          retention-days: 30
 
   # WHY sharded (#ci-perf): `playwright test` (~3min, chromium + mobile
   # projects) runs unsharded. Splitting the test list across 2 shards roughly
@@ -345,7 +528,7 @@ jobs:
       - name: Download Next.js build
         uses: actions/download-artifact@v8
         with:
-          name: nextjs-build
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/.next/
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/2)
@@ -380,6 +563,45 @@ jobs:
           exit 1
       - run: echo "All E2E shards passed."
 
+      - name: Write aggregate E2E evidence
+        if: always()
+        env:
+          PRODUCER_STATUS: ${{ job.status }}
+          SHARD_STATUS: ${{ needs.e2e-shard.result }}
+        run: |
+          mkdir -p .release-evidence
+          STATUS="passed"
+          REASON="All built-artifact E2E shards passed."
+          if [ "$PRODUCER_STATUS" != "success" ] || [ "$SHARD_STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="One or more built-artifact E2E shards did not pass."
+          fi
+          jq -n \
+            --arg scenarioId "ci.aggregate-e2e" \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg repository "${{ github.repository }}" \
+            --arg runId "${{ github.run_id }}" \
+            --arg runAttempt "${{ github.run_attempt }}" \
+            --arg jobName "E2E Tests" \
+            --arg commitSha "${{ github.sha }}" \
+            --arg shardStatus "$SHARD_STATUS" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
+              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
+                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
+              details: {shardStatus: $shardStatus}, generatedAt: $generatedAt}' \
+            > .release-evidence/aggregate-e2e.json
+
+      - name: Upload aggregate E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-e2e
+          path: .release-evidence/aggregate-e2e.json
+          if-no-files-found: error
+          retention-days: 30
+
   deployment-smoke:
     name: Deployment Smoke
     needs: [build]
@@ -394,6 +616,7 @@ jobs:
           exit 1
 
       - name: Skip deployment smoke when not configured
+        id: deployment-smoke-skip
         if: env.DEPLOYMENT_SMOKE_BASE_URL == '' && github.ref != 'refs/heads/main'
         run: echo "DEPLOYMENT_SMOKE_BASE_URL is not configured; skipping deployment smoke."
 
@@ -430,6 +653,7 @@ jobs:
         working-directory: apps/web
 
       - name: Run deployment-shaped smoke tests
+        id: deployment-smoke
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
         working-directory: apps/web
         env:
@@ -447,6 +671,48 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+      - name: Write deployment smoke evidence
+        if: always()
+        env:
+          PRODUCER_STATUS: ${{ job.status }}
+          SMOKE_STATUS: ${{ steps.deployment-smoke.outcome }}
+        run: |
+          mkdir -p .release-evidence
+          STATUS="passed"
+          REASON="Configured deployment-shaped smoke tests passed."
+          if [ -z "$DEPLOYMENT_SMOKE_BASE_URL" ]; then
+            STATUS="skipped"
+            REASON="DEPLOYMENT_SMOKE_BASE_URL was not configured."
+          elif [ "$PRODUCER_STATUS" != "success" ] || [ "$SMOKE_STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="Configured deployment-shaped smoke tests did not pass."
+          fi
+          jq -n \
+            --arg scenarioId "ci.deployment-smoke" \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg repository "${{ github.repository }}" \
+            --arg runId "${{ github.run_id }}" \
+            --arg runAttempt "${{ github.run_attempt }}" \
+            --arg jobName "Deployment Smoke" \
+            --arg commitSha "${{ github.sha }}" \
+            --arg smokeStatus "$SMOKE_STATUS" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
+              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
+                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
+              details: {smokeStatus: $smokeStatus}, generatedAt: $generatedAt}' \
+            > .release-evidence/deployment-smoke.json
+
+      - name: Upload deployment smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-deployment-smoke
+          path: .release-evidence/deployment-smoke.json
+          if-no-files-found: error
+          retention-days: 30
 
   # WHY scoped to the release PR only (#1011): this check confirms
   # supabase/migrations/ has actually been applied to the linked production
@@ -466,6 +732,7 @@ jobs:
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
     steps:
       - name: Skip when Supabase production credentials are not configured
+        id: pending-migrations-skip
         if: env.SUPABASE_ACCESS_TOKEN == '' || env.SUPABASE_PROJECT_REF == ''
         run: |
           echo "::notice::SUPABASE_ACCESS_TOKEN and/or SUPABASE_PROJECT_REF secrets are not configured — skipping the automated pending-migrations check for this release PR. Confirm manually via the 'Pre-Deploy Migration Check' steps in docs/runbooks/migrations.md before merging."
@@ -488,5 +755,46 @@ jobs:
           version: latest
 
       - name: Check for pending migrations against linked production project
+        id: pending-migrations
         if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
         run: pnpm run check:pending-migrations
+
+      - name: Write pending migration evidence
+        if: always()
+        env:
+          PRODUCER_STATUS: ${{ job.status }}
+          MIGRATION_STATUS: ${{ steps.pending-migrations.outcome }}
+        run: |
+          mkdir -p .release-evidence
+          STATUS="passed"
+          REASON="No pending production migrations were detected."
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
+            STATUS="skipped"
+            REASON="Supabase production credentials were not configured."
+          elif [ "$PRODUCER_STATUS" != "success" ] || [ "$MIGRATION_STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="Pending migration check did not pass."
+          fi
+          jq -n \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg runId "${{ github.run_id }}" \
+            --arg commitSha "${{ github.event.pull_request.head.sha }}" \
+            --arg evidenceUri "github-actions://${{ github.repository }}/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs/pending-migrations" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, runId: $runId, environment: "ci-build",
+              candidateIdentity: $commitSha,
+              results: [{scenarioId: "database.pending-migrations",
+                environment: "ci-build", status: $status,
+                startedAt: $generatedAt, finishedAt: $generatedAt, runner: "script",
+                evidence: {datastore: [$evidenceUri]}, fixtures: [], notes: $reason}]}' \
+            > .release-evidence/pending-production-migrations.json
+
+      - name: Upload pending migration evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-pending-migrations
+          path: .release-evidence/pending-production-migrations.json
+          if-no-files-found: error
+          retention-days: 30

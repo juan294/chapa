@@ -1,5 +1,9 @@
 # Incident Response Runbook
 
+`docs/release/release-playbook.md` owns release ordering. When an incident is
+release-related, preserve and reference the E2E Pro `runId`, evidence report,
+candidate tree, deployed commit, and rollback identity throughout this runbook.
+
 ## Severity Definitions
 
 | Severity | Description | Response time |
@@ -45,6 +49,8 @@ This is a solo project. Escalation means:
 ### P1 — Critical
 
 1. **Assess:** Check `/api/health`, Vercel deployment logs, recent commits (`git log main --oneline -10`). When grepping the repo for the offending code, exclude `apps/web/.next/` (gitignored build output) — it can return megabytes of compiled-chunk noise that obscures real signal (e.g. `grep -r --exclude-dir=.next ...`).
+   Also read `/api/version`, the current release evidence report, its raw
+   artifact references, and the named previous evidence-approved deployment.
 2. **Isolate:** Identify whether the issue is in code, config, or a dependency.
 3. **Roll back if needed:** See `docs/runbooks/rollback.md`.
 4. **Communicate:** If the project has public users, add a status note.
@@ -67,6 +73,11 @@ Use this for any P1 or P2 incident. File as a GitHub issue with label `type: doc
 **Severity:** P1 / P2
 **Duration:** [start time] to [end time]
 **Impact:** [What was broken, how many users affected if known]
+**Release run ID:** [run ID or not release-related]
+**Candidate tree:** [tree digest or not applicable]
+**Failed deployed identity:** [commit and deployment]
+**Evidence report:** [durable reference]
+**Rollback identity:** [restored commit and deployment or not applicable]
 
 ### Timeline
 - HH:MM — [Event]

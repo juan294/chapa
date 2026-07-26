@@ -76,6 +76,7 @@ logs/
 # misc
 *.tsbuildinfo
 next-env.d.ts
+quality/evidence/runs/
 supabase/.temp/
 supabase/.branches/
 

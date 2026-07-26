@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "runId": "fixture-zero-pass",
+  "generatedAt": "2026-07-26T10:00:00.000Z",
+  "baselineTag": "v2.19.0",
+  "candidate": {
+    "developCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidateTreeDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "previewUrl": "https://preview.example.test/",
+    "previewIdentity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "obligations": [],
+  "results": [],
+  "exceptions": [],
+  "manualObligations": [],
+  "exploratoryCharters": [],
+  "rollbackReference": "docs/runbooks/rollback.md",
+  "tagAuthorization": { "status": "pending" }
+}

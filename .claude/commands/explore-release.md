@@ -6,7 +6,7 @@ sufficient for a single charter's execution).
 
 Independent, fresh-context exploratory testing of a fixed release candidate. This
 is **Wave B** of the E2E Pro release-verification system
-(`templates/e2e-pro-playbook-template.md`) — the cheap, high-yield layer that
+(`docs/playbooks/e2e-pro-release-verification.md`) — the cheap, high-yield layer that
 targets interaction and recovery failures deterministic suites miss.
 
 It complements, and does not replace:
@@ -16,28 +16,46 @@ It complements, and does not replace:
 - **`/release`** — the tagging authority. Charters feed evidence into the release
   gate; they never tag.
 
-Read `templates/e2e-pro-playbook-template.md` Section 6 (Wave B) for the full
-decision detail. This command is the executable protocol.
+Read `docs/release/release-playbook.md` completely for release ordering and
+authorization, then read the local blueprint's Wave B section for the decision
+detail. This command is the executable charter protocol, not a release
+procedure.
 
 ## Input
 
 ```text
-/explore-release <LAST_RELEASE_REF> <CANDIDATE_SHA_OR_DIGEST>
+/explore-release quality/evidence/runs/{runId}/candidate.json
 ```
 
-If arguments are omitted, infer `<LAST_RELEASE_REF>` from the last release tag and
-`<CANDIDATE_SHA>` from the fixed candidate under release. Confirm both with the
-user before spawning agents — a charter run against the wrong candidate is wasted.
+The candidate record is mandatory and contains `runId`, `baselineTag`,
+`developCommit`, `candidateTreeDigest`, `previewUrl`, and exactly:
+
+```json
+{
+  "authorization": {
+    "environments": ["local-contract", "ci-build", "preview"],
+    "operations": [
+      "read-only",
+      "synthetic-local-write",
+      "authorized-preview-interaction"
+    ]
+  }
+}
+```
+
+Do not infer a moving candidate from `HEAD` or a branch, expand those
+authorizations, or continue if the record is malformed or inconsistent with the
+prepared release run.
 
 ## Step 1: Fix the candidate and read the diff
 
-1. Confirm the candidate is immutable (a specific SHA, tag, or artifact digest),
-   not a moving branch. Stop if it is mutable (playbook D06).
+1. Confirm `baselineTag`, `developCommit`, and `candidateTreeDigest` are
+   immutable and match the prepared run. Stop on mismatch (playbook D06).
 2. Compute the change surface:
 
    ```bash
-   git log --oneline <LAST_RELEASE_REF>..<CANDIDATE_SHA>
-   git diff --stat <LAST_RELEASE_REF>..<CANDIDATE_SHA>
+   git log --oneline "$baselineTag..$developCommit"
+   git diff --stat "$baselineTag..$developCommit"
    ```
 
 3. Map changed paths to user-facing capabilities, actors, surfaces, states, and
@@ -72,8 +90,9 @@ agent MUST be a fresh context that:
 - reports findings without fixing them mid-charter.
 
 Every charter attempts all eight maneuvers, in risk-first order, and reports each
-as `PASS` (with evidence), `FAIL` (with reproduction + evidence), or `N/A` (with a
-concrete reason). **Omitting a row invalidates the charter.**
+as `passed` (with evidence), `failed` (with reproduction + evidence), or
+`not-applicable` (with a concrete reason). **Omitting a row invalidates the
+charter.**
 
 | # | Maneuver | Intent |
 |---:|---|---|
@@ -96,7 +115,7 @@ high-risk area into a pass — agents report where time expired.
 
 Charter agents MUST:
 
-- use synthetic, run-scoped fixtures (`<PROJECT_FIXTURE_PREFIX>-<RUN_ID>`);
+- use synthetic, run-scoped fixtures prefixed `chapa-e2e-{runId}-`;
 - operate only within the charter's authorization;
 - never touch real user data;
 - never trigger live charges, email, messages, destructive mutations, or hardware
@@ -106,12 +125,54 @@ Charter agents MUST:
 
 ## Step 5: Report and gate
 
-Each agent returns an **Exploratory Charter report** (playbook Section 9). The
-orchestrator collects them and applies the block rule.
+Each agent returns a charter result beneath
+`quality/evidence/runs/{runId}/charters/{charterId}.json` with:
+
+```text
+id
+candidate = developCommit
+executorContext
+timeboxMinutes = 30
+riskHypothesis
+changedCapability, actors, surfaces, states, externalSeams
+environment, allowedOperations, safetyClass
+candidateRecord = input candidate-record path
+maneuvers 1 through 8
+findings and triage
+skippedHighRiskAreas
+fixtures and cleanup evidence
+decision
+```
+
+The `candidate` field is the immutable `developCommit`; the charter also retains
+the input candidate-record path so its `candidateTreeDigest` remains
+independently attributable without duplicating identity fields in the charter
+schema.
+
+The orchestrator collects them into the exact release-workflow input:
+
+```json
+{
+  "exploratoryCharters": [],
+  "manualObligations": [],
+  "manualResult": {
+    "scenarioId": "release.manual-arcs",
+    "environment": "preview"
+  }
+}
+```
+
+Populate `exploratoryCharters` with the complete charter JSON files. The release
+operator populates `manualObligations` with one passed candidate-bound execution
+record per catalog `manualObligationIds` and
+`manualResult` with the complete schema-valid `ScenarioResult` and its `ui` and
+`http` evidence. Save this as
+`quality/evidence/runs/{runId}/pre-merge-evidence.json`; the release-verification
+workflow validates and merges it before running the pre-merge analyzer.
 
 The release is **BLOCKED** when any of the following hold:
 
-- any charter reports a FAIL;
+- any charter reports a failed maneuver or decision;
 - a high-risk maneuver or area was skipped;
 - cleanup evidence is missing;
 - a finding lacks triage;
@@ -119,7 +180,8 @@ The release is **BLOCKED** when any of the following hold:
 
 Present a consolidated summary: per-charter decision, all findings with severity
 and reproduction, skipped high-risk areas, and fixture/cleanup evidence. Every
-finding gets tracked (file an issue) — do not silently drop low-severity ones.
+finding must be tracked, but creating an outward-facing issue requires explicit
+issue-creation authorization; until then, retain it in the charter evidence.
 
 Do not tag or release from this command. Hand the evidence to `/release`, which
 gates on it.

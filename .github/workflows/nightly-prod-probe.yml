@@ -13,6 +13,7 @@ jobs:
       DEPLOYMENT_SMOKE_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
       DEPLOYMENT_SMOKE_STRICT: "true"
+      E2E_PRO_RUN_ID: nightly-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Require deployment smoke URL
         if: env.DEPLOYMENT_SMOKE_BASE_URL == ''
@@ -21,6 +22,7 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v6
+        id: checkout
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
         with:
@@ -48,13 +50,124 @@ jobs:
         working-directory: apps/web
 
       - name: Run strict read-only smoke probe
+        id: smoke
+        continue-on-error: true
         run: npx playwright test e2e/smoke.spec.ts --project=chromium
         working-directory: apps/web
         env:
           CI: true
 
+      - name: Read allowlisted production deployment identity
+        id: target-identity
+        if: always() && env.DEPLOYMENT_SMOKE_BASE_URL != ''
+        continue-on-error: true
+        env:
+          TARGET_BASE_URL: ${{ env.DEPLOYMENT_SMOKE_BASE_URL }}
+        run: |
+          mkdir -p .nightly-evidence
+          RAW_RESPONSE="$RUNNER_TEMP/nightly-target-version.json"
+          curl --fail --silent --show-error \
+            --connect-timeout 5 \
+            --max-time 15 \
+            --header 'Accept: application/json' \
+            "${TARGET_BASE_URL%/}/api/version" \
+            --output "$RAW_RESPONSE"
+          jq -e '
+            (.commitSha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
+            (.environment == "production")
+          ' "$RAW_RESPONSE" > /dev/null
+          jq '{commitSha, environment}' "$RAW_RESPONSE" \
+            > .nightly-evidence/target-version.json
+
+      - name: Write normalized nightly evidence
+        if: always()
+        env:
+          SMOKE_STATUS: ${{ steps.smoke.outcome }}
+          IDENTITY_STATUS: ${{ steps.target-identity.outcome }}
+        run: |
+          mkdir -p .nightly-evidence
+          RUNNER_COMMIT="${{ github.sha }}"
+          if git rev-parse --verify HEAD >/dev/null 2>&1; then
+            RUNNER_COMMIT="$(git rev-parse HEAD)"
+          fi
+
+          TARGET_COMMIT=""
+          TARGET_ENVIRONMENT=""
+          if [ -f .nightly-evidence/target-version.json ]; then
+            TARGET_COMMIT="$(jq -r '.commitSha // ""' .nightly-evidence/target-version.json)"
+            TARGET_ENVIRONMENT="$(jq -r '.environment // ""' .nightly-evidence/target-version.json)"
+          else
+            printf '{"commitSha":null,"environment":null}\n' \
+              > .nightly-evidence/target-version.json
+          fi
+
+          STATUS="passed"
+          REASON="Nightly read-only production probe and deployment identity check passed."
+          if [ -z "$DEPLOYMENT_SMOKE_BASE_URL" ]; then
+            STATUS="missing"
+            REASON="DEPLOYMENT_SMOKE_BASE_URL was not configured."
+          elif [ "$SMOKE_STATUS" = "skipped" ] || [ "$IDENTITY_STATUS" = "skipped" ]; then
+            STATUS="skipped"
+            REASON="A required nightly producer was skipped."
+          elif [ "$SMOKE_STATUS" != "success" ] || [ "$IDENTITY_STATUS" != "success" ]; then
+            STATUS="failed"
+            REASON="The production smoke probe or deployment identity check did not pass."
+          fi
+
+          jq -n \
+            --arg scenarioId "monitoring.nightly-production-probe" \
+            --arg status "$STATUS" \
+            --arg reason "$REASON" \
+            --arg repository "${{ github.repository }}" \
+            --arg runId "${{ github.run_id }}" \
+            --arg runAttempt "${{ github.run_attempt }}" \
+            --arg runnerCommit "$RUNNER_COMMIT" \
+            --arg targetCommit "$TARGET_COMMIT" \
+            --arg targetEnvironment "$TARGET_ENVIRONMENT" \
+            --arg smokeStatus "$SMOKE_STATUS" \
+            --arg identityStatus "$IDENTITY_STATUS" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
+              authorizationEligible: false,
+              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
+                workflowRunAttempt: $runAttempt, runnerCommit: $runnerCommit},
+              target: {commitSha: (if $targetCommit == "" then null else $targetCommit end),
+                environment: (if $targetEnvironment == "" then null else $targetEnvironment end)},
+              details: {smokeStatus: $smokeStatus, identityStatus: $identityStatus},
+              generatedAt: $generatedAt}' \
+            > .nightly-evidence/nightly-production-probe.json
+
+          # Keep a schema-compatible normalized fragment for common evidence
+          # tooling. A missing target identity is represented as a failed result
+          # and uses the runner SHA only as an explicit non-authorizing fallback.
+          FRAGMENT_STATUS="$STATUS"
+          if [ "$FRAGMENT_STATUS" = "missing" ]; then
+            FRAGMENT_STATUS="failed"
+          fi
+          CANDIDATE_IDENTITY="$TARGET_COMMIT"
+          IDENTITY_SOURCE="target"
+          if ! [[ "$CANDIDATE_IDENTITY" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            CANDIDATE_IDENTITY="$RUNNER_COMMIT"
+            IDENTITY_SOURCE="runner-fallback"
+          fi
+          EVIDENCE_URI="github-actions://${{ github.repository }}/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/nightly-production-probe"
+          jq -n \
+            --arg runId "$E2E_PRO_RUN_ID" \
+            --arg candidateIdentity "$CANDIDATE_IDENTITY" \
+            --arg status "$FRAGMENT_STATUS" \
+            --arg reason "$REASON Candidate identity source: $IDENTITY_SOURCE." \
+            --arg evidenceUri "$EVIDENCE_URI" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion: 1, runId: $runId, environment: "production",
+              candidateIdentity: $candidateIdentity,
+              results: [{scenarioId: "monitoring.nightly-production-probe", status: $status,
+                startedAt: $generatedAt, finishedAt: $generatedAt, runner: "playwright",
+                evidence: {http: [$evidenceUri], "deployment-identity": [$evidenceUri]},
+                fixtures: [], notes: $reason}]}' \
+            > .nightly-evidence/nightly-production-fragment.json
+
       - name: Upload Playwright report
-        if: failure()
+        if: always() && steps.smoke.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: nightly-prod-probe-report
@@ -62,3 +175,30 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+      - name: Upload normalized nightly evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .nightly-evidence/nightly-production-probe.json
+            .nightly-evidence/nightly-production-fragment.json
+            .nightly-evidence/target-version.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce nightly producer results
+        if: always()
+        env:
+          SMOKE_STATUS: ${{ steps.smoke.outcome }}
+          IDENTITY_STATUS: ${{ steps.target-identity.outcome }}
+        run: |
+          if [ -z "$DEPLOYMENT_SMOKE_BASE_URL" ]; then
+            echo "::error::Nightly evidence is missing because DEPLOYMENT_SMOKE_BASE_URL is not configured."
+            exit 1
+          fi
+          if [ "$SMOKE_STATUS" != "success" ] || [ "$IDENTITY_STATUS" != "success" ]; then
+            echo "::error::Nightly evidence is non-passing (smoke=$SMOKE_STATUS, identity=$IDENTITY_STATUS)."
+            exit 1
+          fi

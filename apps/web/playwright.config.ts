@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL?.trim() || "http://localhost:3001";
 const useExternalBaseUrl = Boolean(process.env.PLAYWRIGHT_BASE_URL?.trim());
+const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME?.trim();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -9,7 +10,14 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  reporter: process.env.CI ? "github" : "html",
+  reporter: jsonOutput
+    ? [
+        [process.env.CI ? "github" : "line"],
+        ["json", { outputFile: jsonOutput }],
+      ]
+    : process.env.CI
+      ? "github"
+      : "html",
 
   use: {
     baseURL,
