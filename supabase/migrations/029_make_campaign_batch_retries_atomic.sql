@@ -78,7 +78,8 @@ DECLARE
   expected_count INTEGER;
   distinct_count INTEGER;
   valid_count INTEGER;
-  eligible_count INTEGER;
+  lease_count INTEGER;
+  matched_count INTEGER;
   updated_count INTEGER;
 BEGIN
   IF jsonb_typeof(p_results) <> 'array' THEN
@@ -115,15 +116,16 @@ BEGIN
   locked AS MATERIALIZED (
     SELECT sends.id
     FROM public.campaign_sends AS sends
-    JOIN input ON input.id = sends.id
     WHERE sends.status = 'processing'
       AND sends.lease_token = p_lease_token
-      AND input.status IN ('sent', 'failed')
     FOR UPDATE OF sends
   )
-  SELECT count(*) INTO eligible_count FROM locked;
+  SELECT count(*), count(input.id)
+  INTO lease_count, matched_count
+  FROM locked
+  LEFT JOIN input ON input.id = locked.id;
 
-  IF eligible_count <> expected_count THEN
+  IF lease_count <> expected_count OR matched_count <> expected_count THEN
     RETURN false;
   END IF;
 
