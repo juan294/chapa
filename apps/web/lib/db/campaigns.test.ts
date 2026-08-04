@@ -54,7 +54,9 @@ const mockFrom = vi.fn((): any => ({
     mockUpdate(...args);
     const chainable: any = {
       eq: () => chainable,
-      in: () => Promise.resolve(queryResult),
+      in: () => chainable,
+      select: () => chainable,
+      maybeSingle: () => Promise.resolve(queryResult),
       then: (resolve: (v: unknown) => void) => resolve(queryResult),
     };
     return chainable;
@@ -93,12 +95,14 @@ import {
   dbGetCampaign,
   dbCreateCampaign,
   dbUpdateCampaign,
+  dbClaimCampaignForSending,
   dbDeleteCampaign,
   dbCreateCampaignSends,
   dbClaimPendingSends,
   dbGetPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
+  dbRequeueSends,
   dbGetCampaignStats,
   dbGetActiveEngagementCampaign,
   mapCampaignRow,
@@ -109,6 +113,28 @@ beforeEach(() => {
   vi.clearAllMocks();
   queryResult = { data: null, error: null };
   queryResults = [];
+});
+
+describe("dbClaimCampaignForSending", () => {
+  it("returns true only when the conditional draft update returns a row", async () => {
+    queryResult = { data: { id: "c-1" }, error: null };
+
+    await expect(
+      dbClaimCampaignForSending("c-1", 12, "2026-08-04T14:00:00.000Z"),
+    ).resolves.toBe(true);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      status: "sending",
+      total_recipients: 12,
+      started_at: "2026-08-04T14:00:00.000Z",
+    });
+  });
+
+  it("returns false when another request already claimed the draft", async () => {
+    queryResult = { data: null, error: null };
+    await expect(
+      dbClaimCampaignForSending("c-1", 12, "2026-08-04T14:00:00.000Z"),
+    ).resolves.toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -626,7 +652,8 @@ describe("dbClaimPendingSends", () => {
 describe("dbMarkSendsSent", () => {
   it("updates claimed sends by lease token", async () => {
     queryResult = { data: null, error: null };
-    await dbMarkSendsSent(["s-1", "s-2"], "lease-token");
+    queryResult = { data: [{ id: "s-1" }, { id: "s-2" }], error: null };
+    await expect(dbMarkSendsSent(["s-1", "s-2"], "lease-token")).resolves.toBe(true);
     expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: "sent",
       lease_token: null,
@@ -635,19 +662,20 @@ describe("dbMarkSendsSent", () => {
 
   it("does not throw when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
-    await expect(dbMarkSendsSent(["s-1"])).resolves.toBeUndefined();
+    await expect(dbMarkSendsSent(["s-1"])).resolves.toBe(false);
   });
 
   it("does not throw on update error", async () => {
     queryResult = { data: null, error: new Error("update failed") };
-    await expect(dbMarkSendsSent(["s-1"])).resolves.toBeUndefined();
+    await expect(dbMarkSendsSent(["s-1"])).resolves.toBe(false);
   });
 });
 
 describe("dbMarkSendsFailed", () => {
   it("updates claimed sends with status and error", async () => {
     queryResult = { data: null, error: null };
-    await dbMarkSendsFailed(["s-1"], "Send failed", "lease-token");
+    queryResult = { data: [{ id: "s-1" }], error: null };
+    await expect(dbMarkSendsFailed(["s-1"], "Send failed", "lease-token")).resolves.toBe(true);
     expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: "failed",
       error: "Send failed",
@@ -657,12 +685,24 @@ describe("dbMarkSendsFailed", () => {
 
   it("does not throw when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
-    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBeUndefined();
+    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBe(false);
   });
 
   it("does not throw on update error", async () => {
     queryResult = { data: null, error: new Error("update failed") };
-    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBeUndefined();
+    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBe(false);
+  });
+});
+
+describe("dbRequeueSends", () => {
+  it("returns claimed sends to pending", async () => {
+    queryResult = { data: [{ id: "s-1" }], error: null };
+    await expect(dbRequeueSends(["s-1"], "Rate limited", "lease-token")).resolves.toBe(true);
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: "pending",
+      error: "Rate limited",
+      lease_token: null,
+    }));
   });
 });
 

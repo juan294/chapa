@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
-import { getGithubToken, getWarmCachePriorityHandles } from "@/lib/env";
+import { getWarmCachePriorityHandles } from "@/lib/env";
 import { dbGetUsers } from "@/lib/db/users";
 import {
   dbGetLatestSnapshotBatch,
@@ -101,51 +101,31 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     ? storedOffset
     : 0;
 
-  // Priority handles: always included regardless of rotation (e.g. "juan294,alice").
-  // Reserve their seats WITHIN the MAX_HANDLES ceiling by shrinking the rotation
-  // slice first — merging them on top of a full-size slice would let per-run
-  // work exceed MAX_HANDLES (the #1052-era bug: real per-run work could reach
-  // min(N, MAX_HANDLES) + priorityHandles.length instead of staying capped).
+  // Priority handles are always included, while the rotating scan fills every
+  // remaining seat. Scanning past overlaps is important: reserving a seat for a
+  // priority handle that is also in the rotation would otherwise underfill the run.
   const priorityHandles = parsePriorityHandles(allHandles);
-  const rotationCeiling = Math.max(0, MAX_HANDLES - priorityHandles.length);
-
-  // Note: when rotationCeiling is 0 (priority handles alone fill or exceed
-  // the ceiling), the wrap-around/plain-slice branches below naturally yield
-  // an empty rotation slice (offset is always < allHandles.length, so the
-  // wrap-around guard is false, and `allHandles.slice(offset, offset)` is
-  // `[]`) — no separate branch needed.
   let toWarm: string[];
-  if (allHandles.length <= rotationCeiling) {
+  let nextOffset: number;
+  if (allHandles.length <= MAX_HANDLES) {
     // All users fit in one run — no rotation needed
     toWarm = [...allHandles];
-  } else if (offset + rotationCeiling > allHandles.length) {
-    // Wraps around: take remaining + start from beginning
-    const remaining = allHandles.slice(offset);
-    const fromStart = allHandles.slice(0, rotationCeiling - remaining.length);
-    toWarm = [...remaining, ...fromStart];
+    nextOffset = 0;
   } else {
-    toWarm = allHandles.slice(offset, offset + rotationCeiling);
-  }
-
-  // Merge priority handles into the warm list (no duplicates), staying within
-  // the MAX_HANDLES ceiling even if more priority handles are configured than
-  // the ceiling allows.
-  if (priorityHandles.length > 0) {
+    toWarm = priorityHandles.slice(0, MAX_HANDLES);
     const warmSet = new Set(toWarm);
-    for (const h of priorityHandles) {
-      if (!warmSet.has(h) && toWarm.length < MAX_HANDLES) {
-        toWarm.push(h);
-        warmSet.add(h);
+    let inspected = 0;
+    while (toWarm.length < MAX_HANDLES && inspected < allHandles.length) {
+      const handle = allHandles[(offset + inspected) % allHandles.length];
+      inspected++;
+      if (handle === undefined) break;
+      if (!warmSet.has(handle)) {
+        warmSet.add(handle);
+        toWarm.push(handle);
       }
     }
+    nextOffset = (offset + inspected) % allHandles.length;
   }
-
-  const nextOffset = allHandles.length <= rotationCeiling
-    ? 0
-    : (offset + rotationCeiling) % allHandles.length;
-
-  // Use fallback GitHub token for server-side fetches (no user session)
-  const githubToken = getGithubToken();
 
   // Pre-fetch all previous snapshots in one batch query (instead of N+1 individual calls)
   const previousSnapshots = await dbGetLatestSnapshotBatch(toWarm);
@@ -161,7 +141,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     toWarm,
     BATCH_SIZE,
     async (handle) => {
-      const result = await warmHandle(handle, githubToken, previousSnapshots, requestId);
+      const result = await warmHandle(handle, previousSnapshots, requestId);
       return { handle, ...result };
     },
   );
@@ -316,14 +296,11 @@ function parsePriorityHandles(allHandles: string[]): string[] {
  */
 async function warmHandle(
   handle: string,
-  githubToken: string | undefined,
   previousSnapshots: Map<string, unknown>,
   requestId?: string,
 ): Promise<HandleResult> {
   try {
-    const materialized = await materializeOrchestratedProfile(handle, {
-      token: githubToken,
-    });
+    const materialized = await materializeOrchestratedProfile(handle);
     if (!materialized) {
       void captureServerError({
         route: "/api/cron/warm-cache",

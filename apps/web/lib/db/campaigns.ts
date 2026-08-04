@@ -31,6 +31,7 @@ export {
   dbGetCampaign,
   dbCreateCampaign,
   dbUpdateCampaign,
+  dbClaimCampaignForSending,
   dbDeleteCampaign,
   dbGetActiveEngagementCampaign,
   dbCreateCampaignSends,
@@ -38,5 +39,6 @@ export {
   dbClaimPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
+  dbRequeueSends,
   dbGetCampaignStats,
 } from "./campaigns/index";

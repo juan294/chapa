@@ -5,7 +5,7 @@
  * sends via a Redis counter and processing in claimed batches of 50.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getResend } from "./resend";
 import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import {
@@ -18,10 +18,12 @@ import type { Campaign, CampaignSendStats } from "@/lib/db/campaigns";
 import {
   dbGetCampaign,
   dbUpdateCampaign,
+  dbClaimCampaignForSending,
   dbCreateCampaignSends,
   dbClaimPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
+  dbRequeueSends,
   dbGetCampaignStats,
 } from "@/lib/db/campaigns";
 import { cacheGet, cacheIncr, cacheReserveQuota } from "@/lib/cache/redis";
@@ -95,6 +97,28 @@ interface ResendBatchResult {
   error?: { message?: string | null } | null;
 }
 
+interface ResendBatchError {
+  message?: string | null;
+  statusCode?: number | null;
+  name?: string | null;
+}
+
+const TRANSIENT_RESEND_ERROR_NAMES = new Set([
+  "rate_limit",
+  "rate_limit_exceeded",
+  "internal_server_error",
+  "application_error",
+  "concurrent_idempotent_requests",
+]);
+
+function isTransientResendError(error: ResendBatchError, wasThrown: boolean): boolean {
+  if (wasThrown) return true;
+  if (error.statusCode === 429 || (error.statusCode != null && error.statusCode >= 500)) {
+    return true;
+  }
+  return error.name != null && TRANSIENT_RESEND_ERROR_NAMES.has(error.name);
+}
+
 // ---------------------------------------------------------------------------
 // Campaign lifecycle
 // ---------------------------------------------------------------------------
@@ -121,11 +145,12 @@ export async function initiateCampaign(
     users.map((u) => ({ handle: u.handle, email: u.email })),
   );
 
-  await dbUpdateCampaign(campaignId, {
-    status: "sending",
-    totalRecipients: count,
-    startedAt: new Date().toISOString(),
-  });
+  const claimed = await dbClaimCampaignForSending(
+    campaignId,
+    count,
+    new Date().toISOString(),
+  );
+  if (!claimed) return null;
 
   return { totalRecipients: count };
 }
@@ -180,11 +205,12 @@ export async function processCampaignBatch(
 
   const resend = getResend();
   if (!resend) {
-    await dbMarkSendsFailed(
+    const acknowledged = await dbMarkSendsFailed(
       claimed.map((s) => s.id),
       "Resend unavailable",
       leaseToken,
     );
+    if (!acknowledged) throw new Error("Failed to acknowledge failed campaign emails");
     const stats = await dbGetCampaignStats(campaignId);
     await dbUpdateCampaign(campaignId, {
       sentCount: stats.sent,
@@ -224,18 +250,46 @@ export async function processCampaignBatch(
   let batchSent = 0;
   let batchFailed = 0;
   const sendIds = claimed.map((s) => s.id);
+  const idempotencyKey = `campaign/${campaignId}/${createHash("sha256")
+    .update(sendIds.join(","))
+    .digest("hex")}`;
 
+  let data: unknown = null;
+  let error: ResendBatchError | null = null;
+  let providerThrew = false;
   try {
-    const { data, error } = await withTimeout(
-      resend.batch.send(emails),
+    const response = await withTimeout(
+      resend.batch.send(emails, { idempotencyKey }),
       EMAIL_SEND_TIMEOUT_MS,
       "processCampaignBatch",
     );
+    data = response.data;
+    error = response.error as ResendBatchError | null;
+  } catch (caught) {
+    providerThrew = true;
+    error = caught instanceof Error
+      ? { message: caught.message, name: caught.name }
+      : { message: "Unknown Resend batch failure" };
+  }
 
-    if (error) {
-      await dbMarkSendsFailed(sendIds, error.message, leaseToken);
-      batchFailed = claimed.length;
+  if (error) {
+    const message = error.message ?? "Unknown Resend batch failure";
+    if (isTransientResendError(error, providerThrew)) {
+      const requeued = await dbRequeueSends(sendIds, message, leaseToken);
+      if (!requeued) throw new Error("Failed to requeue transient campaign emails");
+      await refundDailyQuota(claimed.length);
+      const stats = await dbGetCampaignStats(campaignId);
+      await dbUpdateCampaign(campaignId, {
+        sentCount: stats.sent,
+        failedCount: stats.failed,
+      });
+      return { sent: 0, failed: 0, remaining: getRemainingSends(stats) };
     } else {
+      const acknowledged = await dbMarkSendsFailed(sendIds, message, leaseToken);
+      if (!acknowledged) throw new Error("Failed to acknowledge failed campaign emails");
+      batchFailed = claimed.length;
+    }
+  } else {
       const results = Array.isArray(data) ? (data as ResendBatchResult[]) : [];
       const successfulIds: string[] = [];
       const failedByMessage = new Map<string, string[]>();
@@ -254,22 +308,16 @@ export async function processCampaignBatch(
       }
 
       if (successfulIds.length > 0) {
-        await dbMarkSendsSent(successfulIds, leaseToken);
+        const acknowledged = await dbMarkSendsSent(successfulIds, leaseToken);
+        if (!acknowledged) throw new Error("Failed to acknowledge sent campaign emails");
       }
       for (const [message, failedIds] of failedByMessage) {
-        await dbMarkSendsFailed(failedIds, message, leaseToken);
+        const acknowledged = await dbMarkSendsFailed(failedIds, message, leaseToken);
+        if (!acknowledged) throw new Error("Failed to acknowledge failed campaign emails");
       }
 
       batchSent = successfulIds.length;
       batchFailed = claimed.length - successfulIds.length;
-    }
-  } catch (error) {
-    console.error(
-      "[campaigns] processCampaignBatch error:",
-      (error as Error).message,
-    );
-    await dbMarkSendsFailed(sendIds, (error as Error).message, leaseToken);
-    batchFailed = claimed.length;
   }
 
   if (batchFailed > 0) {

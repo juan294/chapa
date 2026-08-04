@@ -212,6 +212,44 @@ export async function dbUpdateCampaign(
 }
 
 /**
+ * Atomically transition a draft campaign to sending.
+ *
+ * The status predicate makes concurrent send requests contend for one row;
+ * only the request that receives the row may begin delivery.
+ */
+export async function dbClaimCampaignForSending(
+  id: string,
+  totalRecipients: number,
+  startedAt: string,
+): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const { data, error } = await db
+      .from("email_campaigns")
+      .update({
+        status: "sending",
+        total_recipients: totalRecipients,
+        started_at: startedAt,
+      })
+      .eq("id", id)
+      .eq("status", "draft")
+      .select("id")
+      .maybeSingle();
+
+    if (error) throw error;
+    return Boolean(data);
+  } catch (error) {
+    console.error(
+      "[db] dbClaimCampaignForSending failed:",
+      (error as Error).message,
+    );
+    return false;
+  }
+}
+
+/**
  * Fetch the most recent engagement campaign (cached 1h in Redis).
  *
  * Used during cron batch processing to avoid N+1 DB queries when

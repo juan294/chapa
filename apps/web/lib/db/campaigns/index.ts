@@ -30,6 +30,7 @@ export {
   dbGetCampaign,
   dbCreateCampaign,
   dbUpdateCampaign,
+  dbClaimCampaignForSending,
   dbDeleteCampaign,
   dbGetActiveEngagementCampaign,
 } from "./crud";
@@ -40,5 +41,6 @@ export {
   dbClaimPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
+  dbRequeueSends,
   dbGetCampaignStats,
 } from "./sends";

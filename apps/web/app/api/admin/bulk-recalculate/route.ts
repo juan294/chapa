@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { verifyAdminSecret } from "@/lib/auth/admin";
-import { getGithubToken } from "@/lib/env";
 import { rateLimit } from "@/lib/cache/redis";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -104,7 +103,6 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  const githubToken = getGithubToken();
   const errors: { handle: string; error: string }[] = [];
   let recalculated = 0;
   const completed: string[] = [];
@@ -137,7 +135,6 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       batch.map(async (handle) => {
         try {
           const materialized = await materializeOrchestratedProfile(handle, {
-            token: githubToken,
             // #930 — Admin recalculates must bypass the EMA same-day lock.
             // A stored today-snapshot may contain wrong data (e.g. from a
             // timed-out platform fetch); ignoring it ensures the fresh score

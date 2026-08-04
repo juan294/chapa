@@ -151,9 +151,10 @@ export async function dbClaimPendingSends(
 export async function dbMarkSendsSent(
   ids: string[],
   leaseToken?: string,
-): Promise<void> {
+): Promise<boolean> {
+  if (ids.length === 0) return true;
   const db = getSupabase();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     let query = db
@@ -170,11 +171,13 @@ export async function dbMarkSendsSent(
       query = query.eq("lease_token", leaseToken);
     }
 
-    const { error } = await query.in("id", ids);
+    const { data, error } = await query.in("id", ids).select("id");
 
     if (error) throw error;
+    return Array.isArray(data) && data.length === ids.length;
   } catch (error) {
     console.error("[db] dbMarkSendsSent failed:", (error as Error).message);
+    return false;
   }
 }
 
@@ -192,9 +195,10 @@ export async function dbMarkSendsFailed(
   ids: string[],
   errorMsg: string,
   leaseToken?: string,
-): Promise<void> {
+): Promise<boolean> {
+  if (ids.length === 0) return true;
   const db = getSupabase();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     let query = db
@@ -210,11 +214,44 @@ export async function dbMarkSendsFailed(
       query = query.eq("lease_token", leaseToken);
     }
 
-    const { error } = await query.in("id", ids);
+    const { data, error } = await query.in("id", ids).select("id");
 
     if (error) throw error;
+    return Array.isArray(data) && data.length === ids.length;
   } catch (error) {
     console.error("[db] dbMarkSendsFailed failed:", (error as Error).message);
+    return false;
+  }
+}
+
+/** Return a transiently failed claimed batch to pending for a later retry. */
+export async function dbRequeueSends(
+  ids: string[],
+  errorMsg: string,
+  leaseToken?: string,
+): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    let query = db
+      .from("campaign_sends")
+      .update({
+        status: "pending",
+        error: errorMsg,
+        ...CLAIM_CLEAR_FIELDS,
+      })
+      .eq("status", "processing");
+
+    if (leaseToken) query = query.eq("lease_token", leaseToken);
+
+    const { data, error } = await query.in("id", ids).select("id");
+    if (error) throw error;
+    return Array.isArray(data) && data.length === ids.length;
+  } catch (error) {
+    console.error("[db] dbRequeueSends failed:", (error as Error).message);
+    return false;
   }
 }
 

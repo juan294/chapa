@@ -185,9 +185,7 @@ describe("GET /api/cron/warm-cache", () => {
     expect(body.processedCount).toBe(2);
     expect(body.processedSample).toEqual(["alice", "bob"]);
     expect(body.handles).toBeUndefined();
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
-      token: "ghp-server-token",
-    });
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice");
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "alice",
       FAKE_MATERIALIZED,
@@ -470,6 +468,21 @@ describe("GET /api/cron/warm-cache", () => {
     expect(warmedHandles).toContain("user102");
     expect(warmedHandles).toContain("user103");
     expect(warmedHandles).toContain("user104");
+  });
+
+  it("does not underfill a full run when a priority handle overlaps the rotation", async () => {
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user0");
+    mockDbGetUsers.mockResolvedValue(
+      Array.from({ length: 50 }, (_, index) => user(`user${index}`)),
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.processedCount).toBe(50);
+    expect(body.rotation.coversAll).toBe(true);
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(50);
   });
 
   it("wraps around to the start of the handle list when offset + MAX_HANDLES exceeds total users", async () => {
