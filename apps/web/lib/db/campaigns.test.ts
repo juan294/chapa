@@ -692,6 +692,17 @@ describe("dbAcknowledgeCampaignSends", () => {
       ),
     ).resolves.toBe(false);
   });
+
+  it("delegates empty results so the database can reject a nonempty lease", async () => {
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
+    await expect(
+      dbAcknowledgeCampaignSends([], "lease-token"),
+    ).resolves.toBe(false);
+    expect(mockRpc).toHaveBeenCalledWith("acknowledge_campaign_sends", {
+      p_lease_token: "lease-token",
+      p_results: [],
+    });
+  });
 });
 
 describe("dbMarkSendsSent", () => {

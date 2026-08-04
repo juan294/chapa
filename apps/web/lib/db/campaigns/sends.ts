@@ -159,7 +159,6 @@ export async function dbAcknowledgeCampaignSends(
   results: CampaignSendAcknowledgement[],
   leaseToken: string,
 ): Promise<boolean> {
-  if (results.length === 0) return true;
   const db = getSupabase();
   if (!db) return false;
 

@@ -87,10 +87,6 @@ BEGIN
   END IF;
 
   expected_count := jsonb_array_length(p_results);
-  IF expected_count = 0 THEN
-    RETURN true;
-  END IF;
-
   SELECT
     count(DISTINCT input.id),
     count(*) FILTER (WHERE input.status IN ('sent', 'failed'))
