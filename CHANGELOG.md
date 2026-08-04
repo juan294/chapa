@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-08-04
+
+### Added
+
+- **Fail-closed E2E Pro release verification.** Release candidates now carry
+  exact deployment identity through `/api/version`, a declared required-probe
+  set, candidate-bound evidence, and an analyzer that refuses incomplete or
+  mismatched production proof.
+- **Production E2E operator playbook and command.** The release workflow now
+  documents rehearsal, promotion, readback, rollback, and tag-last publication
+  as one auditable path.
+
+### Fixed
+
+- Release probes run only in verification contexts, and Playwright no longer
+  discovers unit-test files as browser tests.
+- CI uses the repository-pinned Knip version, while async UI tests now wait for
+  teardown work instead of leaking unhandled activity between cases.
+- Security-triage findings were remediated and compatible dependency updates
+  were applied without widening the release scope.
+
+### Changed
+
+- Release and agent workflows are synchronized with cc-rpi v1.28.2, including
+  lower-cost model routing for mechanical automation.
+
 ## [2.19.1] - 2026-07-18
 
 ### Fixed
