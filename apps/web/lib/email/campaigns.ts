@@ -144,6 +144,7 @@ export async function initiateCampaign(
     campaignId,
     users.map((u) => ({ handle: u.handle, email: u.email })),
   );
+  if (count === 0) return null;
 
   const claimed = await dbClaimCampaignForSending(
     campaignId,
@@ -251,7 +252,10 @@ export async function processCampaignBatch(
   let batchFailed = 0;
   const sendIds = claimed.map((s) => s.id);
   const idempotencyKey = `campaign/${campaignId}/${createHash("sha256")
-    .update(sendIds.join(","))
+    // Anchor the provider key to the first row in the stable DB claim order.
+    // A retry may claim fewer rows because quota was reserved before an
+    // acknowledgement failure; keeping the same key prevents a second send.
+    .update(sendIds[0] ?? campaignId)
     .digest("hex")}`;
 
   let data: unknown = null;
@@ -286,7 +290,10 @@ export async function processCampaignBatch(
       return { sent: 0, failed: 0, remaining: getRemainingSends(stats) };
     } else {
       const acknowledged = await dbMarkSendsFailed(sendIds, message, leaseToken);
-      if (!acknowledged) throw new Error("Failed to acknowledge failed campaign emails");
+      if (!acknowledged) {
+        await refundDailyQuota(claimed.length);
+        throw new Error("Failed to acknowledge failed campaign emails");
+      }
       batchFailed = claimed.length;
     }
   } else {
@@ -309,11 +316,17 @@ export async function processCampaignBatch(
 
       if (successfulIds.length > 0) {
         const acknowledged = await dbMarkSendsSent(successfulIds, leaseToken);
-        if (!acknowledged) throw new Error("Failed to acknowledge sent campaign emails");
+        if (!acknowledged) {
+          await refundDailyQuota(successfulIds.length);
+          throw new Error("Failed to acknowledge sent campaign emails");
+        }
       }
       for (const [message, failedIds] of failedByMessage) {
         const acknowledged = await dbMarkSendsFailed(failedIds, message, leaseToken);
-        if (!acknowledged) throw new Error("Failed to acknowledge failed campaign emails");
+        if (!acknowledged) {
+          await refundDailyQuota(failedIds.length);
+          throw new Error("Failed to acknowledge failed campaign emails");
+        }
       }
 
       batchSent = successfulIds.length;

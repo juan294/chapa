@@ -135,6 +135,17 @@ describe("initiateCampaign", () => {
     expect(result).toBeNull();
   });
 
+  it("does not claim a campaign when recipient persistence fails", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign);
+    vi.mocked(dbGetUsersWithEmail).mockResolvedValue([
+      { handle: "alice", email: "alice@example.com", displayName: "Alice", avatarUrl: null },
+    ]);
+    vi.mocked(dbCreateCampaignSends).mockResolvedValue(0);
+
+    await expect(initiateCampaign("campaign-1")).resolves.toBeNull();
+    expect(dbClaimCampaignForSending).not.toHaveBeenCalled();
+  });
+
   it("lets only the atomic draft claimant initiate a campaign", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign);
     vi.mocked(dbGetUsersWithEmail).mockResolvedValue([
@@ -239,6 +250,47 @@ describe("processCampaignBatch", () => {
       "Failed to acknowledge sent campaign emails",
     );
     expect(dbMarkSendsFailed).not.toHaveBeenCalled();
+    expect(cacheIncr).toHaveBeenCalledWith(
+      expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),
+      -1,
+      86400,
+    );
+  });
+
+  it("keeps the provider idempotency key stable when an acknowledgement retry claims fewer rows", async () => {
+    const sends = Array.from({ length: 50 }, (_, index) => ({
+      id: `s-${String(index).padStart(2, "0")}`,
+      campaignId: "campaign-1",
+      handle: `user${index}`,
+      email: `user${index}@example.com`,
+      status: "processing" as const,
+      sentAt: null,
+      error: null,
+    }));
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbClaimPendingSends)
+      .mockResolvedValueOnce(sends)
+      .mockResolvedValueOnce(sends.slice(0, 45));
+    mockBatchSend
+      .mockResolvedValueOnce({ data: sends.map((_, index) => ({ id: `msg-${index}` })), error: null })
+      .mockResolvedValueOnce({ data: sends.slice(0, 45).map((_, index) => ({ id: `msg-${index}` })), error: null });
+    vi.mocked(dbMarkSendsSent)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 45, pending: 5, processing: 0, failed: 0 });
+
+    await expect(processCampaignBatch("campaign-1")).rejects.toThrow(
+      "Failed to acknowledge sent campaign emails",
+    );
+    await expect(processCampaignBatch("campaign-1")).resolves.toEqual({
+      sent: 45,
+      failed: 0,
+      remaining: 5,
+    });
+
+    const firstKey = mockBatchSend.mock.calls[0]?.[1]?.idempotencyKey;
+    const retryKey = mockBatchSend.mock.calls[1]?.[1]?.idempotencyKey;
+    expect(firstKey).toBe(retryKey);
   });
 
   it("returns zeros for non-sending campaign", async () => {

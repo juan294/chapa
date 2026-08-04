@@ -496,7 +496,7 @@ describe("dbCreateCampaignSends", () => {
         { campaign_id: "c-1", handle: "alice", email: "alice@example.com", status: "pending" },
         { campaign_id: "c-1", handle: "bob", email: "bob@example.com", status: "pending" },
       ],
-      { onConflict: "campaign_id,handle" },
+      { onConflict: "campaign_id,handle", ignoreDuplicates: true },
     );
   });
 

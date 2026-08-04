@@ -39,7 +39,10 @@ export async function dbCreateCampaignSends(
 
     const { error } = await db
       .from("campaign_sends")
-      .upsert(rows, { onConflict: "campaign_id,handle" });
+      .upsert(rows, {
+        onConflict: "campaign_id,handle",
+        ignoreDuplicates: true,
+      });
 
     if (error) throw error;
     return recipients.length;
