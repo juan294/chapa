@@ -250,6 +250,44 @@ export async function dbClaimCampaignForSending(
 }
 
 /**
+ * Return a just-claimed campaign to draft when recipient persistence fails.
+ *
+ * The started-at predicate is the claim token: it prevents a stale worker from
+ * releasing a later claim after the campaign has been retried.
+ */
+export async function dbReleaseCampaignClaim(
+  id: string,
+  startedAt: string,
+): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const { data, error } = await db
+      .from("email_campaigns")
+      .update({
+        status: "draft",
+        total_recipients: 0,
+        started_at: null,
+      })
+      .eq("id", id)
+      .eq("status", "sending")
+      .eq("started_at", startedAt)
+      .select("id")
+      .maybeSingle();
+
+    if (error) throw error;
+    return Boolean(data);
+  } catch (error) {
+    console.error(
+      "[db] dbReleaseCampaignClaim failed:",
+      (error as Error).message,
+    );
+    return false;
+  }
+}
+
+/**
  * Fetch the most recent engagement campaign (cached 1h in Redis).
  *
  * Used during cron batch processing to avoid N+1 DB queries when

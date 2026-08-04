@@ -23,9 +23,10 @@ vi.mock("@/lib/db/campaigns", () => ({
   dbGetCampaign: vi.fn(),
   dbUpdateCampaign: vi.fn(),
   dbClaimCampaignForSending: vi.fn(),
+  dbReleaseCampaignClaim: vi.fn(),
   dbCreateCampaignSends: vi.fn(),
   dbClaimPendingSends: vi.fn(),
-  dbMarkSendsSent: vi.fn(),
+  dbAcknowledgeCampaignSends: vi.fn(),
   dbMarkSendsFailed: vi.fn(),
   dbRequeueSends: vi.fn(),
   dbGetCampaignStats: vi.fn(),
@@ -44,9 +45,10 @@ import {
   dbGetCampaign,
   dbUpdateCampaign,
   dbClaimCampaignForSending,
+  dbReleaseCampaignClaim,
   dbCreateCampaignSends,
   dbClaimPendingSends,
-  dbMarkSendsSent,
+  dbAcknowledgeCampaignSends,
   dbMarkSendsFailed,
   dbRequeueSends,
   dbGetCampaignStats,
@@ -64,7 +66,8 @@ beforeEach(() => {
   vi.mocked(cacheGet).mockResolvedValue(null);
   vi.mocked(cacheReserveQuota).mockResolvedValue({ allowed: true, current: 1, limit: DAILY_SEND_LIMIT });
   vi.mocked(dbClaimCampaignForSending).mockResolvedValue(true);
-  vi.mocked(dbMarkSendsSent).mockResolvedValue(true);
+  vi.mocked(dbReleaseCampaignClaim).mockResolvedValue(true);
+  vi.mocked(dbAcknowledgeCampaignSends).mockResolvedValue(true);
   vi.mocked(dbMarkSendsFailed).mockResolvedValue(true);
   vi.mocked(dbRequeueSends).mockResolvedValue(true);
 });
@@ -135,7 +138,7 @@ describe("initiateCampaign", () => {
     expect(result).toBeNull();
   });
 
-  it("does not claim a campaign when recipient persistence fails", async () => {
+  it("releases the winning claim when recipient persistence fails", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign);
     vi.mocked(dbGetUsersWithEmail).mockResolvedValue([
       { handle: "alice", email: "alice@example.com", displayName: "Alice", avatarUrl: null },
@@ -143,10 +146,14 @@ describe("initiateCampaign", () => {
     vi.mocked(dbCreateCampaignSends).mockResolvedValue(0);
 
     await expect(initiateCampaign("campaign-1")).resolves.toBeNull();
-    expect(dbClaimCampaignForSending).not.toHaveBeenCalled();
+    expect(dbClaimCampaignForSending).toHaveBeenCalled();
+    expect(dbReleaseCampaignClaim).toHaveBeenCalledWith(
+      "campaign-1",
+      expect.any(String),
+    );
   });
 
-  it("lets only the atomic draft claimant initiate a campaign", async () => {
+  it("does not persist recipients when another request owns the draft claim", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign);
     vi.mocked(dbGetUsersWithEmail).mockResolvedValue([
       { handle: "alice", email: "alice@example.com", displayName: "Alice", avatarUrl: null },
@@ -155,6 +162,7 @@ describe("initiateCampaign", () => {
     vi.mocked(dbClaimCampaignForSending).mockResolvedValue(false);
 
     await expect(initiateCampaign("campaign-1")).resolves.toBeNull();
+    expect(dbCreateCampaignSends).not.toHaveBeenCalled();
   });
 });
 
@@ -184,7 +192,10 @@ describe("processCampaignBatch", () => {
       expect.any(String),
       expect.any(String),
     );
-    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"], expect.any(String));
+    expect(dbAcknowledgeCampaignSends).toHaveBeenCalledWith(
+      [{ id: "s-1", status: "sent", error: null }],
+      expect.any(String),
+    );
     expect(mockBatchSend).toHaveBeenCalledWith(
       expect.any(Array),
       { idempotencyKey: expect.stringMatching(/^campaign\/campaign-1\/[a-f0-9]{64}$/) },
@@ -244,10 +255,10 @@ describe("processCampaignBatch", () => {
       { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "processing", sentAt: null, error: null },
     ]);
     mockBatchSend.mockResolvedValue({ data: [{ id: "msg-1" }], error: null });
-    vi.mocked(dbMarkSendsSent).mockResolvedValue(false);
+    vi.mocked(dbAcknowledgeCampaignSends).mockResolvedValue(false);
 
     await expect(processCampaignBatch("campaign-1")).rejects.toThrow(
-      "Failed to acknowledge sent campaign emails",
+      "Failed to acknowledge campaign email batch",
     );
     expect(dbMarkSendsFailed).not.toHaveBeenCalled();
     expect(cacheIncr).toHaveBeenCalledWith(
@@ -257,7 +268,7 @@ describe("processCampaignBatch", () => {
     );
   });
 
-  it("keeps the provider idempotency key stable when an acknowledgement retry claims fewer rows", async () => {
+  it("replays an expired lease with identical payload and idempotency key", async () => {
     const sends = Array.from({ length: 50 }, (_, index) => ({
       id: `s-${String(index).padStart(2, "0")}`,
       campaignId: "campaign-1",
@@ -270,27 +281,28 @@ describe("processCampaignBatch", () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends)
       .mockResolvedValueOnce(sends)
-      .mockResolvedValueOnce(sends.slice(0, 45));
+      .mockResolvedValueOnce(sends);
     mockBatchSend
       .mockResolvedValueOnce({ data: sends.map((_, index) => ({ id: `msg-${index}` })), error: null })
-      .mockResolvedValueOnce({ data: sends.slice(0, 45).map((_, index) => ({ id: `msg-${index}` })), error: null });
-    vi.mocked(dbMarkSendsSent)
+      .mockResolvedValueOnce({ data: sends.map((_, index) => ({ id: `msg-${index}` })), error: null });
+    vi.mocked(dbAcknowledgeCampaignSends)
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true);
-    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 45, pending: 5, processing: 0, failed: 0 });
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 50, pending: 0, processing: 0, failed: 0 });
 
     await expect(processCampaignBatch("campaign-1")).rejects.toThrow(
-      "Failed to acknowledge sent campaign emails",
+      "Failed to acknowledge campaign email batch",
     );
     await expect(processCampaignBatch("campaign-1")).resolves.toEqual({
-      sent: 45,
+      sent: 50,
       failed: 0,
-      remaining: 5,
+      remaining: 0,
     });
 
     const firstKey = mockBatchSend.mock.calls[0]?.[1]?.idempotencyKey;
     const retryKey = mockBatchSend.mock.calls[1]?.[1]?.idempotencyKey;
     expect(firstKey).toBe(retryKey);
+    expect(mockBatchSend.mock.calls[1]?.[0]).toEqual(mockBatchSend.mock.calls[0]?.[0]);
   });
 
   it("returns zeros for non-sending campaign", async () => {
@@ -352,8 +364,13 @@ describe("processCampaignBatch", () => {
     const result = await processCampaignBatch("campaign-1");
 
     expect(result).toEqual({ sent: 1, failed: 1, remaining: 0 });
-    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"], expect.any(String));
-    expect(dbMarkSendsFailed).toHaveBeenCalledWith(["s-2"], "rejected", expect.any(String));
+    expect(dbAcknowledgeCampaignSends).toHaveBeenCalledWith(
+      [
+        { id: "s-1", status: "sent", error: null },
+        { id: "s-2", status: "failed", error: "rejected" },
+      ],
+      expect.any(String),
+    );
     expect(cacheIncr).toHaveBeenCalledWith(
       expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),
       -1,
@@ -361,7 +378,7 @@ describe("processCampaignBatch", () => {
     );
   });
 
-  it("groups multiple failed sends with the same message into one failure write", async () => {
+  it("acknowledges mixed provider results in one atomic write", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends).mockResolvedValue([
       { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "processing", sentAt: null, error: null },
@@ -382,11 +399,12 @@ describe("processCampaignBatch", () => {
     const result = await processCampaignBatch("campaign-1");
 
     expect(result).toEqual({ sent: 1, failed: 2, remaining: 0 });
-    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"], expect.any(String));
-    expect(dbMarkSendsFailed).toHaveBeenCalledTimes(1);
-    expect(dbMarkSendsFailed).toHaveBeenCalledWith(
-      ["s-2", "s-3"],
-      "mailbox unavailable",
+    expect(dbAcknowledgeCampaignSends).toHaveBeenCalledWith(
+      [
+        { id: "s-1", status: "sent", error: null },
+        { id: "s-2", status: "failed", error: "mailbox unavailable" },
+        { id: "s-3", status: "failed", error: "mailbox unavailable" },
+      ],
       expect.any(String),
     );
     expect(cacheIncr).toHaveBeenCalledWith(
@@ -415,10 +433,12 @@ describe("processCampaignBatch", () => {
     const result = await processCampaignBatch("campaign-1");
 
     expect(result).toEqual({ sent: 1, failed: 2, remaining: 0 });
-    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"], expect.any(String));
-    expect(dbMarkSendsFailed).toHaveBeenCalledWith(
-      ["s-2", "s-3"],
-      "Unknown Resend batch failure",
+    expect(dbAcknowledgeCampaignSends).toHaveBeenCalledWith(
+      [
+        { id: "s-1", status: "sent", error: null },
+        { id: "s-2", status: "failed", error: "Unknown Resend batch failure" },
+        { id: "s-3", status: "failed", error: "Unknown Resend batch failure" },
+      ],
       expect.any(String),
     );
     expect(cacheIncr).toHaveBeenCalledWith(
@@ -521,7 +541,10 @@ describe("processCampaignBatch", () => {
 
     await expect(processCampaignBatch("campaign-1")).rejects.toThrow("DB connection lost");
     // The send itself succeeded — sends were marked
-    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"], expect.any(String));
+    expect(dbAcknowledgeCampaignSends).toHaveBeenCalledWith(
+      [{ id: "s-1", status: "sent", error: null }],
+      expect.any(String),
+    );
   });
 
   it("does not finalize while another worker still holds claimed sends", async () => {

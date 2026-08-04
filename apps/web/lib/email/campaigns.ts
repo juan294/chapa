@@ -19,9 +19,10 @@ import {
   dbGetCampaign,
   dbUpdateCampaign,
   dbClaimCampaignForSending,
+  dbReleaseCampaignClaim,
   dbCreateCampaignSends,
   dbClaimPendingSends,
-  dbMarkSendsSent,
+  dbAcknowledgeCampaignSends,
   dbMarkSendsFailed,
   dbRequeueSends,
   dbGetCampaignStats,
@@ -140,18 +141,27 @@ export async function initiateCampaign(
   const users = await dbGetUsersWithEmail();
   if (users.length === 0) return null;
 
+  const startedAt = new Date().toISOString();
+  const claimed = await dbClaimCampaignForSending(
+    campaignId,
+    users.length,
+    startedAt,
+  );
+  if (!claimed) return null;
+
   const count = await dbCreateCampaignSends(
     campaignId,
     users.map((u) => ({ handle: u.handle, email: u.email })),
   );
-  if (count === 0) return null;
-
-  const claimed = await dbClaimCampaignForSending(
-    campaignId,
-    count,
-    new Date().toISOString(),
-  );
-  if (!claimed) return null;
+  if (count === 0) {
+    const released = await dbReleaseCampaignClaim(campaignId, startedAt);
+    if (!released) {
+      throw new Error(
+        "Failed to release campaign after recipient persistence failure",
+      );
+    }
+    return null;
+  }
 
   return { totalRecipients: count };
 }
@@ -252,10 +262,9 @@ export async function processCampaignBatch(
   let batchFailed = 0;
   const sendIds = claimed.map((s) => s.id);
   const idempotencyKey = `campaign/${campaignId}/${createHash("sha256")
-    // Anchor the provider key to the first row in the stable DB claim order.
-    // A retry may claim fewer rows because quota was reserved before an
-    // acknowledgement failure; keeping the same key prevents a second send.
-    .update(sendIds[0] ?? campaignId)
+    // Expired leases are recovered as one indivisible group by the claim RPC,
+    // so the full ordered membership and provider payload remain identical.
+    .update(sendIds.join("\n") || campaignId)
     .digest("hex")}`;
 
   let data: unknown = null;
@@ -297,40 +306,37 @@ export async function processCampaignBatch(
       batchFailed = claimed.length;
     }
   } else {
-      const results = Array.isArray(data) ? (data as ResendBatchResult[]) : [];
-      const successfulIds: string[] = [];
-      const failedByMessage = new Map<string, string[]>();
+    const results = Array.isArray(data) ? (data as ResendBatchResult[]) : [];
+    const acknowledgements: Array<{
+      id: string;
+      status: "sent" | "failed";
+      error: string | null;
+    }> = [];
 
-      for (const [index, send] of claimed.entries()) {
-        const result = results[index];
-        if (result?.id && !result.error) {
-          successfulIds.push(send.id);
-          continue;
-        }
-
-        const message = result?.error?.message ?? "Unknown Resend batch failure";
-        const ids = failedByMessage.get(message) ?? [];
-        ids.push(send.id);
-        failedByMessage.set(message, ids);
+    for (const [index, send] of claimed.entries()) {
+      const result = results[index];
+      if (result?.id && !result.error) {
+        acknowledgements.push({ id: send.id, status: "sent", error: null });
+        continue;
       }
 
-      if (successfulIds.length > 0) {
-        const acknowledged = await dbMarkSendsSent(successfulIds, leaseToken);
-        if (!acknowledged) {
-          await refundDailyQuota(successfulIds.length);
-          throw new Error("Failed to acknowledge sent campaign emails");
-        }
-      }
-      for (const [message, failedIds] of failedByMessage) {
-        const acknowledged = await dbMarkSendsFailed(failedIds, message, leaseToken);
-        if (!acknowledged) {
-          await refundDailyQuota(failedIds.length);
-          throw new Error("Failed to acknowledge failed campaign emails");
-        }
-      }
+      const message = result?.error?.message ?? "Unknown Resend batch failure";
+      acknowledgements.push({ id: send.id, status: "failed", error: message });
+    }
 
-      batchSent = successfulIds.length;
-      batchFailed = claimed.length - successfulIds.length;
+    const acknowledged = await dbAcknowledgeCampaignSends(
+      acknowledgements,
+      leaseToken,
+    );
+    if (!acknowledged) {
+      await refundDailyQuota(claimed.length);
+      throw new Error("Failed to acknowledge campaign email batch");
+    }
+
+    batchSent = acknowledgements.filter(
+      (item) => item.status === "sent",
+    ).length;
+    batchFailed = claimed.length - batchSent;
   }
 
   if (batchFailed > 0) {

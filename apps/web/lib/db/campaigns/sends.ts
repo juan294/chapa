@@ -99,9 +99,9 @@ export async function dbGetPendingSends(
  * returned row's `status → "processing"`, `lease_token`, and `lease_expires_at`
  * in a single statement — preventing two concurrent workers from picking the
  * same batch. The caller must complete processing before `leaseExpiresAt` and
- * then call `dbMarkSendsSent` / `dbMarkSendsFailed` with the same `leaseToken`
- * to release the lease. Expired leases are automatically re-claimable by the
- * next cron invocation.
+ * then atomically acknowledge the provider batch with the same `leaseToken`.
+ * Expired leases are automatically re-claimable as an indivisible group by
+ * the next cron invocation, preserving an identical idempotent payload.
  *
  * @param leaseToken - Opaque token that ties this batch to the claiming worker
  * @param leaseExpiresAt - ISO-8601 timestamp after which the claim expires
@@ -138,6 +138,45 @@ export async function dbClaimPendingSends(
       (error as Error).message,
     );
     return [];
+  }
+}
+
+export interface CampaignSendAcknowledgement {
+  id: string;
+  status: "sent" | "failed";
+  error: string | null;
+}
+
+/**
+ * Atomically acknowledge every result in one provider batch.
+ *
+ * The database function performs no updates unless every input row still
+ * belongs to the supplied lease. This prevents a partially written
+ * acknowledgement from changing the payload membership of an idempotent
+ * provider retry.
+ */
+export async function dbAcknowledgeCampaignSends(
+  results: CampaignSendAcknowledgement[],
+  leaseToken: string,
+): Promise<boolean> {
+  if (results.length === 0) return true;
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const { data, error } = await db.rpc("acknowledge_campaign_sends", {
+      p_lease_token: leaseToken,
+      p_results: results,
+    });
+
+    if (error) throw error;
+    return data === true;
+  } catch (error) {
+    console.error(
+      "[db] dbAcknowledgeCampaignSends failed:",
+      (error as Error).message,
+    );
+    return false;
   }
 }
 

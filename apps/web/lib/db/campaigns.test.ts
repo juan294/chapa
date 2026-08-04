@@ -96,9 +96,11 @@ import {
   dbCreateCampaign,
   dbUpdateCampaign,
   dbClaimCampaignForSending,
+  dbReleaseCampaignClaim,
   dbDeleteCampaign,
   dbCreateCampaignSends,
   dbClaimPendingSends,
+  dbAcknowledgeCampaignSends,
   dbGetPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
@@ -134,6 +136,21 @@ describe("dbClaimCampaignForSending", () => {
     await expect(
       dbClaimCampaignForSending("c-1", 12, "2026-08-04T14:00:00.000Z"),
     ).resolves.toBe(false);
+  });
+});
+
+describe("dbReleaseCampaignClaim", () => {
+  it("releases only the matching in-progress claim", async () => {
+    queryResult = { data: { id: "c-1" }, error: null };
+
+    await expect(
+      dbReleaseCampaignClaim("c-1", "2026-08-04T14:00:00.000Z"),
+    ).resolves.toBe(true);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      status: "draft",
+      total_recipients: 0,
+      started_at: null,
+    });
   });
 });
 
@@ -646,6 +663,34 @@ describe("dbClaimPendingSends", () => {
     );
 
     expect(result).toEqual([]);
+  });
+});
+
+describe("dbAcknowledgeCampaignSends", () => {
+  it("delegates the complete provider result set to one RPC", async () => {
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
+    const results = [
+      { id: "s-1", status: "sent" as const, error: null },
+      { id: "s-2", status: "failed" as const, error: "rejected" },
+    ];
+
+    await expect(
+      dbAcknowledgeCampaignSends(results, "lease-token"),
+    ).resolves.toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("acknowledge_campaign_sends", {
+      p_lease_token: "lease-token",
+      p_results: results,
+    });
+  });
+
+  it("fails closed when the RPC cannot acknowledge the whole lease", async () => {
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
+    await expect(
+      dbAcknowledgeCampaignSends(
+        [{ id: "s-1", status: "sent", error: null }],
+        "lease-token",
+      ),
+    ).resolves.toBe(false);
   });
 });
 
