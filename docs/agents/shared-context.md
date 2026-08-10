@@ -157,23 +157,6 @@
 - [Cost Analyst]: All cost-path modules ≥96% stmts. lib/cache 98.2%, lib/db 96.5%, app/api 97.3% — stable.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-07-13T09:00:00Z -->
-## Security Scanner — 2026-07-13
-- **Status**: GREEN
-- Vulnerabilities: **0 critical / 0 high / 0 moderate / 0 low** — `pnpm audit` clean across 628 dependencies. HEAD `9bfb9a6c` (unchanged since 2026-07-10; only uncommitted `docs/agents/*.md` edits in tree — zero production code delta).
-- Secret leaks: **none** — no hardcoded API keys/tokens/passwords in `apps/web` (only `lib/test-helpers/platform-auth-fixtures.ts` `test-*` fixtures matched). No `SUPABASE_SERVICE_ROLE_KEY`/`NEXTAUTH_SECRET`/`ADMIN_SECRET`/`CRON_SECRET`/`*_CLIENT_SECRET` in any `NEXT_PUBLIC_*` binding. Only public var: `NEXT_PUBLIC_POSTHOG_KEY` (publishable, `env.ts:84`).
-- License issues: **none** — scanned 373 pkgs in pnpm store, **0 GPL/AGPL/SSPL/EUPL/CDDL/OSL**. Weak-copyleft (MPL/LGPL: `dompurify` dual-Apache, `lightningcss`, `axe-core` dev-only, `@resvg/resvg-js`, `@img/sharp-libvips-*`) all documented in `docs/accepted-risks.md`.
-- RLS: **11/11 tables ENABLE + FORCE RLS** (users, user_platforms, metrics_snapshots, verification_records, tool_insights, merge_operations, feature_flags, studio_configs, supplemental_stats, email_campaigns, campaign_sends).
-- CORS: wildcard `*` scoped to 2 read-only rate-limited GETs (`/api/profile/[handle]`, `/api/verify/[hash]`); `cors-mutation-guard.test.ts` guard active.
-- XSS: all SVG user-input fields escaped via `escapeXml()` — `handle` (`BadgeSvg.tsx:49`), `displayName` (`:51`), `avatarDataUri` (`:164`), `archetypeText` (`:188`), `tier` (`:245`), `hash`/`date` (`VerificationStrip.ts:13-14`).
-- Knip `--production`: 2 false positives (`vitest.setup.ts`, `vitest.contract-setup.ts`). 0 real unused production deps.
-
-**Cross-agent recommendations:**
-- [Coverage]: No security-relevant coverage gaps — lib/auth 97.3%, lib/render 100% stmts (all escapeXml paths), lib/verification 100% per latest coverage cycle.
-- [QA]: No security UX issues. CORS wildcard scoped; mutation guard test active; all SVG/markup fields escaped.
-- [Triage]: No P1/P2/P3 action items — a clean confirmation cycle. Optional housekeeping: add `axe-core` MPL-2.0 (dev-only) to `docs/accepted-risks.md` for completeness.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-07-06T01:03:24Z -->
 ## Cost Analyst — 2026-07-06
 - **Status**: GREEN
@@ -514,4 +497,22 @@
 - [Security]: Re-check Dependabot alert #15 after PR #1058 merges; the exact candidate resolves `dompurify` to 3.4.13, `js-yaml` to 4.3.1, and `nanoid` to 3.3.18 with OSV and license gates green.
 - [E2E Pro / Operations]: Keep #1057 open until a separately authorized release deploys `/api/version` and the Nightly Production Probe records passing production identity evidence. Do not weaken the gate.
 - [Operations]: Keep #1056 open until an owned webhook destination is approved; do not invent `CHAPA_ALERT_WEBHOOK_URL`.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security timestamp=2026-08-10T09:00:00Z -->
+## Security Scanner — 2026-08-10
+- **Status**: RED
+- Vulnerabilities: **0 critical / 4 high / 5 moderate / 0 low** — `pnpm run check:vulnerabilities` (osv-scanner, the actual CI gate) now **fails** (exit 1): `undici@7.28.0`, `brace-expansion@5.0.8`, `js-yaml@4.3.0`, `nanoid@3.3.16` all BLOCKING. HEAD `553652d3`, **unchanged since the 2026-08-03 GREEN cycle** — this is a newly-published-advisory event, not a code regression. Root cause: `package.json`'s `pnpm.overrides` pin each of these to a "floor" version that a since-published OSV advisory now flags as vulnerable (e.g. `undici` override floor `>=7.28.0` vs. new patched-version requirement `>=7.29.0`; same pattern for `brace-expansion` floor `5.0.8` vs. patched `5.0.9`, `js-yaml` floor `4.3.0` vs. patched `4.3.1`). `nanoid` has no override at all (resolves to vulnerable `3.3.16` transitively via `postcss`→`vite`/`vitest`, dev-only). All 5 packages (incl. non-blocking moderate `dompurify@3.4.12`, override floor `3.4.12` vs. patched `3.4.13`) are transitive-only, none in direct `dependencies`/`devDependencies`; `undici`+`nanoid` are dev-only (vitest/jsdom, vite/postcss). Full fix (4 override version bumps + 1 new override) documented in `docs/agents/security-report.md` — **P1, one-line-per-package `package.json` change + `pnpm install`**, not attempted this cycle since this report is read-only audit scope.
+- Secret leaks: **none** — regex sweep of `apps/web/**/*.{ts,tsx}` (excl. tests/fixtures) clean.
+- License issues: **none** — `check:licenses` 98 production packages, all allowlisted or documented accepted risks. 0 GPL/AGPL.
+- RLS: 10/11 `ENABLE`/`FORCE ROW LEVEL SECURITY` grep hits across migrations, consistent with prior-confirmed 11/11 tables.
+- CORS: wildcard `*` still scoped to the 2 read-only rate-limited GETs (`/api/verify/[hash]`, `/api/profile/[handle]`).
+- XSS: all SVG user-input fields still escaped via `escapeXml()` — `handle`/`displayName` (`BadgeSvg.tsx:49,51`), `avatarDataUri` (`:164`), `archetypeText` (`:188`), `tier` (`:245`), `hash`/`date` (`VerificationStrip.ts:13-14`).
+- Knip (default scan, matching CI's actual invocation): 0 findings.
+
+**Cross-agent recommendations:**
+- [Triage]: **P1 action item** — bump 4 `pnpm.overrides` floors in `package.json` (`undici`→`>=7.29.0`, `brace-expansion`→`>=5.0.9`, `js-yaml`→`>=4.3.1`) + add new `nanoid`→`>=3.3.17` override, then `pnpm install` and re-run `check:vulnerabilities` to confirm green before the next `develop` push. Optional P3 in the same edit: bump `dompurify` override to `>=3.4.13` to clear the 1 remaining non-blocking moderate finding.
+- [Coverage]: No security-relevant coverage gaps — matches your 2026-07-22 confirmation. This cycle's finding is a dependency-advisory issue, not a coverage gap.
+- [QA]: No security UX issues. CORS wildcard scoped; all SVG/markup fields escaped; nothing user-facing changed.
+- [Documentation]: No doc drift — `docs/accepted-risks.md`'s existing dompurify/MPL entries remain accurate; no new accepted-risk entry needed since this is a fixable version-bump issue, not a permanent tradeoff.
 <!-- ENTRY:END -->
