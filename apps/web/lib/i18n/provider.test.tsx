@@ -22,6 +22,9 @@ function TestConsumer() {
       <span data-testid="locale">{ctx.locale}</span>
       <button onClick={() => ctx.setLocale('es')}>switch-es</button>
       <button onClick={() => ctx.setLocale('en')}>switch-en</button>
+      <button onClick={() => ctx.setLocale('es', { navigate: false })}>
+        sync-es
+      </button>
     </div>
   );
 }
@@ -99,6 +102,30 @@ describe('LanguageProvider', () => {
 
     expect(setLocaleAction).toHaveBeenCalledWith('es');
     expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('applies an explicit locale before a slow cookie persistence call finishes', async () => {
+    let finishPersistence: (() => void) | undefined;
+    vi.mocked(setLocaleAction).mockImplementationOnce(
+      () => new Promise<void>((resolve) => {
+        finishPersistence = resolve;
+      })
+    );
+
+    render(
+      <LanguageProvider initialLocale="en">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    screen.getByText('sync-es').click();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    finishPersistence?.();
   });
 
   it('reloads through the canonical public path after switching from an internal locale route', async () => {

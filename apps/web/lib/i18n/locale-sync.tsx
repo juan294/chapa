@@ -2,7 +2,7 @@
 
 import { useLayoutEffect } from 'react';
 import { useTranslation } from './use-translation';
-import { isSupportedLocale } from './types';
+import { isSupportedLocale, LOCALE_SYNC_EVENT } from './types';
 
 /**
  * Applies an inbound `?lang=` deep-link query param to the live page.
@@ -23,9 +23,15 @@ export function LocaleSync({ queryLang }: { queryLang?: string | null }) {
   useLayoutEffect(() => {
     if (isSupportedLocale(queryLang)) {
       document.documentElement.dataset.chapaLocaleSync = queryLang;
-      void setLocale(queryLang, { force: true, navigate: false });
+      document.documentElement.lang = queryLang;
+      window.dispatchEvent(new Event(LOCALE_SYNC_EVENT));
+      // The visible query-owned locale is already applied synchronously above.
+      // Cookie persistence is best-effort and must not create an unhandled
+      // rejection when the server action is temporarily unavailable.
+      void setLocale(queryLang, { force: true, navigate: false }).catch(() => {});
       return () => {
         delete document.documentElement.dataset.chapaLocaleSync;
+        window.dispatchEvent(new Event(LOCALE_SYNC_EVENT));
       };
     }
     // setLocale is intentionally omitted: its identity changes whenever the

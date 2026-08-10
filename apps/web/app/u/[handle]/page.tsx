@@ -29,7 +29,9 @@ import {
 } from "@/lib/profile/public-profile";
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { getServerT } from "@/lib/i18n/server";
-import { LocaleSync } from "@/lib/i18n";
+import { LanguageProvider, LocaleSync } from "@/lib/i18n";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
 import { isSupportedLocale } from "@/lib/i18n/types";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { SharePageH2 } from "./SharePageH2";
@@ -91,6 +93,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const { handle } = await params;
   const resolvedSearch = searchParams ? await searchParams : {};
   const queryLang = typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
+  const locale = isSupportedLocale(queryLang) ? queryLang : "es";
   const readOnly = resolvedSearch[READ_ONLY_SMOKE_PARAM] === "1";
 
   if (!isValidHandle(handle)) {
@@ -98,16 +101,23 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   }
 
   return (
-    <main id="main-content" className="min-h-screen bg-bg">
+    <LanguageProvider
+      initialLocale={locale}
+      dictionary={locale === "es" ? es : en}
+    >
+      {/* Establish query ownership in the hydrated shell. The streamed client
+          subtree then starts with the same dictionary as its server markup. */}
       <LocaleSync queryLang={queryLang} />
-      <Suspense fallback={<BadgeSkeleton />}>
-        <SharePageContent handle={handle} readOnly={readOnly} />
-      </Suspense>
-      {/* Progressive disclosure (#783): the terminal command bar is demoted to a
-          subtle, opt-in hint so the badge value stays legible to non-developer
-          visitors. The "/" shortcut and full command bar remain available. */}
-      <CommandBarHint />
-    </main>
+      <main id="main-content" className="min-h-screen bg-bg">
+        <Suspense fallback={<BadgeSkeleton />}>
+          <SharePageContent handle={handle} readOnly={readOnly} />
+        </Suspense>
+        {/* Progressive disclosure (#783): the terminal command bar is demoted to a
+            subtle, opt-in hint so the badge value stays legible to non-developer
+            visitors. The "/" shortcut and full command bar remain available. */}
+        <CommandBarHint />
+      </main>
+    </LanguageProvider>
   );
 }
 

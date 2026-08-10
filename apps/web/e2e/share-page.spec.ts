@@ -103,6 +103,15 @@ test.describe("Share page — /u/:handle", () => {
     );
     expect(documentNavigations).toHaveLength(1);
     expect(hydrationErrors).toEqual([]);
+
+    await page.reload(GOTO_OPTS);
+    await expect(page).toHaveURL(path);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(page).toHaveTitle(
+      "@octocat — Developer Impact, Decoded — Chapa",
+    );
+    expect(documentNavigations).toHaveLength(2);
+    expect(hydrationErrors).toEqual([]);
   });
 
   test("invalid handle returns 404 or error state", async ({ page }) => {

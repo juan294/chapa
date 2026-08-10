@@ -159,15 +159,17 @@ export function LanguageProvider({
     ) => {
       const cookieLocale = readClientLocaleCookie();
       if (next === locale && (!force || cookieLocale === next)) return;
-      // Persist the cookie and update client consumers such as `?lang=` deep
-      // links before the canonical document navigation completes. The server
-      // action deliberately does not revalidate the static layout, avoiding an
-      // automatic RSC refresh racing this navigation.
-      if (cookieLocale !== next) {
-        await setLocaleAction(next);
-      }
+      // Apply the requested dictionary before awaiting cookie persistence. An
+      // explicit `?lang=` page must stay coherent even when its server action
+      // is slow or unavailable; otherwise server-rendered copy can use the
+      // query locale while the shared client navigation remains stale.
       if (next !== locale) {
         await applyLocale(next);
+      }
+      // The server action deliberately does not revalidate the static layout,
+      // avoiding an automatic RSC refresh racing the canonical navigation.
+      if (cookieLocale !== next) {
+        await setLocaleAction(next);
       }
       if (!navigate) return;
       // A full canonical navigation is intentional. `router.refresh()` can

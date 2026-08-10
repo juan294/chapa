@@ -130,6 +130,23 @@ describe('LocaleSync', () => {
     );
   });
 
+  it('handles a rejected query-locale persistence call', async () => {
+    const setLocale = vi.fn().mockRejectedValue(new Error('cookie unavailable'));
+
+    render(
+      <LanguageContext.Provider
+        value={{ locale: 'es', setLocale, t: (key) => key }}
+      >
+        <LocaleSync queryLang="en" />
+      </LanguageContext.Provider>
+    );
+
+    await waitFor(() => expect(setLocale).toHaveBeenCalledOnce());
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
   it('keeps the query locale authoritative over a conflicting cookie', async () => {
     document.cookie = 'chapa-locale=en; path=/';
     window.history.replaceState({}, '', '/?lang=es');

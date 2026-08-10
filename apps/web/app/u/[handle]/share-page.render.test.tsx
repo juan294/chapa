@@ -319,7 +319,7 @@ describe("Phase 4d — Share page i18n", () => {
     });
   });
 
-  describe("page.tsx source — LocaleSync mount", () => {
+  describe("page.tsx source — LocaleSync hydration boundary", () => {
     const SOURCE = fs.readFileSync(
       path.resolve(__dirname, "page.tsx"),
       "utf-8",
@@ -330,8 +330,22 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).toContain("@/lib/i18n");
     });
 
-    it("mounts <LocaleSync> in the page shell", () => {
-      expect(SOURCE).toContain("<LocaleSync");
+    it("establishes a query-initialized provider before streamed content", () => {
+      const pageStart = SOURCE.indexOf("export default async function SharePage");
+      const contentStart = SOURCE.indexOf(
+        "export async function SharePageContent",
+      );
+      const provider = SOURCE.indexOf("<LanguageProvider", pageStart);
+      const localeSync = SOURCE.indexOf("<LocaleSync", pageStart);
+      const suspense = SOURCE.indexOf("<Suspense", pageStart);
+
+      expect(pageStart).toBeGreaterThan(-1);
+      expect(contentStart).toBeGreaterThan(-1);
+      expect(provider).toBeGreaterThan(pageStart);
+      expect(localeSync).toBeGreaterThan(provider);
+      expect(localeSync).toBeLessThan(suspense);
+      expect(suspense).toBeLessThan(contentStart);
+      expect(SOURCE.slice(contentStart)).not.toContain("<LocaleSync");
     });
 
     it("imports interpolate from @/lib/i18n/interpolate", () => {
