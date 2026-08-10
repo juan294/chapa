@@ -116,7 +116,7 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## DOMPurify transitive dependency license (PostHog toolbar)
 
-- **Risk:** `dompurify@3.4.12` appears in the lockfile through PostHog's transitive dependency graph, and is also pinned by a root `pnpm.overrides` security floor. Its license expression is `(MPL-2.0 OR Apache-2.0)`.
+- **Risk:** `dompurify@3.4.13` appears in the lockfile through PostHog's transitive dependency graph, and is also pinned by a root `pnpm.overrides` security floor. Its license expression is `(MPL-2.0 OR Apache-2.0)`.
 - **Accepted because:** Chapa does not import DOMPurify directly; it is pulled in by PostHog tooling. The package offers Apache-2.0 as an alternative license, which is already on the project allowlist. The override keeps the transitive package on the patched floor without adding a runtime sanitizer dependency to application code.
 - **Mitigation:** Keep the override until PostHog's dependency range guarantees the patched version. Re-check this entry during dependency upgrades and license audits.
 - **Severity:** Low
