@@ -17,7 +17,7 @@
     <mxCell id="share" value="Share Page&#10;/u/:handle" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="frontend">
       <mxGeometry x="190" y="38" width="155" height="45" as="geometry"/>
     </mxCell>
-    <mxCell id="studio" value="Creator Studio&#10;/studio" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="frontend">
+    <mxCell id="studio" value="Creator Studio&#10;/studio · durable config" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="frontend">
       <mxGeometry x="360" y="38" width="155" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="aboutpages" value="About + Archetypes&#10;/about · /archetypes/*" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="frontend">
@@ -71,7 +71,7 @@
     <mxCell id="authep" value="Auth Endpoints&#10;/api/auth/*" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="api">
       <mxGeometry x="20" y="35" width="160" height="45" as="geometry"/>
     </mxCell>
-    <mxCell id="pubep" value="Public Endpoints&#10;/api/profile, /u/:handle/badge.svg" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
+    <mxCell id="pubep" value="Public Endpoints&#10;/api/profile · /api/version&#10;/u/:handle/badge.svg" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
       <mxGeometry x="210" y="35" width="180" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="privep" value="Authenticated Endpoints&#10;/api/refresh, /api/generate, /api/supplemental" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
@@ -113,7 +113,7 @@
     <mxCell id="platforms" value="Platform Clients&#10;(lib/github/, lib/bitbucket/,&#10;lib/codeberg/, lib/gitlab/) · supplemental merge" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
       <mxGeometry x="210" y="103" width="200" height="45" as="geometry"/>
     </mxCell>
-    <mxCell id="dbmod" value="Database CRUD&#10;(lib/db/)&#10;snapshots · supplemental · users" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
+    <mxCell id="dbmod" value="Database CRUD&#10;(lib/db/)&#10;snapshots · supplemental · studio config" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
       <mxGeometry x="440" y="103" width="160" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="profilemod" value="Profile Modules&#10;(lib/profile/)&#10;materialize · orchestrate · public" style="rounded=1;whiteSpace=wrap;fillColor=#edf7ed;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
@@ -122,7 +122,7 @@
     <mxCell id="observability" value="Observability  ·  lib/analytics/server-errors  ·  withErrorCapture()  ·  Structured JSON Logger" style="rounded=1;whiteSpace=wrap;fillColor=#edf7ed;strokeColor=#82b366;fontSize=10;" vertex="1" parent="engine">
       <mxGeometry x="20" y="157" width="400" height="44" as="geometry"/>
     </mxCell>
-    <mxCell id="emailcampaign" value="Email + Campaigns  ·  lib/email/  ·  lib/campaigns/  ·  Lease-based Send Claiming" style="rounded=1;whiteSpace=wrap;fillColor=#edf7ed;strokeColor=#82b366;fontSize=10;" vertex="1" parent="engine">
+    <mxCell id="emailcampaign" value="Email + Campaigns · lib/email/ · lib/campaigns/&#10;Atomic lease claim · full-batch ack · stable retry identity" style="rounded=1;whiteSpace=wrap;fillColor=#edf7ed;strokeColor=#82b366;fontSize=10;" vertex="1" parent="engine">
       <mxGeometry x="440" y="157" width="420" height="44" as="geometry"/>
     </mxCell>
     <mxCell id="i18nmod" value="i18n System&#10;(lib/i18n/)&#10;detect · en/es dicts · cookie · server + client t()" style="rounded=1;whiteSpace=wrap;fillColor=#fff8e6;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
@@ -143,10 +143,10 @@
     <mxCell id="redis" value="Upstash&#10;Redis" style="shape=cylinder3;whiteSpace=wrap;fillColor=#fff;strokeColor=#9673a6;size=12;fontSize=11;" vertex="1" parent="data">
       <mxGeometry x="220" y="35" width="140" height="70" as="geometry"/>
     </mxCell>
-    <mxCell id="supatables" value="Tables:&#10;users · user_platforms&#10;metrics_snapshots · tool_insights&#10;email_campaigns · campaign_sends&#10;merge_operations · feature_flags&#10;verification_records&#10;supplemental_stats   ← new (#825)" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
+    <mxCell id="supatables" value="Tables:&#10;users · user_platforms&#10;metrics_snapshots · tool_insights&#10;email_campaigns · campaign_sends&#10;merge_operations · feature_flags&#10;verification_records · studio_configs&#10;supplemental_stats" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
       <mxGeometry x="15" y="115" width="170" height="135" as="geometry"/>
     </mxCell>
-    <mxCell id="rediskeys" value="Keys:&#10;stats:v2:* · stats:stale:*&#10;ratelimit:* · oauthstate:*&#10;sideeffects:done:*&#10;supplemental:&lt;handle&gt; (24h)&#10;stats:dirty:&lt;handle&gt;   ← new (#826)" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
+    <mxCell id="rediskeys" value="Keys:&#10;stats:v2:* · stats:stale:*&#10;ratelimit:* · oauthstate:*&#10;sideeffects:done:*&#10;supplemental:&lt;handle&gt; (24h)&#10;stats:dirty:&lt;handle&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
       <mxGeometry x="205" y="115" width="200" height="135" as="geometry"/>
     </mxCell>
     <mxCell id="cli" value="CLI (packages/cli/)" style="swimlane;startSize=26;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">

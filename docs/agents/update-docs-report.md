@@ -1,30 +1,104 @@
 # Documentation Update Report
 
-> Generated on 2026-07-18 | Branch: `develop` | Changes since `v2.19.0` (8175a8a0, 2026-07-16)
+> Generated on 2026-08-10 | Branch: `develop` | Changes since `v2.19.1`
 
 ## Summary
 
-- **1 document updated** (`CHANGELOG.md` — `[Unreleased]` section)
-- **0 diagrams updated** (0 exist in the repo — confirmed by dedicated discovery pass, nothing stale)
-- **0 version references corrected** (tag, `apps/web/package.json`, and `CHANGELOG.md`'s top released entry all agree at `v2.19.0`; README badges, cc-rpi blueprint marker, and CI Node pins all current)
-- **0 inline doc blocks updated** (no new/changed exported function signatures in this range needed a JSDoc refresh — `stats-integrity.ts`'s new `isScopeBlindedStats()` already carries full JSDoc from its own commit)
+- **7 documents updated**
+- **1 architecture diagram refreshed** (native draw.io source and PNG export)
+- **3 version-reference groups corrected**
+- **0 inline doc blocks updated**
 - **0 items flagged [NEEDS REVIEW]**
 
 ## Discovery
 
-Four parallel read-only agents (change-analyst, doc-inventory, diagram-analyzer, version-scanner) audited the 24-file/1084-insertion/434-deletion delta since `v2.19.0`. Net finding: the same-day triage cycle immediately prior to this pass (commit `d9a4525a`) had already corrected every doc-relevant gap it touched — CLAUDE.md's OAuth token-scoping model (#1002/#1004 sections), the `/api/health` `insufficient_scope` line, the CI Gates list (`check:vercel-config`), and the cron section's `vercel.json` Root Directory note. The only gap that survived that cycle was `CHANGELOG.md`, which is not part of the triage workflow's scope.
+Four read-only discovery roles audited changes since the released `v2.19.1`
+tree: change analysis, documentation inventory, diagram analysis, and version
+scanning. Because `v2.19.1` was squash-merged to `main`, the tag is not an
+ancestor of `develop`; reconciliation commit `8f4591e3` has the same tree as
+the release and is the accurate content boundary.
+
+The unreleased delta contains 21 commits across 152 files. The documentation-
+relevant changes are exact-SHA E2E Pro release verification, `/api/version`,
+atomic campaign delivery retries and acknowledgements, GitHub-stat visibility
+and cache corrections, overlap-safe server jobs, dependency security floors,
+and cc-rpi v1.28.2 workflow synchronization. SEO work remains research and
+planning only.
 
 ## Changes by File
 
 ### `CHANGELOG.md`
 
-The `[Unreleased]` section documented only the `heal-poisoned-stats`/#1049 fix (`isScopeBlindedStats` detector for the #1045 corruption shape). Two shipped, unreleased fixes had no entry:
+- Refreshed the existing prepared v2.20.0 release section; no release was
+  published or tagged.
+- Added atomic campaign retry/acknowledgement, server-job overlap safety,
+  GitHub-stat visibility/cache integrity, and dependency security fixes.
+- Corrected the `[Unreleased]` comparison base to `v2.19.1` and restored the
+  missing v2.18.0 through v2.19.1 comparison references.
 
-1. **Extended the existing #1049 entry** with one sentence noting the `metrics_snapshots` column-name bug (`issues_closed` vs `issues_closed_count`) the heal script's own dry-run caught same-day, before it touched any data — this was a same-day self-correction within the same fix, not a separate outstanding issue, so it's folded into the existing bullet rather than given its own.
-2. **Added a new entry** for the `warm-cache` `WARM_CACHE_PRIORITY_HANDLES` ceiling-bypass fix — a real correctness bug (per-run GitHub-call volume could exceed the documented 50-handle ceiling, live since the cron went hourly in #1010) closed this triage cycle after being carried as a cost-analyst P2 for 2 cycles.
-3. **Added a new entry** for the `dbGetCampaignStats` rewrite (4 parallel `COUNT` queries → 1 query + JS reduce) — closed this triage cycle after being carried as a cost-analyst P2 for 7+ cycles.
+### `README.md`
 
-All three entries match the existing bold-summary + explanatory-paragraph voice and cite the same technical details (issue numbers where they exist, file/function names, concrete before/after behavior) as the surrounding entries.
+- Refreshed the verified test totals to 8,688 tests across 513 files.
+- Added the no-store `/api/version` deployment-identity endpoint.
+
+### `CLAUDE.md`
+
+- Documented the campaign invariant: stable lease-bound batch membership,
+  retry-stable provider identity, complete transactional acknowledgement, and
+  fail-closed handling of incomplete persistence.
+
+### `CONTRIBUTING.md`
+
+- Aligned the dependency-license policy with the enforced permissive allowlist
+  and documented-exception requirement.
+
+### `LICENSE-THIRD-PARTY.md`
+
+- Aligned the inventory introduction and review policy with the same license
+  allowlist and package-specific exception workflow.
+
+### `docs/accepted-risks.md`
+
+- Replaced the obsolete one-route admin description with the current dashboard
+  and 12-route-module surface, including campaign mutations.
+- Updated the future centralized-guard wording for Next.js `proxy.ts`.
+- Removed stale, abbreviated allowlist wording from dependency-risk entries.
+
+### `quality/evidence/README.md`
+
+- Updated the concrete release-evidence baseline example from `v2.19.0` to
+  `v2.19.1`.
+
+### `docs/chapa-architecture.drawio`
+
+- Added `/api/version` to public endpoints.
+- Added durable Creator Studio configuration and the `studio_configs` table.
+- Replaced the old lease-only campaign label with atomic claim, full-batch
+  acknowledgement, and stable retry identity.
+- Removed obsolete “new” annotations from Supabase and Redis inventory items.
+
+### `docs/chapa-architecture.drawio.png`
+
+- Re-exported the updated architecture at 1244 x 1211 with embedded draw.io XML.
+- Visually inspected the export for legibility and clipping.
+
+## Verification
+
+- `pnpm run lint`: **PASS** for all workspace projects.
+- `git diff --check`: **PASS**.
+- Draw.io XML well-formedness, unique IDs, edge geometry, embedded PNG source,
+  and visual inspection: **PASS**.
+- `quality/evidence/README.md` Markdown lint: **PASS**.
+- Strict Markdown violations across the edited Markdown baseline decreased from
+  924 to 919; no edited file gained a new violation.
+- The workflow's broad Markdown command did not pass. Its root-only
+  `--ignore node_modules` argument traversed nested workspace `node_modules`
+  and `node_modules.nosync` trees, and tracked historical documents already
+  contain default-rule violations such as long lines and repeated changelog
+  headings. These failures predate this update.
+- `scripts/verify-counts.sh`, `scripts/verify-version.sh`,
+  `scripts/verify-skills.sh`, and `scripts/check-tree-drift.sh` are referenced
+  by the generic workflow but do not exist in this repository.
 
 ## Flagged for Review
 
@@ -32,6 +106,8 @@ None.
 
 ## Notes
 
-- **Markdownlint**: no `.markdownlint*` config exists in this repo and no CI workflow runs markdownlint, so `npx markdownlint CHANGELOG.md` was run but its default-ruleset output (80-char line-length warnings, duplicate `### Fixed` heading warnings — both pre-existing and structurally expected in a Keep-a-Changelog file) was not treated as a real failure, consistent with this project's own policy of gating markdownlint on the presence of a project config.
-- **Version bump**: change-analyst noted this range (a real data-corruption detection/repair fix, a live cron rate-limit-ceiling fix, and a cost fix) looks like a legitimate `v2.19.1` or `v2.20.0` candidate. No version bump was made — that's `/release`'s decision, not `/update-docs`'s. Recommend running `/release` next if a new version is being prepared.
-- `/pre-launch` catches issues `/update-docs` does not (security, performance, accessibility) — not run as part of this pass.
+- `apps/web/package.json` remains at the prepared `2.20.0` candidate version.
+  No version bump, tag, publication, push, or deployment was performed.
+- Run `/release` next if v2.20.0 is ready to enter the release workflow.
+- `/pre-launch` covers security, performance, and accessibility checks that
+  `/update-docs` does not.

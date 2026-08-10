@@ -49,9 +49,16 @@ Documented security, infrastructure, and performance decisions that were evaluat
 ## No edge middleware for admin protection (#402)
 
 - **Risk:** Admin routes (`/admin`, `/api/admin/*`) are protected at the component/handler level rather than via Next.js edge middleware.
-- **Mitigation:** Admin access requires both a valid authenticated session AND the user's GitHub handle being present in the `ADMIN_HANDLES` environment variable. Component-level protection is functionally equivalent to middleware protection -- unauthorized requests are rejected before any admin data is returned. The admin surface is small (one dashboard page, one API route) and does not handle destructive operations.
+- **Mitigation:** Admin access requires both a valid authenticated session AND
+  the user's GitHub handle being present in the `ADMIN_HANDLES` environment
+  variable. Component- and handler-level protection rejects unauthorized
+  requests before any admin data is returned. The current surface is one
+  dashboard plus 12 API route handlers, including campaign mutation and send
+  operations; each handler enforces the appropriate shared admin or
+  bearer-token guard.
 - **Severity:** Low
-- **Future improvement:** Add `middleware.ts` with admin route matching when Next.js middleware stabilizes further or if the admin surface area grows significantly.
+- **Future improvement:** Re-evaluate a route-wide `proxy.ts` admin guard if the
+  surface grows further; handler-level authorization remains authoritative.
 
 ## Stateless session cookie has no server-side revocation mechanism (SE-L2, #1038)
 
@@ -71,7 +78,10 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## MPL-2.0 dependency (@resvg/resvg-js) (#464, #596)
 
-- **Risk:** `@resvg/resvg-js@2.6.2` (and its platform-specific binary `@resvg/resvg-js-darwin-arm64`) uses MPL-2.0 (weak copyleft), which is not on the project's explicit allowlist (MIT, Apache-2.0, BSD, ISC). Used for SVG-to-PNG rendering in OG image generation.
+- **Risk:** `@resvg/resvg-js@2.6.2` (and its platform-specific binary
+  `@resvg/resvg-js-darwin-arm64`) uses MPL-2.0 (weak copyleft), which is outside
+  the project's permissive-license allowlist. Used for SVG-to-PNG rendering in
+  OG image generation.
 - **Note:** `@vercel/analytics` was previously MPL-2.0 but has changed to **MIT** as of v2.0.1, resolving that concern.
 - **Mitigation:** MPL-2.0 is a file-level weak copyleft license — it only requires sharing modifications to the MPL-licensed source files themselves. Chapa uses the package as an unmodified dependency via its public API, so there is no obligation to open-source any of Chapa's own code. MPL-2.0 is not GPL, AGPL, or LGPL and is explicitly compatible with proprietary and MIT-licensed projects. No modifications are made to the package's source files.
 - **Severity:** Low
@@ -108,7 +118,8 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## MPL-2.0 License (lightningcss) (#627)
 
-- **Risk:** `lightningcss` and `lightningcss-darwin-arm64` are licensed under MPL-2.0, which is not in our stated license policy (MIT, Apache-2.0, BSD, ISC).
+- **Risk:** `lightningcss` and `lightningcss-darwin-arm64` are licensed under
+  MPL-2.0, which is outside the project's permissive-license allowlist.
 - **Accepted because:** MPL-2.0 is a weak copyleft that only requires sharing modifications to MPL-licensed files themselves — not the entire project. lightningcss is a build-time dependency (Tailwind CSS processor) that is not bundled into the production application. No MPL-licensed code is distributed to end users.
 - **Mitigation:** None required. The dependency is transitive via Tailwind and not directly imported.
 - **Severity:** Low
@@ -124,7 +135,9 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## axe-core MPL-2.0 license (dev-only)
 
-- **Risk:** `axe-core` (pulled in transitively for accessibility testing) is licensed under MPL-2.0, which is not in our stated license policy (MIT, Apache-2.0, BSD, ISC).
+- **Risk:** `axe-core` (pulled in transitively for accessibility testing) is
+  licensed under MPL-2.0, which is outside the project's permissive-license
+  allowlist.
 - **Accepted because:** `axe-core` is a `devDependency` used only by the a11y test suite — it is never imported by application code and never bundled into the production build. No MPL-licensed code is distributed to end users.
 - **Mitigation:** None required. Confirmed dev-only via `pnpm -r why axe-core` and the license scan in security-agent cycles.
 - **Severity:** None (dev-only)

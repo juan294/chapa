@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.20.0] - 2026-08-04
+## [2.20.0] - 2026-08-10
 
 ### Added
 
@@ -21,12 +21,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Campaign delivery retries are now atomic and replay-safe.** Workers claim a
+  stable lease-bound batch, reuse provider idempotency keys across retries, and
+  acknowledge the complete batch in one database operation. Partial or empty
+  acknowledgements are rejected, while transient delivery failures are
+  requeued without losing send identity or leaving a campaign stuck.
+- **Server jobs now fail safely under overlap and partial persistence.** The
+  warm-cache scheduler fills its fixed seat budget without duplicating work,
+  and campaign processing releases or recovers claims when durable state cannot
+  be confirmed.
+- **GitHub statistics preserve the best observable dataset.** Server-token
+  fetches are classified by their effective private-repository visibility,
+  scope-blind user refreshes cannot outrank complete data, and in-flight/cache
+  coordination no longer lets a weaker fetch replace a stronger one.
 - Release probes run only in verification contexts, and Playwright no longer
   discovers unit-test files as browser tests.
 - CI uses the repository-pinned Knip version, while async UI tests now wait for
   teardown work instead of leaking unhandled activity between cases.
 - Security-triage findings were remediated and compatible dependency updates
-  were applied without widening the release scope.
+  were applied without widening the release scope, including patched floors for
+  `dompurify`, `js-yaml`, `nanoid`, `brace-expansion`, and `undici`.
 
 ### Changed
 
@@ -853,7 +867,12 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.17.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.20.0...HEAD
+[2.20.0]: https://github.com/juan294/chapa/compare/v2.19.1...v2.20.0
+[2.19.1]: https://github.com/juan294/chapa/compare/v2.19.0...v2.19.1
+[2.19.0]: https://github.com/juan294/chapa/compare/v2.18.1...v2.19.0
+[2.18.1]: https://github.com/juan294/chapa/compare/v2.18.0...v2.18.1
+[2.18.0]: https://github.com/juan294/chapa/compare/v2.17.0...v2.18.0
 [2.17.0]: https://github.com/juan294/chapa/compare/v2.16.1...v2.17.0
 [2.16.1]: https://github.com/juan294/chapa/compare/v2.16.0...v2.16.1
 [2.16.0]: https://github.com/juan294/chapa/compare/v2.15.0...v2.16.0
