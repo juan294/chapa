@@ -134,8 +134,10 @@ export function LanguageProvider({
   const setLocale = useCallback(
     async (next: Locale) => {
       if (next === locale) return;
-      // Persist the cookie, then apply the locale client-side (load its dictionary
-      // chunk + update state) so client components reflect the change immediately.
+      // Persist the cookie and update client consumers such as `?lang=` deep
+      // links before the canonical document navigation completes. The server
+      // action deliberately does not revalidate the static layout, avoiding an
+      // automatic RSC refresh racing this navigation.
       await setLocaleAction(next);
       await applyLocale(next);
       // A full canonical navigation is intentional. `router.refresh()` can

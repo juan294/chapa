@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Locale switching now refreshes the complete server-rendered page.** After
   persisting the selected language, Chapa navigates through the canonical
   public URL so navigation, hero copy, calls to action, and directly visited
-  internal locale routes cannot settle into a mixed-language state.
+  internal locale routes cannot settle into a mixed-language state. Locale
+  cookie writes no longer invalidate the static layout before navigation,
+  avoiding a production-only Next.js RSC refresh race.
 - **Campaign delivery retries are now atomic and replay-safe.** Workers claim a
   stable lease-bound batch, reuse provider idempotency keys across retries, and
   acknowledge the complete batch in one database operation. Partial or empty

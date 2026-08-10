@@ -17,16 +17,16 @@ describe('setLocaleAction', () => {
     vi.clearAllMocks();
   });
 
-  it('calls writeLocaleCookie and revalidatePath for valid locale "es"', async () => {
+  it('writes valid locale "es" without invalidating static routes', async () => {
     await setLocaleAction('es');
     expect(writeLocaleCookie).toHaveBeenCalledWith('es');
-    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('calls writeLocaleCookie and revalidatePath for valid locale "en"', async () => {
+  it('writes valid locale "en" without invalidating static routes', async () => {
     await setLocaleAction('en');
     expect(writeLocaleCookie).toHaveBeenCalledWith('en');
-    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it('does NOT call writeLocaleCookie for invalid locale "fr"', async () => {

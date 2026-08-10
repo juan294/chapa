@@ -11,10 +11,11 @@ import { SUPPORTED_LOCALES, type Locale } from './types';
  * rather than `setLocaleAction` directly. `setLocale` persists the
  * `chapa-locale` cookie (via `setLocaleAction`) for future loads AND applies
  * the locale to the current render immediately (loads the target dictionary +
- * updates provider state + `router.refresh()`), so a request like
- * `/u/handle?lang=en` switches the visible language on first paint instead of
- * only on a subsequent reload (#1020). `setLocale` already no-ops when
- * `next === locale`, so this is safe to call on every mount/param change.
+ * updates provider state) before navigating through the canonical URL. A request
+ * like `/u/handle?lang=en` therefore switches the visible language on first
+ * paint instead of only on a subsequent reload (#1020). `setLocale` already
+ * no-ops when `next === locale`, so this is safe to call on every mount/param
+ * change.
  */
 export function LocaleSync({ queryLang }: { queryLang?: string | null }) {
   const { setLocale } = useTranslation();

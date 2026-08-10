@@ -8,9 +8,10 @@ authorizes PR creation, merge, production operations, tagging, or publishing.
 ## Candidate-bound preview arcs
 
 Record the E2E Pro `runId`, `developCommit`, `candidateTreeDigest`, exact preview
-URL, executor, time, result, and evidence for every applicable row. The preview
-must first pass `/api/version` identity verification; do not use a stable alias
-or older deployment.
+URL, executor, time, result, and evidence for every applicable row. The immutable
+preview must first pass `/api/version` identity verification. A stable alias is
+not candidate evidence unless Vercel metadata proves it resolves to that exact
+immutable deployment at the time of the interaction.
 
 For the `develop` preview, verify that branch-scoped `GITHUB_CLIENT_ID` and
 `GITHUB_CLIENT_SECRET` overrides select the dedicated preview OAuth app. Never
@@ -18,7 +19,7 @@ change the production OAuth callback to make a preview login pass.
 
 | Flow | Evidence |
 |---|---|
-| GitHub login | Complete GitHub OAuth and confirm the authenticated redirect returns to the exact preview. This is an authorized preview interaction, not the read-only redirect probe. |
+| GitHub login | After proving the `develop` alias resolves to the exact immutable deployment, begin and complete GitHub OAuth on that alias and confirm the authenticated redirect returns to the same alias. OAuth state cookies are host-scoped, so beginning on the immutable hostname and returning through the configured alias is invalid evidence. This is an authorized preview interaction, not the read-only redirect probe. |
 | Badge generation | Authenticate, generate or open the synthetic/test profile, and record visible badge evidence. |
 | Public badge SVG | Open `/u/{handle}/badge.svg` without authentication; record status, content type, and rendering. |
 | Share page | Open `/u/{handle}` and record badge preview, breakdown, and embed snippet. |
