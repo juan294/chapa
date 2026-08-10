@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync, useTranslation } from "@/lib/i18n";
 import { VerifyForm } from "./VerifyForm";
@@ -7,9 +9,15 @@ import { VerifyForm } from "./VerifyForm";
 export function VerifyInputPageClient() {
   const { t } = useTranslation();
 
+  useEffect(() => {
+    document.title = `${t('verify.title') as string} — Chapa`;
+  }, [t]);
+
   return (
     <div className="min-h-screen bg-bg text-text-primary">
-      <LocaleSync />
+      <Suspense fallback={null}>
+        <VerifyQueryLocale />
+      </Suspense>
       <NavbarClient />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         <div className="animate-fade-in-up">
@@ -38,4 +46,9 @@ export function VerifyInputPageClient() {
       </main>
     </div>
   );
+}
+
+function VerifyQueryLocale() {
+  const searchParams = useSearchParams();
+  return <LocaleSync queryLang={searchParams?.get("lang")} />;
 }

@@ -54,7 +54,9 @@ const mockFrom = vi.fn((): any => ({
     mockUpdate(...args);
     const chainable: any = {
       eq: () => chainable,
-      in: () => Promise.resolve(queryResult),
+      in: () => chainable,
+      select: () => chainable,
+      maybeSingle: () => Promise.resolve(queryResult),
       then: (resolve: (v: unknown) => void) => resolve(queryResult),
     };
     return chainable;
@@ -93,9 +95,12 @@ import {
   dbGetCampaign,
   dbCreateCampaign,
   dbUpdateCampaign,
+  dbClaimCampaignForSending,
+  dbReleaseCampaignClaim,
   dbDeleteCampaign,
   dbCreateCampaignSends,
   dbClaimPendingSends,
+  dbAcknowledgeCampaignSends,
   dbGetPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
@@ -109,6 +114,43 @@ beforeEach(() => {
   vi.clearAllMocks();
   queryResult = { data: null, error: null };
   queryResults = [];
+});
+
+describe("dbClaimCampaignForSending", () => {
+  it("returns true only when the conditional draft update returns a row", async () => {
+    queryResult = { data: { id: "c-1" }, error: null };
+
+    await expect(
+      dbClaimCampaignForSending("c-1", 12, "2026-08-04T14:00:00.000Z"),
+    ).resolves.toBe(true);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      status: "sending",
+      total_recipients: 12,
+      started_at: "2026-08-04T14:00:00.000Z",
+    });
+  });
+
+  it("returns false when another request already claimed the draft", async () => {
+    queryResult = { data: null, error: null };
+    await expect(
+      dbClaimCampaignForSending("c-1", 12, "2026-08-04T14:00:00.000Z"),
+    ).resolves.toBe(false);
+  });
+});
+
+describe("dbReleaseCampaignClaim", () => {
+  it("releases only the matching in-progress claim", async () => {
+    queryResult = { data: { id: "c-1" }, error: null };
+
+    await expect(
+      dbReleaseCampaignClaim("c-1", "2026-08-04T14:00:00.000Z"),
+    ).resolves.toBe(true);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      status: "draft",
+      total_recipients: 0,
+      started_at: null,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -470,7 +512,7 @@ describe("dbCreateCampaignSends", () => {
         { campaign_id: "c-1", handle: "alice", email: "alice@example.com", status: "pending" },
         { campaign_id: "c-1", handle: "bob", email: "bob@example.com", status: "pending" },
       ],
-      { onConflict: "campaign_id,handle" },
+      { onConflict: "campaign_id,handle", ignoreDuplicates: true },
     );
   });
 
@@ -621,12 +663,70 @@ describe("dbClaimPendingSends", () => {
 
     expect(result).toEqual([]);
   });
+
+  it("fails closed before the RPC when the lease token is blank", async () => {
+    const result = await dbClaimPendingSends(
+      "c-1",
+      10,
+      "   ",
+      "2026-04-23T12:10:00.000Z",
+    );
+
+    expect(result).toEqual([]);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("dbAcknowledgeCampaignSends", () => {
+  it("delegates the complete provider result set to one RPC", async () => {
+    mockRpc.mockResolvedValueOnce({ data: true, error: null });
+    const results = [
+      { id: "s-1", status: "sent" as const, error: null },
+      { id: "s-2", status: "failed" as const, error: "rejected" },
+    ];
+
+    await expect(
+      dbAcknowledgeCampaignSends(results, "lease-token"),
+    ).resolves.toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith("acknowledge_campaign_sends", {
+      p_lease_token: "lease-token",
+      p_results: results,
+    });
+  });
+
+  it("fails closed when the RPC cannot acknowledge the whole lease", async () => {
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
+    await expect(
+      dbAcknowledgeCampaignSends(
+        [{ id: "s-1", status: "sent", error: null }],
+        "lease-token",
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it("fails closed before the RPC when the result set is empty", async () => {
+    await expect(
+      dbAcknowledgeCampaignSends([], "lease-token"),
+    ).resolves.toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before the RPC when the lease token is blank", async () => {
+    await expect(
+      dbAcknowledgeCampaignSends(
+        [{ id: "s-1", status: "sent", error: null }],
+        "   ",
+      ),
+    ).resolves.toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("dbMarkSendsSent", () => {
   it("updates claimed sends by lease token", async () => {
     queryResult = { data: null, error: null };
-    await dbMarkSendsSent(["s-1", "s-2"], "lease-token");
+    queryResult = { data: [{ id: "s-1" }, { id: "s-2" }], error: null };
+    await expect(dbMarkSendsSent(["s-1", "s-2"], "lease-token")).resolves.toBe(true);
     expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: "sent",
       lease_token: null,
@@ -635,19 +735,20 @@ describe("dbMarkSendsSent", () => {
 
   it("does not throw when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
-    await expect(dbMarkSendsSent(["s-1"])).resolves.toBeUndefined();
+    await expect(dbMarkSendsSent(["s-1"])).resolves.toBe(false);
   });
 
   it("does not throw on update error", async () => {
     queryResult = { data: null, error: new Error("update failed") };
-    await expect(dbMarkSendsSent(["s-1"])).resolves.toBeUndefined();
+    await expect(dbMarkSendsSent(["s-1"])).resolves.toBe(false);
   });
 });
 
 describe("dbMarkSendsFailed", () => {
   it("updates claimed sends with status and error", async () => {
     queryResult = { data: null, error: null };
-    await dbMarkSendsFailed(["s-1"], "Send failed", "lease-token");
+    queryResult = { data: [{ id: "s-1" }], error: null };
+    await expect(dbMarkSendsFailed(["s-1"], "Send failed", "lease-token")).resolves.toBe(true);
     expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: "failed",
       error: "Send failed",
@@ -657,12 +758,12 @@ describe("dbMarkSendsFailed", () => {
 
   it("does not throw when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
-    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBeUndefined();
+    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBe(false);
   });
 
   it("does not throw on update error", async () => {
     queryResult = { data: null, error: new Error("update failed") };
-    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBeUndefined();
+    await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBe(false);
   });
 });
 

@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { getBaseUrl, getAdminHandles } from "./env";
+import {
+  getBaseUrl,
+  getAdminHandles,
+  getVercelGitCommitSha,
+  getWarmCachePriorityHandles,
+} from "./env";
 
 // Next.js only inlines NEXT_PUBLIC_* env vars into the client bundle when they
 // are referenced as a STATIC LITERAL member expression (process.env.NEXT_PUBLIC_X).
@@ -82,5 +87,32 @@ describe("getAdminHandles", () => {
   it("returns empty array when ADMIN_HANDLES is not set", () => {
     vi.stubEnv("ADMIN_HANDLES", undefined);
     expect(getAdminHandles()).toEqual([]);
+  });
+});
+
+describe("getWarmCachePriorityHandles", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("trims and deduplicates configured handles in stable order", () => {
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "alice, bob,alice,bob, carol ");
+    expect(getWarmCachePriorityHandles()).toEqual(["alice", "bob", "carol"]);
+  });
+});
+
+describe("getVercelGitCommitSha", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns the trimmed immutable deployment commit", () => {
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", `  ${"a".repeat(40)} \n`);
+    expect(getVercelGitCommitSha()).toBe("a".repeat(40));
+  });
+
+  it("returns undefined when no deployment commit is available", () => {
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "");
+    expect(getVercelGitCommitSha()).toBeUndefined();
   });
 });

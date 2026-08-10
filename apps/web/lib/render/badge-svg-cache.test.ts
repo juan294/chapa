@@ -7,7 +7,9 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 import {
+  BADGE_RENDER_VARIANT,
   buildBadgeSvgCacheKey,
+  buildBadgeSvgRenderLockKey,
   handleCacheJitterSeconds,
   readBadgeSvgCache,
   readBadgeSvgCacheWithStatus,
@@ -24,15 +26,22 @@ beforeEach(() => {
 
 describe("badge-svg-cache", () => {
   describe("buildBadgeSvgCacheKey", () => {
-    it("uses the format badge:<version>:<lowercase-handle>:warm-amber:<date>", () => {
+    it("includes the badge renderer version so visual changes bypass stale SVGs", () => {
       const key = buildBadgeSvgCacheKey("Octocat", "2026-05-01");
-      expect(key).toBe(`badge:${CACHE_VERSION}:octocat:warm-amber:2026-05-01`);
+      expect(BADGE_RENDER_VARIANT).toBe("warm-amber-v2");
+      expect(key).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01`);
     });
 
     it("lowercases the handle so case variants share a cache slot", () => {
       const a = buildBadgeSvgCacheKey("OCTOCAT", "2026-05-01");
       const b = buildBadgeSvgCacheKey("octocat", "2026-05-01");
       expect(a).toBe(b);
+    });
+
+    it("uses the same identity for the cross-instance render lock", () => {
+      expect(buildBadgeSvgRenderLockKey("Octocat", "2026-05-01")).toBe(
+        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01`,
+      );
     });
   });
 

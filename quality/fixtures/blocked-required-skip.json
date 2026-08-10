@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "runId": "fixture-required-skip",
+  "generatedAt": "2026-07-26T10:00:00.000Z",
+  "baselineTag": "v2.19.0",
+  "candidate": {
+    "developCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidateTreeDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "previewUrl": "https://preview.example.test/",
+    "previewIdentity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "obligations": [],
+  "results": [{
+    "scenarioId": "deployment.preview-identity",
+    "environment": "preview",
+    "status": "skipped",
+    "startedAt": "2026-07-26T10:01:00.000Z",
+    "finishedAt": "2026-07-26T10:01:01.000Z",
+    "runner": "playwright",
+    "evidence": {},
+    "fixtures": []
+  }],
+  "exceptions": [],
+  "manualObligations": [],
+  "exploratoryCharters": [],
+  "rollbackReference": "docs/runbooks/rollback.md",
+  "tagAuthorization": { "status": "pending" }
+}

@@ -193,21 +193,6 @@ After user approval:
    agents are spawned for Wave 3. Report these as "filed, not fixed"
    in Step 5.
 
-5. **Instance-sweep requirement for every bug fix.**
-   - Grep the signature of the bug class, not only the named file.
-   - Fix and test every matching instance in the same change.
-   - Record the grep signature and every matching `file:line` in the PR/report.
-   - A finding is not resolved until the bug class is closed, or the unresolved
-     instances are explicitly filed as follow-up issues with rationale.
-
-6. **Seam-bug regression standard.**
-   - Every production 5xx on legal input (`server_error`, `badge_5xx`,
-     `oauth_callback_failure`) and every "success but nothing saved" report
-     becomes a tracked issue.
-   - The regression test must run at the failing seam with the real stack:
-     a `*.contract.test.ts` payload matrix or a DB-reading E2E.
-   - A unit-mock reproduction alone is not sufficient for seam bugs.
-
 ## Step 3: Integration & Verification
 
 Run the full push-PR-merge cycle once per wave. Complete Wave 1 before

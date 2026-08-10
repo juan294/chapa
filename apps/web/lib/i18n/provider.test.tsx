@@ -1,21 +1,35 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, cleanup } from '@testing-library/react';
+import { render, screen, act, cleanup, waitFor } from '@testing-library/react';
 import { useContext } from 'react';
 import { LanguageContext, LanguageProvider } from './provider';
 import { es } from './dictionaries/es';
 import type { Translations } from './types';
 
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(() => ({ refresh: vi.fn() })),
-}));
-
 vi.mock('./set-locale-action', () => ({
   setLocaleAction: vi.fn(async () => {}),
 }));
 
-import { useRouter } from 'next/navigation';
 import { setLocaleAction } from './set-locale-action';
+
+const originalLocation = window.location;
+
+function stubLocation({
+  pathname,
+  search = '',
+  hash = '',
+}: {
+  pathname: string;
+  search?: string;
+  hash?: string;
+}) {
+  const assign = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { ...originalLocation, pathname, search, hash, assign },
+  });
+  return assign;
+}
 
 function TestConsumer() {
   const ctx = useContext(LanguageContext);
@@ -25,6 +39,9 @@ function TestConsumer() {
       <span data-testid="locale">{ctx.locale}</span>
       <button onClick={() => ctx.setLocale('es')}>switch-es</button>
       <button onClick={() => ctx.setLocale('en')}>switch-en</button>
+      <button onClick={() => ctx.setLocale('es', { navigate: false })}>
+        sync-es
+      </button>
     </div>
   );
 }
@@ -36,6 +53,12 @@ describe('LanguageProvider', () => {
 
   afterEach(() => {
     cleanup();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
+    document.cookie = 'chapa-locale=; Max-Age=0; path=/';
+    window.history.replaceState({}, '', '/');
   });
 
   it('provides the initial locale via context', () => {
@@ -56,9 +79,40 @@ describe('LanguageProvider', () => {
     expect(screen.getByTestId('locale').textContent).toBe('es');
   });
 
-  it('calls setLocaleAction and router.refresh when setLocale is called with a different locale', async () => {
-    const mockRefresh = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ refresh: mockRefresh } as unknown as ReturnType<typeof useRouter>);
+  it('keeps an explicit query locale authoritative before LocaleSync mounts', async () => {
+    document.cookie = 'chapa-locale=en; path=/';
+    window.history.replaceState({}, '', '/studio?lang=es');
+
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+
+  it('applies an explicit query locale on a route without LocaleSync', async () => {
+    window.history.replaceState({}, '', '/verify?lang=en');
+
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('locale').textContent).toBe('en')
+    );
+  });
+
+  it('persists the locale and reloads the canonical route when the locale changes', async () => {
+    const assign = stubLocation({ pathname: '/' });
 
     render(
       <LanguageProvider initialLocale="en">
@@ -71,13 +125,102 @@ describe('LanguageProvider', () => {
     });
 
     expect(setLocaleAction).toHaveBeenCalledWith('es');
-    expect(mockRefresh).toHaveBeenCalled();
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('applies an explicit locale before a slow cookie persistence call finishes', async () => {
+    let finishPersistence: (() => void) | undefined;
+    vi.mocked(setLocaleAction).mockImplementationOnce(
+      () => new Promise<void>((resolve) => {
+        finishPersistence = resolve;
+      })
+    );
+
+    render(
+      <LanguageProvider initialLocale="en">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    screen.getByText('sync-es').click();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    finishPersistence?.();
+  });
+
+  it('still navigates to the requested query locale when cookie persistence fails', async () => {
+    const assign = stubLocation({
+      pathname: '/u/juan294',
+      search: '?lang=en',
+    });
+    vi.mocked(setLocaleAction).mockRejectedValueOnce(
+      new Error('cookie persistence unavailable')
+    );
+
+    render(
+      <LanguageProvider initialLocale="en">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('switch-es').click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    expect(assign).toHaveBeenCalledWith('/u/juan294?lang=es');
+  });
+
+  it('adds a locale query fallback when canonical cookie persistence fails', async () => {
+    const assign = stubLocation({ pathname: '/' });
+    vi.mocked(setLocaleAction).mockRejectedValueOnce(
+      new Error('cookie persistence unavailable')
+    );
+
+    render(
+      <LanguageProvider initialLocale="en">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('switch-es').click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    expect(assign).toHaveBeenCalledWith('/?lang=es');
+  });
+
+  it('reloads through the canonical public path after switching from an internal locale route', async () => {
+    const assign = stubLocation({
+      pathname: '/es',
+      search: '?source=release&lang=es',
+      hash: '#features',
+    });
+
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('switch-en').click();
+    });
+
+    expect(setLocaleAction).toHaveBeenCalledWith('en');
+    expect(assign).toHaveBeenCalledWith('/?source=release&lang=en#features');
   });
 
   it('is a no-op when setLocale is called with the same locale', async () => {
-    const mockRefresh = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ refresh: mockRefresh } as unknown as ReturnType<typeof useRouter>);
-
     render(
       <LanguageProvider initialLocale="en">
         <TestConsumer />
@@ -89,7 +232,6 @@ describe('LanguageProvider', () => {
     });
 
     expect(setLocaleAction).not.toHaveBeenCalled();
-    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it('context value is accessible via useContext(LanguageContext)', () => {

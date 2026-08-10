@@ -1,146 +1,113 @@
-# Release Checklist (develop → main)
+# Release Capability Checklist
 
-Use this checklist every time you prepare a production release. The goal is to catch regressions before real users hit them.
+`docs/release/release-playbook.md` is the sole release-ordering authority. Use
+this runbook when that procedure calls for manual, migration, cron-readiness,
+rollback-readiness, or post-release detail. Completing this checklist never
+authorizes PR creation, merge, production operations, tagging, or publishing.
 
-## Pre-Release Gates
+## Candidate-bound preview arcs
 
-All of these must be green before creating the `develop → main` PR.
+Record the E2E Pro `runId`, `developCommit`, `candidateTreeDigest`, exact preview
+URL, executor, time, result, and evidence for every applicable row. The immutable
+preview must first pass `/api/version` identity verification. A stable alias is
+not candidate evidence unless Vercel metadata proves it resolves to that exact
+immutable deployment at the time of the interaction.
 
-### 1. CI Passes on develop
+For the `develop` preview, verify that branch-scoped `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET` overrides select the dedicated preview OAuth app. Never
+change the production OAuth callback to make a preview login pass.
 
-```bash
-gh run list --branch develop --limit 5
-```
+| Flow | Evidence |
+|---|---|
+| GitHub login | After proving the `develop` alias resolves to the exact immutable deployment, begin and complete GitHub OAuth on that alias and confirm the authenticated redirect returns to the same alias. OAuth state cookies are host-scoped, so beginning on the immutable hostname and returning through the configured alias is invalid evidence. This is an authorized preview interaction, not the read-only redirect probe. |
+| Badge generation | Authenticate, generate or open the synthetic/test profile, and record visible badge evidence. |
+| Public badge SVG | Open `/u/{handle}/badge.svg` without authentication; record status, content type, and rendering. |
+| Share page | Open `/u/{handle}` and record badge preview, breakdown, and embed snippet. |
+| Core dependency health | Record `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` from `/api/health`; all must be `ok` for release-required deployed evidence. |
+| Cron freshness | Record each cron component separately. Overall health may be degraded by stale cron heartbeats even when the candidate's core dependencies are healthy. |
+| Verification | Follow the share-page verification link and record `/verify/{hash}` rendering. |
+| Locale | Switch Spanish to English and back; record that the selected locale renders without untranslated release-sensitive copy. |
 
-All recent runs must be passing (green). If any are failing, fix them first.
+Recommended preview observation is 24 hours for caching, scoring, OAuth, cron, or
+vendor-sensitive changes and at least one hour for documentation-only changes.
+The run records the actual duration; elapsed time alone is not a pass.
 
-### 2. Full Test Suite + Type Check + Lint
+## Alerting readiness
 
-Run locally in the worktree or main project:
+Record whether `CHAPA_ALERT_WEBHOOK_URL` is configured for production. It
+receives the active signals documented in
+`docs/runbooks/incident-response.md`. Reading configuration state is distinct
+from changing it; environment changes require explicit authorization.
 
-```bash
-pnpm run test && pnpm run typecheck && pnpm run lint
-```
+## Migration readiness
 
-All must exit 0. No exceptions.
+Use `docs/runbooks/migrations.md`.
 
-### 3. Release-Candidate Preview Deployment Soak (24h recommended, 1h minimum)
+- Review migrations between the release baseline and `developCommit`.
+- Run `pnpm run validate:migrations`.
+- Import the release-PR pending-migration CI result.
+- If CI skipped because its read-only credentials are absent, attach explicit
+  manual drift evidence; a skip is never a required pass.
+- Applying a migration is a separately authorized production operation.
 
-Every push to `develop` creates a Vercel preview deployment automatically. Use
-the deployment for the exact `develop` commit that will be merged to `main`;
-do not reuse an older stable preview URL as release evidence.
+## Cron and schedule readiness
 
-1. Open the preview URL from the Vercel dashboard or from the GitHub PR checks
-   for the current `develop` SHA.
-2. Test the following flows manually:
+`apps/web/vercel.json` registers four jobs:
 
-| Flow | Steps |
-|------|-------|
-| **GitHub login** | Click login → GitHub OAuth → confirm redirect back to app with session |
-| **Badge generation** | Log in → `/generate` or visit `/u/<handle>` → confirm badge renders |
-| **Badge SVG public** | Open `/u/<handle>/badge.svg` in incognito → must load without auth |
-| **Share page** | Visit `/u/<handle>` → badge preview, breakdown, and embed snippet visible |
-| **Health endpoint** | `curl <preview-url>/api/health` → `{"status":"ok","dependencies":{"redis":"ok","supabase":"ok","github":"ok"}}` |
-| **Verification** | Click verify link on share page → `/verify/:hash` renders correctly |
-| **Language switcher** | Click the globe icon in the nav bar → switch from ES to EN and back → confirm page re-renders in the selected locale with no untranslated strings |
+| Route | Schedule role | Duration budget |
+|---|---|---:|
+| `/api/cron/warm-cache` | Profile cache refresh | 300 seconds |
+| `/api/cron/sync-audience` | Audience synchronization | 300 seconds |
+| `/api/cron/process-campaigns` | Campaign processing | 300 seconds |
+| `/api/cron/latency-check` | Badge latency probe | 60 seconds |
 
-For production, confirm `CHAPA_ALERT_WEBHOOK_URL` is configured before release. It receives `health_degraded`, `badge_5xx`, `oauth_callback_failure`, and `cron_failure` alerts as documented in `docs/runbooks/incident-response.md`.
+The release-required static gate is `pnpm run check:vercel-config`. Also record:
 
-3. Leave the preview running for at least 24 hours if the change touches caching, scoring, or OAuth. For documentation-only changes, 1 hour is sufficient.
+- the production Vercel plan supports the configured duration budgets;
+- `CRON_SECRET` is configured;
+- `/api/health` exposes a heartbeat component for each job; and
+- the previous production execution state is understood.
 
-### 4. Supabase Migrations Applied to Production
+Calling a cron route executes operational work. Do not invoke any cron merely to
+complete this checklist. A separately authorized invocation records the route,
+time, response, side effects, and resulting heartbeat.
 
-Before promoting `develop → main`, confirm all new Supabase migrations have been applied to the production database:
+## Release metadata
 
-- [ ] Run `supabase db diff --linked` (or check Supabase dashboard Migration History) to confirm no pending migrations exist.
-- [ ] If any migration is pending, apply it with `supabase db push --linked` before merging to `main`.
+- Changelog entry matches the approved release diff.
+- Application and lockfile versions match.
+- Every current version reference was updated.
+- The old-version scan contains only explained history.
+- The release PR description links the run ID, candidate commit/tree, included
+  commits, relevant issues, and pre-merge evidence report.
 
-Never ship code that references schema objects not yet present in the production database.
+The release command owns PR creation and merge; this runbook contains no
+alternative procedure.
 
-### 5. Cron Auth and Scheduled Jobs Ready
+## Rollback readiness
 
-> **Vercel Pro plan required.** All three cron routes (`/api/cron/warm-cache`,
-> `/api/cron/sync-audience`, `/api/cron/process-campaigns`) set `maxDuration = 300`
-> seconds (see `vercel.json` `functions` block). The Vercel Hobby plan caps
-> serverless functions at 60 seconds — deploying on Hobby will cause these cron
-> jobs to time out silently. Ensure the Vercel project is on the Pro plan before
-> release.
+Before merge authorization:
 
-Before promoting `develop → main`, confirm Vercel production has `CRON_SECRET`
-configured and that cron routes accept the configured bearer token:
+- identify the previous evidence-approved production deployment and commit;
+- confirm its evidence report and deployment are retrievable;
+- distinguish application rollback from any required schema recovery;
+- review `docs/runbooks/rollback.md`; and
+- record the applicable rollback triggers.
 
-- [ ] `CRON_SECRET` exists in the Vercel production environment.
-- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://chapa.thecreativetoken.com/api/cron/warm-cache` returns a non-auth failure response.
-- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://chapa.thecreativetoken.com/api/cron/sync-audience` returns a non-auth failure response.
-- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://chapa.thecreativetoken.com/api/cron/process-campaigns` returns a non-auth failure response.
+Rollback triggers include core health failure, badge SVG 5xx, broken OAuth,
+production identity mismatch, data loss, and a material error-rate spike.
 
-Run these only as an intentional release check; they execute operational cron
-work.
+## Post-release read-only verification
 
-### 6. CHANGELOG Entry + Version Bump
-
-Before creating the release PR:
-
-- [ ] `CHANGELOG.md` has an entry for this release describing what changed (features, fixes, breaking changes).
-- [ ] Version bump is present if the project follows semver (`package.json` version or equivalent).
-
-### 7. Rollback Decision Criteria
-
-Before merging, confirm you're prepared to roll back if needed:
-
-- You know which commit introduced each change (`git log develop --oneline`)
-- The previous production deployment is still available in Vercel (it always is — Vercel keeps deployment history)
-- Rollback procedure is documented in `docs/runbooks/rollback.md`
-
-**Rollback triggers** (if any of these happen within 30 minutes of going live):
-- `/api/health` returns errors
-- Badge SVG endpoint returns 5xx
-- GitHub login flow broken
-- Error rate spike visible in Vercel logs
-
-## Creating the Release PR
-
-Only after all gates above are green:
-
-```bash
-# Confirm develop is ahead of main
-git log main..develop --oneline
-
-# Create the PR
-gh pr create --base main --head develop --title "Release: [brief description]" --body "..."
-```
-
-The PR description should list all commits since the last release and link to any relevant issues.
-
-## Post-Release Verification
-
-Within 15 minutes of merge to `main`:
+Within 15 minutes of the authorized release:
 
 ```bash
-# Verify production health
-curl https://chapa.thecreativetoken.com/api/health | jq '{status, dependencies}'
-
-# Verify a badge loads
-curl -I https://chapa.thecreativetoken.com/u/<known-handle>/badge.svg
+curl -fsS https://chapa.thecreativetoken.com/api/version
+curl -sS https://chapa.thecreativetoken.com/api/health \
+  | jq '{status, dependencies}'
+curl -fsSI 'https://chapa.thecreativetoken.com/u/octocat/badge.svg?__chapa_smoke=1'
 ```
 
-If anything is wrong: **roll back immediately** (see `docs/runbooks/rollback.md`), then investigate on `develop`.
-
-## Notes on the Release Gap
-
-The commit distance between `develop` and `main` grows with each development
-cycle. Before any release, check the current gap with:
-
-```bash
-git log main..develop --oneline | wc -l
-```
-
-Before the next release:
-
-1. Run the full checklist above against a fresh preview deployment.
-2. Prioritize `pnpm run test && pnpm run typecheck` — these catch most
-   regressions automatically.
-3. Manually test the badge SVG and OAuth flows — these are the highest-impact
-   user paths.
-4. Confirm all new CI gates pass (`check:circular`, `no-process-env` lint rule,
-   bundle-size budget, coverage thresholds).
+Record production identity, core dependencies, cron freshness, badge response,
+Vercel logs/alerts, evidence report, and `runId`. On a rollback trigger, use
+`docs/runbooks/rollback.md`; do not continue the release while investigating.

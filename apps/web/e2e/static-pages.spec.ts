@@ -40,6 +40,28 @@ test.describe("Static pages — load and render", () => {
     await expect(input).toBeVisible();
   });
 
+  test("/verify explicit locale wins over a conflicting saved locale", async ({
+    page,
+    baseURL,
+  }) => {
+    if (!baseURL) throw new Error("Playwright baseURL is required");
+    await page.context().addCookies([
+      {
+        name: "chapa-locale",
+        value: "en",
+        url: new URL("/", baseURL).origin,
+      },
+    ]);
+
+    await page.goto("/verify?lang=es");
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.locator("h1")).toContainText("Verificar una Chapa");
+    await expect(
+      page.getByRole("button", { name: "ES", exact: true }),
+    ).toBeVisible();
+  });
+
   test("/verify form validates hex hash input", async ({ page }) => {
     await page.goto("/verify");
 

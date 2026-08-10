@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/agent-utils.sh"
 
 AGENT_KEY="qa_agent"
+MODEL="sonnet"
 OUTPUT_FILE="${CHAPA_DIR}/docs/agents/qa-report.md"
 LOG_FILE="${LOGS_DIR}/qa-agent-$(date '+%Y-%m-%d').log"
 
@@ -40,6 +41,7 @@ acquire_agent_lock "vitest-heavy-agent" "qa-agent"
 trap 'release_agent_lock "vitest-heavy-agent"' EXIT
 
 claude -p "${PROMPT}" \
+  --model "${MODEL}" \
   --allowedTools "Read,Glob,Grep,Bash" \
   --output-format text \
   > "${OUTPUT_FILE}" 2>>"${LOG_FILE}" || {

@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "runId": "fixture-pass",
+  "generatedAt": "2026-07-26T10:00:00.000Z",
+  "baselineTag": "v2.19.0",
+  "candidate": {
+    "developCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidateTreeDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "previewUrl": "https://preview.example.test/",
+    "previewIdentity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "mainCommit": "cccccccccccccccccccccccccccccccccccccccc",
+    "mainTreeDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "productionUrl": "https://production.example.test/",
+    "productionIdentity": "cccccccccccccccccccccccccccccccccccccccc"
+  },
+  "obligations": [
+    { "scenarioId": "deployment.preview-identity", "required": true, "environment": "preview", "status": "passed" },
+    { "scenarioId": "deployment.production-identity", "required": true, "environment": "production", "status": "passed" },
+    { "scenarioId": "health.core-dependencies", "required": true, "environment": "preview", "status": "passed" },
+    { "scenarioId": "health.core-dependencies", "required": true, "environment": "production", "status": "passed" },
+    { "scenarioId": "profile.public-badge-read", "required": true, "environment": "preview", "status": "passed" },
+    { "scenarioId": "profile.public-badge-read", "required": true, "environment": "production", "status": "passed" },
+    { "scenarioId": "profile.public-share-read", "required": true, "environment": "preview", "status": "passed" },
+    { "scenarioId": "profile.public-share-read", "required": true, "environment": "production", "status": "passed" },
+    { "scenarioId": "auth.github-login-redirect", "required": true, "environment": "preview", "status": "passed" },
+    { "scenarioId": "auth.protected-write-denied", "required": true, "environment": "preview", "status": "passed" },
+    { "scenarioId": "studio.config-persistence", "required": true, "environment": "local-contract", "status": "passed" },
+    { "scenarioId": "profile.snapshot-integrity", "required": true, "environment": "local-contract", "status": "passed" },
+    { "scenarioId": "operations.vercel-cron-registration", "required": true, "environment": "ci-build", "status": "passed" },
+    { "scenarioId": "database.pending-migrations", "required": true, "environment": "ci-build", "status": "passed" },
+    { "scenarioId": "release.manual-arcs", "required": true, "environment": "preview", "status": "passed" }
+  ],
+  "results": [
+    {
+      "scenarioId": "deployment.preview-identity",
+      "environment": "preview",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:01:00.000Z",
+      "finishedAt": "2026-07-26T10:01:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/preview-version.json"], "deployment-identity": ["artifacts/preview-identity.txt"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "deployment.production-identity",
+      "environment": "production",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:02:00.000Z",
+      "finishedAt": "2026-07-26T10:02:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/production-version.json"], "deployment-identity": ["artifacts/production-identity.txt"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "health.core-dependencies",
+      "environment": "preview",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:03:00.000Z",
+      "finishedAt": "2026-07-26T10:03:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/health.json"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "health.core-dependencies",
+      "environment": "production",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:03:02.000Z",
+      "finishedAt": "2026-07-26T10:03:03.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/production-health.json"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "profile.public-badge-read",
+      "environment": "preview",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:04:00.000Z",
+      "finishedAt": "2026-07-26T10:04:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/badge.json"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "profile.public-badge-read",
+      "environment": "production",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:04:02.000Z",
+      "finishedAt": "2026-07-26T10:04:03.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/production-badge.json"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "profile.public-share-read",
+      "environment": "preview",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:05:00.000Z",
+      "finishedAt": "2026-07-26T10:05:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/share.json"], "ui": ["artifacts/share.png"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "profile.public-share-read",
+      "environment": "production",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:05:02.000Z",
+      "finishedAt": "2026-07-26T10:05:03.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/production-share.json"], "ui": ["artifacts/production-share.png"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "auth.github-login-redirect",
+      "environment": "preview",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:06:00.000Z",
+      "finishedAt": "2026-07-26T10:06:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/github-redirect.json"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "auth.protected-write-denied",
+      "environment": "preview",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:07:00.000Z",
+      "finishedAt": "2026-07-26T10:07:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/protected-denial.json"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "studio.config-persistence",
+      "environment": "local-contract",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:08:00.000Z",
+      "finishedAt": "2026-07-26T10:08:01.000Z",
+      "runner": "playwright",
+      "evidence": { "ui": ["artifacts/studio.png"], "http": ["artifacts/studio.json"], "datastore": ["artifacts/studio-row.json"], "cleanup": ["artifacts/studio-residue.json"] },
+      "fixtures": [{ "id": "fixture-pass-studio", "cleanupStatus": "removed", "residueEvidence": "artifacts/studio-residue.json" }]
+    },
+    {
+      "scenarioId": "profile.snapshot-integrity",
+      "environment": "local-contract",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:09:00.000Z",
+      "finishedAt": "2026-07-26T10:09:01.000Z",
+      "runner": "playwright",
+      "evidence": { "http": ["artifacts/snapshot.json"], "datastore": ["artifacts/snapshot-row.json"], "cleanup": ["artifacts/snapshot-residue.json"] },
+      "fixtures": [{ "id": "fixture-pass-snapshot", "cleanupStatus": "removed", "residueEvidence": "artifacts/snapshot-residue.json" }]
+    },
+    {
+      "scenarioId": "operations.vercel-cron-registration",
+      "environment": "ci-build",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:10:00.000Z",
+      "finishedAt": "2026-07-26T10:10:01.000Z",
+      "runner": "script",
+      "evidence": { "configuration": ["artifacts/vercel-config.txt"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "database.pending-migrations",
+      "environment": "ci-build",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:11:00.000Z",
+      "finishedAt": "2026-07-26T10:11:01.000Z",
+      "runner": "script",
+      "evidence": { "datastore": ["artifacts/pending-migrations.json"] },
+      "fixtures": []
+    },
+    {
+      "scenarioId": "release.manual-arcs",
+      "environment": "preview",
+      "status": "passed",
+      "startedAt": "2026-07-26T10:12:00.000Z",
+      "finishedAt": "2026-07-26T10:12:01.000Z",
+      "runner": "manual",
+      "evidence": {
+        "ui": ["artifacts/manual-arcs.md"],
+        "http": ["artifacts/manual-arcs-http.json"]
+      },
+      "fixtures": []
+    }
+  ],
+  "exceptions": [],
+  "manualObligations": [
+    {
+      "id": "oauth.github-real",
+      "executor": "synthetic-release-operator",
+      "executedAt": "2026-07-26T10:12:00.000Z",
+      "environment": "preview",
+      "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "Real OAuth completion reviewed at its authorization boundary",
+      "status": "passed",
+      "evidence": ["artifacts/manual-oauth.md"]
+    },
+    {
+      "id": "profile.authenticated-badge",
+      "executor": "synthetic-release-operator",
+      "executedAt": "2026-07-26T10:12:01.000Z",
+      "environment": "preview",
+      "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "Authenticated badge behavior verified",
+      "status": "passed",
+      "evidence": ["artifacts/manual-authenticated-badge.md"]
+    },
+    {
+      "id": "profile.share-verification",
+      "executor": "synthetic-release-operator",
+      "executedAt": "2026-07-26T10:12:02.000Z",
+      "environment": "preview",
+      "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "Profile share behavior verified",
+      "status": "passed",
+      "evidence": ["artifacts/manual-share.md"]
+    },
+    {
+      "id": "locales.en-es",
+      "executor": "synthetic-release-operator",
+      "executedAt": "2026-07-26T10:12:03.000Z",
+      "environment": "preview",
+      "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "English and Spanish release surfaces verified",
+      "status": "passed",
+      "evidence": ["artifacts/manual-locales.md"]
+    },
+    {
+      "id": "migration.review",
+      "executor": "synthetic-release-operator",
+      "executedAt": "2026-07-26T10:12:04.000Z",
+      "environment": "preview",
+      "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "Migration applicability and authorization reviewed",
+      "status": "passed",
+      "evidence": ["artifacts/manual-migration-review.md"]
+    },
+    {
+      "id": "rollback.readiness",
+      "executor": "synthetic-release-operator",
+      "executedAt": "2026-07-26T10:12:05.000Z",
+      "environment": "preview",
+      "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "Rollback procedure and evidence references reviewed",
+      "status": "passed",
+      "evidence": ["artifacts/manual-rollback-readiness.md"]
+    }
+  ],
+  "exploratoryCharters": [
+    {
+      "id": "fixture-pass-charter",
+      "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executorContext": "fresh-synthetic-context",
+      "timeboxMinutes": 30,
+      "riskHypothesis": "Repeated release interactions could leave inconsistent state",
+      "changedCapability": "release candidate behavior",
+      "actors": ["release operator"],
+      "surfaces": ["preview application"],
+      "states": ["fixed candidate"],
+      "externalSeams": ["Vercel"],
+      "environment": "preview",
+      "allowedOperations": ["read"],
+      "safetyClass": "read-only",
+      "candidateRecord": "quality/evidence/runs/fixture-pass/candidate.json",
+      "maneuvers": [
+        { "number": 1, "status": "passed", "evidence": "artifacts/charter-1.md" },
+        { "number": 2, "status": "passed", "evidence": "artifacts/charter-2.md" },
+        { "number": 3, "status": "passed", "evidence": "artifacts/charter-3.md" },
+        { "number": 4, "status": "passed", "evidence": "artifacts/charter-4.md" },
+        { "number": 5, "status": "passed", "evidence": "artifacts/charter-5.md" },
+        { "number": 6, "status": "passed", "evidence": "artifacts/charter-6.md" },
+        { "number": 7, "status": "passed", "evidence": "artifacts/charter-7.md" },
+        { "number": 8, "status": "passed", "evidence": "artifacts/charter-8.md" }
+      ],
+      "findings": [],
+      "skippedHighRiskAreas": [],
+      "fixtures": [],
+      "decision": "pass"
+    }
+  ],
+  "rollbackReference": "docs/runbooks/rollback.md",
+  "tagAuthorization": { "status": "pending" }
+}

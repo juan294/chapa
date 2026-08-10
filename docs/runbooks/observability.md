@@ -5,6 +5,8 @@
 This runbook covers log retention and how to wire a durable **log drain** so
 production logs outlive Vercel's short built-in retention window. It complements
 the alerting path already described in `docs/runbooks/incident-response.md`.
+`docs/release/release-playbook.md` owns release ordering; this file provides
+monitoring and forensic detail only.
 
 ## The problem: Vercel log retention is short
 
@@ -113,6 +115,23 @@ So the two layers are complementary:
 
 Configure both. The webhook tells you something broke; the log drain lets you find
 out why after the fact.
+
+## Release evidence correlation
+
+For a release-related alert or investigation, begin with the E2E Pro evidence
+report and correlate:
+
+- `runId`;
+- `developCommit` and `candidateTreeDigest`;
+- `mainCommit` and production `/api/version` identity;
+- exact deployment URL and observation timestamps;
+- workflow/job and Playwright artifact references; and
+- any rollback deployment and restored identity.
+
+Add the evidence report reference and `runId` to the incident record. Logs and
+alerts supplement the release manifest; they do not substitute for missing
+required evidence or authorize merge, tag, rollback, or another production
+operation.
 
 ## Verification checklist
 

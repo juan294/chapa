@@ -42,6 +42,107 @@ test.describe("Share page — /u/:handle", () => {
     await expect(heading).toBeVisible();
   });
 
+  test("locale switch updates the live profile title and accessible badge label", async ({
+    page,
+  }) => {
+    const response = await page.goto(smokeProfilePath, GOTO_OPTS);
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBeLessThan(500);
+
+    await expect(page.locator("h1")).toHaveText(
+      "Impacto de desarrollador de octocat",
+    );
+    await expect(page.getByRole("img", { name: "Chapa de octocat" })).toBeAttached();
+
+    await page.getByRole("button", { name: "ES", exact: true }).click();
+    await page.getByRole("option", { name: "English" }).click();
+
+    await expect(page).toHaveURL(smokeProfilePath);
+    await expect(page).toHaveTitle(
+      "@octocat — Developer Impact, Decoded — Chapa",
+    );
+    await expect(page.locator("h1")).toHaveText(
+      "octocat's developer impact",
+    );
+    await expect(
+      page.getByRole("img", { name: "Chapa badge for octocat" }),
+    ).toBeAttached();
+  });
+
+  test("direct locale deep link settles without a hydration reload loop", async ({
+    page,
+  }) => {
+    const hydrationErrors: string[] = [];
+    const documentNavigations: string[] = [];
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        /(?:hydration|Minified React error #(?:418|419))/i.test(message.text())
+      ) {
+        hydrationErrors.push(message.text());
+      }
+    });
+    page.on("request", (request) => {
+      if (
+        request.isNavigationRequest() &&
+        request.frame() === page.mainFrame()
+      ) {
+        documentNavigations.push(request.url());
+      }
+    });
+
+    const path = `${smokeProfilePath}&lang=en`;
+    const response = await page.goto(path, GOTO_OPTS);
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBeLessThan(500);
+
+    await expect(page).toHaveURL(path);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(page).toHaveTitle(
+      "@octocat — Developer Impact, Decoded — Chapa",
+    );
+    // Wait for the lazy owner/visitor subtree and shared session request to
+    // settle. A cached session used to change this subtree's first client
+    // render and emit React #418 after the earlier heading assertions passed.
+    await expect(page.getByText("Embed this badge")).toBeVisible();
+    await expect(page.getByText("Discover your impact")).toBeVisible();
+    expect(documentNavigations).toHaveLength(1);
+    expect(hydrationErrors).toEqual([]);
+
+    await page.reload(GOTO_OPTS);
+    await expect(page).toHaveURL(path);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(page).toHaveTitle(
+      "@octocat — Developer Impact, Decoded — Chapa",
+    );
+    await expect(page.getByText("Embed this badge")).toBeVisible();
+    await expect(page.getByText("Discover your impact")).toBeVisible();
+    expect(documentNavigations).toHaveLength(2);
+    expect(hydrationErrors).toEqual([]);
+  });
+
+  test("a pinned locale deep link can switch to the other language", async ({
+    page,
+  }) => {
+    const englishPath = `${smokeProfilePath}&lang=en`;
+    const spanishPath = `${smokeProfilePath}&lang=es`;
+
+    await page.goto(englishPath, GOTO_OPTS);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+
+    await page.getByRole("button", { name: "EN", exact: true }).click();
+    await page.getByRole("option", { name: "Español" }).click();
+    await expect(page).toHaveURL(spanishPath);
+    await expect(page.locator("h1")).toHaveText(
+      "Impacto de desarrollador de octocat",
+    );
+
+    await page.getByRole("button", { name: "ES", exact: true }).click();
+    await page.getByRole("option", { name: "English" }).click();
+    await expect(page).toHaveURL(englishPath);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+  });
+
   test("invalid handle returns 404 or error state", async ({ page }) => {
     const response = await page.goto(
       "/u/this-user-definitely-does-not-exist-xyz123",

@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/agent-utils.sh"
 
 AGENT_KEY="security_scanner"
+MODEL="sonnet"
 OUTPUT_FILE="${CHAPA_DIR}/docs/agents/security-report.md"
 LOG_FILE="${LOGS_DIR}/security-agent-$(date '+%Y-%m-%d').log"
 
@@ -37,6 +38,7 @@ log_info "Running Claude headless mode..."
 # Run Claude in headless mode
 cd "${CHAPA_DIR}"
 claude -p "${PROMPT}" \
+  --model "${MODEL}" \
   --allowedTools "Read,Glob,Grep,Bash" \
   --output-format text \
   > "${OUTPUT_FILE}" 2>>"${LOG_FILE}" || {

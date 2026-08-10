@@ -93,34 +93,6 @@ describe("computeActivityInsights", () => {
     });
   });
 
-  describe("busiestDay", () => {
-    it("returns the weekday with the most total contributions", () => {
-      // 2025-03-03 is a Monday, 2025-03-10 is also a Monday
-      const data = makeDays("2025-03-03", [
-        10, // Mon
-        1,  // Tue
-        1,  // Wed
-        1,  // Thu
-        1,  // Fri
-        0,  // Sat
-        0,  // Sun
-        10, // Mon again
-        1,  // Tue
-        1,  // Wed
-      ]);
-      expect(computeActivityInsights(data).busiestDay).toBe("Mon");
-    });
-
-    it("returns empty string for empty data", () => {
-      expect(computeActivityInsights([]).busiestDay).toBe("");
-    });
-
-    it("returns empty string when all counts are zero", () => {
-      const data = makeDays("2025-03-01", [0, 0, 0]);
-      expect(computeActivityInsights(data).busiestDay).toBe("");
-    });
-  });
-
   describe("peakDay", () => {
     it("returns the day with the highest count", () => {
       const data = makeDays("2025-03-01", [3, 15, 7, 2]);
@@ -194,20 +166,21 @@ describe("computeActivityInsights", () => {
         10, 10, 10, 10, 10, 10, 10,
       ]);
       const summary = computeActivityInsights(data).summary;
-      // Best week (70) is 10x average of first week (7), so should mention "most active week"
-      expect(summary).toContain("Most active week");
-      expect(summary).toContain("your weekly average");
+      // Best week (70) is 10x average of first week (7).
+      expect(summary).toMatchObject({
+        kind: "most-active-week",
+        ratio: 10,
+      });
     });
 
     it("falls back to peak day when no week is notably above average", () => {
       const data = makeDays("2025-03-03", [5, 5, 5, 5, 5, 5, 5]);
       const summary = computeActivityInsights(data).summary;
-      // All weeks are equal, so falls back to peak day or active days count
-      expect(summary.length).toBeGreaterThan(0);
+      expect(summary).toMatchObject({ kind: "peak-day", count: 5 });
     });
 
     it("returns empty-state message for no data", () => {
-      expect(computeActivityInsights([]).summary).toBe("No activity recorded yet");
+      expect(computeActivityInsights([]).summary).toEqual({ kind: "none" });
     });
   });
 

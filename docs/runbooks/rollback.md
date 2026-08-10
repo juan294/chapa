@@ -1,5 +1,10 @@
 # Rollback Runbook
 
+`docs/release/release-playbook.md` owns release ordering and selects this
+runbook when a rollback trigger fires. Every rollback changes production and
+requires explicit rollback authorization. Analyzer PASS or an earlier release
+approval does not authorize rollback.
+
 ## When to Roll Back
 
 Roll back when a production deployment causes:
@@ -12,9 +17,11 @@ Roll back when a production deployment causes:
 
 1. Open [vercel.com/dashboard](https://vercel.com/dashboard) and select the Chapa project.
 2. Navigate to **Deployments** tab.
-3. Find the last known-good deployment (look for the deployment before the current one, or filter by date).
+3. Read the failed release report and select its named previous
+   evidence-approved deployment. Do not choose merely by chronology.
 4. Click the three-dot menu on that deployment and select **Promote to Production**.
-5. Confirm — traffic shifts immediately (no rebuild required).
+5. Confirm the target identity, then obtain explicit rollback authorization.
+6. Promote it; traffic shifts immediately without a rebuild.
 
 ## Rollback via Vercel CLI
 
@@ -22,13 +29,14 @@ Roll back when a production deployment causes:
 # List recent deployments
 vercel ls --app chapa
 
-# Promote a specific deployment to production
-vercel promote <deployment-url>
+# After explicit rollback authorization, promote the report's approved target
+vercel promote "$approvedDeploymentUrl"
 ```
 
 ## Rollback via Git (emergency revert)
 
-If the bad code needs to be reverted from `main` and re-deployed:
+If the bad code needs to be reverted from `main` and re-deployed, obtain
+explicit authorization for the emergency `main` mutation first:
 
 ```bash
 # On main branch
@@ -42,15 +50,23 @@ git push origin main
 After promoting or reverting:
 
 ```bash
-# Check health endpoint
+# Verify restored deployment identity
+curl -fsS https://chapa.thecreativetoken.com/api/version
+
+# Check health and core dependency state
 curl https://chapa.thecreativetoken.com/api/health
 
-# Verify a badge loads
-curl -I https://chapa.thecreativetoken.com/u/<handle>/badge.svg
+# Verify the read-only smoke badge
+curl -I 'https://chapa.thecreativetoken.com/u/octocat/badge.svg?__chapa_smoke=1'
 
 # Confirm the deployment URL in response headers
 curl -I https://chapa.thecreativetoken.com | grep x-vercel-deployment-url
 ```
+
+Require `/api/version` to match the previous evidence-approved commit in the
+failed release report. Record the failed `runId`, failed candidate/main
+identities, rollback deployment URL and commit, command/operator, time, health,
+badge, header, and restored identity evidence.
 
 ## Schema Changes Are Not Covered by This Runbook
 
@@ -65,6 +81,6 @@ action.
 
 ## Post-Rollback
 
-1. Open a GitHub issue describing the incident (use `type: bug`, `priority: critical`).
+1. Open a GitHub issue describing the incident (use `type: bug`, `priority: critical`) and link the failed release evidence and rollback identities.
 2. Revert or fix the bad code on `develop` before re-deploying.
 3. File a post-mortem using the template in `docs/runbooks/incident-response.md`.

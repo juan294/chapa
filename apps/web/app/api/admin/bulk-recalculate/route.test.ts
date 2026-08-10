@@ -137,7 +137,6 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.total).toBe(2);
     expect(mockDbGetUsers).toHaveBeenCalled();
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
-      token: "ghp-server-token",
       ignoreSnapshot: true,
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
@@ -188,12 +187,12 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       1,
       "mona",
-      { token: "ghp-server-token", ignoreSnapshot: true },
+      { ignoreSnapshot: true },
     );
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       2,
       "zara",
-      { token: "ghp-server-token", ignoreSnapshot: true },
+      { ignoreSnapshot: true },
     );
   });
 

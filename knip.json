@@ -23,6 +23,7 @@
         "app/**/error.tsx",
         "app/**/loading.tsx",
         "app/**/not-found.tsx",
+        "e2e/helpers/vercel-protection-global-setup.ts",
         "scripts/**/*.ts"
       ],
       "project": ["**/*.{ts,tsx}"],

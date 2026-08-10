@@ -218,18 +218,18 @@ When multiple platforms are connected, stats are merged automatically (see [Mult
 
 **Public mode (no login):**
 - Anyone can visit `/u/{handle}` or embed `/u/{handle}/badge.svg`
-- Uses publicly available GitHub contribution data
-- Cached for 24 hours to respect API rate limits
+- Uses the server `GITHUB_TOKEN`; contribution counts may include private-repo activity visible to that token, but never repository names or code
+- Primary stats are cached for 6 hours with a 7-day last-known-good fallback; badge responses use a 6-hour CDN cache
 
 **Verified mode (OAuth login):**
-- User authenticates with GitHub OAuth (`read:user` scope only)
+- User authenticates with GitHub OAuth (`read:user user:email` scopes)
 - Badge shows a "Verified" indicator
-- Uses the user's OAuth token for API requests (higher rate limits, 5000 req/hr vs 60 req/hr)
+- Uses the user's OAuth token for signed-in refreshes; because the app does not request `repo`, this path is not private-inclusive
 - Token is encrypted at rest using AES-256-GCM
 
 ### What we request from GitHub
 
-- OAuth scope: `read:user` (the minimum needed to identify the user)
+- OAuth scopes: `read:user user:email` (identity and verified-email lookup)
 - We NEVER request write access to repositories
 - We NEVER access private repository content or code
 - We query contribution metadata only (counts, dates, PR sizes)
@@ -353,12 +353,13 @@ Step 2: Next badge request merges the data automatically
 > than cache that corrupt result, Chapa detects the collapse and serves the last-known-good
 > stats, so the score never drops on a partial fetch.
 >
-> **Scoring-data integrity contract (#1004):** a further three-boundary defense sits on top of
-> #1002. An authoritative merged-PR count (a separate `search(is:merged)` query) catches a
-> degraded fetch at the source — with no prior cached result required. Cache writes are
-> scope-aware and never downgrading, so a public/cron fetch can't overwrite a signed-in user's
-> richer cached data. And snapshot history plus the badge's verification hash are only ever
-> written from complete stats, so a bad fetch can't poison permanent history or be cryptographically attested.
+> **Scoring-data integrity contract (#1004, corrected #1045/#1050):** a further three-boundary
+> defense sits on top of #1002. The fetch boundary rejects internally inconsistent payloads;
+> `search(is:merged)` is token-scoped too, so it is not an independent authoritative count.
+> Cache writes are scope-aware and never downgrading: the scope-blind signed-in user's refresh
+> cannot overwrite the private-inclusive server-token result used by anonymous and cron
+> requests. Snapshot history and the badge's verification hash are only written from complete
+> stats, so a bad fetch cannot poison permanent history or be cryptographically attested.
 
 ### How stats are merged
 
@@ -437,7 +438,7 @@ The endpoint implements 4 layers of protection:
 - **CSRF protection:** OAuth flow uses a random state parameter stored in Redis (TTL 600s) with one-time consumption — the state is deleted immediately after validation, preventing replay attacks. An in-memory map provides fallback when Redis is unavailable
 - **Token storage:** GitHub OAuth tokens are stored server-side in Supabase (`user_platforms` table), not in session cookies — the session cookie holds only the user's identity (login + name), never the raw token
 - **Secure cookies:** `HttpOnly`, `SameSite=Lax`, and `Secure` flag (enforced on HTTPS; localhost gets `SameSite=Lax` without `Secure` for dev convenience, via centralized cookie policy)
-- **Minimal scope:** Only `read:user` is requested -- no write access to anything
+- **Minimal scope:** Only `read:user user:email` is requested -- no repository or write access
 
 ### SVG injection prevention
 
@@ -508,7 +509,7 @@ The `compareSnapshots()` function produces structured deltas between two snapsho
 2. **We never expose your tokens.** GitHub OAuth tokens are stored server-side in our database (never in cookies or client-accessible storage). CLI tokens are not stored at all.
 3. **Your EMU token stays on your machine.** The CLI tool uses it locally and uploads only the extracted statistics.
 4. **Private repo names are never exposed.** We track "repos contributed to" as a count, not a list.
-5. **Cached data expires after 24 hours.** Supplemental data, stats, and badge renders all expire after one day. Lifetime metric snapshots are stored permanently but contain only public data (scores, stats, dates — no private repo names, no code, no tokens).
+5. **Caches are bounded.** Primary stats and badge responses use a 6-hour cache, last-known-good stats are retained for 7 days, and supplemental data expires after 24 hours. Lifetime metric snapshots are stored permanently, but contain only aggregate scores, stats, and dates — no private repo names, code, or tokens.
 6. **Confidence is fair, not punitive.** Confidence adjustments affect the final score gently (max 7.5% reduction) and are never accusatory. Confidence values are visible to admins for diagnostics but are not shown on developer-facing pages.
 
 ---
@@ -522,7 +523,7 @@ A: The same caps and logarithmic normalization apply. Even if you claimed 10,000
 A: Because Chapa's server cannot independently verify EMU data (the enterprise API is walled off). The -5 penalty is minimal and the messaging is clear: "Includes activity from a linked account that cannot be independently verified." This is transparency, not punishment.
 
 **Q: Does my employer see my Chapa badge?**
-A: No. Chapa queries the GitHub API using your personal token. Your EMU token is used only locally on your machine by the CLI. Your employer's GitHub Enterprise instance is never contacted by Chapa's servers.
+A: No. Signed-in refreshes use your personal OAuth token, while anonymous and scheduled refreshes use Chapa's server token. Your EMU token is used only locally on your machine by the CLI. Your employer's GitHub Enterprise instance is never contacted by Chapa's servers.
 
 **Q: What happens if I don't re-upload supplemental data?**
 A: The supplemental data expires after 24 hours. Your badge will revert to showing only your personal GitHub stats. To maintain combined stats, run the CLI daily (or set up a cron job).

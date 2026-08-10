@@ -291,7 +291,7 @@ describe("ImpactBreakdown", () => {
     });
 
     it("renders a fallback message when data is missing", () => {
-      expect(SOURCE).toContain("No impact data available");
+      expect(SOURCE).toContain("dashboard.noImpactData");
     });
   });
 

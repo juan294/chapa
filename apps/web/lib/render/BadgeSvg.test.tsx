@@ -82,9 +82,21 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("@testuser");
     });
 
-    it("contains 'Verified metrics' subtitle", () => {
+    it("labels metrics as public when no verification seal exists", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("Public metrics");
+      expect(svg).not.toContain("Verified metrics");
+      expect(svg).not.toContain("M12 1L3 5v6");
+    });
+
+    it("labels metrics as verified only when a verification seal exists", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
       expect(svg).toContain("Verified metrics");
+      expect(svg).toContain('aria-label="Verification seal"');
+      expect(svg).toContain("/verify/abc12345");
     });
 
     it("contains 'Chapa_' logo text with underscore cursor", () => {
@@ -158,7 +170,10 @@ describe("renderBadgeSvg", () => {
 
   describe("verified icon", () => {
     it("contains a shield/checkmark icon in non-demo mode", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
       expect(svg).toContain("M12 1L3 5v6");
     });
 
@@ -168,12 +183,18 @@ describe("renderBadgeSvg", () => {
     });
 
     it("verified icon has low opacity", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
       expect(svg).toMatch(/opacity="0\.4"/);
     });
 
     it("shield icon appears just before 'Verified metrics' text in SVG", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
       const shieldIdx = svg.indexOf("M12 1L3 5v6");
       const subtitleIdx = svg.indexOf("Verified metrics");
       expect(shieldIdx).toBeGreaterThan(-1);
@@ -493,7 +514,7 @@ describe("renderBadgeSvg", () => {
   describe("font size parity", () => {
     it("subtitle font-size is at least 19 to display at ~14px", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const match = svg.match(/font-size="(\d+)"[^>]*>Verified metrics/);
+      const match = svg.match(/font-size="(\d+)"[^>]*>Public metrics/);
       expect(match).not.toBeNull();
       expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(19);
     });

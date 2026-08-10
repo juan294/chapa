@@ -153,7 +153,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | Email | Resend |
 | CLI | Node.js, tsup, device auth flow |
 | Hosting | Vercel |
-| Testing | Vitest, 496+ test files, 8,479+ tests, TDD workflow |
+| Testing | Vitest, 513 test files, 8,688 tests, TDD workflow |
 
 ## Environment Variables
 
@@ -207,6 +207,7 @@ See `.env.example` for the full list with descriptions.
 | `GET /admin` | Admin dashboard (admin handles only) |
 | `GET /about` | About page (scoring explainer, archetype showcase) |
 | `GET /api/health` | Health check (`status`, timestamp, and Redis/Supabase/GitHub dependency probes) |
+| `GET /api/version` | No-store deployment identity for release verification |
 | `GET /api/verify/:hash` | Badge verification |
 | `POST /api/refresh?handle=` | Force refresh (rate-limited) |
 | `GET /api/history/:handle` | Score history, trend, and diff |

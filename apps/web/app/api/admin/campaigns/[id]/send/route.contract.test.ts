@@ -62,7 +62,7 @@ describe("POST /api/admin/campaigns/[id]/send contract", () => {
     const response = await POST(request(), CTX);
     const body = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(body.error).toBe("Failed to initiate campaign");
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("Campaign already started or could not be claimed");
   });
 });

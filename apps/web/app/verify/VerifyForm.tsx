@@ -8,7 +8,7 @@ const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
 export function VerifyForm() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
   const [hash, setHash] = useState("");
   const [error, setError] = useState("");
 
@@ -19,7 +19,7 @@ export function VerifyForm() {
       setError(t('verifyForm.invalidHash') as string);
       return;
     }
-    router.push(`/verify/${trimmed}`);
+    router.push(`/verify/${trimmed}?lang=${locale}`);
   }
 
   return (

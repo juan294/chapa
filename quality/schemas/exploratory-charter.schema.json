@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chapa.dev/schemas/exploratory-charter.schema.json",
+  "title": "Chapa exploratory release charter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "candidate", "executorContext", "timeboxMinutes", "riskHypothesis", "changedCapability", "actors", "surfaces", "states", "externalSeams", "environment", "allowedOperations", "safetyClass", "candidateRecord", "maneuvers", "findings", "skippedHighRiskAreas", "fixtures", "decision"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "candidate": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "executorContext": { "type": "string", "minLength": 1 },
+    "timeboxMinutes": { "type": "integer", "minimum": 1 },
+    "riskHypothesis": { "type": "string", "minLength": 1 },
+    "changedCapability": { "type": "string", "minLength": 1 },
+    "actors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "surfaces": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "states": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "externalSeams": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "environment": {
+      "enum": ["local-contract", "ci-build", "preview", "production"]
+    },
+    "allowedOperations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "safetyClass": {
+      "enum": ["read-only", "synthetic-local-write", "authorized-preview-interaction", "production-operation", "outward-effect"]
+    },
+    "candidateRecord": { "type": "string", "minLength": 1 },
+    "maneuvers": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "allOf": [
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 1 } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 2 } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 3 } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 4 } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 5 } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 6 } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 7 } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["number"], "properties": { "number": { "const": 8 } } }, "minContains": 1, "maxContains": 1 }
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["number", "status"],
+        "properties": {
+          "number": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "status": { "enum": ["passed", "failed", "not-applicable"] },
+          "evidence": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "status", "summary"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "severity": { "enum": ["low", "medium", "high", "critical"] },
+          "status": { "enum": ["triaged", "untriaged"] },
+          "summary": { "type": "string", "minLength": 1 },
+          "reference": { "type": "string" }
+        }
+      }
+    },
+    "skippedHighRiskAreas": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "cleanupStatus", "residueEvidence"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "cleanupStatus": { "enum": ["removed", "present", "unknown"] },
+          "residueEvidence": { "type": "string" }
+        }
+      }
+    },
+    "decision": { "enum": ["pass", "blocked"] }
+  }
+}

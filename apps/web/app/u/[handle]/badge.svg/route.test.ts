@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { CACHE_VERSION } from "@/lib/cache/version";
+import { BADGE_RENDER_VARIANT } from "@/lib/render/badge-svg-cache";
 
 const {
   mockMaterializePublicProfile,
@@ -449,7 +450,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       await GET(req, ctx);
 
       expect(mockCacheSet).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
         FAKE_SVG,
         expect.any(Number),
       );
@@ -499,7 +500,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       // TTL is base 24h + per-handle jitter of 0-2h (PE-S1)
       expect(mockCacheSet).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
         FAKE_SVG,
         expect.toSatisfy((ttl: number) => ttl >= 86400 && ttl <= 86400 + 7200),
       );
@@ -510,11 +511,11 @@ describe("GET /u/[handle]/badge.svg", () => {
       await GET(req, ctx);
 
       expect(mockCacheSetNx).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:warm-amber:`)),
+        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
         30,
       );
       expect(mockCacheDel).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:warm-amber:`)),
+        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
       );
     });
 
@@ -525,7 +526,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       await GET(req, ctx);
 
       expect(mockCacheGet).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
       );
     });
 

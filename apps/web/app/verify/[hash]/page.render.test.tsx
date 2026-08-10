@@ -7,7 +7,27 @@ vi.mock("@/lib/verification/store", () => ({
 }));
 
 vi.mock("@/components/Navbar", () => ({
-  Navbar: () => <nav data-testid="navbar">Navbar</nav>,
+  Navbar: ({ locale }: { locale?: string }) => (
+    <nav data-testid="navbar" data-locale={locale}>Navbar</nav>
+  ),
+}));
+
+vi.mock("@/lib/i18n", () => ({
+  LanguageProvider: ({
+    children,
+    initialLocale,
+  }: {
+    children: React.ReactNode;
+    initialLocale: string;
+  }) => (
+    <div data-testid="language-provider" data-initial-locale={initialLocale}>
+      {children}
+    </div>
+  ),
+  LangSync: () => <span data-testid="lang-sync" />,
+  LocaleSync: ({ queryLang }: { queryLang?: string }) => (
+    <span data-testid="locale-sync" data-query-lang={queryLang} />
+  ),
 }));
 
 // Mock getServerLocale + getServerT to return English without needing Next.js headers()
@@ -24,7 +44,9 @@ vi.mock("@/lib/i18n/server", async () => {
     return current;
   }
   return {
-    getServerLocale: vi.fn().mockResolvedValue("en"),
+    getServerLocale: vi.fn().mockImplementation(async (lang?: string) =>
+      lang === "es" || lang === "en" ? lang : "en"
+    ),
     getServerT: vi.fn().mockImplementation(() => (key: string) =>
       deepGet(en as unknown as Record<string, unknown>, key)
     ),
@@ -48,6 +70,7 @@ vi.mock("next/link", () => ({
 }));
 
 import { getVerificationRecord } from "@/lib/verification/store";
+import { getServerLocale } from "@/lib/i18n/server";
 import VerifyPage, { generateMetadata } from "./page";
 
 afterEach(() => {
@@ -86,8 +109,7 @@ describe("generateMetadata", () => {
       searchParams: Promise.resolve({}),
     });
     // English: verify.title = 'Verify a badge'
-    expect(meta.title).toContain("Verify");
-    expect(meta.title).toContain("a1b2c3d4");
+    expect(meta.title).toBe("Verify a badge a1b2c3d4");
   });
 
   it("returns invalid hash title for a non-hex hash", async () => {
@@ -96,7 +118,7 @@ describe("generateMetadata", () => {
       searchParams: Promise.resolve({}),
     });
     // English: verifyDetail.invalidHashTitle = 'Invalid hash'
-    expect(meta.title).toContain("Invalid hash");
+    expect(meta.title).toBe("Invalid hash");
   });
 
   it("disables robots indexing for all verify pages", async () => {
@@ -106,9 +128,35 @@ describe("generateMetadata", () => {
     });
     expect((meta.robots as { index: boolean }).index).toBe(false);
   });
+
+  it("ignores an ambiguous repeated locale parameter", async () => {
+    await generateMetadata({
+      params: Promise.resolve({ hash: "not-valid!" }),
+      searchParams: Promise.resolve({ lang: ["en", "es"] }),
+    });
+
+    expect(getServerLocale).toHaveBeenLastCalledWith(undefined);
+  });
 });
 
 describe("VerifyPage", () => {
+  it("synchronizes the shared language provider with the query locale", async () => {
+    const jsx = await VerifyPage({
+      params: Promise.resolve({ hash: "not-valid!" }),
+      searchParams: Promise.resolve({ lang: "es" }),
+    });
+    render(jsx);
+
+    expect(screen.getByTestId("locale-sync").getAttribute("data-query-lang")).toBe(
+      "es",
+    );
+    expect(
+      screen.getByTestId("language-provider").getAttribute("data-initial-locale"),
+    ).toBe("es");
+    expect(screen.getByTestId("navbar").getAttribute("data-locale")).toBe("es");
+    expect(screen.getByTestId("lang-sync")).toBeDefined();
+  });
+
   describe("invalid hash", () => {
     it("renders InvalidHashCard for non-hex characters", async () => {
       const jsx = await VerifyPage({

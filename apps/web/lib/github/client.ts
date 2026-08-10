@@ -28,16 +28,16 @@ const INFLIGHT_TIMEOUT_MS = 30_000;
 
 // In-flight request deduplication map.
 // Prevents concurrent calls for the same handle/auth context from making
-// duplicate API calls. Public callers may reuse an authenticated in-flight
-// fetch because it produces a safe superset of the public result.
+// duplicate API calls. Lower-visibility callers may reuse a private-inclusive
+// in-flight fetch because it produces a safe superset of their result.
 const _inflight = new Map<string, Promise<StatsData | null>>();
 
 /**
- * Rank a fetch's token scope for the non-downgrading cache-write rule (#1004,
- * phase 2). An authenticated fetch outranks a public one because only the
- * user's own OAuth token can see their private-repo merges; an untagged
- * (legacy, pre-#1004) entry is treated as the weakest scope so it never
- * blocks a fresh write.
+ * Rank a fetch's effective visibility for the non-downgrading cache-write
+ * rule (#1004, phase 2). `authenticated` means private-inclusive (currently
+ * the repo-scoped server `GITHUB_TOKEN`), while `public` includes the user's
+ * scope-blind OAuth session token. An untagged legacy entry is treated as the
+ * weakest scope so it never blocks a fresh write.
  */
 function scopeRank(scope: StatsData["fetchScope"]): number {
   return scope === "authenticated" ? 2 : 1;
@@ -69,7 +69,9 @@ export async function getStats(
   const mode = options.readOnly ? "readonly" : "write";
   const publicInflightKey = `${lowerHandle}:public:${mode}`;
   const authenticatedInflightKey = `${lowerHandle}:authenticated:${mode}`;
-  const inflightKey = token ? authenticatedInflightKey : publicInflightKey;
+  const isPrivateInclusive =
+    (token && OAUTH_GRANTS_PRIVATE_REPO_ACCESS) || (!token && Boolean(getGithubToken()));
+  const inflightKey = isPrivateInclusive ? authenticatedInflightKey : publicInflightKey;
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
@@ -81,9 +83,9 @@ export async function getStats(
     );
   }
 
-  // Public callers can share an authenticated fetch. Authenticated callers
-  // must not reuse a weaker public fetch.
-  const existing = token
+  // Lower-visibility callers can share a private-inclusive fetch. A
+  // private-inclusive caller must not reuse a scope-blind fetch.
+  const existing = isPrivateInclusive
     ? _inflight.get(authenticatedInflightKey)
     : _inflight.get(authenticatedInflightKey) ?? _inflight.get(publicInflightKey);
   if (existing) return existing;
@@ -347,17 +349,17 @@ async function _fetchAndCache(
   // The GitHub contributionsCollection is scoped to the authenticating token:
   // a token that cannot see a user's private-repo merges (per the corrected
   // #1050 model above, that's the user's own session token — OAUTH_SCOPES
-  // omits `repo` — not the server GITHUB_TOKEN) returns prsMergedCount=0 even
-  // when the user has hundreds of merged PRs. Caching that result collapses
-  // Delivery (PR weight is 70% of it) and flips profileType to
+  // omits `repo` — not the server GITHUB_TOKEN) can return zero or a severe
+  // shortfall relative to the private-inclusive baseline. Caching that result
+  // collapses Delivery (PR weight is 70% of it) and may flip profileType to
   // "collaborative". If the fresh result lost PR data relative to
-  // last-known-good, serve the good stale data and do NOT overwrite the
-  // stale key — otherwise a corrupt zero poisons the very fallback meant to
+  // last-known-good, serve the good stale data and do NOT overwrite the stale
+  // key — otherwise a corrupt shortfall poisons the very fallback meant to
   // protect against it.
   if (isDegradedPrFetch(stats, stale)) {
     console.warn(
       `[github] degraded PR fetch for ${lowerHandle} ` +
-        `(prsMergedCount 0, last-known-good ${stale!.prsMergedCount}) — ` +
+        `(prsMergedCount ${stats.prsMergedCount}, last-known-good ${stale!.prsMergedCount}) — ` +
         `serving last-known-good, not overwriting stale cache`,
     );
     fireAndForget(
@@ -380,18 +382,18 @@ async function _fetchAndCache(
 
   // Non-downgrading cache-write rule (#1004, phase 2 of the scoring-integrity
   // contract): a lower-scope fetch must never overwrite a higher-scope entry
-  // already cached for this handle — e.g. the warm-cache cron's public
-  // GITHUB_TOKEN must not clobber a user's own authenticated fetch that saw
-  // their private-repo merges (the 2026-03-31 seam). This subsumes the old
-  // unconditional cache writes below.
+  // already cached for this handle — e.g. a scope-blind user-session refresh
+  // must not clobber the private-inclusive server-token result established by
+  // an anonymous or warm-cache request. This subsumes the old unconditional
+  // cache writes below.
   //
   // `getStats` already confirmed a miss on `cacheKey` before calling this
   // function, so `existingMerged` is normally null here. But the public and
   // authenticated fetch paths for the same handle are deduplicated under
-  // *separate* inflight keys (a public caller may reuse an in-flight
-  // authenticated fetch, but not vice versa — see `getStats` above), so a
-  // public fetch and an authenticated fetch for the same handle can run
-  // concurrently and both reach this point. Re-reading `cacheKey` here,
+  // *separate* inflight keys (a scope-blind caller may reuse an in-flight
+  // private-inclusive fetch, but not vice versa — see `getStats` above), so
+  // both scopes for the same handle can run concurrently and reach this point.
+  // Re-reading `cacheKey` here,
   // immediately before the write, catches that race: if the authenticated
   // fetch already wrote its better-scoped entry by the time this call
   // reaches its write, this read sees it and skips the downgrade.

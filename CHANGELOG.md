@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-08-11
+
+### Added
+
+- **Fail-closed E2E Pro release verification.** Release candidates now carry
+  exact deployment identity through `/api/version`, a declared required-probe
+  set, candidate-bound evidence, and an analyzer that refuses incomplete or
+  mismatched production proof. Its bootstrap artifact now has one explicit
+  consumer-facing layout, so exact CI, release-PR, preview, and aggregate jobs
+  read the same candidate paths after download, and normalized contract
+  fragments remain present when their allowlisted source directory is hidden.
+  Candidate-supplied pre-merge evidence is also preserved as the validated
+  object instead of being replaced by the validation predicate result.
+- **Production E2E operator playbook and command.** The release workflow now
+  documents rehearsal, promotion, readback, rollback, and tag-last publication
+  as one auditable path.
+
+### Fixed
+
+- **Locale switching now refreshes the complete server-rendered page.** After
+  persisting the selected language, Chapa navigates through the canonical
+  public URL so navigation, hero copy, calls to action, and directly visited
+  internal locale routes cannot settle into a mixed-language state. Locale
+  cookie writes no longer invalidate the static layout before navigation,
+  avoiding a production-only Next.js RSC refresh race.
+- **Campaign delivery retries are now atomic and replay-safe.** Workers claim a
+  stable lease-bound batch, reuse provider idempotency keys across retries, and
+  acknowledge the complete batch in one database operation. Partial or empty
+  acknowledgements and invalid lease inputs are rejected. After an ambiguous
+  provider failure, the complete batch stays under its lease so a retry cannot
+  change membership or its idempotency key. Lease tokens containing only
+  whitespace, including tabs and newlines, now fail closed.
+- **Public profiles now stay coherent across locale changes.** Share-page
+  titles, headings, accessible badge labels, dimension details, and key-number
+  labels all follow the active language after navigation and reload. Activity
+  summaries, dates, weekday labels, legends, tooltips, and accessibility text
+  now also remain fully English or Spanish. Explicit `?lang=` profile links
+  establish locale synchronization before streamed hydration begins, and their
+  metadata keeps the requested language. Verification detail pages keep
+  their body, navbar, selector, and document language on the query locale even
+  after an opposite-language visit. Verify pages no longer duplicate the Chapa
+  title suffix. Lazy profile sections also start from a hydration-safe session
+  state before they apply cached authentication, preventing React hydration
+  errors during authenticated or signed-out share-page visits. Activity range
+  spacing is normalized across server and browser internationalization engines,
+  and pinned `?lang=` profile links can still switch languages when cookie
+  persistence is temporarily unavailable.
+- **The verification landing page now honors explicit locale links.** Static
+  `/verify?lang=` visits synchronize the visible form, navigation, document
+  language, selector, and title with the requested English or Spanish locale,
+  even when a conflicting saved locale loads before the page query reader, and
+  verified-hash submissions preserve that locale on the result page.
+- **Badge generation now reports authentication state truthfully.** The progress
+  screen checks the GitHub session before it marks authentication complete, and
+  each later generation step becomes active before it is marked done. Error
+  alerts also follow locale changes instead of retaining their initial language.
+  Direct language links and retry links now keep generation metadata, progress,
+  and error copy in the same locale.
+- **Badge verification claims now match the available proof.** Badges without
+  a real verification record say "Public metrics" and omit the seal. Only
+  badges with a verification hash and date say "Verified metrics" and link to
+  their verification record; the render-cache variant was advanced so stale
+  misleading SVGs are not reused.
+- **Server jobs now fail safely under overlap and partial persistence.** The
+  warm-cache scheduler fills its fixed seat budget without duplicating work,
+  and campaign processing releases or recovers claims when durable state cannot
+  be confirmed.
+- **GitHub statistics preserve the best observable dataset.** Server-token
+  fetches are classified by their effective private-repository visibility,
+  scope-blind user refreshes cannot outrank complete data, and in-flight/cache
+  coordination no longer lets a weaker fetch replace a stronger one.
+- Release probes run only in verification contexts, and Playwright no longer
+  discovers unit-test files as browser tests.
+- CI uses the repository-pinned Knip version, while async UI tests now wait for
+  teardown work instead of leaking unhandled activity between cases.
+- Security-triage findings were remediated and compatible dependency updates
+  were applied without widening the release scope, including patched floors for
+  `dompurify`, `js-yaml`, `nanoid`, `brace-expansion`, and `undici`.
+
+### Changed
+
+- Release and agent workflows are synchronized with cc-rpi v1.28.2, including
+  lower-cost model routing for mechanical automation.
+- Protected-preview release checks now require Vercel's automation bypass,
+  scope it only to identity and browser-probe steps, and remove the temporary
+  browser authorization state after each run.
+
 ## [2.19.1] - 2026-07-18
 
 ### Fixed
@@ -827,7 +914,12 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.17.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.20.0...HEAD
+[2.20.0]: https://github.com/juan294/chapa/compare/v2.19.1...v2.20.0
+[2.19.1]: https://github.com/juan294/chapa/compare/v2.19.0...v2.19.1
+[2.19.0]: https://github.com/juan294/chapa/compare/v2.18.1...v2.19.0
+[2.18.1]: https://github.com/juan294/chapa/compare/v2.18.0...v2.18.1
+[2.18.0]: https://github.com/juan294/chapa/compare/v2.17.0...v2.18.0
 [2.17.0]: https://github.com/juan294/chapa/compare/v2.16.1...v2.17.0
 [2.16.1]: https://github.com/juan294/chapa/compare/v2.16.0...v2.16.1
 [2.16.0]: https://github.com/juan294/chapa/compare/v2.15.0...v2.16.0

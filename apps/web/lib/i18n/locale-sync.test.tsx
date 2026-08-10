@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, waitFor, cleanup } from '@testing-library/react';
+import { render, waitFor, cleanup, act } from '@testing-library/react';
 import { useContext } from 'react';
 import { LocaleSync } from './locale-sync';
 import { LanguageContext, LanguageProvider } from './provider';
@@ -35,6 +35,9 @@ describe('LocaleSync', () => {
 
   afterEach(() => {
     cleanup();
+    document.cookie = 'chapa-locale=; Max-Age=0; path=/';
+    window.history.replaceState({}, '', '/');
+    delete document.documentElement.dataset.chapaLocaleSync;
   });
 
   it('renders null (no DOM output)', () => {
@@ -100,12 +103,78 @@ describe('LocaleSync', () => {
     expect(setLocaleAction).not.toHaveBeenCalled();
   });
 
-  it('does NOT call setLocaleAction when queryLang already matches the active locale (idempotent guard)', () => {
+  it('persists a valid query locale even when it matches the initial locale', async () => {
     render(
       <LanguageProvider initialLocale="en" dictionary={en}>
         <LocaleSync queryLang="en" />
       </LanguageProvider>
     );
+    await waitFor(() => expect(setLocaleAction).toHaveBeenCalledWith('en'));
+  });
+
+  it('applies a query locale without starting a document navigation', async () => {
+    const setLocale = vi.fn(async () => {});
+    render(
+      <LanguageContext.Provider
+        value={{ locale: 'es', setLocale, t: (key) => key }}
+      >
+        <LocaleSync queryLang="en" />
+      </LanguageContext.Provider>
+    );
+
+    await waitFor(() =>
+      expect(setLocale).toHaveBeenCalledWith('en', {
+        force: true,
+        navigate: false,
+      })
+    );
+  });
+
+  it('handles a rejected query-locale persistence call', async () => {
+    const setLocale = vi.fn().mockRejectedValue(new Error('cookie unavailable'));
+
+    render(
+      <LanguageContext.Provider
+        value={{ locale: 'es', setLocale, t: (key) => key }}
+      >
+        <LocaleSync queryLang="en" />
+      </LanguageContext.Provider>
+    );
+
+    await waitFor(() => expect(setLocale).toHaveBeenCalledOnce());
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
+  it('keeps the query locale authoritative over a conflicting cookie', async () => {
+    document.cookie = 'chapa-locale=en; path=/';
+    window.history.replaceState({}, '', '/?lang=es');
+
+    const { getByTestId } = render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <LocaleSync queryLang="es" />
+        <TranslatedTitle />
+      </LanguageProvider>
+    );
+
+    await waitFor(() => expect(setLocaleAction).toHaveBeenCalledWith('es'));
+    expect(getByTestId('title').textContent).toBe('Impacto de desarrollador,');
+  });
+
+  it('does not rewrite a matching cookie or reload its active dictionary', async () => {
+    document.cookie = 'chapa-locale=es; path=/';
+
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <LocaleSync queryLang="es" />
+        <TranslatedTitle />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(setLocaleAction).not.toHaveBeenCalled();
   });
 

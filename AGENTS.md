@@ -9,8 +9,8 @@ When operating in Codex, treat these files as the source of truth:
 
 - `CLAUDE.md` -- project overview, workflow, commands, git/deploy context
 - `.claude/commands/*.md` -- workflow definitions for `/research`, `/plan`,
-  `/implement`, `/validate`, `/pre-launch`, `/update-docs`, `/release`,
-  and related commands
+  `/implement`, `/validate`, `/pre-launch`, `/update-docs`, `/prodplaybook`,
+  `/release`, and related commands
 - `.claude/rules/*.md` -- reusable rules and path-scoped constraints
 - `.claude/skills/*/SKILL.md` -- on-demand skills and domain procedures
 
@@ -21,7 +21,7 @@ and is kept in sync with the compatibility conventions below.
 
 When the user invokes a slash-style workflow such as `/research`,
 `/plan`, `/implement`, `/validate`, `/pre-launch`, `/update-docs`,
-`/release`, `/fix-ci`, `/describe-pr`, or `/status`:
+`/prodplaybook`, `/release`, `/fix-ci`, `/describe-pr`, or `/status`:
 
 1. Check for the matching file in `.claude/commands/`.
 2. Read that command file completely before acting.
@@ -90,7 +90,8 @@ Preserve the standard cc-rpi artifact locations:
 - `docs/research/` -- research documents
 - `docs/plans/` -- implementation plans and phase files
 - `docs/decisions/` -- ADRs and decision records
-- `docs/agents/` -- local operational reports
+- `docs/agents/` -- operational reports (commit policy follows repo
+  visibility per Rule #70: gitignored on public repos, tracked on private)
 
 Respect the phase gates:
 

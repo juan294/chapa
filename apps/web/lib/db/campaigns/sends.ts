@@ -39,7 +39,10 @@ export async function dbCreateCampaignSends(
 
     const { error } = await db
       .from("campaign_sends")
-      .upsert(rows, { onConflict: "campaign_id,handle" });
+      .upsert(rows, {
+        onConflict: "campaign_id,handle",
+        ignoreDuplicates: true,
+      });
 
     if (error) throw error;
     return recipients.length;
@@ -96,9 +99,9 @@ export async function dbGetPendingSends(
  * returned row's `status → "processing"`, `lease_token`, and `lease_expires_at`
  * in a single statement — preventing two concurrent workers from picking the
  * same batch. The caller must complete processing before `leaseExpiresAt` and
- * then call `dbMarkSendsSent` / `dbMarkSendsFailed` with the same `leaseToken`
- * to release the lease. Expired leases are automatically re-claimable by the
- * next cron invocation.
+ * then atomically acknowledge the provider batch with the same `leaseToken`.
+ * Expired leases are automatically re-claimable as an indivisible group by
+ * the next cron invocation, preserving an identical idempotent payload.
  *
  * @param leaseToken - Opaque token that ties this batch to the claiming worker
  * @param leaseExpiresAt - ISO-8601 timestamp after which the claim expires
@@ -109,6 +112,7 @@ export async function dbClaimPendingSends(
   leaseToken: string,
   leaseExpiresAt: string,
 ): Promise<CampaignSend[]> {
+  if (!leaseToken.trim()) return [];
   const db = getSupabase();
   if (!db) return [];
 
@@ -138,6 +142,45 @@ export async function dbClaimPendingSends(
   }
 }
 
+export interface CampaignSendAcknowledgement {
+  id: string;
+  status: "sent" | "failed";
+  error: string | null;
+}
+
+/**
+ * Atomically acknowledge every result in one provider batch.
+ *
+ * The database function performs no updates unless every input row still
+ * belongs to the supplied lease. This prevents a partially written
+ * acknowledgement from changing the payload membership of an idempotent
+ * provider retry.
+ */
+export async function dbAcknowledgeCampaignSends(
+  results: CampaignSendAcknowledgement[],
+  leaseToken: string,
+): Promise<boolean> {
+  if (results.length === 0 || !leaseToken.trim()) return false;
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const { data, error } = await db.rpc("acknowledge_campaign_sends", {
+      p_lease_token: leaseToken,
+      p_results: results,
+    });
+
+    if (error) throw error;
+    return data === true;
+  } catch (error) {
+    console.error(
+      "[db] dbAcknowledgeCampaignSends failed:",
+      (error as Error).message,
+    );
+    return false;
+  }
+}
+
 /**
  * Mark the given send IDs as "sent" and clear their lease fields.
  *
@@ -151,9 +194,10 @@ export async function dbClaimPendingSends(
 export async function dbMarkSendsSent(
   ids: string[],
   leaseToken?: string,
-): Promise<void> {
+): Promise<boolean> {
+  if (ids.length === 0) return true;
   const db = getSupabase();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     let query = db
@@ -170,11 +214,13 @@ export async function dbMarkSendsSent(
       query = query.eq("lease_token", leaseToken);
     }
 
-    const { error } = await query.in("id", ids);
+    const { data, error } = await query.in("id", ids).select("id");
 
     if (error) throw error;
+    return Array.isArray(data) && data.length === ids.length;
   } catch (error) {
     console.error("[db] dbMarkSendsSent failed:", (error as Error).message);
+    return false;
   }
 }
 
@@ -192,9 +238,10 @@ export async function dbMarkSendsFailed(
   ids: string[],
   errorMsg: string,
   leaseToken?: string,
-): Promise<void> {
+): Promise<boolean> {
+  if (ids.length === 0) return true;
   const db = getSupabase();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     let query = db
@@ -210,11 +257,13 @@ export async function dbMarkSendsFailed(
       query = query.eq("lease_token", leaseToken);
     }
 
-    const { error } = await query.in("id", ids);
+    const { data, error } = await query.in("id", ids).select("id");
 
     if (error) throw error;
+    return Array.isArray(data) && data.length === ids.length;
   } catch (error) {
     console.error("[db] dbMarkSendsFailed failed:", (error as Error).message);
+    return false;
   }
 }
 

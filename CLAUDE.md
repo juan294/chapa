@@ -74,6 +74,9 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/profile/:handle` Public impact profile snapshot (rate-limited, CORS-enabled)
 - GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
 - GET `/api/health` Health check (Redis dbsize + Supabase query + GitHub API probe + cron heartbeat staleness for warm-cache/sync-audience/process-campaigns/latency-check, rate-limited; returns "skipped" for unconfigured services; #1047 — asserts the server `GITHUB_TOKEN` still carries `repo` scope and returns a distinct `insufficient_scope` status if not, since that token silently losing `repo` would blind every badge to private-repo merges with no other signal)
+- GET `/api/version` Read-only deployment identity (`commitSha` + Vercel
+  environment, no-store); E2E Pro uses it to bind preview and production
+  evidence to the fixed release candidate
 - GET `/api/feature-flags` Public feature flag values
 - GET `/u/:handle/og-image` OG image for share page (dynamic, cached)
 - GET `/og-image` Default OG image
@@ -158,6 +161,13 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - **Degraded-fetch protection (#1002, corrected #1050)**: GitHub's `contributionsCollection` is scoped to the authenticating token. The GitHub OAuth app requests no `repo` scope (`OAUTH_SCOPES`), so a user's own session token cannot see their private-repo merges — it is the *blinded* fetch. The server `GITHUB_TOKEN` (used by the warm-cache cron, bulk-recalculate, and any anonymous/tokenless badge hit) is `repo`-scoped and private-inclusive. `isDegradedPrFetch()` (`apps/web/lib/github/stats-integrity.ts`) detects the resulting collapse; `getStats()` then serves last-known-good, does **not** overwrite the `stats:stale:<handle>` key (preserving the fallback), refreshes only the primary key, and emits a `github_degraded_pr_fetch` telemetry event. The guard only blocks good→bad, so the next fetch by the server token heals the data and it sticks. A user's own Refresh click cannot repopulate private-repo PRs — only the server `GITHUB_TOKEN` can (or a future OAuth app requesting `repo`). `/api/health` asserts the server token still carries `repo` (`insufficient_scope` status otherwise, #1047). See `docs/accepted-risks.md` ("OAuth app requests no repo scope") for the full model.
 - **Scoring-data integrity contract (#1004, corrected #1045)**: a three-boundary defense on top of #1002 that ends the "degraded fetch collapses a score" class of bug at its root. Fetch boundary: `assessRawFetchIntegrity` rejects a structurally-inconsistent payload before it's scored, cached, or persisted — checking that the merged-PR sample's node count matches its own `totalCount` claim; `search(is:merged)` is token-scoped just like `pullRequestContributions`, so it cannot serve as an independent "authoritative" cross-check (a blinded fetch under-reports both fields consistently and the check would silently agree with itself). Cache boundary: scope-aware, non-downgrading writes — a lower-scoped fetch (`fetchScope: "public"`, e.g. a user's own session-token refresh, which omits `repo`) can never clobber a higher-scoped cache entry (`fetchScope: "authenticated"`, private-inclusive — e.g. the server `GITHUB_TOKEN`), and `stats:stale` only ever holds complete data. Persist boundary: snapshot history and the HMAC verification record are gated on stats completeness. `stats_fetch_rejected` / `snapshot_skipped_incomplete_stats` telemetry surface degradation in production; `heal-poisoned-stats` (maintenance script) repairs already-poisoned cache keys and snapshot rows.
 - **Snapshot-write reconciliation**: `reconcileSnapshotWrite` (`apps/web/lib/profile/snapshot-write.ts`) wraps the Supabase `metrics_snapshots` write and its Redis mirror as one saga, tracking a tri-state write outcome (`inserted` / `duplicate` / `failed`, #1015/#1016 — detected via row presence on the upsert response, not the PostgREST HTTP status code). A benign same-day `duplicate` still gets an opportunistic cache refresh rather than being treated as a failure; only a genuine `failed` write emits a structured P2 operational alert (suppressed when Redis is unconfigured). The public badge path (`persistProfileSnapshot`) escalates a genuine failure via `captureServerError` instead of silently discarding it (#1009) — satisfying the "durable write failure must be observable" rule below. Note: the saga only observes a single call's own outcome — it has no visibility into a race between concurrent producers (badge route, warm-cache cron, refresh, recalculate); this is an accepted, self-healing (via the next warm-cache pass) risk, not solved with locking.
+- **Campaign send leases**: `claim_campaign_sends()` atomically claims one
+  stable batch for a worker. Provider idempotency keys derive from that stable
+  batch membership and must survive retries. After delivery,
+  `acknowledge_campaign_sends()` applies the complete sent/failed result set in
+  one transaction; empty, partial, or mismatched acknowledgements fail closed.
+  A persistence failure must release or expire the lease so the same batch can
+  be replayed safely, never silently reported as delivered.
 - **Feature flags**: Async DB-backed flag reads live in `apps/web/lib/feature-flags.ts` (server-only). Synchronous client-safe helpers (`isStudioEnabledSync`, etc.) live in `apps/web/lib/feature-flags-sync.ts` — use the sync module in client components and middleware; use the async module in server actions and API routes.
 - **Rate-limit fail-open (with fail-closed exceptions)**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) allows all requests when Redis is unavailable (fail-open) on public reads — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement, and GitHub's own API limits + CDN caching provide secondary protection. Auth-critical and write routes use `rateLimitStrict` (fail-closed) instead: `/api/auth/session`, `/api/refresh`, and — since #1027 — all platform OAuth connect/callback/disconnect routes (Bitbucket/Codeberg/GitLab), which also share GitHub's single-use replay-consume nonce via a per-platform `chapa_<provider>_oauth_state_store` cookie. See `redis.ts` for the full fail-open rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
@@ -279,6 +289,9 @@ Go directly to these paths -- never search for them.
 | Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
 | Reliability playbooks | `docs/playbooks/reliability-hardening-playbook.md` | Seam-bug hardening reference |
 | Reliability plan | `docs/plans/2026-07-03-reliability-hardening.md` | Contract matrix, canaries, process guarantees |
+| E2E Pro architecture | `docs/playbooks/e2e-pro-release-verification.md` | Comprehensive decisions and evidence semantics |
+| Production E2E verification | `.claude/commands/prodplaybook.md` | Standalone freshness audit and verification; never releases |
+| Production release procedure | `docs/release/release-playbook.md` | Single short ordering and authorization authority |
 
 ---
 
@@ -290,7 +303,8 @@ Go directly to these paths -- never search for them.
 
 1. All development happens on `develop`
 2. Never commit directly to `main` — it represents what's deployed
-3. Release to production via PR: `develop` → `main`
+3. Release to production via `develop` → `main` squash PR, following
+   `docs/release/release-playbook.md`; PR, merge, and tag approvals are separate
 4. Always run checks before committing (pre-commit hooks enforce this)
 5. Always `git pull --rebase` before pushing
 6. Run verification sequentially with `;` or `&&`, never as parallel Bash calls
@@ -320,7 +334,9 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 ## Testing & CI
 - This project uses TDD. Always write tests before or alongside implementation.
 - All PRs must have CI green before merging. Run the full test suite locally before pushing.
-- After merging to develop, if production deployment is the goal, immediately create a PR from develop → main.
+- After merging to `develop`, production release work follows
+  `docs/release/release-playbook.md`. Do not infer release PR or merge
+  authorization from feature completion or green CI.
 
 ### CI Gates (enforced in CI, must pass locally too)
 - **Circular dependency check**: `pnpm run check:circular` (via `madge`) — no circular imports allowed.
@@ -354,6 +370,13 @@ pnpm run lint           # Check linting
 pnpm run test:watch          # Watch mode
 pnpm run test:coverage       # Coverage report
 pnpm run test:contract:local # Contract suite against local Supabase (run `supabase start` first)
+pnpm quality:validate        # Validate E2E Pro requiredness catalog
+pnpm run test:e2e -- --grep @release-required # Required deployed selectors
+
+# E2E Pro release evidence
+pnpm release:prepare-run -- --baseline-tag "$baselineTag" --develop-commit "$developCommit" --candidate-tree "$candidateTreeDigest" --preview-url "$previewUrl" --run-id "$runId" --output "quality/evidence/runs/$runId/release-run.json"
+pnpm release:analyze -- --run quality/evidence/runs/{runId}/release-run.json --stage final
+pnpm release:render-report -- --run quality/evidence/runs/{runId}/release-run.json --stage final
 
 # Development
 pnpm run dev            # Local dev server (port 3001)
@@ -416,6 +439,10 @@ ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer i
 
 > **Intentionally omitted:** `CI`, `NODE_ENV`, and `VERCEL_*` are standard Node/Vercel build vars and do not need to be configured manually. `TESTPLATFORM_CLIENT_ID` / `TESTPLATFORM_CLIENT_SECRET` are test-only mocks — not real credentials and not needed in any deployed environment.
 
+`/api/version` reads Vercel commit/environment identity through
+`apps/web/lib/env.ts`; route and test code must not introduce direct
+`process.env` access.
+
 ### Environment Variable Safety
 
 **Always `.trim()` environment variables before use, especially API keys.**
@@ -448,48 +475,7 @@ GitHub Issues is the single source of truth for planned work. Every issue gets *
 
 Reference issues in commits with `Fixes #N` or `Refs #N`.
 
-## Working Patterns
-
-<examples>
-<example name="push-sequence">
-Commit before pulling — hook blocks dirty pulls.
-
-```bash
-git add src/feature.ts && git commit -m "feat: add feature"
-git pull --rebase && git push
-```
-
-</example>
-
-<example name="worktree-cleanup">
-Remove worktrees before merging PRs. Use -D (uppercase) for branches.
-
-```bash
-git worktree remove --force ../feature-branch; git branch -D feature-branch
-```
-
-</example>
-
-<example name="file-paths">
-Use absolute paths in all file tools and worktree commands. Never use ~.
-
-```bash
-cd /Users/dev/project && pnpm run test
-```
-
-</example>
-</examples>
-
 Rules load from `.claude/rules/` and `.claude/skills/` automatically.
-
-## TDD Protocol
-
-All code changes follow Red-Green-Refactor:
-1. **Red** — Write a failing test FIRST
-2. **Green** — Minimum code to pass
-3. **Refactor** — Clean up with green tests
-
-No exceptions. Bug fixes need a regression test. Refactors need existing coverage. No "tests later."
 
 ## Agent Behavior
 

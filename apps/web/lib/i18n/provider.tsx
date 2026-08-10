@@ -8,10 +8,9 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   LOCALE_COOKIE,
-  SUPPORTED_LOCALES,
+  isSupportedLocale,
   type Locale,
   type Translations,
 } from './types';
@@ -21,11 +20,50 @@ import { en } from './dictionaries/en';
 
 export interface LanguageContextValue {
   locale: Locale;
-  setLocale: (locale: Locale) => Promise<void>;
+  setLocale: (
+    locale: Locale,
+    options?: { force?: boolean; navigate?: boolean },
+  ) => Promise<void>;
   t: (key: string) => string | string[] | Record<string, unknown>[];
 }
 
 export const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+function readClientLocaleCookie(): Locale | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie.match(
+    new RegExp('(?:^|; )' + LOCALE_COOKIE + '=([^;]+)')
+  );
+  const value = match?.[1];
+  return isSupportedLocale(value) ? value : undefined;
+}
+
+/**
+ * Return the canonical public URL for a locale-segmented internal route.
+ *
+ * The proxy rewrites canonical paths such as `/about` to `/es/about` or
+ * `/en/about`. Those locale-prefixed paths are implementation details, but
+ * they remain directly addressable. A locale change must therefore navigate
+ * back through the canonical path so the proxy can select fresh server-rendered
+ * content using the newly persisted cookie.
+ */
+export function canonicalLocaleHref({
+  pathname,
+  search,
+  hash,
+}: Pick<Location, 'pathname' | 'search' | 'hash'>, locale?: Locale, ensureLocaleQuery = false): string {
+  const canonicalPath = pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
+  let canonicalSearch = search;
+  if (locale) {
+    const params = new URLSearchParams(search);
+    if (params.has('lang') || ensureLocaleQuery) {
+      params.set('lang', locale);
+      const serialized = params.toString();
+      canonicalSearch = serialized ? `?${serialized}` : '';
+    }
+  }
+  return `${canonicalPath}${canonicalSearch}${hash}`;
+}
 
 /**
  * Provides the active locale + dictionary to the client tree.
@@ -59,7 +97,6 @@ export function LanguageProvider({
   const [activeDictionary, setActiveDictionary] = useState<Translations>(
     dictionary ?? en
   );
-  const router = useRouter();
 
   // Load a locale's dictionary client-side. The active locale's dictionary is
   // already supplied via the RSC payload, so this only fetches the OTHER locale
@@ -84,27 +121,36 @@ export function LanguageProvider({
     [loadDictionary]
   );
 
-  // On mount, honor the persisted locale cookie. The layout renders statically at
-  // DEFAULT_LOCALE, so a returning non-default-locale user's choice is applied here.
+  // On mount, an explicit query locale owns the page before the persisted cookie.
+  // Some query readers are behind Suspense, so their LocaleSync layout effect can
+  // mount after this provider effect. Reading the URL here prevents the cookie's
+  // async dictionary load from racing and overwriting that deep-link locale.
+  // Routes without LocaleSync also remain coherent for an explicit `?lang=`.
+  /* eslint-disable react-hooks/set-state-in-effect -- locale updates await an async dictionary import and synchronize URL/cookie state after mount */
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const match = document.cookie.match(
-      new RegExp('(?:^|; )' + LOCALE_COOKIE + '=([^;]+)')
-    );
-    const cookieLocale = match?.[1] as Locale | undefined;
-    if (
-      cookieLocale &&
-      SUPPORTED_LOCALES.includes(cookieLocale) &&
-      cookieLocale !== locale
-    ) {
+    const mountedQueryLocale = document.documentElement.dataset.chapaLocaleSync;
+    if (isSupportedLocale(mountedQueryLocale)) {
+      // LocaleSync already started the query-owned update in its layout effect.
+      return;
+    }
+    const queryLocale = new URLSearchParams(window.location.search).get('lang');
+    if (isSupportedLocale(queryLocale)) {
+      if (queryLocale !== locale) {
+        void applyLocale(queryLocale);
+      }
+      return;
+    }
+    const cookieLocale = readClientLocaleCookie();
+    if (cookieLocale && cookieLocale !== locale) {
       // State updates happen after an awaited dynamic import (not synchronously),
       // and this only runs once on mount to honor the persisted locale cookie.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       void applyLocale(cookieLocale);
     }
     // Run once on mount; `locale`/`applyLocale` are stable enough for this check.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const t = useCallback(
     (key: string) =>
@@ -116,15 +162,43 @@ export function LanguageProvider({
   );
 
   const setLocale = useCallback(
-    async (next: Locale) => {
-      if (next === locale) return;
-      // Persist the cookie, then apply the locale client-side (load its dictionary
-      // chunk + update state) so client components reflect the change immediately.
-      await setLocaleAction(next);
-      await applyLocale(next);
-      router.refresh();
+    async (
+      next: Locale,
+      { force = false, navigate = true }: { force?: boolean; navigate?: boolean } = {},
+    ) => {
+      const cookieLocale = readClientLocaleCookie();
+      if (next === locale && (!force || cookieLocale === next)) return;
+      // Apply the requested dictionary before awaiting cookie persistence. An
+      // explicit `?lang=` page must stay coherent even when its server action
+      // is slow or unavailable; otherwise server-rendered copy can use the
+      // query locale while the shared client navigation remains stale.
+      if (next !== locale) {
+        await applyLocale(next);
+      }
+      // The server action deliberately does not revalidate the static layout,
+      // avoiding an automatic RSC refresh racing the canonical navigation.
+      let persistenceFailed = false;
+      if (cookieLocale !== next) {
+        try {
+          await setLocaleAction(next);
+        } catch {
+          persistenceFailed = true;
+          // Keep the already-applied dictionary authoritative and continue to
+          // the explicit query-locale navigation. A transient server-action
+          // failure must not leave the locale control unable to switch.
+        }
+      }
+      if (!navigate) return;
+      // A full canonical navigation is intentional. `router.refresh()` can
+      // retain the prior locale's server-component payload for the same public
+      // URL, while directly visited `/en` or `/es` routes never pass through
+      // the locale-selecting proxy. Re-entering through the canonical path
+      // makes the persisted cookie authoritative for the whole page.
+      window.location.assign(
+        canonicalLocaleHref(window.location, next, persistenceFailed),
+      );
     },
-    [locale, applyLocale, router]
+    [locale, applyLocale]
   );
 
   const value = useMemo<LanguageContextValue>(

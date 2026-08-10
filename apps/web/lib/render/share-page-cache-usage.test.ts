@@ -1,7 +1,7 @@
 /**
  * #720 — share page must try the badge SVG cache before re-rendering.
  *
- * The badge.svg route writes to `badge:<version>:<handle>:warm-amber:<date>`
+ * The badge.svg route writes to `badge:<version>:<handle>:warm-amber-<render-version>:<date>`
  * after every successful render. The share page used to ignore this cache
  * and call renderBadgeSvg() unconditionally during SSR, duplicating render
  * work on every ISR regeneration. This test locks in the cache-first flow.

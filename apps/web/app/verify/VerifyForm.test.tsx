@@ -74,7 +74,7 @@ describe("VerifyForm", () => {
 
   describe("navigation on valid submit", () => {
     it("uses router.push to navigate to verify/[hash]", () => {
-      expect(SOURCE).toContain("router.push(`/verify/${trimmed}`)");
+      expect(SOURCE).toContain("router.push(`/verify/${trimmed}?lang=${locale}`)");
     });
 
     it("imports useRouter from next/navigation", () => {

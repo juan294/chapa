@@ -1,8 +1,8 @@
 # Third-Party Licenses
 
 This project is licensed under the MIT License (see `LICENSE`). Most dependencies
-use permissive licenses (MIT, Apache-2.0, BSD, ISC) that are fully compatible
-with MIT.
+use allowed permissive licenses (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause,
+ISC, 0BSD, or CC0-1.0) that are compatible with MIT.
 
 The following currently installed dependencies use weak copyleft licenses and are
 documented here for transparency.
@@ -13,7 +13,7 @@ documented here for transparency.
 |---------|---------|---------|
 | `@resvg/resvg-js` | ^2.6.2 | SVG-to-PNG rasterization for badge rendering |
 | `lightningcss` | 1.32.0 | CSS transformation pipeline used by Tailwind / Next.js tooling |
-| `dompurify` | 3.4.0 | Transitive dependency (dual-licensed `MPL-2.0 OR Apache-2.0`); used unmodified through its public API. We accept it under MPL-2.0 since the same reasoning applies; the Apache-2.0 alternative is also available. |
+| `dompurify` | 3.4.13 | Transitive dependency (dual-licensed `MPL-2.0 OR Apache-2.0`); used unmodified through its public API. We accept it under MPL-2.0 since the same reasoning applies; the Apache-2.0 alternative is also available. |
 
 ## LGPL-3.0-or-later Dependencies
 
@@ -57,8 +57,9 @@ Specifically:
 
 ## Review Policy
 
-When adding new dependencies, verify they use a permissive license (MIT,
-Apache-2.0, BSD, ISC). If a dependency uses MPL-2.0, LGPL, or another weak
-copyleft license, document it in this file and keep `docs/accepted-risks.md`
-aligned with the same package set and justification.
+When adding new dependencies, verify they use an allowed permissive license
+(MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, or CC0-1.0). A
+dependency outside that allowlist requires an explicit, package-specific
+exception in `docs/accepted-risks.md`; keep this inventory aligned with the
+same package set and justification.
 Strong copyleft licenses (GPL, AGPL) are not accepted.

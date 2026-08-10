@@ -17,6 +17,7 @@ vi.mock('./set-locale-action', () => ({
 describe('LangSync', () => {
   beforeEach(() => {
     document.documentElement.lang = '';
+    delete document.documentElement.dataset.chapaLocaleSync;
   });
 
   it('sets document.documentElement.lang to initial locale on mount', () => {
@@ -32,6 +33,19 @@ describe('LangSync', () => {
   it('sets document.documentElement.lang to "es" when initial locale is es', () => {
     render(
       <LanguageProvider initialLocale="es">
+        <LangSync />
+      </LanguageProvider>
+    );
+
+    expect(document.documentElement.lang).toBe('es');
+  });
+
+  it('does not overwrite an explicit query locale owned by LocaleSync', () => {
+    document.documentElement.lang = 'es';
+    document.documentElement.dataset.chapaLocaleSync = 'es';
+
+    render(
+      <LanguageProvider initialLocale="en">
         <LangSync />
       </LanguageProvider>
     );

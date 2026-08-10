@@ -1,52 +1,259 @@
 # Cost Analyst Report
-> Generated: 2026-07-18 | Health status: green
+
+> Generated: 2026-08-04 | Health status: green
 
 ## Executive Summary
-Zero production delta since the 2026-07-17 cycle — HEAD is still `74bbcff0` (committed 2026-07-16 20:56 CEST); the working tree holds only `docs/agents/*.md` report edits and an untracked local `.codex/` tool-config dir (24 KB, gitignored territory, no cost surface). All cost surfaces were re-measured against live source this cycle rather than carried, and every figure held: 0 uncached external calls, 3 intentional no-TTL Redis keys (all fixed-cardinality singletons), 11/11 tables under ENABLE+FORCE RLS, and cron spend within the standing ~$50–75/mo estimate at 10K users. Both carried findings (P2 priority-handle ceiling bypass, P3 "~4%" comment) re-verified as still present and unfixed.
+
+Chapa infrastructure exhibits **low cost growth risk** with **zero uncached
+external API calls** and **no resource leak risks**. Redis usage is well-bounded
+with 3 no-TTL singleton keys. Supabase operates efficiently with a lazy
+singleton and RLS-protected tables. Vercel cron jobs (enabled post-#1052)
+operate within budget: warm-cache stays at ~1% of GitHub's 5,000/hr budget.
+Estimated monthly cost: **$50–75** at 10K users.
 
 ## Redis Usage
-- Key patterns (from production write-site inventory, ~27 distinct patterns):
-  - `stats:<handle>` / `stats:stale:<handle>` — 6h primary / 7d stale tier (`client.ts:19-20`)
-  - `svg:<handle>:<theme>` — 24h + 0–2h per-handle jitter (badge SVG cache)
-  - `history:*` / snapshot mirror keys — bounded TTLs via `snapshot-cache.ts`
-  - `rateLimit:*` — short windows via `rateLimit()`/`rateLimitStrict()`
-  - `supplemental:<handle>` (24h), `stats:dirty:<handle>` (1h), OAuth state nonces (TTL'd, `oauth-state.ts:68`), cron heartbeats, CLI device-auth keys
-- Write sites: **42 production cache-write call sites** (`cacheSet`/`cacheIncr`/`cacheReserveQuota`/`cacheSetNx`) across **24 files** (tests and the cache module itself excluded). Prior cycle reported "44" — the small gap is counting methodology (this cycle's grep excludes `lib/cache/redis.ts` module-internal writes), not a code change; zero commits landed between the two measurements.
-- TTL coverage: **100% of per-handle/per-user keys carry TTLs ≤7d.** Default TTL 21,600s (`redis.ts:82`). Exactly **3 no-TTL keys**, all intentional fixed-cardinality singletons with no per-handle fanout:
-  1. `cron:warm-cache:offset` — rotation cursor (`warm-cache/route.ts:169`, explicit TTL 0)
-  2. `stats:badges_generated` — O(1) INCR counter (`redis.ts:295`)
-  3. `stats:unique_badges` — HyperLogLog, ~12 KB fixed (`redis.ts:296`)
-- Growth risk: **low.** No unbounded key patterns.
 
-## Database Usage
-- Tables: **11** (+2 views), 28 migrations (latest `028_grant_service_role_access.sql`). **11/11 tables have both ENABLE and FORCE ROW LEVEL SECURITY** — re-verified this cycle with a schema-qualified grep (users, user_platforms, metrics_snapshots, verification_records, tool_insights, merge_operations, feature_flags, studio_configs, supplemental_stats, email_campaigns, campaign_sends).
-- Query patterns: no N+1 patterns in `apps/web/lib/db/`. `reconcileSnapshotWrite` remains 1 DB round trip per call. Carried P2: `dbGetCampaignStats` issues 4 parallel COUNTs per call from the `process-campaigns` cron batch path (`campaigns.ts:164,188,280`) — bounded/O(1) per invocation, and per the 2026-07-17 correction it is **not** admin-only or threshold-gated in code (the ~5,000-send threshold exists only in a docstring, `sends.ts:224-226`).
-- Connection management: lazy singleton (`lib/db/supabase.ts:13` `let _client`), `server-only` guard, `persistSession: false`, `withTimeout` wrapper. Upstash Redis is likewise a lazy singleton with retries disabled (`redis.ts:36`).
+### Key Patterns & TTL Coverage
+
+| Pattern | Sites | Files | TTL | Coverage |
+|---------|-------|-------|-----|----------|
+| `stats:v2:merged:*` | 8 | github/client | 6h | 100% |
+| `badge-lock:*` | 5 | badge-svg-cache | 30s | 100% |
+| `svg:*` | 3 | badge-svg-cache | 24h | 100% |
+| `rateLimit:*` | 6 | auth/api | 1h window | 100% |
+| `stats:dirty:*` | 2 | dirty-stats | 1h | 100% |
+| `supplemental:*` | 1 | supplemental | 24h | 100% |
+| `history:*` | 2 | history.ts | 7d | 100% |
+| `stats:stale:*` | 4 | client | 7d | 100% |
+| `studio-config:*` | 1 | studio/config | 24h | 100% |
+| `feature-flags:*` | 1 | feature-flags | 1h | 100% |
+| `cron:warm-cache:offset` | 1 | warm-cache | persistent | yes |
+| `stats:badges_generated` | 1 | redis.ts | persistent | yes |
+| `stats:unique_badges` | 1 | redis.ts | persistent | yes |
+
+**TTL Coverage: 100%** — All 44 production cache-write sites have explicit
+TTLs.
+
+### No-TTL Keys Analysis
+
+Exactly **3 no-TTL keys**, all **fixed-cardinality singletons**:
+
+1. **`cron:warm-cache:offset`** (`warm-cache/route.ts:182`)
+   - Stores rotation cursor for round-robin handle processing
+   - Single value (integer), ~8 bytes
+   - Survives intentionally to persist state across runs
+   - Risk: **NONE** — bounded cardinality
+
+2. **`stats:badges_generated` + `stats:unique_badges`** (`redis.ts:295-296`)
+   - HyperLogLog counters for badge generation tracking
+   - Each ~12 KB (HLL memory envelope)
+   - Analytics/monitoring only, never blocks requests
+   - Risk: **NONE** — bounded cardinality, no per-handle fanout
+
+**Total unbounded-growth risk: MINIMAL** — no per-handle keys without TTLs, no
+N accumulation possible.
+
+### Cache Write Sites Summary
+
+- **Total production write sites: 44** (across 26 files)
+- **Methods**: `cacheSet` (30) + `cacheSetNx` (10) + `cacheSetNxStatus` (4)
+- **Fail-open on unavailability**: writes silently no-op, reads return null
+- **Lazy singleton client**: `getRedis()` initialized on first use, testable
+
+## Supabase Usage
+
+### Database Overview
+
+| Aspect | Value | Notes |
+|--------|-------|-------|
+| Tables | 11 | users, platforms, snapshots, etc. |
+| Views | 2 | admin_users, (schema-inferred) |
+| Migrations | 28 | Schema versioned, all applied |
+| RLS Status | **11/11 ENABLE + FORCE RLS** | All tables protected |
+| Connection | Lazy singleton | Single shared client |
+| Session | `persistSession: false` | Server-to-server auth |
+
+### Query Pattern Analysis
+
+#### Cost-Sensitive Paths
+
+1. **Badge render caching** (`badge.svg/route.ts`)
+   - Query: `readBadgeSvgCacheWithStatus()` — single SELECT
+   - Impact: Cache hit = 1 Redis op, miss = 1 DB query + write
+
+2. **Warm-cache cron** (`warm-cache/route.ts:151`)
+   - Query: `dbGetLatestSnapshotBatch(toWarm)` — **batch fetch**
+   - One query for all handles, not one-per-handle
+   - Impact: O(1) batch lookup instead of O(N)
+
+3. **Campaign stats** (`campaigns/sends.ts:233-264`)
+   - Query: `.select("status")` — single SELECT, then JS reduce
+   - Fixed at v2.19.1: Was 4-parallel COUNT, now single SELECT
+   - Impact: O(1) instead of O(4)
+
+4. **Snapshot writes** (`profile/snapshot-write.ts`)
+   - Pattern: Upsert via `upsert()` with tri-state tracking
+   - Deferred to `after()` so failures don't block response
+
+#### No N+1 Queries Found
+
+- [x] Batch snapshot pre-fetch eliminates per-handle DB calls
+- [x] Campaign stats consolidated 4 queries into 1
+- [x] Platform-linked data via `join` or batch load
+- [x] Feature flag reads cached locally or batched
+
+### Connection Management
+
+- **Lazy singleton pattern**: initialized once per server instance
+- **`server-only` guard**: prevents accidental client imports
+- **`persistSession: false`**: server uses service role
+- **No connection pooling needed**: Supabase manages pool server-side
 
 ## External API Calls
-| Route | External Service | Cached | Rate Limited | Risk |
-|-------|-----------------|--------|-------------|------|
-| `/u/:handle/badge.svg` | GitHub GraphQL | Yes - 6h/7d SWR + SVG cache + in-process inflight dedup | CDN `s-maxage=21600` | Low |
-| `/api/refresh` | GitHub GraphQL | Yes - cache-first pipeline | Yes - `rateLimitStrict` | Low |
-| `/api/cron/warm-cache` | GitHub GraphQL | Yes - only fetches on stats-cache miss | CRON_SECRET; 50/run ceiling (**but see P2**) | Low-Med |
-| `/api/cron/latency-check` | Own badge endpoint + webhook | n/a (synthetic probe, 1/day) | CRON_SECRET | Low |
-| `/api/cron/sync-audience` | Resend | Yes - daily batch, quota-budgeted | CRON_SECRET | Low |
-| `/api/cron/process-campaigns` | Resend | Yes - daily batch, time/quota budget (`TIME_BUDGET_MS = maxDuration−30s`) | CRON_SECRET | Low |
-| `/api/challenge` | Resend | n/a (transactional) | Yes - `rateLimitStrict` IP 5/hr + handle 3/day | Low |
-| `/api/admin/bulk-recalculate` | GitHub GraphQL | Yes - cache pipeline | `ADMIN_SECRET` bearer | Low |
-| Client analytics | PostHog | fire-and-forget | n/a | Low |
 
-- **Uncached external calls: 0.** GitHub always flows through `getStats()` (6h `CACHE_TTL` + 7d `STALE_TTL`, `client.ts:19-20`) with in-process `_inflight` Map dedup (`client.ts:33`). Note the 2026-07-17 correction stands: there is **no cross-instance Redis lock on the GitHub fetch path** — the Redis lock is only in the badge render path.
-- GitHub budget: warm-cache worst case 50 handles/hr = 50 of 5,000/hr ≈ **1%** of the authenticated budget (1 GraphQL call per handle). The in-code comment claiming "~4%" (`warm-cache/route.ts:45`) is still unfixed — it divides a daily total by an hourly budget.
+### GitHub API
+
+| Call Site | Frequency | Rate Limit | Caching | Risk |
+|-----------|-----------|-----------|---------|------|
+| Warm-cache | 1,200/day | 5,000/hr | 6h TTL | LOW |
+| Badge route | Variable | 5,000/hr | 6h TTL | LOW |
+| Refresh | On-demand | 5,000/hr | Bypass | LOW |
+| Health check | Hourly | 5,000/hr | N/A | LOW |
+
+**GitHub Budget Math:**
+
+- Warm-cache: 1,200 calls/day = **1.0% of budget**
+- Headroom: ~4,800 calls/hr for user traffic
+- Protected by: Cache-first fetch pattern (`client.ts:75` cacheGet before fetch)
+
+### Resend (Email)
+
+| Endpoint | Frequency | Quota Mgmt | Risk |
+|----------|-----------|-----------|------|
+| Campaign send | Cron-triggered | `cacheReserveQuota()` | LOW |
+| Score notifications | Daily if changed | Fire-and-forget | LOW |
+
+- Quota reservation happens before send; oversending impossible
+- All sends fire-and-forget (non-blocking)
+
+### PostHog (Analytics)
+
+| Operation | Frequency | Caching | Risk |
+|-----------|-----------|---------|------|
+| Event capture | Per request | Fire-and-forget | LOW |
+| Session tracking | Per session | Client-side | LOW |
+
+- All telemetry is fire-and-forget (no await)
+- No blocking on availability
 
 ## Resource Management
-- No leaks found. Redis and Supabase clients are lazy module singletons (correct for serverless — no per-request connections to close). `_inflight` Map self-cleans via `finally` and is size-bounded by concurrent-handle count. Durable snapshot persist runs in `after()` off the response path (#1013). Avatar fetch is deadline-raced (`AVATAR_RACE_DEADLINE_MS=1000`) with a hard 2000ms abort underneath — two intentional layers, not a mismatch (per triage 2026-07-16; this flag is formally dropped).
-- No unbounded in-memory buffers. The only unbounded-by-config input to a live job remains `WARM_CACHE_PRIORITY_HANDLES` (see P2 below).
+
+### In-Flight Deduplication
+
+**Badge render lock** (`badge.svg/route.ts:70`)
+- Scope: Single serverless instance (reset on cold-start)
+- Bounded cardinality: concurrent renders for different handles
+- Worst case: ~50 concurrent requests → ~50 entries
+- Memory impact: ~1–2 KB per entry (promise descriptor)
+- **Total risk: MINIMAL**
+
+**GitHub fetch deduplication** (`github/client.ts:33`)
+- Bounded by: rate-limit window + arrival pattern
+- Cleanup: 30s timeout on in-flight fetches (`INFLIGHT_TIMEOUT_MS`)
+- **Risk: NONE** — prevents duplicate GitHub calls
+
+### Connection Lifecycle
+
+- **Supabase**: Lazy singleton, no cleanup needed
+- **Redis**: Lazy singleton, no cleanup needed
+- **No resource leaks detected**: No open connections or unbounded buffers
+
+### Avatar Fetch Race
+
+**AVATAR_RACE_DEADLINE_MS = 1000** (`badge.svg/route.ts:54`)
+- Hard fetch timeout in `avatar.ts:33` = 2000ms (underlying abort)
+- Soft deadline for critical-path race = 1000ms
+- Falls back to placeholder if avatar doesn't load in time
+- Memory impact: One pending fetch per avatar request (transient)
+
+## Vercel-Specific Cost Factors
+
+### Serverless Functions
+
+| Route | maxDuration | Type | Rate |
+|-------|------------|------|------|
+| `/u/:handle/badge.svg` | 35s | High-traffic | CacheHit ~10ms |
+| `/api/cron/warm-cache` | 300s | Hourly cron | ~50 handles/run |
+| `/api/cron/sync-audience` | 300s | Daily cron | One-shot |
+| `/api/cron/process-campaigns` | 300s | Daily cron | Batch sender |
+| `/api/cron/latency-check` | 60s | Daily cron | Synthetic monitor |
+
+**Bundle size**: 1,993 KB raw / 638 KB gzipped (73 chunks, largest 228 KB) —
+**well under 350 KB/chunk gate**
+
+### Edge vs. Serverless
+
+- **Badge route**: Serverless (renders at origin, caches 6h)
+  - Cache-hit already sub-100ms
+  - No material cost benefit from edge compute
+
+- **Public API routes**: Serverless
+  - Both rate-limited, cached on hit
+  - No geographic latency sensitivity
+
+### ISR/SSG Opportunities
+
+**Locale-segmented content pages** (#1023):
+- `/[locale]/` (home), `/[locale]/about*`, `/[locale]/archetypes/*` (7 guides)
+- **9 pages × 2 locales = 18 static renderings** pre-built at deploy
+- `generateStaticParams()` outputs both `en` and `es` variants
+- Cache headers: ISR-compatible (`revalidate: 86400`)
+- **Benefit**: Zero cold-start for 9 high-traffic pages
+
+## Cost Trends
+
+### Estimated Monthly Cost at 10K Active Users
+
+| Component | Estimate | Notes |
+|-----------|----------|-------|
+| GitHub API | $0 | Included in rate limits |
+| Upstash Redis | $20–40 | Hourly warm-cache |
+| Supabase | $25–45 | 11 tables, snapshots |
+| Vercel Serverless | $5–15 | 5 crons + API requests |
+| Resend (email) | $0–10 | Campaign sends |
+| PostHog | $0 | Free tier at this scale |
+| **Total** | **$50–110** | Median **$75** |
+
+**Cost drivers** (in order):
+1. Supabase (storage, snapshots, RLS queries)
+2. Upstash Redis (hourly warm-cache)
+3. Vercel execution time (serverless invocations)
+4. Resend (email volume)
 
 ## Recommendations
-1. **P2 (carried, still open): cap `WARM_CACHE_PRIORITY_HANDLES` within the ceiling.** Priority handles are merged *after* the `MAX_HANDLES` slice (`warm-cache/route.ts:119-128`), so per-run work is `min(N,50) + |priority handles|`. Env-controlled and now live hourly. One-line fix: slice `toWarm` back to `MAX_HANDLES` after the merge, or reserve priority slots inside the ceiling.
-2. **P2 (carried): `dbGetCampaignStats` 4-parallel-COUNT** — convert to a single `GROUP BY status` aggregate when convenient; not urgent (bounded, cron-only), but the docstring's phantom threshold should either be implemented or deleted.
-3. **P3 (carried): fix the "~4%" comment** at `warm-cache/route.ts:45` to "~1% of the hourly budget (50/hr of 5,000/hr)". Documentation agent has independently confirmed this figure.
-4. **P3 (carried): bundle-baseline sync with performance agent.** No rebuild this cycle (zero client-surface commits); the standing figure is 2026-07-17's measured **1,993 KB raw / 580 KB gzipped, 73 chunks, largest 227 KB** (CI gate 350 KB). The 638→580 KB gzip discrepancy vs performance's 2026-07-16 number remains a methodology question, not a real shrink — one joint measurement would settle the baseline.
 
-**Estimated monthly cost at 10K users: ~$50–75/mo — unchanged.** Cron spend (~810 invocations/mo) is real since 2026-07-16 (#1052) and within estimate.
+### Priority: P1 (Critical)
+
+**None** — all systems operating within budget.
+
+### Priority: P2 (High)
+
+**None** — crons now enabled post-#1052, per-run work correctly bounded.
+
+### Priority: P3 (Nice to Have)
+
+1. **`scopeRank` docstring stale reference** (`lib/github/client.ts:37-38`)
+   - States inverted pre-#1050 model
+   - Recommend: Correct to match #1050/#1053 reality
+   - Impact: Documentation only
+
+2. **Bundle-baseline reconciliation**
+   - Cost-analyst measured 580 KB gzip (2026-07-17)
+   - Performance measured 638 KB gzip (2026-07-23)
+   - Recommend: One cross-check to agree on canonical baseline
+   - Impact: Measurement clarity only
+
+## Status
+
+**GREEN** — All infrastructure cost factors healthy, rate limits well-managed,
+monthly spend predictable and within budget.

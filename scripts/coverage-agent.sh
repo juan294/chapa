@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/agent-utils.sh"
 
 AGENT_KEY="coverage_agent"
+MODEL="claude-haiku-4-5-20251001"
 OUTPUT_FILE="${CHAPA_DIR}/docs/agents/coverage-report.md"
 LOG_FILE="${LOGS_DIR}/coverage-agent-$(date '+%Y-%m-%d').log"
 CLAUDE_MAX_ATTEMPTS=3
@@ -46,6 +47,7 @@ TMP_OUTPUT=$(mktemp)
 claude_ok=false
 for attempt in $(seq 1 "${CLAUDE_MAX_ATTEMPTS}"); do
   if claude -p "${PROMPT}" \
+    --model "${MODEL}" \
     --allowedTools "Read,Glob,Grep,Bash" \
     --output-format text \
     > "${TMP_OUTPUT}" 2>>"${LOG_FILE}" && validate_report_file "${TMP_OUTPUT}" "coverage-agent"; then

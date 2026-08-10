@@ -1,105 +1,122 @@
 # Deployment Smoke Runbook
 
-## Overview
+`docs/release/release-playbook.md` owns release ordering and authorization. This
+runbook explains deployed read-only probes, identity, and failure evidence.
 
-The `deployment-smoke` job in `.github/workflows/ci.yml` runs the Playwright
-smoke suite (`apps/web/e2e/smoke.spec.ts`) against a **live deployment** rather
-than the local CI build artifact. This catches problems that only surface in a
-real Vercel environment — wrong env vars, broken Redis/Supabase wiring, edge
-runtime differences, CDN/header misconfiguration — that the local-artifact E2E
-job (`e2e`) cannot see.
+## Two deployed-smoke contexts
 
-The job runs in "strict" mode (`DEPLOYMENT_SMOKE_STRICT=true`), so it asserts
-real success responses instead of accepting the graceful-degradation fallbacks
-the local E2E run tolerates.
+### General CI deployment smoke
 
-## When It Runs
+The `deployment-smoke` job in `.github/workflows/ci.yml` runs
+`apps/web/e2e/smoke.spec.ts` against `DEPLOYMENT_SMOKE_BASE_URL`. It is
+conditional on a configured URL outside production refs and retains Playwright
+failure artifacts.
 
-The job is **conditionally skipped unless a target URL is configured.** Every
-step is guarded with `if: env.DEPLOYMENT_SMOKE_BASE_URL != ''`, sourced from the
-`DEPLOYMENT_SMOKE_BASE_URL` secret. When the secret is empty (the default), the
-job logs a skip notice and no-ops — it never fails spuriously and costs no
-Playwright runtime.
+This general job is useful deployment signal, but a conditional skip is not
+release evidence. It does not authorize a release and cannot substitute for the
+candidate-bound workflow.
 
-When the secret is set, the job:
+### E2E Pro release-required smoke
 
-1. Checks out the repo and installs dependencies.
-2. Installs Playwright Chromium (cached across runs).
-3. Runs `npx playwright test e2e/smoke.spec.ts` with
-   `PLAYWRIGHT_BASE_URL` pointed at the deployment and
-   `DEPLOYMENT_SMOKE_STRICT=true`.
-4. On failure, uploads the Playwright report as an artifact
-   (`deployment-smoke-report`, 7-day retention).
+`.github/workflows/release-verification.yml` receives an immutable
+`developCommit`, `candidateTreeDigest`, exact preview URL, and `runId`. It runs
+`apps/web/e2e/release-required.spec.ts` with:
 
-## What It Verifies (strict mode)
-
-| Route | Assertion |
-|-------|-----------|
-| `/` | Landing page renders (`#main-content` visible) |
-| `/api/health` | HTTP 200, `status: "ok"`, each core dependency (redis/supabase/github) is `ok` |
-| `/u/octocat/badge.svg?__chapa_smoke=1` | HTTP 200, `Content-Type: image/svg+xml`, body contains `<svg>…</svg>` |
-| `/u/octocat?__chapa_smoke=1` | Share page returns HTTP 200, body visible without persisting profile side effects |
-| `/api/auth/login` | Redirects toward GitHub OAuth |
-
-These are the same tests the local `e2e` job runs, but strict mode requires real
-2xx responses, so a misconfigured preview deployment fails the job instead of
-silently passing.
-
-## How to Configure `DEPLOYMENT_SMOKE_BASE_URL`
-
-The value is a base URL (no trailing path) pointing at the deployed Chapa
-release candidate for the exact commit under test. For release PRs, update it to
-the current Vercel preview URL for the `develop` SHA being promoted. Do not
-reuse an older stable preview URL as evidence for a new release candidate.
-
-The workflow reads it from `secrets.DEPLOYMENT_SMOKE_BASE_URL`. Set it as a
-repository secret (or environment secret) so the value is masked in logs:
-
-```bash
-# Via GitHub CLI — set a repo-level secret
-gh secret set DEPLOYMENT_SMOKE_BASE_URL --body "https://chapa-git-develop-<org>.vercel.app"
+```text
+EXPECTED_DEPLOYMENT_COMMIT = developCommit
+EXPECTED_DEPLOYMENT_ENV = preview
+PLAYWRIGHT_BASE_URL = exact preview URL
+E2E_PRO_RUN_ID = runId
 ```
 
-Or via the GitHub UI: **Settings → Secrets and variables → Actions → New
-repository secret**, name `DEPLOYMENT_SMOKE_BASE_URL`, value the preview URL.
+An absent URL, absent identity, stale preview, wrong environment, missing
+artifact, cancelled producer, failure, or required skip is blocking.
 
-To disable the job again, remove the secret:
+Production release-required smoke uses `mainCommit`, environment `production`,
+and only the production-safe read-only subset after authorized promotion.
+
+## Identity proof
+
+The first release-required request is `/api/version`.
+
+| Environment | Required body |
+|---|---|
+| Preview | `commitSha` equals `developCommit`; `environment` equals `preview` |
+| Production | `commitSha` equals `mainCommit`; `environment` equals `production` |
+
+The release gate separately proves `mainTreeDigest == candidateTreeDigest`.
+Reachability, a familiar URL, or a green run from another SHA never proves
+candidate identity.
+
+## Required deployed probes
+
+| Stable scenario | Assertion |
+|---|---|
+| `deployment.preview-identity` or `deployment.production-identity` | Exact `/api/version` commit and environment |
+| `health.core-dependencies` | `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` are `ok` |
+| `profile.public-badge-read` | Smoke-only badge is HTTP 200, SVG content type, and contains valid SVG markers |
+| `profile.public-share-read` | Smoke-only share page is HTTP 200 and has a visible body |
+| `auth.github-login-redirect` | Preview login returns a redirect to GitHub |
+| `auth.protected-write-denied` | Unauthenticated generation request is denied and does not report success |
+
+The health probe deliberately does not require overall HTTP 200 or
+`status == "ok"`. Overall health also includes cron-heartbeat freshness, which
+describes environment scheduling rather than whether a new deployment's core
+dependencies started correctly. Cron freshness remains visible, alerting, and a
+manual operational readiness arc.
+
+The `?__chapa_smoke=1` public profile and badge paths are read-only. Do not
+replace them with an ordinary profile materialization path for production
+release evidence.
+
+## Reproduce against the exact target
 
 ```bash
-gh secret delete DEPLOYMENT_SMOKE_BASE_URL
+cd apps/web
+EXPECTED_DEPLOYMENT_COMMIT="$expectedCommit" \
+EXPECTED_DEPLOYMENT_ENV="$expectedEnvironment" \
+PLAYWRIGHT_BASE_URL="$exactDeploymentUrl" \
+E2E_PRO_RUN_ID="$runId" \
+pnpm exec playwright test e2e/release-required.spec.ts \
+  --grep @release-required
 ```
 
-With the secret removed, the job reverts to its no-op skip behavior.
+For the older general smoke suite:
 
-> Note: the workflow consumes the URL as a **secret**. If you prefer a
-> non-masked GitHub Actions **variable** instead, change the `env` mapping in
-> the `deployment-smoke` job from `secrets.DEPLOYMENT_SMOKE_BASE_URL` to
-> `vars.DEPLOYMENT_SMOKE_BASE_URL` and set it with `gh variable set`.
+```bash
+cd apps/web
+PLAYWRIGHT_BASE_URL="$exactDeploymentUrl" \
+DEPLOYMENT_SMOKE_STRICT=true \
+pnpm exec playwright test e2e/smoke.spec.ts
+```
 
-## Reading Failures
+## Failure evidence
 
-1. Open the failed CI run → the **Deployment Smoke** job.
-2. Find the failing step **Run deployment-shaped smoke tests** — the Playwright
-   output names the failing route and the actual vs. expected response.
-3. Download the **deployment-smoke-report** artifact for the full Playwright
-   HTML report (traces, screenshots, network).
-4. Reproduce locally against the same target:
+Record:
 
-   ```bash
-   cd apps/web
-   PLAYWRIGHT_BASE_URL="https://<preview-url>" DEPLOYMENT_SMOKE_STRICT=true \
-     npx playwright test e2e/smoke.spec.ts
-   ```
+- run ID, expected commit, tree, environment, and exact URL;
+- workflow run and job IDs;
+- Playwright JSON result;
+- HTTP response allowlist;
+- trace, screenshot, or test output;
+- actual `/api/version` response; and
+- analyzer blocking reason.
 
-### Common causes
+Do not include secrets, bearer headers, OAuth tokens, service-role keys, or
+personal data. The release workflow retains normalized manifests/reports longer
+than raw browser evidence as defined in the evidence README.
 
-| Symptom | Likely cause |
-|---------|--------------|
-| `/api/health` not `ok` / dependency not `ok`/`skipped` | Missing or wrong Redis/Supabase/GitHub env vars on the deployment |
-| Badge SVG non-200 or wrong content-type | GitHub token missing or rate-limited; Redis cache unreachable |
-| Share page non-200 | SSR error on `/u/:handle` — check the deployment's runtime logs |
-| Login does not redirect | GitHub OAuth client env vars missing on the deployment |
+## Common interpretations
 
-Because the target is a live deployment, failures usually point at the
-deployment's **environment configuration**, not the application code. Verify the
-Vercel project's env vars before assuming a code regression.
+| Symptom | Interpretation |
+|---|---|
+| Identity missing or mismatched | Wrong, stale, or not-yet-ready deployment |
+| Core dependency not `ok` | Deployed Redis, Supabase, GitHub, credential, or scope problem |
+| Overall health degraded with core dependencies `ok` | Inspect cron freshness separately; do not relabel it a deployment pass/fail |
+| Badge non-200 or invalid SVG | Public badge path, GitHub, or Redis integration problem |
+| Share non-200 | Public profile SSR or dependency problem |
+| Login does not redirect | GitHub OAuth configuration problem |
+| Protected write does not deny | Authentication or authorization regression |
+
+Changing a deployment URL, secret, variable, or Vercel environment is an
+external configuration action and remains separately authorized.

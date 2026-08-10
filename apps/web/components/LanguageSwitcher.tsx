@@ -95,7 +95,7 @@ export function LanguageSwitcher() {
       ref={containerRef}
       role="group"
       aria-label={t("aria.languageSwitcher") as string}
-      className="relative"
+      className="relative z-50"
     >
       <button
         ref={triggerRef}
@@ -133,7 +133,7 @@ export function LanguageSwitcher() {
         aria-label={t("aria.languageSwitcher") as string}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleListboxKeyDown}
-        className={`absolute top-full right-0 mt-2 p-1.5 min-w-[8rem] rounded-lg bg-card border border-stroke shadow-card transition-all duration-200 ease-out ${
+        className={`absolute z-50 top-full right-0 mt-2 p-1.5 min-w-[8rem] rounded-lg bg-card border border-stroke shadow-card transition-all duration-200 ease-out ${
           isExpanded
             ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
             : "opacity-0 -translate-y-2 scale-95 pointer-events-none"

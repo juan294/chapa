@@ -104,14 +104,14 @@ describe("POST /api/admin/campaigns/[id]/send", () => {
     expect(body.message).toContain("200 emails");
   });
 
-  it("returns 500 when initiateCampaign returns null", async () => {
+  it("returns 409 when another request already claimed the draft", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue({ status: "draft" } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(initiateCampaign).mockResolvedValue(null);
 
     const res = await POST(makeRequest(), { params: mockParams });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toBe("Failed to initiate campaign");
+    expect(body.error).toBe("Campaign already started or could not be claimed");
   });
 
   it("returns 429 when rate limited", async () => {
@@ -174,7 +174,7 @@ describe("POST /api/admin/campaigns/[id]/send", () => {
 
     expect(body.firstBatch.sent).toBe(25);
     expect(body.firstBatch.failed).toBe(5);
-    expect(body.message).toBe("All emails sent");
+    expect(body.message).toBe("25 sent; 5 failed");
   });
 
   it("shows single-batch message when recipients exactly 95", async () => {

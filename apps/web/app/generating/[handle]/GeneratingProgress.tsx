@@ -11,7 +11,7 @@ const REDIRECT_DELAY_MS = 800;
 
 export function GeneratingProgress({ handle }: { handle: string }) {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
 
   // Step labels derived from dictionary on each render (locale-aware)
   const stepLabels = [
@@ -23,18 +23,22 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
   // Step statuses stored as state (driven by API response)
   const [stepStatuses, setStepStatuses] = useState<StepStatus[]>([
-    'done', 'active', 'pending', 'pending',
+    'active', 'pending', 'pending', 'pending',
   ]);
-  const [error, setError] = useState<string | null>(null);
+  const [hasError, setHasError] = useState(false);
   const [done, setDone] = useState(false);
 
   const completeRemainingSteps = useCallback(() => {
-    // Mark steps 1, 2, 3 as done with staggered delays
+    // Complete each step and activate the next one with staggered delays.
     const remaining = [1, 2, 3];
     remaining.forEach((idx, i) => {
       setTimeout(() => {
         setStepStatuses((prev) =>
-          prev.map((s, j) => (j === idx ? 'done' : s)),
+          prev.map((status, stepIndex) => {
+            if (stepIndex === idx) return 'done';
+            if (stepIndex === idx + 1) return 'active';
+            return status;
+          }),
         );
         if (idx === remaining[remaining.length - 1]) {
           setDone(true);
@@ -56,17 +60,18 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         if (cancelled) return;
 
         if (!res.ok) {
-          setError(t('generation.error') as string);
+          setHasError(true);
           setStepStatuses((prev) =>
             prev.map((s) => (s === 'active' ? 'error' : s)),
           );
           return;
         }
 
+        setStepStatuses(['done', 'active', 'pending', 'pending']);
         completeRemainingSteps();
       } catch {
         if (cancelled) return;
-        setError(t('generation.error') as string);
+        setHasError(true);
         setStepStatuses((prev) =>
           prev.map((s) => (s === 'active' ? 'error' : s)),
         );
@@ -78,7 +83,6 @@ export function GeneratingProgress({ handle }: { handle: string }) {
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completeRemainingSteps]);
 
   // Redirect after all steps complete
@@ -190,11 +194,13 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         </div>
 
         {/* Error message */}
-        {error && (
+        {hasError && (
           <div role="alert" className="mt-6 animate-terminal-fade-in motion-reduce:animate-none rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
-            <p className="font-heading text-sm text-terminal-red">{error}</p>
+            <p className="font-heading text-sm text-terminal-red">
+              {t('generation.error') as string}
+            </p>
             <a
-              href={`/generating/${encodeURIComponent(handle)}`}
+              href={`/generating/${encodeURIComponent(handle)}?lang=${locale}`}
               className="mt-2 inline-block font-heading text-sm text-text-secondary underline underline-offset-4 hover:text-text-primary"
             >
               {t('generation.retry') as string}

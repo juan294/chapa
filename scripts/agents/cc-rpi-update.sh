@@ -11,6 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/agent-utils.sh"
 
 AGENT_NAME="cc-rpi-update"
+MODEL="claude-haiku-4-5-20251001"
 REPORT_FILE="${AGENTS_DIR}/cc-rpi-update-report.md"
 
 log_info "Starting ${AGENT_NAME} agent"
@@ -41,6 +42,7 @@ Important:
 log_info "Running Claude CLI for cc-rpi update..."
 
 if "$CLAUDE_BIN" -p "$PROMPT" \
+  --model "$MODEL" \
   --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git *),Bash(gh *),Bash(pnpm *)" \
   --permission-mode bypassPermissions \
   --output-format text \

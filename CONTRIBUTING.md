@@ -72,7 +72,9 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 
 - TypeScript strict mode
 - ESLint for linting (run `pnpm run lint`)
-- No copyleft dependencies (MIT, Apache-2.0, BSD, ISC only)
+- Dependencies must use an allowed permissive license (MIT, Apache-2.0,
+  BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, or CC0-1.0). Any other license
+  requires an explicit exception in `docs/accepted-risks.md`.
 - Escape all user input in SVG rendering
 - Use design system tokens, not hardcoded colors (see `docs/design-system.md`)
 

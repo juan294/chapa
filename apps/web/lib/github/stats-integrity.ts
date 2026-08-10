@@ -14,10 +14,11 @@ const SCOPE_SHORTFALL_RATIO = 0.5;
  * last-known-good data. See #1002, extended by #1045.
  *
  * GitHub's `contributionsCollection` GraphQL block — *and* the `search()`
- * query #1004 added — are both scoped to the *authenticating* token. A token
- * that cannot see a user's private-repo merges (the server `GITHUB_TOKEN`, or
- * an anonymous badge request) reports only what is public. That result looks
- * structurally valid, so it previously overwrote good cached stats —
+ * query #1004 added — are both scoped to the *authenticating* token. A user's
+ * session token cannot see private-repo merges because the OAuth app omits
+ * `repo`; the repo-scoped server `GITHUB_TOKEN` used by anonymous and cron
+ * requests is private-inclusive. The scope-blind result looks structurally
+ * valid, so it previously overwrote good cached stats —
  * collapsing the Delivery dimension (merged-PR weight is 70% of Delivery) and
  * flipping `profileType` to "collaborative" (`detectProfileType` divides by
  * `max(prsMergedCount, 1)`).

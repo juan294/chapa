@@ -212,7 +212,7 @@ export function getGitlabEnabledEnv(): string | undefined {
 
 /** Comma-separated list of handles to prioritise in every warm-cache run. */
 export function getWarmCachePriorityHandles(): string[] {
-  return readList("WARM_CACHE_PRIORITY_HANDLES");
+  return Array.from(new Set(readList("WARM_CACHE_PRIORITY_HANDLES")));
 }
 
 // ---------------------------------------------------------------------------
@@ -279,4 +279,9 @@ export function getNodeEnv(): string {
 /** Vercel deployment environment — `"production"`, `"preview"`, or `"development"`. */
 export function getVercelEnv(): string | undefined {
   return readTrimmed("VERCEL_ENV");
+}
+
+/** Immutable source commit exposed by Vercel for the current deployment. */
+export function getVercelGitCommitSha(): string | undefined {
+  return readTrimmed("VERCEL_GIT_COMMIT_SHA");
 }

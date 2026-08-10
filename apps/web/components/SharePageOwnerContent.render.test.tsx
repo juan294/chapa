@@ -297,8 +297,12 @@ describe("SharePageOwnerContent — render", () => {
       });
     });
 
-    // English: shareOwner.ready = 'Ready'
-    expect(screen.getByText("Ready")).toBeTruthy();
+    // English: shareOwner.ready = 'Ready'. Wait for the resolved fetch to
+    // drive the component's state update; under a busy full-suite worker the
+    // fetch assertion above can win the race against React's render.
+    await waitFor(() => {
+      expect(screen.getByText("Ready")).toBeTruthy();
+    });
   });
 
   it("reloads the page 800ms after a successful regenerate", async () => {

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "runId": "fixture-incomplete-charter",
+  "generatedAt": "2026-07-26T10:00:00.000Z",
+  "baselineTag": "v2.19.0",
+  "candidate": {
+    "developCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "candidateTreeDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "previewUrl": "https://preview.example.test/",
+    "previewIdentity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "obligations": [],
+  "results": [{
+    "scenarioId": "deployment.preview-identity",
+    "environment": "preview",
+    "status": "passed",
+    "startedAt": "2026-07-26T10:01:00.000Z",
+    "finishedAt": "2026-07-26T10:01:01.000Z",
+    "runner": "playwright",
+    "evidence": {
+      "http": ["artifacts/preview-version.json"],
+      "deployment-identity": ["artifacts/preview-identity.txt"]
+    },
+    "fixtures": []
+  }],
+  "exceptions": [],
+  "manualObligations": [],
+  "exploratoryCharters": [{
+    "id": "charter-incomplete",
+    "candidate": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "executorContext": "fresh-synthetic-context",
+    "timeboxMinutes": 30,
+    "riskHypothesis": "An interrupted interaction could leave inconsistent state",
+    "changedCapability": "release candidate behavior",
+    "actors": ["release operator"],
+    "surfaces": ["preview application"],
+    "states": ["fixed candidate"],
+    "externalSeams": ["Vercel"],
+    "environment": "preview",
+    "allowedOperations": ["read"],
+    "safetyClass": "read-only",
+    "candidateRecord": "quality/evidence/runs/fixture-incomplete-charter/candidate.json",
+    "maneuvers": [
+      { "number": 1, "status": "passed", "evidence": "artifacts/charter-1.md" },
+      { "number": 2, "status": "passed", "evidence": "artifacts/charter-2.md" },
+      { "number": 3, "status": "passed", "evidence": "artifacts/charter-3.md" },
+      { "number": 4, "status": "passed", "evidence": "artifacts/charter-4.md" },
+      { "number": 5, "status": "passed", "evidence": "artifacts/charter-5.md" },
+      { "number": 6, "status": "passed", "evidence": "artifacts/charter-6.md" },
+      { "number": 7, "status": "passed", "evidence": "artifacts/charter-7.md" }
+    ],
+    "findings": [],
+    "skippedHighRiskAreas": [],
+    "fixtures": [],
+    "decision": "pass"
+  }],
+  "rollbackReference": "docs/runbooks/rollback.md",
+  "tagAuthorization": { "status": "pending" }
+}

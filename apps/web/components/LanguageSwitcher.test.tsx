@@ -54,6 +54,12 @@ describe("LanguageSwitcher", () => {
   });
 
   describe("expanded state", () => {
+    it("keeps the menu above page content", () => {
+      render(<LanguageSwitcher />);
+      expect(screen.getByRole("group").className).toContain("z-50");
+      expect(screen.getByRole("listbox").className).toContain("z-50");
+    });
+
     it("expands and shows both options on trigger click", () => {
       render(<LanguageSwitcher />);
       const toggleButton = screen.getByRole("button", { expanded: false });

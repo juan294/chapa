@@ -2,6 +2,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { VerifyForm } from "./VerifyForm";
+import { LanguageContext, type LanguageContextValue } from "@/lib/i18n/provider";
+import { es } from "@/lib/i18n/dictionaries/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 
 const mockPush = vi.fn();
 
@@ -41,7 +44,7 @@ describe("VerifyForm", () => {
     const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "a1b2c3d4" } });
     fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
-    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4");
+    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4?lang=en");
   });
 
   it("navigates to /verify/{hash} on valid 16-char hex submission", () => {
@@ -49,7 +52,7 @@ describe("VerifyForm", () => {
     const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "a1b2c3d4e5f6a7b8" } });
     fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
-    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8");
+    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8?lang=en");
   });
 
   it("navigates to /verify/{hash} on valid 32-char hex submission", () => {
@@ -57,7 +60,24 @@ describe("VerifyForm", () => {
     const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8" } });
     fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
-    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8");
+    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8?lang=en");
+  });
+
+  it("preserves the active Spanish locale on valid submission", () => {
+    const value: LanguageContextValue = {
+      locale: "es",
+      setLocale: async () => {},
+      t: (key) => resolveTranslation(key, es) as ReturnType<LanguageContextValue["t"]>,
+    };
+    render(
+      <LanguageContext.Provider value={value}>
+        <VerifyForm />
+      </LanguageContext.Provider>,
+    );
+    const input = screen.getByLabelText("Hash de verificación");
+    fireEvent.change(input, { target: { value: "a1b2c3d4" } });
+    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4?lang=es");
   });
 
   // ─── Invalid input ────────────────────────────────────────────────────
@@ -116,7 +136,7 @@ describe("VerifyForm", () => {
     const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "  a1b2c3d4  " } });
     fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
-    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4");
+    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4?lang=en");
   });
 
   it("lowercases input before validation and navigation", () => {
@@ -124,7 +144,7 @@ describe("VerifyForm", () => {
     const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "A1B2C3D4" } });
     fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
-    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4");
+    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4?lang=en");
   });
 
   it("trims and lowercases combined", () => {
@@ -134,6 +154,6 @@ describe("VerifyForm", () => {
       target: { value: "  A1B2C3D4E5F6A7B8  " },
     });
     fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
-    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8");
+    expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8?lang=en");
   });
 });

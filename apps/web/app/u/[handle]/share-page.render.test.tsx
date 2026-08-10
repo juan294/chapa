@@ -242,6 +242,17 @@ describe("Phase 4d — Share page i18n", () => {
       expect(metadata.title).toContain("jdoe");
     });
 
+    it("uses English metadata for an explicit ?lang=en deep link", async () => {
+      const metadata = await generateMetadata({
+        params: Promise.resolve({ handle: "jdoe" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      expect(metadata.title).toBe("@jdoe — Developer Impact, Decoded");
+      const images = metadata.openGraph?.images as Array<{ alt?: string }>;
+      expect(images[0]?.alt).toBe("Chapa badge for jdoe");
+    });
+
     it("returns Not Found for invalid handle", async () => {
       mockIsValidHandle.mockReturnValue(false);
       const metadata = await generateMetadata({
@@ -308,7 +319,7 @@ describe("Phase 4d — Share page i18n", () => {
     });
   });
 
-  describe("page.tsx source — LocaleSync mount", () => {
+  describe("page.tsx source — LocaleSync hydration boundary", () => {
     const SOURCE = fs.readFileSync(
       path.resolve(__dirname, "page.tsx"),
       "utf-8",
@@ -319,8 +330,22 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).toContain("@/lib/i18n");
     });
 
-    it("mounts <LocaleSync> in the page shell", () => {
-      expect(SOURCE).toContain("<LocaleSync");
+    it("establishes a query-initialized provider before streamed content", () => {
+      const pageStart = SOURCE.indexOf("export default async function SharePage");
+      const contentStart = SOURCE.indexOf(
+        "export async function SharePageContent",
+      );
+      const provider = SOURCE.indexOf("<LanguageProvider", pageStart);
+      const localeSync = SOURCE.indexOf("<LocaleSync", pageStart);
+      const suspense = SOURCE.indexOf("<Suspense", pageStart);
+
+      expect(pageStart).toBeGreaterThan(-1);
+      expect(contentStart).toBeGreaterThan(-1);
+      expect(provider).toBeGreaterThan(pageStart);
+      expect(localeSync).toBeGreaterThan(provider);
+      expect(localeSync).toBeLessThan(suspense);
+      expect(suspense).toBeLessThan(contentStart);
+      expect(SOURCE.slice(contentStart)).not.toContain("<LocaleSync");
     });
 
     it("imports interpolate from @/lib/i18n/interpolate", () => {
@@ -337,8 +362,14 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).toContain("export const revalidate = 3600");
     });
 
-    it("uses sharePage.srH1 key in h1", () => {
-      expect(SOURCE).toContain("sharePage.srH1");
+    it("delegates locale-sensitive title and labels to a client component", () => {
+      expect(SOURCE).toContain("SharePageLocaleContent");
+      const localeSource = fs.readFileSync(
+        path.resolve(__dirname, "SharePageLocaleContent.tsx"),
+        "utf-8",
+      );
+      expect(localeSource).toContain("sharePage.srH1");
+      expect(localeSource).toContain("sharePage.badgeAriaLabel");
     });
 
     it("renders SharePageH2 client component for the badge section heading", () => {

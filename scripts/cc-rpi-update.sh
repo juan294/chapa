@@ -11,6 +11,7 @@ set -euo pipefail
 
 # ── Configuration ──
 CC_RPI_PATH="/Users/juan/code/cc-rpi"
+MODEL="claude-haiku-4-5-20251001"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/agent-utils.sh"
@@ -66,6 +67,7 @@ log_info "Blueprint: ${CC_RPI_PATH}"
 
 while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
   if claude -p "${PROMPT}" \
+    --model "${MODEL}" \
     --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git add*),Bash(git commit*),Bash(git diff*),Bash(git log*),Bash(git status*)" \
     --output-format text \
     > "${REPORT_FILE}" 2>&1; then

@@ -2,7 +2,15 @@ import { getVerificationRecord } from "@/lib/verification/store";
 import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
-import type { Translations } from "@/lib/i18n";
+import {
+  LangSync,
+  LanguageProvider,
+  LocaleSync,
+  type Locale,
+  type Translations,
+} from "@/lib/i18n";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -12,7 +20,11 @@ export const dynamic = 'force-dynamic';
 
 interface VerifyPageProps {
   params: Promise<{ hash: string }>;
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string | string[] }>;
+}
+
+function queryLocale(lang: string | string[] | undefined): string | undefined {
+  return typeof lang === "string" ? lang : undefined;
 }
 
 export async function generateMetadata({
@@ -20,13 +32,14 @@ export async function generateMetadata({
   searchParams,
 }: VerifyPageProps): Promise<Metadata> {
   const { hash } = await params;
-  const { lang } = await searchParams;
+  const { lang: rawLang } = await searchParams;
+  const lang = queryLocale(rawLang);
   const locale = await getServerLocale(lang);
   const t = getServerT(locale);
   return {
     title: HASH_PATTERN.test(hash)
-      ? `${t('verify.title') as string} ${hash} — Chapa`
-      : `${t('verifyDetail.invalidHashTitle') as string} — Chapa`,
+      ? `${t('verify.title') as string} ${hash}`
+      : t('verifyDetail.invalidHashTitle') as string,
     description: t('verify.description') as string,
     robots: { index: false },
   };
@@ -34,26 +47,27 @@ export async function generateMetadata({
 
 export default async function VerifyPage({ params, searchParams }: VerifyPageProps) {
   const { hash } = await params;
-  const { lang } = await searchParams;
+  const { lang: rawLang } = await searchParams;
+  const lang = queryLocale(rawLang);
   const locale = await getServerLocale(lang);
   const t = getServerT(locale);
 
   if (!HASH_PATTERN.test(hash)) {
     return (
-      <div className="min-h-screen bg-bg text-text-primary">
-        <Navbar />
+      <VerifyLocaleBoundary locale={locale} queryLang={lang}>
+        <Navbar locale={locale} />
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
           <InvalidHashCard hash={hash} t={t} />
         </main>
-      </div>
+      </VerifyLocaleBoundary>
     );
   }
 
   const record = await getVerificationRecord(hash);
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary">
-      <Navbar />
+    <VerifyLocaleBoundary locale={locale} queryLang={lang}>
+      <Navbar locale={locale} />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
           <VerifiedCard hash={hash} record={record} t={t} />
@@ -61,7 +75,28 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
           <NotFoundCard hash={hash} t={t} />
         )}
       </main>
-    </div>
+    </VerifyLocaleBoundary>
+  );
+}
+
+function VerifyLocaleBoundary({
+  children,
+  locale,
+  queryLang,
+}: {
+  children: React.ReactNode;
+  locale: Locale;
+  queryLang?: string;
+}) {
+  return (
+    <LanguageProvider
+      initialLocale={locale}
+      dictionary={locale === "es" ? es : en}
+    >
+      <LangSync />
+      <LocaleSync queryLang={queryLang} />
+      <div className="min-h-screen bg-bg text-text-primary">{children}</div>
+    </LanguageProvider>
   );
 }
 

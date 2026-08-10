@@ -116,6 +116,26 @@ describe("useSession", () => {
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(fetch).toHaveBeenCalledWith("/api/auth/session");
     });
+
+    it("keeps each new hook mount hydration-neutral before reusing a cached result", async () => {
+      const user = {
+        login: "testuser",
+        name: "Test",
+        avatar_url: "https://example.com/avatar.png",
+      };
+      mockFetchSession(user);
+
+      const { result: first } = renderHook(() => useSession());
+      await waitFor(() => expect(first.current.loading).toBe(false));
+
+      const { result: second } = renderHook(() => useSession());
+      expect(second.current.session).toBeNull();
+      expect(second.current.loading).toBe(true);
+
+      await waitFor(() => expect(second.current.loading).toBe(false));
+      expect(second.current.session).toEqual(user);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("invalidation", () => {
@@ -155,6 +175,58 @@ describe("useSession", () => {
 
       expect(callCount).toBe(2);
     });
+
+    it("keeps the replacement request authoritative when the original resolves later", async () => {
+      const user1 = {
+        login: "stale-user",
+        name: "Stale User",
+        avatar_url: "https://example.com/stale.png",
+      };
+      const user2 = {
+        login: "fresh-user",
+        name: "Fresh User",
+        avatar_url: "https://example.com/fresh.png",
+      };
+      let resolveFirst: ((response: unknown) => void) | undefined;
+      let resolveSecond: ((response: unknown) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockImplementationOnce(
+            () => new Promise((resolve) => {
+              resolveFirst = resolve;
+            }),
+          )
+          .mockImplementationOnce(
+            () => new Promise((resolve) => {
+              resolveSecond = resolve;
+            }),
+          ),
+      );
+
+      const responseFor = (user: typeof user1) => ({
+        ok: true,
+        json: () => Promise.resolve({ user }),
+      });
+      const { result } = renderHook(() => useSession());
+
+      act(() => result.current.invalidate());
+      await act(async () => {
+        resolveSecond?.(responseFor(user2));
+      });
+      await waitFor(() => expect(result.current.session).toEqual(user2));
+
+      await act(async () => {
+        resolveFirst?.(responseFor(user1));
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(result.current.session).toEqual(user2);
+      expect(result.current.loading).toBe(false);
+    });
   });
 });
 
@@ -188,7 +260,7 @@ describe("clearSessionCache", () => {
     expect(result1.current.session?.login).toBe("userA");
     expect(callCount).toBe(1);
 
-    // clearSessionCache — wipes both cachedPromise and cachedResult
+    // clearSessionCache — drops the fulfilled promise so the next mount fetches
     clearSessionCache();
 
     // Second render — cache is gone, must re-fetch and get user2

@@ -38,8 +38,8 @@ export const POST = withErrorCapture("/api/admin/campaigns/[id]/send", async (re
   const result = await initiateCampaign(id, campaign);
   if (!result) {
     return NextResponse.json(
-      { error: "Failed to initiate campaign" },
-      { status: 500 },
+      { error: "Campaign already started or could not be claimed" },
+      { status: 409 },
     );
   }
 
@@ -50,7 +50,9 @@ export const POST = withErrorCapture("/api/admin/campaigns/[id]/send", async (re
     totalRecipients: result.totalRecipients,
     firstBatch: batchResult,
     message:
-      result.totalRecipients <= DAILY_SEND_LIMIT
+      batchResult.failed > 0
+        ? `${batchResult.sent} sent; ${batchResult.failed} failed`
+        : result.totalRecipients <= DAILY_SEND_LIMIT && batchResult.remaining === 0
         ? "All emails sent"
         : `Sending ${result.totalRecipients} emails in daily batches of ${DAILY_SEND_LIMIT} (Free plan limit)`,
   });

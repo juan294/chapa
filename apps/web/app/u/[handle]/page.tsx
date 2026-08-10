@@ -29,9 +29,13 @@ import {
 } from "@/lib/profile/public-profile";
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { getServerT } from "@/lib/i18n/server";
-import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
+import { LanguageProvider, LocaleSync } from "@/lib/i18n";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
+import { isSupportedLocale } from "@/lib/i18n/types";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { SharePageH2 } from "./SharePageH2";
+import { SharePageLocaleContent } from "./SharePageLocaleContent";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -43,16 +47,21 @@ interface SharePageProps {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: SharePageProps): Promise<Metadata> {
   const { handle } = await params;
   if (!isValidHandle(handle)) {
     return { title: "Not Found" };
   }
 
-  // generateMetadata runs at ISR build time — avoid server-only APIs.
-  // Use the primary audience locale (es) for social metadata so Spanish users
-  // get localised social cards. Client hydration via LocaleSync handles runtime locale.
-  const t = getServerT("es");
+  // Avoid request-only locale APIs so the page stays ISR-compatible. Spanish
+  // remains the social-card default, while an explicit deep-link locale must
+  // also select matching metadata so streamed metadata cannot overwrite the
+  // client title with a different language after hydration.
+  const resolvedSearch = searchParams ? await searchParams : {};
+  const requestedLocale = resolvedSearch.lang;
+  const locale = isSupportedLocale(requestedLocale) ? requestedLocale : "es";
+  const t = getServerT(locale);
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
   // Daily cache buster forces social platforms to re-fetch the OG image
@@ -84,6 +93,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const { handle } = await params;
   const resolvedSearch = searchParams ? await searchParams : {};
   const queryLang = typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
+  const locale = isSupportedLocale(queryLang) ? queryLang : "es";
   const readOnly = resolvedSearch[READ_ONLY_SMOKE_PARAM] === "1";
 
   if (!isValidHandle(handle)) {
@@ -91,16 +101,23 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   }
 
   return (
-    <main id="main-content" className="min-h-screen bg-bg">
+    <LanguageProvider
+      initialLocale={locale}
+      dictionary={locale === "es" ? es : en}
+    >
+      {/* Establish query ownership in the hydrated shell. The streamed client
+          subtree then starts with the same dictionary as its server markup. */}
       <LocaleSync queryLang={queryLang} />
-      <Suspense fallback={<BadgeSkeleton />}>
-        <SharePageContent handle={handle} readOnly={readOnly} />
-      </Suspense>
-      {/* Progressive disclosure (#783): the terminal command bar is demoted to a
-          subtle, opt-in hint so the badge value stays legible to non-developer
-          visitors. The "/" shortcut and full command bar remain available. */}
-      <CommandBarHint />
-    </main>
+      <main id="main-content" className="min-h-screen bg-bg">
+        <Suspense fallback={<BadgeSkeleton />}>
+          <SharePageContent handle={handle} readOnly={readOnly} />
+        </Suspense>
+        {/* Progressive disclosure (#783): the terminal command bar is demoted to a
+            subtle, opt-in hint so the badge value stays legible to non-developer
+            visitors. The "/" shortcut and full command bar remain available. */}
+        <CommandBarHint />
+      </main>
+    </LanguageProvider>
   );
 }
 
@@ -214,9 +231,7 @@ export async function SharePageContent({
       : {}),
   };
 
-  // Keep the public share page ISR-safe: server-render default-locale strings
-  // without dynamic cookie/header reads; LocaleSync applies query/cookie locale client-side.
-  const t = getServerT(DEFAULT_LOCALE);
+  const badgeLabelId = `share-badge-label-${handle}`;
 
   return (
     <>
@@ -236,9 +251,7 @@ export async function SharePageContent({
       <NavbarClient />
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
-        <h1 className="sr-only">
-          {interpolate(t("sharePage.srH1") as string, { handle })}
-        </h1>
+        <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
 
         {/* ── Badge Section Title ──────────────────────────────── */}
         <SharePageH2 />
@@ -246,28 +259,30 @@ export async function SharePageContent({
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
           <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
-            {inlineSvg ? (
-              <div
-                role="img"
-                aria-label={interpolate(t("sharePage.badgeAriaLabel") as string, { handle })}
-                className="w-full rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
-                dangerouslySetInnerHTML={{ __html: inlineSvg }}
-              />
-            ) : (
-              /* Fallback: if SVG render failed, load via <img> with skeleton */
-              <div className="relative">
-                <BadgeSkeleton />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={badgeImageSrc}
-                  alt={interpolate(t("sharePage.badgeAlt") as string, { handle })}
-                  width={1200}
-                  height={630}
-                  fetchPriority="high"
-                  className="w-full rounded-xl relative"
-                />
-              </div>
-            )}
+            <div
+              role="img"
+              aria-labelledby={badgeLabelId}
+              className="w-full rounded-xl overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:block"
+            >
+              {inlineSvg ? (
+                <div dangerouslySetInnerHTML={{ __html: inlineSvg }} />
+              ) : (
+                /* Fallback: if SVG render failed, load via <img> with skeleton */
+                <div className="relative">
+                  <BadgeSkeleton />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={badgeImageSrc}
+                    alt=""
+                    aria-hidden="true"
+                    width={1200}
+                    height={630}
+                    fetchPriority="high"
+                    className="w-full rounded-xl relative"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

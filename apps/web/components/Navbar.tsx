@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import type { Locale } from "@/lib/i18n";
 import { NavbarShell } from "./NavbarShell";
 
 interface NavLinkItem {
@@ -11,6 +12,7 @@ interface NavLinkItem {
 
 interface NavbarProps {
   navLinks?: NavLinkItem[];
+  locale?: Locale;
 }
 
 /**
@@ -22,10 +24,10 @@ interface NavbarProps {
  * `isAdminHandle()`. Rendering itself is delegated to `NavbarShell` so this
  * variant and `NavbarClient` never drift in markup (#1025).
  */
-export async function Navbar({ navLinks }: NavbarProps) {
+export async function Navbar({ navLinks, locale: localeOverride }: NavbarProps) {
   const h = await headers();
   const session = getOptionalServerSessionFromHeaders(h);
-  const locale = await getServerLocale();
+  const locale = await getServerLocale(localeOverride);
   const t = getServerT(locale);
 
   return (
