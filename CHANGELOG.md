@@ -43,7 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metadata keeps the requested language. Verification detail pages keep
   their body, navbar, selector, and document language on the query locale even
   after an opposite-language visit. Verify pages no longer duplicate the Chapa
-  title suffix.
+  title suffix. Lazy profile sections also start from a hydration-safe session
+  state before they apply cached authentication, preventing React hydration
+  errors during authenticated or signed-out share-page visits.
 - **Badge generation now reports authentication state truthfully.** The progress
   screen checks the GitHub session before it marks authentication complete, and
   each later generation step becomes active before it is marked done. Error

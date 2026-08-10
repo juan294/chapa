@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 
 export interface SessionUser {
@@ -24,7 +24,6 @@ interface UseSessionReturn {
  * several components need session data (e.g. the share page).
  */
 let cachedPromise: Promise<SessionUser | null> | null = null;
-let cachedResult: SessionUser | null | undefined = undefined;
 
 function fetchSession(): Promise<SessionUser | null> {
   if (cachedPromise) return cachedPromise;
@@ -42,13 +41,9 @@ function fetchSession(): Promise<SessionUser | null> {
       return res.json() as Promise<{ user: SessionUser | null }>;
     })
     .then((data: { user: SessionUser | null }) => {
-      cachedResult = data.user ?? null;
-      return cachedResult;
+      return data.user ?? null;
     })
-    .catch(() => {
-      cachedResult = null;
-      return null;
-    });
+    .catch(() => null);
 
   return cachedPromise;
 }
@@ -61,7 +56,6 @@ function fetchSession(): Promise<SessionUser | null> {
  */
 export function clearSessionCache(): void {
   cachedPromise = null;
-  cachedResult = undefined;
 }
 
 /**
@@ -72,41 +66,52 @@ export function clearSessionCache(): void {
  * is called, causing a fresh fetch on the next render cycle.
  */
 export function useSession(): UseSessionReturn {
-  const [session, setSession] = useState<SessionUser | null>(() => {
-    // If we already have a cached result, use it synchronously
-    return cachedResult !== undefined ? cachedResult : null;
-  });
-  const [loading, setLoading] = useState<boolean>(() => {
-    return cachedResult === undefined;
-  });
+  // Every mount starts from the same hydration-safe snapshot that the server
+  // renders. A module-level result may already exist because an earlier client
+  // component fetched the session while a lazy subtree was still loading; using
+  // that value synchronously would make the subtree's first client render differ
+  // from its server HTML.
+  const [session, setSession] = useState<SessionUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(false);
+  const requestGenerationRef = useRef(0);
 
   useEffect(() => {
-    // If cached result is already available, the useState initializers
-    // have already set the correct values — no fetch needed.
-    if (cachedResult !== undefined) return;
+    mountedRef.current = true;
+    const generation = ++requestGenerationRef.current;
 
-    let cancelled = false;
-
+    // A fulfilled cached promise still invokes this handler in a microtask, so
+    // every mount keeps its hydration-neutral first render without a second
+    // synchronous result cache.
     fetchSession().then((user) => {
-      if (!cancelled) {
+      if (
+        mountedRef.current &&
+        requestGenerationRef.current === generation
+      ) {
         setSession(user);
         setLoading(false);
       }
     });
 
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
+      requestGenerationRef.current += 1;
     };
   }, []);
 
   const invalidate = useCallback(() => {
-    cachedPromise = null;
-    cachedResult = undefined;
+    const generation = ++requestGenerationRef.current;
+    clearSessionCache();
     setLoading(true);
 
     fetchSession().then((user) => {
-      setSession(user);
-      setLoading(false);
+      if (
+        mountedRef.current &&
+        requestGenerationRef.current === generation
+      ) {
+        setSession(user);
+        setLoading(false);
+      }
     });
   }, []);
 

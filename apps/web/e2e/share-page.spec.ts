@@ -101,6 +101,11 @@ test.describe("Share page — /u/:handle", () => {
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
+    // Wait for the lazy owner/visitor subtree and shared session request to
+    // settle. A cached session used to change this subtree's first client
+    // render and emit React #418 after the earlier heading assertions passed.
+    await expect(page.getByText("Embed this badge")).toBeVisible();
+    await expect(page.getByText("Discover your impact")).toBeVisible();
     expect(documentNavigations).toHaveLength(1);
     expect(hydrationErrors).toEqual([]);
 
@@ -110,6 +115,8 @@ test.describe("Share page — /u/:handle", () => {
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
+    await expect(page.getByText("Embed this badge")).toBeVisible();
+    await expect(page.getByText("Discover your impact")).toBeVisible();
     expect(documentNavigations).toHaveLength(2);
     expect(hydrationErrors).toEqual([]);
   });
