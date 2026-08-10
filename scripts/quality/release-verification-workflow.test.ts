@@ -72,6 +72,11 @@ describe("release verification workflow contract", () => {
     expect(importJob.indexOf("actions/checkout@v6")).toBeLessThan(
       importJob.indexOf("Download candidate bootstrap"),
     );
+    const importedEvidenceUpload = importJob.slice(
+      importJob.indexOf("Upload imported exact-CI evidence"),
+      importJob.indexOf("Enforce exact-CI import result"),
+    );
+    expect(importedEvidenceUpload).toContain("include-hidden-files: true");
   });
 
   it("packages bootstrap evidence at the paths consumed by every job", () => {
@@ -94,6 +99,10 @@ describe("release verification workflow contract", () => {
     expect(release).toContain("CI_SOURCE_PATH: bootstrap/ci/ci-source.json");
     expect(release).toContain("bootstrap/release-artifact-contract.json");
     expect(release).toContain("preview-evidence/bootstrap/candidate.json");
+    expect(release).toContain("jq -e 'select(");
+    expect(release).toContain(
+      `)' > "$RUN_DIRECTORY/pre-merge-evidence.json"`,
+    );
   });
 
   it("selects normalized inputs by exact basename and uses the executable merger", () => {
@@ -171,6 +180,11 @@ describe("release verification workflow contract", () => {
       expect(release).toContain(artifact);
     }
     expect(release).toContain("release-diagnostics.json");
+    const rawEvidenceUpload = release.slice(
+      release.indexOf("Upload allowlisted raw release evidence"),
+      release.indexOf("Set aggregate decision"),
+    );
+    expect(rawEvidenceUpload).toContain("include-hidden-files: true");
     const diagnosticsStep = release.slice(
       release.indexOf("- name: Ensure durable blocked diagnostics exist"),
       release.indexOf("- name: Upload durable final release evidence"),

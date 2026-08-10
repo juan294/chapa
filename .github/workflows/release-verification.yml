@@ -191,13 +191,13 @@ jobs:
             "$RUN_DIRECTORY/release-run.json" \
             > "$RUN_DIRECTORY/candidate.json"
           printf '%s\n' "$PRE_MERGE_EVIDENCE" |
-            jq -e '
+            jq -e 'select(
               type == "object" and
               (.exploratoryCharters | type == "array" and length > 0) and
               (.manualObligations | type == "array" and length > 0) and
               (.manualResult | type == "object") and
               .manualResult.scenarioId == "release.manual-arcs"
-            ' > "$RUN_DIRECTORY/pre-merge-evidence.json"
+            )' > "$RUN_DIRECTORY/pre-merge-evidence.json"
           jq -n \
             --arg repository "${{ github.repository }}" \
             --arg workflowRunId "${{ github.run_id }}" \
@@ -394,6 +394,7 @@ jobs:
             imported-ci/ci-artifacts.json
             imported-ci/ci-import-summary.json
             imported-ci/artifacts/**/*.json
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
 
@@ -892,6 +893,7 @@ jobs:
             aggregate/preview/**/trace.zip
             aggregate/preview/**/*.png
             aggregate/raw-evidence/*.json
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 30
 

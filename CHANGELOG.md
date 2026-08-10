@@ -16,7 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set, candidate-bound evidence, and an analyzer that refuses incomplete or
   mismatched production proof. Its bootstrap artifact now has one explicit
   consumer-facing layout, so exact CI, release-PR, preview, and aggregate jobs
-  read the same candidate paths after download.
+  read the same candidate paths after download, and normalized contract
+  fragments remain present when their allowlisted source directory is hidden.
+  Candidate-supplied pre-merge evidence is also preserved as the validated
+  object instead of being replaced by the validation predicate result.
 - **Production E2E operator playbook and command.** The release workflow now
   documents rehearsal, promotion, readback, rollback, and tag-last publication
   as one auditable path.
