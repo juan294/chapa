@@ -51,6 +51,17 @@ describe("Verify input page", () => {
     it("exports a default function component", () => {
       expect(SOURCE).toContain("export default function VerifyInputPage");
     });
+
+    it("applies an explicit query locale on the static landing page", () => {
+      expect(SOURCE).toContain("useSearchParams");
+      expect(SOURCE).toContain('searchParams?.get("lang")');
+      expect(SOURCE).toContain("<LocaleSync queryLang=");
+    });
+
+    it("keeps the static metadata title coherent with the active locale", () => {
+      expect(SOURCE).toContain("document.title =");
+      expect(SOURCE).toContain("t('verify.title')");
+    });
   });
 
   describe("heading hierarchy", () => {

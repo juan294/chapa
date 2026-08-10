@@ -49,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spacing is normalized across server and browser internationalization engines,
   and pinned `?lang=` profile links can still switch languages when cookie
   persistence is temporarily unavailable.
+- **The verification landing page now honors explicit locale links.** Static
+  `/verify?lang=` visits synchronize the visible form, navigation, document
+  language, selector, and title with the requested English or Spanish locale,
+  and verified-hash submissions preserve that locale on the result page.
 - **Badge generation now reports authentication state truthfully.** The progress
   screen checks the GitHub session before it marks authentication complete, and
   each later generation step becomes active before it is marked done. Error
