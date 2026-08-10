@@ -2,6 +2,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
+import { LanguageProvider } from "@/lib/i18n";
+import { es } from "@/lib/i18n/dictionaries/es";
 import fs from "fs";
 import { resolve } from "path";
 
@@ -220,6 +222,65 @@ describe("ActivityHeatmap", () => {
     render(<ActivityHeatmap heatmapData={[]} activeDays={0} />);
 
     expect(screen.getByText("No activity recorded yet")).toBeTruthy();
+  });
+
+  it("renders the complete activity panel in Spanish", () => {
+    const data = makeDays("2025-03-03", [3, 5, 2, 0, 4, 1, 8]);
+    const { container } = render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <ActivityHeatmap
+          heatmapData={data}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByText("Actividad")).toBeTruthy();
+    expect(screen.getByText("Racha actual")).toBeTruthy();
+    expect(screen.getByText("Día más activo")).toBeTruthy();
+    expect(screen.getByText("Esta semana")).toBeTruthy();
+    expect(screen.getByText("Entrega")).toBeTruthy();
+    expect(screen.getByText("Calidad")).toBeTruthy();
+    expect(screen.getByText("Constancia")).toBeTruthy();
+    expect(screen.getByText("Alcance")).toBeTruthy();
+    expect(
+      screen.getByRole("img", {
+        name: /Mapa de actividad: 6 días activos durante el último año/i,
+      }),
+    ).toBeTruthy();
+
+    expect(container.textContent).not.toContain("Current streak");
+    expect(container.textContent).not.toContain("Most active day");
+    expect(container.textContent).not.toContain("This week");
+    expect(container.textContent).not.toContain("No activity");
+  });
+
+  it("renders the empty activity summary in Spanish", () => {
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <ActivityHeatmap heatmapData={[]} activeDays={0} />
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByText("Aún no hay actividad registrada")).toBeTruthy();
+    expect(screen.queryByText("No activity recorded yet")).toBeNull();
+  });
+
+  it("formats a same-month most-active-week range in Spanish order", () => {
+    const data = makeDays("2025-03-03", [
+      1, 1, 1, 1, 1, 1, 1,
+      10, 10, 10, 10, 10, 10, 10,
+    ]);
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <ActivityHeatmap heatmapData={data} activeDays={14} />
+      </LanguageProvider>,
+    );
+
+    expect(
+      screen.getByText(/Semana más activa: 10.*16.*mar.*10\.0 veces/i),
+    ).toBeTruthy();
   });
 
   // ----------------------------------------------------------------

@@ -17,8 +17,8 @@ describe("GeneratingProgress", () => {
   });
 
   describe("progress steps", () => {
-    it("GitHub authentication step copy is in the English dictionary", () => {
-      expect(EN_DICT).toContain("Authenticated with GitHub");
+    it("GitHub session check step copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Checking GitHub session");
     });
 
     it("contribution fetch step copy is in the English dictionary", () => {

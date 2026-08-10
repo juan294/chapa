@@ -35,8 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change membership or its idempotency key.
 - **Public profiles now stay coherent across locale changes.** Share-page
   titles, headings, accessible badge labels, dimension details, and key-number
-  labels all follow the active language after navigation and reload. Verify
-  pages no longer duplicate the Chapa title suffix.
+  labels all follow the active language after navigation and reload. Activity
+  summaries, dates, weekday labels, legends, tooltips, and accessibility text
+  now also remain fully English or Spanish. Verify pages no longer duplicate
+  the Chapa title suffix.
+- **Badge generation now reports authentication state truthfully.** The progress
+  screen checks the GitHub session before it marks authentication complete, and
+  each later generation step becomes active before it is marked done.
 - **Badge verification claims now match the available proof.** Badges without
   a real verification record say "Public metrics" and omit the seal. Only
   badges with a verification hash and date say "Verified metrics" and link to

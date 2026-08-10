@@ -3,10 +3,13 @@
 import { useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
-import { computeActivityInsights } from "./activity-insights";
-import { formatIsoDate } from "@/lib/utils/date";
+import {
+  computeActivityInsights,
+  type ActivitySummary,
+} from "./activity-insights";
 import { seededRandom } from "@/lib/utils/prng";
 import { useTranslation } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { DIMENSION_COLORS } from "@/lib/utils/dimension-colors";
 
@@ -26,11 +29,11 @@ export interface ActivityHeatmapProps {
 const WEEKS = 13;
 const DAYS = 7;
 
-const DIMENSION_LABELS: Record<Dimension, string> = {
-  delivery: "Delivery",
-  quality: "Quality",
-  consistency: "Consistency",
-  breadth: "Breadth",
+const DIMENSION_KEYS: Record<Dimension, string> = {
+  delivery: "dashboard.activity.delivery",
+  quality: "dashboard.activity.quality",
+  consistency: "dashboard.activity.consistency",
+  breadth: "dashboard.activity.breadth",
 };
 
 const DIMENSIONS: Dimension[] = [
@@ -39,6 +42,70 @@ const DIMENSIONS: Dimension[] = [
   "consistency",
   "breadth",
 ];
+
+type TranslationFn = ReturnType<typeof useTranslation>["t"];
+
+const DATE_LOCALES: Record<Locale, string> = {
+  en: "en-US",
+  es: "es-ES",
+};
+
+function text(t: TranslationFn, key: string): string {
+  return t(key) as string;
+}
+
+function formatLocalizedDate(
+  iso: string,
+  locale: Locale,
+  options: Intl.DateTimeFormatOptions = {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  },
+): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString(
+    DATE_LOCALES[locale],
+    options,
+  );
+}
+
+function formatWeekRange(startDate: string, endDate: string, locale: Locale): string {
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  return new Intl.DateTimeFormat(DATE_LOCALES[locale], {
+    month: "short",
+    day: "numeric",
+  }).formatRange(start, end);
+}
+
+function formatActivitySummary(
+  summary: ActivitySummary,
+  locale: Locale,
+  t: TranslationFn,
+): string {
+  switch (summary.kind) {
+    case "most-active-week":
+      return interpolate(text(t, "dashboard.activity.summaryMostActiveWeek"), {
+        range: formatWeekRange(summary.startDate, summary.endDate, locale),
+        ratio: summary.ratio.toFixed(1),
+      });
+    case "peak-day":
+      return interpolate(
+        text(
+          t,
+          summary.count === 1
+            ? "dashboard.activity.summaryPeakDayOne"
+            : "dashboard.activity.summaryPeakDayMany",
+        ),
+        {
+          date: formatLocalizedDate(summary.date, locale),
+          count: summary.count.toLocaleString(DATE_LOCALES[locale]),
+        },
+      );
+    case "none":
+      return text(t, "dashboard.activity.empty");
+  }
+}
 
 // ── Per-day dimension assignment ─────────────────────────────────────
 
@@ -128,7 +195,7 @@ export function ActivityHeatmap({
   activeDays,
   dimensions,
 }: ActivityHeatmapProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const insights = useMemo(
     () => computeActivityInsights(heatmapData),
     [heatmapData]
@@ -147,11 +214,11 @@ export function ActivityHeatmap({
       style={{ animationDelay: "2000ms" }}
     >
       <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-4">
-        Activity
+        {text(t, "dashboard.activity.title")}
       </h3>
 
       <p className="text-sm text-text-secondary mb-3">
-        {insights.summary}
+        {formatActivitySummary(insights.summary, locale, t)}
       </p>
 
       {/* Insight cards */}
@@ -163,7 +230,6 @@ export function ActivityHeatmap({
             last7={insights.last7DaysActive}
           />
           <RhythmCard
-            busiestDay={insights.busiestDay}
             busiestDayIndex={insights.busiestDayIndex}
             distribution={insights.weekdayDistribution}
           />
@@ -189,18 +255,20 @@ export function ActivityHeatmap({
                 style={{ backgroundColor: DIMENSION_COLORS[dim] }}
               />
               <span className="text-[10px] text-text-secondary font-body">
-                {DIMENSION_LABELS[dim]}
+                {text(t, DIMENSION_KEYS[dim])}
               </span>
             </div>
           ))}
         </div>
         {/* Dot size key */}
         <div className="flex items-center gap-3">
-          <span className="text-[10px] text-text-secondary font-body">Activity:</span>
+          <span className="text-[10px] text-text-secondary font-body">
+            {text(t, "dashboard.activity.activityLabel")}
+          </span>
           {[
-            { label: "Low", size: 5 },
-            { label: "Med", size: 9 },
-            { label: "High", size: 14 },
+            { label: text(t, "dashboard.activity.low"), size: 5 },
+            { label: text(t, "dashboard.activity.medium"), size: 9 },
+            { label: text(t, "dashboard.activity.high"), size: 14 },
           ].map(({ label, size }) => (
             <div key={label} className="flex items-center gap-1">
               <div
@@ -238,12 +306,12 @@ function StreakCard({
         <div className="flex flex-col">
           <span
             className="text-2xl font-heading font-bold text-text-primary leading-none"
-            title="Days with 1+ contribution"
+            title={text(t, "dashboard.activity.streakTitle")}
           >
             {current}d
           </span>
           <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider mt-0.5">
-            Current streak
+            {text(t, "dashboard.activity.currentStreak")}
           </span>
         </div>
         <div
@@ -264,7 +332,8 @@ function StreakCard({
         </div>
       </div>
       <p className="text-[10px] text-text-secondary font-body mt-1.5">
-        Best: <span className="text-text-primary font-medium">{longest}d</span>
+        {text(t, "dashboard.activity.best")} {" "}
+        <span className="text-text-primary font-medium">{longest}d</span>
       </p>
     </div>
   );
@@ -272,24 +341,45 @@ function StreakCard({
 
 /** Maps Mon–Sun display order to JS getDay() indices (Mon=1, ..., Sun=0) */
 const WEEKDAY_JS_INDICES = [1, 2, 3, 4, 5, 6, 0];
+const WEEKDAY_KEYS = [
+  "dashboard.activity.sun",
+  "dashboard.activity.mon",
+  "dashboard.activity.tue",
+  "dashboard.activity.wed",
+  "dashboard.activity.thu",
+  "dashboard.activity.fri",
+  "dashboard.activity.sat",
+];
+const DOW_HEADER_KEYS = [
+  "dashboard.activity.monNarrow",
+  "dashboard.activity.tueNarrow",
+  "dashboard.activity.wedNarrow",
+  "dashboard.activity.thuNarrow",
+  "dashboard.activity.friNarrow",
+  "dashboard.activity.satNarrow",
+  "dashboard.activity.sunNarrow",
+];
 
 function RhythmCard({
-  busiestDay,
   busiestDayIndex,
   distribution,
 }: {
-  busiestDay: string;
   busiestDayIndex: number;
   distribution: number[];
 }) {
+  const { t } = useTranslation();
   const maxVal = Math.max(1, ...distribution);
+  const busiestDay =
+    busiestDayIndex >= 0
+      ? text(t, WEEKDAY_KEYS[busiestDayIndex] ?? "dashboard.activity.sun")
+      : "—";
   return (
     <div className={CARD_CLASS}>
       <span className="text-lg font-heading font-semibold text-text-primary leading-none">
-        {busiestDay || "—"}
+        {busiestDay}
       </span>
       <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
-        Most active day
+        {text(t, "dashboard.activity.mostActiveDay")}
       </span>
       <div className="flex items-end gap-px mt-2" style={{ height: 20 }}>
         {WEEKDAY_JS_INDICES.map((jsIdx, displayIdx) => {
@@ -311,7 +401,7 @@ function RhythmCard({
                 }}
               />
               <span className="text-[7px] text-text-secondary font-body leading-none">
-                {DOW_HEADERS[displayIdx]}
+                {text(t, DOW_HEADER_KEYS[displayIdx] ?? "dashboard.activity.sunNarrow")}
               </span>
             </div>
           );
@@ -328,17 +418,20 @@ function ThisWeekCard({
   total: number;
   weeklyAvg: number;
 }) {
+  const { t, locale } = useTranslation();
   const ratio = weeklyAvg > 0 ? total / weeklyAvg : 0;
-  const ratioLabel = ratio > 0 ? `${ratio.toFixed(1)}x avg` : "";
+  const ratioLabel = ratio > 0
+    ? `${ratio.toFixed(1)}x ${text(t, "dashboard.activity.average")}`
+    : "";
   const isAbove = ratio >= 1;
 
   return (
     <div className={CARD_CLASS}>
       <span className="text-lg font-heading font-semibold text-text-primary leading-none">
-        {total.toLocaleString()}
+        {total.toLocaleString(DATE_LOCALES[locale])}
       </span>
       <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
-        This week
+        {text(t, "dashboard.activity.thisWeek")}
       </span>
       {ratioLabel && (
         <p className="text-[10px] font-body font-medium mt-1">
@@ -363,7 +456,11 @@ interface WeekBucket {
   days: EnrichedDay[];
 }
 
-function bucketByWeek(data: EnrichedDay[]): WeekBucket[] {
+function bucketByWeek(
+  data: EnrichedDay[],
+  locale: Locale,
+  t: TranslationFn,
+): WeekBucket[] {
   const chunks: { first: EnrichedDay; days: EnrichedDay[]; total: number }[] = [];
   for (let i = 0; i < data.length; i += DAYS) {
     const chunk = data.slice(i, i + DAYS);
@@ -374,11 +471,13 @@ function bucketByWeek(data: EnrichedDay[]): WeekBucket[] {
   return chunks.map(({ first, days, total }, idx) => {
     const weeksAgo = chunks.length - 1 - idx;
     let label: string;
-    if (weeksAgo === 0) label = "This wk";
-    else if (weeksAgo === 1) label = "Last wk";
+    if (weeksAgo === 0) label = text(t, "dashboard.activity.thisWeekShort");
+    else if (weeksAgo === 1) label = text(t, "dashboard.activity.lastWeekShort");
     else {
-      const d = new Date(first.date + "T12:00:00");
-      label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      label = formatLocalizedDate(first.date, locale, {
+        month: "short",
+        day: "numeric",
+      });
     }
     return { label, total, days };
   });
@@ -397,6 +496,7 @@ interface ChartTooltipData {
 }
 
 function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
+  const { t, locale } = useTranslation();
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
@@ -414,7 +514,15 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
       {tip.count > 0 ? (
         <>
           <p className="text-text-secondary whitespace-nowrap">
-            {tip.count} contribution{tip.count !== 1 ? "s" : ""}
+            {interpolate(
+              text(
+                t,
+                tip.count === 1
+                  ? "dashboard.activity.contributionOne"
+                  : "dashboard.activity.contributionMany",
+              ),
+              { count: tip.count.toLocaleString(DATE_LOCALES[locale]) },
+            )}
           </p>
           <div className="mt-1.5 flex flex-col gap-0.5">
             {DIMENSIONS.map((dim) => {
@@ -432,7 +540,7 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
                       fontWeight: dim === tip.dominant ? 600 : 400,
                     }}
                   >
-                    {DIMENSION_LABELS[dim]} {pct}%
+                    {text(t, DIMENSION_KEYS[dim])} {pct}%
                   </span>
                 </div>
               );
@@ -440,7 +548,9 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
           </div>
         </>
       ) : (
-        <p className="text-text-secondary">No activity</p>
+        <p className="text-text-secondary">
+          {text(t, "dashboard.activity.noActivity")}
+        </p>
       )}
     </div>,
     document.body
@@ -448,8 +558,6 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
 }
 
 // ── Dot timeline ─────────────────────────────────────────────────────
-
-const DOW_HEADERS = ["M", "T", "W", "T", "F", "S", "S"];
 
 function DotTimeline({
   data,
@@ -460,19 +568,19 @@ function DotTimeline({
   peakDate: string;
   activeDays: number;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const maxCount = useMemo(
     () => Math.max(1, ...data.map((d) => d.count)),
     [data]
   );
-  const weeks = useMemo(() => bucketByWeek(data), [data]);
+  const weeks = useMemo(() => bucketByWeek(data, locale, t), [data, locale, t]);
   const [tooltip, setTooltip] = useState<ChartTooltipData | null>(null);
 
   const handleDotEnter = useCallback(
     (day: EnrichedDay, e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
       setTooltip({
-        title: formatIsoDate(day.date),
+        title: formatLocalizedDate(day.date, locale),
         count: day.count,
         dimensionWeights: day.dimensionWeights,
         dominant: day.dominant,
@@ -481,14 +589,14 @@ function DotTimeline({
         cellBottom: rect.bottom,
       });
     },
-    []
+    [locale]
   );
 
   const handleDotFocus = useCallback(
     (day: EnrichedDay, e: React.FocusEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
       setTooltip({
-        title: formatIsoDate(day.date),
+        title: formatLocalizedDate(day.date, locale),
         count: day.count,
         dimensionWeights: day.dimensionWeights,
         dominant: day.dominant,
@@ -497,7 +605,7 @@ function DotTimeline({
         cellBottom: rect.bottom,
       });
     },
-    []
+    [locale]
   );
 
   const handleDotKeyDown = useCallback(
@@ -505,7 +613,7 @@ function DotTimeline({
       if (e.key === "Enter" || e.key === " ") {
         const rect = e.currentTarget.getBoundingClientRect();
         setTooltip({
-          title: formatIsoDate(day.date),
+          title: formatLocalizedDate(day.date, locale),
           count: day.count,
           dimensionWeights: day.dimensionWeights,
           dominant: day.dominant,
@@ -515,13 +623,20 @@ function DotTimeline({
         });
       }
     },
-    []
+    [locale]
   );
 
   const handleLeave = useCallback(() => setTooltip(null), []);
 
-  const dayWord = activeDays === 1 ? "day" : "days";
-  const timelineLabel = `Activity heatmap: ${activeDays} active ${dayWord} over the past year`;
+  const timelineLabel = interpolate(
+    text(
+      t,
+      activeDays === 1
+        ? "dashboard.activity.timelineOne"
+        : "dashboard.activity.timelineMany",
+    ),
+    { activeDays: String(activeDays) },
+  );
 
   return (
     <div role="img" aria-label={timelineLabel}>
@@ -529,12 +644,12 @@ function DotTimeline({
       <div className="flex items-center gap-2 mb-1">
         <span className="w-12 shrink-0" />
         <div className="flex items-center gap-1 flex-1">
-          {DOW_HEADERS.map((label, i) => (
+          {DOW_HEADER_KEYS.map((key, i) => (
             <span
               key={i}
               className="flex-1 text-center text-[7px] text-text-secondary font-body"
             >
-              {label}
+              {text(t, key)}
             </span>
           ))}
         </div>
@@ -558,7 +673,15 @@ function DotTimeline({
                     <div
                       role="button"
                       tabIndex={0}
-                      aria-label={interpolate(t('aria.contributionOnDate') as string, { count: String(day.count), date: formatIsoDate(day.date) })}
+                      aria-label={interpolate(
+                        text(
+                          t,
+                          day.count === 1
+                            ? "dashboard.activity.contributionOne"
+                            : "dashboard.activity.contributionMany",
+                        ),
+                        { count: String(day.count) },
+                      ) + ` — ${formatLocalizedDate(day.date, locale)}`}
                       className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
                       style={{
                         width: size,

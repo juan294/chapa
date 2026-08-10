@@ -39,10 +39,19 @@ describe("GeneratingProgress", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
     render(<GeneratingProgress handle="testuser" />);
     // English dict (useTranslation falls back to English without LanguageProvider)
-    expect(screen.getByText("Authenticated with GitHub")).toBeDefined();
+    expect(screen.getByText("Checking GitHub session")).toBeDefined();
     expect(screen.getByText("Collecting contribution data")).toBeDefined();
     expect(screen.getByText("Computing impact profile")).toBeDefined();
     expect(screen.getByText("Rendering badge")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the GitHub session check as active until the API confirms it", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    const { container } = render(<GeneratingProgress handle="testuser" />);
+
+    expect(container.querySelector('[data-step="0"]')?.getAttribute("data-status")).toBe("active");
+    expect(container.querySelector('[data-step="1"]')?.getAttribute("data-status")).toBe("pending");
     vi.unstubAllGlobals();
   });
 
@@ -85,6 +94,9 @@ describe("GeneratingProgress", () => {
     });
 
     expect(screen.getByRole("alert")).toBeDefined();
+    expect(
+      document.querySelector('[data-step="0"]')?.getAttribute("data-status"),
+    ).toBe("error");
     vi.unstubAllGlobals();
   });
 
@@ -116,6 +128,13 @@ describe("GeneratingProgress", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
+    expect(
+      document.querySelector('[data-step="0"]')?.getAttribute("data-status"),
+    ).toBe("done");
+    expect(
+      document.querySelector('[data-step="1"]')?.getAttribute("data-status"),
+    ).toBe("active");
+
     // Advance through staggered step completions (300ms * 3 = 900ms)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
@@ -130,6 +149,29 @@ describe("GeneratingProgress", () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith("/u/testuser");
+    vi.unstubAllGlobals();
+  });
+
+  it("activates each generation step before marking it done", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-step="1"]')?.getAttribute("data-status")).toBe("active");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(document.querySelector('[data-step="1"]')?.getAttribute("data-status")).toBe("done");
+    expect(document.querySelector('[data-step="2"]')?.getAttribute("data-status")).toBe("active");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(document.querySelector('[data-step="2"]')?.getAttribute("data-status")).toBe("done");
+    expect(document.querySelector('[data-step="3"]')?.getAttribute("data-status")).toBe("active");
     vi.unstubAllGlobals();
   });
 });

@@ -23,18 +23,22 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
   // Step statuses stored as state (driven by API response)
   const [stepStatuses, setStepStatuses] = useState<StepStatus[]>([
-    'done', 'active', 'pending', 'pending',
+    'active', 'pending', 'pending', 'pending',
   ]);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const completeRemainingSteps = useCallback(() => {
-    // Mark steps 1, 2, 3 as done with staggered delays
+    // Complete each step and activate the next one with staggered delays.
     const remaining = [1, 2, 3];
     remaining.forEach((idx, i) => {
       setTimeout(() => {
         setStepStatuses((prev) =>
-          prev.map((s, j) => (j === idx ? 'done' : s)),
+          prev.map((status, stepIndex) => {
+            if (stepIndex === idx) return 'done';
+            if (stepIndex === idx + 1) return 'active';
+            return status;
+          }),
         );
         if (idx === remaining[remaining.length - 1]) {
           setDone(true);
@@ -63,6 +67,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           return;
         }
 
+        setStepStatuses(['done', 'active', 'pending', 'pending']);
         completeRemainingSteps();
       } catch {
         if (cancelled) return;
