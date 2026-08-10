@@ -20,6 +20,12 @@ vi.mock("./GeneratingProgress", () => ({
   ),
 }));
 
+vi.mock("@/lib/i18n", () => ({
+  LocaleSync: ({ queryLang }: { queryLang?: string }) => (
+    <span data-testid="locale-sync" data-query-lang={queryLang} />
+  ),
+}));
+
 // Mock getServerLocale + getServerT to return English without needing Next.js headers()
 vi.mock("@/lib/i18n/server", async () => {
   const { en } = await import("@/lib/i18n/dictionaries/en");
@@ -57,6 +63,30 @@ describe("GeneratingPage render", () => {
     render(page);
     expect(screen.getByTestId("generating-progress")).toBeDefined();
     expect(screen.getByText("testuser")).toBeDefined();
+  });
+
+  it("synchronizes the live progress copy with an explicit query locale", async () => {
+    const page = await GeneratingPage({
+      params: Promise.resolve({ handle: "testuser" }),
+      searchParams: Promise.resolve({ lang: "en" }),
+    });
+    render(page);
+
+    expect(screen.getByTestId("locale-sync").getAttribute("data-query-lang")).toBe(
+      "en",
+    );
+  });
+
+  it("does not apply an ambiguous repeated query locale", async () => {
+    const page = await GeneratingPage({
+      params: Promise.resolve({ handle: "testuser" }),
+      searchParams: Promise.resolve({ lang: ["en", "es"] }),
+    });
+    render(page);
+
+    expect(
+      screen.getByTestId("locale-sync").getAttribute("data-query-lang"),
+    ).toBeNull();
   });
 
   it("calls notFound for invalid handle", async () => {

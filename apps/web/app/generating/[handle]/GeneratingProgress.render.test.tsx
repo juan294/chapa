@@ -129,6 +129,24 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  it("keeps the active locale in the retry deep link", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    render(
+      <LanguageContext.Provider value={languageValue("en", en)}>
+        <GeneratingProgress handle="testuser" />
+      </LanguageContext.Provider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByText("Try again").closest("a")?.getAttribute("href")).toBe(
+      "/generating/testuser?lang=en",
+    );
+    vi.unstubAllGlobals();
+  });
+
   it("updates an existing error alert when the active locale changes", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
     const { rerender } = render(

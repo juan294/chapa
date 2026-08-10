@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen checks the GitHub session before it marks authentication complete, and
   each later generation step becomes active before it is marked done. Error
   alerts also follow locale changes instead of retaining their initial language.
+  Direct language links and retry links now keep generation metadata, progress,
+  and error copy in the same locale.
 - **Badge verification claims now match the available proof.** Badges without
   a real verification record say "Public metrics" and omit the seal. Only
   badges with a verification hash and date say "Verified metrics" and link to

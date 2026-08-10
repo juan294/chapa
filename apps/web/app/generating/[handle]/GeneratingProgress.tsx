@@ -11,7 +11,7 @@ const REDIRECT_DELAY_MS = 800;
 
 export function GeneratingProgress({ handle }: { handle: string }) {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
 
   // Step labels derived from dictionary on each render (locale-aware)
   const stepLabels = [
@@ -200,7 +200,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
               {t('generation.error') as string}
             </p>
             <a
-              href={`/generating/${encodeURIComponent(handle)}`}
+              href={`/generating/${encodeURIComponent(handle)}?lang=${locale}`}
               className="mt-2 inline-block font-heading text-sm text-text-secondary underline underline-offset-4 hover:text-text-primary"
             >
               {t('generation.retry') as string}
