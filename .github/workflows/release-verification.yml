@@ -278,19 +278,26 @@ jobs:
           echo "run-id=$RELEASE_PR_RUN_ID" >> "$GITHUB_OUTPUT"
           echo "run-attempt=$RELEASE_PR_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
+      - name: Stage candidate bootstrap layout
+        run: |
+          set -euo pipefail
+          bootstrap="$RUN_DIRECTORY/bootstrap"
+          mkdir -p "$bootstrap/ci"
+          cp "$RUN_DIRECTORY/candidate.json" "$bootstrap/candidate.json"
+          cp "$RUN_DIRECTORY/release-run.json" "$bootstrap/release-run.json"
+          cp "$RUN_DIRECTORY/pre-merge-evidence.json" "$bootstrap/pre-merge-evidence.json"
+          cp "$RUN_DIRECTORY/workflow-source.json" "$bootstrap/workflow-source.json"
+          cp "$RUN_DIRECTORY/ci/ci-source.json" "$bootstrap/ci/ci-source.json"
+          cp "$RUN_DIRECTORY/ci/release-pr-source.json" "$bootstrap/ci/release-pr-source.json"
+          cp scripts/quality/release-artifact-contract.json \
+            "$bootstrap/release-artifact-contract.json"
+
       - name: Upload candidate bootstrap evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: release-bootstrap-${{ inputs.runId }}-${{ github.run_attempt }}
-          path: |
-            quality/evidence/runs/${{ inputs.runId }}/candidate.json
-            quality/evidence/runs/${{ inputs.runId }}/release-run.json
-            quality/evidence/runs/${{ inputs.runId }}/pre-merge-evidence.json
-            quality/evidence/runs/${{ inputs.runId }}/workflow-source.json
-            quality/evidence/runs/${{ inputs.runId }}/ci/ci-source.json
-            quality/evidence/runs/${{ inputs.runId }}/ci/release-pr-source.json
-            scripts/quality/release-artifact-contract.json
+          path: quality/evidence/runs/${{ inputs.runId }}/bootstrap
           if-no-files-found: error
           retention-days: 30
 

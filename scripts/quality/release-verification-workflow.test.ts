@@ -74,6 +74,28 @@ describe("release verification workflow contract", () => {
     );
   });
 
+  it("packages bootstrap evidence at the paths consumed by every job", () => {
+    expect(release).toContain("name: Stage candidate bootstrap layout");
+    expect(release).toContain('mkdir -p "$bootstrap/ci"');
+    for (const path of [
+      '"$bootstrap/candidate.json"',
+      '"$bootstrap/release-run.json"',
+      '"$bootstrap/pre-merge-evidence.json"',
+      '"$bootstrap/workflow-source.json"',
+      '"$bootstrap/ci/ci-source.json"',
+      '"$bootstrap/ci/release-pr-source.json"',
+      '"$bootstrap/release-artifact-contract.json"',
+    ]) {
+      expect(release).toContain(path);
+    }
+    expect(release).toContain(
+      "path: quality/evidence/runs/${{ inputs.runId }}/bootstrap",
+    );
+    expect(release).toContain("CI_SOURCE_PATH: bootstrap/ci/ci-source.json");
+    expect(release).toContain("bootstrap/release-artifact-contract.json");
+    expect(release).toContain("preview-evidence/bootstrap/candidate.json");
+  });
+
   it("selects normalized inputs by exact basename and uses the executable merger", () => {
     expect(artifactContract).toContain(
       '"contract-and-local-journey.json"',

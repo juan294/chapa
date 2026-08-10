@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fail-closed E2E Pro release verification.** Release candidates now carry
   exact deployment identity through `/api/version`, a declared required-probe
   set, candidate-bound evidence, and an analyzer that refuses incomplete or
-  mismatched production proof.
+  mismatched production proof. Its bootstrap artifact now has one explicit
+  consumer-facing layout, so exact CI, release-PR, preview, and aggregate jobs
+  read the same candidate paths after download.
 - **Production E2E operator playbook and command.** The release workflow now
   documents rehearsal, promotion, readback, rollback, and tag-last publication
   as one auditable path.
