@@ -32,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   acknowledge the complete batch in one database operation. Partial or empty
   acknowledgements and invalid lease inputs are rejected. After an ambiguous
   provider failure, the complete batch stays under its lease so a retry cannot
-  change membership or its idempotency key.
+  change membership or its idempotency key. Lease tokens containing only
+  whitespace, including tabs and newlines, now fail closed.
 - **Public profiles now stay coherent across locale changes.** Share-page
   titles, headings, accessible badge labels, dimension details, and key-number
   labels all follow the active language after navigation and reload. Activity
