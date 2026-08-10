@@ -51,12 +51,12 @@ export function canonicalLocaleHref({
   pathname,
   search,
   hash,
-}: Pick<Location, 'pathname' | 'search' | 'hash'>, locale?: Locale): string {
+}: Pick<Location, 'pathname' | 'search' | 'hash'>, locale?: Locale, ensureLocaleQuery = false): string {
   const canonicalPath = pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
   let canonicalSearch = search;
   if (locale) {
     const params = new URLSearchParams(search);
-    if (params.has('lang')) {
+    if (params.has('lang') || ensureLocaleQuery) {
       params.set('lang', locale);
       const serialized = params.toString();
       canonicalSearch = serialized ? `?${serialized}` : '';
@@ -168,8 +168,16 @@ export function LanguageProvider({
       }
       // The server action deliberately does not revalidate the static layout,
       // avoiding an automatic RSC refresh racing the canonical navigation.
+      let persistenceFailed = false;
       if (cookieLocale !== next) {
-        await setLocaleAction(next);
+        try {
+          await setLocaleAction(next);
+        } catch {
+          persistenceFailed = true;
+          // Keep the already-applied dictionary authoritative and continue to
+          // the explicit query-locale navigation. A transient server-action
+          // failure must not leave the locale control unable to switch.
+        }
       }
       if (!navigate) return;
       // A full canonical navigation is intentional. `router.refresh()` can
@@ -177,7 +185,9 @@ export function LanguageProvider({
       // URL, while directly visited `/en` or `/es` routes never pass through
       // the locale-selecting proxy. Re-entering through the canonical path
       // makes the persisted cookie authoritative for the whole page.
-      window.location.assign(canonicalLocaleHref(window.location, next));
+      window.location.assign(
+        canonicalLocaleHref(window.location, next, persistenceFailed),
+      );
     },
     [locale, applyLocale]
   );

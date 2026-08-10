@@ -121,6 +121,28 @@ test.describe("Share page — /u/:handle", () => {
     expect(hydrationErrors).toEqual([]);
   });
 
+  test("a pinned locale deep link can switch to the other language", async ({
+    page,
+  }) => {
+    const englishPath = `${smokeProfilePath}&lang=en`;
+    const spanishPath = `${smokeProfilePath}&lang=es`;
+
+    await page.goto(englishPath, GOTO_OPTS);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+
+    await page.getByRole("button", { name: "EN", exact: true }).click();
+    await page.getByRole("option", { name: "Español" }).click();
+    await expect(page).toHaveURL(spanishPath);
+    await expect(page.locator("h1")).toHaveText(
+      "Impacto de desarrollador de octocat",
+    );
+
+    await page.getByRole("button", { name: "ES", exact: true }).click();
+    await page.getByRole("option", { name: "English" }).click();
+    await expect(page).toHaveURL(englishPath);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+  });
+
   test("invalid handle returns 404 or error state", async ({ page }) => {
     const response = await page.goto(
       "/u/this-user-definitely-does-not-exist-xyz123",

@@ -283,6 +283,21 @@ describe("ActivityHeatmap", () => {
     ).toBeTruthy();
   });
 
+  it("normalizes Intl range spacing so server and browser text hydrate identically", () => {
+    const data = makeDays("2025-04-08", [
+      1, 1, 1, 1, 1, 1, 1,
+      10, 10, 10, 10, 10, 10, 10,
+    ]);
+    const { container } = render(
+      <ActivityHeatmap heatmapData={data} activeDays={14} />,
+    );
+
+    expect(container.textContent).toContain(
+      "Most active week: Apr 15 – 21 — 10.0x your weekly average",
+    );
+    expect(container.textContent).not.toMatch(/[\u2009\u202f]/);
+  });
+
   // ----------------------------------------------------------------
   // 12. ChartTooltip rendering via handleDotEnter
   // ----------------------------------------------------------------

@@ -75,7 +75,12 @@ function formatWeekRange(startDate: string, endDate: string, locale: Locale): st
   return new Intl.DateTimeFormat(DATE_LOCALES[locale], {
     month: "short",
     day: "numeric",
-  }).formatRange(start, end);
+  })
+    .formatRange(start, end)
+    // Node and Chromium can use different Unicode spacing around the range
+    // separator (for example thin spaces versus ordinary spaces). Normalize
+    // those equivalent forms so server HTML and the first client render match.
+    .replace(/[\u00a0\u2009\u202f]/g, " ");
 }
 
 function formatActivitySummary(

@@ -14,6 +14,23 @@ import { setLocaleAction } from './set-locale-action';
 
 const originalLocation = window.location;
 
+function stubLocation({
+  pathname,
+  search = '',
+  hash = '',
+}: {
+  pathname: string;
+  search?: string;
+  hash?: string;
+}) {
+  const assign = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { ...originalLocation, pathname, search, hash, assign },
+  });
+  return assign;
+}
+
 function TestConsumer() {
   const ctx = useContext(LanguageContext);
   if (!ctx) return <div data-testid="no-ctx">no context</div>;
@@ -78,17 +95,7 @@ describe('LanguageProvider', () => {
   });
 
   it('persists the locale and reloads the canonical route when the locale changes', async () => {
-    const assign = vi.fn();
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        ...originalLocation,
-        pathname: '/',
-        search: '',
-        hash: '',
-        assign,
-      },
-    });
+    const assign = stubLocation({ pathname: '/' });
 
     render(
       <LanguageProvider initialLocale="en">
@@ -128,17 +135,58 @@ describe('LanguageProvider', () => {
     finishPersistence?.();
   });
 
+  it('still navigates to the requested query locale when cookie persistence fails', async () => {
+    const assign = stubLocation({
+      pathname: '/u/juan294',
+      search: '?lang=en',
+    });
+    vi.mocked(setLocaleAction).mockRejectedValueOnce(
+      new Error('cookie persistence unavailable')
+    );
+
+    render(
+      <LanguageProvider initialLocale="en">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('switch-es').click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    expect(assign).toHaveBeenCalledWith('/u/juan294?lang=es');
+  });
+
+  it('adds a locale query fallback when canonical cookie persistence fails', async () => {
+    const assign = stubLocation({ pathname: '/' });
+    vi.mocked(setLocaleAction).mockRejectedValueOnce(
+      new Error('cookie persistence unavailable')
+    );
+
+    render(
+      <LanguageProvider initialLocale="en">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('switch-es').click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    expect(assign).toHaveBeenCalledWith('/?lang=es');
+  });
+
   it('reloads through the canonical public path after switching from an internal locale route', async () => {
-    const assign = vi.fn();
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        ...originalLocation,
-        pathname: '/es',
-        search: '?source=release&lang=es',
-        hash: '#features',
-        assign,
-      },
+    const assign = stubLocation({
+      pathname: '/es',
+      search: '?source=release&lang=es',
+      hash: '#features',
     });
 
     render(

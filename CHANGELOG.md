@@ -45,7 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after an opposite-language visit. Verify pages no longer duplicate the Chapa
   title suffix. Lazy profile sections also start from a hydration-safe session
   state before they apply cached authentication, preventing React hydration
-  errors during authenticated or signed-out share-page visits.
+  errors during authenticated or signed-out share-page visits. Activity range
+  spacing is normalized across server and browser internationalization engines,
+  and pinned `?lang=` profile links can still switch languages when cookie
+  persistence is temporarily unavailable.
 - **Badge generation now reports authentication state truthfully.** The progress
   screen checks the GitHub session before it marks authentication complete, and
   each later generation step becomes active before it is marked done. Error
