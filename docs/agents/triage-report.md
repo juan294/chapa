@@ -1,79 +1,91 @@
 # Triage Report
-> Generated on 2026-07-25 | 9 reports processed | 13 action items | 0 Dependabot PRs
+> Generated on 2026-08-10 | 8 reports processed | 4 action items | 0 Dependabot PRs
 
 ## Agent Failures
-None — no `logs/*.error.log` files modified in the last 24h.
+
+None -- all agents produced their expected reports.
 
 ## Reports Reviewed
+
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi Update | no-op | 0 |
-| 2 | cost-analyst-report.md | Cost Analyst | GREEN | 2 (scope model comment; bundle baseline reconciliation) |
-| 3 | coverage-report.md | Coverage | GREEN | 0 |
-| 4 | documentation-report.md | Documentation | GREEN | 2 optional P3s |
-| 5 | performance-report.md | Performance | GREEN | 1 informational baseline |
-| 6 | qa-report.md | QA | GREEN | 0 |
-| 7 | security-report.md | Security | GREEN at report time | 1 shared scope-comment carry |
-| 8 | triage-report.md | Prior Triage | GREEN | 0 |
-| 9 | update-docs-report.md | Documentation Update | GREEN | 0 |
+| 1 | `cost-analyst-report.md` | Cost Analyst | GREEN | 0 -- both recommendations were already satisfied by current source/evidence |
+| 2 | `e2e-pro-rehearsal-report.md` | E2E Pro | YELLOW | 1 -- production identity evidence remains release-gated; tracked in #1057 |
+| 3 | `performance-report.md` | Performance | GREEN | 0 |
+| 4 | `coverage-report.md` | Coverage | GREEN | 0 -- the three optional carries measure 100% in the current coverage artifact |
+| 5 | `documentation-report.md` | Documentation | GREEN | 0 -- `/api/version` is documented and the stale Zod carry no longer applies |
+| 6 | `security-report.md` | Security | GREEN at report time | 0 from the report; live dependency discovery superseded its snapshot |
+| 7 | `cc-rpi-update-report.md` | cc-rpi Update | GREEN | 0 -- blueprint already current |
+| 8 | `qa-report.md` | QA | GREEN | 0 |
 
 ## Overall Status: YELLOW
 
-All code, dependency, documentation, CI, and GitHub alert findings are resolved. The status remains YELLOW only because production alert delivery is still unconfigured and tracked in issue #1056.
+All implementation and exact-SHA PR checks are green. The status remains
+YELLOW because Dependabot alert #15 cannot close until the draft PR is merged,
+and the production deployment identity probe remains release-gated in #1057.
 
 ## Action Items Completed
+
 | # | Item | Source | Tests Added | Status |
 |---|------|--------|-------------|--------|
-| 1 | Corrected the five-cycle `scopeRank` carry so `authenticated` means private-inclusive server-token visibility and a user OAuth session without `repo` remains lower scope. | cost-analyst-report.md + security-report.md | Existing scope tests | Done |
-| 2 | Added maintenance rationale to all four `AuthorTypewriter` timing constants. | documentation-report.md | — | Done |
-| 3 | Verified `campaigns/types.ts` already documents its public types, DB row shapes, and validation constants; the optional “Zod schema” recommendation is stale because this module has no Zod schema. | documentation-report.md | — | Done |
-| 4 | Adopted the reproducible performance baseline of 1,996 KB raw / 638 KB gzip / 73 chunks and retired the cost report's unreproducible 580 KB figure for future comparisons. | cost-analyst-report.md + performance-report.md | — | Done |
-| 5 | Swept and corrected the token-visibility model in `stats-integrity.ts`, `impact-v6.md`, and `how-it-works.md`, including OAuth scopes, cache TTLs, and aggregate-data privacy wording. | Cross-report consistency sweep | Existing suite | Done |
-| 6 | Patched Dependabot alert #7 (`brace-expansion`) to 5.0.8 and bounded the override below the next major. | GitHub alert #7 | Vulnerability gate | Done; GitHub closed |
-| 7 | Patched Dependabot alert #8 (`dompurify`) to 3.4.12, bounded the override, and updated its accepted-risk version. | GitHub alert #8 | Vulnerability + license gates | Done; GitHub closed |
-| 8 | Upgraded Next.js and its aligned tooling to 16.2.11; patched OSV findings in `js-yaml`, `postcss`, and `sharp`; pinned `sharp` 0.35.3 because it is beyond Next's declared optional range. | OSV vulnerability gate | Full build | Done |
-| 9 | Updated `accepted-risks.md` so the private-tier GHAS compensation names the actual OSV and license gates and no longer claims zero live alerts. | GitHub alert-surface review | — | Done |
-| 10 | Corrected in-flight request deduplication to rank effective private visibility rather than token presence, preventing a private-inclusive server-token request from reusing a scope-blind OAuth fetch. | `/simplify` quality pass | 2 rewritten regression tests | Done |
-| 11 | Filed issue #1056 after CLI discovery found no sanctioned `CHAPA_ALERT_WEBHOOK_URL`; the issue records live-health evidence and the configuration/test checklist. | Production alert-stream review | — | Tracked |
-| 12 | Hardened async UI teardown after the report-commit hook exposed a timing flake: the regenerate assertion now waits for React's resolved-fetch render, and delayed toolbar updates check the mounted guard before touching state or routing. | Pre-commit full-suite evidence | 65 focused tests + full suite | Done |
-| 13 | Fixed Dead Code Detection after run 30172649125 exposed that CI used unpinned `pnpm dlx knip` 6.29.0 instead of the repository's clean pinned 6.27.0 baseline; both workflow steps now use `pnpm exec knip`. | GitHub Actions | Both pinned Knip scans + full suite | Done |
-
-## `/simplify` (3 independent read-only passes)
-- **Reuse:** found the duplicated, inverted cache-write comment; corrected it to reference effective visibility.
-- **Quality:** found the in-flight deduplication seam, stale warning text, remaining `how-it-works.md` contradictions, and unbounded overrides; all were fixed.
-- **Efficiency:** found the unbounded `sharp` override outside Next 16.2.11's declared range; pinned the exact build-validated version.
-- Full verification was rerun after all cleanup changes.
+| 1 | Raised `dompurify` to 3.4.13 and synchronized license references | Dependabot alert #15 / GHSA-55q2-fjhq-7xh7 | No -- transitive patch | Done on PR #1058; awaiting merge/rescan |
+| 2 | Raised `js-yaml` to 4.3.1 | Live OSV gate / GHSA-5p4m-2wfm-xmqj | No -- transitive patch | Done on PR #1058 |
+| 3 | Raised `nanoid` to 3.3.18 | Live OSV gate / GHSA-2v37-7h3g-55p8 | No -- transitive patch | Done on PR #1058 |
+| 4 | Filed #1057 for the six consecutive nightly production identity failures | Live CI reconciliation | N/A | Done; release remains separately gated |
 
 ## GitHub Security & Quality Alerts
+
 | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
 |---|------|----------|--------------|---------------|----------|--------|-------|
-| 1 | Code scanning | — | GitHub Advanced Security | — | Repository | Accepted risk | API returned 403; private-tier limitation documented |
-| 2 | Secret scanning | — | GitHub Advanced Security | — | Repository | Accepted risk | API returned 404; CI Gitleaks compensating gate |
-| 7 | Dependabot | HIGH | brace-expansion 5.0.6 | GHSA-3jxr-9vmj-r5cp | pnpm-lock.yaml | Closed | Resolves to 5.0.8; GitHub rescan confirmed |
-| 8 | Dependabot | LOW | dompurify 3.4.11 | GitHub advisory | pnpm-lock.yaml | Closed | Resolves to 3.4.12; GitHub rescan confirmed |
+| 15 | Dependabot | MEDIUM | `dompurify` | GHSA-55q2-fjhq-7xh7 | `pnpm-lock.yaml` | Fixed on draft PR #1058 | Resolves to 3.4.13; GitHub closure awaits merge/rescan |
+| N/A | OSV | HIGH | `js-yaml` | GHSA-5p4m-2wfm-xmqj | `pnpm-lock.yaml` | Fixed on draft PR #1058 | Resolves to 4.3.1 |
+| N/A | OSV | HIGH | `nanoid` | GHSA-2v37-7h3g-55p8 | `pnpm-lock.yaml` | Fixed on draft PR #1058 | Resolves to 3.3.18 |
+| N/A | Code scanning API | LOW accepted limitation | GitHub Advanced Security | API returned 403 | Repository tier | Accepted | Documented in `docs/accepted-risks.md`; compensating CI gates green |
+| N/A | Secret scanning API | LOW accepted limitation | GitHub Advanced Security | API returned 404 | Repository tier | Accepted | Gitleaks workflow green on the exact candidate |
 
 ## Dependabot PRs
-None — no open Dependabot-authored PRs.
 
-## Production Observability
-- Live `/api/health`: overall `ok`; Redis, Supabase, GitHub, and all four cron heartbeats healthy.
-- Bounded Vercel logs: 0 named alert events in 7 days and 0 HTTP 5xx in 24 hours; this is not authoritative for direct PostHog ingestion.
-- PostHog authoritative event query was unavailable: no CLI and the existing browser session was signed out.
-- Alert webhook: `skipped`; no production environment value or repository-approved destination found. Issue #1056 tracks configuration.
+None -- no open Dependabot-authored PRs were discovered.
 
 ## Verification
-- [x] Frozen-lockfile install
-- [x] Vulnerability gate — no high/critical vulnerability with an available fix
-- [x] License gate — 98 production packages allowed or documented
-- [x] Tests — 8,529/8,529 passing across 499 files
-- [x] Typecheck — both workspaces clean
-- [x] Lint — both workspaces clean
-- [x] Next 16.2.11 production build — 81/81 static pages generated
-- [x] `/simplify` — 3 passes, findings applied, full sequence rerun
-- [x] CI green on `241521451b4b8a8f1735fec050278b17b91b0942`: CI 30172856571; Dead Code 30172856484; Security 30172856541; Secret Scanning 30172856488; Bundle Size 30172856539
-- [x] Exact-SHA Vercel preview `chapa-f1fhw2f2p-thecreativetoken.vercel.app` Ready; authenticated CLI checks returned HTTP 200 for `/` and `/api/health`
-- [x] Dependabot alerts #7/#8 closed by GitHub rescan (0 open)
+
+- [x] Vulnerability gate passing
+- [x] License gate passing
+- [x] 8,688 tests passing across 513 files
+- [x] Typecheck clean
+- [x] Lint clean
+- [x] `codex-simplify` completed with no cleanup findings
+- [x] Full local verification repeated after simplify
+- [x] Exact candidate `c8ef6af6fb0089685a8df4314c7137b9c9268b1e` CI green on draft PR #1058
+- [x] CI run 31362822385 green (unit shards, contract DB, build, E2E, deployment smoke)
+- [x] Security Scan 31362822342 green
+- [x] Secret Scanning 31362822350 green
+- [x] Dead Code Detection 31362822352 green
+- [x] Bundle Size Analysis 31362822349 green
+- [x] Lighthouse CI 31362822353 green
+- [x] Claude Code Review 31362822373 green
+- [x] Vercel deployment and preview-comment checks green
 
 ## Carried Items
-- Issue #1056: choose and configure the approved production alert webhook destination, then exercise a safe test alert.
-- GHAS code/secret scanning remains an accepted private-tier limitation with CI compensating controls.
+
+- Draft PR #1058 is green and unmerged. Merge authorization remains separate.
+- Issue #1057 tracks deployment of the existing `/api/version` endpoint and
+  re-verification of the nightly identity producer. Release and production
+  authorization remain separate.
+- Issue #1056 still requires an owner-approved alert destination before
+  configuring `CHAPA_ALERT_WEBHOOK_URL`; no destination was invented.
+- Native GitHub code/secret scanning remains unavailable on the current private
+  repository tier; the documented compensating workflows remain green.
+
+SHARED_CONTEXT_START
+## Triage -- 2026-08-10
+- **Reports processed**: 8 (cost analyst, E2E Pro rehearsal, performance, coverage, documentation, security, cc-rpi update, and QA).
+- **Action items resolved**: 4 -- patched `dompurify` 3.4.12 to 3.4.13 for Dependabot alert #15, patched live-OSV HIGH findings `js-yaml` 4.3.0 to 4.3.1 and `nanoid` 3.3.16 to 3.3.18, and filed #1057 for six consecutive nightly production identity failures.
+- **Verification**: Local vulnerability/license gates, 8,688 tests, typecheck, and lint passed twice; pre-commit repeated tests/typecheck/lint. Exact candidate `c8ef6af6fb0089685a8df4314c7137b9c9268b1e` is green across all PR #1058 Actions and Vercel checks. PR remains draft and unmerged.
+- **Summary**: Reconciled stale GREEN agent snapshots with live dependency and CI state, fixed every actionable dependency finding, preserved the fail-closed production identity gate, and kept release/production/merge authorization separate.
+
+**Cross-agent recommendations:**
+- [Security]: Re-check Dependabot alert #15 after PR #1058 merges; the exact candidate resolves `dompurify` to 3.4.13, `js-yaml` to 4.3.1, and `nanoid` to 3.3.18 with OSV and license gates green.
+- [E2E Pro / Operations]: Keep #1057 open until a separately authorized release deploys `/api/version` and the Nightly Production Probe records passing production identity evidence. Do not weaken the gate.
+- [Operations]: Keep #1056 open until an owned webhook destination is approved; do not invent `CHAPA_ALERT_WEBHOOK_URL`.
+SHARED_CONTEXT_END
