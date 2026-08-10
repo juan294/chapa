@@ -79,9 +79,26 @@ describe('LanguageProvider', () => {
     expect(screen.getByTestId('locale').textContent).toBe('es');
   });
 
-  it('hydrates the persisted cookie on a route that does not mount LocaleSync', async () => {
+  it('keeps an explicit query locale authoritative before LocaleSync mounts', async () => {
     document.cookie = 'chapa-locale=en; path=/';
     window.history.replaceState({}, '', '/studio?lang=es');
+
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+
+  it('applies an explicit query locale on a route without LocaleSync', async () => {
+    window.history.replaceState({}, '', '/verify?lang=en');
 
     render(
       <LanguageProvider initialLocale="es" dictionary={es}>

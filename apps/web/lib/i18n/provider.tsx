@@ -121,27 +121,36 @@ export function LanguageProvider({
     [loadDictionary]
   );
 
-  // On mount, honor the persisted locale cookie. The layout renders statically at
-  // DEFAULT_LOCALE, so a returning non-default-locale user's choice is applied here.
+  // On mount, an explicit query locale owns the page before the persisted cookie.
+  // Some query readers are behind Suspense, so their LocaleSync layout effect can
+  // mount after this provider effect. Reading the URL here prevents the cookie's
+  // async dictionary load from racing and overwriting that deep-link locale.
+  // Routes without LocaleSync also remain coherent for an explicit `?lang=`.
+  /* eslint-disable react-hooks/set-state-in-effect -- locale updates await an async dictionary import and synchronize URL/cookie state after mount */
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const ownedQueryLocale = document.documentElement.dataset.chapaLocaleSync;
-    if (isSupportedLocale(ownedQueryLocale)) {
-      // LocaleSync owns an explicit deep-link override. Applying a stale cookie
-      // here would race that override and could leave client copy in the wrong
-      // language after hydration.
+    const mountedQueryLocale = document.documentElement.dataset.chapaLocaleSync;
+    if (isSupportedLocale(mountedQueryLocale)) {
+      // LocaleSync already started the query-owned update in its layout effect.
+      return;
+    }
+    const queryLocale = new URLSearchParams(window.location.search).get('lang');
+    if (isSupportedLocale(queryLocale)) {
+      if (queryLocale !== locale) {
+        void applyLocale(queryLocale);
+      }
       return;
     }
     const cookieLocale = readClientLocaleCookie();
     if (cookieLocale && cookieLocale !== locale) {
       // State updates happen after an awaited dynamic import (not synchronously),
       // and this only runs once on mount to honor the persisted locale cookie.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       void applyLocale(cookieLocale);
     }
     // Run once on mount; `locale`/`applyLocale` are stable enough for this check.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const t = useCallback(
     (key: string) =>

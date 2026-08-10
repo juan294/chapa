@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.20.0] - 2026-08-10
+## [2.20.0] - 2026-08-11
 
 ### Added
 
@@ -54,7 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The verification landing page now honors explicit locale links.** Static
   `/verify?lang=` visits synchronize the visible form, navigation, document
   language, selector, and title with the requested English or Spanish locale,
-  and verified-hash submissions preserve that locale on the result page.
+  even when a conflicting saved locale loads before the page query reader, and
+  verified-hash submissions preserve that locale on the result page.
 - **Badge generation now reports authentication state truthfully.** The progress
   screen checks the GitHub session before it marks authentication complete, and
   each later generation step becomes active before it is marked done. Error
