@@ -42,6 +42,33 @@ test.describe("Share page — /u/:handle", () => {
     await expect(heading).toBeVisible();
   });
 
+  test("locale switch updates the live profile title and accessible badge label", async ({
+    page,
+  }) => {
+    const response = await page.goto(smokeProfilePath, GOTO_OPTS);
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBeLessThan(500);
+
+    await expect(page.locator("h1")).toHaveText(
+      "Impacto de desarrollador de octocat",
+    );
+    await expect(page.getByRole("img", { name: "Chapa de octocat" })).toBeAttached();
+
+    await page.getByRole("button", { name: "ES", exact: true }).click();
+    await page.getByRole("option", { name: "English" }).click();
+
+    await expect(page).toHaveURL(smokeProfilePath);
+    await expect(page).toHaveTitle(
+      "@octocat — Developer Impact, Decoded — Chapa",
+    );
+    await expect(page.locator("h1")).toHaveText(
+      "octocat's developer impact",
+    );
+    await expect(
+      page.getByRole("img", { name: "Chapa badge for octocat" }),
+    ).toBeAttached();
+  });
+
   test("invalid handle returns 404 or error state", async ({ page }) => {
     const response = await page.goto(
       "/u/this-user-definitely-does-not-exist-xyz123",

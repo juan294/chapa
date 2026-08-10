@@ -28,7 +28,6 @@ vi.mock("@/lib/db/campaigns", () => ({
   dbClaimPendingSends: vi.fn(),
   dbAcknowledgeCampaignSends: vi.fn(),
   dbMarkSendsFailed: vi.fn(),
-  dbRequeueSends: vi.fn(),
   dbGetCampaignStats: vi.fn(),
 }));
 
@@ -50,7 +49,6 @@ import {
   dbClaimPendingSends,
   dbAcknowledgeCampaignSends,
   dbMarkSendsFailed,
-  dbRequeueSends,
   dbGetCampaignStats,
 } from "@/lib/db/campaigns";
 import { cacheGet, cacheIncr, cacheReserveQuota } from "@/lib/cache/redis";
@@ -69,7 +67,6 @@ beforeEach(() => {
   vi.mocked(dbReleaseCampaignClaim).mockResolvedValue(true);
   vi.mocked(dbAcknowledgeCampaignSends).mockResolvedValue(true);
   vi.mocked(dbMarkSendsFailed).mockResolvedValue(true);
-  vi.mocked(dbRequeueSends).mockResolvedValue(true);
 });
 
 const draftCampaign = {
@@ -225,7 +222,7 @@ describe("processCampaignBatch", () => {
     }));
   });
 
-  it("requeues a transient Resend batch error for retry", async () => {
+  it("keeps a transient Resend batch under its lease for an identical retry", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends).mockResolvedValue([
       { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "processing", sentAt: null, error: null },
@@ -234,13 +231,12 @@ describe("processCampaignBatch", () => {
       data: null,
       error: { message: "Rate limited", statusCode: 429, name: "rate_limit" },
     });
-    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 1, processing: 0, failed: 0 });
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 0, processing: 1, failed: 0 });
     vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
 
     const result = await processCampaignBatch("campaign-1");
 
     expect(result).toEqual({ sent: 0, failed: 0, remaining: 1 });
-    expect(dbRequeueSends).toHaveBeenCalledWith(["s-1"], "Rate limited", expect.any(String));
     expect(dbMarkSendsFailed).not.toHaveBeenCalled();
     expect(cacheIncr).toHaveBeenCalledWith(
       expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),

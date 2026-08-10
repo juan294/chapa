@@ -45,6 +45,7 @@ export function renderBadgeSvg(
   options: BadgeOptions = {},
 ): string {
   const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false } = options;
+  const hasVerification = Boolean(verificationHash && verificationDate);
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
@@ -134,6 +135,11 @@ export function renderBadgeSvg(
     : verificationHash && verificationDate
       ? renderVerificationStrip(verificationHash, verificationDate)
       : "";
+  const metricsLabel = demoMode
+    ? "Simulated metrics"
+    : hasVerification
+      ? "Verified metrics"
+      : "Public metrics";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
@@ -168,11 +174,11 @@ export function renderBadgeSvg(
 
   <!-- Handle -->
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
-  <!-- Verified icon (shield + checkmark) before subtitle — hidden in demo mode -->
-  ${demoMode ? "" : `<g transform="translate(${PAD + 72}, ${headerY + 6})" opacity="0.4">
+  <!-- Verified icon (shield + checkmark) appears only with a real seal. -->
+  ${hasVerification ? `<g transform="translate(${PAD + 72}, ${headerY + 6})" opacity="0.4">
     <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${t.accent}" transform="scale(0.7)"/>
-  </g>`}
-  <text x="${PAD + 72 + (demoMode ? 0 : 20)}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">${demoMode ? "Simulated metrics" : "Verified metrics"}</text>
+  </g>` : ""}
+  <text x="${PAD + 72 + (hasVerification ? 20 : 0)}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">${metricsLabel}</text>
 
   <!-- Chapa_ logo (top-right) -->
   <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="22" fill="${t.textSecondary}" opacity="0.7" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">_</tspan></text>

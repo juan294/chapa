@@ -104,7 +104,6 @@ import {
   dbGetPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
-  dbRequeueSends,
   dbGetCampaignStats,
   dbGetActiveEngagementCampaign,
   mapCampaignRow,
@@ -664,6 +663,18 @@ describe("dbClaimPendingSends", () => {
 
     expect(result).toEqual([]);
   });
+
+  it("fails closed before the RPC when the lease token is blank", async () => {
+    const result = await dbClaimPendingSends(
+      "c-1",
+      10,
+      "   ",
+      "2026-04-23T12:10:00.000Z",
+    );
+
+    expect(result).toEqual([]);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("dbAcknowledgeCampaignSends", () => {
@@ -693,15 +704,21 @@ describe("dbAcknowledgeCampaignSends", () => {
     ).resolves.toBe(false);
   });
 
-  it("delegates empty results so the database can reject a nonempty lease", async () => {
-    mockRpc.mockResolvedValueOnce({ data: false, error: null });
+  it("fails closed before the RPC when the result set is empty", async () => {
     await expect(
       dbAcknowledgeCampaignSends([], "lease-token"),
     ).resolves.toBe(false);
-    expect(mockRpc).toHaveBeenCalledWith("acknowledge_campaign_sends", {
-      p_lease_token: "lease-token",
-      p_results: [],
-    });
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before the RPC when the lease token is blank", async () => {
+    await expect(
+      dbAcknowledgeCampaignSends(
+        [{ id: "s-1", status: "sent", error: null }],
+        "   ",
+      ),
+    ).resolves.toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });
 
@@ -747,18 +764,6 @@ describe("dbMarkSendsFailed", () => {
   it("does not throw on update error", async () => {
     queryResult = { data: null, error: new Error("update failed") };
     await expect(dbMarkSendsFailed(["s-1"], "error")).resolves.toBe(false);
-  });
-});
-
-describe("dbRequeueSends", () => {
-  it("returns claimed sends to pending", async () => {
-    queryResult = { data: [{ id: "s-1" }], error: null };
-    await expect(dbRequeueSends(["s-1"], "Rate limited", "lease-token")).resolves.toBe(true);
-    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      status: "pending",
-      error: "Rate limited",
-      lease_token: null,
-    }));
   });
 });
 

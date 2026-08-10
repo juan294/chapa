@@ -337,8 +337,14 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).toContain("export const revalidate = 3600");
     });
 
-    it("uses sharePage.srH1 key in h1", () => {
-      expect(SOURCE).toContain("sharePage.srH1");
+    it("delegates locale-sensitive title and labels to a client component", () => {
+      expect(SOURCE).toContain("SharePageLocaleContent");
+      const localeSource = fs.readFileSync(
+        path.resolve(__dirname, "SharePageLocaleContent.tsx"),
+        "utf-8",
+      );
+      expect(localeSource).toContain("sharePage.srH1");
+      expect(localeSource).toContain("sharePage.badgeAriaLabel");
     });
 
     it("renders SharePageH2 client component for the badge section heading", () => {

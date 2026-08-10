@@ -24,7 +24,6 @@ import {
   dbClaimPendingSends,
   dbAcknowledgeCampaignSends,
   dbMarkSendsFailed,
-  dbRequeueSends,
   dbGetCampaignStats,
 } from "@/lib/db/campaigns";
 import { cacheGet, cacheIncr, cacheReserveQuota } from "@/lib/cache/redis";
@@ -288,8 +287,10 @@ export async function processCampaignBatch(
   if (error) {
     const message = error.message ?? "Unknown Resend batch failure";
     if (isTransientResendError(error, providerThrew)) {
-      const requeued = await dbRequeueSends(sendIds, message, leaseToken);
-      if (!requeued) throw new Error("Failed to requeue transient campaign emails");
+      // The provider result is ambiguous: the batch may have been accepted
+      // before the timeout/rate-limit response reached us. Keep the complete
+      // group under its lease so expiry recovery replays identical membership
+      // and therefore the same provider idempotency key.
       await refundDailyQuota(claimed.length);
       const stats = await dbGetCampaignStats(campaignId);
       await dbUpdateCampaign(campaignId, {

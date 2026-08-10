@@ -12,11 +12,11 @@ import {
 } from "@/lib/cache/redis";
 import {
   buildBadgeSvgCacheKey,
+  buildBadgeSvgRenderLockKey,
   readBadgeSvgCache,
   readBadgeSvgCacheWithStatus,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
-import { CACHE_VERSION } from "@/lib/cache/version";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
@@ -89,10 +89,6 @@ function fallbackSvg(handle: string, message: string): string {
   <text x="60" y="340" font-family="'JetBrains Mono', monospace" font-size="28" fill="#E6EDF3">@${safe}</text>
   <text x="60" y="400" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2">${escapeXml(message)}</text>
 </svg>`;
-}
-
-function buildBadgeRenderLockKey(handle: string, date: string): string {
-  return `badge-lock:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -248,7 +244,7 @@ export async function GET(
   const deferred = createDeferred<BadgeRenderResult>();
   inflightBadgeRenders.set(svgCacheKey, deferred.promise);
 
-  const renderLockKey = buildBadgeRenderLockKey(handle, today);
+  const renderLockKey = buildBadgeSvgRenderLockKey(handle, today);
   let gotRenderLock = false;
 
   // Try to get an auth token from session (better rate limits)

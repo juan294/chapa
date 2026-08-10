@@ -17,11 +17,12 @@ import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
  * and response construction that follow a successful read.
  */
 const CACHE_DEADLINE_MS = 500;
+export const BADGE_RENDER_VARIANT = "warm-amber-v2";
 
 /**
  * Base TTL for badge SVG cache entries.
  *
- * The KEY format (`badge:{version}:{handle}:{date}`) uses today's UTC date, so
+ * The key format includes the render variant and today's UTC date, so
  * the key already encodes freshness. The TTL is set slightly longer than 24h so
  * the entry survives into the next day and can be served as a "stale" fallback
  * for lock-losers (PE-M2) before the new day's SVG is rendered.
@@ -51,7 +52,11 @@ export function handleCacheJitterSeconds(handle: string): number {
 }
 
 export function buildBadgeSvgCacheKey(handle: string, date: string): string {
-  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
+  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${date}`;
+}
+
+export function buildBadgeSvgRenderLockKey(handle: string, date: string): string {
+  return buildBadgeSvgCacheKey(handle, date).replace(/^badge:/, "badge-lock:");
 }
 
 async function withCacheFallback<T>(
@@ -117,7 +122,8 @@ export async function readBadgeSvgCacheWithStatus(
  *
  * The TTL is base 24h + a per-handle jitter of up to 2h (PE-S1) to spread
  * UTC-midnight cache expiry across handles and avoid a recompute herd.
- * The cache KEY shape is unchanged — only the expiry differs per handle.
+ * The render variant is part of the key so a visual contract change can
+ * invalidate old SVGs. Within one variant, only expiry differs per handle.
  *
  * @param key  - Cache key built by {@link buildBadgeSvgCacheKey}
  * @param svg  - Rendered SVG string

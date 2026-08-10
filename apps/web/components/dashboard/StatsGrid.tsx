@@ -7,44 +7,10 @@ import { InfoTooltip } from "@/components/InfoTooltip";
 import { DeltaIndicator } from "./DeltaIndicator";
 import { useTranslation } from "@/lib/i18n";
 
-const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
-  Stars: {
-    id: "stat-stars",
-    tip: "Stars received on your repos \u2014 not repos you\u2019ve starred yourself.",
-  },
-  Forks: {
-    id: "stat-forks",
-    tip: "Times other developers forked your repositories.",
-  },
-  Watchers: {
-    id: "stat-watchers",
-    tip: "People watching your repos for activity notifications.",
-  },
-  "Active Days": {
-    id: "stat-active-days",
-    tip: "Unique days with at least one contribution in the last 365 days.",
-  },
-  Commits: {
-    id: "stat-commits",
-    tip: "Commits pushed across all repos in the last 365 days.",
-  },
-  "PRs Merged": {
-    id: "stat-prs-merged",
-    tip: "Pull requests you authored that were merged in the last 365 days.",
-  },
-  Reviews: {
-    id: "stat-reviews",
-    tip: "Code reviews submitted on others\u2019 PRs in the last 365 days.",
-  },
-  Repos: {
-    id: "stat-repos",
-    tip: "Repos with 3+ commits in the last 365 days. Shallow one-commit contributions are excluded.",
-  },
-};
-
 interface StatItem {
+  key: "stars" | "forks" | "watchers" | "activeDays" | "commits" | "prsMerged" | "reviews" | "repos";
+  tooltipId: string;
   value: number;
-  label: string;
   delta: number | undefined;
 }
 
@@ -57,43 +23,51 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
   const { t } = useTranslation();
   const items: StatItem[] = [
     {
+      key: "stars",
+      tooltipId: "stat-stars",
       value: stats.totalStars,
-      label: "Stars",
       delta: diff?.stats.totalStars,
     },
     {
+      key: "forks",
+      tooltipId: "stat-forks",
       value: stats.totalForks,
-      label: "Forks",
       delta: diff?.stats.totalForks,
     },
     {
+      key: "watchers",
+      tooltipId: "stat-watchers",
       value: stats.totalWatchers,
-      label: "Watchers",
       delta: diff?.stats.totalWatchers,
     },
     {
+      key: "activeDays",
+      tooltipId: "stat-active-days",
       value: stats.activeDays,
-      label: "Active Days",
       delta: diff?.stats.activeDays,
     },
     {
+      key: "commits",
+      tooltipId: "stat-commits",
       value: stats.commitsTotal,
-      label: "Commits",
       delta: diff?.stats.commitsTotal,
     },
     {
+      key: "prsMerged",
+      tooltipId: "stat-prs-merged",
       value: stats.prsMergedCount,
-      label: "PRs Merged",
       delta: diff?.stats.prsMergedCount,
     },
     {
+      key: "reviews",
+      tooltipId: "stat-reviews",
       value: stats.reviewsSubmittedCount,
-      label: "Reviews",
       delta: diff?.stats.reviewsSubmittedCount,
     },
     {
+      key: "repos",
+      tooltipId: "stat-repos",
       value: stats.reposContributed,
-      label: "Repos",
       delta: diff?.stats.reposContributed,
     },
   ];
@@ -106,13 +80,13 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {items.map((item, i) => {
-          const tooltip = STAT_TOOLTIPS[item.label];
+          const label = t(`dashboard.stats.${item.key}.label`) as string;
           const showDelta =
             item.delta !== undefined && item.delta !== 0;
 
           return (
             <div
-              key={item.label}
+              key={item.key}
               className="rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up"
               style={{ animationDelay: `${2200 + i * 60}ms` }}
             >
@@ -122,14 +96,12 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
 
               <div className="flex items-center justify-center gap-1 mt-1">
                 <span className="text-xs text-text-secondary uppercase tracking-wider">
-                  {item.label}
+                  {label}
                 </span>
-                {tooltip && (
-                  <InfoTooltip
-                    content={tooltip.tip}
-                    id={tooltip.id}
-                  />
-                )}
+                <InfoTooltip
+                  content={t(`dashboard.stats.${item.key}.tip`) as string}
+                  id={item.tooltipId}
+                />
               </div>
 
               {showDelta && (

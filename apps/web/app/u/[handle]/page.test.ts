@@ -6,16 +6,21 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
+const LOCALE_CONTENT_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "SharePageLocaleContent.tsx"),
+  "utf-8",
+);
 
 describe("SharePage", () => {
   // W1 — share page must have an h1 for WCAG 2.1 Level A compliance
   describe("heading hierarchy", () => {
     it("has an h1 element", () => {
-      expect(SOURCE).toMatch(/<h1[\s>]/);
+      expect(SOURCE).toContain("SharePageLocaleContent");
+      expect(LOCALE_CONTENT_SOURCE).toMatch(/<h1[\s>]/);
     });
 
     it("h1 is screen-reader only", () => {
-      const h1Match = SOURCE.match(/<h1[^>]*>/);
+      const h1Match = LOCALE_CONTENT_SOURCE.match(/<h1[^>]*>/);
       expect(h1Match).not.toBeNull();
       expect(h1Match![0]).toContain("sr-only");
     });

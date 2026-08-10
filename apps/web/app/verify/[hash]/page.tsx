@@ -25,8 +25,8 @@ export async function generateMetadata({
   const t = getServerT(locale);
   return {
     title: HASH_PATTERN.test(hash)
-      ? `${t('verify.title') as string} ${hash} — Chapa`
-      : `${t('verifyDetail.invalidHashTitle') as string} — Chapa`,
+      ? `${t('verify.title') as string} ${hash}`
+      : t('verifyDetail.invalidHashTitle') as string,
     description: t('verify.description') as string,
     robots: { index: false },
   };

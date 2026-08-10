@@ -155,8 +155,9 @@ describe("VerifyPage", () => {
       expect(SOURCE).toContain("export async function generateMetadata");
     });
 
-    it("includes 'Chapa' in title for valid hashes", () => {
-      expect(SOURCE).toContain("Chapa");
+    it("leaves the single Chapa suffix to the root metadata template", () => {
+      expect(SOURCE).toContain("t('verify.title')");
+      expect(SOURCE).not.toContain("— Chapa");
     });
 
     it("returns invalid hash title for invalid hashes via i18n key", () => {

@@ -86,8 +86,7 @@ describe("generateMetadata", () => {
       searchParams: Promise.resolve({}),
     });
     // English: verify.title = 'Verify a badge'
-    expect(meta.title).toContain("Verify");
-    expect(meta.title).toContain("a1b2c3d4");
+    expect(meta.title).toBe("Verify a badge a1b2c3d4");
   });
 
   it("returns invalid hash title for a non-hex hash", async () => {
@@ -96,7 +95,7 @@ describe("generateMetadata", () => {
       searchParams: Promise.resolve({}),
     });
     // English: verifyDetail.invalidHashTitle = 'Invalid hash'
-    expect(meta.title).toContain("Invalid hash");
+    expect(meta.title).toBe("Invalid hash");
   });
 
   it("disables robots indexing for all verify pages", async () => {

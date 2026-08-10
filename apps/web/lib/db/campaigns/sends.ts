@@ -112,6 +112,7 @@ export async function dbClaimPendingSends(
   leaseToken: string,
   leaseExpiresAt: string,
 ): Promise<CampaignSend[]> {
+  if (!leaseToken.trim()) return [];
   const db = getSupabase();
   if (!db) return [];
 
@@ -159,6 +160,7 @@ export async function dbAcknowledgeCampaignSends(
   results: CampaignSendAcknowledgement[],
   leaseToken: string,
 ): Promise<boolean> {
+  if (results.length === 0 || !leaseToken.trim()) return false;
   const db = getSupabase();
   if (!db) return false;
 
@@ -261,37 +263,6 @@ export async function dbMarkSendsFailed(
     return Array.isArray(data) && data.length === ids.length;
   } catch (error) {
     console.error("[db] dbMarkSendsFailed failed:", (error as Error).message);
-    return false;
-  }
-}
-
-/** Return a transiently failed claimed batch to pending for a later retry. */
-export async function dbRequeueSends(
-  ids: string[],
-  errorMsg: string,
-  leaseToken?: string,
-): Promise<boolean> {
-  if (ids.length === 0) return true;
-  const db = getSupabase();
-  if (!db) return false;
-
-  try {
-    let query = db
-      .from("campaign_sends")
-      .update({
-        status: "pending",
-        error: errorMsg,
-        ...CLAIM_CLEAR_FIELDS,
-      })
-      .eq("status", "processing");
-
-    if (leaseToken) query = query.eq("lease_token", leaseToken);
-
-    const { data, error } = await query.in("id", ids).select("id");
-    if (error) throw error;
-    return Array.isArray(data) && data.length === ids.length;
-  } catch (error) {
-    console.error("[db] dbRequeueSends failed:", (error as Error).message);
     return false;
   }
 }

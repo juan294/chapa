@@ -1064,6 +1064,41 @@ export const en: Translations = {
     keyNumbers: 'Key Numbers',
     vsLastWeek: 'vs last week',
     breakdown: 'Breakdown',
+    noImpactData: 'No impact data available',
+    stats: {
+      stars: {
+        label: 'Stars',
+        tip: 'Stars received on your repos — not repos you’ve starred yourself.',
+      },
+      forks: {
+        label: 'Forks',
+        tip: 'Times other developers forked your repositories.',
+      },
+      watchers: {
+        label: 'Watchers',
+        tip: 'People watching your repos for activity notifications.',
+      },
+      activeDays: {
+        label: 'Active Days',
+        tip: 'Unique days with at least one contribution in the last 365 days.',
+      },
+      commits: {
+        label: 'Commits',
+        tip: 'Commits pushed across all repos in the last 365 days.',
+      },
+      prsMerged: {
+        label: 'PRs Merged',
+        tip: 'Pull requests you authored that were merged in the last 365 days.',
+      },
+      reviews: {
+        label: 'Reviews',
+        tip: 'Code reviews submitted on others’ PRs in the last 365 days.',
+      },
+      repos: {
+        label: 'Repos',
+        tip: 'Repos with 3+ commits in the last 365 days. Shallow one-commit contributions are excluded.',
+      },
+    },
   },
   dimensions: {
     delivery: {

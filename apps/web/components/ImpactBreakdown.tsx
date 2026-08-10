@@ -6,18 +6,6 @@ import { InfoTooltip } from "./InfoTooltip";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 
-const DIMENSION_SUBTITLES: Record<string, string> = {
-  delivery: "PRs merged \u00b7 issues closed \u00b7 commits",
-  quality: "Code reviews \u00b7 quality gatekeeping",
-  consistency: "Active days \u00b7 sustained contributions",
-  breadth: "Repos contributed \u00b7 community reach",
-  craft: "AI tool proficiency \u00b7 effectiveness \u00b7 sophistication",
-};
-
-const SOLO_DIMENSION_SUBTITLES: Partial<Record<string, string>> = {
-  quality: "PR descriptions \u00b7 branch discipline \u00b7 issue linkage",
-};
-
 const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   delivery: { from: "var(--color-dimension-delivery)", to: "var(--color-dimension-delivery-light)" },
   quality: { from: "var(--color-dimension-quality)", to: "var(--color-dimension-quality-light)" },
@@ -27,46 +15,24 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
 };
 
 
-const DIMENSION_TOOLTIPS: Record<string, { id: string; tip: string }> = {
-  delivery: {
-    id: "dim-delivery",
-    tip: "Measures shipping output: PRs merged, issues closed, and commits. High score = consistently turning ideas into merged code.",
-  },
-  quality: {
-    id: "dim-quality",
-    tip: "Measures code review impact: reviews submitted and review quality. High score = actively protecting code quality.",
-  },
-  consistency: {
-    id: "dim-consistency",
-    tip: "Measures contribution steadiness: active days and even distribution across weeks. High score = reliable, sustained output.",
-  },
-  breadth: {
-    id: "dim-breadth",
-    tip: "Measures cross-project reach: repos contributed to, project diversity, and community metrics (stars, forks, watchers).",
-  },
-  craft: {
-    id: "dim-craft",
-    tip: "Measures AI tool mastery: proficiency with coding assistants, effectiveness of tool-assisted workflows, and sophistication of usage patterns.",
-  },
+const DIMENSION_TOOLTIP_IDS: Record<string, string> = {
+  delivery: "dim-delivery",
+  quality: "dim-quality",
+  consistency: "dim-consistency",
+  breadth: "dim-breadth",
+  craft: "dim-craft",
 };
 
-const SOLO_DIMENSION_TOOLTIPS: Partial<Record<string, { id: string; tip: string }>> = {
-  quality: {
-    id: "dim-quality",
-    tip: "Measures engineering discipline: PR descriptions, feature branch usage, issue linkage, and commit cleanliness.",
-  },
-};
-
-const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
-  Stars: { id: "stat-stars", tip: "Stars received on your repos \u2014 not repos you\u2019ve starred yourself." },
-  Forks: { id: "stat-forks", tip: "Times other developers forked your repositories." },
-  Watchers: { id: "stat-watchers", tip: "People watching your repos for activity notifications." },
-  "Active Days": { id: "stat-active-days", tip: "Unique days with at least one contribution in the last 365 days." },
-  Commits: { id: "stat-commits", tip: "Commits pushed across all repos in the last 365 days." },
-  "PRs Merged": { id: "stat-prs-merged", tip: "Pull requests you authored that were merged in the last 365 days." },
-  Reviews: { id: "stat-reviews", tip: "Code reviews submitted on others\u2019 PRs in the last 365 days." },
-  Repos: { id: "stat-repos", tip: "Repos with 3+ commits in the last 365 days. Shallow one-commit contributions are excluded." },
-};
+const STAT_KEYS = [
+  ["stars", "stat-stars"],
+  ["forks", "stat-forks"],
+  ["watchers", "stat-watchers"],
+  ["activeDays", "stat-active-days"],
+  ["commits", "stat-commits"],
+  ["prsMerged", "stat-prs-merged"],
+  ["reviews", "stat-reviews"],
+  ["repos", "stat-repos"],
+] as const;
 
 const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewBox: string }> = {
   github: {
@@ -221,7 +187,9 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
   if (!impact || !stats) {
     return (
       <div className="rounded-xl border border-stroke bg-card p-8 text-center">
-        <p className="text-sm text-text-secondary">No impact data available</p>
+        <p className="text-sm text-text-secondary">
+          {t('dashboard.noImpactData') as string}
+        </p>
       </div>
     );
   }
@@ -232,6 +200,16 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
   const activeDimensions: (keyof DimensionScores)[] = hasCraft
     ? ["delivery", "quality", "consistency", "breadth", "craft"]
     : ["delivery", "quality", "consistency", "breadth"];
+  const statValues = {
+    stars: stats.totalStars ?? 0,
+    forks: stats.totalForks ?? 0,
+    watchers: stats.totalWatchers ?? 0,
+    activeDays: stats.activeDays ?? 0,
+    commits: stats.commitsTotal ?? 0,
+    prsMerged: stats.prsMergedCount ?? 0,
+    reviews: stats.reviewsSubmittedCount ?? 0,
+    repos: stats.reposContributed ?? 0,
+  };
 
   return (
     <div className="space-y-10">
@@ -252,8 +230,12 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   <span className="text-xs text-text-secondary uppercase tracking-wider flex items-center gap-1">
                     {t(`dimensions.${key}.label`) as string}
                     <InfoTooltip
-                      id={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.id : undefined) ?? DIMENSION_TOOLTIPS[key]!.id}
-                      content={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.tip : undefined) ?? DIMENSION_TOOLTIPS[key]!.tip}
+                      id={DIMENSION_TOOLTIP_IDS[key]!}
+                      content={t(
+                        isSolo && key === 'quality'
+                          ? 'dimensions.quality.soloTip'
+                          : `dimensions.${key}.tip`,
+                      ) as string}
                     />
                   </span>
                   <span className="font-heading text-3xl font-extrabold text-text-primary leading-none tabular-nums">
@@ -278,7 +260,11 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   />
                 </div>
                 <p className="text-xs text-text-secondary/50 mt-2.5 leading-relaxed">
-                  {(isSolo ? SOLO_DIMENSION_SUBTITLES[key] : undefined) ?? DIMENSION_SUBTITLES[key]}
+                  {t(
+                    isSolo && key === 'quality'
+                      ? 'dimensions.quality.soloSubtitle'
+                      : `dimensions.${key}.subtitle`,
+                  ) as string}
                 </p>
               </div>
             ),
@@ -292,35 +278,28 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
           {t('dashboard.keyNumbers') as string}
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { value: stats.totalStars ?? 0, label: "Stars" },
-            { value: stats.totalForks ?? 0, label: "Forks" },
-            { value: stats.totalWatchers ?? 0, label: "Watchers" },
-            { value: stats.activeDays ?? 0, label: "Active Days" },
-            { value: stats.commitsTotal ?? 0, label: "Commits" },
-            { value: stats.prsMergedCount ?? 0, label: "PRs Merged" },
-            { value: stats.reviewsSubmittedCount ?? 0, label: "Reviews" },
-            { value: stats.reposContributed ?? 0, label: "Repos" },
-          ].map((stat, i) => (
-            <div
-              key={stat.label}
-              className="rounded-xl bg-card shadow-card px-3 py-4 text-center animate-fade-in-up relative hover:z-10 focus-within:z-10 transition-shadow hover:shadow-card-hover"
-              style={{ animationDelay: `${700 + i * 60}ms` }}
-            >
-              <div className="font-heading text-2xl font-extrabold text-text-primary leading-none tabular-nums">
-                {formatCompact(stat.value)}
-              </div>
-              <div className="text-xs text-text-secondary uppercase tracking-wider mt-1.5 flex items-center justify-center gap-1">
-                {stat.label}
-                {STAT_TOOLTIPS[stat.label] && (
+          {STAT_KEYS.map(([key, tooltipId], i) => {
+            const label = t(`dashboard.stats.${key}.label`) as string;
+
+            return (
+              <div
+                key={key}
+                className="rounded-xl bg-card shadow-card px-3 py-4 text-center animate-fade-in-up relative hover:z-10 focus-within:z-10 transition-shadow hover:shadow-card-hover"
+                style={{ animationDelay: `${700 + i * 60}ms` }}
+              >
+                <div className="font-heading text-2xl font-extrabold text-text-primary leading-none tabular-nums">
+                  {formatCompact(statValues[key])}
+                </div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider mt-1.5 flex items-center justify-center gap-1">
+                  {label}
                   <InfoTooltip
-                    id={STAT_TOOLTIPS[stat.label]!.id}
-                    content={STAT_TOOLTIPS[stat.label]!.tip}
+                    id={tooltipId}
+                    content={t(`dashboard.stats.${key}.tip`) as string}
                   />
-                )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

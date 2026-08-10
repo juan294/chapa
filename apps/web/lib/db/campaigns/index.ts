@@ -43,6 +43,5 @@ export {
   dbAcknowledgeCampaignSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
-  dbRequeueSends,
   dbGetCampaignStats,
 } from "./sends";

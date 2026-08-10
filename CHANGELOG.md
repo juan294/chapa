@@ -30,8 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Campaign delivery retries are now atomic and replay-safe.** Workers claim a
   stable lease-bound batch, reuse provider idempotency keys across retries, and
   acknowledge the complete batch in one database operation. Partial or empty
-  acknowledgements are rejected, while transient delivery failures are
-  requeued without losing send identity or leaving a campaign stuck.
+  acknowledgements and invalid lease inputs are rejected. After an ambiguous
+  provider failure, the complete batch stays under its lease so a retry cannot
+  change membership or its idempotency key.
+- **Public profiles now stay coherent across locale changes.** Share-page
+  titles, headings, accessible badge labels, dimension details, and key-number
+  labels all follow the active language after navigation and reload. Verify
+  pages no longer duplicate the Chapa title suffix.
+- **Badge verification claims now match the available proof.** Badges without
+  a real verification record say "Public metrics" and omit the seal. Only
+  badges with a verification hash and date say "Verified metrics" and link to
+  their verification record; the render-cache variant was advanced so stale
+  misleading SVGs are not reused.
 - **Server jobs now fail safely under overlap and partial persistence.** The
   warm-cache scheduler fills its fixed seat budget without duplicating work,
   and campaign processing releases or recovers claims when durable state cannot

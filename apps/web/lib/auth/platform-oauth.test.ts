@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { BADGE_RENDER_VARIANT } from "@/lib/render/badge-svg-cache";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the module under test.
@@ -523,7 +524,7 @@ describe("createCallbackHandler", () => {
     await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
 
     expect(mockCacheDel).toHaveBeenCalledWith(
-      expect.stringMatching(/^badge:.*:testuser:warm-amber:/),
+      expect.stringMatching(new RegExp(`^badge:.*:testuser:${BADGE_RENDER_VARIANT}:`)),
     );
   });
 
@@ -740,7 +741,7 @@ describe("createDisconnectHandler", () => {
     await POST(makeRequest());
 
     expect(mockCacheDel).toHaveBeenCalledWith(
-      expect.stringMatching(/^badge:.*:testuser:warm-amber:/),
+      expect.stringMatching(new RegExp(`^badge:.*:testuser:${BADGE_RENDER_VARIANT}:`)),
     );
   });
 
