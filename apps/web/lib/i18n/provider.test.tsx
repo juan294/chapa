@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, cleanup } from '@testing-library/react';
+import { render, screen, act, cleanup, waitFor } from '@testing-library/react';
 import { useContext } from 'react';
 import { LanguageContext, LanguageProvider } from './provider';
 import { es } from './dictionaries/es';
@@ -37,6 +37,8 @@ describe('LanguageProvider', () => {
       configurable: true,
       value: originalLocation,
     });
+    document.cookie = 'chapa-locale=; Max-Age=0; path=/';
+    window.history.replaceState({}, '', '/');
   });
 
   it('provides the initial locale via context', () => {
@@ -55,6 +57,21 @@ describe('LanguageProvider', () => {
       </LanguageProvider>
     );
     expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+
+  it('hydrates the persisted cookie on a route that does not mount LocaleSync', async () => {
+    document.cookie = 'chapa-locale=en; path=/';
+    window.history.replaceState({}, '', '/studio?lang=es');
+
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('locale').textContent).toBe('en')
+    );
   });
 
   it('persists the locale and reloads the canonical route when the locale changes', async () => {
@@ -91,7 +108,7 @@ describe('LanguageProvider', () => {
       value: {
         ...originalLocation,
         pathname: '/es',
-        search: '?source=release',
+        search: '?source=release&lang=es',
         hash: '#features',
         assign,
       },
@@ -108,7 +125,7 @@ describe('LanguageProvider', () => {
     });
 
     expect(setLocaleAction).toHaveBeenCalledWith('en');
-    expect(assign).toHaveBeenCalledWith('/?source=release#features');
+    expect(assign).toHaveBeenCalledWith('/?source=release&lang=en#features');
   });
 
   it('is a no-op when setLocale is called with the same locale', async () => {

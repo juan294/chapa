@@ -10,7 +10,7 @@ import {
 } from 'react';
 import {
   LOCALE_COOKIE,
-  SUPPORTED_LOCALES,
+  isSupportedLocale,
   type Locale,
   type Translations,
 } from './types';
@@ -20,11 +20,23 @@ import { en } from './dictionaries/en';
 
 export interface LanguageContextValue {
   locale: Locale;
-  setLocale: (locale: Locale) => Promise<void>;
+  setLocale: (
+    locale: Locale,
+    options?: { force?: boolean; navigate?: boolean },
+  ) => Promise<void>;
   t: (key: string) => string | string[] | Record<string, unknown>[];
 }
 
 export const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+function readClientLocaleCookie(): Locale | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie.match(
+    new RegExp('(?:^|; )' + LOCALE_COOKIE + '=([^;]+)')
+  );
+  const value = match?.[1];
+  return isSupportedLocale(value) ? value : undefined;
+}
 
 /**
  * Return the canonical public URL for a locale-segmented internal route.
@@ -39,9 +51,18 @@ export function canonicalLocaleHref({
   pathname,
   search,
   hash,
-}: Pick<Location, 'pathname' | 'search' | 'hash'>): string {
+}: Pick<Location, 'pathname' | 'search' | 'hash'>, locale?: Locale): string {
   const canonicalPath = pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
-  return `${canonicalPath}${search}${hash}`;
+  let canonicalSearch = search;
+  if (locale) {
+    const params = new URLSearchParams(search);
+    if (params.has('lang')) {
+      params.set('lang', locale);
+      const serialized = params.toString();
+      canonicalSearch = serialized ? `?${serialized}` : '';
+    }
+  }
+  return `${canonicalPath}${canonicalSearch}${hash}`;
 }
 
 /**
@@ -104,15 +125,15 @@ export function LanguageProvider({
   // DEFAULT_LOCALE, so a returning non-default-locale user's choice is applied here.
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const match = document.cookie.match(
-      new RegExp('(?:^|; )' + LOCALE_COOKIE + '=([^;]+)')
-    );
-    const cookieLocale = match?.[1] as Locale | undefined;
-    if (
-      cookieLocale &&
-      SUPPORTED_LOCALES.includes(cookieLocale) &&
-      cookieLocale !== locale
-    ) {
+    const ownedQueryLocale = document.documentElement.dataset.chapaLocaleSync;
+    if (isSupportedLocale(ownedQueryLocale)) {
+      // LocaleSync owns an explicit deep-link override. Applying a stale cookie
+      // here would race that override and could leave client copy in the wrong
+      // language after hydration.
+      return;
+    }
+    const cookieLocale = readClientLocaleCookie();
+    if (cookieLocale && cookieLocale !== locale) {
       // State updates happen after an awaited dynamic import (not synchronously),
       // and this only runs once on mount to honor the persisted locale cookie.
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -132,20 +153,29 @@ export function LanguageProvider({
   );
 
   const setLocale = useCallback(
-    async (next: Locale) => {
-      if (next === locale) return;
+    async (
+      next: Locale,
+      { force = false, navigate = true }: { force?: boolean; navigate?: boolean } = {},
+    ) => {
+      const cookieLocale = readClientLocaleCookie();
+      if (next === locale && (!force || cookieLocale === next)) return;
       // Persist the cookie and update client consumers such as `?lang=` deep
       // links before the canonical document navigation completes. The server
       // action deliberately does not revalidate the static layout, avoiding an
       // automatic RSC refresh racing this navigation.
-      await setLocaleAction(next);
-      await applyLocale(next);
+      if (cookieLocale !== next) {
+        await setLocaleAction(next);
+      }
+      if (next !== locale) {
+        await applyLocale(next);
+      }
+      if (!navigate) return;
       // A full canonical navigation is intentional. `router.refresh()` can
       // retain the prior locale's server-component payload for the same public
       // URL, while directly visited `/en` or `/es` routes never pass through
       // the locale-selecting proxy. Re-entering through the canonical path
       // makes the persisted cookie authoritative for the whole page.
-      window.location.assign(canonicalLocaleHref(window.location));
+      window.location.assign(canonicalLocaleHref(window.location, next));
     },
     [locale, applyLocale]
   );

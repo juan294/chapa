@@ -69,6 +69,42 @@ test.describe("Share page — /u/:handle", () => {
     ).toBeAttached();
   });
 
+  test("direct locale deep link settles without a hydration reload loop", async ({
+    page,
+  }) => {
+    const hydrationErrors: string[] = [];
+    const documentNavigations: string[] = [];
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        /(?:hydration|Minified React error #(?:418|419))/i.test(message.text())
+      ) {
+        hydrationErrors.push(message.text());
+      }
+    });
+    page.on("request", (request) => {
+      if (
+        request.isNavigationRequest() &&
+        request.frame() === page.mainFrame()
+      ) {
+        documentNavigations.push(request.url());
+      }
+    });
+
+    const path = `${smokeProfilePath}&lang=en`;
+    const response = await page.goto(path, GOTO_OPTS);
+    expect(response).not.toBeNull();
+    expect(response!.status()).toBeLessThan(500);
+
+    await expect(page).toHaveURL(path);
+    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(page).toHaveTitle(
+      "@octocat — Developer Impact, Decoded — Chapa",
+    );
+    expect(documentNavigations).toHaveLength(1);
+    expect(hydrationErrors).toEqual([]);
+  });
+
   test("invalid handle returns 404 or error state", async ({ page }) => {
     const response = await page.goto(
       "/u/this-user-definitely-does-not-exist-xyz123",

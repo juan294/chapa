@@ -242,6 +242,17 @@ describe("Phase 4d — Share page i18n", () => {
       expect(metadata.title).toContain("jdoe");
     });
 
+    it("uses English metadata for an explicit ?lang=en deep link", async () => {
+      const metadata = await generateMetadata({
+        params: Promise.resolve({ handle: "jdoe" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      expect(metadata.title).toBe("@jdoe — Developer Impact, Decoded");
+      const images = metadata.openGraph?.images as Array<{ alt?: string }>;
+      expect(images[0]?.alt).toBe("Chapa badge for jdoe");
+    });
+
     it("returns Not Found for invalid handle", async () => {
       mockIsValidHandle.mockReturnValue(false);
       const metadata = await generateMetadata({

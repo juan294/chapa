@@ -30,6 +30,7 @@ import {
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { getServerT } from "@/lib/i18n/server";
 import { LocaleSync } from "@/lib/i18n";
+import { isSupportedLocale } from "@/lib/i18n/types";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { SharePageH2 } from "./SharePageH2";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
@@ -44,16 +45,21 @@ interface SharePageProps {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: SharePageProps): Promise<Metadata> {
   const { handle } = await params;
   if (!isValidHandle(handle)) {
     return { title: "Not Found" };
   }
 
-  // generateMetadata runs at ISR build time — avoid server-only APIs.
-  // Use the primary audience locale (es) for social metadata so Spanish users
-  // get localised social cards. Client hydration via LocaleSync handles runtime locale.
-  const t = getServerT("es");
+  // Avoid request-only locale APIs so the page stays ISR-compatible. Spanish
+  // remains the social-card default, while an explicit deep-link locale must
+  // also select matching metadata so streamed metadata cannot overwrite the
+  // client title with a different language after hydration.
+  const resolvedSearch = searchParams ? await searchParams : {};
+  const requestedLocale = resolvedSearch.lang;
+  const locale = isSupportedLocale(requestedLocale) ? requestedLocale : "es";
+  const t = getServerT(locale);
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
   // Daily cache buster forces social platforms to re-fetch the OG image

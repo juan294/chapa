@@ -37,8 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   titles, headings, accessible badge labels, dimension details, and key-number
   labels all follow the active language after navigation and reload. Activity
   summaries, dates, weekday labels, legends, tooltips, and accessibility text
-  now also remain fully English or Spanish. Verify pages no longer duplicate
-  the Chapa title suffix.
+  now also remain fully English or Spanish. Explicit `?lang=` profile links
+  settle without a hydration reload loop, and their streamed metadata keeps the
+  requested language. Verification detail pages synchronize their navbar with
+  the query locale. Verify pages no longer duplicate the Chapa title suffix.
 - **Badge generation now reports authentication state truthfully.** The progress
   screen checks the GitHub session before it marks authentication complete, and
   each later generation step becomes active before it is marked done. Error

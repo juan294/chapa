@@ -2,7 +2,7 @@ import { getVerificationRecord } from "@/lib/verification/store";
 import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
-import type { Translations } from "@/lib/i18n";
+import { LocaleSync, type Translations } from "@/lib/i18n";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -41,6 +41,7 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   if (!HASH_PATTERN.test(hash)) {
     return (
       <div className="min-h-screen bg-bg text-text-primary">
+        <LocaleSync queryLang={lang} />
         <Navbar />
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
           <InvalidHashCard hash={hash} t={t} />
@@ -53,6 +54,7 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">
+      <LocaleSync queryLang={lang} />
       <Navbar />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (

@@ -10,6 +10,12 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar">Navbar</nav>,
 }));
 
+vi.mock("@/lib/i18n", () => ({
+  LocaleSync: ({ queryLang }: { queryLang?: string }) => (
+    <span data-testid="locale-sync" data-query-lang={queryLang} />
+  ),
+}));
+
 // Mock getServerLocale + getServerT to return English without needing Next.js headers()
 vi.mock("@/lib/i18n/server", async () => {
   const { en } = await import("@/lib/i18n/dictionaries/en");
@@ -108,6 +114,18 @@ describe("generateMetadata", () => {
 });
 
 describe("VerifyPage", () => {
+  it("synchronizes the shared language provider with the query locale", async () => {
+    const jsx = await VerifyPage({
+      params: Promise.resolve({ hash: "not-valid!" }),
+      searchParams: Promise.resolve({ lang: "es" }),
+    });
+    render(jsx);
+
+    expect(screen.getByTestId("locale-sync").getAttribute("data-query-lang")).toBe(
+      "es",
+    );
+  });
+
   describe("invalid hash", () => {
     it("renders InvalidHashCard for non-hex characters", async () => {
       const jsx = await VerifyPage({
