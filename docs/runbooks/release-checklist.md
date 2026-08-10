@@ -12,6 +12,10 @@ URL, executor, time, result, and evidence for every applicable row. The preview
 must first pass `/api/version` identity verification; do not use a stable alias
 or older deployment.
 
+For the `develop` preview, verify that branch-scoped `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET` overrides select the dedicated preview OAuth app. Never
+change the production OAuth callback to make a preview login pass.
+
 | Flow | Evidence |
 |---|---|
 | GitHub login | Complete GitHub OAuth and confirm the authenticated redirect returns to the exact preview. This is an authorized preview interaction, not the read-only redirect probe. |

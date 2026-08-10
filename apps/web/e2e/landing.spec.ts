@@ -72,4 +72,39 @@ test.describe("Landing page — sections and content", () => {
     await expect(verifyLink).toBeVisible();
     await expect(verifyLink).toContainText("Verificar una Chapa");
   });
+
+  test("locale switch reloads all landing copy through the canonical URL", async ({
+    page,
+  }) => {
+    await page.getByRole("button", { name: "ES", exact: true }).click();
+    await page.getByRole("option", { name: "English" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(page.locator("h1")).toContainText("Developer impact");
+    await expect(
+      page.locator('main a[href="/api/auth/login"]').first()
+    ).toContainText("Get your badge");
+
+    await page.getByRole("button", { name: "EN", exact: true }).click();
+    await page.getByRole("option", { name: "Español" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(page.locator("h1")).toContainText("Impacto de desarrollador");
+    await expect(
+      page.locator('main a[href="/api/auth/login"]').first()
+    ).toContainText("Consigue tu Chapa");
+  });
+
+  test("switching from a directly visited locale route returns to the canonical URL", async ({
+    page,
+  }) => {
+    await page.goto("/es");
+    await expect(page.locator("h1")).toContainText("Impacto de desarrollador");
+
+    await page.getByRole("button", { name: "ES", exact: true }).click();
+    await page.getByRole("option", { name: "English" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(page.locator("h1")).toContainText("Developer impact");
+  });
 });

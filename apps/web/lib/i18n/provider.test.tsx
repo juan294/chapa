@@ -6,16 +6,13 @@ import { LanguageContext, LanguageProvider } from './provider';
 import { es } from './dictionaries/es';
 import type { Translations } from './types';
 
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(() => ({ refresh: vi.fn() })),
-}));
-
 vi.mock('./set-locale-action', () => ({
   setLocaleAction: vi.fn(async () => {}),
 }));
 
-import { useRouter } from 'next/navigation';
 import { setLocaleAction } from './set-locale-action';
+
+const originalLocation = window.location;
 
 function TestConsumer() {
   const ctx = useContext(LanguageContext);
@@ -36,6 +33,10 @@ describe('LanguageProvider', () => {
 
   afterEach(() => {
     cleanup();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 
   it('provides the initial locale via context', () => {
@@ -56,9 +57,18 @@ describe('LanguageProvider', () => {
     expect(screen.getByTestId('locale').textContent).toBe('es');
   });
 
-  it('calls setLocaleAction and router.refresh when setLocale is called with a different locale', async () => {
-    const mockRefresh = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ refresh: mockRefresh } as unknown as ReturnType<typeof useRouter>);
+  it('persists the locale and reloads the canonical route when the locale changes', async () => {
+    const assign = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        ...originalLocation,
+        pathname: '/',
+        search: '',
+        hash: '',
+        assign,
+      },
+    });
 
     render(
       <LanguageProvider initialLocale="en">
@@ -71,13 +81,37 @@ describe('LanguageProvider', () => {
     });
 
     expect(setLocaleAction).toHaveBeenCalledWith('es');
-    expect(mockRefresh).toHaveBeenCalled();
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('reloads through the canonical public path after switching from an internal locale route', async () => {
+    const assign = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        ...originalLocation,
+        pathname: '/es',
+        search: '?source=release',
+        hash: '#features',
+        assign,
+      },
+    });
+
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('switch-en').click();
+    });
+
+    expect(setLocaleAction).toHaveBeenCalledWith('en');
+    expect(assign).toHaveBeenCalledWith('/?source=release#features');
   });
 
   it('is a no-op when setLocale is called with the same locale', async () => {
-    const mockRefresh = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ refresh: mockRefresh } as unknown as ReturnType<typeof useRouter>);
-
     render(
       <LanguageProvider initialLocale="en">
         <TestConsumer />
@@ -89,7 +123,6 @@ describe('LanguageProvider', () => {
     });
 
     expect(setLocaleAction).not.toHaveBeenCalled();
-    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it('context value is accessible via useContext(LanguageContext)', () => {

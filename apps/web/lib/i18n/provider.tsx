@@ -8,7 +8,6 @@ import {
   useMemo,
   type ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   LOCALE_COOKIE,
   SUPPORTED_LOCALES,
@@ -26,6 +25,24 @@ export interface LanguageContextValue {
 }
 
 export const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+/**
+ * Return the canonical public URL for a locale-segmented internal route.
+ *
+ * The proxy rewrites canonical paths such as `/about` to `/es/about` or
+ * `/en/about`. Those locale-prefixed paths are implementation details, but
+ * they remain directly addressable. A locale change must therefore navigate
+ * back through the canonical path so the proxy can select fresh server-rendered
+ * content using the newly persisted cookie.
+ */
+export function canonicalLocaleHref({
+  pathname,
+  search,
+  hash,
+}: Pick<Location, 'pathname' | 'search' | 'hash'>): string {
+  const canonicalPath = pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
+  return `${canonicalPath}${search}${hash}`;
+}
 
 /**
  * Provides the active locale + dictionary to the client tree.
@@ -59,7 +76,6 @@ export function LanguageProvider({
   const [activeDictionary, setActiveDictionary] = useState<Translations>(
     dictionary ?? en
   );
-  const router = useRouter();
 
   // Load a locale's dictionary client-side. The active locale's dictionary is
   // already supplied via the RSC payload, so this only fetches the OTHER locale
@@ -122,9 +138,14 @@ export function LanguageProvider({
       // chunk + update state) so client components reflect the change immediately.
       await setLocaleAction(next);
       await applyLocale(next);
-      router.refresh();
+      // A full canonical navigation is intentional. `router.refresh()` can
+      // retain the prior locale's server-component payload for the same public
+      // URL, while directly visited `/en` or `/es` routes never pass through
+      // the locale-selecting proxy. Re-entering through the canonical path
+      // makes the persisted cookie authoritative for the whole page.
+      window.location.assign(canonicalLocaleHref(window.location));
     },
-    [locale, applyLocale, router]
+    [locale, applyLocale]
   );
 
   const value = useMemo<LanguageContextValue>(
