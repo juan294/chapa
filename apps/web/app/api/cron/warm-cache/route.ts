@@ -287,7 +287,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
  */
 function parsePriorityHandles(allHandles: string[]): string[] {
   const handleSet = new Set(allHandles);
-  return getWarmCachePriorityHandles().filter((h) => handleSet.has(h));
+  return getWarmCachePriorityHandles().filter((handle) => handleSet.has(handle));
 }
 
 /**

@@ -62,6 +62,9 @@ on:
       preMergeEvidence:
         required: true
         type: string
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET:
+        required: true
     outputs:
       decision:
         description: Analyzer decision for the collected release evidence
@@ -519,6 +522,15 @@ jobs:
       E2E_PRO_RUN_ID: ${{ inputs.runId }}
       PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/preview-evidence/playwright/preview-results.json
     steps:
+      - name: Require Vercel automation bypass secret
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          test -n "$VERCEL_AUTOMATION_BYPASS_SECRET" || {
+            echo "::error::VERCEL_AUTOMATION_BYPASS_SECRET is required for protected preview evidence."
+            exit 1
+          }
+
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.developCommit }}
@@ -558,6 +570,8 @@ jobs:
       - name: Verify preview deployment identity
         id: identity
         continue-on-error: true
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           mkdir -p preview-evidence
           pnpm exec tsx scripts/quality/verify-deployment-identity.ts \
@@ -567,6 +581,8 @@ jobs:
       - name: Run release-required preview probes
         id: playwright
         continue-on-error: true
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           mkdir -p preview-evidence/playwright
           pnpm --filter @chapa/web exec playwright test \

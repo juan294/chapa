@@ -470,6 +470,25 @@ describe("GET /api/cron/warm-cache", () => {
     expect(warmedHandles).toContain("user104");
   });
 
+  it("deduplicates repeated priority handles before reserving warm-cache seats", async () => {
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user100,user100,user101");
+    mockDbGetUsers.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => user(`user${index}`)),
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+    const warmedHandles = mockMaterializeOrchestratedProfile.mock.calls.map(
+      ([handle]) => handle,
+    );
+
+    expect(res.status).toBe(200);
+    expect(body.processedCount).toBe(50);
+    expect(warmedHandles).toHaveLength(50);
+    expect(new Set(warmedHandles)).toHaveLength(50);
+    expect(warmedHandles.filter((handle) => handle === "user100")).toHaveLength(1);
+  });
+
   it("does not underfill a full run when a priority handle overlaps the rotation", async () => {
     vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user0");
     mockDbGetUsers.mockResolvedValue(

@@ -51,8 +51,8 @@ Capability detail lives in the linked runbooks; evidence semantics live in
    rollbackReference="$baselineTag"
    ```
 
-3. Wait for push CI whose `headSha` is exactly `developCommit`. Verify preview
-   `/api/version` reports that commit and environment `preview`.
+3. Wait for exact-`developCommit` push CI and preview `/api/version`. Protected
+   previews require `VERCEL_AUTOMATION_BYPASS_SECRET`; missing blocks verification.
 4. Prepare the run and candidate record:
 
    ```bash

@@ -212,7 +212,7 @@ export function getGitlabEnabledEnv(): string | undefined {
 
 /** Comma-separated list of handles to prioritise in every warm-cache run. */
 export function getWarmCachePriorityHandles(): string[] {
-  return readList("WARM_CACHE_PRIORITY_HANDLES");
+  return Array.from(new Set(readList("WARM_CACHE_PRIORITY_HANDLES")));
 }
 
 // ---------------------------------------------------------------------------

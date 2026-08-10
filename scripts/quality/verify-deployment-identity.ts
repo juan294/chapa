@@ -94,6 +94,7 @@ export function verifyProduction(
 export async function fetchVersionResponse(
   baseUrl: string,
   fetcher: typeof fetch = fetch,
+  vercelAutomationBypassSecret?: string,
 ): Promise<VersionResponse> {
   let url: URL;
   try {
@@ -106,7 +107,12 @@ export async function fetchVersionResponse(
     response = await fetcher(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
-      headers: { accept: "application/json" },
+      headers: {
+        accept: "application/json",
+        ...(vercelAutomationBypassSecret
+          ? { "x-vercel-protection-bypass": vercelAutomationBypassSecret }
+          : {}),
+      },
     });
   } catch (error) {
     throw new Error(
@@ -122,6 +128,22 @@ export async function fetchVersionResponse(
     throw new Error(`deployment identity request failed with status ${response.status}`);
   }
   return parseVersionResponse(await response.text());
+}
+
+export function previewProtectionBypassSecret(
+  requestedBaseUrl: string,
+  candidatePreviewUrl: string,
+  secret?: string,
+): string | undefined {
+  if (!secret) return undefined;
+  try {
+    return new URL(requestedBaseUrl).toString() ===
+      new URL(candidatePreviewUrl).toString()
+      ? secret
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function argument(name: string, required = true): string | undefined {
@@ -184,12 +206,23 @@ export async function main(): Promise<void> {
   const candidate = JSON.parse(readFileSync(candidatePath, "utf8")) as CandidateFile;
   const mainCommit = argument("--main-commit", false) ?? candidate.mainCommit;
   const productionUrl = argument("--production-url", false) ?? candidate.productionUrl;
+  const vercelAutomationBypassSecret =
+    process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
 
   const { evidence, blockingReasons } = await verifyCandidateIdentity(
     candidate,
     { mainCommit, productionUrl },
     {
-      fetchVersion: fetchVersionResponse,
+      fetchVersion: (baseUrl) =>
+        fetchVersionResponse(
+          baseUrl,
+          fetch,
+          previewProtectionBypassSecret(
+            baseUrl,
+            candidate.previewUrl,
+            vercelAutomationBypassSecret,
+          ),
+        ),
       resolveTree: (commit) =>
         execFileSync("git", ["rev-parse", `${commit}^{tree}`], {
         encoding: "utf8",

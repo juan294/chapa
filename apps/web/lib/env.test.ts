@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { getBaseUrl, getAdminHandles, getVercelGitCommitSha } from "./env";
+import {
+  getBaseUrl,
+  getAdminHandles,
+  getVercelGitCommitSha,
+  getWarmCachePriorityHandles,
+} from "./env";
 
 // Next.js only inlines NEXT_PUBLIC_* env vars into the client bundle when they
 // are referenced as a STATIC LITERAL member expression (process.env.NEXT_PUBLIC_X).
@@ -82,6 +87,17 @@ describe("getAdminHandles", () => {
   it("returns empty array when ADMIN_HANDLES is not set", () => {
     vi.stubEnv("ADMIN_HANDLES", undefined);
     expect(getAdminHandles()).toEqual([]);
+  });
+});
+
+describe("getWarmCachePriorityHandles", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("trims and deduplicates configured handles in stable order", () => {
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "alice, bob,alice,bob, carol ");
+    expect(getWarmCachePriorityHandles()).toEqual(["alice", "bob", "carol"]);
   });
 });
 

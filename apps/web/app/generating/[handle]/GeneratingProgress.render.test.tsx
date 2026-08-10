@@ -2,8 +2,21 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, act } from "@testing-library/react";
 import { GeneratingProgress } from "./GeneratingProgress";
+import { LanguageContext, type LanguageContextValue } from "@/lib/i18n/provider";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+import type { Locale, Translations } from "@/lib/i18n";
 
 const mockPush = vi.fn();
+
+function languageValue(locale: Locale, dictionary: Translations): LanguageContextValue {
+  return {
+    locale,
+    setLocale: async () => {},
+    t: (key) => resolveTranslation(key, dictionary) as ReturnType<LanguageContextValue["t"]>,
+  };
+}
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -113,6 +126,29 @@ describe("GeneratingProgress", () => {
 
     // English: generation.retry = 'Try again'
     expect(screen.getByText("Try again")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("updates an existing error alert when the active locale changes", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    const { rerender } = render(
+      <LanguageContext.Provider value={languageValue("es", es)}>
+        <GeneratingProgress handle="testuser" />
+      </LanguageContext.Provider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("Algo salió mal al generar tu Chapa.")).toBeDefined();
+
+    rerender(
+      <LanguageContext.Provider value={languageValue("en", en)}>
+        <GeneratingProgress handle="testuser" />
+      </LanguageContext.Provider>,
+    );
+    expect(screen.getByText("Something went wrong generating your badge.")).toBeDefined();
+    expect(screen.queryByText("Algo salió mal al generar tu Chapa.")).toBeNull();
     vi.unstubAllGlobals();
   });
 

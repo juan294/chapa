@@ -99,6 +99,25 @@ describe("release verification workflow contract", () => {
     expect(release).toContain("EXPECTED_DEPLOYMENT_COMMIT: ${{ inputs.developCommit }}");
     expect(release).toContain('EXPECTED_DEPLOYMENT_ENV: "preview"');
     expect(release).toContain("PLAYWRIGHT_BASE_URL: ${{ inputs.previewUrl }}");
+    expect(release).toContain(
+      "VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}",
+    );
+    expect(
+      release.match(
+        /VERCEL_AUTOMATION_BYPASS_SECRET: \$\{\{ secrets\.VERCEL_AUTOMATION_BYPASS_SECRET \}\}/g,
+      ),
+    ).toHaveLength(3);
+    expect(release).toMatch(
+      /workflow_call:[\s\S]*?secrets:\s+VERCEL_AUTOMATION_BYPASS_SECRET:\s+required: true/,
+    );
+    expect(release).toContain("Require Vercel automation bypass secret");
+    const previewJob = release.slice(
+      release.indexOf("  preview:"),
+      release.indexOf("  aggregate:"),
+    );
+    expect(previewJob.slice(0, previewJob.indexOf("    steps:"))).not.toContain(
+      "VERCEL_AUTOMATION_BYPASS_SECRET",
+    );
     expect(release).toContain('DEPLOYMENT_SMOKE_STRICT: "true"');
     expect(release).toContain("e2e/release-required.spec.ts");
     expect(release).toContain("--grep @release-required");

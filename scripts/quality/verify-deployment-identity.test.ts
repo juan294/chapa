@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fetchVersionResponse,
   parseVersionResponse,
+  previewProtectionBypassSecret,
   verifyCandidateIdentity,
   verifyPreview,
   verifyProduction,
@@ -37,6 +38,42 @@ describe("deployment identity verification", () => {
         async () => new Response("not json", { status: 200 }),
       ),
     ).rejects.toThrow("version response is not valid JSON");
+  });
+
+  it("sends a configured Vercel protection bypass secret as a header", async () => {
+    const requests: RequestInit[] = [];
+    await fetchVersionResponse(
+      "https://preview.example.com",
+      async (_url, init) => {
+        requests.push(init ?? {});
+        return new Response(
+          JSON.stringify({ commitSha: developCommit, environment: "preview" }),
+          { status: 200 },
+        );
+      },
+      "preview-secret",
+    );
+
+    expect(new Headers(requests[0]?.headers).get("x-vercel-protection-bypass")).toBe(
+      "preview-secret",
+    );
+  });
+
+  it("selects the bypass secret only for the exact candidate preview URL", () => {
+    expect(
+      previewProtectionBypassSecret(
+        "https://preview.example.com",
+        "https://preview.example.com/",
+        "preview-secret",
+      ),
+    ).toBe("preview-secret");
+    expect(
+      previewProtectionBypassSecret(
+        "https://chapa.example.com",
+        "https://preview.example.com/",
+        "preview-secret",
+      ),
+    ).toBeUndefined();
   });
 
   it("accepts the exact preview deployment identity", () => {
