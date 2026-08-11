@@ -46,10 +46,13 @@ vi.mock("@/lib/feature-flags-sync", () => ({
   isGitlabEnabledSync: vi.fn(() => false),
 }));
 
-// Mock the dynamic import of ShortcutCheatSheet
+// Mock the dynamic import of ShortcutCheatSheet.
+// `vi.fn` (not a plain factory) so the loader argument can be captured and
+// resolved — otherwise the `.then()` mapper in the component is never executed
+// by any test and a wrong export name would break the cheat sheet silently.
 vi.mock("next/dynamic", () => ({
   __esModule: true,
-  default: () => {
+  default: vi.fn(() => {
     return function MockShortcutCheatSheet(props: {
       open: boolean;
       onClose: () => void;
@@ -62,7 +65,7 @@ vi.mock("next/dynamic", () => ({
         </div>
       ) : null;
     };
-  },
+  }),
 }));
 
 // Spy on global fetch for go-profile test
@@ -79,6 +82,8 @@ import {
 } from "./KeyboardShortcutsListener";
 import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
 import { useEffect } from "react";
+import dynamic from "next/dynamic";
+import { resolveDynamicLoader } from "@/lib/test-helpers/dynamic-mock";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -524,6 +529,25 @@ describe("KeyboardShortcutsListener", () => {
       });
 
       expect(handler).not.toHaveBeenCalled();
+    });
+  });
+  /* ---------------------------------------------------------------- */
+  /* #1006 — next/dynamic loader coverage                              */
+  /* ---------------------------------------------------------------- */
+
+  describe("deferred ShortcutCheatSheet loader", () => {
+    it("resolves the dynamic loader to the ShortcutCheatSheet export", async () => {
+      // The component maps the module through
+      // `.then((m) => ({ default: m.ShortcutCheatSheet }))`. Nothing else in
+      // this suite executes that mapper, so a wrong export name would ship a
+      // broken cheat sheet with every test still green.
+      const { ShortcutCheatSheet } = await import("./ShortcutCheatSheet");
+
+      const resolved = await resolveDynamicLoader<typeof ShortcutCheatSheet>(
+        dynamic,
+      );
+
+      expect(resolved).toBe(ShortcutCheatSheet);
     });
   });
 });
