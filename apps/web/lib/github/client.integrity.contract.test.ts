@@ -72,13 +72,13 @@ describe("scoring-integrity real-pipeline contract", () => {
 
     expect(result).toBeNull();
     expect(await redisFake.cacheGet(`stats:v2:merged:${handle}`)).toBeNull();
-    expect(await redisFake.cacheGet(`stats:stale:${handle}`)).toBeNull();
+    expect(await redisFake.cacheGet(`stats:stale:v2:${handle}`)).toBeNull();
   });
 
   it("degraded fetch with a healthy stale baseline: getStats serves the stale value and does not downgrade it", async () => {
     const handle = "contract-degraded-warm";
     const healthy = healthyStaleStats(handle);
-    await redisFake.cacheSet(`stats:stale:${handle}`, healthy, 604800);
+    await redisFake.cacheSet(`stats:stale:v2:${handle}`, healthy, 604800);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(degradedGraphqlResponse()));
 
     const result = await getStats(handle);
@@ -86,9 +86,46 @@ describe("scoring-integrity real-pipeline contract", () => {
     expect(result).not.toBeNull();
     expect(result!.prsMergedCount).toBe(904);
 
-    const staleAfter = await redisFake.cacheGet<StatsData>(`stats:stale:${handle}`);
+    const staleAfter = await redisFake.cacheGet<StatsData>(`stats:stale:v2:${handle}`);
     expect(staleAfter).not.toBeNull();
     expect(staleAfter!.prsMergedCount).toBe(904);
+  });
+
+  it("#1060: a rejected fetch re-composes the current supplemental instead of discarding it", async () => {
+    // The frivas shape, through the real pipeline: an EMU record is uploaded,
+    // then a degraded/scope-blind fetch arrives. The fetch is correctly
+    // rejected in favour of the baseline — and the supplemental must survive
+    // that rejection rather than being dropped for the 6h cache TTL.
+    const handle = "contract-supplemental-rejected";
+    const healthy = healthyStaleStats(handle);
+    await redisFake.cacheSet(`stats:stale:v2:${handle}`, healthy, 604800);
+    await redisFake.cacheSet(
+      `supplemental:${handle}`,
+      {
+        targetHandle: handle,
+        sourceHandle: `${handle}-emu`,
+        uploadedAt: new Date().toISOString(),
+        stats: makeFullStats({
+          handle: `${handle}-emu`,
+          prsMergedCount: 32,
+          commitsTotal: 453,
+        }),
+      },
+      86400,
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(degradedGraphqlResponse()));
+
+    const result = await getStats(handle);
+
+    expect(result).not.toBeNull();
+    // 904 (protected GitHub-derived baseline) + 32 (current supplemental).
+    expect(result!.prsMergedCount).toBe(936);
+    expect(result!.hasSupplementalData).toBe(true);
+
+    // The baseline itself stays GitHub-derived and untouched by the rejection.
+    const baselineAfter = await redisFake.cacheGet<StatsData>(`stats:stale:v2:${handle}`);
+    expect(baselineAfter!.prsMergedCount).toBe(904);
+    expect(baselineAfter!.hasSupplementalData).not.toBe(true);
   });
 
   it("persist boundary: a poisoned hot-cache entry never becomes a snapshot row or a verification record", async () => {
