@@ -3,6 +3,7 @@ import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
+import { materializePublicProfile } from "@/lib/profile/public-profile";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
@@ -10,10 +11,46 @@ import { withErrorCapture } from "@/lib/analytics/server-errors";
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
 
 /**
+ * #1062 — the fresh, badge-consistent headline.
+ *
+ * `adjustedComposite`/`tier` on this endpoint come from the persisted snapshot
+ * and are EMA-smoothed for the trend sparkline (#1001), while the badge, share
+ * page and verification record all show the FRESH score. After a step change in
+ * inputs the two diverge sharply — an EMU merge took frivas to a badge headline
+ * of 69/Solid while this endpoint still reported 25/Emerging.
+ *
+ * Rather than silently change the meaning of two published fields, the fresh
+ * pair is exposed additively. Read-only materialization: this is a public,
+ * CORS-enabled GET and must never trigger a cache write.
+ *
+ * Failure here is non-fatal by design — the endpoint predates these fields and
+ * must keep serving the snapshot half if the fresh score cannot be computed.
+ */
+async function getDisplayHeadline(
+  handle: string,
+): Promise<{ displayScore: number | null; displayTier: string | null }> {
+  try {
+    const materialized = await materializePublicProfile(handle, {
+      readOnly: true,
+    });
+    if (!materialized) return { displayScore: null, displayTier: null };
+    return {
+      displayScore: materialized.displayImpact.adjustedComposite,
+      displayTier: materialized.displayImpact.tier,
+    };
+  } catch {
+    return { displayScore: null, displayTier: null };
+  }
+}
+
+/**
  * GET /api/profile/:handle — Public impact profile snapshot.
  *
  * Returns the latest impact dimensions, archetype, tier, and optional craft
  * score for a user. Designed for external consumers (portfolio sites).
+ *
+ * `adjustedComposite`/`tier` are the smoothed trend values; `displayScore`/
+ * `displayTier` are the fresh values shown on the badge (#1062).
  */
 export const GET = withErrorCapture("/api/profile/[handle]", async (
   request: NextRequest,
@@ -55,6 +92,9 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
     : null;
   const craftScore = snapshot.craft ?? (craftResult ? craftResult.craftScore : undefined);
 
+  // Only after the 404 above — the missing-snapshot path stays a cheap cache read.
+  const { displayScore, displayTier } = await getDisplayHeadline(handle);
+
   const dimensions: DimensionScores = {
     delivery: snapshot.delivery,
     quality: snapshot.quality,
@@ -80,6 +120,9 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
         : null,
       snapshotDate: snapshot.date,
       computedAt: snapshot.capturedAt,
+      // #1062 — fresh, matches the badge. Null when it cannot be computed.
+      displayScore,
+      displayTier,
     },
     {
       headers: {
