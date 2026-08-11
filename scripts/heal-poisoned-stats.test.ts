@@ -61,7 +61,7 @@ describe("normalizeHandle", () => {
 describe("key builders", () => {
   it("build the exact keys the app itself reads/writes", () => {
     expect(mergedStatsKey("juan294")).toBe("stats:v2:merged:juan294");
-    expect(staleStatsKey("juan294")).toBe("stats:stale:juan294");
+    expect(staleStatsKey("juan294")).toBe("stats:stale:v2:juan294");
     expect(snapshotKey("juan294")).toBe("snapshot:v2:latest:juan294");
   });
 });
@@ -155,6 +155,8 @@ interface FetchScenario {
   mergedValue: unknown;
   staleValue: unknown;
   snapshotRows: SnapshotRowLike[];
+  /** The `supplemental:<handle>` record, when the handle has an EMU merge. */
+  supplementalValue?: unknown;
 }
 
 function mockFetch(scenario: FetchScenario) {
@@ -170,6 +172,9 @@ function mockFetch(scenario: FetchScenario) {
     }
     if (url.includes("/GET/stats%3Astale%3A")) {
       return jsonResponse({ result: toRedisResult(scenario.staleValue) });
+    }
+    if (url.includes("/GET/supplemental%3A")) {
+      return jsonResponse({ result: toRedisResult(scenario.supplementalValue ?? null) });
     }
 
     // Redis DEL
@@ -231,6 +236,7 @@ describe("healHandle — dry run (apply: false)", () => {
       handle: "juan294",
       mergedPoisoned: true,
       stalePoisoned: true,
+      supplementalStale: false,
       poisonedSnapshotRows: 2,
       poisonedSnapshotDates: ["2026-03-02", "2026-07-14"],
       deletedRedisKeys: [],
@@ -256,6 +262,7 @@ describe("healHandle — dry run (apply: false)", () => {
       handle: "healthy-user",
       mergedPoisoned: false,
       stalePoisoned: false,
+      supplementalStale: false,
       poisonedSnapshotRows: 0,
       poisonedSnapshotDates: [],
       deletedRedisKeys: [],
@@ -292,14 +299,14 @@ describe("healHandle — apply mode (apply: true)", () => {
     expect(result.deletedRedisKeys.sort()).toEqual(
       [
         "stats:v2:merged:juan294",
-        "stats:stale:juan294",
+        "stats:stale:v2:juan294",
         "snapshot:v2:latest:juan294",
       ].sort(),
     );
     expect(result.deletedSnapshotRows).toBe(2);
 
     expect(calls.some((c) => c.url.includes("/DEL/stats%3Av2%3Amerged%3Ajuan294"))).toBe(true);
-    expect(calls.some((c) => c.url.includes("/DEL/stats%3Astale%3Ajuan294"))).toBe(true);
+    expect(calls.some((c) => c.url.includes("/DEL/stats%3Astale%3Av2%3Ajuan294"))).toBe(true);
     expect(calls.some((c) => c.url.includes("/DEL/snapshot%3Av2%3Alatest%3Ajuan294"))).toBe(true);
     expect(calls.some((c) => c.method === "DELETE")).toBe(true);
   });
@@ -399,5 +406,140 @@ describe("healHandle — blinded Redis keys (#1049)", () => {
     // operator exactly these dates, and apply must delete exactly them.
     expect(decodeURIComponent(del!.url)).toContain("date=in.(2026-07-14)");
     expect(decodeURIComponent(del!.url)).toContain("handle=eq.juan294");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1060 — the pre-merge shape.
+//
+// A composed entry written before (or without) the current supplemental record
+// is not "poisoned" by either existing predicate: it is structurally valid
+// GitHub-derived data that simply never saw the EMU merge. The frivas incident
+// (2026-08-11) had exactly this shape and the script could not detect it.
+// ---------------------------------------------------------------------------
+describe("healHandle — stale supplemental (#1060)", () => {
+  const uploadedAt = "2026-08-11T11:14:49.248Z";
+
+  /** A composed entry that correctly absorbed the supplemental. */
+  const composedAfterUpload = {
+    ...healthyStats,
+    fetchedAt: "2026-08-11T11:29:33.141Z",
+    hasSupplementalData: true,
+  };
+
+  /** The real frivas entry: written 3h13m before the upload, never recomposed. */
+  const preMergeEntry = {
+    prsMergedCount: 0,
+    prsMergedWeight: 0,
+    linesAdded: 0,
+    linesDeleted: 0,
+    commitsTotal: 54,
+    issuesClosedCount: 0,
+    fetchedAt: "2026-08-11T08:01:47.493Z",
+  };
+
+  function supplementalRecord() {
+    return {
+      targetHandle: "frivas",
+      sourceHandle: "frivas-at-navteca",
+      uploadedAt,
+      stats: { prsMergedCount: 32, commitsTotal: 453 },
+    };
+  }
+
+  it("does not flag a composed entry that absorbed the supplemental", async () => {
+    const { fn } = mockFetch({
+      mergedValue: composedAfterUpload,
+      staleValue: healthyStats,
+      snapshotRows: [healthyRow],
+      supplementalValue: supplementalRecord(),
+    });
+    vi.stubGlobal("fetch", fn);
+
+    const result = await healHandle(cfg, "frivas", false);
+
+    expect(result.supplementalStale).toBe(false);
+  });
+
+  it("flags a composed entry missing the supplemental marker", async () => {
+    const { fn } = mockFetch({
+      mergedValue: { ...healthyStats, fetchedAt: "2026-08-11T12:00:00.000Z" },
+      staleValue: healthyStats,
+      snapshotRows: [healthyRow],
+      supplementalValue: supplementalRecord(),
+    });
+    vi.stubGlobal("fetch", fn);
+
+    const result = await healHandle(cfg, "frivas", false);
+
+    expect(result.supplementalStale).toBe(true);
+  });
+
+  it("flags a composed entry written before the supplemental was uploaded", async () => {
+    const { fn } = mockFetch({
+      mergedValue: {
+        ...healthyStats,
+        fetchedAt: "2026-08-11T08:01:47.493Z",
+        hasSupplementalData: true,
+      },
+      staleValue: healthyStats,
+      snapshotRows: [healthyRow],
+      supplementalValue: supplementalRecord(),
+    });
+    vi.stubGlobal("fetch", fn);
+
+    const result = await healHandle(cfg, "frivas", false);
+
+    expect(result.supplementalStale).toBe(true);
+  });
+
+  it("never flags a handle with no supplemental record", async () => {
+    const { fn } = mockFetch({
+      mergedValue: { ...healthyStats, fetchedAt: "2026-08-11T08:01:47.493Z" },
+      staleValue: healthyStats,
+      snapshotRows: [healthyRow],
+    });
+    vi.stubGlobal("fetch", fn);
+
+    const result = await healHandle(cfg, "frivas", false);
+
+    expect(result.supplementalStale).toBe(false);
+  });
+
+  it("the frivas incident shape is detected", async () => {
+    const { fn, calls } = mockFetch({
+      mergedValue: preMergeEntry,
+      staleValue: healthyStats,
+      snapshotRows: [healthyRow],
+      supplementalValue: supplementalRecord(),
+    });
+    vi.stubGlobal("fetch", fn);
+
+    const result = await healHandle(cfg, "frivas", false);
+
+    expect(result.supplementalStale).toBe(true);
+    // Dry run mutates nothing.
+    expect(calls.some((c) => c.url.includes("/DEL/"))).toBe(false);
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+  });
+
+  it("apply mode purges the composed and snapshot keys but preserves the baseline", async () => {
+    const { fn } = mockFetch({
+      mergedValue: preMergeEntry,
+      staleValue: healthyStats,
+      snapshotRows: [healthyRow],
+      supplementalValue: supplementalRecord(),
+    });
+    vi.stubGlobal("fetch", fn);
+
+    const result = await healHandle(cfg, "frivas", true);
+
+    expect(result.deletedRedisKeys).toContain(mergedStatsKey("frivas"));
+    expect(result.deletedRedisKeys).toContain(snapshotKey("frivas"));
+    // The baseline is the protected GitHub-derived record and is not the
+    // defective value — deleting it would discard the scope protection.
+    expect(result.deletedRedisKeys).not.toContain(staleStatsKey("frivas"));
+    // The supplemental record itself is the user's data and is never touched.
+    expect(result.deletedRedisKeys.every((k) => !k.startsWith("supplemental:"))).toBe(true);
   });
 });

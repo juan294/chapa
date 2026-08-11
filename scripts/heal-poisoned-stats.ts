@@ -111,9 +111,18 @@ export function mergedStatsKey(handle: string): string {
   return `stats:v2:merged:${handle}`;
 }
 
-/** Matches the literal key `_fetchAndCache` reads/writes in client.ts. */
+/**
+ * Matches the literal baseline key `_fetchAndCache` reads/writes in client.ts.
+ * Versioned to `v2` by #1060: it now holds GitHub-derived data only, so that
+ * the integrity guards compare like against like.
+ */
 export function staleStatsKey(handle: string): string {
-  return `stats:stale:${handle}`;
+  return `stats:stale:v2:${handle}`;
+}
+
+/** Matches the literal key `_loadOverlays` reads in client.ts. */
+export function supplementalKey(handle: string): string {
+  return `supplemental:${handle}`;
 }
 
 /** Matches `buildSnapshotKey()` in `apps/web/lib/cache/snapshot-cache.ts`. */
@@ -211,6 +220,30 @@ function parseStatsValue(raw: unknown): ParsedStats | null {
     ...(typeof prsMergedWeight === "number" && { prsMergedWeight }),
     ...(typeof linesAdded === "number" && { linesAdded }),
     ...(typeof linesDeleted === "number" && { linesDeleted }),
+  };
+}
+
+/**
+ * Extract only the fields the stale-supplemental check needs (#1060), with no
+ * requirement that the value be a complete `StatsData` — a composed entry and a
+ * `SupplementalStats` envelope are different shapes and both are read here.
+ */
+function parseSupplementalShape(
+  raw: unknown,
+): { hasSupplementalData?: boolean; fetchedAt?: string; uploadedAt?: string } | null {
+  if (raw === null || raw === undefined) return null;
+  let obj: unknown;
+  try {
+    obj = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  if (typeof obj !== "object" || obj === null) return null;
+  const { hasSupplementalData, fetchedAt, uploadedAt } = obj as Record<string, unknown>;
+  return {
+    ...(typeof hasSupplementalData === "boolean" && { hasSupplementalData }),
+    ...(typeof fetchedAt === "string" && { fetchedAt }),
+    ...(typeof uploadedAt === "string" && { uploadedAt }),
   };
 }
 
@@ -346,10 +379,37 @@ async function supaDeleteSnapshotsByDate(
 // Per-handle heal
 // ---------------------------------------------------------------------------
 
+/**
+ * #1060 — detect a composed entry that never absorbed the current supplemental.
+ *
+ * This shape is not "poisoned" by either predicate above: it is structurally
+ * valid GitHub-derived data that simply predates (or never saw) the EMU merge.
+ * `mergeStats` stamps `hasSupplementalData` on any composed value, so its
+ * absence alongside an existing supplemental record proves the entry was
+ * written from a value that never included it. A composed entry whose
+ * `fetchedAt` predates the upload is the same defect one step later: it
+ * absorbed an *older* supplemental than the one now on record.
+ *
+ * The repair is to drop the composed entry so the next tokenless request
+ * recomposes it. The baseline key is deliberately left alone — it is the
+ * protected GitHub-derived record, not the defective value.
+ */
+export function isSupplementalStale(
+  merged: { hasSupplementalData?: boolean; fetchedAt?: string } | null,
+  supplemental: { uploadedAt?: string } | null,
+): boolean {
+  if (!supplemental || !merged) return false;
+  if (merged.hasSupplementalData !== true) return true;
+  if (!merged.fetchedAt || !supplemental.uploadedAt) return false;
+  return merged.fetchedAt < supplemental.uploadedAt;
+}
+
 export interface HealResult {
   handle: string;
   mergedPoisoned: boolean;
   stalePoisoned: boolean;
+  /** #1060 — composed entry exists but never absorbed the current supplemental. */
+  supplementalStale: boolean;
   poisonedSnapshotRows: number;
   /** Exact dates queued for deletion — printed in dry-run for operator review. */
   poisonedSnapshotDates: string[];
@@ -364,9 +424,10 @@ export async function healHandle(
 ): Promise<HealResult> {
   const handle = normalizeHandle(rawHandle);
 
-  const [mergedRaw, staleRaw] = await Promise.all([
+  const [mergedRaw, staleRaw, supplementalRaw] = await Promise.all([
     redis(cfg, ["GET", mergedStatsKey(handle)]),
     redis(cfg, ["GET", staleStatsKey(handle)]),
+    redis(cfg, ["GET", supplementalKey(handle)]),
   ]);
 
   const mergedStats = parseStatsValue(mergedRaw);
@@ -374,6 +435,10 @@ export async function healHandle(
 
   const mergedPoisoned = mergedStats !== null && statsValueIsPoisoned(mergedStats);
   const stalePoisoned = staleStats !== null && statsValueIsPoisoned(staleStats);
+  const supplementalStale = isSupplementalStale(
+    parseSupplementalShape(mergedRaw),
+    parseSupplementalShape(supplementalRaw),
+  );
 
   const snapshotRows = await supaFetchSnapshotRows(cfg, handle);
   const poisonedSnapshotDates = selectPoisonedSnapshotDates(snapshotRows);
@@ -383,15 +448,19 @@ export async function healHandle(
   let deletedSnapshotRows = 0;
 
   if (apply) {
-    if (mergedPoisoned) {
+    // #1060 — a stale-supplemental entry is repaired the same way as a poisoned
+    // one: drop the composed value so the next tokenless request recomposes it.
+    if (mergedPoisoned || supplementalStale) {
       await redis(cfg, ["DEL", mergedStatsKey(handle)]);
       deletedRedisKeys.push(mergedStatsKey(handle));
     }
+    // The baseline holds GitHub-derived data only, so a stale supplemental is
+    // never a reason to drop it — only genuine poison is.
     if (stalePoisoned) {
       await redis(cfg, ["DEL", staleStatsKey(handle)]);
       deletedRedisKeys.push(staleStatsKey(handle));
     }
-    if (mergedPoisoned || stalePoisoned) {
+    if (mergedPoisoned || stalePoisoned || supplementalStale) {
       await redis(cfg, ["DEL", snapshotKey(handle)]);
       deletedRedisKeys.push(snapshotKey(handle));
     }
@@ -404,6 +473,7 @@ export async function healHandle(
     handle,
     mergedPoisoned,
     stalePoisoned,
+    supplementalStale,
     poisonedSnapshotRows,
     poisonedSnapshotDates,
     deletedRedisKeys,
@@ -431,6 +501,10 @@ export async function run(rawArgs: string[]): Promise<void> {
     console.log(`  ${mergedStatsKey(result.handle).padEnd(30)} poisoned: ${result.mergedPoisoned}`);
     console.log(`  ${staleStatsKey(result.handle).padEnd(30)} poisoned: ${result.stalePoisoned}`);
     console.log(
+      `  ${supplementalKey(result.handle).padEnd(30)} not absorbed by composed entry: ` +
+        `${result.supplementalStale}`,
+    );
+    console.log(
       `  metrics_snapshots poisoned rows (zero-shape or scope-blinded): ${result.poisonedSnapshotRows}` +
         (result.poisonedSnapshotDates.length > 0
           ? ` -> [${result.poisonedSnapshotDates.join(", ")}]`
@@ -444,7 +518,12 @@ export async function run(rawArgs: string[]): Promise<void> {
         console.log(`      -> DELETED ${result.deletedSnapshotRows} snapshot row(s)`);
       }
     }
-    totalPoisonedKeys += (result.mergedPoisoned ? 1 : 0) + (result.stalePoisoned ? 1 : 0);
+    totalPoisonedKeys +=
+      (result.mergedPoisoned ? 1 : 0) +
+      (result.stalePoisoned ? 1 : 0) +
+      // Counted so a handle whose ONLY defect is an unabsorbed supplemental
+      // still reports as needing repair rather than "nothing to heal".
+      (!result.mergedPoisoned && result.supplementalStale ? 1 : 0);
     totalPoisonedRows += result.poisonedSnapshotRows;
   }
 
