@@ -160,93 +160,122 @@ async function _enrichWithLogins(
   return enriched;
 }
 
-/** Internal: fetch from GitHub, merge Bitbucket + Codeberg + supplemental, cache. */
-/**
- * Serve last-known-good `stale` data and, unless read-only, refresh only the
- * primary key with it (6h TTL) so a sustained upstream problem doesn't cause
- * a refetch on every subsequent request. The protected stale key itself is
- * left untouched. Shared by both the total-fetch-failure and #1002
- * degraded-fetch call sites below — same anti-thrash invariant, different
- * trigger.
- */
-async function _serveStaleAndReCache(
-  cacheKey: string,
-  stale: StatsData,
-  readOnly: boolean | undefined,
-): Promise<StatsData> {
-  if (!readOnly) {
-    await cacheSet(cacheKey, stale, CACHE_TTL);
-  }
-  return stale;
+// ---------------------------------------------------------------------------
+// GitHub-derived vs composed stats (#1060, #1061)
+//
+// Two distinct roles, deliberately never conflated:
+//
+//   GitHub-derived — the raw `fetchStats` output. Its completeness depends on
+//     the authenticating token's scope, so it is the ONLY thing the integrity
+//     guards may inspect or use as a baseline. Stored at `stats:stale:v2:`.
+//
+//   Composed — GitHub-derived with linked platforms (Bitbucket/Codeberg/GitLab)
+//     and EMU supplemental layered on top. What callers receive, and what
+//     `stats:v2:merged:` stores.
+//
+// The invariant: the guards only ever see `primary`; everything else composes
+// onto whichever GitHub-derived value wins. Before #1060 the supplemental was
+// merged *before* the guards, which meant (a) a rejected fetch re-cached a
+// baseline that had never seen the current supplemental, silently dropping an
+// EMU merge for 6h, and (b) a large supplemental could lift a scope-blinded
+// GitHub fetch over both of `isDegradedPrFetch`'s detection signatures.
+//
+// A future fourth data source belongs in `_compose`, never in the guard input.
+// ---------------------------------------------------------------------------
+
+/** Sources that are NOT GitHub-token-scoped, and therefore never guard inputs. */
+interface StatsOverlays {
+  bitbucket: StatsData | null;
+  codeberg: StatsData | null;
+  gitlab: StatsData | null;
+  supplemental: SupplementalStats | null;
+  linkedPlatforms: Platform[];
+  linkedPlatformLogins: Record<string, string>;
 }
 
-async function _fetchAndCache(
+/**
+ * Classify what the fetch could actually see (#1004, corrected by #1050).
+ *
+ * `fetchScope` means "was this fetch private-inclusive?", NOT "was a token
+ * object present?". #1004 conflated the two — `token ? "authenticated" :
+ * "public"` — and that inverted the ranking against reality:
+ *
+ *   anonymous badge hit -> no session token -> queries.ts falls back to the
+ *     server GITHUB_TOKEN, which holds `repo` scope -> sees private merges
+ *     -> was labelled "public"        (rank 1)
+ *   user's own refresh -> session OAuth token, scoped `read:user user:email`
+ *     with NO `repo` -> cannot see private repos at all
+ *     -> was labelled "authenticated" (rank 2)
+ *
+ * Since scopeRank ranks authenticated above public, the blinded fetch
+ * outranked the complete one and overwrote it. Verified against the live API:
+ * 987 merged PRs with `repo`, 140 without. A user clicking Refresh on their
+ * own profile collapsed their own Delivery 100 -> 58.
+ *
+ * Corrected mapping — label by what the fetch could actually see:
+ *
+ *   session token + OAuth grants `repo`  -> private-inclusive
+ *     Today OAUTH_SCOPES omits `repo`, so this is false. Derived from the same
+ *     constant rather than restated, so adding `repo` to the OAuth app updates
+ *     this in the same edit instead of drifting.
+ *
+ *   no session token + server GITHUB_TOKEN configured -> private-inclusive
+ *     queries.ts resolves `token ?? getGithubToken()`, so a tokenless call
+ *     authenticates as the server PAT, which holds `repo`. GitHub's GraphQL
+ *     API rejects unauthenticated requests outright (403), so a fetch that
+ *     returned data without a session token necessarily used this token.
+ *     `/api/health` asserts that token still carries `repo` (#1047), so this
+ *     assumption is monitored rather than assumed silently.
+ *
+ *   neither -> public
+ */
+function _classifyScope(token?: string): StatsData["fetchScope"] {
+  const usedPrivateInclusiveServerToken = !token && Boolean(getGithubToken());
+  return (token && OAUTH_GRANTS_PRIVATE_REPO_ACCESS) || usedPrivateInclusiveServerToken
+    ? "authenticated"
+    : "public";
+}
+
+/**
+ * Load every non-GitHub source for a handle. Called on every path — including
+ * total GitHub-fetch failure — so that whichever GitHub-derived value is served
+ * is always composed from the same, current overlay inputs. Serving a
+ * GitHub-derived baseline without re-composition would drop EMU and linked
+ * platform data during a GitHub outage.
+ */
+async function _loadOverlays(
   handle: string,
   lowerHandle: string,
-  cacheKey: string,
-  token?: string,
-  options: { readOnly?: boolean } = {},
-): Promise<StatsData | null> {
-  const staleKey = `stats:stale:${lowerHandle}`;
-
-  // Read stale fallback before fetch (so we have it if fetch fails)
-  const stale = await cacheGet<StatsData>(staleKey);
-
-  // Fetch from GitHub
-  const primary = await fetchStats(handle, token);
-  if (!primary) {
-    // API failed (rate limit, network error, etc.) — serve stale if available
-    if (stale) {
-      console.warn(`[cache] serving stale data for ${lowerHandle} (API unavailable)`);
-      return _serveStaleAndReCache(cacheKey, stale, options.readOnly);
-    }
-    return null;
-  }
-
-  // Fetch Bitbucket + Codeberg + GitLab in parallel — error in one must not block the others
-  const [bbResult, cbResult, glResult] = options.readOnly
-    ? [
+  readOnly: boolean | undefined,
+): Promise<StatsOverlays> {
+  // Platform fetches run in parallel — an error in one must not block the others.
+  const [bbResult, cbResult, glResult] = readOnly
+    ? ([
         { status: "fulfilled", value: null },
         { status: "fulfilled", value: null },
         { status: "fulfilled", value: null },
-      ] as const
+      ] as const)
     : await Promise.allSettled([
         fetchBitbucketIfLinked(handle, lowerHandle),
         fetchCodebergIfLinked(handle, lowerHandle),
         fetchGitlabIfLinked(handle, lowerHandle),
       ]);
 
-  const bbStats = bbResult.status === "fulfilled" ? bbResult.value : null;
-  const cbStats = cbResult.status === "fulfilled" ? cbResult.value : null;
-  const glStats = glResult.status === "fulfilled" ? glResult.value : null;
+  const bitbucket = bbResult.status === "fulfilled" ? bbResult.value : null;
+  const codeberg = cbResult.status === "fulfilled" ? cbResult.value : null;
+  const gitlab = glResult.status === "fulfilled" ? glResult.value : null;
 
-  // Merge Bitbucket into primary (markAsSupplemental: false — linked platform, not EMU)
-  let stats: StatsData = bbStats
-    ? mergeStats(primary, bbStats, { markAsSupplemental: false })
-    : primary;
-
-  // Merge Codeberg into current stats
-  if (cbStats) {
-    stats = mergeStats(stats, cbStats, { markAsSupplemental: false });
-  }
-
-  // Merge GitLab into current stats
-  if (glStats) {
-    stats = mergeStats(stats, glStats, { markAsSupplemental: false });
-  }
-
-  // Check for supplemental data (e.g. EMU account). Redis is the hot path
-  // with a 24h TTL; Supabase (#825) is the durable fallback so a missed CLI
-  // upload day no longer silently drops EMU stats from scores. On a Redis
-  // miss + DB hit, we rehydrate Redis so subsequent reads stay fast.
+  // Supplemental (e.g. EMU account). Redis is the hot path with a 24h TTL;
+  // Supabase (#825) is the durable fallback so a missed CLI upload day no
+  // longer silently drops EMU stats from scores. On a Redis miss + DB hit, we
+  // rehydrate Redis so subsequent reads stay fast.
   const supplementalKey = `supplemental:${lowerHandle}`;
-  const cachedSupplemental = await cacheGet<SupplementalStats>(supplementalKey);
-  let supplemental: SupplementalStats | null = cachedSupplemental;
+  let supplemental = await cacheGet<SupplementalStats>(supplementalKey);
   if (!supplemental) {
     const persisted = await dbGetSupplemental(lowerHandle);
     if (persisted) {
       supplemental = persisted;
-      if (!options.readOnly) {
+      if (!readOnly) {
         fireAndForget(
           () => cacheSet(supplementalKey, persisted, SUPPLEMENTAL_TTL),
           () => undefined,
@@ -254,184 +283,214 @@ async function _fetchAndCache(
       }
     }
   }
-  if (supplemental) {
-    stats = mergeStats(stats, supplemental.stats);
-  }
 
-  // Build linkedPlatforms from DB link status (source of truth), not stats fetch
-  // success. Platforms appear in Data Sources even when their stats fetch
+  // Build linkedPlatforms from DB link status (source of truth), not stats
+  // fetch success. Platforms appear in Data Sources even when their stats fetch
   // temporarily fails (expired token, API error). Fixes #632.
   const [bbDbLink, cbDbLink, glDbLink] = await Promise.all([
-    bbStats ? null : isBitbucketEnabled().then((ok) =>
-      ok ? dbGetLinkedPlatform(handle, "bitbucket") : null,
-    ),
-    cbStats ? null : isCodebergEnabled().then((ok) =>
-      ok ? dbGetLinkedPlatform(handle, "codeberg") : null,
-    ),
-    glStats ? null : isGitlabEnabled().then((ok) =>
-      ok ? dbGetLinkedPlatform(handle, "gitlab") : null,
-    ),
+    bitbucket
+      ? null
+      : isBitbucketEnabled().then((ok) =>
+          ok ? dbGetLinkedPlatform(handle, "bitbucket") : null,
+        ),
+    codeberg
+      ? null
+      : isCodebergEnabled().then((ok) =>
+          ok ? dbGetLinkedPlatform(handle, "codeberg") : null,
+        ),
+    gitlab
+      ? null
+      : isGitlabEnabled().then((ok) =>
+          ok ? dbGetLinkedPlatform(handle, "gitlab") : null,
+        ),
   ]);
 
   const linkedPlatforms: Platform[] = [];
-  if (bbStats || bbDbLink) linkedPlatforms.push("bitbucket");
-  if (cbStats || cbDbLink) linkedPlatforms.push("codeberg");
-  if (glStats || glDbLink) linkedPlatforms.push("gitlab");
+  if (bitbucket || bbDbLink) linkedPlatforms.push("bitbucket");
+  if (codeberg || cbDbLink) linkedPlatforms.push("codeberg");
+  if (gitlab || glDbLink) linkedPlatforms.push("gitlab");
 
+  const linkedPlatformLogins: Record<string, string> = {};
   if (linkedPlatforms.length > 0) {
-    // bbDbLink/cbDbLink/glDbLink already have remoteLogin; only re-fetch for stats-path
+    // bbDbLink/cbDbLink/glDbLink already have remoteLogin; only re-fetch for
+    // the stats-path.
     const [bbLogin, cbLogin, glLogin] = await Promise.all([
-      bbDbLink ?? (bbStats ? dbGetLinkedPlatform(handle, "bitbucket") : null),
-      cbDbLink ?? (cbStats ? dbGetLinkedPlatform(handle, "codeberg") : null),
-      glDbLink ?? (glStats ? dbGetLinkedPlatform(handle, "gitlab") : null),
+      bbDbLink ?? (bitbucket ? dbGetLinkedPlatform(handle, "bitbucket") : null),
+      cbDbLink ?? (codeberg ? dbGetLinkedPlatform(handle, "codeberg") : null),
+      glDbLink ?? (gitlab ? dbGetLinkedPlatform(handle, "gitlab") : null),
     ]);
-    const linkedPlatformLogins: Record<string, string> = {};
     if (bbLogin) linkedPlatformLogins.bitbucket = bbLogin.remoteLogin;
     if (cbLogin) linkedPlatformLogins.codeberg = cbLogin.remoteLogin;
     if (glLogin) linkedPlatformLogins.gitlab = glLogin.remoteLogin;
+  }
 
+  return {
+    bitbucket,
+    codeberg,
+    gitlab,
+    supplemental,
+    linkedPlatforms,
+    linkedPlatformLogins,
+  };
+}
+
+/**
+ * Layer every non-GitHub source onto a GitHub-derived value.
+ *
+ * `mergeStats` preserves the left operand's identity fields — including
+ * `fetchScope` (merge.ts) — so the composed result always carries the scope of
+ * the GitHub-derived value it was built from, with no post-hoc mutation.
+ */
+function _compose(githubDerived: StatsData, overlays: StatsOverlays): StatsData {
+  let stats = githubDerived;
+
+  // markAsSupplemental: false — a linked platform is a first-party source, not
+  // an EMU merge, and must not set `hasSupplementalData`.
+  if (overlays.bitbucket) {
+    stats = mergeStats(stats, overlays.bitbucket, { markAsSupplemental: false });
+  }
+  if (overlays.codeberg) {
+    stats = mergeStats(stats, overlays.codeberg, { markAsSupplemental: false });
+  }
+  if (overlays.gitlab) {
+    stats = mergeStats(stats, overlays.gitlab, { markAsSupplemental: false });
+  }
+  if (overlays.supplemental) {
+    stats = mergeStats(stats, overlays.supplemental.stats);
+  }
+
+  if (overlays.linkedPlatforms.length > 0) {
     stats = {
       ...stats,
-      linkedPlatforms,
-      ...(Object.keys(linkedPlatformLogins).length > 0 && { linkedPlatformLogins }),
+      linkedPlatforms: overlays.linkedPlatforms,
+      ...(Object.keys(overlays.linkedPlatformLogins).length > 0 && {
+        linkedPlatformLogins: overlays.linkedPlatformLogins,
+      }),
     };
   }
 
-  // Tag the fetch's scope so the non-downgrading cache-write rule below can
-  // refuse to let a lower-scope fetch overwrite a higher-scope entry already
-  // cached for this handle (#1004), corrected by #1050.
-  //
-  // `fetchScope` means "was this fetch private-inclusive?", NOT "was a token
-  // object present?". #1004 conflated the two — `token ? "authenticated" :
-  // "public"` — and that inverted the ranking against reality:
-  //
-  //   anonymous badge hit -> no session token -> queries.ts falls back to the
-  //     server GITHUB_TOKEN, which holds `repo` scope -> sees private merges
-  //     -> was labelled "public"        (rank 1)
-  //   user's own refresh -> session OAuth token, scoped `read:user user:email`
-  //     with NO `repo` -> cannot see private repos at all
-  //     -> was labelled "authenticated" (rank 2)
-  //
-  // Since scopeRank ranks authenticated above public, the blinded fetch
-  // outranked the complete one and overwrote it. Verified against the live
-  // API: 987 merged PRs with `repo`, 140 without. A user clicking Refresh on
-  // their own profile collapsed their own Delivery 100 -> 58.
-  //
-  // Corrected mapping — label by what the fetch could actually see:
-  //
-  //   session token + OAuth grants `repo`  -> private-inclusive
-  //     Today OAUTH_SCOPES omits `repo`, so this is false. Derived from the
-  //     same constant rather than restated, so adding `repo` to the OAuth app
-  //     updates this in the same edit instead of drifting.
-  //
-  //   no session token + server GITHUB_TOKEN configured -> private-inclusive
-  //     queries.ts resolves `token ?? getGithubToken()`, so a tokenless call
-  //     authenticates as the server PAT, which holds `repo`. GitHub's GraphQL
-  //     API rejects unauthenticated requests outright (403), so a fetch that
-  //     returned data without a session token necessarily used this token.
-  //     `/api/health` asserts that token still carries `repo` (#1047), so this
-  //     assumption is monitored rather than assumed silently.
-  //
-  //   neither -> public
-  //
-  // This keeps the ranking meaningful and correctly oriented: a scope-blind
-  // session fetch (140 PRs) is now "public" and can no longer outrank or
-  // overwrite the server token's complete view (987 PRs) held as
-  // "authenticated" — and isDegradedPrFetch's #1045 shortfall check now fires
-  // on exactly the refresh path that corrupted juan294's profile.
-  const usedPrivateInclusiveServerToken = !token && Boolean(getGithubToken());
-  stats.fetchScope =
-    (token && OAUTH_GRANTS_PRIVATE_REPO_ACCESS) || usedPrivateInclusiveServerToken
-      ? "authenticated"
-      : "public";
+  return stats;
+}
 
-  // #1002 — Guard against a viewer-scoped fetch that lost merged-PR visibility.
-  // The GitHub contributionsCollection is scoped to the authenticating token:
-  // a token that cannot see a user's private-repo merges (per the corrected
-  // #1050 model above, that's the user's own session token — OAUTH_SCOPES
-  // omits `repo` — not the server GITHUB_TOKEN) can return zero or a severe
-  // shortfall relative to the private-inclusive baseline. Caching that result
-  // collapses Delivery (PR weight is 70% of it) and may flip profileType to
-  // "collaborative". If the fresh result lost PR data relative to
-  // last-known-good, serve the good stale data and do NOT overwrite the stale
-  // key — otherwise a corrupt shortfall poisons the very fallback meant to
-  // protect against it.
-  if (isDegradedPrFetch(stats, stale)) {
+/** Internal: fetch from GitHub, guard, compose overlays, cache. */
+async function _fetchAndCache(
+  handle: string,
+  lowerHandle: string,
+  cacheKey: string,
+  token?: string,
+  options: { readOnly?: boolean } = {},
+): Promise<StatsData | null> {
+  // #1060 — the protected baseline holds GitHub-derived data ONLY, so that the
+  // guards below compare like against like. Versioned to `v2` because pre-#1060
+  // entries at `stats:stale:` held fully composed data; judging a GitHub-derived
+  // fetch against one of those would misfire on exactly the EMU users this
+  // change is meant to protect.
+  const baselineKey = `stats:stale:v2:${lowerHandle}`;
+
+  // Read the baseline before the fetch, so it is available if the fetch fails.
+  const baseline = await cacheGet<StatsData>(baselineKey);
+
+  const primary = await fetchStats(handle, token);
+
+  const overlays = await _loadOverlays(handle, lowerHandle, options.readOnly);
+
+  if (!primary) {
+    // API failed (rate limit, network error, etc.) — serve the baseline,
+    // re-composed with current overlays so an outage never drops EMU or
+    // linked-platform data. The baseline key itself is left untouched.
+    if (!baseline) return null;
+    console.warn(`[cache] serving stale data for ${lowerHandle} (API unavailable)`);
+    const composed = _compose(baseline, overlays);
+    if (!options.readOnly) {
+      // Refresh only the primary key (6h TTL) so a sustained upstream problem
+      // doesn't cause a refetch on every subsequent request.
+      await cacheSet(cacheKey, composed, CACHE_TTL);
+    }
+    return composed;
+  }
+
+  primary.fetchScope = _classifyScope(token);
+
+  let rejected = false;
+
+  // #1002/#1045 — Guard against a viewer-scoped fetch that lost merged-PR
+  // visibility. GitHub's contributionsCollection is scoped to the
+  // authenticating token: a token that cannot see a user's private-repo merges
+  // (per #1050 that's the user's own session token — OAUTH_SCOPES omits `repo`
+  // — not the server GITHUB_TOKEN) can return zero or a severe shortfall
+  // relative to the private-inclusive baseline. Caching that collapses Delivery
+  // (PR weight is 70% of it) and may flip profileType to "collaborative".
+  //
+  // Both operands are GitHub-derived: composing the supplemental first would
+  // let an EMU contribution mask the shortfall (#1061).
+  if (isDegradedPrFetch(primary, baseline)) {
     console.warn(
       `[github] degraded PR fetch for ${lowerHandle} ` +
-        `(prsMergedCount ${stats.prsMergedCount}, last-known-good ${stale!.prsMergedCount}) — ` +
-        `serving last-known-good, not overwriting stale cache`,
+        `(prsMergedCount ${primary.prsMergedCount}, last-known-good ${baseline!.prsMergedCount}) — ` +
+        `serving last-known-good, not overwriting the baseline`,
     );
     fireAndForget(
       () =>
         captureServerEvent("github_degraded_pr_fetch", {
           handle: lowerHandle,
-          freshPrsMergedCount: stats.prsMergedCount,
-          stalePrsMergedCount: stale!.prsMergedCount,
-          freshCommitsTotal: stats.commitsTotal,
-          authenticated: Boolean(token),
+          freshPrsMergedCount: primary.prsMergedCount,
+          stalePrsMergedCount: baseline!.prsMergedCount,
+          freshCommitsTotal: primary.commitsTotal,
+          // The classified scope of this fetch, not merely whether a token
+          // object was present — the pre-#1050 notion mislabelled which
+          // fetches were private-inclusive.
+          fetchScope: primary.fetchScope,
         }),
       () => undefined,
     );
-    return _serveStaleAndReCache(cacheKey, stale!, options.readOnly);
+    rejected = true;
   }
+
+  // #1004 phase 2 — a lower-scope fetch must never downgrade a better-scoped
+  // entry. `getStats` already confirmed a miss on `cacheKey`, but the public and
+  // authenticated fetch paths for the same handle dedup under separate inflight
+  // keys, so both scopes can run concurrently; re-reading `cacheKey` here
+  // catches an authenticated write that landed in the meantime. #1046: that
+  // re-read alone cannot carry the rule (it is null by construction on every
+  // non-racing call), so the durable baseline is consulted too — whichever is
+  // better-scoped wins.
+  const existingComposed = options.readOnly
+    ? null
+    : await cacheGet<StatsData>(cacheKey);
+  const bestKnownScopeRank = Math.max(
+    scopeRank(existingComposed?.fetchScope),
+    scopeRank(baseline?.fetchScope),
+  );
+  if (scopeRank(primary.fetchScope) < bestKnownScopeRank) {
+    rejected = true;
+  }
+
+  // A rejected fetch falls back to the protected baseline; overlays are layered
+  // onto whichever value wins, so a rejection is never destructive for a
+  // non-GitHub source (#1060).
+  const accepted = !rejected;
+  const base = accepted ? primary : (baseline ?? primary);
+  const composed = _compose(base, overlays);
 
   if (options.readOnly) {
-    return stats;
+    return composed;
   }
 
-  // Non-downgrading cache-write rule (#1004, phase 2 of the scoring-integrity
-  // contract): a lower-scope fetch must never overwrite a higher-scope entry
-  // already cached for this handle — e.g. a scope-blind user-session refresh
-  // must not clobber the private-inclusive server-token result established by
-  // an anonymous or warm-cache request. This subsumes the old unconditional
-  // cache writes below.
-  //
-  // `getStats` already confirmed a miss on `cacheKey` before calling this
-  // function, so `existingMerged` is normally null here. But the public and
-  // authenticated fetch paths for the same handle are deduplicated under
-  // *separate* inflight keys (a scope-blind caller may reuse an in-flight
-  // private-inclusive fetch, but not vice versa — see `getStats` above), so
-  // both scopes for the same handle can run concurrently and reach this point.
-  // Re-reading `cacheKey` here,
-  // immediately before the write, catches that race: if the authenticated
-  // fetch already wrote its better-scoped entry by the time this call
-  // reaches its write, this read sees it and skips the downgrade.
-  //
-  // #1046: that re-read closes the race but cannot carry the rule on its own —
-  // because `cacheKey` is a confirmed miss by construction, `existingMerged`
-  // is null on every non-racing call and the check silently degraded to a
-  // no-op, letting a scope-blinded fetch write the primary key unopposed. The
-  // 6h primary TTL then made it self-renewing: every anonymous badge hit after
-  // expiry re-poisoned it. `stats:stale` is the durable record of the best
-  // scope ever seen for this handle (7-day TTL, and the write below refuses to
-  // downgrade it), so it — not the just-missed primary key — is the honest
-  // baseline to judge a downgrade against. Both are consulted: whichever is
-  // better-scoped wins.
-  const existingMerged = await cacheGet<StatsData>(cacheKey);
-  const bestKnownScopeRank = Math.max(
-    scopeRank(existingMerged?.fetchScope),
-    scopeRank(stale?.fetchScope),
-  );
-  const mergedIsDowngrade = scopeRank(stats.fetchScope) < bestKnownScopeRank;
-  if (!mergedIsDowngrade) {
-    await cacheSet(cacheKey, stats, CACHE_TTL);
-  } else if (stale != null) {
-    // Serve-and-cache the better-scoped last-known-good rather than leaving the
-    // primary key empty, which would re-fetch (and re-reject) on every hit.
-    await cacheSet(cacheKey, stale, CACHE_TTL);
+  // A rejected fetch with no baseline to fall back on has nothing better to
+  // offer the shared cache, so it writes nothing rather than persisting a
+  // downgrade — the caller still receives its own composed data below.
+  if (accepted || baseline != null) {
+    await cacheSet(cacheKey, composed, CACHE_TTL);
   }
 
-  // `stale` (the protected 7-day last-known-good) was already read at the
-  // top of this function, before the fetch — no race window to close there.
-  const staleIsDowngrade =
-    stale != null && scopeRank(stats.fetchScope) < scopeRank(stale.fetchScope);
-  if (!staleIsDowngrade) {
-    await cacheSet(staleKey, stats, STALE_TTL);
+  // Only a fetch accepted on its own merits may become the new baseline, and
+  // only its GitHub-derived half is stored there.
+  if (accepted) {
+    await cacheSet(baselineKey, primary, STALE_TTL);
   }
 
   // Record in permanent user registry (fire-and-forget)
   fireAndForget(() => dbUpsertUser(handle), () => undefined);
 
-  return stats;
+  return composed;
 }
