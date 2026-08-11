@@ -195,7 +195,11 @@ describe("POST /api/refresh", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    // Pre-fetch invalidation now routes through the shared helper rather than a
+    // duplicated key literal.
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
+      stats: true,
+    });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
     });
@@ -217,12 +221,44 @@ describe("POST /api/refresh", () => {
     await POST(makeRequest("testuser"));
 
     const persistOrder = mockPersistOrchestratedSnapshot.mock.invocationCallOrder[0];
+    // Two invalidation calls now bracket the fetch: `{stats}` before it to force
+    // the refetch, and the snapshot-derived artifacts after the persist. Only
+    // the second is ordered against the persist.
+    const postPersistIdx = mockInvalidateProfileReadModels.mock.calls.findIndex(
+      (c) => (c[1] as { badgeSvg?: boolean } | undefined)?.badgeSvg === true,
+    );
     const invalidateOrder =
-      mockInvalidateProfileReadModels.mock.invocationCallOrder[0];
+      mockInvalidateProfileReadModels.mock.invocationCallOrder[postPersistIdx];
 
     expect(persistOrder).toBeDefined();
+    expect(postPersistIdx).toBeGreaterThanOrEqual(0);
     expect(invalidateOrder).toBeDefined();
     expect(persistOrder!).toBeLessThan(invalidateOrder!);
+  });
+
+  it("forces the refetch before materializing, never after", async () => {
+    await POST(makeRequest("testuser"));
+
+    const statsInvalidateOrder =
+      mockInvalidateProfileReadModels.mock.invocationCallOrder[0];
+    const materializeOrder =
+      mockMaterializeOrchestratedProfile.mock.invocationCallOrder[0];
+
+    expect(mockInvalidateProfileReadModels.mock.calls[0]![1]).toEqual({ stats: true });
+    expect(statsInvalidateOrder!).toBeLessThan(materializeOrder!);
+  });
+
+  it("never clears the protected GitHub-derived baseline", async () => {
+    await POST(makeRequest("testuser"));
+
+    // `stats:stale:v2:` carries the scope-downgrade protection from #1050;
+    // a refresh must never drop it.
+    expect(mockCacheDel).not.toHaveBeenCalledWith(
+      expect.stringContaining("stats:stale"),
+    );
+    for (const call of mockInvalidateProfileReadModels.mock.calls) {
+      expect(Object.keys(call[1] as object)).not.toContain("staleStats");
+    }
   });
 
   it("updates craft cache when materialized profile carries craft data", async () => {
@@ -299,7 +335,12 @@ describe("POST /api/refresh", () => {
     const res = await POST(makeRequest("testuser"));
 
     expect(res.status).toBe(500);
-    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
+    // The pre-fetch `{stats}` invalidation has already run by this point; what
+    // must NOT run is the post-persist artifact invalidation.
+    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalledWith(
+      "testuser",
+      expect.objectContaining({ badgeSvg: true }),
+    );
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
