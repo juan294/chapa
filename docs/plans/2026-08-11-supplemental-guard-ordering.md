@@ -82,12 +82,15 @@ comfortably in budget.
 
 ## 4. Phases
 
-| Phase | Title | Batch | Files |
-|---|---|---|---|
-| 1 | Compose-after-guard restructure + versioned baseline key | no — must land first | `apps/web/lib/github/client.ts`, `stats-integrity.ts`, `client.test.ts`, `stats-integrity.test.ts` |
-| 2 | Teach `heal-poisoned-stats` the pre-merge shape | `[batch-eligible]` | `scripts/heal-poisoned-stats.ts`, `scripts/heal-poisoned-stats.test.ts` |
-| 3 | Normalize refresh/supplemental invalidation | `[batch-eligible]` | `apps/web/app/api/refresh/route.ts`, `apps/web/app/api/supplemental/route.ts` + their tests |
-| 4 | ADR + doc updates | `[batch-eligible]` | `docs/decisions/`, `CLAUDE.md`, `docs/accepted-risks.md` |
+| Phase | Title | Batch | Status | Files |
+|---|---|---|---|---|
+| 1 | Compose-after-guard restructure + versioned baseline key | no — must land first | **done** | `apps/web/lib/github/client.ts`, `stats-integrity.ts`, `client.test.ts` |
+| 2 | Teach `heal-poisoned-stats` the pre-merge shape | `[batch-eligible]` | **done** | `scripts/heal-poisoned-stats.ts`, `scripts/heal-poisoned-stats.test.ts` |
+| 3 | Normalize refresh/supplemental invalidation | `[batch-eligible]` | **done** | `apps/web/app/api/refresh/route.ts`, `apps/web/app/api/supplemental/route.ts` + their tests |
+| 4 | ADR + doc updates | `[batch-eligible]` | **done** | `docs/decisions/`, `CLAUDE.md`, `docs/accepted-risks.md` |
+
+All four phases implemented 2026-08-11 on `fix/1060-supplemental-guard-ordering`.
+Deviations recorded in `2026-08-11-supplemental-guard-ordering-notes.md`.
 
 Phases 2-4 have no file overlap with each other and none consumes Phase 1's code
 output — Phase 2 and 3 are independent subsystems, Phase 4 records decisions already
