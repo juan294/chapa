@@ -6,6 +6,16 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Pending-migrations gate tolerates one migra artifact on `admin_users` (#1064)
+
+- **Risk:** `pnpm run check:pending-migrations` treats a schema diff consisting *solely* of a `drop view` + `create or replace view` pair for `public.admin_users`, matching one exact pinned body, as clean. An `admin_users` change that normalized to precisely that text would pass unnoticed.
+- **Why accepted:** The tolerated text is what the view already is, so reaching it requires changing the view to itself. migra emits this block on every run against the production project even when nothing differs — verified read-only on 2026-08-11: production's `pg_get_viewdef('public.admin_users')` is textually identical to what `014_views_security_invoker.sql` produces, `pg_class.reloptions` is `{security_invoker=true}` as that migration sets, and the emitted block is byte-for-byte identical (674 characters) whether or not a migration recreates the view. No migration content can silence it, which is why `032_reconcile_remote_schema.sql` deliberately omits the view. Without this tolerance the gate blocks *every* release PR, including ones that change no migrations — which is how it behaved when it first started running, and a gate that always fails is a gate nobody reads.
+- **Mitigation:** The tolerance is pinned to the exact statement pair, whitespace-normalized, in `TOLERATED_MIGRA_ARTIFACT` (`scripts/check-pending-migrations.ts`). Three regression tests in `check-pending-migrations.test.ts` assert that the gate still blocks when the artifact is accompanied by any other statement, when the `admin_users` body genuinely changes, and when the same body shape appears for a different view. Real drift in any other object is unaffected. The proper fix is replacing migra with schema introspection, tracked in #1064.
+- **Severity:** Low (one admin-only view, pinned body, blocking behavior preserved everywhere else)
+- **Accepted:** 2026-08-11
+
+---
+
 ## CSP unsafe-inline for scripts (#396, #778, #959)
 
 - **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`. This is a known limitation of the framework — removing it causes hydration to fail.
