@@ -15,7 +15,7 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 - **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
 - **Tier System**: Four tiers based on adjusted score — Emerging (0-29), Solid (30-69), High (70-84), and Elite (85-100).
 - **Confidence Rating**: A quality signal (50-100) based on data diversity and consistency.
-- **Badge Verification**: Every badge includes a cryptographic HMAC-SHA256 hash proving data authenticity.
+- **Badge Verification**: Badges marked "Verified metrics" include a cryptographic HMAC-SHA256 hash proving data authenticity. Badges marked "Public metrics" do not claim cryptographic attestation.
 
 ## Endpoints
 

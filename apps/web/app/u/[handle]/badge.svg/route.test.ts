@@ -265,6 +265,23 @@ describe("GET /u/[handle]/badge.svg", () => {
     );
   });
 
+  it("does not cache an unverified badge so a later complete fetch can heal", async () => {
+    mockGetPublicProfileVerification.mockReturnValue(null);
+
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    await GET(req, ctx);
+
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({
+        verificationHash: undefined,
+        verificationDate: undefined,
+      }),
+    );
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
   it("passes read-only mode and skips SVG cache writes for smoke requests", async () => {
     mockPersistProfileSnapshot.mockResolvedValue(false);
     const [req, ctx] = makeRequest(

@@ -6,7 +6,7 @@ This is the extended documentation for AI models and LLM crawlers. For a concise
 
 ## Overview
 
-Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Each badge includes a cryptographic verification hash (HMAC-SHA256) proving the data hasn't been tampered with.
+Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Badges marked "Verified metrics" include a cryptographic verification hash (HMAC-SHA256) proving the data has not been tampered with. Badges marked "Public metrics" do not claim cryptographic attestation.
 
 ## Scoring Model: Impact v6
 

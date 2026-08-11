@@ -47,4 +47,15 @@ describe("GET /llms.txt", () => {
     expect(text).toContain("/about/scoring");
     expect(text).toContain("/llms-full.txt");
   });
+
+  it("limits cryptographic claims to badges marked Verified metrics", async () => {
+    const res = getLlmsTxt();
+    const text = await res.text();
+
+    expect(text).toContain('Badges marked "Verified metrics"');
+    expect(text).toContain('Badges marked "Public metrics"');
+    expect(text).not.toContain(
+      "Every badge includes a cryptographic HMAC-SHA256 hash",
+    );
+  });
 });
