@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheDel, rateLimitStrict } from "@/lib/cache/redis";
+import { rateLimitStrict } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
@@ -55,9 +55,11 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
-  // Clear cached stats so getStats fetches fresh from GitHub
-  // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>" (lowercase)
-  await cacheDel(`stats:v2:merged:${normalizedHandle}`);
+  // Pre-fetch invalidation: drop the composed stats entry so getStats misses
+  // and refetches from GitHub. Routed through invalidateProfileReadModels so the
+  // key literal lives in exactly one place (post-write-invalidation.ts) — this
+  // was a hand-maintained duplicate of client.ts's key until #1060 versioned it.
+  await invalidateProfileReadModels(handle, { stats: true });
 
   const token = await getSessionGitHubToken(session);
   if (!token) {
@@ -99,6 +101,12 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
+  // Post-persist invalidation: clear the artifacts derived from the snapshot
+  // just written. Deliberately separate from the pre-fetch call above, which
+  // exists to force the refetch — the two serve different purposes and must not
+  // be collapsed into one. Neither ever clears `stats:stale:v2:`: that is the
+  // protected GitHub-derived baseline, and dropping it would discard the
+  // scope-downgrade protection established by #1050.
   await invalidateProfileReadModels(handle, {
     badgeSvg: true,
     snapshot: true,

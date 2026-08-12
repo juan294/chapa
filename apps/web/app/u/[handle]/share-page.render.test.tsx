@@ -126,6 +126,13 @@ vi.mock("./SharePageH2", () => ({
 
 import { generateMetadata, SharePageContent } from "./page";
 
+async function flushAfterCallbacks(): Promise<void> {
+  const callbacks = mockAfter.mock.calls.map(
+    (call) => call[0] as () => void | Promise<void>,
+  );
+  await Promise.all(callbacks.map((callback) => callback()));
+}
+
 const FAKE_MATERIALIZED = {
   stats: {
     handle: "testuser",
@@ -284,6 +291,23 @@ describe("Phase 4d — Share page i18n", () => {
       const jsxString = JSON.stringify(result);
       expect(jsxString).not.toContain("Tu Impacto, Decodificado");
       expect(jsxString).not.toContain("Your Impact, Decoded");
+    });
+
+    it("does not cache an unverified badge so a later complete fetch can heal", async () => {
+      mockGetPublicProfileVerification.mockReturnValue(null);
+
+      await SharePageContent({ handle: "testuser" });
+      await flushAfterCallbacks();
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          verificationHash: undefined,
+          verificationDate: undefined,
+        }),
+      );
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
     });
 
     it("keeps fallback badge image requests read-only in smoke mode", async () => {

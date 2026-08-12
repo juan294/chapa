@@ -10,6 +10,10 @@ const EN_DICT = fs.readFileSync(
   path.resolve(__dirname, "../../lib/i18n/dictionaries/en.ts"),
   "utf-8",
 );
+const ES_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../../lib/i18n/dictionaries/es.ts"),
+  "utf-8",
+);
 
 describe("Verify input page", () => {
   describe("metadata", () => {
@@ -95,6 +99,21 @@ describe("Verify input page", () => {
 
     it("hint about where to find the hash is in the English dictionary", () => {
       expect(EN_DICT).toContain("right edge");
+    });
+
+    it("limits hash claims to badges marked Verified metrics", () => {
+      expect(EN_DICT).toContain("badge marked Verified metrics");
+      expect(EN_DICT).toContain(
+        "Badges marked Public metrics do not claim cryptographic verification",
+      );
+      expect(EN_DICT).not.toContain("from any Chapa badge");
+    });
+
+    it("states the same verified-versus-public limit in Spanish", () => {
+      expect(ES_DICT).toContain("Métricas verificadas");
+      expect(ES_DICT).toContain(
+        "Métricas públicas» no afirman tener verificación criptográfica",
+      );
     });
 
     it("uses getServerT() for all page copy (i18n-integrated)", () => {

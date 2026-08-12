@@ -112,7 +112,7 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
 function setupCacheMiss(githubStats: StatsData) {
   mockCacheGet
     .mockResolvedValueOnce(null) // stats:v2:merged:test-user (primary)
-    .mockResolvedValueOnce(null) // stats:stale:test-user (stale fallback)
+    .mockResolvedValueOnce(null) // stats:stale:v2:test-user (GitHub-derived baseline)
     .mockResolvedValueOnce(null); // supplemental:test-user
   mockFetchStatsData.mockResolvedValue(githubStats);
   // platform fns default to null from beforeEach
@@ -125,6 +125,11 @@ function setupCacheMiss(githubStats: StatsData) {
 describe("getStats", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // `clearAllMocks` clears recorded calls but NOT queued `mockResolvedValueOnce`
+    // values, so a test that queues more reads than its path consumes leaks the
+    // remainder into the next test. Resetting the queue keeps these cases
+    // order-independent.
+    mockCacheGet.mockReset();
     mockCacheSet.mockResolvedValue(undefined);
     mockFetchBitbucketIfLinked.mockResolvedValue(null);
     mockFetchCodebergIfLinked.mockResolvedValue(null);
@@ -178,7 +183,7 @@ describe("getStats", () => {
       expect(result).toEqual(lastGood);
       // The protected stale key is never overwritten with degraded data.
       expect(mockCacheSet).not.toHaveBeenCalledWith(
-        "stats:stale:test-user",
+        "stats:stale:v2:test-user",
         expect.anything(),
         expect.anything(),
       );
@@ -230,7 +235,7 @@ describe("getStats", () => {
       expect(result).toEqual(healthy);
       // Both keys are written with the healthy data.
       expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:merged:test-user", healthy, expect.any(Number));
-      expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:test-user", healthy, expect.any(Number));
+      expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:v2:test-user", healthy, expect.any(Number));
       expect(mockCaptureServerEvent).not.toHaveBeenCalled();
     });
 
@@ -241,7 +246,7 @@ describe("getStats", () => {
       const result = await getStats("test-user");
 
       expect(result).toEqual(fresh);
-      expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:test-user", fresh, expect.any(Number));
+      expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:v2:test-user", fresh, expect.any(Number));
       expect(mockCaptureServerEvent).not.toHaveBeenCalled();
     });
   });
@@ -339,7 +344,7 @@ describe("getStats", () => {
       const result = await getStats("test-user", "gho_session_token_no_repo_scope");
 
       expect(mockCacheSet).not.toHaveBeenCalledWith(
-        "stats:stale:test-user",
+        "stats:stale:v2:test-user",
         expect.anything(),
         expect.anything(),
       );
@@ -429,7 +434,7 @@ describe("getStats", () => {
       await getStats("test-user");
 
       expect(mockCacheSet).toHaveBeenCalledWith(
-        "stats:stale:test-user",
+        "stats:stale:v2:test-user",
         expect.objectContaining({ fetchScope: "authenticated" }),
         expect.any(Number),
       );
@@ -454,7 +459,7 @@ describe("getStats", () => {
         expect.any(Number),
       );
       expect(mockCacheSet).toHaveBeenCalledWith(
-        "stats:stale:test-user",
+        "stats:stale:v2:test-user",
         expect.objectContaining({ fetchScope: "public" }),
         expect.any(Number),
       );
@@ -476,7 +481,7 @@ describe("getStats", () => {
       await getStats("test-user", "gho_session_token_no_repo_scope");
 
       expect(mockCacheSet).toHaveBeenCalledWith(
-        "stats:stale:test-user",
+        "stats:stale:v2:test-user",
         expect.objectContaining({ fetchScope: "public" }),
         expect.any(Number),
       );
@@ -611,7 +616,7 @@ describe("getStats", () => {
       21600,
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "stats:stale:test-user",
+      "stats:stale:v2:test-user",
       fresh,
       604800,
     );
@@ -627,7 +632,7 @@ describe("getStats", () => {
 
     await getStats("Test-User");
     expect(mockCacheGet).toHaveBeenCalledWith("stats:v2:merged:test-user");
-    expect(mockCacheGet).toHaveBeenCalledWith("stats:stale:test-user");
+    expect(mockCacheGet).toHaveBeenCalledWith("stats:stale:v2:test-user");
     expect(mockCacheSet).toHaveBeenCalledWith(
       "stats:v2:merged:test-user",
       fresh,
@@ -765,7 +770,7 @@ describe("getStats", () => {
     expect(mockDbGetSupplemental).not.toHaveBeenCalled();
   });
 
-  it("caches the merged result (not just primary)", async () => {
+  it("caches the composed result under the merged key and the GitHub-derived half under the baseline key", async () => {
     const primary = makeStats({ commitsTotal: 50 });
     const supplemental: SupplementalStats = {
       targetHandle: "test-user",
@@ -776,7 +781,7 @@ describe("getStats", () => {
 
     mockCacheGet
       .mockResolvedValueOnce(null) // merged
-      .mockResolvedValueOnce(null) // stale
+      .mockResolvedValueOnce(null) // baseline
       .mockResolvedValueOnce(supplemental);
     mockFetchStatsData.mockResolvedValue(primary);
 
@@ -787,11 +792,18 @@ describe("getStats", () => {
       expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
       21600,
     );
+    // #1060 — the baseline is the guard's comparison input, so it holds the
+    // GitHub-derived value alone. Composing the supplemental into it would make
+    // every later fetch judge itself against a non-GitHub-derived number.
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "stats:stale:test-user",
-      expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
+      "stats:stale:v2:test-user",
+      expect.objectContaining({ commitsTotal: 50 }),
       604800,
     );
+    const baselineWrite = mockCacheSet.mock.calls.find(
+      (c) => c[0] === "stats:stale:v2:test-user",
+    );
+    expect(baselineWrite![1].hasSupplementalData).toBeUndefined();
   });
 
   it("upserts user in Supabase on successful fetch", async () => {
@@ -869,7 +881,7 @@ describe("getStats", () => {
         21600,
       );
       expect(mockCacheSet).toHaveBeenCalledWith(
-        "stats:stale:test-user",
+        "stats:stale:v2:test-user",
         fresh,
         604800,
       );
@@ -894,7 +906,7 @@ describe("getStats", () => {
         21600,
       );
       expect(mockCacheSet).not.toHaveBeenCalledWith(
-        "stats:stale:test-user",
+        "stats:stale:v2:test-user",
         expect.anything(),
         expect.anything(),
       );
@@ -936,7 +948,7 @@ describe("getStats", () => {
 
       await getStats("Test-User");
 
-      expect(mockCacheGet).toHaveBeenCalledWith("stats:stale:test-user");
+      expect(mockCacheGet).toHaveBeenCalledWith("stats:stale:v2:test-user");
     });
 
     it("logs when serving stale data", async () => {
@@ -1717,6 +1729,280 @@ describe("getStats", () => {
       expect(result).not.toBeNull();
       expect(result!.commitsTotal).toBe(70); // 50 + 20 (GitLab errored out)
       expect(result!.linkedPlatforms).toEqual(["bitbucket", "gitlab"]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #1060 / #1061 — GitHub-derived vs composed stats.
+  //
+  // The integrity guards exist to detect GitHub *token-scope* blindness, so
+  // they may only ever inspect GitHub-derived data. Linked-platform and EMU
+  // supplemental counts are not token-scoped: composing them before the guards
+  // both (a) lets a rejected fetch discard the supplemental entirely (#1060)
+  // and (b) lets a supplemental mask a blinded GitHub fetch (#1061).
+  //
+  // `stats:stale:v2:` holds GitHub-derived data ONLY; `stats:v2:merged:` holds
+  // the composed value callers receive.
+  // -------------------------------------------------------------------------
+  describe("GitHub-derived vs composed stats (#1060, #1061)", () => {
+    const BASELINE_KEY = "stats:stale:v2:test-user";
+    const COMPOSED_KEY = "stats:v2:merged:test-user";
+
+    function supplementalOf(stats: StatsData): SupplementalStats {
+      return {
+        targetHandle: "test-user",
+        sourceHandle: "corp-user",
+        stats,
+        uploadedAt: new Date().toISOString(),
+      };
+    }
+
+    it("#1060: a scope-downgraded fetch keeps the current supplemental instead of discarding it", async () => {
+      // The exact frivas shape: EMU stats uploaded, then the owner clicks
+      // Refresh. The session token is scope-blind, so the fetch is rejected as
+      // a downgrade — but the EMU data must survive that rejection.
+      const baseline = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 40,
+        commitsTotal: 200,
+      });
+      const publicFetch = makeStats({ prsMergedCount: 25, commitsTotal: 180 });
+      const supplemental = supplementalOf(
+        makeStats({ handle: "corp-user", prsMergedCount: 32, commitsTotal: 453 }),
+      );
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // getStats: composed key miss
+        .mockResolvedValueOnce(baseline) // baseline: authenticated, GitHub-derived
+        .mockResolvedValueOnce(supplemental) // supplemental hit
+        .mockResolvedValueOnce(null); // re-read of composed key before write
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      const result = await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      // 40 (protected baseline) + 32 (current supplemental) — NOT 40 alone.
+      expect(result!.prsMergedCount).toBe(72);
+      expect(result!.hasSupplementalData).toBe(true);
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        COMPOSED_KEY,
+        expect.objectContaining({ prsMergedCount: 72, hasSupplementalData: true }),
+        expect.any(Number),
+      );
+    });
+
+    it("#1061: a supplemental cannot mask a blinded GitHub fetch", async () => {
+      // GitHub returns zero merged PRs (scope-blinded) but the EMU supplemental
+      // carries 50, which — if composed first — lifts the value over both
+      // detection signatures and disarms the guard.
+      const baseline = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 80,
+        commitsTotal: 400,
+      });
+      const blindedFetch = makeStats({ prsMergedCount: 0, commitsTotal: 500 });
+      const supplemental = supplementalOf(
+        makeStats({ handle: "corp-user", prsMergedCount: 50, commitsTotal: 300 }),
+      );
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // composed key miss
+        .mockResolvedValueOnce(baseline)
+        .mockResolvedValueOnce(supplemental)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(blindedFetch);
+
+      await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      // The guard must have seen 0, not 50.
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "github_degraded_pr_fetch",
+        expect.objectContaining({
+          handle: "test-user",
+          freshPrsMergedCount: 0,
+          stalePrsMergedCount: 80,
+          fetchScope: "public",
+        }),
+      );
+      // The protected baseline is never overwritten by a rejected fetch.
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        BASELINE_KEY,
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("#1061: an equivalent blinded fetch with no supplemental behaves identically", async () => {
+      const baseline = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 80,
+        commitsTotal: 400,
+      });
+      const blindedFetch = makeStats({ prsMergedCount: 0, commitsTotal: 500 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(baseline)
+        .mockResolvedValueOnce(null) // no supplemental
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(blindedFetch);
+
+      await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "github_degraded_pr_fetch",
+        expect.objectContaining({ freshPrsMergedCount: 0 }),
+      );
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        BASELINE_KEY,
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("the baseline key stores GitHub-derived data only — no supplemental, no platforms", async () => {
+      const primary = makeStats({ commitsTotal: 50, prsMergedCount: 5 });
+      const supplemental = supplementalOf(
+        makeStats({ handle: "corp-user", commitsTotal: 30, prsMergedCount: 3 }),
+      );
+      mockFetchBitbucketIfLinked.mockResolvedValue(
+        makeStats({ handle: "bb-user", commitsTotal: 7, prsMergedCount: 1 }),
+      );
+      mockDbGetLinkedPlatform.mockResolvedValue({ remoteLogin: "bb-user" });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // composed key miss
+        .mockResolvedValueOnce(null) // no baseline
+        .mockResolvedValueOnce(supplemental)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(primary);
+
+      await getStats("test-user");
+
+      // Composed key: everything layered on.
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        COMPOSED_KEY,
+        expect.objectContaining({
+          commitsTotal: 87, // 50 + 7 + 30
+          prsMergedCount: 9, // 5 + 1 + 3
+          hasSupplementalData: true,
+        }),
+        expect.any(Number),
+      );
+      // Baseline key: GitHub primary alone.
+      const baselineWrite = mockCacheSet.mock.calls.find(
+        (c) => c[0] === BASELINE_KEY,
+      );
+      expect(baselineWrite).toBeDefined();
+      expect(baselineWrite![1]).toMatchObject({
+        commitsTotal: 50,
+        prsMergedCount: 5,
+        fetchScope: "authenticated",
+      });
+      expect(baselineWrite![1].hasSupplementalData).toBeUndefined();
+      expect(baselineWrite![1].linkedPlatforms).toBeUndefined();
+    });
+
+    it("re-composes the supplemental when GitHub is unavailable and the baseline is served", async () => {
+      const baseline = makeStats({
+        fetchScope: "authenticated",
+        commitsTotal: 200,
+        prsMergedCount: 40,
+      });
+      const supplemental = supplementalOf(
+        makeStats({ handle: "corp-user", commitsTotal: 453, prsMergedCount: 32 }),
+      );
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // composed key miss
+        .mockResolvedValueOnce(baseline)
+        .mockResolvedValueOnce(supplemental);
+      mockFetchStatsData.mockResolvedValue(null); // GitHub down
+
+      const result = await getStats("test-user");
+
+      expect(result!.prsMergedCount).toBe(72);
+      expect(result!.hasSupplementalData).toBe(true);
+      // A GitHub outage must not touch the protected baseline.
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        BASELINE_KEY,
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("returns the better-scoped composed value to the caller on a downgrade (D4)", async () => {
+      const baseline = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 40,
+        commitsTotal: 200,
+      });
+      const publicFetch = makeStats({ prsMergedCount: 25, commitsTotal: 180 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(baseline)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      const result = await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      // Pre-#1060 this returned the caller's own blinded fetch. It now returns
+      // the protected, better-scoped data — the user sees their real score.
+      expect(result!.fetchScope).toBe("authenticated");
+      expect(result!.prsMergedCount).toBe(40);
+    });
+
+    it("writes no cache in read-only mode even when composing a rejected fetch", async () => {
+      const baseline = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 40,
+        commitsTotal: 200,
+      });
+      const publicFetch = makeStats({ prsMergedCount: 25, commitsTotal: 180 });
+      const supplemental = supplementalOf(
+        makeStats({ handle: "corp-user", prsMergedCount: 32, commitsTotal: 453 }),
+      );
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(baseline)
+        .mockResolvedValueOnce(supplemental);
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      const result = await getStats("test-user", "gho_session_token_no_repo_scope", {
+        readOnly: true,
+      });
+
+      expect(result!.prsMergedCount).toBe(72);
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("a first fetch with a supplemental writes both keys with their own shapes", async () => {
+      const primary = makeStats({ commitsTotal: 50, prsMergedCount: 5 });
+      const supplemental = supplementalOf(
+        makeStats({ handle: "corp-user", commitsTotal: 30, prsMergedCount: 3 }),
+      );
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null) // no baseline (new user)
+        .mockResolvedValueOnce(supplemental)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(primary);
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        COMPOSED_KEY,
+        expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
+        21600,
+      );
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        BASELINE_KEY,
+        expect.objectContaining({ commitsTotal: 50 }),
+        604800,
+      );
     });
   });
 });

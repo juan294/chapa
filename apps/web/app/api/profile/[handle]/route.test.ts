@@ -11,12 +11,14 @@ const {
   mockDbGetToolInsights,
   mockGetClientIp,
   mockIsValidHandle,
+  mockMaterializePublicProfile,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetCachedLatestSnapshot: vi.fn(),
   mockDbGetToolInsights: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockIsValidHandle: vi.fn(),
+  mockMaterializePublicProfile: vi.fn(),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -37,6 +39,10 @@ vi.mock("@/lib/db/tool-insights", () => ({
 
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
+}));
+
+vi.mock("@/lib/profile/public-profile", () => ({
+  materializePublicProfile: mockMaterializePublicProfile,
 }));
 
 // ---------------------------------------------------------------------------
@@ -97,6 +103,14 @@ const MOCK_CRAFT = {
   computedAt: "2026-03-27T08:00:00.000Z",
 };
 
+/**
+ * #1062 — the FRESH, badge-consistent impact. Deliberately different from the
+ * snapshot's smoothed `adjustedComposite`/`tier` so the two can't be confused.
+ */
+const MOCK_MATERIALIZED = {
+  displayImpact: { adjustedComposite: 69, tier: "Solid" },
+};
+
 const LATEST_UPLOADED_CRAFT = {
   ...MOCK_CRAFT,
   tool: "cursor" as const,
@@ -116,6 +130,7 @@ beforeEach(() => {
   mockGetCachedLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
   mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
   mockGetClientIp.mockReturnValue("127.0.0.1");
+  mockMaterializePublicProfile.mockResolvedValue(MOCK_MATERIALIZED);
 });
 
 // ---------------------------------------------------------------------------
@@ -150,6 +165,8 @@ describe("GET /api/profile/:handle", () => {
       },
       snapshotDate: "2026-03-27",
       computedAt: "2026-03-27T10:30:00Z",
+      displayScore: 69,
+      displayTier: "Solid",
     });
   });
 
@@ -378,5 +395,69 @@ describe("OPTIONS /api/profile/:handle", () => {
     expect(resp.headers.get("Access-Control-Allow-Headers")).toBe(
       "Content-Type",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1062 — display (fresh, badge-consistent) vs smoothed (trend) score
+// ---------------------------------------------------------------------------
+
+describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () => {
+  it("exposes the fresh badge headline alongside the smoothed trend value", async () => {
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+    const body = await resp.json();
+
+    // The smoothed trend snapshot keeps its existing field names — no consumer
+    // of the public API sees a changed meaning.
+    expect(body.adjustedComposite).toBe(68);
+    expect(body.tier).toBe("High");
+    // The badge-consistent headline is additive.
+    expect(body.displayScore).toBe(69);
+    expect(body.displayTier).toBe("Solid");
+  });
+
+  it("materializes read-only so a public GET never triggers a cache write", async () => {
+    await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("juan294", {
+      readOnly: true,
+    });
+  });
+
+  it("returns null display fields when the profile cannot be materialized", async () => {
+    mockMaterializePublicProfile.mockResolvedValue(null);
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+    const body = await resp.json();
+
+    expect(resp.status).toBe(200);
+    expect(body.displayScore).toBeNull();
+    expect(body.displayTier).toBeNull();
+    // The snapshot half of the response is unaffected.
+    expect(body.adjustedComposite).toBe(68);
+  });
+
+  it("degrades to null display fields when materialization throws, never 500s", async () => {
+    // A 500 on legal user input is always a bug — this endpoint worked before
+    // the display fields existed and must keep working if they cannot be
+    // computed.
+    mockMaterializePublicProfile.mockRejectedValue(new Error("redis down"));
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+    const body = await resp.json();
+
+    expect(resp.status).toBe(200);
+    expect(body.displayScore).toBeNull();
+    expect(body.displayTier).toBeNull();
+    expect(body.compositeScore).toBe(68);
+  });
+
+  it("does not materialize when the snapshot is missing (404 path stays cheap)", async () => {
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
+
+    const resp = await GET(makeRequest("nobody"), makeParams("nobody"));
+
+    expect(resp.status).toBe(404);
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
   });
 });

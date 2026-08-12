@@ -9,6 +9,14 @@ const SOURCE = [
     "utf-8",
   ),
 ].join("\n");
+const EN_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../../../../lib/i18n/dictionaries/en.ts"),
+  "utf-8",
+);
+const ES_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../../../../lib/i18n/dictionaries/es.ts"),
+  "utf-8",
+);
 
 describe("Verification explainer page (server component)", () => {
   describe("static/ISR rendering", () => {
@@ -82,6 +90,24 @@ describe("Verification explainer page (server component)", () => {
 
     it("uses design table rows key", () => {
       expect(SOURCE).toContain("about.verification.designTableRows");
+    });
+
+    it("limits cryptographic claims to badges marked Verified metrics", () => {
+      expect(EN_DICT).toContain(
+        "Badges marked Public metrics do not claim cryptographic attestation",
+      );
+      expect(EN_DICT).not.toContain(
+        "Every Chapa badge carries a compact verification strip",
+      );
+    });
+
+    it("states the same verified-versus-public limit in Spanish", () => {
+      expect(ES_DICT).toContain(
+        "Métricas públicas» no afirman tener certificación criptográfica",
+      );
+      expect(ES_DICT).not.toContain(
+        "Cada Chapa incluye una banda compacta de verificación",
+      );
     });
   });
 });

@@ -191,10 +191,12 @@ export async function SharePageContent({
   // Deferred work: verification storage, tracking, snapshots, and (on a
   // fresh render where the avatar resolved) cache write so future requests
   // and the badge.svg route can hit the cache. We deliberately do NOT
-  // cache renders that fell back to a placeholder avatar — that would
-  // poison the shared cache with a degraded SVG for up to 24h. (#800)
+  // cache renders that fell back to a placeholder avatar or lack a
+  // verification record. Either state can be temporary, and caching it would
+  // prevent a later complete fetch from healing the SVG for up to 24h. (#800)
   if (materialized && inlineSvg && !readOnly) {
-    const svgToCache = renderedFresh && avatarResolved ? inlineSvg : null;
+    const svgToCache =
+      renderedFresh && avatarResolved && verification ? inlineSvg : null;
     const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
       readOnly,
     });

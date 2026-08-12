@@ -49,4 +49,15 @@ describe("GET /llms-full.txt", () => {
     expect(text).toContain("HTML");
     expect(text).toContain("Creator Studio");
   });
+
+  it("limits cryptographic claims to badges marked Verified metrics", async () => {
+    const res = getLlmsFullTxt();
+    const text = await res.text();
+
+    expect(text).toContain('Badges marked "Verified metrics"');
+    expect(text).toContain('Badges marked "Public metrics"');
+    expect(text).not.toContain(
+      "Each badge includes a cryptographic verification hash",
+    );
+  });
 });

@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-08-11
+
+### Fixed
+
+- **An EMU merge is no longer discarded when you refresh your own badge.**
+  Supplemental stats uploaded by `chapa merge` were composed into the stats
+  object *before* the two integrity guards that exist to detect GitHub
+  token-scope blindness. When the scope-downgrade rule rejected a refresh — which
+  it does for every user-initiated refresh, because the OAuth app requests no
+  `repo` scope — it re-cached a baseline that had never seen the supplemental,
+  silently dropping the merge for six hours and restarting that clock on every
+  further refresh. Observed in production: a badge stuck at 16/Emerging against a
+  true 69/Solid. A rejected fetch is now non-destructive for every non-GitHub
+  data source, and returns the better-scoped value to the caller rather than the
+  caller's own blinded data, so a rejected refresh shows the real score.
+- **A large EMU supplemental can no longer hide a scope-blinded GitHub fetch.**
+  `isDegradedPrFetch` reads `prsMergedCount`, which the merge step had already
+  inflated with supplemental PRs, so enough EMU activity lifted a blinded fetch
+  over both detection signatures — disarming the guard for exactly the users with
+  the most data to lose. Both guards now judge GitHub-derived stats only.
+- **The degraded-fetch alert reports the fetch's classified scope** instead of
+  merely whether a token object was present, which mislabelled which fetches were
+  private-inclusive.
+- **`heal-poisoned-stats` detects the pre-merge shape.** The repair script's two
+  predicates keyed on merged-PR counts and could not see a structurally valid
+  entry that simply predated an EMU upload — the shape of the incident above.
+
+### Added
+
+- **`/api/profile` exposes the badge-consistent headline.** `displayScore` and
+  `displayTier` carry the fresh score shown on the badge and share page, while
+  `compositeScore`/`adjustedComposite`/`tier` keep their existing meaning as the
+  EMA-smoothed trend snapshot. The two diverge sharply after any step change in
+  inputs — an EMU merge produced a badge headline of 69/Solid while this endpoint
+  still reported 25/Emerging for the same handle in the same minute. Both pairs
+  are now documented in `llms-full.txt`, which had never listed the endpoint.
+- **An architecture decision record for the scoring-data integrity contract.**
+  The contract had evolved across five issues with no written decision; the ADR
+  states the invariant that the guards operate exclusively on GitHub-derived
+  stats and that every other source composes onto whichever value they select.
+
+### Changed
+
+- **The protected stats baseline holds GitHub-derived data only**, under the new
+  `stats:stale:v2:` key so it is composed the same way as the fresh value it is
+  compared against. Pre-existing entries are orphaned deliberately and expire on
+  their seven-day TTL; no backfill is required.
+- CI cancels superseded runs on non-`main` refs. `main` is excluded because
+  release-verification evidence is bound to an exact commit and must finish.
+
 ## [2.20.0] - 2026-08-11
 
 ### Added
@@ -914,7 +964,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.20.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.21.0...HEAD
+[2.21.0]: https://github.com/juan294/chapa/compare/v2.20.0...v2.21.0
 [2.20.0]: https://github.com/juan294/chapa/compare/v2.19.1...v2.20.0
 [2.19.1]: https://github.com/juan294/chapa/compare/v2.19.0...v2.19.1
 [2.19.0]: https://github.com/juan294/chapa/compare/v2.18.1...v2.19.0

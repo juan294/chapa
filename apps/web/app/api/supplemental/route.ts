@@ -116,6 +116,11 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
   }
 
   // 6. Invalidate score-dependent read models and rendered badge artifact.
+  // `stats: true` is load-bearing: it drops the composed stats entry so the
+  // next getStats recomposes with this record. Without it the upload succeeds
+  // and the score silently never moves. It deliberately does NOT clear
+  // `stats:stale:v2:` — that baseline holds GitHub-derived data only and is
+  // unaffected by a supplemental upload (#1060).
   await invalidateProfileReadModels(targetHandle, {
     stats: true,
     badgeSvg: true,

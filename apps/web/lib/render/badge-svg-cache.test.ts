@@ -28,7 +28,7 @@ describe("badge-svg-cache", () => {
   describe("buildBadgeSvgCacheKey", () => {
     it("includes the badge renderer version so visual changes bypass stale SVGs", () => {
       const key = buildBadgeSvgCacheKey("Octocat", "2026-05-01");
-      expect(BADGE_RENDER_VARIANT).toBe("warm-amber-v2");
+      expect(BADGE_RENDER_VARIANT).toBe("warm-amber-v3");
       expect(key).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01`);
     });
 

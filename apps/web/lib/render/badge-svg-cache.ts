@@ -17,7 +17,7 @@ import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
  * and response construction that follow a successful read.
  */
 const CACHE_DEADLINE_MS = 500;
-export const BADGE_RENDER_VARIANT = "warm-amber-v2";
+export const BADGE_RENDER_VARIANT = "warm-amber-v3";
 
 /**
  * Base TTL for badge SVG cache entries.

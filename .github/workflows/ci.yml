@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [develop, main]
 
+# CI-cost rule: a newer push to the same ref supersedes the in-progress run, so
+# don't keep paying to verify a commit nobody will ship. `main` is excluded from
+# cancellation — release-verification evidence is bound to an exact commit and
+# must always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   lint-and-typecheck:
     name: Lint & Typecheck

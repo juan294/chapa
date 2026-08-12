@@ -47,15 +47,26 @@ const SCOPE_SHORTFALL_RATIO = 0.5;
  * baseline always writes through, so the next authenticated fetch heals the
  * data and it sticks.
  *
- * @param fresh    The just-fetched (possibly merged) stats about to be cached.
- * @param lastGood The last-known-good stats (the `stats:stale:<handle>` value),
- *                 or null/undefined when no baseline exists.
- * @returns true when `fresh` should be rejected in favor of `lastGood`.
+ * BOTH operands MUST be GitHub-derived — the raw `fetchStats` output, before
+ * linked-platform or EMU supplemental data is composed onto it (#1061).
+ * Those sources are not GitHub-token-scoped, so including them lets a
+ * non-GitHub contribution lift a scope-blinded fetch over both signatures
+ * above: `mergeStats` sums `prsMergedCount`, so a 50-PR EMU supplemental hides
+ * a GitHub fetch that returned 0. `client.ts` therefore calls this with
+ * `primary` and the `stats:stale:v2:<handle>` baseline, both pre-composition.
+ *
+ * @param freshGithubDerived    The just-fetched GitHub-derived stats, pre-composition.
+ * @param lastGoodGithubDerived The last-known-good GitHub-derived stats (the
+ *                 `stats:stale:v2:<handle>` value), or null/undefined when no
+ *                 baseline exists.
+ * @returns true when the fresh fetch should be rejected in favor of the baseline.
  */
 export function isDegradedPrFetch(
-  fresh: StatsData,
-  lastGood: StatsData | null | undefined,
+  freshGithubDerived: StatsData,
+  lastGoodGithubDerived: StatsData | null | undefined,
 ): boolean {
+  const fresh = freshGithubDerived;
+  const lastGood = lastGoodGithubDerived;
   // No baseline to compare against — cannot judge, so accept the fetch.
   if (!lastGood) return false;
 

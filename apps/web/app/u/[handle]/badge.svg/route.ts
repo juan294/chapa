@@ -369,7 +369,10 @@ export async function GET(
       disableAnimation: true,
     });
     const renderMs = Date.now() - renderStart;
-    if (!readOnly && avatarResolved) {
+    // A missing verification record can be temporary when the first public
+    // fetch is incomplete. Do not make that unverified render the terminal
+    // 24-hour cache value; a later complete fetch must be able to heal it.
+    if (!readOnly && avatarResolved && verification) {
       await writeBadgeSvgCache(svgCacheKey, svg, handle);
     }
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;

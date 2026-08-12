@@ -6,6 +6,16 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Pending-migrations gate tolerates one migra artifact on `admin_users` (#1064)
+
+- **Risk:** `pnpm run check:pending-migrations` treats a schema diff consisting *solely* of a `drop view` + `create or replace view` pair for `public.admin_users`, matching one exact pinned body, as clean. An `admin_users` change that normalized to precisely that text would pass unnoticed.
+- **Why accepted:** The tolerated text is what the view already is, so reaching it requires changing the view to itself. migra emits this block on every run against the production project even when nothing differs — verified read-only on 2026-08-11: production's `pg_get_viewdef('public.admin_users')` is textually identical to what `014_views_security_invoker.sql` produces, `pg_class.reloptions` is `{security_invoker=true}` as that migration sets, and the emitted block is byte-for-byte identical (674 characters) whether or not a migration recreates the view. No migration content can silence it, which is why `032_reconcile_remote_schema.sql` deliberately omits the view. Without this tolerance the gate blocks *every* release PR, including ones that change no migrations — which is how it behaved when it first started running, and a gate that always fails is a gate nobody reads.
+- **Mitigation:** The tolerance is pinned to the exact statement pair, whitespace-normalized, in `TOLERATED_MIGRA_ARTIFACT` (`scripts/check-pending-migrations.ts`). Three regression tests in `check-pending-migrations.test.ts` assert that the gate still blocks when the artifact is accompanied by any other statement, when the `admin_users` body genuinely changes, and when the same body shape appears for a different view. Real drift in any other object is unaffected. The proper fix is replacing migra with schema introspection, tracked in #1064.
+- **Severity:** Low (one admin-only view, pinned body, blocking behavior preserved everywhere else)
+- **Accepted:** 2026-08-11
+
+---
+
 ## CSP unsafe-inline for scripts (#396, #778, #959)
 
 - **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`. This is a known limitation of the framework — removing it causes hydration to fail.
@@ -276,7 +286,7 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 - **Risk:** The GitHub OAuth login requests only `read:user user:email` (`lib/auth/github.ts`, `OAUTH_SCOPES`). A user's session token therefore cannot read their private repositories, so `/api/refresh` sees only public merged PRs. GitHub offers no read-only classic scope for private repos — `repo` grants full read/write.
 - **Decision (owner, 2026-07-16):** keep the narrow scopes. Asking every user for full private-repo access to render a badge is a disproportionate trust demand, and existing users would all have to re-consent.
-- **Mitigation:** post-#1050, a scope-blind refresh is labeled `fetchScope: "public"` and can never outrank or overwrite the server token's complete data — it is *rejected* (last-known-good served), not corrupting. The hourly `warm-cache` cron (#1052) refreshes every score with the `repo`-scoped server `GITHUB_TOKEN`, so freshness no longer depends on user-initiated refreshes. `/api/health` asserts the server token retains `repo` (`insufficient_scope` otherwise, #1047). If `repo` is ever added to `OAUTH_SCOPES`, `fetchScope` updates automatically — it derives from the same constant.
+- **Mitigation:** post-#1050, a scope-blind refresh is labeled `fetchScope: "public"` and can never outrank or overwrite the server token's complete data — it is *rejected* (last-known-good served), not corrupting. Post-#1060 that holds for **every** data source, not just GitHub: rejection now serves the last-known-good GitHub-derived data re-composed with the current EMU supplemental and linked-platform stats. Previously rejection re-cached a baseline that had never seen the current supplemental, so a refresh taken right after `chapa merge` silently discarded the merge for 6h — the one case where rejection *was* corrupting. The hourly `warm-cache` cron (#1052) refreshes every score with the `repo`-scoped server `GITHUB_TOKEN`, so freshness no longer depends on user-initiated refreshes. `/api/health` asserts the server token retains `repo` (`insufficient_scope` otherwise, #1047). If `repo` is ever added to `OAUTH_SCOPES`, `fetchScope` updates automatically — it derives from the same constant.
 - **Severity:** Low (a private-heavy user's manual Refresh is a near-no-op; the cron covers freshness within the hour)
 - **Accepted:** 2026-07-16
 

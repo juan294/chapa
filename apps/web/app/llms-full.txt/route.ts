@@ -6,7 +6,7 @@ This is the extended documentation for AI models and LLM crawlers. For a concise
 
 ## Overview
 
-Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Each badge includes a cryptographic verification hash (HMAC-SHA256) proving the data hasn't been tampered with.
+Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Badges marked "Verified metrics" include a cryptographic verification hash (HMAC-SHA256) proving the data has not been tampered with. Badges marked "Public metrics" do not claim cryptographic attestation.
 
 ## Scoring Model: Impact v6
 
@@ -63,6 +63,7 @@ Each archetype has a dedicated guide page at /archetypes/{type} explaining the t
 ### Public (no auth required)
 - \`GET /u/{handle}/badge.svg\` — Embeddable badge image. Returns SVG with Cache-Control headers (6h s-maxage, 7d stale-while-revalidate).
 - \`GET /u/{handle}\` — Share page with badge, breakdown, and embed snippets.
+- \`GET /api/profile/{handle}\` — JSON: impact dimensions, archetype, tier, and optional craft score. Two headline pairs, deliberately distinct: \`displayScore\`/\`displayTier\` are the FRESH values shown on the badge and share page, while \`compositeScore\`/\`adjustedComposite\`/\`tier\` come from the persisted daily snapshot and are EMA-smoothed for the trend sparkline. Use \`displayScore\` to match the badge; use \`adjustedComposite\` to plot history. \`displayScore\`/\`displayTier\` are null when the fresh score cannot be computed.
 - \`GET /api/history/{handle}\` — JSON: score history, trend (improving/stable/declining), and snapshot diffs.
 - \`GET /about/scoring\` — Scoring methodology page.
 - \`GET /archetypes/{type}\` — Archetype guide (builder, guardian, marathoner, polymath, artificer, balanced, emerging).

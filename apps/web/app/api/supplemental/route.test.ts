@@ -294,6 +294,22 @@ describe("POST /api/supplemental", () => {
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:juan294");
   });
 
+  it("never clears the protected GitHub-derived baseline (#1060)", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    await POST(req);
+
+    // `stats:stale:v2:` holds GitHub-derived data only, so a supplemental
+    // upload has no bearing on it. Clearing it would discard the scope
+    // protection from #1050 for no benefit.
+    expect(mockCacheDel).not.toHaveBeenCalledWith(
+      expect.stringContaining("stats:stale"),
+    );
+  });
+
   it("handle comparison is case-insensitive", async () => {
     mockResolveRequestAuth.mockResolvedValue({ handle: "Juan294" });
     const req = makeRequest(
