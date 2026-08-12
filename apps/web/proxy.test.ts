@@ -15,8 +15,24 @@ function makeRequest(
 }
 
 describe("resolveProxyLocale", () => {
-  it("prefers the chapa-locale cookie over everything else", () => {
+  it("prefers an explicit supported lang query over the persisted locale", () => {
+    const request = makeRequest("/about/verification?lang=en", {
+      cookie: "chapa-locale=es",
+      acceptLanguage: "es-ES,es;q=0.9",
+    });
+    expect(resolveProxyLocale(request)).toBe("en");
+  });
+
+  it("prefers the chapa-locale cookie over Accept-Language without a supported query", () => {
     const request = makeRequest("/about", {
+      cookie: "chapa-locale=en",
+      acceptLanguage: "es-ES,es;q=0.9",
+    });
+    expect(resolveProxyLocale(request)).toBe("en");
+  });
+
+  it("ignores an unsupported lang query and falls through to the cookie", () => {
+    const request = makeRequest("/about/verification?lang=fr", {
       cookie: "chapa-locale=en",
       acceptLanguage: "es-ES,es;q=0.9",
     });
@@ -57,6 +73,17 @@ describe("proxy", () => {
     const response = proxy(request);
     const rewritten = response.headers.get("x-middleware-rewrite");
     expect(rewritten).toBe("https://chapa.example.com/en/about/scoring?foo=bar");
+  });
+
+  it("rewrites an explicit English deep link to matching English content", () => {
+    const request = makeRequest("/about/verification?lang=en", {
+      cookie: "chapa-locale=es",
+    });
+    const response = proxy(request);
+    const rewritten = response.headers.get("x-middleware-rewrite");
+    expect(rewritten).toBe(
+      "https://chapa.example.com/en/about/verification?lang=en",
+    );
   });
 
   it("rewrites an archetype slug page to the default locale when unresolved", () => {

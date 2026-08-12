@@ -6,14 +6,19 @@ import type { Locale } from "./lib/i18n/types";
 /**
  * Resolves the locale for a content-page request using the same priority
  * order as the server-side `getServerLocale()` helper (lib/i18n/server.ts):
- * `chapa-locale` cookie first, then `Accept-Language`, falling back to
- * `DEFAULT_LOCALE`. Re-implemented here (reading directly from the
+ * an explicit supported `?lang=` override first, then the `chapa-locale`
+ * cookie, then `Accept-Language`, falling back to `DEFAULT_LOCALE`.
+ * Re-implemented here (reading directly from the
  * `NextRequest` cookie jar / headers) rather than reusing `getServerLocale`
  * because the proxy (formerly "middleware") runs on the Edge runtime and
  * must not import `next/headers` (which requires the Next.js request-scoped
  * async storage that `getServerLocale` relies on).
  */
 export function resolveProxyLocale(request: NextRequest): Locale {
+  const queryLocale = request.nextUrl.searchParams.get("lang");
+  if (queryLocale && SUPPORTED_LOCALES.includes(queryLocale as Locale)) {
+    return queryLocale as Locale;
+  }
   const cookieValue = request.cookies.get(LOCALE_COOKIE)?.value;
   if (cookieValue && SUPPORTED_LOCALES.includes(cookieValue as Locale)) {
     return cookieValue as Locale;
