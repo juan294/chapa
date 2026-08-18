@@ -2,6 +2,12 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 
+// KeyboardShortcutsListener (mounted unconditionally by CommandBarHint, #1068)
+// calls useRouter() — needs an app-router context that isn't present in tests.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 // Mock the heavy command bar so this test focuses on disclosure behavior.
 vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: ({ isAdmin }: { isAdmin?: boolean }) => (

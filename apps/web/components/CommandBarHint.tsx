@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { isInputFocused } from "@/lib/keyboard/shortcuts";
 import { useTranslation } from "@/lib/i18n";
 
@@ -18,6 +19,16 @@ import { useTranslation } from "@/lib/i18n";
  * change the *initial presentation*, not the capability. Once summoned, the
  * existing `focus-command-bar` ("/") shortcut in KeyboardShortcutsListener
  * takes over and focuses the (now mounted) command input.
+ *
+ * `KeyboardShortcutsListener` is mounted here unconditionally — regardless
+ * of `summoned` — so the global `navigation` scope, the "?" cheat sheet, and
+ * page-scope shortcut registrations (e.g. `SharePageShortcuts`) all work
+ * from first paint, not just after the visitor opts into the command bar
+ * (#1068). The same listener instance stays mounted across the summon
+ * transition, so `GlobalCommandBarLazy` is told to skip mounting its own via
+ * `skipShortcutsListener` — mounting a second instance would publish the
+ * module store twice and the loser's unmount cleanup would kill the
+ * survivor's registrations.
  */
 export function CommandBarHint({ isAdmin }: { isAdmin?: boolean } = {}) {
   const { t } = useTranslation();
@@ -59,22 +70,25 @@ export function CommandBarHint({ isAdmin }: { isAdmin?: boolean } = {}) {
     return () => clearTimeout(timer);
   }, [summoned]);
 
-  if (summoned) {
-    return <GlobalCommandBarLazy isAdmin={isAdmin} />;
-  }
-
   return (
-    <button
-      type="button"
-      data-testid="command-bar-hint"
-      onClick={summon}
-      aria-label={t("commandHint.ariaLabel") as string}
-      className="group fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-lg border border-stroke bg-card/90 px-3 py-1.5 font-terminal text-xs text-text-secondary shadow-card backdrop-blur-md transition-colors hover:border-amber/30 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40 motion-reduce:transition-none"
-    >
-      <kbd className="rounded border border-stroke bg-bg/60 px-1.5 py-0.5 font-terminal text-[0.7rem] leading-none text-amber group-hover:border-amber/40">
-        /
-      </kbd>
-      <span>{t("commandHint.label") as string}</span>
-    </button>
+    <>
+      <KeyboardShortcutsListener />
+      {summoned ? (
+        <GlobalCommandBarLazy isAdmin={isAdmin} skipShortcutsListener />
+      ) : (
+        <button
+          type="button"
+          data-testid="command-bar-hint"
+          onClick={summon}
+          aria-label={t("commandHint.ariaLabel") as string}
+          className="group fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-lg border border-stroke bg-card/90 px-3 py-1.5 font-terminal text-xs text-text-secondary shadow-card backdrop-blur-md transition-colors hover:border-amber/30 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40 motion-reduce:transition-none"
+        >
+          <kbd className="rounded border border-stroke bg-bg/60 px-1.5 py-0.5 font-terminal text-[0.7rem] leading-none text-amber group-hover:border-amber/40">
+            /
+          </kbd>
+          <span>{t("commandHint.label") as string}</span>
+        </button>
+      )}
+    </>
   );
 }
