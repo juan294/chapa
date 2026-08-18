@@ -160,7 +160,6 @@ describe("ImpactDashboard", () => {
       <ImpactDashboard
         impact={mockImpact}
         stats={mockStats}
-        handle="testuser"
       />,
     );
 
@@ -184,7 +183,6 @@ describe("ImpactDashboard", () => {
       <ImpactDashboard
         impact={mockImpact}
         stats={mockStats}
-        handle="testuser"
         trend={mockTrend}
         diff={mockDiff}
       />,
@@ -213,7 +211,6 @@ describe("ImpactDashboard", () => {
       <ImpactDashboard
         impact={mockImpact}
         stats={mockStats}
-        handle="testuser"
       />,
     );
 
@@ -246,7 +243,6 @@ describe("ImpactDashboard", () => {
       <ImpactDashboard
         impact={mockImpact}
         stats={mockStats}
-        handle="testuser"
         trend={null}
         diff={null}
       />,

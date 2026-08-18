@@ -140,7 +140,6 @@ export function SharePageOwnerContent({
           <ImpactDashboard
             impact={impact}
             stats={stats}
-            handle={handle}
             craftResult={craftResult}
             trend={trend}
             diff={diff}

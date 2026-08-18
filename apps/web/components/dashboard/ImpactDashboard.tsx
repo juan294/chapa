@@ -20,7 +20,6 @@ interface ImpactDashboardProps {
   // reads confidence/confidencePenalties.
   impact: ClientImpactV6Result;
   stats: StatsData;
-  handle: string;
   craftResult?: CraftResult | null;
   /**
    * Trend/diff history data, fetched server-side (#1034) by the share page
