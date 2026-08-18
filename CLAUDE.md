@@ -78,6 +78,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
   environment, no-store); E2E Pro uses it to bind preview and production
   evidence to the fixed release candidate
 - GET `/api/feature-flags` Public feature flag values
+- GET `/api/insights/:handle` AI tool insights for a user (public, no auth; rate-limited; returns only computed scores, no raw data)
 - GET `/u/:handle/og-image` OG image for share page (dynamic, cached)
 - GET `/og-image` Default OG image
 - GET `/llms.txt` LLM-friendly site summary
@@ -90,7 +91,6 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
 - POST `/api/generate` Generate badge for authenticated user
 - POST `/api/recalculate` Recalculate impact scores
-- GET `/api/insights/:handle` AI tool insights for a user
 - POST `/api/insights` Submit tool insights data
 - GET `/api/cli/auth/poll` CLI device auth polling (RFC 8628-style: first poll issues + returns a `device_code`; subsequent polls from the CLI should echo it to bind the session to the initiating device; legacy CLIs that omit it still work)
 - POST `/api/cli/auth/approve` CLI device auth approval
