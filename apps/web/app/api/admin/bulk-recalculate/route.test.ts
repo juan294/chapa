@@ -80,6 +80,7 @@ const FAKE_MATERIALIZED = {
     computedAt: "2026-04-17T12:00:00.000Z",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 42, tier: "Solid" },
+  statsComplete: true,
 };
 
 const VALID_SECRET = "test-admin-secret";
@@ -304,6 +305,31 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.errors[0]).toEqual({
       handle: "alice",
       error: "Snapshot replace failed",
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1076 — persistOrchestratedSnapshot's #1003 gate intentionally skips
+  // persistence when materialized.statsComplete is false. Distinguish that
+  // from a genuine write failure in the per-handle error message so an
+  // operator scanning bulk-recalculate output can tell them apart.
+  // ---------------------------------------------------------------------------
+
+  it("#1076: reports an incomplete-stats skip distinctly from a genuine snapshot replace failure", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue({
+      ...FAKE_MATERIALIZED,
+      statsComplete: false,
+    });
+    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(body.recalculated).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.errors[0]).toEqual({
+      handle: "alice",
+      error: "Snapshot skipped: stats incomplete",
     });
   });
 
