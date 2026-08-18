@@ -472,6 +472,60 @@ describe("GET /u/[handle]/badge.svg", () => {
         expect.any(Number),
       );
     });
+
+    // #1080 — `avatarResolved` used to conflate "nothing to fetch" and "a hard
+    // failure settled before the deadline" with "the deadline actually fired".
+    // Both of the first two cases will never resolve differently on a retry,
+    // so the SVG cache must still be written for them; only a genuine timeout
+    // should withhold the write (a retry might succeed there).
+    it("#1080: writes the SVG cache when the handle has no avatarUrl at all (nothing to fetch)", async () => {
+      mockMaterializePublicProfile.mockResolvedValue({
+        ...FAKE_MATERIALIZED,
+        stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: undefined },
+      });
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+    });
+
+    it("#1080: still writes the SVG cache when the avatar fetch fails outright before the deadline (not a timeout)", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("404 from CDN"));
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+    });
+
+    it("#1080: still withholds the SVG cache write when the avatar fetch genuinely times out against the deadline", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await responsePromise;
+
+        expect(mockCacheSet).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("SVG full-response cache (#717)", () => {
