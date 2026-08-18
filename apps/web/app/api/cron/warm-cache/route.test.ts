@@ -20,6 +20,10 @@ const {
   mockCaptureServerError,
   mockCaptureServerEvent,
   mockCaptureOperationalAlert,
+  mockRenderBadgeSvg,
+  mockGetPublicProfileVerification,
+  mockBuildBadgeSvgCacheKey,
+  mockWriteBadgeSvgCache,
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
@@ -38,6 +42,10 @@ const {
   mockCaptureServerError: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
   mockCaptureOperationalAlert: vi.fn(),
+  mockRenderBadgeSvg: vi.fn(),
+  mockGetPublicProfileVerification: vi.fn(),
+  mockBuildBadgeSvgCacheKey: vi.fn(),
+  mockWriteBadgeSvgCache: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cron", () => ({
@@ -89,6 +97,20 @@ vi.mock("@/lib/render/avatar", () => ({
   getAvatarBase64: (...args: unknown[]) => mockGetAvatarBase64(...args),
 }));
 
+vi.mock("@/lib/render/BadgeSvg", () => ({
+  renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
+}));
+
+vi.mock("@/lib/profile/public-profile", () => ({
+  getPublicProfileVerification: (...args: unknown[]) =>
+    mockGetPublicProfileVerification(...args),
+}));
+
+vi.mock("@/lib/render/badge-svg-cache", () => ({
+  buildBadgeSvgCacheKey: (...args: unknown[]) => mockBuildBadgeSvgCacheKey(...args),
+  writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+}));
+
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
   captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
@@ -125,6 +147,7 @@ const FAKE_MATERIALIZED = {
     computedAt: "2026-04-17T12:00:00.000Z",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 66, tier: "Solid" },
+  statsComplete: true,
 };
 
 function makeRequest(): NextRequest {
@@ -157,6 +180,15 @@ describe("GET /api/cron/warm-cache", () => {
     mockCaptureServerError.mockResolvedValue(undefined);
     mockCaptureServerEvent.mockResolvedValue(undefined);
     mockCaptureOperationalAlert.mockResolvedValue(undefined);
+    mockRenderBadgeSvg.mockReturnValue("<svg>rendered</svg>");
+    mockGetPublicProfileVerification.mockReturnValue({
+      hash: "verified-hash",
+      date: "2026-04-17",
+    });
+    mockBuildBadgeSvgCacheKey.mockImplementation(
+      (handle: string, date: string) => `badge:v1:${handle}:warm-amber-v3:${date}`,
+    );
+    mockWriteBadgeSvgCache.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -572,6 +604,95 @@ describe("GET /api/cron/warm-cache", () => {
     // Warm still succeeds — avatar failure is fire-and-forget
     expect(body.warmed).toBe(2);
     expect(body.failed).toBe(0);
+  });
+
+  // #1089 (PE-M2): the cron previously never rendered/wrote the badge SVG
+  // cache, guaranteeing a cold miss for every handle at the UTC date
+  // rollover. warmHandle must now render and write the SVG, gated by the
+  // exact same quality gates that protect the request-path write in
+  // finalizeMaterializedBadge (apps/web/app/u/[handle]/badge.svg/route.ts):
+  // the avatar must have resolved AND a verification record must exist
+  // (which itself requires materialized.statsComplete).
+  describe("badge SVG cache warming (#1089)", () => {
+    it("renders and writes the badge SVG cache when the avatar resolves and stats look complete", async () => {
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          avatarDataUri: "data:image/png;base64,abc",
+          verificationHash: "verified-hash",
+          verificationDate: "2026-04-17",
+          disableAnimation: true,
+        }),
+      );
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.stringContaining("alice"),
+        "<svg>rendered</svg>",
+        "alice",
+      );
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.stringContaining("bob"),
+        "<svg>rendered</svg>",
+        "bob",
+      );
+    });
+
+    it("withholds the SVG cache write when verification is null (degraded/incomplete stats)", async () => {
+      mockGetPublicProfileVerification.mockReturnValue(null);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      // The warm itself still succeeds — only the SVG publish is gated.
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("withholds the SVG cache write when the avatar fails to resolve", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("avatar fetch timeout"));
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("withholds the SVG cache write when the handle has no avatarUrl (mirrors the request path's avatarResolved gate)", async () => {
+      mockMaterializeOrchestratedProfile.mockResolvedValue({
+        ...FAKE_MATERIALIZED,
+        stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: null },
+      });
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
+
+    it("does not let a badge SVG render/write failure fail the warm", async () => {
+      mockWriteBadgeSvgCache.mockRejectedValue(new Error("redis write boom"));
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(body.failed).toBe(0);
+    });
   });
 
   // DO-M5: PostHog cron_warm_cache_complete event

@@ -12,7 +12,6 @@ import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
@@ -22,10 +21,17 @@ import {
 } from "@/lib/analytics/server-errors";
 import { getRequestId } from "@/lib/log";
 import { getAvatarBase64 } from "@/lib/render/avatar";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import {
+  buildBadgeSvgCacheKey,
+  writeBadgeSvgCache,
+} from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
+import { getPublicProfileVerification } from "@/lib/profile/public-profile";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -314,13 +320,38 @@ async function warmHandle(
     let snapshotRecorded = false;
     let notified = false;
 
-    // Pre-warm avatar cache opportunistically for later public renders.
-    const avatarUrl = materialized.stats.avatarUrl;
-    if (avatarUrl) {
-      fireAndForget(
-        () => getAvatarBase64(handle, avatarUrl),
-        () => undefined,
-      );
+    // #1089 (PE-M2): render and publish the badge SVG cache entry here so the
+    // first real visitor after the UTC date rollover gets a cache hit instead
+    // of paying the full materialize+render cost the cron already just paid.
+    // Gated by the exact same quality checks that protect the request-path
+    // write in finalizeMaterializedBadge (apps/web/app/u/[handle]/badge.svg/
+    // route.ts): the avatar must have resolved AND a verification record must
+    // exist (which itself requires materialized.statsComplete, #1003) — a
+    // degraded cron fetch must never publish a lower-quality badge for 24h.
+    // The avatar fetch is awaited (not fire-and-forget as before) since its
+    // result now feeds the render; its own internal fetch abort bounds this.
+    try {
+      const avatarUrl = materialized.stats.avatarUrl;
+      const avatarDataUri = avatarUrl
+        ? await getAvatarBase64(handle, avatarUrl).catch(() => undefined)
+        : undefined;
+      const avatarResolved = avatarDataUri !== undefined;
+      const verification = getPublicProfileVerification(materialized);
+
+      if (avatarResolved && verification) {
+        const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+          avatarDataUri,
+          verificationHash: verification.hash,
+          verificationDate: verification.date,
+          // Mirrors the request path — this SVG is served to <img> embeds,
+          // where SMIL <animate> never runs.
+          disableAnimation: true,
+        });
+        const today = toDateString(new Date());
+        await writeBadgeSvgCache(buildBadgeSvgCacheKey(handle, today), svg, handle);
+      }
+    } catch {
+      // Badge SVG warming is opportunistic — never fail the warm over it.
     }
 
     // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
