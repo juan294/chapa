@@ -37,6 +37,12 @@ export function BadgeToolbar({
   const shareRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
+    // Re-arm on every (re)mount — under React StrictMode's dev-only
+    // mount/cleanup/mount cycle, the cleanup below flips this false before
+    // the "real" mount ever fires a timer callback. Without resetting it
+    // here, mountedRef.current is permanently false from the first render,
+    // silently dropping the post-refresh router.refresh() call (#1073).
+    mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
   const { isOpen: shareOpen, setIsOpen: setShareOpen } = useDropdownMenu(shareRef);

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { StrictMode } from "react";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
 import { BadgeToolbar, stripBadgeAnimations } from "./BadgeToolbar";
 import type { SessionUser } from "@/hooks/useSession";
@@ -869,6 +870,35 @@ describe("BadgeToolbar render", () => {
 
       const btn = screen.getByLabelText("Refresh badge data");
       expect(btn.hasAttribute("disabled")).toBe(true);
+    });
+  });
+
+  describe("StrictMode mount/unmount/remount (#1073)", () => {
+    it("still calls router.refresh() after a successful refresh once mounted under StrictMode's double-invoke cycle", async () => {
+      mockSessionAndRefresh("testuser", { ok: true });
+
+      render(
+        <StrictMode>
+          <BadgeToolbar handle="testuser" />
+        </StrictMode>,
+      );
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      await waitFor(() => expect(screen.getByText("Refreshed!")).toBeDefined());
+
+      // The success handler schedules router.refresh() 500ms later, gated on
+      // mountedRef.current. StrictMode mounts, cleans up, and remounts the
+      // effect synchronously in dev; if the ref is never re-armed on mount,
+      // it stays false from that first cycle and this call is silently
+      // dropped forever.
+      await waitFor(
+        () => expect(mockRouterRefresh).toHaveBeenCalled(),
+        { timeout: 1000 },
+      );
     });
   });
 
