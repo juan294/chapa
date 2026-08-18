@@ -15,13 +15,19 @@ test.describe("Generation locale — /generating/:handle", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       "Generating badge for",
     );
+    // #1108 (UX-H2): a signed-out visitor hits a 401 from /api/generate,
+    // which now surfaces a session-specific message and a sign-in link
+    // (not the old generic "something went wrong" + same-URL retry that
+    // could never succeed without re-authenticating).
     await expect(page.locator("main").getByRole("alert")).toContainText(
-      "Something went wrong generating your badge.",
+      "Your session has expired. Please sign in again.",
     );
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("link", { name: "Try again" })).toHaveAttribute(
+    await expect(
+      page.getByRole("link", { name: "Sign in again" }),
+    ).toHaveAttribute(
       "href",
-      path,
+      `/api/auth/login?redirect=${encodeURIComponent("/generating/chapa-e2e-release-locale")}`,
     );
   });
 });
