@@ -1,6 +1,6 @@
 import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
 import { captureServerError } from "@/lib/analytics/server-errors";
-import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
+import { cacheDel, cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
 import { dbUpsertUser } from "@/lib/db/users";
 import { notifyFirstBadge } from "@/lib/email/notifications";
@@ -132,10 +132,8 @@ export async function persistProfileSnapshot(
   // #826 — When inputs have legitimately changed mid-day (supplemental upload),
   // bypass the guard so today's snapshot can be replaced with the fresh score.
   const today = new Date().toISOString().slice(0, 10);
-  const guardStatus = await cacheSetNxStatus(
-    `sideeffects:done:${handle}:${today}`,
-    86400,
-  );
+  const guardKey = `sideeffects:done:${handle}:${today}`;
+  const guardStatus = await cacheSetNxStatus(guardKey, 86400);
   if (guardStatus === "exists" && !materialized.inputsChanged) return false;
 
   // #826 — replace today's row when inputs changed; otherwise insert and
@@ -161,6 +159,15 @@ export async function persistProfileSnapshot(
       statusCode: 200,
       error: new Error(`Failed to persist profile snapshot for handle: ${handle}`),
     });
+
+    // #1081 — The SETNX day-guard above was already claimed for this
+    // handle+day before the durable write ran. A genuine write failure must
+    // release it (rather than leaving it in place until its 24h TTL expires)
+    // so the NEXT badge request today retries the write instead of silently
+    // forfeiting the rest of the day's snapshot history to the next
+    // warm-cache rotation. "inserted" and "duplicate" are correct terminal
+    // states and must NOT release the guard.
+    void cacheDel(guardKey);
   }
 
   if (persisted && materialized.inputsChanged) {
