@@ -25,23 +25,48 @@ describe("BadgeOverlay (source-reading a11y)", () => {
 });
 
 describe("BadgeOverlay hotspot elements", () => {
-  it("hotspots use <div> with tabIndex to avoid nested <button> hydration error", () => {
+  it("hotspots use a plain <div>, not a nested <button>", () => {
     // Hotspots contain InfoTooltip which renders a <button>. Using <button> for
     // the hotspot would create nested buttons — invalid HTML that causes React
-    // hydration errors. Use <div tabIndex={0}> instead.
+    // hydration errors. Use a plain <div> instead.
     const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
     expect(hotspotSection).toBeDefined();
     expect(hotspotSection).not.toMatch(/<button[\s\n]/);
-    expect(hotspotSection).toContain("tabIndex={0}");
     expect(hotspotSection).toContain('role="group"');
   });
 
-  it("hotspots are keyboard accessible with aria-label", () => {
+  // #1116 (UX-L2): these 11 hotspots are structural annotation regions, not
+  // widgets — they perform no action. tabIndex={0} put them all in the
+  // keyboard tab order as silent, non-actionable stops before the page's
+  // real actions (toolbar, embed snippet). Their content is already exposed
+  // to assistive tech via the always-present sr-only description (below),
+  // which is reachable in natural reading order without requiring focus at
+  // all — so the hotspots themselves must NOT be focusable.
+  it("hotspots are NOT in the tab order (#1116)", () => {
+    const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
+    expect(hotspotSection).toBeDefined();
+    expect(hotspotSection).not.toContain("tabIndex");
+  });
+
+  // The onFocus/onBlur handlers previously drove the desktop leader-line
+  // reveal for keyboard users. Once the hotspot is no longer focusable those
+  // handlers can never fire — removed as dead code (#1116). Hover
+  // (onMouseEnter/onMouseLeave) remains as the reveal mechanism for sighted
+  // mouse users; the mobile InfoTooltip fallback and the always-present
+  // sr-only description remain unaffected.
+  it("no longer wires onFocus/onBlur on hotspots (dead code once unfocusable, #1116)", () => {
+    const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
+    expect(hotspotSection).toBeDefined();
+    expect(hotspotSection).not.toContain("onFocus");
+    expect(hotspotSection).not.toContain("onBlur");
+  });
+
+  it("hotspots remain labeled with aria-label and still respond to hover", () => {
     const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
     expect(hotspotSection).toBeDefined();
     expect(hotspotSection).toContain("aria-label");
-    expect(hotspotSection).toContain("onFocus");
-    expect(hotspotSection).toContain("onBlur");
+    expect(hotspotSection).toContain("onMouseEnter");
+    expect(hotspotSection).toContain("onMouseLeave");
   });
 });
 

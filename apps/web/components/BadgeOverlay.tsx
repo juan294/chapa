@@ -290,8 +290,8 @@ export function BadgeOverlay() {
   const overlayRef = useRef<HTMLDivElement>(null);
   // Only the currently-active hotspot's element is ever needed (for the
   // flip-guard fallback in computePanelPosition) — captured directly from
-  // the triggering event's currentTarget in onMouseEnter/onFocus below,
-  // rather than tracking every hotspot's ref in a Map.
+  // the triggering event's currentTarget in onMouseEnter below, rather than
+  // tracking every hotspot's ref in a Map.
   const activeHotspotElRef = useRef<HTMLDivElement | null>(null);
 
   // Build tooltip map from dictionary. Memoized on `t` (stable per locale)
@@ -428,6 +428,18 @@ export function BadgeOverlay() {
       )}
 
       {/* ── Hotspot regions ── */}
+      {/* #1116 (UX-L2): these 11 regions are structural annotations, not
+          widgets — they perform no action, so they are intentionally left
+          unfocusable and excluded from the keyboard tab order. Their content
+          is already exposed to assistive tech via the always-present
+          sr-only <span> below (aria-describedby), reachable in normal
+          reading order without any interaction — so removing them from the
+          tab order strands no screen-reader-only functionality. The
+          keyboard focus/blur handlers that used to drive the desktop
+          leader-line reveal were removed since they can no longer fire;
+          hover (onMouseEnter/onMouseLeave) remains the desktop
+          leader-line/panel reveal for sighted mouse users, and the
+          InfoTooltip tap fallback covers mobile. */}
       {HOTSPOT_BASES.map((hotspot) => {
         const tooltip = TOOLTIP_MAP[hotspot.id] ?? '';
         const activate = (e: SyntheticEvent<HTMLDivElement>) => {
@@ -438,8 +450,7 @@ export function BadgeOverlay() {
           <div
             key={hotspot.id}
             role="group"
-            tabIndex={0}
-            className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber"
+            className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150"
             style={{
               top: hotspot.top,
               left: hotspot.left,
@@ -448,8 +459,6 @@ export function BadgeOverlay() {
             }}
             onMouseEnter={activate}
             onMouseLeave={() => setActiveLeaderLine(null)}
-            onFocus={activate}
-            onBlur={() => setActiveLeaderLine(null)}
             aria-describedby={`${hotspot.id}-desc`}
             aria-label={`${hotspot.id.replace("badge-", "")} info`}
           >
