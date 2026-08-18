@@ -40,6 +40,12 @@ describe("coming-soon page", () => {
     expect(metadata.title).toBe("Coming soon");
   });
 
+  it("declares its own canonical path instead of inheriting the bare origin (#1065 / FE-H1)", async () => {
+    const { generateMetadata } = await import("./page");
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({}) });
+    expect(metadata.alternates).toEqual({ canonical: "/coming-soon" });
+  });
+
   it("exports a default component", async () => {
     const mod = await import("./page");
     expect(typeof mod.default).toBe("function");

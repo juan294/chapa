@@ -19,6 +19,9 @@ export async function generateMetadata({
   return {
     title: t('archetypes.builder.metadataTitle') as string,
     description: t('archetypes.builder.metadataDescription') as string,
+    alternates: {
+      canonical: "/archetypes/builder",
+    },
   };
 }
 

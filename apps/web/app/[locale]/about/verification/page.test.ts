@@ -39,6 +39,10 @@ describe("Verification explainer page (server component)", () => {
     it("includes OpenGraph metadata", () => {
       expect(SOURCE).toContain("openGraph");
     });
+
+    it("declares the unprefixed public path as its canonical (#1065 / FE-H1)", () => {
+      expect(SOURCE).toContain('canonical: "/about/verification"');
+    });
   });
 
   // #1023 (FE-H1) — locale now comes from the route's [locale] segment

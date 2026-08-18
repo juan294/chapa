@@ -73,9 +73,6 @@ export const metadata: Metadata = {
       "Your developer impact, decoded into multiple dimensions. Live, embeddable SVG badge.",
     images: ["/og-image"],
   },
-  alternates: {
-    canonical: BASE_URL,
-  },
 };
 
 export default async function RootLayout({

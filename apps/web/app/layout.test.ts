@@ -73,6 +73,16 @@ describe("RootLayout", () => {
     });
   });
 
+  describe("canonical URL (#1065 / FE-H1)", () => {
+    it("does not set a root-level canonical override (per-page canonicals take over)", () => {
+      expect(SOURCE).not.toMatch(/alternates:\s*\{\s*canonical:\s*BASE_URL/);
+    });
+
+    it("keeps metadataBase set so relative per-page canonicals resolve correctly", () => {
+      expect(SOURCE).toContain("metadataBase: new URL(BASE_URL)");
+    });
+  });
+
   describe("feature flags", () => {
     it("resolves client navigation flags through cached DB-backed server helpers", () => {
       expect(SOURCE).toContain("isStudioEnabled()");

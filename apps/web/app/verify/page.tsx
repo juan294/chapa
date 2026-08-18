@@ -12,6 +12,9 @@ export async function generateMetadata(): Promise<Metadata> {
     title: t('verify.title') as string,
     description: t('verify.description') as string,
     robots: { index: false, follow: true },
+    alternates: {
+      canonical: "/verify",
+    },
   };
 }
 

@@ -19,6 +19,9 @@ export async function generateMetadata({
   return {
     title: t('archetypes.guardian.metadataTitle') as string,
     description: t('archetypes.guardian.metadataDescription') as string,
+    alternates: {
+      canonical: "/archetypes/guardian",
+    },
   };
 }
 

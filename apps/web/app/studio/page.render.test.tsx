@@ -208,4 +208,11 @@ describe("StudioPage render", () => {
     expect(metadata.description).toBe("Customize your badge");
     expect(mocks.getServerT).toHaveBeenCalledWith("en");
   });
+
+  it("declares its own canonical path instead of inheriting the bare origin (#1065 / FE-H1)", async () => {
+    const { generateMetadata } = await import("./page");
+    const metadata = await generateMetadata();
+
+    expect(metadata.alternates).toEqual({ canonical: "/studio" });
+  });
 });

@@ -15,6 +15,9 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   return {
     title: t('comingSoon.metadataTitle') as string,
     robots: { index: false, follow: false },
+    alternates: {
+      canonical: "/coming-soon",
+    },
   };
 }
 

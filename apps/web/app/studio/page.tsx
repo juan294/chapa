@@ -55,6 +55,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t('studio.metadataTitle') as string,
     description: t('studio.metadataDescription') as string,
+    alternates: {
+      canonical: "/studio",
+    },
   };
 }
 

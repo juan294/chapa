@@ -25,6 +25,9 @@ export async function generateMetadata({
       title: t('legal.privacy.metadataOgTitle') as string,
       description: t('legal.privacy.metadataDescription') as string,
     },
+    alternates: {
+      canonical: "/privacy",
+    },
   };
 }
 

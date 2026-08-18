@@ -25,6 +25,9 @@ export async function generateMetadata({
       title: t('legal.terms.metadataOgTitle') as string,
       description: t('legal.terms.metadataDescription') as string,
     },
+    alternates: {
+      canonical: "/terms",
+    },
   };
 }
 
