@@ -29,6 +29,8 @@ import {
   redactImpactForVisitor,
 } from "@/lib/profile/public-profile";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
+import { captureServerError } from "@/lib/analytics/server-errors";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
@@ -248,6 +250,14 @@ export async function SharePageContent({
   // shut the same way as a genuine race-timeout meant it NEVER got cached.
   // It still gets a write, just a short-TTL one, so it doesn't shadow a
   // later good render for the full 24h+jitter a normal write would use.
+  //
+  // #1091 — persistProfileSnapshot is a durable Supabase write with nothing
+  // in the rendered HTML depending on its result, so (mirroring the badge
+  // route's #1013 fix) it now runs inside after() alongside the deferred
+  // cache work it gates, instead of blocking TTFB. A genuine failure from
+  // the deferred chain is escalated via captureServerError rather than
+  // swallowed — persistProfileSnapshot already does this internally for its
+  // own "failed" write outcome; this outer catch covers any other error.
   if (materialized && inlineSvg && !readOnly) {
     const cacheEligible = renderedFresh && !!verification && (avatarResolved || avatarPermanentlyAbsent);
     const svgToCache = cacheEligible ? inlineSvg : null;
@@ -255,9 +265,6 @@ export async function SharePageContent({
     // the standard 24h+jitter TTL (writeBadgeSvgCache's own default).
     const svgCacheTtlSeconds =
       cacheEligible && !avatarResolved ? AVATAR_ABSENT_CACHE_TTL_SECONDS : undefined;
-    const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
-      readOnly,
-    });
     after(() => {
       if (svgToCache) {
         void writeBadgeSvgCache(
@@ -267,8 +274,20 @@ export async function SharePageContent({
           svgCacheTtlSeconds !== undefined ? { ttlSeconds: svgCacheTtlSeconds } : undefined,
         );
       }
-      if (!shouldRunDeferred) return;
-      return deferProfileCacheWork(handle, materialized, { verification });
+      return persistProfileSnapshot(handle, materialized, { readOnly })
+        .then((shouldRunDeferred) => {
+          if (!shouldRunDeferred) return;
+          return deferProfileCacheWork(handle, materialized, { verification });
+        })
+        .catch((err) => {
+          fireAndForget(() =>
+            captureServerError({
+              route: `/u/${handle}`,
+              statusCode: 500,
+              error: err,
+            }),
+          );
+        });
     });
   }
 
