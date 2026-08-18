@@ -858,4 +858,134 @@ describe("GET /api/cron/warm-cache", () => {
       );
     });
   });
+
+  // #1095: warm-cache had no wall-clock budget check, unlike process-campaigns'
+  // 30s-reserved-buffer pattern. A hard platform timeout mid-run meant the
+  // rotation offset and heartbeat never got written, and — since it's not a
+  // thrown error — no cron_failure alert fired either.
+  describe("time budget (#1095)", () => {
+    const BUDGET_MS = (300 - 30) * 1000; // maxDuration=300, mirrors process-campaigns' 30s buffer
+
+    it("stops processing further handles once the time budget is exhausted, defers the rest, writes the heartbeat, and does not throw", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10); // offset=10, no priority handles -> toWarm = user10..user59 (50)
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0) // start
+        .mockReturnValueOnce(T0) // time-budget check before batch 0 (elapsed 0) -> proceed
+        .mockReturnValueOnce(T0 + BUDGET_MS) // check before batch 1 -> exceeded -> stop
+        .mockReturnValue(T0 + BUDGET_MS); // durationMs / heartbeat / any further calls
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.timedOut).toBe(true);
+      // Only the first batch (5 handles) was actually processed before the budget check tripped.
+      expect(body.processedCount).toBe(5);
+      expect(body.warmed).toBe(5);
+      expect(body.deferredCount).toBe(45);
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(5);
+      // Heartbeat still written despite the early stop — graceful degradation, not a crash.
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "cron:lastrun:warm-cache",
+        expect.any(Number),
+        172800,
+      );
+
+      nowSpy.mockRestore();
+    });
+
+    it("advances the rotation offset only past the genuinely-completed handles, not the full intended slice (#750)", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10);
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0 + BUDGET_MS)
+        .mockReturnValue(T0 + BUDGET_MS);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      // Only 5 of the intended 50 rotation handles (offset 10..59) actually completed
+      // (user10..user14) -> next offset must be 15, NOT 60 (the full intended slice).
+      expect(body.rotation.nextOffset).toBe(15);
+      expect(mockCacheSet).toHaveBeenCalledWith("cron:warm-cache:offset", 15, 0);
+
+      nowSpy.mockRestore();
+    });
+
+    it("does not advance the offset at all when the budget is exhausted before any rotation handle completes", async () => {
+      // Priority handles fill the first batch; the budget runs out before any
+      // rotation-scanned handle is processed.
+      vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user70,user71,user72,user73,user74");
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10);
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0) // check before batch 0 (priority handles) -> proceed
+        .mockReturnValueOnce(T0 + BUDGET_MS) // check before batch 1 (first rotation batch) -> exceeded
+        .mockReturnValue(T0 + BUDGET_MS);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(body.processedCount).toBe(5);
+      expect(body.rotation.nextOffset).toBe(10); // unchanged from stored offset
+      expect(mockCacheSet).toHaveBeenCalledWith("cron:warm-cache:offset", 10, 0);
+
+      nowSpy.mockRestore();
+    });
+
+    it("emits a P2 operational alert when the time budget is exhausted, without throwing", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10);
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0 + BUDGET_MS)
+        .mockReturnValue(T0 + BUDGET_MS);
+
+      const res = await GET(makeRequest());
+
+      expect(res.status).toBe(200);
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_time_budget_exceeded",
+          severity: "P2",
+          route: "/api/cron/warm-cache",
+        }),
+      );
+
+      nowSpy.mockRestore();
+    });
+
+    it("reports timedOut: false and zero deferrals when the run completes within budget", async () => {
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(body.timedOut).toBe(false);
+      expect(body.deferredCount).toBe(0);
+    });
+  });
 });
