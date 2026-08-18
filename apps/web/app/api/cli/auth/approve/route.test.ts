@@ -10,6 +10,7 @@ vi.mock("@/lib/auth/require-session", () => ({
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
+  cacheGet: vi.fn(),
   cacheSet: vi.fn(),
   rateLimit: vi.fn(),
 }));
@@ -20,7 +21,7 @@ vi.mock("@/lib/http/client-ip", () => ({
 
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(requireSession).mockReturnValue({ session: SESSION });
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+  vi.mocked(cacheGet).mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -146,5 +148,58 @@ describe("POST /api/cli/auth/approve", () => {
     expect(res.headers.get("Retry-After")).toBe("60");
     const body = await res.json();
     expect(body.error).toMatch(/too many requests/i);
+  });
+
+  // -------------------------------------------------------------------------
+  // BE-H3 / SE-H1 (#1078, #1097): read-modify-write, not a blind overwrite.
+  // -------------------------------------------------------------------------
+
+  it("preserves deviceCode/deviceCodeConfirmed from the existing session instead of overwriting them", async () => {
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode: "abc123def456",
+      deviceCodeConfirmed: true,
+    });
+    vi.mocked(cacheSet).mockResolvedValue(true);
+
+    await POST(
+      makeRequest(
+        { sessionId: "1feae8e3-6bc0-47da-84aa-0e24e2510454" },
+        "chapa_session=valid",
+      ),
+    );
+
+    expect(cacheGet).toHaveBeenCalledWith(
+      "cli:device:1feae8e3-6bc0-47da-84aa-0e24e2510454",
+    );
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cli:device:1feae8e3-6bc0-47da-84aa-0e24e2510454",
+      {
+        status: "approved",
+        handle: "testuser",
+        deviceCode: "abc123def456",
+        deviceCodeConfirmed: true,
+      },
+      300,
+    );
+  });
+
+  it("creates a fresh approved session when no prior session exists (legacy path)", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(null);
+    vi.mocked(cacheSet).mockResolvedValue(true);
+
+    const res = await POST(
+      makeRequest(
+        { sessionId: "1feae8e3-6bc0-47da-84aa-0e24e2510454" },
+        "chapa_session=valid",
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cli:device:1feae8e3-6bc0-47da-84aa-0e24e2510454",
+      { status: "approved", handle: "testuser" },
+      300,
+    );
   });
 });
