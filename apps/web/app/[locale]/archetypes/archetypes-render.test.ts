@@ -42,6 +42,10 @@ describe("Archetype pages — render tests", () => {
           expect(source).toContain(`archetypes.${archetype}.metadataTitle`);
           expect(source).toContain(`archetypes.${archetype}.metadataDescription`);
         });
+
+        it("declares the unprefixed public path as its canonical (#1065 / FE-H1)", () => {
+          expect(source).toContain(`canonical: "/archetypes/${archetype}"`);
+        });
       });
 
       describe("default export", () => {

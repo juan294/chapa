@@ -54,6 +54,13 @@ describe("Landing page (server component)", () => {
     });
   });
 
+  describe("canonical URL (#1065 / FE-H1)", () => {
+    it("declares its own canonical for the unprefixed root path", () => {
+      expect(SOURCE).toContain("generateMetadata");
+      expect(SOURCE).toContain('canonical: "/"');
+    });
+  });
+
   describe("rendering", () => {
     it("computes the demo badge SVG server-side and passes it as a prop", () => {
       expect(SOURCE).toContain("renderBadgeSvg");

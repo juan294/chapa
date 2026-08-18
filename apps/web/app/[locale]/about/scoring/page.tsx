@@ -28,6 +28,9 @@ export async function generateMetadata({
       title: t('about.scoring.twitterTitle') as string,
       description: t('about.scoring.twitterDescription') as string,
     },
+    alternates: {
+      canonical: "/about/scoring",
+    },
   };
 }
 

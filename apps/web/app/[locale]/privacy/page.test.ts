@@ -35,5 +35,9 @@ describe("legal pages — i18n server component", () => {
     it(`/${page} does NOT use static metadata export`, () => {
       expect(source).not.toContain("export const metadata");
     });
+
+    it(`/${page} declares the unprefixed public path as its canonical (#1065 / FE-H1)`, () => {
+      expect(source).toContain(`canonical: "/${page}"`);
+    });
   }
 });

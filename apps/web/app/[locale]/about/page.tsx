@@ -34,6 +34,9 @@ export async function generateMetadata({
       title: t('about.index.twitterTitle') as string,
       description: t('about.index.twitterDescription') as string,
     },
+    alternates: {
+      canonical: "/about",
+    },
   };
 }
 

@@ -27,4 +27,10 @@ describe("VerifyInputPage generateMetadata", () => {
     const meta = await generateMetadata();
     expect(meta.title).toBeTruthy();
   });
+
+  it("declares its own canonical path instead of inheriting the bare origin (#1065 / FE-H1)", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata();
+    expect(meta.alternates).toEqual({ canonical: "/verify" });
+  });
 });

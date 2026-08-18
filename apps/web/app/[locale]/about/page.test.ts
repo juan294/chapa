@@ -44,6 +44,12 @@ describe("About page (locale-segmented RSC)", () => {
     });
   });
 
+  describe("canonical URL (#1065 / FE-H1)", () => {
+    it("declares the unprefixed public path as its canonical, not the internal /[locale]/ path", () => {
+      expect(SOURCE).toContain('canonical: "/about"');
+    });
+  });
+
   it("exports a default async component", () => {
     expect(SOURCE).toMatch(/export default async function AboutPage/);
   });
