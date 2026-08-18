@@ -159,6 +159,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             });
             revalidatePath(`/u/${handle}`);
             recalculated++;
+            completed.push(handle);
           } else {
             // #1076 — persistOrchestratedSnapshot's #1003 gate intentionally
             // skips persistence when the fetched stats look incomplete/
@@ -179,7 +180,6 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
         }
       }),
     );
-    completed.push(...batch);
   }
 
   return NextResponse.json({

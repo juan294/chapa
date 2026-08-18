@@ -294,6 +294,23 @@ describe("POST /api/admin/bulk-recalculate", () => {
     });
   });
 
+  it("#1084: does not mark a handle that errored as completed", async () => {
+    // "alice" fails the materialize step; "bob" succeeds. If `completed`
+    // wrongly includes "alice", a resume's `pending` calculation (handles
+    // minus completed) would silently skip retrying the failed handle.
+    mockMaterializeOrchestratedProfile.mockResolvedValueOnce(null);
+    mockMaterializeOrchestratedProfile.mockResolvedValueOnce(FAKE_MATERIALIZED);
+
+    const res = await POST(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.recalculated).toBe(1);
+    expect(body.failed).toBe(1);
+    expect(body.completed).not.toContain("alice");
+    expect(body.completed).toEqual(["bob"]);
+  });
+
   it("reports snapshot replace failures explicitly", async () => {
     mockPersistOrchestratedSnapshot.mockResolvedValue(false);
 
