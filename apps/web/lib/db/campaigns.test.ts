@@ -38,6 +38,7 @@ const mockFrom = vi.fn((): any => ({
       in: () => Promise.resolve(nextQueryResult()),
       maybeSingle: () => Promise.resolve(nextQueryResult()),
       limit: () => chainable,
+      range: () => Promise.resolve(nextQueryResult()),
       then: (resolve: (v: unknown) => void) => resolve(nextQueryResult()),
     };
     return chainable;

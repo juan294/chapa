@@ -16,11 +16,20 @@ const mockNot = vi.fn();
 let listResolve: { data: unknown; error: unknown };
 let singleResolve: { data: unknown; error: unknown };
 let updateResolve: { error: unknown };
+// Optional per-call resolver for simulating multiple distinct .range() pages
+// (pagination tests) — when set, overrides the shared `listResolve`.
+let rangeResolver:
+  | ((from: number, to: number) => { data: unknown; error: unknown })
+  | null;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const buildOrderable = (): any => ({
   range: (...rangeArgs: unknown[]) => {
     mockRange(...rangeArgs);
+    if (rangeResolver) {
+      const [from, to] = rangeArgs as [number, number];
+      return Promise.resolve(rangeResolver(from, to));
+    }
     return Promise.resolve(listResolve);
   },
   then: (
@@ -96,6 +105,7 @@ beforeEach(() => {
   listResolve = { data: [], error: null };
   singleResolve = { data: null, error: null };
   updateResolve = { error: null };
+  rangeResolver = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -258,12 +268,51 @@ describe("dbGetUsers", () => {
     expect(mockRange).toHaveBeenCalledWith(0, 9);
   });
 
-  it("returns all rows when no options provided (backward compat)", async () => {
+  it("pages via .range() even with no options provided (#1079 — no-opts path must not silently truncate)", async () => {
     listResolve = { data: [], error: null };
 
     await dbGetUsers();
 
-    expect(mockRange).not.toHaveBeenCalled();
+    expect(mockRange).toHaveBeenCalledWith(0, 999);
+  });
+
+  it("returns every user past the 1000-row max_rows cap when no options are provided (#1079)", async () => {
+    const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      handle: `user-${i}`,
+      registered_at: "2025-06-15T10:00:00Z",
+      display_name: null,
+      avatar_url: null,
+    }));
+    const page2 = [
+      {
+        handle: "user-1000",
+        registered_at: "2025-06-14T10:00:00Z",
+        display_name: null,
+        avatar_url: null,
+      },
+    ];
+
+    rangeResolver = (from) =>
+      from === 0 ? { data: page1, error: null } : { data: page2, error: null };
+
+    const result = await dbGetUsers();
+
+    expect(result).toHaveLength(1001);
+    expect(result.map((u) => u.handle)).toContain("user-1000");
+    expect(mockRange).toHaveBeenCalledWith(0, 999);
+    expect(mockRange).toHaveBeenCalledWith(1000, 1999);
+  });
+
+  it("does not page past a single explicit .range() page when limit/offset are provided", async () => {
+    listResolve = {
+      data: [{ handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: null, avatar_url: null }],
+      error: null,
+    };
+
+    await dbGetUsers({ limit: 10, offset: 20 });
+
+    expect(mockRange).toHaveBeenCalledTimes(1);
+    expect(mockRange).toHaveBeenCalledWith(20, 29);
   });
 });
 
@@ -420,6 +469,41 @@ describe("dbGetUsersWithEmail", () => {
     expect(result[0]).toHaveProperty("avatarUrl", "https://a.com/a.png");
     expect(result[0]).not.toHaveProperty("display_name");
     expect(result[0]).not.toHaveProperty("avatar_url");
+  });
+
+  it("pages via .range()", async () => {
+    listResolve = { data: [], error: null };
+
+    await dbGetUsersWithEmail();
+
+    expect(mockRange).toHaveBeenCalledWith(0, 999);
+  });
+
+  it("returns every eligible user past the 1000-row max_rows cap (#1079)", async () => {
+    const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      handle: `user-${i}`,
+      email: `user-${i}@example.com`,
+      display_name: null,
+      avatar_url: null,
+    }));
+    const page2 = [
+      {
+        handle: "user-1000",
+        email: "user-1000@example.com",
+        display_name: null,
+        avatar_url: null,
+      },
+    ];
+
+    rangeResolver = (from) =>
+      from === 0 ? { data: page1, error: null } : { data: page2, error: null };
+
+    const result = await dbGetUsersWithEmail();
+
+    expect(result).toHaveLength(1001);
+    expect(result.map((u) => u.handle)).toContain("user-1000");
+    expect(mockRange).toHaveBeenCalledWith(0, 999);
+    expect(mockRange).toHaveBeenCalledWith(1000, 1999);
   });
 });
 

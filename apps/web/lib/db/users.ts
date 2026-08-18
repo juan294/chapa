@@ -7,6 +7,7 @@
 
 import { getSupabase } from "./supabase";
 import { parseRows } from "./parse-row";
+import { fetchAllPages } from "./paginate";
 
 // ---------------------------------------------------------------------------
 // Row type
@@ -71,7 +72,15 @@ export async function dbUpsertUser(
 
 /**
  * Get registered users, ordered by registration date (newest first).
- * Supports optional pagination via limit/offset.
+ *
+ * With `opts.limit`, returns a single explicit page (caller-controlled,
+ * e.g. an admin UI page). Without it, returns EVERY registered user —
+ * PostgREST caps any single unpaginated select at `max_rows` (1000,
+ * supabase/config.toml:18), so this pages through with `.range()` via
+ * `fetchAllPages` rather than silently truncating (#1079). Callers of the
+ * no-opts form (warm-cache cron, bulk-recalculate) rely on seeing every
+ * registered user, including the earliest registrants past row 1000.
+ *
  * Returns empty array when DB is unavailable.
  */
 export async function dbGetUsers(
@@ -81,20 +90,22 @@ export async function dbGetUsers(
   if (!db) return [];
 
   try {
-    let query = db
-      .from("users")
-      .select("handle, registered_at, display_name, avatar_url")
-      .order("registered_at", { ascending: false });
+    const baseQuery = () =>
+      db
+        .from("users")
+        .select("handle, registered_at, display_name, avatar_url")
+        .order("registered_at", { ascending: false });
 
+    let data: unknown[];
     if (opts?.limit) {
       const from = opts.offset ?? 0;
       const to = from + opts.limit - 1; // Supabase .range() is inclusive
-      query = query.range(from, to);
+      const { data: page, error } = await baseQuery().range(from, to);
+      if (error) throw error;
+      data = page ?? [];
+    } else {
+      data = await fetchAllPages<UserRow>((from, to) => baseQuery().range(from, to));
     }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
 
     return parseRows<UserRow>(data, USER_REQUIRED_KEYS, "users").map((row) => ({
       handle: row.handle,
@@ -122,6 +133,12 @@ export interface UserWithEmail {
 /**
  * Get all users who have an email AND have notifications enabled.
  * Used for campaign audience targeting.
+ *
+ * Pages through results with `fetchAllPages` instead of issuing a single
+ * unpaginated select — PostgREST's `max_rows = 1000` cap (#1079) would
+ * otherwise silently exclude any campaign audience past the first 1000
+ * eligible users.
+ *
  * Returns empty array when DB is unavailable.
  */
 export async function dbGetUsersWithEmail(): Promise<UserWithEmail[]> {
@@ -129,24 +146,22 @@ export async function dbGetUsersWithEmail(): Promise<UserWithEmail[]> {
   if (!db) return [];
 
   try {
-    const { data, error } = await db
-      .from("users")
-      .select("handle, email, display_name, avatar_url")
-      .not("email", "is", null)
-      .eq("email_notifications", true)
-      .order("registered_at", { ascending: false });
+    const data = await fetchAllPages<{
+      handle: string;
+      email: string;
+      display_name: string | null;
+      avatar_url: string | null;
+    }>((from, to) =>
+      db
+        .from("users")
+        .select("handle, email, display_name, avatar_url")
+        .not("email", "is", null)
+        .eq("email_notifications", true)
+        .order("registered_at", { ascending: false })
+        .range(from, to),
+    );
 
-    if (error) throw error;
-    if (!data) return [];
-
-    return (
-      data as {
-        handle: string;
-        email: string;
-        display_name: string | null;
-        avatar_url: string | null;
-      }[]
-    ).map((row) => ({
+    return data.map((row) => ({
       handle: row.handle,
       email: row.email,
       displayName: row.display_name ?? null,
