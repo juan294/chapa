@@ -92,7 +92,7 @@ export async function GET(
     });
 
     const png = await withTimeout(
-      Promise.resolve().then(() => svgToPng(svg, 1200)),
+      svgToPng(svg, 1200),
       SVG_TO_PNG_TIMEOUT_MS,
       "svgToPng",
     );
