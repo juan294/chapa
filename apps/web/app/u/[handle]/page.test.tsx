@@ -109,6 +109,10 @@ vi.mock("@/lib/i18n", () => ({
   LanguageProvider: (props: { children?: unknown }) => props.children,
 }));
 
+vi.mock("@/components/ErrorBanner", () => ({
+  ErrorBanner: () => null,
+}));
+
 vi.mock("@/components/CommandBarHint", () => ({
   CommandBarHint: () => null,
 }));
@@ -130,6 +134,7 @@ vi.mock("@/components/BadgeSkeleton", () => ({
 
 import SharePage, { SharePageContent, generateMetadata } from "./page";
 import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 /**
  * Recursively walk a rendered React element tree (as returned by an async
@@ -335,6 +340,56 @@ describe("SharePage /u/[handle]", () => {
         (el) => !!el.props && "initialLocale" in el.props,
       );
       expect(provider!.props.initialLocale).toBe("en");
+    });
+  });
+
+  // #1107 (UX-H1) — every platform OAuth (Bitbucket/Codeberg/GitLab)
+  // connect/callback failure branch in lib/auth/platform-oauth.ts redirects
+  // back to this exact page as `?error=<platform>_<code>`. Read server-side
+  // (the route is already dynamic per #1066), not via the client
+  // useSyncExternalStore leaf the landing page uses — that pattern exists
+  // solely to avoid opting a static page out of ISR, which is moot here.
+  describe("platform OAuth error banner (#1107)", () => {
+    it("renders an ErrorBanner with a platform-aware message when ?error=<platform>_<code> is present", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ error: "gitlab_token_exchange" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).not.toBeNull();
+      expect(banner!.props.message as string).toContain("GitLab");
+    });
+
+    it("renders no ErrorBanner when there is no error query param", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).toBeNull();
+    });
+
+    it("renders no ErrorBanner for an unrelated query string", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).toBeNull();
+    });
+
+    it("recognizes the base GitHub session_storage code too (#1107 gap fix)", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ error: "session_storage" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).not.toBeNull();
+      expect(typeof banner!.props.message).toBe("string");
     });
   });
 

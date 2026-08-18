@@ -28,6 +28,8 @@ import {
   redactImpactForVisitor,
 } from "@/lib/profile/public-profile";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
+import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { LanguageProvider, LocaleSync } from "@/lib/i18n";
@@ -101,6 +103,18 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const locale = await getServerLocale(queryLang);
   const readOnly = resolvedSearch[READ_ONLY_SMOKE_PARAM] === "1";
 
+  // #1107 — every platform OAuth (Bitbucket/Codeberg/GitLab) connect/
+  // callback failure branch in lib/auth/platform-oauth.ts redirects back to
+  // this exact page as `?error=<platform>_<code>`, but nothing here read
+  // that param — a failed "Connect GitLab" click left the user with zero
+  // feedback. Read server-side (not via a client useSyncExternalStore leaf
+  // like the landing page's #982 pattern): that pattern exists solely to
+  // avoid opting a static/ISR page out of static rendering, and this route
+  // is already dynamic (#1066 above already awaits searchParams and reads
+  // the session), so there is no static-rendering cost left to avoid here.
+  const errorCode = typeof resolvedSearch.error === "string" ? resolvedSearch.error : null;
+  const errorMessage = getOAuthErrorMessage(errorCode);
+
   if (!isValidHandle(handle)) {
     notFound();
   }
@@ -113,6 +127,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
       {/* Establish query ownership in the hydrated shell. The streamed client
           subtree then starts with the same dictionary as its server markup. */}
       <LocaleSync queryLang={queryLang} />
+      {errorMessage && <ErrorBanner message={errorMessage} />}
       <main id="main-content" className="min-h-screen bg-bg">
         <Suspense fallback={<BadgeSkeleton />}>
           <SharePageContent handle={handle} readOnly={readOnly} />
