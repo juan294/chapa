@@ -16,6 +16,16 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Production migration-history label mismatch on version 004 (#1064)
+
+- **Risk:** Production's applied-migrations history records version `004` under the name `add_agent_feature_flags` — the name that belongs to `005` — while the repository file at that version is `004_add_user_email.sql`. A history table entry has the wrong label for its version.
+- **Why accepted:** This is bookkeeping only, not schema drift. The schema production actually holds matches the repository file exactly: `users.email` (text, nullable) and `users.email_notifications` (boolean, NOT NULL, default true) both exist as `004_add_user_email.sql` specifies, verified read-only against production on 2026-08-11. `check:pending-migrations` diffs schema state, not migration-history labels, so this mismatch does not affect the gate — confirmed passing on PR #1063's linked-production CI run after the `032_reconcile_remote_schema.sql` reconciliation.
+- **Mitigation:** None required — correcting a Supabase migration-history label retroactively risks its own drift for zero schema benefit. Re-evaluate only if the Supabase CLI ever begins validating history labels against file names as part of `db diff`.
+- **Severity:** Low (cosmetic, no schema or gate impact)
+- **Accepted:** 2026-08-18
+
+---
+
 ## CSP unsafe-inline for scripts (#396, #778, #959)
 
 - **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`. This is a known limitation of the framework — removing it causes hydration to fail.
