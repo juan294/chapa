@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { getOAuthErrorMessage, OAUTH_ERROR_CODES } from "./error-messages";
+import { es } from "@/lib/i18n/dictionaries/es";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 
 describe("getOAuthErrorMessage", () => {
   it("returns a user-friendly message for 'no_code'", () => {
@@ -62,5 +65,37 @@ describe("getOAuthErrorMessage", () => {
       expect(msg.length).toBeLessThan(200);
       expect(msg.length).toBeGreaterThan(10);
     }
+  });
+
+  // #1109 (UX-H3): OAuth error messages must render in the visitor's locale,
+  // not a hardcoded English literal.
+  describe("i18n (#1109)", () => {
+    it("uses the English dictionary by default (no translator passed)", () => {
+      expect(getOAuthErrorMessage("no_code")).toBe(
+        resolveTranslation("oauthErrors.noCode", en),
+      );
+    });
+
+    it("resolves the Spanish message when given a Spanish translator", () => {
+      const esT = (key: string) => resolveTranslation(key, es) as string;
+      const knownCodes = [
+        "no_code",
+        "invalid_state",
+        "config",
+        "token_exchange",
+        "user_fetch",
+      ] as const;
+      for (const code of knownCodes) {
+        const msg = getOAuthErrorMessage(code, esT);
+        expect(msg).toBeTruthy();
+        expect(msg).not.toBe(getOAuthErrorMessage(code));
+      }
+    });
+
+    it("resolves the Spanish fallback for an unknown code", () => {
+      const esT = (key: string) => resolveTranslation(key, es) as string;
+      const msg = getOAuthErrorMessage("unknown_error_xyz", esT);
+      expect(msg).toBe(resolveTranslation("oauthErrors.fallback", es));
+    });
   });
 });

@@ -1,7 +1,15 @@
-export default function StudioLoading() {
+// Server component (no client hooks) — a route loading.tsx is Next's
+// Suspense fallback. `app/studio/page.tsx` is `force-dynamic` and resolves
+// the real per-request locale via getServerLocale(); this fallback mirrors
+// that (matching apps/web/app/coming-soon/loading.tsx's established
+// pattern) rather than assuming DEFAULT_LOCALE like the static-route loaders.
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
+
+export default async function StudioLoading() {
+  const t = getServerT(await getServerLocale());
   return (
-    <main id="main-content" className="min-h-screen bg-bg" role="status" aria-label="Loading">
-      <span className="sr-only">Loading...</span>
+    <main id="main-content" className="min-h-screen bg-bg" role="status" aria-label={t("aria.loading") as string}>
+      <span className="sr-only">{t("common.loading") as string}</span>
       {/* Nav placeholder */}
       <div className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">

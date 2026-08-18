@@ -95,7 +95,10 @@ describe("RootLayout render", () => {
       }),
     );
 
-    expect(screen.getByText("Skip to main content")).toBeTruthy();
+    // Layout renders at DEFAULT_LOCALE ('es', #861) — the skip link now reads
+    // from the resolved dictionary (#1109 / UX-H3) instead of a hardcoded
+    // English literal, so it renders in Spanish here.
+    expect(screen.getByText("Saltar al contenido principal")).toBeTruthy();
     expect(screen.getByTestId("theme-provider")).toBeTruthy();
     expect(
       screen.getByTestId("feature-flags").getAttribute("data-studio"),

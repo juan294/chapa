@@ -5,7 +5,17 @@
  * and passed to the landing page as `?error=<code>`.
  *
  * Messages must be non-technical and never expose internal details.
+ *
+ * Message text lives in the i18n dictionary (`oauthErrors.*`, #1109) so it
+ * renders in the visitor's locale. This module stays a pure, dependency-free
+ * code→dictKey lookup; callers resolve the key through their own translator
+ * (`useTranslation()`'s `t`, or `getServerT`). The default `t` — matching
+ * `useTranslation()`'s no-provider fallback — resolves against the English
+ * dictionary, so existing callers that don't pass a translator keep working
+ * unchanged.
  */
+import { en } from "@/lib/i18n/dictionaries/en";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 
 export const OAUTH_ERROR_CODES = [
   "no_code",
@@ -17,20 +27,19 @@ export const OAUTH_ERROR_CODES = [
 
 type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
 
-const ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
-  no_code:
-    "Sign-in was interrupted before completing. Please try again.",
-  invalid_state:
-    "Your sign-in session expired or was invalid. Please try again.",
-  config:
-    "Something went wrong on our end. Please try again later.",
-  token_exchange:
-    "We couldn\u2019t complete sign-in with GitHub. Please try again.",
-  user_fetch:
-    "We couldn\u2019t retrieve your GitHub profile. Please try again.",
+const ERROR_MESSAGE_KEYS: Record<OAuthErrorCode, string> = {
+  no_code: "oauthErrors.noCode",
+  invalid_state: "oauthErrors.invalidState",
+  config: "oauthErrors.config",
+  token_exchange: "oauthErrors.tokenExchange",
+  user_fetch: "oauthErrors.userFetch",
 };
 
-const FALLBACK_MESSAGE = "Something went wrong during sign-in. Please try again.";
+const FALLBACK_KEY = "oauthErrors.fallback";
+
+function defaultT(key: string): string {
+  return resolveTranslation(key, en) as string;
+}
 
 /**
  * Maps an OAuth error code (from the URL `?error=` param) to a
@@ -38,12 +47,16 @@ const FALLBACK_MESSAGE = "Something went wrong during sign-in. Please try again.
  *
  * Returns `null` when the input is falsy (undefined, null, empty string),
  * meaning there is no error to display.
+ *
+ * @param t Optional translator, e.g. `useTranslation().t`. Defaults to the
+ *   English dictionary when omitted.
  */
 export function getOAuthErrorMessage(
   code: string | null | undefined,
+  t: (key: string) => string = defaultT,
 ): string | null {
   if (!code) return null;
 
-  const known = ERROR_MESSAGES[code as OAuthErrorCode];
-  return known ?? FALLBACK_MESSAGE;
+  const key = ERROR_MESSAGE_KEYS[code as OAuthErrorCode] ?? FALLBACK_KEY;
+  return t(key);
 }

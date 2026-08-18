@@ -32,8 +32,13 @@ describe("RootLayout", () => {
       expect(SOURCE).toMatch(/href="#main-content"/);
     });
 
-    it("has the correct visible text", () => {
-      expect(SOURCE).toContain("Skip to main content");
+    it("renders its visible text from the resolved DEFAULT_LOCALE dictionary, not a hardcoded English literal (#1109)", () => {
+      // The layout is statically rendered at DEFAULT_LOCALE ('es') and already
+      // resolves `dictionary` for that locale (#861) — the skip link, as the
+      // first thing a keyboard/screen-reader user hits, must read from it
+      // rather than hardcoding English.
+      expect(SOURCE).toContain('resolveTranslation("common.skipToMainContent", dictionary)');
+      expect(SOURCE).not.toMatch(/>\s*Skip to main content\s*</);
     });
 
     it("is visually hidden by default with sr-only", () => {

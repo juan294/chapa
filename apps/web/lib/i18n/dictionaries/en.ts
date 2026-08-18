@@ -10,9 +10,11 @@ export const en: Translations = {
     tryAgain: 'Try again',
     goHome: 'Go home',
     loading: 'Loading...',
+    loadingChapa: 'Loading Chapa...',
     copied: 'Copied!',
     copy: 'Copy',
     orConnector: 'or',
+    skipToMainContent: 'Skip to main content',
   },
   aria: {
     mainNavigation: 'Main navigation',
@@ -54,6 +56,8 @@ export const en: Translations = {
     impactScore: '{label} score',
     impactScoreValue: 'Impact score: {score}',
     impactScoreTier: 'Impact score {score}, tier {tier}',
+    terminalCommandInput: 'Terminal command input',
+    loading: 'Loading',
   },
   landing: {
     navLinks: [
@@ -221,6 +225,17 @@ export const en: Translations = {
     label: 'for commands',
     ariaLabel: 'Open the command bar — or press the / key',
   },
+  terminalInput: {
+    placeholder: 'Type / for commands...',
+  },
+  oauthErrors: {
+    noCode: 'Sign-in was interrupted before completing. Please try again.',
+    invalidState: 'Your sign-in session expired or was invalid. Please try again.',
+    config: 'Something went wrong on our end. Please try again later.',
+    tokenExchange: 'We couldn’t complete sign-in with GitHub. Please try again.',
+    userFetch: 'We couldn’t retrieve your GitHub profile. Please try again.',
+    fallback: 'Something went wrong during sign-in. Please try again.',
+  },
   verify: {
     title: 'Verify a badge',
     description: 'Verify the authenticity of a Chapa badge marked Verified metrics with its verification hash.',
@@ -329,6 +344,19 @@ export const en: Translations = {
     verification: "Cryptographic seal for badges marked Verified metrics, proving these scores haven't been tampered with.",
     craft: "AI Craft Score — measures your proficiency, effectiveness, and sophistication with AI coding tools like Claude Code.",
     github: "Chapa analyzes public metrics from GitHub and other linked platforms. These platforms are not affiliated with or endorsing this project.",
+  },
+  badgeOverlayLabels: {
+    archetype: 'ARCHETYPE',
+    watchers: 'WATCHERS',
+    forks: 'FORKS',
+    stars: 'STARS',
+    heatmap: 'HEATMAP',
+    radar: 'RADAR',
+    score: 'SCORE',
+    tier: 'TIER',
+    verification: 'VERIFICATION',
+    craft: 'CRAFT',
+    github: 'GITHUB',
   },
   archetypes: {
     dominantDimensionLabel: 'Dominant dimension:',

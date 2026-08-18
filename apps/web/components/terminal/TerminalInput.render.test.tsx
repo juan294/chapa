@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import { TerminalInput } from "./TerminalInput";
+import { LanguageProvider } from "@/lib/i18n";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 afterEach(cleanup);
 
@@ -235,6 +237,38 @@ describe("TerminalInput", () => {
       // ArrowUp should start from the beginning of history again
       fireEvent.keyDown(input, { key: "ArrowUp" });
       expect(input.value).toBe("/second");
+    });
+  });
+
+  // #1109 (UX-H3): the placeholder and aria-label must come from the i18n
+  // dictionary, not a hardcoded English literal, so the primary interaction
+  // affordance is translated on this Spanish-default site.
+  describe("i18n (#1109)", () => {
+    it("renders the English placeholder via the useTranslation fallback (no provider)", () => {
+      render(<TerminalInput onSubmit={vi.fn()} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      expect(input.placeholder).toBe("Type / for commands...");
+    });
+
+    it("renders the Spanish placeholder and aria-label when wrapped in LanguageProvider with the es dictionary", () => {
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <TerminalInput onSubmit={vi.fn()} />
+        </LanguageProvider>,
+      );
+      const input = screen.getByLabelText(
+        "Entrada de comando de terminal",
+      ) as HTMLInputElement;
+      expect(input.placeholder).toBe("Escribe / para ver comandos...");
+    });
+
+    it("keeps the stable #terminal-command-input id regardless of locale", () => {
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <TerminalInput onSubmit={vi.fn()} />
+        </LanguageProvider>,
+      );
+      expect(document.querySelector("#terminal-command-input")).not.toBeNull();
     });
   });
 });

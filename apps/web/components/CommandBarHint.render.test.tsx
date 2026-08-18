@@ -6,7 +6,7 @@ import { render, screen, cleanup, fireEvent, act } from "@testing-library/react"
 vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: ({ isAdmin }: { isAdmin?: boolean }) => (
     <div data-testid="global-command-bar" data-admin={isAdmin ? "true" : "false"}>
-      <input aria-label="Terminal command input" />
+      <input id="terminal-command-input" aria-label="Terminal command input" />
     </div>
   ),
 }));
@@ -57,6 +57,25 @@ describe("CommandBarHint — progressive disclosure", () => {
       fireEvent.keyDown(document, { key: "/" });
     });
     expect(screen.getByTestId("global-command-bar")).toBeDefined();
+  });
+
+  // Regression: focus routing after summon relies on the stable
+  // #terminal-command-input id selector, not the (now-translatable)
+  // aria-label. See KeyboardShortcutsListener/GlobalCommandBar/StudioClient
+  // for the sibling selectors that share this contract.
+  it("moves focus into the terminal input after being summoned via '/'", () => {
+    render(<CommandBarHint />);
+    act(() => {
+      fireEvent.keyDown(document, { key: "/" });
+    });
+    const input = document.querySelector<HTMLInputElement>(
+      "#terminal-command-input",
+    );
+    expect(input).not.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(document.activeElement).toBe(input);
   });
 
   it("does NOT summon when '/' is typed inside a text input", () => {

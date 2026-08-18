@@ -14,6 +14,7 @@ vi.mock("@/lib/keyboard/use-keyboard-shortcuts", () => ({
 
 vi.mock("@/lib/keyboard/shortcuts", () => ({
   ShortcutScope: {},
+  TERMINAL_COMMAND_INPUT_ID: "terminal-command-input",
 }));
 
 vi.mock("@/lib/feature-flags-sync", () => ({

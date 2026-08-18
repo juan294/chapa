@@ -20,13 +20,20 @@ describe("Verify loading.tsx", () => {
     expect(SOURCE).toContain("animate-pulse");
   });
 
-  it("has role='status' and aria-label='Loading' on the main container", () => {
+  it("has role='status' on the main container", () => {
     expect(SOURCE).toContain('role="status"');
-    expect(SOURCE).toContain('aria-label="Loading"');
+  });
+
+  // #1109 (UX-H3): the aria-label and sr-only text must come from the i18n
+  // dictionary, not a hardcoded English literal.
+  it("resolves aria-label and sr-only text via getServerT(DEFAULT_LOCALE)", () => {
+    expect(SOURCE).toContain("getServerT");
+    expect(SOURCE).toContain('t("aria.loading")');
+    expect(SOURCE).toContain('t("common.loading")');
+    expect(SOURCE).not.toMatch(/aria-label="Loading"/);
   });
 
   it("has an sr-only loading text span", () => {
     expect(SOURCE).toContain('className="sr-only"');
-    expect(SOURCE).toContain("Loading...");
   });
 });

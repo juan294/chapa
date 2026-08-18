@@ -127,6 +127,7 @@ vi.mock("@/components/terminal/TerminalInput", () => ({
   }) => (
     <div data-testid="terminal-input">
       <input
+        id="terminal-command-input"
         aria-label="Terminal command input"
         data-prompt={prompt}
         onChange={(e) => onPartialChange(e.target.value)}
