@@ -152,12 +152,18 @@ requests targeting `main` (i.e. the release PR itself), not on every push to
 
 This step requires read-only Supabase Management API credentials
 (`SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF`) configured as GitHub
-Actions secrets. If those secrets are not configured, the workflow step logs
-a clear skip message and does not fail the PR — it degrades to the manual
-checklist below, it does not silently report success. See
-`docs/runbooks/secret-rotation.md` conventions for how secrets are managed in
-this repo, and confirm with `gh secret list` whether the check is actually
-active before relying on it as the sole gate.
+Actions secrets. **Both secrets were added on 2026-08-10** (confirmed via
+`gh secret list`), and the gate has run against production on at least one
+release PR since (#1063 — see the "Pending-migrations gate tolerates one
+migra artifact on `admin_users` (#1064)" entry in `docs/accepted-risks.md`).
+It is active today, not self-skipping. If those secrets were ever removed or
+rotated out from under CI, the workflow step would log a clear skip message
+and degrade to the manual checklist below rather than silently reporting
+success — but that is a fail-safe for an unexpected regression, not the
+documented default. See `docs/runbooks/secret-rotation.md` conventions for
+how secrets are managed in this repo, and confirm with `gh secret list` if
+you have any doubt about current state before relying on it as the sole
+gate.
 
 For E2E Pro, that CI skip is recorded as `skipped`, not `passed`. The required
 release obligation remains blocked until the operator attaches explicit manual
@@ -170,7 +176,7 @@ evidence is complete.
 Record these results for the release playbook before promotion:
 
 - [ ] Run `git diff main..develop -- supabase/migrations/` — if any new migration files appear, confirm they have been applied to the production Supabase project before merging.
-- [ ] Confirm the `check:pending-migrations` CI step on the release PR passed (or, if it was skipped because the secret isn't configured yet, fall back to the manual check above).
+- [ ] Confirm the `check:pending-migrations` CI step on the release PR passed (or, in the unexpected case that it was skipped because a secret was missing, fall back to the manual check above and investigate why — the secrets are normally configured).
 - [ ] Attach the release-PR run ID, exact head SHA, result, and manual evidence
       reference when applicable to the E2E Pro run.
 
