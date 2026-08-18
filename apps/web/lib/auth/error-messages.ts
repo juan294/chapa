@@ -5,7 +5,18 @@
  * and passed to the landing page as `?error=<code>`.
  *
  * Messages must be non-technical and never expose internal details.
+ *
+ * Message text lives in the i18n dictionary (`oauthErrors.*`, #1109) so it
+ * renders in the visitor's locale. This module stays a pure, dependency-free
+ * code→dictKey lookup; callers resolve the key through their own translator
+ * (`useTranslation()`'s `t`, or `getServerT`). The default `t` — matching
+ * `useTranslation()`'s no-provider fallback — resolves against the English
+ * dictionary, so existing callers that don't pass a translator keep working
+ * unchanged.
  */
+import { en } from "@/lib/i18n/dictionaries/en";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 export const OAUTH_ERROR_CODES = [
   "no_code",
@@ -15,28 +26,26 @@ export const OAUTH_ERROR_CODES = [
   "user_fetch",
   // #1107 \u2014 emitted by app/api/auth/callback/route.ts:158 since it was
   // added, but never registered here; it silently fell through to the
-  // generic FALLBACK_MESSAGE instead of getting its own copy.
+  // generic fallback message instead of getting its own copy.
   "session_storage",
 ] as const;
 
 type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
 
-const ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
-  no_code:
-    "Sign-in was interrupted before completing. Please try again.",
-  invalid_state:
-    "Your sign-in session expired or was invalid. Please try again.",
-  config:
-    "Something went wrong on our end. Please try again later.",
-  token_exchange:
-    "We couldn\u2019t complete sign-in with GitHub. Please try again.",
-  user_fetch:
-    "We couldn\u2019t retrieve your GitHub profile. Please try again.",
-  session_storage:
-    "We couldn\u2019t start your session. Please try again.",
+const ERROR_MESSAGE_KEYS: Record<OAuthErrorCode, string> = {
+  no_code: "oauthErrors.noCode",
+  invalid_state: "oauthErrors.invalidState",
+  config: "oauthErrors.config",
+  token_exchange: "oauthErrors.tokenExchange",
+  user_fetch: "oauthErrors.userFetch",
+  session_storage: "oauthErrors.sessionStorage",
 };
 
-const FALLBACK_MESSAGE = "Something went wrong during sign-in. Please try again.";
+const FALLBACK_KEY = "oauthErrors.fallback";
+
+function defaultT(key: string): string {
+  return resolveTranslation(key, en) as string;
+}
 
 /**
  * Platform identifiers used by the linked-account OAuth flows
@@ -62,34 +71,33 @@ type PlatformOAuthSuffix =
   | "user_fetch"
   | "storage";
 
-const PLATFORM_SUFFIX_MESSAGES: Record<
-  PlatformOAuthSuffix,
-  (platform: string) => string
-> = {
-  no_code: (platform) =>
-    `Connecting your ${platform} account was interrupted before completing. Please try again.`,
-  invalid_state: (platform) =>
-    `Your ${platform} connection request expired or was invalid. Please try again.`,
-  config: () => "Something went wrong on our end. Please try again later.",
-  token_exchange: (platform) =>
-    `We couldn\u2019t connect your ${platform} account. Please try again.`,
-  user_fetch: (platform) =>
-    `We couldn\u2019t retrieve your ${platform} profile. Please try again.`,
-  storage: (platform) =>
-    `We couldn\u2019t save your ${platform} connection. Please try again.`,
+const PLATFORM_SUFFIX_KEYS: Record<PlatformOAuthSuffix, string> = {
+  no_code: "oauthErrors.platform.noCode",
+  invalid_state: "oauthErrors.platform.invalidState",
+  config: "oauthErrors.platform.config",
+  token_exchange: "oauthErrors.platform.tokenExchange",
+  user_fetch: "oauthErrors.platform.userFetch",
+  storage: "oauthErrors.platform.storage",
 };
 
 /**
- * Matches a `<platform>_<suffix>` code and builds platform-aware copy, or
- * returns `null` when `code` isn't one of the recognized platform codes.
+ * Matches a `<platform>_<suffix>` code and builds platform-aware, translated
+ * copy, or returns `null` when `code` isn't one of the recognized platform
+ * codes. Dictionary strings carry a `{platform}` placeholder (#1109) resolved
+ * via `interpolate()` \u2014 the same pattern used elsewhere in the i18n system
+ * (see `ScoreExplanationPanel.tsx`'s `platformLine`/`qualityCaveat`).
  */
-function getPlatformOAuthErrorMessage(code: string): string | null {
+function getPlatformOAuthErrorMessage(
+  code: string,
+  t: (key: string) => string,
+): string | null {
   for (const platform of PLATFORM_OAUTH_PLATFORMS) {
     const prefix = `${platform}_`;
     if (!code.startsWith(prefix)) continue;
     const suffix = code.slice(prefix.length) as PlatformOAuthSuffix;
-    const buildMessage = PLATFORM_SUFFIX_MESSAGES[suffix];
-    return buildMessage ? buildMessage(PLATFORM_LABELS[platform]) : null;
+    const key = PLATFORM_SUFFIX_KEYS[suffix];
+    if (!key) return null;
+    return interpolate(t(key), { platform: PLATFORM_LABELS[platform] });
   }
   return null;
 }
@@ -102,15 +110,19 @@ function getPlatformOAuthErrorMessage(code: string): string | null {
  *
  * Returns `null` when the input is falsy (undefined, null, empty string),
  * meaning there is no error to display.
+ *
+ * @param t Optional translator, e.g. `useTranslation().t`. Defaults to the
+ *   English dictionary when omitted.
  */
 export function getOAuthErrorMessage(
   code: string | null | undefined,
+  t: (key: string) => string = defaultT,
 ): string | null {
   if (!code) return null;
 
-  const platformMessage = getPlatformOAuthErrorMessage(code);
+  const platformMessage = getPlatformOAuthErrorMessage(code, t);
   if (platformMessage) return platformMessage;
 
-  const known = ERROR_MESSAGES[code as OAuthErrorCode];
-  return known ?? FALLBACK_MESSAGE;
+  const key = ERROR_MESSAGE_KEYS[code as OAuthErrorCode] ?? FALLBACK_KEY;
+  return t(key);
 }

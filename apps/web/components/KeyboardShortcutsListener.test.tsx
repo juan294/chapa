@@ -36,6 +36,7 @@ vi.mock("@/lib/keyboard/use-keyboard-shortcuts", () => ({
 vi.mock("@/lib/keyboard/shortcuts", () => ({
   // Provide the type export that the source imports
   ShortcutScope: {},
+  TERMINAL_COMMAND_INPUT_ID: "terminal-command-input",
 }));
 
 vi.mock("@/lib/feature-flags-sync", () => ({
@@ -349,7 +350,7 @@ describe("KeyboardShortcutsListener", () => {
       render(
         <>
           <KeyboardShortcutsListener />
-          <input aria-label="Terminal command input" data-testid="cmd-input" />
+          <input id="terminal-command-input" aria-label="Terminal command input" data-testid="cmd-input" />
         </>,
       );
 

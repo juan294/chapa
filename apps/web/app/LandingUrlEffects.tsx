@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { LocaleSync } from "@/lib/i18n";
+import { LocaleSync, useTranslation } from "@/lib/i18n";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 
@@ -37,9 +37,13 @@ function useLocationSearch(): string {
  * accepted trade for keeping the highest-traffic route on the CDN.
  */
 export function LandingUrlEffects() {
+  const { t } = useTranslation();
   const params = new URLSearchParams(useLocationSearch());
   const lang = params.get("lang") ?? undefined;
-  const errorMessage = getOAuthErrorMessage(params.get("error"));
+  const errorMessage = getOAuthErrorMessage(
+    params.get("error"),
+    (key) => t(key) as string,
+  );
 
   return (
     <>

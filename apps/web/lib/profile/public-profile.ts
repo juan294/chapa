@@ -1,6 +1,5 @@
 import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
-import { captureServerError, captureServerEvent } from "@/lib/analytics/server-errors";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { captureServerError } from "@/lib/analytics/server-errors";
 import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
 import { dbUpsertUser } from "@/lib/db/users";

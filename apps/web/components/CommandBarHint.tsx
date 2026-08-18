@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
-import { isInputFocused } from "@/lib/keyboard/shortcuts";
+import { isInputFocused, TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 import { useTranslation } from "@/lib/i18n";
 
 /**
@@ -64,7 +64,7 @@ export function CommandBarHint({ isAdmin }: { isAdmin?: boolean } = {}) {
     if (!summoned) return;
     const timer = setTimeout(() => {
       document
-        .querySelector<HTMLInputElement>('input[aria-label="Terminal command input"]')
+        .querySelector<HTMLInputElement>(`#${TERMINAL_COMMAND_INPUT_ID}`)
         ?.focus();
     }, 50);
     return () => clearTimeout(timer);

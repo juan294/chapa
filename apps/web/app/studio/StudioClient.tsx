@@ -20,6 +20,7 @@ import {
 } from "@/components/terminal/command-registry";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListener";
 import { useTranslation } from "@/lib/i18n";
+import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
@@ -209,7 +210,7 @@ export function StudioClient({
   const handleAutocompleteFill = useCallback((command: string) => {
     setShowAutocomplete(false);
     const input = document.querySelector<HTMLInputElement>(
-      'input[aria-label="Terminal command input"]',
+      `#${TERMINAL_COMMAND_INPUT_ID}`,
     );
     if (input) {
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
@@ -229,7 +230,7 @@ export function StudioClient({
       switch (id) {
         case "focus-terminal": {
           const input = document.querySelector<HTMLInputElement>(
-            'input[aria-label="Terminal command input"]',
+            `#${TERMINAL_COMMAND_INPUT_ID}`,
           );
           input?.focus();
           break;

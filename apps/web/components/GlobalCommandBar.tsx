@@ -16,6 +16,7 @@ import type { OutputLine } from "@/components/terminal/command-registry";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { useTranslation } from "@/lib/i18n";
 import { tObject } from "@/lib/i18n/typed-accessors";
+import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
 const OUTPUT_TIMEOUT_MS = 5000;
 
@@ -126,7 +127,7 @@ export function GlobalCommandBar({
   const handleAutocompleteFill = useCallback((command: string) => {
     setShowAutocomplete(false);
     const input = document.querySelector<HTMLInputElement>(
-      'input[aria-label="Terminal command input"]',
+      `#${TERMINAL_COMMAND_INPUT_ID}`,
     );
     if (input) {
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(

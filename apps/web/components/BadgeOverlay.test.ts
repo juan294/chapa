@@ -137,9 +137,9 @@ describe("BadgeOverlay lazy rendering (#323)", () => {
 
   it("does NOT pre-render all annotation panels via HOTSPOTS.map", () => {
     // The panel layer should NOT iterate all hotspots — only the active one renders.
-    // Match the section between "hidden md:contents" and "Hotspot regions".
+    // Match the section between the panel comment and "Hotspot regions".
     const panelSection = SRC.match(
-      /hidden md:contents[\s\S]*?Hotspot regions/,
+      /leader line annotation panel[\s\S]*?Hotspot regions/,
     )?.[0];
     expect(panelSection).toBeDefined();
     expect(panelSection).not.toMatch(/HOTSPOTS\.map/);

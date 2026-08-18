@@ -1,7 +1,17 @@
+// Server component (no client hooks) — a route loading.tsx is Next's
+// Suspense fallback and must render without waiting on client JS. The i18n
+// text is resolved at DEFAULT_LOCALE ('es'), matching this page's own ISR
+// approach (`app/u/[handle]/page.tsx` deliberately avoids getServerLocale()'s
+// cookies()/headers() reads to stay ISR-eligible, falling back to "es").
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { getServerT } from "@/lib/i18n/server";
+
+const t = getServerT(DEFAULT_LOCALE);
+
 export default function SharePageLoading() {
   return (
-    <main id="main-content" className="min-h-screen bg-bg" role="status" aria-label="Loading">
-      <span className="sr-only">Loading...</span>
+    <main id="main-content" className="min-h-screen bg-bg" role="status" aria-label={t("aria.loading") as string}>
+      <span className="sr-only">{t("common.loading") as string}</span>
       <div className="relative mx-auto max-w-4xl px-6 py-16">
         {/* Header skeleton */}
         <div className="mb-12">

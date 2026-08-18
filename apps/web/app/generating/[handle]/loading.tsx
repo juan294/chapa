@@ -1,12 +1,21 @@
-export default function GeneratingLoading() {
+// Server component (no client hooks) — a route loading.tsx is Next's
+// Suspense fallback. `app/generating/[handle]/page.tsx` is `force-dynamic`
+// and resolves the real per-request locale via getServerLocale(); this
+// fallback mirrors that (matching apps/web/app/coming-soon/loading.tsx's
+// established pattern) rather than assuming DEFAULT_LOCALE like the
+// static-route loaders.
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
+
+export default async function GeneratingLoading() {
+  const t = getServerT(await getServerLocale());
   return (
     <main
       id="main-content"
       className="flex min-h-screen items-center justify-center bg-bg px-6"
       role="status"
-      aria-label="Loading"
+      aria-label={t("aria.loading") as string}
     >
-      <span className="sr-only">Loading...</span>
+      <span className="sr-only">{t("common.loading") as string}</span>
       <div className="w-full max-w-md">
         {/* Terminal header skeleton */}
         <div className="mb-8">

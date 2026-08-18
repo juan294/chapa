@@ -180,8 +180,30 @@ describe("BadgeOverlay — rendering", () => {
     expect(container.querySelector("circle")).not.toBeNull();
   });
 
+  // The panel now portals to document.body (#1069 / #1110), so its live
+  // position depends on the overlay root's getBoundingClientRect() rather
+  // than the static panelTop/panelLeft percentages. Mock a realistic badge
+  // rect (matching the 1200×630 viewBox) so the "above" case lands above the
+  // rect.top < 120 flip-guard threshold from InfoTooltip's own pattern.
+  function mockOverlayRect() {
+    const overlay = screen.getByRole("group", { name: "Badge element tooltips" });
+    vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
+      top: 400,
+      left: 0,
+      right: 1200,
+      bottom: 1030,
+      width: 1200,
+      height: 630,
+      x: 0,
+      y: 400,
+      toJSON: () => {},
+    });
+    return overlay;
+  }
+
   it("panel uses translate(-50%, -100%) for above-anchored hotspots", () => {
-    const { container } = render(<BadgeOverlay />);
+    render(<BadgeOverlay />);
+    mockOverlayRect();
     // badge-archetype has panelAnchor: "above"
     const archetypeHotspot = screen
       .getAllByRole("group")
@@ -190,13 +212,14 @@ describe("BadgeOverlay — rendering", () => {
 
     fireEvent.mouseEnter(archetypeHotspot!);
 
-    const panel = container.querySelector('[role="tooltip"]') as HTMLElement | null;
+    const panel = screen.getByRole("tooltip") as HTMLElement;
     expect(panel).not.toBeNull();
-    expect(panel!.style.transform).toBe("translate(-50%, -100%)");
+    expect(panel.style.transform).toBe("translate(-50%, -100%)");
   });
 
   it("panel uses translate(-50%, 0%) for below-anchored hotspots", () => {
-    const { container } = render(<BadgeOverlay />);
+    render(<BadgeOverlay />);
+    mockOverlayRect();
     // badge-heatmap has panelAnchor: "below"
     const heatmapHotspot = screen
       .getAllByRole("group")
@@ -205,16 +228,17 @@ describe("BadgeOverlay — rendering", () => {
 
     fireEvent.mouseEnter(heatmapHotspot!);
 
-    const panel = container.querySelector('[role="tooltip"]') as HTMLElement | null;
+    const panel = screen.getByRole("tooltip") as HTMLElement;
     expect(panel).not.toBeNull();
-    expect(panel!.style.transform).toBe("translate(-50%, 0%)");
+    expect(panel.style.transform).toBe("translate(-50%, 0%)");
   });
 
   // Fix #1021 (UX-M1 pass): the desktop leader-line annotation panel must use
   // the mandated z-99999 tooltip layering rule so it can layer above a modal
   // or sticky header if ever needed, matching every other tooltip surface.
   it("desktop leader-line panel uses z-index 99999, not z-20", () => {
-    const { container } = render(<BadgeOverlay />);
+    render(<BadgeOverlay />);
+    mockOverlayRect();
     const archetypeHotspot = screen
       .getAllByRole("group")
       .find((el) => el.getAttribute("aria-label") === "archetype info");
@@ -222,10 +246,68 @@ describe("BadgeOverlay — rendering", () => {
 
     fireEvent.mouseEnter(archetypeHotspot!);
 
-    const panel = container.querySelector('[role="tooltip"]') as HTMLElement | null;
+    const panel = screen.getByRole("tooltip") as HTMLElement;
     expect(panel).not.toBeNull();
-    expect(panel!.className).toContain("z-[99999]");
-    expect(panel!.className).not.toContain("z-20");
+    expect(panel.className).toContain("z-[99999]");
+    expect(panel.className).not.toContain("z-20");
+  });
+
+  // #1069 / #1110: the panel must actually be portaled to document.body, not
+  // rendered inline inside the (transformed, animated, z-10-stacked) overlay
+  // subtree — that inline placement was the root cause of the mandate
+  // violation and the ineffective z-[99999].
+  it("portals the panel to document.body, outside the render container", () => {
+    const { container } = render(<BadgeOverlay />);
+    mockOverlayRect();
+    const archetypeHotspot = screen
+      .getAllByRole("group")
+      .find((el) => el.getAttribute("aria-label") === "archetype info");
+
+    fireEvent.mouseEnter(archetypeHotspot!);
+
+    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+    expect(document.body.querySelector('[role="tooltip"]')).not.toBeNull();
+  });
+
+  // #1069 / #1110: an "above"-anchored panel that would still clip above the
+  // viewport (rect.top < 120, matching InfoTooltip's own flip rule) falls
+  // back to anchoring below the hovered hotspot itself.
+  it("flips an above-anchored panel to below when its computed position would clip the viewport top", () => {
+    render(<BadgeOverlay />);
+    const overlay = screen.getByRole("group", { name: "Badge element tooltips" });
+    // Badge sits near the very top of the viewport — the archetype panel's
+    // "-14%" offset would land well above rect.top < 120.
+    vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
+      top: 20,
+      left: 0,
+      right: 1200,
+      bottom: 650,
+      width: 1200,
+      height: 630,
+      x: 0,
+      y: 20,
+      toJSON: () => {},
+    });
+    const archetypeHotspot = screen
+      .getAllByRole("group")
+      .find((el) => el.getAttribute("aria-label") === "archetype info")!;
+    vi.spyOn(archetypeHotspot, "getBoundingClientRect").mockReturnValue({
+      top: 34,
+      left: 60,
+      right: 214,
+      bottom: 54,
+      width: 154,
+      height: 20,
+      x: 60,
+      y: 34,
+      toJSON: () => {},
+    });
+
+    fireEvent.mouseEnter(archetypeHotspot);
+
+    const panel = screen.getByRole("tooltip") as HTMLElement;
+    expect(panel.style.transform).toBe("translate(-50%, 0%)");
+    expect(panel.style.top).toBe("54px");
   });
 });
 
@@ -272,5 +354,47 @@ describe("BadgeOverlay — archetype tooltip completeness (#735)", () => {
     for (const name of EXPECTED_ARCHETYPES) {
       expect(descSpan!.textContent).toContain(name);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1109 (UX-H3): desktop panel headings must come from the dictionary
+// (labelKey), not be derived from the hotspot id (raw English "ARCHETYPE" /
+// "HEATMAP" above fully-translated Spanish tooltip bodies).
+// ---------------------------------------------------------------------------
+
+describe("BadgeOverlay — desktop panel heading translation (#1109)", () => {
+  function mockOverlayRect() {
+    const overlay = screen.getByRole("group", { name: "Badge element tooltips" });
+    vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
+      top: 400,
+      left: 0,
+      right: 1200,
+      bottom: 1030,
+      width: 1200,
+      height: 630,
+      x: 0,
+      y: 400,
+      toJSON: () => {},
+    });
+  }
+
+  it("renders the translated English heading via labelKey, not the raw hotspot id", () => {
+    render(<BadgeOverlay />);
+    mockOverlayRect();
+    const heatmapHotspot = screen
+      .getAllByRole("group")
+      .find((el) => el.getAttribute("aria-label") === "heatmap info")!;
+
+    fireEvent.mouseEnter(heatmapHotspot);
+
+    const panel = screen.getByRole("tooltip");
+    expect(panel.textContent).toContain("HEATMAP");
+  });
+
+  it("every hotspot has a labelKey resolving to a non-empty string in en.ts", () => {
+    // Static assertion: labelKey must be a dictionary key, not a raw id.
+    expect(SOURCE).toContain("labelKey:");
+    expect(SOURCE).not.toContain('activeBase.id.replace("badge-", "")');
   });
 });

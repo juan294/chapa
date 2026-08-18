@@ -143,7 +143,7 @@ describe("Loading page renders", () => {
 
   it("renders StudioLoading", async () => {
     const { default: StudioLoading } = await import("./studio/loading");
-    render(<StudioLoading />);
+    render(await StudioLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
@@ -167,7 +167,7 @@ describe("Loading page renders", () => {
 
   it("renders GeneratingLoading", async () => {
     const { default: GeneratingLoading } = await import("./generating/[handle]/loading");
-    render(<GeneratingLoading />);
+    render(await GeneratingLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 });

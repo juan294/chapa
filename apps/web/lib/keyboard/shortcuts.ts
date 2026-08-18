@@ -3,6 +3,16 @@
  * Zero React dependencies. Fully testable.
  */
 
+/**
+ * DOM id of the terminal command input (`apps/web/components/terminal/TerminalInput.tsx`),
+ * shared with every keyboard-shortcut/autocomplete focus-routing call site
+ * (CommandBarHint, GlobalCommandBar, KeyboardShortcutsListener, StudioClient).
+ * A single source of truth so a translated `aria-label` (#1109) can never
+ * silently break focus routing the way the previous
+ * `input[aria-label="Terminal command input"]` selector did.
+ */
+export const TERMINAL_COMMAND_INPUT_ID = "terminal-command-input";
+
 /* ------------------------------------------------------------------ */
 /* Types                                                              */
 /* ------------------------------------------------------------------ */

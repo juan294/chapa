@@ -14,7 +14,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
-import { type ShortcutScope } from "@/lib/keyboard/shortcuts";
+import { type ShortcutScope, TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { createModuleStore } from "@/hooks/createModuleStore";
 import dynamic from "next/dynamic";
@@ -174,7 +174,7 @@ export function KeyboardShortcutsListener() {
           return;
         case "focus-command-bar": {
           const input = document.querySelector<HTMLInputElement>(
-            'input[aria-label="Terminal command input"]',
+            `#${TERMINAL_COMMAND_INPUT_ID}`,
           );
           input?.focus();
           return;

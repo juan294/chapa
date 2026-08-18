@@ -10,9 +10,11 @@ export const es: Translations = {
     tryAgain: 'Intentar de nuevo',
     goHome: 'Volver al inicio',
     loading: 'Cargando...',
+    loadingChapa: 'Cargando Chapa...',
     copied: '¡Copiado!',
     copy: 'Copiar',
     orConnector: 'o',
+    skipToMainContent: 'Saltar al contenido principal',
   },
   aria: {
     mainNavigation: 'Navegación principal',
@@ -54,6 +56,8 @@ export const es: Translations = {
     impactScore: 'puntuación {label}',
     impactScoreValue: 'Puntuación de impacto: {score}',
     impactScoreTier: 'Puntuación de impacto {score}, nivel {tier}',
+    terminalCommandInput: 'Entrada de comando de terminal',
+    loading: 'Cargando',
   },
   landing: {
     navLinks: [
@@ -221,6 +225,26 @@ export const es: Translations = {
     label: 'para comandos',
     ariaLabel: 'Abrir la barra de comandos — o pulsa la tecla /',
   },
+  terminalInput: {
+    placeholder: 'Escribe / para ver comandos...',
+  },
+  oauthErrors: {
+    noCode: 'El inicio de sesión se interrumpió antes de completarse. Inténtalo de nuevo.',
+    invalidState: 'Tu sesión de inicio de sesión expiró o no era válida. Inténtalo de nuevo.',
+    config: 'Algo salió mal de nuestro lado. Inténtalo de nuevo más tarde.',
+    tokenExchange: 'No pudimos completar el inicio de sesión con GitHub. Inténtalo de nuevo.',
+    userFetch: 'No pudimos obtener tu perfil de GitHub. Inténtalo de nuevo.',
+    sessionStorage: 'No pudimos iniciar tu sesión. Inténtalo de nuevo.',
+    fallback: 'Algo salió mal durante el inicio de sesión. Inténtalo de nuevo.',
+    platform: {
+      noCode: 'La conexión con tu cuenta de {platform} se interrumpió antes de completarse. Inténtalo de nuevo.',
+      invalidState: 'Tu solicitud de conexión con {platform} expiró o no era válida. Inténtalo de nuevo.',
+      config: 'Algo salió mal de nuestro lado. Inténtalo de nuevo más tarde.',
+      tokenExchange: 'No pudimos conectar tu cuenta de {platform}. Inténtalo de nuevo.',
+      userFetch: 'No pudimos obtener tu perfil de {platform}. Inténtalo de nuevo.',
+      storage: 'No pudimos guardar tu conexión con {platform}. Inténtalo de nuevo.',
+    },
+  },
   verify: {
     title: 'Verificar una Chapa',
     description: 'Verifica la autenticidad de una Chapa marcada como «Métricas verificadas» con su hash de verificación.',
@@ -333,6 +357,19 @@ export const es: Translations = {
     verification: "En las Chapas marcadas como «Métricas verificadas», un sello criptográfico prueba que estas puntuaciones no han sido manipuladas.",
     craft: "Puntuación de Oficio IA: mide tu dominio, eficacia y sofisticación con herramientas de codificación IA como Claude Code.",
     github: "Chapa analiza métricas públicas de GitHub y otras plataformas vinculadas. Estas plataformas no están afiliadas ni respaldan este proyecto.",
+  },
+  badgeOverlayLabels: {
+    archetype: 'ARQUETIPO',
+    watchers: 'OBSERVADORES',
+    forks: 'BIFURCACIONES',
+    stars: 'ESTRELLAS',
+    heatmap: 'MAPA DE CALOR',
+    radar: 'RADAR',
+    score: 'PUNTUACIÓN',
+    tier: 'NIVEL',
+    verification: 'VERIFICACIÓN',
+    craft: 'OFICIO',
+    github: 'GITHUB',
   },
   archetypes: {
     dominantDimensionLabel: 'Dimensión dominante:',

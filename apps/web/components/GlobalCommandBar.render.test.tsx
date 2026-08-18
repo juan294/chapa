@@ -37,6 +37,7 @@ vi.mock("@/components/terminal/TerminalInput", () => ({
     return (
       <div data-testid="terminal-input">
         <input
+          id="terminal-command-input"
           data-testid="cmd-input"
           aria-label="Terminal command input"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
