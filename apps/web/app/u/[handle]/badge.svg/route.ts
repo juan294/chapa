@@ -189,18 +189,32 @@ async function finalizeMaterializedBadge(
   renderMs: number;
 }> {
   let avatarDataUri: string | undefined;
-  let avatarResolved = false;
+  // #1080 — whether the avatar step reached a definitive outcome (resolved,
+  // either with data or a hard failure/404, or there was no `avatarUrl` to
+  // fetch in the first place) vs. genuinely hitting the race deadline before
+  // settling. Only the latter should withhold the SVG cache write — a retry
+  // might succeed once the CDN responds. A missing `avatarUrl` or a fetch
+  // that already failed will never resolve differently on retry either, so
+  // those are safe to cache normally instead of being permanently stuck on
+  // the cache-miss side of the latency SLO.
+  let avatarFetchTimedOut = false;
   if (!options.readOnly) {
     const avatarPromise = materialized.stats.avatarUrl
       ? getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
       : Promise.resolve(undefined);
-    avatarDataUri = await Promise.race([
+    const AVATAR_TIMEOUT = Symbol("avatar-race-timeout");
+    const raceResult = await Promise.race([
       avatarPromise,
-      new Promise<undefined>((resolve) =>
-        setTimeout(() => resolve(undefined), AVATAR_RACE_DEADLINE_MS),
+      new Promise<typeof AVATAR_TIMEOUT>((resolve) =>
+        setTimeout(() => resolve(AVATAR_TIMEOUT), AVATAR_RACE_DEADLINE_MS),
       ),
     ]);
-    avatarResolved = avatarDataUri !== undefined;
+    if (raceResult === AVATAR_TIMEOUT) {
+      avatarFetchTimedOut = true;
+      avatarDataUri = undefined;
+    } else {
+      avatarDataUri = raceResult;
+    }
   }
   const verification = getPublicProfileVerification(materialized);
 
@@ -218,7 +232,7 @@ async function finalizeMaterializedBadge(
   // A missing verification record can be temporary when the first public
   // fetch is incomplete. Do not make that unverified render the terminal
   // 24-hour cache value; a later complete fetch must be able to heal it.
-  if (!options.readOnly && avatarResolved && verification) {
+  if (!options.readOnly && !avatarFetchTimedOut && verification) {
     await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
   }
 
