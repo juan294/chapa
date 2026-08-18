@@ -1,5 +1,3 @@
-export const revalidate = 3600;
-
 import { Suspense } from "react";
 import { after } from "next/server";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
@@ -28,11 +26,10 @@ import {
   persistProfileSnapshot,
 } from "@/lib/profile/public-profile";
 import { getTrendData } from "@/lib/history/get-trend-data";
-import { getServerT } from "@/lib/i18n/server";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { LanguageProvider, LocaleSync } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
-import { isSupportedLocale } from "@/lib/i18n/types";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { SharePageH2 } from "./SharePageH2";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
@@ -54,13 +51,16 @@ export async function generateMetadata({
     return { title: "Not Found" };
   }
 
-  // Avoid request-only locale APIs so the page stays ISR-compatible. Spanish
-  // remains the social-card default, while an explicit deep-link locale must
-  // also select matching metadata so streamed metadata cannot overwrite the
-  // client title with a different language after hydration.
+  // #1066 — the route is dynamic (see SharePage below), so locale resolves
+  // via getServerLocale: an explicit ?lang= deep-link override first (#1020
+  // contract — must win over the cookie), then the chapa-locale cookie,
+  // then Accept-Language, falling back to DEFAULT_LOCALE ('es'). This must
+  // resolve to the SAME locale as the body below, or streamed metadata
+  // could disagree with the client title after hydration.
   const resolvedSearch = searchParams ? await searchParams : {};
-  const requestedLocale = resolvedSearch.lang;
-  const locale = isSupportedLocale(requestedLocale) ? requestedLocale : "es";
+  const requestedLocale =
+    typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
+  const locale = await getServerLocale(requestedLocale);
   const t = getServerT(locale);
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
@@ -93,7 +93,9 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const { handle } = await params;
   const resolvedSearch = searchParams ? await searchParams : {};
   const queryLang = typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
-  const locale = isSupportedLocale(queryLang) ? queryLang : "es";
+  // #1066 — same resolution as generateMetadata above (query > cookie >
+  // header > default), so the body never disagrees with streamed metadata.
+  const locale = await getServerLocale(queryLang);
   const readOnly = resolvedSearch[READ_ONLY_SMOKE_PARAM] === "1";
 
   if (!isValidHandle(handle)) {

@@ -89,6 +89,7 @@ vi.mock("@/lib/i18n/server", async () => {
 vi.mock("@/lib/i18n", () => ({
   DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
+  LanguageProvider: (props: { children?: unknown }) => props.children,
 }));
 
 vi.mock("@/components/CommandBarHint", () => ({
@@ -193,6 +194,12 @@ describe("SharePage /u/[handle]", () => {
   });
 
   it("generates metadata with the daily OG cache buster", async () => {
+    // #1066 — locale now resolves via getServerLocale (mocked here to the
+    // "es" cookie/header-fallback default) rather than a hardcoded literal;
+    // this test is about the OG cache-buster URL, not locale resolution
+    // itself (see the "locale resolution (#1066)" describe block for that).
+    mockGetServerLocale.mockResolvedValue("es");
+
     const metadata = await generateMetadata({
       params: Promise.resolve({ handle: "testuser" }),
     });
@@ -214,6 +221,95 @@ describe("SharePage /u/[handle]", () => {
       SharePage({ params: Promise.resolve({ handle: "bad!!handle" }) }),
     ).rejects.toThrow("NOT_FOUND");
     expect(mockNotFound).toHaveBeenCalled();
+  });
+
+  // #1066 (FE-H2) — the route now commits to dynamic rendering and resolves
+  // locale via getServerLocale (query override > chapa-locale cookie >
+  // Accept-Language > DEFAULT_LOCALE — see lib/i18n/server.ts, already
+  // covered by its own unit tests). These tests assert page.tsx wires the
+  // query param through correctly and that generateMetadata/body agree.
+  describe("locale resolution (#1066)", () => {
+    it("generateMetadata resolves locale via getServerLocale using the ?lang= override", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      await generateMetadata({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      // #1020 contract: an explicit ?lang= must win over any cookie —
+      // asserting the literal value is forwarded (not dropped) is what
+      // guarantees that precedence downstream in getServerLocale.
+      expect(mockGetServerLocale).toHaveBeenCalledWith("en");
+    });
+
+    it("generateMetadata falls through to cookie/header resolution when ?lang= is absent", async () => {
+      mockGetServerLocale.mockResolvedValue("es");
+
+      await generateMetadata({
+        params: Promise.resolve({ handle: "testuser" }),
+      });
+
+      expect(mockGetServerLocale).toHaveBeenCalledWith(null);
+    });
+
+    it("SharePage's LanguageProvider uses the ?lang= override for the body locale", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      expect(mockGetServerLocale).toHaveBeenCalledWith("en");
+      const provider = findElement(
+        result,
+        (el) => !!el.props && "initialLocale" in el.props,
+      );
+      expect(provider).not.toBeNull();
+      expect(provider!.props.initialLocale).toBe("en");
+    });
+
+    it("SharePage's LanguageProvider falls back to the cookie-resolved locale when ?lang= is absent", async () => {
+      // getServerLocale is mocked here to stand in for a real cookie read
+      // (its own precedence order is covered by lib/i18n/server.test.ts) —
+      // this test only asserts page.tsx defers to it rather than
+      // hardcoding "es".
+      mockGetServerLocale.mockResolvedValue("es");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
+
+      expect(mockGetServerLocale).toHaveBeenCalledWith(null);
+      const provider = findElement(
+        result,
+        (el) => !!el.props && "initialLocale" in el.props,
+      );
+      expect(provider!.props.initialLocale).toBe("es");
+    });
+
+    it("generateMetadata and the body resolve to the same locale for an identical request", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      await generateMetadata({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+      const bodyResult = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      const forwardedValues = mockGetServerLocale.mock.calls.map((args) => args[0]);
+      expect(forwardedValues.every((value) => value === "en")).toBe(true);
+      const provider = findElement(
+        bodyResult,
+        (el) => !!el.props && "initialLocale" in el.props,
+      );
+      expect(provider!.props.initialLocale).toBe("en");
+    });
   });
 
   it("renders the inline badge from displayImpact, not rawImpact", async () => {
