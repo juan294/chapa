@@ -4,21 +4,11 @@ import { getNextauthSecret } from "@/lib/env";
 import { generateCliToken } from "@/lib/auth/cli-token";
 import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+import {
+  type CliDeviceSession as DeviceSession,
+  cliDeviceSessionKey,
+} from "@/lib/auth/cli-device-session";
 import { randomBytes, timingSafeEqual } from "crypto";
-
-interface DeviceSession {
-  status: "pending" | "approved";
-  handle?: string;
-  /** RFC 8628-style high-entropy secret (BE-M2 #869). Only the originating CLI device
-   *  should possess this. Offered on the first poll. Absent on sessions created
-   *  before this hardening (e.g. directly by the approve route). */
-  deviceCode?: string;
-  /** Set true once a poll has echoed back the correct {@link deviceCode}, proving the
-   *  client actually possesses it. ONLY once confirmed is device_code enforced on
-   *  subsequent polls. This keeps existing (legacy) CLI binaries — which never echo
-   *  the code — fully working via sessionId only. See enforcement logic below. */
-  deviceCodeConfirmed?: boolean;
-}
 
 // BE-M1 (#868): When no trusted IP header is present, all such requests would
 // collapse into a single "unknown" rate-limit bucket, defeating per-IP limiting.
@@ -75,7 +65,7 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
     );
   }
 
-  const session = await cacheGet<DeviceSession>(`cli:device:${sessionId}`);
+  const session = await cacheGet<DeviceSession>(cliDeviceSessionKey(sessionId));
 
   // BE-M2 (#869): RFC 8628-style device_code split — FULLY BACKWARD-COMPATIBLE.
   //
@@ -115,7 +105,7 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
     };
     // Best-effort store — if Redis is unavailable, fall through to pending response
     // without device_code (fail-open, consistent with existing rate-limit fail-open).
-    await cacheSet(`cli:device:${sessionId}`, pendingSession, DEVICE_SESSION_TTL);
+    await cacheSet(cliDeviceSessionKey(sessionId), pendingSession, DEVICE_SESSION_TTL);
     return NextResponse.json({ status: "pending", device_code: newDeviceCode });
   }
 
@@ -140,7 +130,7 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
       if (!session.deviceCodeConfirmed) {
         const confirmed: DeviceSession = { ...session, deviceCodeConfirmed: true };
         // Best-effort persist; if it fails the enforcement simply isn't latched yet.
-        await cacheSet(`cli:device:${sessionId}`, confirmed, DEVICE_SESSION_TTL);
+        await cacheSet(cliDeviceSessionKey(sessionId), confirmed, DEVICE_SESSION_TTL);
       }
     } else if (session.deviceCodeConfirmed) {
       // No code presented, but the client previously proved possession → enforce.
@@ -166,7 +156,7 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
     const token = generateCliToken(session.handle, secret);
 
     // Clean up — one-time use
-    await cacheDel(`cli:device:${sessionId}`);
+    await cacheDel(cliDeviceSessionKey(sessionId));
 
     return NextResponse.json({
       status: "approved",
