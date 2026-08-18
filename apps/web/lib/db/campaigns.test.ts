@@ -101,6 +101,7 @@ import {
   dbDeleteCampaign,
   dbCreateCampaignSends,
   dbClaimPendingSends,
+  dbReleaseCampaignSendLease,
   dbAcknowledgeCampaignSends,
   dbGetPendingSends,
   dbMarkSendsSent,
@@ -674,6 +675,58 @@ describe("dbClaimPendingSends", () => {
     );
 
     expect(result).toEqual([]);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("dbReleaseCampaignSendLease", () => {
+  it("releases a lease group back to pending through the RPC", async () => {
+    mockRpc.mockResolvedValueOnce({ data: 3, error: null });
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(mockRpc).toHaveBeenCalledWith("release_campaign_send_lease", {
+      p_lease_token: "lease-token",
+    });
+    expect(result).toBe(true);
+  });
+
+  it("fails closed when the released count does not match the caller's expectation", async () => {
+    mockRpc.mockResolvedValueOnce({ data: 2, error: null });
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when DB unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(result).toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("returns false on RPC error", async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error("rpc failed") });
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(result).toBe(false);
+  });
+
+  it("fails closed before the RPC when the lease token is blank", async () => {
+    const result = await dbReleaseCampaignSendLease("   ", 3);
+
+    expect(result).toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before the RPC when the expected count is not positive", async () => {
+    const result = await dbReleaseCampaignSendLease("lease-token", 0);
+
+    expect(result).toBe(false);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 });

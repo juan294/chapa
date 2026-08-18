@@ -143,6 +143,47 @@ export async function dbClaimPendingSends(
   }
 }
 
+/**
+ * Release a claimed lease group back to `pending`.
+ *
+ * Used when a recovered expired-lease group — returned whole by
+ * `claim_campaign_sends`, ignoring the requested limit, to preserve an
+ * identical payload for provider idempotency (see `dbClaimPendingSends`) —
+ * exceeds the remaining daily send quota. Re-claiming that group again would
+ * just refresh its lease under a fresh window without making progress, so it
+ * is released back to `pending` instead. The database function deliberately
+ * leaves `group_token` untouched so a later claim recovers the exact same
+ * membership rather than splitting it across smaller batches, which would
+ * break provider-side idempotency for an earlier ambiguous attempt (#1085).
+ *
+ * @param expectedCount - Number of rows the caller expects to release (from
+ *   its own claim result). A mismatch fails closed (returns false) so a
+ *   caller never silently under- or over-releases the group it holds.
+ */
+export async function dbReleaseCampaignSendLease(
+  leaseToken: string,
+  expectedCount: number,
+): Promise<boolean> {
+  if (!leaseToken.trim() || expectedCount <= 0) return false;
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const { data, error } = await db.rpc("release_campaign_send_lease", {
+      p_lease_token: leaseToken,
+    });
+
+    if (error) throw error;
+    return data === expectedCount;
+  } catch (error) {
+    console.error(
+      "[db] dbReleaseCampaignSendLease failed:",
+      (error as Error).message,
+    );
+    return false;
+  }
+}
+
 export interface CampaignSendAcknowledgement {
   id: string;
   status: "sent" | "failed";
