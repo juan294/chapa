@@ -88,7 +88,7 @@ describe("BadgeOverlay — rendering", () => {
   it("activates leader line panel on mouseEnter", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabIndex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
     expect(hotspots.length).toBeGreaterThan(0);
 
@@ -104,7 +104,7 @@ describe("BadgeOverlay — rendering", () => {
   it("deactivates leader line panel on mouseLeave", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabIndex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
 
     fireEvent.mouseEnter(hotspots[0]!);
@@ -114,31 +114,38 @@ describe("BadgeOverlay — rendering", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
-  it("activates leader line panel on focus", () => {
+  // #1116 (UX-L2): hotspots are structural, non-actionable regions — 11 of
+  // them were previously tabIndex={0}, adding 11 silent stops to the share
+  // page's keyboard tab order before its real actions (toolbar, embed
+  // snippet). onFocus/onBlur were removed along with tabIndex, so a
+  // synthetic focus event must NOT reveal the panel — the element can no
+  // longer receive real DOM focus either, since it's not part of the tab
+  // order.
+  it("does not activate the leader line panel on focus — hotspot is no longer focusable (#1116)", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabIndex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
 
     fireEvent.focus(hotspots[0]!);
-    expect(screen.queryByRole("tooltip")).not.toBeNull();
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
-  it("deactivates leader line panel on blur", () => {
+  it("hotspots are excluded from the keyboard tab order (#1116)", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabIndex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
-
-    fireEvent.focus(hotspots[0]!);
-    fireEvent.blur(hotspots[0]!);
-    expect(screen.queryByRole("tooltip")).toBeNull();
+    expect(hotspots.length).toBe(11);
+    for (const hotspot of hotspots) {
+      expect(hotspot.getAttribute("tabindex")).toBeNull();
+    }
   });
 
   it("switching between hotspots shows the correct tooltip content", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabIndex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
 
     // Activate first hotspot
@@ -158,7 +165,7 @@ describe("BadgeOverlay — rendering", () => {
   it("renders leader line SVG path when hotspot is active", () => {
     const { container } = render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabIndex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
 
     // No SVG path rendered initially
@@ -173,7 +180,7 @@ describe("BadgeOverlay — rendering", () => {
   it("renders circle dot at leader line origin when hotspot is active", () => {
     const { container } = render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabIndex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
 
     fireEvent.mouseEnter(hotspots[0]!);

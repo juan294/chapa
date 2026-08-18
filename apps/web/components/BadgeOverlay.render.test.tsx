@@ -25,9 +25,26 @@ describe("BadgeOverlay", () => {
   it("renders all 11 hotspot regions", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("tabindex") === "0",
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
     );
     expect(hotspots.length).toBe(11);
+  });
+
+  // #1116 (UX-L2): these hotspots are structural annotation regions, not
+  // widgets — no unique action lives behind focusing them, so they must be
+  // excluded from the keyboard tab order. Screen reader users still get the
+  // content via the always-present sr-only description (tested below),
+  // which is reachable in reading order without requiring focus.
+  it("hotspots are not focusable via Tab (#1116)", () => {
+    render(<BadgeOverlay />);
+    const hotspots = screen.getAllByRole("group").filter(
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+    );
+    expect(hotspots.length).toBe(11);
+    for (const hotspot of hotspots) {
+      expect(hotspot.getAttribute("tabindex")).toBeNull();
+      expect(hotspot.tabIndex).toBe(-1);
+    }
   });
 
   it("hotspots have aria-label", () => {
@@ -58,19 +75,14 @@ describe("BadgeOverlay", () => {
     expect(svg?.querySelector("path")).toBeNull();
   });
 
-  it("shows leader line on focus", () => {
+  // #1116 (UX-L2): onFocus/onBlur were removed along with tabIndex — the
+  // hotspot can no longer receive DOM focus, so firing a synthetic focus
+  // event must NOT reveal the leader line. Hover remains the reveal
+  // mechanism (see "shows leader line on hotspot hover" above).
+  it("does not show leader line on focus — hotspot is no longer focusable (#1116)", () => {
     const { container } = render(<BadgeOverlay />);
     const archetype = screen.getByLabelText("archetype info");
     fireEvent.focus(archetype);
-    const svg = container.querySelector("#leader-lines-svg");
-    expect(svg?.querySelector("path")).not.toBeNull();
-  });
-
-  it("hides leader line on blur", () => {
-    const { container } = render(<BadgeOverlay />);
-    const archetype = screen.getByLabelText("archetype info");
-    fireEvent.focus(archetype);
-    fireEvent.blur(archetype);
     const svg = container.querySelector("#leader-lines-svg");
     expect(svg?.querySelector("path")).toBeNull();
   });
@@ -103,13 +115,36 @@ describe("BadgeOverlay", () => {
   it("each hotspot's aria-describedby always points to a present DOM element", () => {
     const { container } = render(<BadgeOverlay />);
     const hotspots = Array.from(
-      container.querySelectorAll<HTMLElement>("[tabindex='0']"),
+      container.querySelectorAll<HTMLElement>("[aria-describedby]"),
     );
     for (const hotspot of hotspots) {
       const describedById = hotspot.getAttribute("aria-describedby");
       expect(describedById).not.toBeNull();
       const referencedEl = container.querySelector(`#${describedById}`);
       expect(referencedEl).not.toBeNull();
+    }
+  });
+
+  // #1116 (UX-L2): all 11 hotspots must be reachable by assistive tech via
+  // reading order (sr-only description present, non-empty, no interaction
+  // required) — this is precisely what makes it safe to drop them from the
+  // keyboard tab order.
+  it("all 11 hotspots have non-empty sr-only descriptions reachable without any interaction (#1116)", () => {
+    const { container } = render(<BadgeOverlay />);
+    const hotspots = screen.getAllByRole("group").filter(
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+    );
+    expect(hotspots.length).toBe(11);
+    for (const hotspot of hotspots) {
+      const describedById = hotspot.getAttribute("aria-describedby");
+      expect(describedById).toBeTruthy();
+      const descEl = container.querySelector(`#${describedById}`);
+      expect(descEl).not.toBeNull();
+      expect(descEl?.classList.contains("sr-only")).toBe(true);
+      expect(descEl?.textContent?.trim().length).toBeGreaterThan(0);
+      // Not gated behind tabIndex/focus — the element is unfocusable and the
+      // description is present at initial render.
+      expect(hotspot.getAttribute("tabindex")).toBeNull();
     }
   });
 });
