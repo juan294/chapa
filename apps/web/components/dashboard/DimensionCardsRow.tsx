@@ -1,6 +1,11 @@
 "use client";
 
-import type { CraftResult, ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
+import type {
+  ClientImpactV6Result,
+  CraftResult,
+  StatsData,
+  DimensionScores,
+} from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DimensionCard } from "./DimensionCard";
@@ -10,7 +15,9 @@ import { useTranslation } from "@/lib/i18n";
 const CORE_DIMENSIONS = ["delivery", "quality", "consistency", "breadth"] as const;
 
 export interface DimensionCardsRowProps {
-  impact: ImpactV6Result;
+  // #1067 — redacted PublicImpactV6Result for a non-owner visitor, full
+  // ImpactV6Result for the owner. This component never reads confidence.
+  impact: ClientImpactV6Result;
   stats: StatsData;
   trend?: TrendSummary | null;
   diff?: SnapshotDiff | null;

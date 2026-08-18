@@ -12,6 +12,7 @@ const {
   mockRunPublicProfileSideEffects,
   mockPersistProfileSnapshot,
   mockDeferProfileCacheWork,
+  mockRedactImpactForVisitor,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -20,12 +21,15 @@ const {
   mockReadBadgeSvgCache,
   mockWriteBadgeSvgCache,
   mockGetTrendData,
+  mockHeaders,
+  mockGetOptionalServerSessionFromHeaders,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
   mockPersistProfileSnapshot: vi.fn(),
   mockDeferProfileCacheWork: vi.fn(),
+  mockRedactImpactForVisitor: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -34,6 +38,17 @@ const {
   mockReadBadgeSvgCache: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockGetTrendData: vi.fn(),
+  mockHeaders: vi.fn(),
+  mockGetOptionalServerSessionFromHeaders: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: (...args: unknown[]) => mockHeaders(...args),
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
+    mockGetOptionalServerSessionFromHeaders(...args),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -47,6 +62,8 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+  redactImpactForVisitor: (...args: unknown[]) =>
+    mockRedactImpactForVisitor(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -182,6 +199,13 @@ beforeEach(() => {
   mockReadBadgeSvgCache.mockResolvedValue(null);
   mockWriteBadgeSvgCache.mockResolvedValue(undefined);
   mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
+  mockHeaders.mockResolvedValue({ get: () => null });
+  mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+  mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
+    return rest;
+  });
 });
 
 describe("Phase 4d — Share page i18n", () => {

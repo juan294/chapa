@@ -1,3 +1,4 @@
+import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
 import { captureServerError, captureServerEvent } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
@@ -16,6 +17,28 @@ import { reconcileSnapshotWrite } from "./snapshot-write";
 export interface PublicVerificationCode {
   hash: string;
   date: string;
+}
+
+/**
+ * Strip owner-only confidence data before an `ImpactV6Result` crosses into a
+ * "use client" component's serialized props for a non-owner share-page
+ * visitor (#1067 FE-M1). Whatever is passed as a client-component prop is
+ * serialized into the RSC payload the browser downloads regardless of
+ * whether any component renders it — a client-side `isOwner` display gate is
+ * not sufficient on its own.
+ *
+ * Returns a NEW object; never mutates `impact`. The same
+ * `MaterializedProfile.displayImpact` reference this is called on also feeds
+ * the persisted snapshot and the HMAC verification record in the same
+ * request (see `runPublicProfileSideEffects` / `buildVerificationRecord`
+ * above), both of which require the real confidence value.
+ */
+export function redactImpactForVisitor(
+  impact: ImpactV6Result,
+): PublicImpactV6Result {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...publicImpact } = impact;
+  return publicImpact;
 }
 
 export async function materializePublicProfile(

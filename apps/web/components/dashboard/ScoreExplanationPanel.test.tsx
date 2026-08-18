@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { CraftResult } from "@chapa/shared";
 import { makeImpact, makeStats } from "@/lib/test-helpers/fixtures";
+import { redactImpactForVisitor } from "@/lib/profile/public-profile";
 import { ScoreExplanationPanel } from "./ScoreExplanationPanel";
 
 afterEach(cleanup);
@@ -118,6 +119,25 @@ describe("ScoreExplanationPanel", () => {
     expect(screen.getByText("GitLab does not expose PR-description, branch, or issue-link signals, so your Quality dimension is based on limited data here.")).toBeTruthy();
     expect(screen.queryByText("Confidence")).toBeNull();
     expect(screen.queryByText("Confidence: 95%")).toBeNull();
+  });
+
+  // #1067 (FE-M1) — the share page now passes a structurally-redacted
+  // PublicImpactV6Result (no confidence/confidencePenalties keys at all,
+  // not just hidden values) for non-owner requests. The panel must accept
+  // that shape without throwing and still never surface confidence copy.
+  it("renders correctly when given a redacted (visitor) impact payload with no confidence fields", () => {
+    const redacted = redactImpactForVisitor(soloImpact);
+    expect("confidence" in redacted).toBe(false);
+    expect("confidencePenalties" in redacted).toBe(false);
+
+    render(
+      <ScoreExplanationPanel impact={redacted} stats={soloStats} isOwner={false} />,
+    );
+    expandPanel();
+
+    expect(screen.getByText("52 (Solid)")).toBeTruthy();
+    expect(screen.queryByText("Confidence")).toBeNull();
+    expect(screen.queryByText(/Confidence:/)).toBeNull();
   });
 
   it("shows confidence details only to the owner", () => {

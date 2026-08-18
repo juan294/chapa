@@ -66,7 +66,9 @@ describe("SharePage", () => {
 
     it("passes stats, impact, and handle to SharePageOwnerContent", () => {
       expect(SOURCE).toContain("stats={stats}");
-      expect(SOURCE).toContain("impact={impact}");
+      // #1067 — impactForClient is the redacted-for-visitors projection of
+      // impact (see redactImpactForVisitor); the raw impact stays server-only.
+      expect(SOURCE).toContain("impact={impactForClient}");
       expect(SOURCE).toContain("handle={handle}");
     });
   });
@@ -137,6 +139,11 @@ describe("SharePage", () => {
 
     it("resolves locale via getServerLocale (cookie/header fallback), not a hardcoded default", () => {
       expect(SOURCE).toContain("getServerLocale");
+    });
+
+    it("imports headers from next/headers to resolve the requester's session", () => {
+      expect(SOURCE).toMatch(/from ["']next\/headers["']/);
+      expect(SOURCE).toMatch(/\bheaders\(\)/);
     });
 
     it("uses NavbarClient (unaffected by the dynamic-rendering change)", () => {

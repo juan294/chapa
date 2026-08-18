@@ -1,6 +1,6 @@
 import type {
+  ClientImpactV6Result,
   DimensionScores,
-  ImpactV6Result,
   ImpactTier,
 } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
@@ -108,14 +108,16 @@ function findWorstDimension(trend: TrendSummary): string {
  * weakest-dimension tip, next-tier guidance, and archetype context. Results are
  * sorted by priority and capped at 5. Used by the share page insights panel.
  *
- * @param impact - Current impact profile (dimensions, archetype, tier, composite)
+ * @param impact - Current impact profile (dimensions, archetype, tier, composite).
+ *   May be a redacted PublicImpactV6Result for a non-owner share-page visitor
+ *   (#1067) — this function never reads confidence/confidencePenalties.
  * @param trend  - Optional trend summary (direction, avgDelta, dimension trends)
  * @param diff   - Optional snapshot diff (tier/dimension changes since last snapshot)
  * @param t      - Translation function for locale-aware strings
  * @returns Up to 5 insights sorted by priority (1 = highest)
  */
 export function generateInsights(
-  impact: ImpactV6Result,
+  impact: ClientImpactV6Result,
   trend: TrendSummary | null,
   diff: SnapshotDiff | null,
   t: (key: string) => string | string[] | Record<string, unknown>[] = (key) => key,

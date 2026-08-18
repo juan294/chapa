@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DataSources } from "@/components/ImpactBreakdown";
@@ -89,7 +89,9 @@ function EmptyImpactState({ handle }: { handle: string }) {
 interface SharePageOwnerContentProps {
   handle: string;
   stats: StatsData | null;
-  impact: ImpactV6Result | null;
+  // #1067 — redacted PublicImpactV6Result for a non-owner visitor, full
+  // ImpactV6Result for the owner (see SharePageOwnerContentLazy).
+  impact: ClientImpactV6Result | null;
   craftResult?: CraftResult | null;
   trend?: TrendSummary | null;
   diff?: SnapshotDiff | null;

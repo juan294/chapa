@@ -6,24 +6,30 @@ const {
   mockRunPublicProfileSideEffects,
   mockPersistProfileSnapshot,
   mockDeferProfileCacheWork,
+  mockRedactImpactForVisitor,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
   mockAfter,
   mockGetServerLocale,
   mockGetTrendData,
+  mockHeaders,
+  mockGetOptionalServerSessionFromHeaders,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
   mockPersistProfileSnapshot: vi.fn(),
   mockDeferProfileCacheWork: vi.fn(),
+  mockRedactImpactForVisitor: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockAfter: vi.fn(),
   mockGetServerLocale: vi.fn(),
   mockGetTrendData: vi.fn(),
+  mockHeaders: vi.fn(),
+  mockGetOptionalServerSessionFromHeaders: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -36,6 +42,17 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+  redactImpactForVisitor: (...args: unknown[]) =>
+    mockRedactImpactForVisitor(...args),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: (...args: unknown[]) => mockHeaders(...args),
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
+    mockGetOptionalServerSessionFromHeaders(...args),
 }));
 
 vi.mock("@/lib/history/get-trend-data", () => ({
@@ -191,6 +208,15 @@ describe("SharePage /u/[handle]", () => {
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockGetServerLocale.mockResolvedValue("en");
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
+    mockHeaders.mockResolvedValue({ get: () => null });
+    // No session by default — most tests exercise the visitor path. Tests
+    // that need owner behavior override this per-test.
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+    mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
+      return rest;
+    });
   });
 
   it("generates metadata with the daily OG cache buster", async () => {
@@ -309,6 +335,66 @@ describe("SharePage /u/[handle]", () => {
         (el) => !!el.props && "initialLocale" in el.props,
       );
       expect(provider!.props.initialLocale).toBe("en");
+    });
+  });
+
+  // #1067 (FE-M1) — confidence/confidencePenalties must never reach the
+  // client-serialized props for a non-owner request. Ownership is resolved
+  // server-side (via the session cookie), not client-side, so it can gate
+  // what data is SENT, not just what is displayed.
+  describe("owner-only confidence redaction (#1067)", () => {
+    it("resolves the session via headers() + getOptionalServerSessionFromHeaders", async () => {
+      const fakeHeaderStore = { get: () => null };
+      mockHeaders.mockResolvedValue(fakeHeaderStore);
+
+      await renderPage("testuser");
+
+      expect(mockGetOptionalServerSessionFromHeaders).toHaveBeenCalledWith(fakeHeaderStore);
+    });
+
+    it("passes the redacted impact when there is no session (anonymous visitor)", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      const result = await renderPage("testuser");
+
+      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_MATERIALIZED.displayImpact);
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
+      expect("confidence" in impactProp).toBe(false);
+      expect("confidencePenalties" in impactProp).toBe(false);
+    });
+
+    it("passes the redacted impact when a different user's session is present", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "someone-else" });
+
+      const result = await renderPage("testuser");
+
+      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_MATERIALIZED.displayImpact);
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
+      expect("confidence" in impactProp).toBe(false);
+    });
+
+    it("passes the FULL impact (including confidence) when the session matches the handle", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+
+      const result = await renderPage("testuser");
+
+      expect(mockRedactImpactForVisitor).not.toHaveBeenCalled();
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      expect(ownerEl!.props.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
+    });
+
+    it("never redacts the impact used to render the inline badge SVG (server-only, not client-serialized)", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      await renderPage("testuser");
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.anything(),
+      );
     });
   });
 
@@ -458,7 +544,17 @@ describe("SharePage /u/[handle]", () => {
       // Impact/stats sections are still present — the page doesn't omit the
       // dashboard just because history is missing.
       expect(ownerEl!.props.stats).toEqual(FAKE_MATERIALIZED.stats);
-      expect(ownerEl!.props.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
+      // #1067 — the default test session is a visitor (no session), so the
+      // page redacts confidence/confidencePenalties before this crosses
+      // into the client component tree. See "owner-only confidence
+      // redaction (#1067)" below for dedicated coverage of that behavior.
+      expect(ownerEl!.props.impact).toEqual({
+        adjustedComposite: 65,
+        tier: "Solid",
+        archetype: "Builder",
+        dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+        profileType: "collaborative",
+      });
     });
 
     it("degrades gracefully (renders, does not throw) when getTrendData itself rejects", async () => {
