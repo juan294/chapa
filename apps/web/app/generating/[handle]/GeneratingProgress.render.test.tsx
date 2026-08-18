@@ -50,12 +50,22 @@ describe("GeneratingProgress", () => {
 
   it("renders initial steps", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
-    render(<GeneratingProgress handle="testuser" />);
-    // English dict (useTranslation falls back to English without LanguageProvider)
-    expect(screen.getByText("Checking GitHub session")).toBeDefined();
-    expect(screen.getByText("Collecting contribution data")).toBeDefined();
-    expect(screen.getByText("Computing impact profile")).toBeDefined();
-    expect(screen.getByText("Rendering badge")).toBeDefined();
+    const { container } = render(<GeneratingProgress handle="testuser" />);
+    // English dict (useTranslation falls back to English without LanguageProvider).
+    // Scoped to each visual step row via data-step, since step 0's label is
+    // also mirrored (once) in the visually-hidden live status line (#1114).
+    expect(container.querySelector('[data-step="0"]')?.textContent).toContain(
+      "Checking GitHub session",
+    );
+    expect(container.querySelector('[data-step="1"]')?.textContent).toContain(
+      "Collecting contribution data",
+    );
+    expect(container.querySelector('[data-step="2"]')?.textContent).toContain(
+      "Computing impact profile",
+    );
+    expect(container.querySelector('[data-step="3"]')?.textContent).toContain(
+      "Rendering badge",
+    );
     vi.unstubAllGlobals();
   });
 
@@ -344,6 +354,74 @@ describe("GeneratingProgress", () => {
     // scheduled by completeRemainingSteps — must be cancelled on unmount.
     // None should be left pending to fire later against a stale closure.
     expect(vi.getTimerCount()).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("uses a single visually-hidden status line for live announcements, separate from the visible (aria-hidden) step list (#1114)", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    const { container } = render(<GeneratingProgress handle="testuser" />);
+
+    const statusRegion = screen.getByRole("status");
+    // Exactly one step's worth of text is exposed to the accessibility tree
+    // at a time -- not a burst covering every step in the visible list.
+    expect(statusRegion.textContent).toBe("Checking GitHub session");
+    expect(statusRegion.textContent).not.toContain("Collecting contribution data");
+    expect(statusRegion.textContent).not.toContain("Computing impact profile");
+    expect(statusRegion.textContent).not.toContain("Rendering badge");
+
+    // The visible step list is hidden from the accessibility tree; the live
+    // status line lives outside it so the two can't double-announce.
+    const stepList = container.querySelector('[data-step="0"]')?.parentElement;
+    expect(stepList?.getAttribute("aria-hidden")).toBe("true");
+    expect(stepList?.getAttribute("role")).not.toBe("status");
+    expect(stepList?.contains(statusRegion)).toBe(false);
+    expect(statusRegion.contains(stepList ?? null)).toBe(false);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("announces exactly one step transition at a time as generation progresses, never the whole list at once (#1114)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    const statusRegion = screen.getByRole("status");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusRegion.textContent).toBe("Collecting contribution data");
+    expect(statusRegion.textContent).not.toContain("Checking GitHub session");
+    expect(statusRegion.textContent).not.toContain("Computing impact profile");
+    expect(statusRegion.textContent).not.toContain("Rendering badge");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(statusRegion.textContent).toBe("Computing impact profile");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(statusRegion.textContent).toBe("Rendering badge");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the error alert as a separate, independently-announced role, not nested in the status line (#1114)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Something went wrong generating your badge.");
+
+    const statusRegion = screen.getByRole("status");
+    expect(statusRegion.contains(alert)).toBe(false);
+    expect(alert.contains(statusRegion)).toBe(false);
+
     vi.unstubAllGlobals();
   });
 

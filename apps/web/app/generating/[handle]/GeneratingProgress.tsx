@@ -33,6 +33,12 @@ export function GeneratingProgress({ handle }: { handle: string }) {
   const [stepStatuses, setStepStatuses] = useState<StepStatus[]>([
     'active', 'pending', 'pending', 'pending',
   ]);
+  // Index of the step currently being announced to screen readers via the
+  // single live-region status line below (see `liveStatusText`). Updated
+  // exactly once per step transition -- never derived from the whole
+  // `stepStatuses` array, so a screen reader gets one announcement per
+  // transition instead of a burst covering every step (#1114).
+  const [announcedStepIndex, setAnnouncedStepIndex] = useState(0);
   const [errorKind, setErrorKind] = useState<ErrorKind | null>(null);
   const [done, setDone] = useState(false);
   const [showSlowNotice, setShowSlowNotice] = useState(false);
@@ -75,6 +81,8 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           );
           if (idx === remaining[remaining.length - 1]) {
             setDone(true);
+          } else {
+            setAnnouncedStepIndex(idx + 1);
           }
         }, STEP_DELAY_MS * (i + 1));
         registerTimer(id);
@@ -135,6 +143,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         }
 
         setStepStatuses(['done', 'active', 'pending', 'pending']);
+        setAnnouncedStepIndex(1);
         completeRemainingSteps(registerStepTimer);
       } catch {
         clearTimeout(timeoutId);
@@ -187,12 +196,19 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           </h1>
         </div>
 
-        {/* Progress steps */}
-        <div
-          role="status"
-          aria-live="polite"
-          className="space-y-3"
-        >
+        {/* Live status line for screen readers -- a single visually-hidden
+            node updated exactly once per step transition (see
+            `announcedStepIndex`), instead of wrapping the whole visible step
+            list (which re-announces all four rows on every transition,
+            #1114). */}
+        <div role="status" aria-live="polite" className="sr-only">
+          {stepLabels[announcedStepIndex] ?? ''}
+        </div>
+
+        {/* Progress steps (visual only -- hidden from the accessibility tree
+            so it doesn't double-announce alongside the live status line
+            above). */}
+        <div aria-hidden="true" className="space-y-3">
           {stepLabels.map((label, i) => {
             const status = stepStatuses[i] ?? 'pending';
             return (
