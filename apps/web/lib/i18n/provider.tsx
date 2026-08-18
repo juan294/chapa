@@ -113,7 +113,31 @@ export function LanguageProvider({
   dictionary?: Translations;
 }) {
   const ancestor = useContext(LanguageContext);
-  if (ancestor && ancestor.locale === initialLocale) {
+  // #1108-repro — capture the pass-through decision ONCE, at mount, instead
+  // of recomputing `ancestor.locale === initialLocale` on every render. The
+  // ancestor is a LIVE context value: the root `LanguageProviderInner`'s own
+  // mount effect can apply a persisted locale cookie shortly after mount,
+  // changing ITS `locale` from `DEFAULT_LOCALE` to whatever was persisted.
+  // If that happens to land on this nested provider's `initialLocale` after
+  // it already mounted as a real provider (SSR and the first client render
+  // both correctly took the "REAL" branch — ancestor was still
+  // `DEFAULT_LOCALE` at that point), re-deriving the decision on the next
+  // render would flip it to "PASS-THROUGH" mid-lifecycle: React sees the
+  // element type at this position change from `LanguageProviderInner` to a
+  // bare `Fragment` and unmounts/remounts the ENTIRE subtree below —
+  // including this page's own Suspense boundary. If that boundary's first
+  // streamed resolution was still in flight when the remount happened, the
+  // remount's fresh copy could land in the DOM alongside the still-settling
+  // original instead of cleanly replacing it, producing duplicate content
+  // (confirmed via `ancestor`/`initialLocale` render tracing: the decision
+  // observably flipped from "REAL" to "PASS-THROUGH" after mount in a
+  // reproducing run). Freezing the decision at mount (matching what SSR
+  // already committed to) makes it immune to the ancestor's locale changing
+  // later for any reason — cookie sync, a future locale switch, etc.
+  const [usePassThrough] = useState(
+    () => !!ancestor && ancestor.locale === initialLocale,
+  );
+  if (usePassThrough) {
     return <>{children}</>;
   }
   return (
