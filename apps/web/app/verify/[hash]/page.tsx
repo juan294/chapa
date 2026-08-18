@@ -3,6 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import {
+  DEFAULT_LOCALE,
   LangSync,
   LanguageProvider,
   LocaleSync,
@@ -91,7 +92,10 @@ function VerifyLocaleBoundary({
   return (
     <LanguageProvider
       initialLocale={locale}
-      dictionary={locale === "es" ? es : en}
+      // #1071 — same reasoning as the share page: skip re-serializing the
+      // dictionary the root layout's LanguageProvider already provides when
+      // this page's resolved locale matches DEFAULT_LOCALE.
+      dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
     >
       <LangSync />
       <LocaleSync queryLang={queryLang} />

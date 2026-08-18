@@ -13,6 +13,7 @@ vi.mock("@/components/Navbar", () => ({
 }));
 
 vi.mock("@/lib/i18n", () => ({
+  DEFAULT_LOCALE: "es",
   LanguageProvider: ({
     children,
     initialLocale,
