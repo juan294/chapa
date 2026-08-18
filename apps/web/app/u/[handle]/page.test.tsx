@@ -16,6 +16,7 @@ const {
   mockHeaders,
   mockGetOptionalServerSessionFromHeaders,
   mockWriteBadgeSvgCache,
+  mockCaptureServerError,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockHeaders: vi.fn(),
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
+  mockCaptureServerError: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -59,6 +61,12 @@ vi.mock("@/lib/auth/session", () => ({
 
 vi.mock("@/lib/history/get-trend-data", () => ({
   getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
+}));
+
+// #1091 — the after()-deferred snapshot write must escalate a genuine
+// failure via captureServerError, mirroring the badge route's #1013 pattern.
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -230,6 +238,7 @@ describe("SharePage /u/[handle]", () => {
     mockGetServerLocale.mockResolvedValue("en");
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
     mockHeaders.mockResolvedValue({ get: () => null });
+    mockCaptureServerError.mockResolvedValue(undefined);
     // No session by default — most tests exercise the visitor path. Tests
     // that need owner behavior override this per-test.
     mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
@@ -503,6 +512,61 @@ describe("SharePage /u/[handle]", () => {
       FAKE_MATERIALIZED,
       { verification: { hash: "abc12345", date: "2026-04-17" } },
     );
+  });
+
+  // #1091 (PE-M6) — persistProfileSnapshot is a durable Supabase write with
+  // nothing in the rendered HTML depending on its result. It must not hold
+  // TTFB open, mirroring the badge route's #1013 fix.
+  describe("durable snapshot write deferred to after() (#1091)", () => {
+    it("does not await the durable snapshot write on the render path — only after() invokes it", async () => {
+      await renderPage();
+
+      // The render call itself must return without having invoked the
+      // durable write directly.
+      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED,
+        { readOnly: false },
+      );
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED,
+        { verification: { hash: "abc12345", date: "2026-04-17" } },
+      );
+    });
+
+    it("skips deferProfileCacheWork when persistProfileSnapshot resolves false", async () => {
+      mockPersistProfileSnapshot.mockResolvedValue(false);
+
+      await renderPage();
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
+    });
+
+    it("escalates a deferred snapshot-write failure via captureServerError instead of swallowing it", async () => {
+      const writeError = new Error("supabase write failed");
+      mockPersistProfileSnapshot.mockRejectedValue(writeError);
+
+      await renderPage();
+      const callback = mockAfter.mock.calls[0][0];
+
+      // The after() callback itself must never throw/reject — a durable
+      // write failure must be observable, not surfaced as an unhandled
+      // rejection in the after() runtime.
+      await expect(callback()).resolves.not.toThrow();
+
+      expect(mockCaptureServerError).toHaveBeenCalledWith(
+        expect.objectContaining({ error: writeError }),
+      );
+    });
   });
 
   it("does not register side effects in read-only smoke mode", async () => {
