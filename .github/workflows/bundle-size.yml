@@ -39,12 +39,28 @@ name: Bundle Size Analysis
 on:
   push:
     branches: [develop]
+    paths-ignore:
+      - "docs/research/**"
+      - "docs/plans/**"
+      - "docs/agents/**"
   pull_request:
     branches: [develop, main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required-checks: '["Analyze Bundle Size","Bundle Analyzer Report"]'
+
   analyze:
     name: Analyze Bundle Size
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -182,6 +198,8 @@ jobs:
 
   bundle-analyzer:
     name: Bundle Analyzer Report
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
 
     permissions:

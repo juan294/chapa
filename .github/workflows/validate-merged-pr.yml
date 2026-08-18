@@ -1,0 +1,56 @@
+name: Validate merged PR source
+
+on:
+  workflow_call:
+    inputs:
+      required-checks:
+        description: JSON array of Actions check names that must be successful
+        required: true
+        type: string
+    outputs:
+      validated_by_pr:
+        description: Whether the exact develop push came from a fully green PR
+        value: ${{ jobs.classify.outputs.validated_by_pr }}
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    outputs:
+      validated_by_pr: ${{ steps.source.outputs.validated_by_pr }}
+    steps:
+      - name: Verify exact green PR merge
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUIRED_CHECKS: ${{ inputs.required-checks }}
+        run: |
+          set -euo pipefail
+          VALIDATED=false
+          if PULLS=$(gh api -H "Accept: application/vnd.github+json" \
+            "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" 2>/dev/null); then
+            PR_NUMBER=$(jq -r --arg sha "$GITHUB_SHA" '
+              map(select(.merged_at != null and .base.ref == "develop" and .merge_commit_sha == $sha))
+              | if length == 1 then .[0].number else empty end
+            ' <<<"$PULLS")
+            if [ -n "$PR_NUMBER" ]; then
+              CHECKS=$(gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+                --json name,state,link 2>/dev/null || true)
+              if jq -e --argjson required "$REQUIRED_CHECKS" '
+                . as $checks
+                | all($required[]; . as $required_name | any($checks[];
+                  .name == $required_name
+                  and .state == "SUCCESS"
+                  and ((.link // "") | contains("/actions/runs/"))))
+              ' <<<"$CHECKS" >/dev/null; then
+                VALIDATED=true
+              fi
+            fi
+          else
+            echo "::warning::Could not inspect the develop push source; full CI will run."
+          fi
+          echo "validated_by_pr=$VALIDATED" >> "$GITHUB_OUTPUT"

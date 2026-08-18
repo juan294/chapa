@@ -8,13 +8,25 @@ on:
   schedule:
     - cron: "0 4 * * *" # Daily 04:00 UTC — full history scan
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' && github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required-checks: '["Gitleaks"]'
+
   gitleaks:
     name: Gitleaks
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

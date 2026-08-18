@@ -15,8 +15,16 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required-checks: '["Lint & Typecheck","Test","Contract (real DB)","Build","E2E Tests","Deployment Smoke"]'
+
   lint-and-typecheck:
     name: Lint & Typecheck
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -86,6 +94,8 @@ jobs:
   # finish (full signal in one run).
   test-shard:
     name: Test Shard (${{ matrix.shard }})
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -143,27 +153,36 @@ jobs:
   # shard was not successful — keeping "Test" red on a real failure.
   test:
     name: Test
-    needs: [test-shard]
+    needs: [develop_push_source, test-shard]
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Reuse verified PR validation
+        if: needs.develop_push_source.outputs.validated_by_pr == 'true'
+        run: echo "Exact merge SHA already passed every required PR check."
+
       - name: Fail if any shard failed
-        if: needs.test-shard.result != 'success'
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true' && needs.test-shard.result != 'success'
         run: |
           echo "::error::One or more unit-test shards did not succeed (result: ${{ needs.test-shard.result }})"
           exit 1
 
       - uses: actions/checkout@v6
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true'
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v5
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true'
       - uses: actions/setup-node@v6
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true'
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - if: needs.develop_push_source.outputs.validated_by_pr != 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Download shard blob reports
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true'
         uses: actions/download-artifact@v8
         with:
           pattern: vitest-blob-*
@@ -171,6 +190,7 @@ jobs:
           merge-multiple: true
 
       - name: Merge coverage & enforce thresholds
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true'
         id: test
         run: |
           # Merge both shard blobs into a single coverage report and enforce the
@@ -200,7 +220,7 @@ jobs:
           fi
 
       - name: Report coverage to portfolio
-        if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true' && success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         continue-on-error: true
         env:
           COVERAGE_SECRET: ${{ secrets.COVERAGE_SECRET }}
@@ -238,7 +258,7 @@ jobs:
           echo "Coverage reported: $(echo "$BODY" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.testCount+' tests, '+d.coveragePercent+'% coverage')")"
 
       - name: Scoring integrity gate
-        if: github.event_name == 'pull_request'
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true' && github.event_name == 'pull_request'
         run: |
           SCORING_FILES="apps/web/lib/impact/ apps/web/lib/github/merge.ts packages/shared/src/stats-aggregation.ts packages/shared/src/types.ts packages/shared/src/constants.ts packages/shared/src/stats-schema.ts apps/web/lib/github/stats-integrity.ts apps/web/lib/github/queries.ts apps/web/lib/github/client.ts apps/web/lib/github/stats.ts apps/web/lib/profile/materialize-profile.ts apps/web/lib/profile/public-profile.ts"
           CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- $SCORING_FILES || true)
@@ -251,7 +271,7 @@ jobs:
           fi
 
       - name: Write aggregate unit and coverage evidence
-        if: always()
+        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
         env:
           PRODUCER_STATUS: ${{ job.status }}
           SHARD_STATUS: ${{ needs.test-shard.result }}
@@ -290,7 +310,7 @@ jobs:
             > .release-evidence/unit-and-coverage.json
 
       - name: Upload aggregate unit and coverage evidence
-        if: always()
+        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-test
@@ -300,6 +320,8 @@ jobs:
 
   contract:
     name: Contract (real DB)
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     env:
       NEXTAUTH_SECRET: contract-nextauth-secret-32-characters
@@ -411,7 +433,8 @@ jobs:
     # not coverage. Dropping `test` from needs un-serializes the ~3.7min E2E
     # path from behind the ~5.5min unit suite. `test` still runs as its own
     # required gate; nothing here depends on its ordering for correctness.
-    needs: [lint-and-typecheck]
+    needs: [develop_push_source, lint-and-typecheck]
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true' && needs['lint-and-typecheck'].result == 'success'
     runs-on: ubuntu-latest
     env:
       # Dummy values for build — real values are in Vercel
@@ -560,19 +583,24 @@ jobs:
   # E2E shard did not succeed.
   e2e:
     name: E2E Tests
-    needs: [e2e-shard]
+    needs: [develop_push_source, e2e-shard]
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Reuse verified PR validation
+        if: needs.develop_push_source.outputs.validated_by_pr == 'true'
+        run: echo "Exact merge SHA already passed every required PR check."
+
       - name: Fail if any E2E shard failed
-        if: needs.e2e-shard.result != 'success'
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true' && needs.e2e-shard.result != 'success'
         run: |
           echo "::error::One or more E2E shards did not succeed (result: ${{ needs.e2e-shard.result }})"
           exit 1
-      - run: echo "All E2E shards passed."
+      - if: needs.develop_push_source.outputs.validated_by_pr != 'true'
+        run: echo "All E2E shards passed."
 
       - name: Write aggregate E2E evidence
-        if: always()
+        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
         env:
           PRODUCER_STATUS: ${{ job.status }}
           SHARD_STATUS: ${{ needs.e2e-shard.result }}
@@ -602,7 +630,7 @@ jobs:
             > .release-evidence/aggregate-e2e.json
 
       - name: Upload aggregate E2E evidence
-        if: always()
+        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-e2e
@@ -612,7 +640,8 @@ jobs:
 
   deployment-smoke:
     name: Deployment Smoke
-    needs: [build]
+    needs: [develop_push_source, build]
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     env:
       DEPLOYMENT_SMOKE_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
