@@ -209,12 +209,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** Low
 - **Accepted:** 2026-07-15
 
-## `packages/shared` has no build step (#450)
+## `packages/shared` build step exists but does not drive runtime resolution (#450, #1099)
 
-- **Risk:** The shared types package has no `tsc` build or compiled output.
-- **Mitigation:** Next.js `transpilePackages` handles TypeScript compilation of workspace packages at build time. Adding a separate build step would add complexity and staleness risk without benefit. `pnpm run typecheck` validates the shared package.
+- **Risk (resolved #748, corrected #1099):** `packages/shared` originally had no `tsc` build or compiled output. #748 added `tsconfig.build.json` and a `build` script (`tsc -p tsconfig.build.json`, emitting to `dist/`), but nothing invoked it — the root `build` script filtered to `@chapa/web` only, so the build step existed but was never exercised, and this entry (until #1099) still described it as absent.
+- **Current state:** The root `build` script now runs `pnpm --filter @chapa/shared build` before `pnpm --filter @chapa/web build`, so `packages/shared`'s `tsc` emit is exercised on every CI `build` job and local `pnpm run build`, giving a real regression signal if the package fails to compile standalone.
+- **Deliberately unchanged:** `package.json`'s `main`/`types` still resolve to `src/index.ts` (not `dist/`) for every workspace consumer — Next.js `transpilePackages` still compiles the package from source at app build time. Only `publishConfig.main`/`publishConfig.types` point at `dist/`, for a hypothetical external npm consumer. Switching the top-level `main`/`types` to `dist/` would introduce a staleness class (built output going stale relative to source) that this design deliberately avoids; the build is invoked for verification only, not to change what gets resolved.
 - **Severity:** None
-- **Accepted:** 2026-02-21
+- **Accepted:** 2026-02-21 (original gap), corrected 2026-08-18 (#1099 — build wired into root `build` script)
 
 ## pnpm build warnings (core-js, protobufjs) (#450)
 

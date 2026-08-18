@@ -69,14 +69,18 @@ extraction succeeds only if these two subtrees are genuinely pure at the seam.
 
 ## What Blocks This Today
 
-1. **`packages/shared` has no build step.** It relies on Next.js
-   `transpilePackages` to compile its TypeScript at app build time (documented as
-   an accepted risk in `docs/accepted-risks.md`, #450). A package consumed by
-   *another package* (not just the Next app) cannot lean on `transpilePackages` —
-   it needs its own emitted output (or to be transpiled by the consuming package's
-   bundler). **This is being addressed in #748** (giving `packages/shared` a real
-   build/emit step). Package extraction should not start until #748 lands, because
-   `impact-engine` and `badge-renderer` would inherit the same build gap.
+1. **`packages/shared` has no build step. — RESOLVED (#748, wired in by #1099).**
+   #748 added `tsconfig.build.json` and a `build` script (`tsc -p
+   tsconfig.build.json`, emitting `dist/`) to `packages/shared`. #1099 wired that
+   script into the root `build` script (`pnpm --filter @chapa/shared build &&
+   pnpm --filter @chapa/web build`), so it now runs — and is exercised as a
+   regression signal — on every CI `build` job and local `pnpm run build`.
+   Workspace consumers (`@chapa/web`) still resolve the package via `src/` through
+   Next.js `transpilePackages`, unchanged; `dist/` exists for a standalone
+   `tsc`/bundler emit and for a hypothetical external npm consumer
+   (`publishConfig.main`/`types`). See `docs/accepted-risks.md`
+   ("`packages/shared` build step exists but does not drive runtime resolution").
+   This blocker is cleared — package extraction is no longer blocked on it.
 2. **Import-boundary enforcement is app-scoped.** The CI rule forbidding relative
    imports of `packages/shared` (use `@chapa/shared`) and the circular-dependency
    check (`pnpm run check:circular` via madge) are tuned for the current layout.
@@ -94,9 +98,12 @@ extraction succeeds only if these two subtrees are genuinely pure at the seam.
 
 ## Phased Migration
 
-**Phase 0 — Unblock (prerequisite).** Land #748 so `packages/shared` builds/emits
-its own output. Confirm a package can be consumed by another package, not just by
-the Next app.
+**Phase 0 — Unblock (prerequisite). — DONE (#748, #1099).** `packages/shared`
+builds/emits its own output (`dist/`) via its `build` script, now wired into the
+root `build` script and exercised on every CI run. Remaining before Phase 1
+starts: still no demonstrated second consumer (blocker #5 below) — confirm a
+package can actually be consumed by *another package*, not just by the Next app,
+once `impact-engine` exists.
 
 **Phase 1 — Extract `impact-engine`.** It is the cleanest seam (pure compute, no
 assets). Move `lib/impact/*` to `packages/impact-engine`, depend only on
@@ -133,8 +140,9 @@ Each phase ships independently, with green CI, on `develop`. No phase touches
   and independently versionable; the app shrinks toward orchestration only.
 - **Negative:** More build/release surface (each package needs build, lint,
   coverage wiring); upfront cost with no payoff until a second consumer exists.
-- **Neutral:** Until Phase 0 (#748) lands, this remains a documented direction
-  with no code movement.
+- **Neutral:** Phase 0 (#748, #1099) is done; this remains a documented direction
+  with no code movement until a phase is actually scheduled (still blocked on
+  #2-#5 above, notably a demonstrated second consumer).
 
 ## Review Schedule
 
