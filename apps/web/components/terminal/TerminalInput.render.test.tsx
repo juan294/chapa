@@ -271,4 +271,34 @@ describe("TerminalInput", () => {
       expect(document.querySelector("#terminal-command-input")).not.toBeNull();
     });
   });
+
+  // #1111 (UX-M2): iOS Safari auto-zooms any focused control below 16px
+  // computed font-size and does not zoom back out on blur.
+  describe("mobile font-size (#1111)", () => {
+    it("uses a ≥16px-equivalent font-size class on small viewports, reverting to text-sm at sm and up", () => {
+      render(<TerminalInput onSubmit={vi.fn()} />);
+      const wrapper = screen.getByLabelText("Terminal command input").closest("div.flex");
+      expect(wrapper?.className).toContain("text-base");
+      expect(wrapper?.className).toContain("sm:text-sm");
+    });
+
+    it("disables autoCapitalize and autoCorrect on the terminal input", () => {
+      render(<TerminalInput onSubmit={vi.fn()} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      expect(input.getAttribute("autocapitalize")).toBe("off");
+      expect(input.getAttribute("autocorrect")).toBe("off");
+    });
+
+    it("keeps the prompt and input on the same shared font-size (baseline alignment)", () => {
+      render(<TerminalInput onSubmit={vi.fn()} />);
+      const input = screen.getByLabelText("Terminal command input");
+      // Neither the input nor the prompt span declares its own text-size
+      // utility — both inherit font-size from the shared wrapper's
+      // text-base/sm:text-sm via normal CSS cascade, so they can never
+      // drift out of sync in the flex row.
+      expect(input.className).not.toMatch(/(?:^|\s)text-(?:xs|sm|base|lg|xl)(?:\s|$)/);
+      const prompt = screen.getByText(/chapa/);
+      expect(prompt.className).not.toMatch(/(?:^|\s)text-(?:xs|sm|base|lg|xl)(?:\s|$)/);
+    });
+  });
 });

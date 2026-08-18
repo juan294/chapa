@@ -115,7 +115,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
 
   return (
     <div
-      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-terminal text-sm"
+      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-terminal text-base sm:text-sm leading-6"
     >
       <span className="text-amber select-none shrink-0">
         {prompt} &gt;
@@ -133,6 +133,8 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
           placeholder={placeholder}
           aria-label={ariaLabel}
           autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
           spellCheck={false}
         />
       </div>
