@@ -228,16 +228,41 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 9. Has correct ARIA attributes (role="article", aria-label)
+  // 9. Does not duplicate visible text into aria-label (#1113)
   // ----------------------------------------------------------------
-  it("has correct ARIA attributes", () => {
+  it("does not set an aria-label duplicating the visible headline and body", () => {
     render(<InsightCard insight={achievementInsight} />);
 
     const article = screen.getByRole("article");
     expect(article).toBeTruthy();
-    expect(article.getAttribute("aria-label")).toBe(
-      "You leveled up to High! Your consistent effort paid off.",
-    );
+    // No aria-label at all — the visible headline/body provide the
+    // accessible name, so a screen reader announces the content once.
+    expect(article.hasAttribute("aria-label")).toBe(false);
+    expect(screen.getByText("You leveled up to High!")).toBeTruthy();
+    expect(screen.getByText("Your consistent effort paid off.")).toBeTruthy();
+  });
+
+  // ----------------------------------------------------------------
+  // 9b. No card variant sets a redundant full-text aria-label (#1113)
+  // ----------------------------------------------------------------
+  it("never sets aria-label to headline+body text for any card variant", () => {
+    const variants = [
+      trendInsight,
+      trendDownInsight,
+      trendDimensionInsight,
+      tipInsight,
+      tipNoDimensionInsight,
+      achievementInsight,
+      nextTierInsight,
+    ];
+
+    for (const insight of variants) {
+      const { container, unmount } = render(<InsightCard insight={insight} />);
+      const article = container.querySelector("[role='article']") as HTMLElement;
+      expect(article).toBeTruthy();
+      expect(article.hasAttribute("aria-label")).toBe(false);
+      unmount();
+    }
   });
 
   // ----------------------------------------------------------------
