@@ -232,7 +232,6 @@ function AchievementCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      aria-label={`${insight.headline} ${insight.body}`}
       className="relative rounded-xl border border-terminal-green/20 bg-terminal-green/[0.04] p-5 animate-fade-in-up overflow-hidden"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
@@ -269,7 +268,6 @@ function TrendCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      aria-label={`${insight.headline} ${insight.body}`}
       className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
@@ -308,7 +306,6 @@ function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      aria-label={`${insight.headline} ${insight.body}`}
       className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
@@ -374,7 +371,6 @@ function CoachingTipCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      aria-label={`${insight.headline} ${insight.body}`}
       className="rounded-lg border border-stroke/50 bg-card/50 px-4 py-3 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
@@ -402,7 +398,6 @@ function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      aria-label={`${insight.headline} ${insight.body}`}
       className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up overflow-hidden"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
