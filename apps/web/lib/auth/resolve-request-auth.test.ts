@@ -63,6 +63,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetSessionSecret.mockReturnValue("test-secret-key");
   mockGetSessionGitHubToken.mockResolvedValue("ghp_test");
+  // Default: no session cookie. vi.clearAllMocks() clears call history but
+  // NOT previously-configured return values, so without this default a test
+  // that never sets mockGetOptionalRequestSession itself (e.g. the
+  // Authorization-header tests, or a request with no session cookie at all)
+  // can silently inherit a truthy session object left behind by whichever
+  // test happened to run before it under shuffled order.
+  mockGetOptionalRequestSession.mockReturnValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -145,12 +152,27 @@ describe("resolveRequestAuth — structural pre-check (BE-H2c)", () => {
   it("rejects empty string token without calling fetchGitHubUser", async () => {
     mockIsCliToken.mockReturnValue(false);
 
-    const result = await resolveRequestAuth(
-      makeRequest({ Authorization: "Bearer " }),
-    );
+    // The real Fetch `Headers` implementation strips trailing HTTP
+    // whitespace from header values, so a literal "Bearer " built via
+    // `makeRequest`/`Request` collapses to "Bearer" (no trailing space) and
+    // never satisfies `authHeader.startsWith("Bearer ")` — it falls through
+    // to the session-cookie branch instead, never reaching the empty-token
+    // structural pre-check this test is named after. A minimal request
+    // stand-in whose `headers.get()` returns the raw, unnormalized value
+    // bypasses that trimming so this test genuinely exercises
+    // `isStructurallyValidGithubToken("")`.
+    const request = {
+      headers: {
+        get: (name: string) =>
+          name === "Authorization" ? "Bearer " : null,
+      },
+    } as unknown as Request;
+
+    const result = await resolveRequestAuth(request);
 
     expect(result).toBeNull();
     expect(mockFetchGitHubUser).not.toHaveBeenCalled();
+    expect(mockIsCliToken).toHaveBeenCalledWith("");
   });
 
   it("rejects a random string token that looks like a word without calling fetchGitHubUser", async () => {

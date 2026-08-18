@@ -35,6 +35,11 @@ describe("oauth-state store (redis)", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    // The retry test below switches to fake timers; without restoring real
+    // timers here, a run where that test executes first leaves fake timers
+    // active for the next test, and consumeOauthState's real setTimeout-based
+    // retry `sleep()` calls never resolve — hanging until the test timeout.
+    vi.useRealTimers();
   });
 
   it("enables read-your-writes consistency and consumes state exactly once", async () => {

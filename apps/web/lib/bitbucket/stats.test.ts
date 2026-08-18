@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockFetchContributionData, mockBuildStats } = vi.hoisted(() => ({
   mockFetchContributionData: vi.fn(),
@@ -14,6 +14,10 @@ vi.mock("./stats-aggregation", () => ({
 }));
 
 import { fetchBitbucketStats } from "./stats";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("fetchBitbucketStats", () => {
   it("returns null when contribution data fetch fails", async () => {
