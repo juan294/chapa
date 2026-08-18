@@ -1,104 +1,92 @@
 # Documentation Update Report
 
-> Generated on 2026-08-10 | Branch: `develop` | Changes since `v2.19.1`
+> Generated on 2026-08-18 | Branch: `docs/update-docs-2026-08-18` | Changes since `v2.21.0`
 
 ## Summary
 
-- **7 documents updated**
+- **2 documents updated** (version-reference fixes)
 - **1 architecture diagram refreshed** (native draw.io source and PNG export)
-- **3 version-reference groups corrected**
+- **2 version-reference groups corrected**
 - **0 inline doc blocks updated**
 - **0 items flagged [NEEDS REVIEW]**
 
 ## Discovery
 
-Four read-only discovery roles audited changes since the released `v2.19.1`
-tree: change analysis, documentation inventory, diagram analysis, and version
-scanning. Because `v2.19.1` was squash-merged to `main`, the tag is not an
-ancestor of `develop`; reconciliation commit `8f4591e3` has the same tree as
-the release and is the accurate content boundary.
+Four read-only discovery agents (change-analyst, doc-inventory, diagram-analyzer,
+version-scanner) audited the project since the last release tag, `v2.21.0`
+(tagged 2026-08-12 at `dda3f060` on `main`). Because releases are squash-merged
+from `develop` to `main`, that tag is not an ancestor of `develop`; commit
+`b59858b4` has the same tree as the release and is the accurate content
+boundary.
 
-The unreleased delta contains 21 commits across 152 files. The documentation-
-relevant changes are exact-SHA E2E Pro release verification, `/api/version`,
-atomic campaign delivery retries and acknowledgements, GitHub-stat visibility
-and cache corrections, overlap-safe server jobs, dependency security floors,
-and cc-rpi v1.28.2 workflow synchronization. SEO work remains research and
-planning only.
+The delta since `b59858b4` is 3 commits / 11 files, entirely triage/agent-report
+housekeeping (`docs/agents/*`, `.claude/cc-rpi-sync.json`, one
+`docs/accepted-risks.md` addition) — **zero application code changed**. None
+of that delta needed documentation changes; the `accepted-risks.md` addition
+already is its own complete documentation.
+
+The actual findings below are pre-existing drift the discovery agents caught
+during a general freshness check, unrelated to this specific delta.
 
 ## Changes by File
 
-### `CHANGELOG.md`
-
-- Refreshed the existing prepared v2.20.0 release section; no release was
-  published or tagged.
-- Added atomic campaign retry/acknowledgement, server-job overlap safety,
-  GitHub-stat visibility/cache integrity, and dependency security fixes.
-- Corrected the `[Unreleased]` comparison base to `v2.19.1` and restored the
-  missing v2.18.0 through v2.19.1 comparison references.
-
-### `README.md`
-
-- Refreshed the verified test totals to 8,688 tests across 513 files.
-- Added the no-store `/api/version` deployment-identity endpoint.
-
-### `CLAUDE.md`
-
-- Documented the campaign invariant: stable lease-bound batch membership,
-  retry-stable provider identity, complete transactional acknowledgement, and
-  fail-closed handling of incomplete persistence.
-
-### `CONTRIBUTING.md`
-
-- Aligned the dependency-license policy with the enforced permissive allowlist
-  and documented-exception requirement.
-
-### `LICENSE-THIRD-PARTY.md`
-
-- Aligned the inventory introduction and review policy with the same license
-  allowlist and package-specific exception workflow.
-
-### `docs/accepted-risks.md`
-
-- Replaced the obsolete one-route admin description with the current dashboard
-  and 12-route-module surface, including campaign mutations.
-- Updated the future centralized-guard wording for Next.js `proxy.ts`.
-- Removed stale, abbreviated allowlist wording from dependency-risk entries.
-
 ### `quality/evidence/README.md`
 
-- Updated the concrete release-evidence baseline example from `v2.19.0` to
-  `v2.19.1`.
+- Updated the example `--baseline-tag` in the `release:prepare-run` usage
+  snippet from `v2.19.1` to `v2.21.0` (line 12) — the example had drifted two
+  releases behind the actual latest tag.
+
+### `docs/playbooks/e2e-pro-release-verification.md`
+
+- Updated the example `"baselineTag"` value in the evidence-manifest JSON
+  sample from `"v2.19.1"` to `"v2.21.0"` (line 688) — same stale-example
+  pattern as above, same doc family.
 
 ### `docs/chapa-architecture.drawio`
 
-- Added `/api/version` to public endpoints.
-- Added durable Creator Studio configuration and the `studio_configs` table.
-- Replaced the old lease-only campaign label with atomic claim, full-batch
-  acknowledgement, and stable retry identity.
-- Removed obsolete “new” annotations from Supabase and Redis inventory items.
+Five corrections to bring the diagram in line with shipped changes:
+
+1. **OAuth State node** — was labeled "Redis-backed CSRF"; the actual
+   implementation (#1027) stores the CSRF nonce in a per-platform cookie
+   (`chapa_<provider>_oauth_state_store`), not a shared Redis key. Relabeled
+   to "Per-platform cookie CSRF".
+2. **Supabase views** — the Supabase node listed only the 11 tables; added
+   the 2 views (`admin_users`, `latest_snapshots`) that CLAUDE.md documents
+   alongside them.
+3. **i18n module box** — predated #1023's static-rendering migration; added
+   mention of `proxy.ts` (Next.js 16 root proxy rewrite) and the 9
+   statically-rendered `app/[locale]/*` content pages.
+4. **Public Endpoints bucket** — was missing `/api/history/:handle` (score
+   history/trend/diff); added alongside `/api/profile`, `/api/version`, and
+   the badge route.
+5. **Redis key list** — `stats:stale:*` corrected to `stats:stale:v2:<handle>`
+   (actual key prefix); the now-nonexistent `oauthstate:*` key (removed by
+   #1027's cookie-based CSRF) replaced with the real `svg:badge:*` pattern,
+   which was previously missing from the diagram entirely.
 
 ### `docs/chapa-architecture.drawio.png`
 
-- Re-exported the updated architecture at 1244 x 1211 with embedded draw.io XML.
-- Visually inspected the export for legibility and clipping.
+- Re-exported the updated architecture at 1244×1211 with embedded draw.io XML
+  (`/Applications/draw.io.app` CLI, `-e -b 10`).
+- Visually inspected the export for legibility and clipping — all text
+  renders cleanly, no overlap, no truncation.
 
 ## Verification
 
-- `pnpm run lint`: **PASS** for all workspace projects.
-- `git diff --check`: **PASS**.
-- Draw.io XML well-formedness, unique IDs, edge geometry, embedded PNG source,
-  and visual inspection: **PASS**.
-- `quality/evidence/README.md` Markdown lint: **PASS**.
-- Strict Markdown violations across the edited Markdown baseline decreased from
-  924 to 919; no edited file gained a new violation.
-- The workflow's broad Markdown command did not pass. Its root-only
-  `--ignore node_modules` argument traversed nested workspace `node_modules`
-  and `node_modules.nosync` trees, and tracked historical documents already
-  contain default-rule violations such as long lines and repeated changelog
-  headings. These failures predate this update.
-- `scripts/verify-counts.sh`, `scripts/verify-version.sh`,
-  `scripts/verify-skills.sh`, and `scripts/check-tree-drift.sh` are referenced
-  by the generic workflow but do not exist in this repository.
+- `npx markdownlint quality/evidence/README.md`: **0 errors** (clean file).
+- `npx markdownlint docs/playbooks/e2e-pro-release-verification.md`: line 688
+  (the edited line) has **0 errors**. The file as a whole carries pre-existing
+  MD013 (line-length) and MD060 (table-pipe-style) violations scattered
+  throughout — matching the documented precedent from the prior
+  (2026-08-10) update-docs cycle, where this same broad-command failure was
+  noted as pre-existing and unrelated to that update. No markdownlint config
+  is checked into the repo, so these rules aren't part of this project's
+  actual lint gate (`pnpm run lint` is ESLint-only).
+- `pnpm run lint` (`eslint .`, both `packages/shared` and `apps/web`): **PASS**.
+- `git diff --check`: **PASS** (no whitespace errors).
+- Draw.io XML well-formedness (parsed via `xml.etree.ElementTree`), unique
+  `mxCell` IDs (checked via sort/uniq), embedded PNG source, and visual
+  inspection: **PASS**.
 
 ## Flagged for Review
 
@@ -106,8 +94,17 @@ None.
 
 ## Notes
 
-- `apps/web/package.json` remains at the prepared `2.20.0` candidate version.
-  No version bump, tag, publication, push, or deployment was performed.
-- Run `/release` next if v2.20.0 is ready to enter the release workflow.
-- `/pre-launch` covers security, performance, and accessibility checks that
-  `/update-docs` does not.
+- The frontend swimlane's 5-box simplification (Landing/Share/Studio/
+  About+Archetypes/Admin) omits several real pages (`/verify/:hash`,
+  `/generating/:handle`, `/cli/authorize`, `/privacy`, `/terms`,
+  `/coming-soon`, `/experiments/*`). This was flagged by diagram-analyzer for
+  awareness only — it reads as an intentional level-of-abstraction choice
+  (the swimlane is a "page category" overview, not an exhaustive route map)
+  rather than drift, so it was left as-is. Revisit if the diagram's intended
+  scope changes.
+- `apps/web/package.json`'s version, `CHANGELOG.md`'s latest entry, README.md
+  badges, and CI workflow Node-version pins were all confirmed current
+  against `v2.21.0` — no changes needed there.
+- `docs/design-system.md`, `docs/impact-v6.md`, `docs/svg-design.md`,
+  `docs/accepted-risks.md`, and the most recent ADR were all confirmed
+  current against the live codebase by doc-inventory — no changes needed.

@@ -9,7 +9,7 @@ preview URL:
 
 ```sh
 pnpm release:prepare-run -- \
-  --baseline-tag v2.19.1 \
+  --baseline-tag v2.21.0 \
   --develop-commit <40-character-commit> \
   --candidate-tree <40-character-tree> \
   --preview-url https://preview.example.test \
