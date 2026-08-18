@@ -7,6 +7,14 @@ const GlobalCommandBar = dynamic(
   { ssr: false },
 );
 
-export function GlobalCommandBarLazy({ isAdmin }: { isAdmin?: boolean } = {}) {
-  return <GlobalCommandBar isAdmin={isAdmin} />;
+export function GlobalCommandBarLazy({
+  isAdmin,
+  skipShortcutsListener,
+}: {
+  isAdmin?: boolean;
+  skipShortcutsListener?: boolean;
+} = {}) {
+  return (
+    <GlobalCommandBar isAdmin={isAdmin} skipShortcutsListener={skipShortcutsListener} />
+  );
 }
