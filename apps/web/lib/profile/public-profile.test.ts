@@ -20,6 +20,7 @@ const mockDbReplaceSnapshot = vi.fn();
 const mockUpdateSnapshotCache = vi.fn();
 const mockDbUpsertUser = vi.fn();
 const mockCacheSetNxStatus = vi.fn();
+const mockCacheDel = vi.fn();
 const mockClearStatsDirty = vi.fn();
 const mockCaptureServerEvent =
   vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
@@ -41,6 +42,7 @@ vi.mock("@/lib/verification/store", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   trackBadgeGenerated: (...args: unknown[]) => mockTrackBadgeGenerated(...args),
   cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
+  cacheDel: (...args: unknown[]) => mockCacheDel(...args),
 }));
 
 vi.mock("@/lib/email/notifications", () => ({
@@ -289,6 +291,45 @@ describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () =>
 
       expect(result).toBe(true);
       expect(mockCaptureServerError).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #1081 — A failed durable write must release the once-per-day SETNX guard
+  // it already claimed, so the NEXT badge request the same day retries the
+  // write instead of silently forfeiting the rest of the day's snapshot.
+  // "inserted" and "duplicate" are correct terminal states and must leave the
+  // guard in place.
+  // -------------------------------------------------------------------------
+
+  describe("#1081 day-guard release on failed durable write", () => {
+    it("releases the day-guard key when the durable write genuinely fails", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("failed");
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("testuser", materialized);
+
+      expect(mockCacheDel).toHaveBeenCalledWith(
+        expect.stringMatching(/^sideeffects:done:testuser:/),
+      );
+    });
+
+    it("does NOT release the day-guard key on a genuinely fresh insert", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("inserted");
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("testuser", materialized);
+
+      expect(mockCacheDel).not.toHaveBeenCalled();
+    });
+
+    it("does NOT release the day-guard key on a benign duplicate", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("duplicate");
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("testuser", materialized);
+
+      expect(mockCacheDel).not.toHaveBeenCalled();
     });
   });
 });
