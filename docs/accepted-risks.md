@@ -1,8 +1,20 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-07-15 | Audit: v42
+> Last reviewed: 2026-08-18 | Audit: v43
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
+
+---
+
+## Project scale policy: no new gates, monitoring infra, or disproportionate hardening (2026-08-18)
+
+- **Risk:** Chapa is maintained by a single developer with a very small user base. Pre-launch audits are written from a general "public launch under scrutiny" posture and will keep proposing things that are good practice for a funded team with an on-call rotation and real attack surface at scale: new CI gates, expanded coverage-floor enforcement, third-party uptime monitors, alert deduplication/throttling systems, paid log-retention integrations, secret-rotation runbooks, supply-chain checksum pinning, least-privilege CI permission audits, and defensive hardening against threat models (sustained abuse traffic, tail-latency SLO breaches, IP-spoofing edge cases) that don't apply at this project's actual scale.
+- **Why accepted:** More gates and more process are themselves a cost — for a solo maintainer, every new CI check, coverage floor, monitoring dashboard, or runbook is something *they* personally have to maintain, and a false-positive/red gate blocks *their own* ability to ship, with no team to absorb the friction. This project has already accumulated more CI/release-process machinery (E2E Pro release verification, multi-stage evidence pipeline, license/vulnerability scanning, migration-drift gates, contract tests, bundle-size budgets, etc.) than a solo project with barely any users needs, and the explicit direction going forward is to *not* add to that pile. A finding that only makes sense under a "large team, many users, adversarial attacker, formal incident response" threat model is out of scope here, even if it would be correct advice for a bigger project.
+- **What this covers (reject, do not re-raise as findings):** proposals to add new CI gates, git hooks, or lint/typecheck/coverage enforcement scope; new external monitoring/alerting services or infrastructure (uptime monitors, alert dedup/throttling, log-retention/APM integrations, multi-sample SLO monitoring); security/privacy hardening sized for an adversary or user volume this project doesn't have (rate-limit tightening against abuse with no realistic attacker, IP-spoofing edge cases, CI supply-chain checksum pinning, GitHub Actions least-privilege permission audits, secret-rotation documentation, Node-version dashboard-drift insurance); and architecture-purity refactors proposed for their own sake (e.g., "consolidate N duplicate implementations into one contract") where the current code works and nothing is actually broken.
+- **What this does NOT cover:** genuine bugs that affect the product or data — a route that returns wrong data, a cache that never gets invalidated, a UI state a real visitor can hit, data corruption, or a durable write that silently fails. Those get fixed regardless of user count. The line is "does this fix something that's actually broken" vs. "does this add ceremony/infrastructure that only pays off at a scale or threat level this project isn't at."
+- **Mitigation:** None needed — this is a standing policy, not a specific technical risk. `/pre-launch` and `/remediate` should read this entry and not raise or re-raise findings in the categories above for this project.
+- **Severity:** N/A (process policy, not a technical risk)
+- **Accepted:** 2026-08-18
 
 ---
 
