@@ -28,7 +28,10 @@ let cachedPromise: Promise<SessionUser | null> | null = null;
 function fetchSession(): Promise<SessionUser | null> {
   if (cachedPromise) return cachedPromise;
 
-  cachedPromise = fetch("/api/auth/session")
+  // Bound to this specific attempt so the failure handlers below only ever
+  // clear a cache entry they themselves created — an `invalidate()` (or a
+  // fresh retry) that has since replaced `cachedPromise` is never clobbered.
+  const promise: Promise<SessionUser | null> = fetch("/api/auth/session")
     .then((res) => {
       if (!res.ok) {
         trackEvent("client_api_error", {
@@ -36,16 +39,24 @@ function fetchSession(): Promise<SessionUser | null> {
           status: res.status,
           source: "useSession",
         });
-        return { user: null };
+        // A non-ok response (e.g. a 429 from the fail-closed rate limiter
+        // during a Redis blip) is a transport/server failure, not a genuine
+        // "logged out" answer. Don't let it poison the cache permanently —
+        // clear it so the next caller retries against the network instead of
+        // reusing this negative result forever.
+        if (cachedPromise === promise) cachedPromise = null;
+        return null;
       }
       return res.json() as Promise<{ user: SessionUser | null }>;
     })
-    .then((data: { user: SessionUser | null }) => {
-      return data.user ?? null;
-    })
-    .catch(() => null);
+    .then((data) => (data ? (data.user ?? null) : null))
+    .catch(() => {
+      if (cachedPromise === promise) cachedPromise = null;
+      return null;
+    });
 
-  return cachedPromise;
+  cachedPromise = promise;
+  return promise;
 }
 
 /**
