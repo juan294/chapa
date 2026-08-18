@@ -35,6 +35,20 @@ const CACHE_TTL_BASE_SECONDS = 86_400; // 24h
 const CACHE_TTL_JITTER_MAX_SECONDS = 7_200; // up to +2h jitter (PE-S1)
 
 /**
+ * #1088 (PE-M1) — short TTL for a placeholder SVG cache write on a handle
+ * whose stats carry no `avatarUrl` at all (a permanent condition until the
+ * next stats refetch — distinct from a race-timeout on a real fetch, see
+ * `finalizeMaterializedBadge` in the badge.svg route). Long enough to stop
+ * every single request for such a handle from forcing a full
+ * materialize+render (the bug — a README embed with real traffic never got
+ * ANY cache population). Short enough that it can't shadow a later good
+ * render (e.g. avatarUrl reappearing on a subsequent stats refetch) for
+ * anywhere near the 24h+jitter a normal write gets, and far short of the
+ * next UTC daily key rollover the cache key itself already encodes.
+ */
+export const AVATAR_ABSENT_CACHE_TTL_SECONDS = 20 * 60; // 20 minutes
+
+/**
  * Compute a stable per-handle jitter offset (0 to CACHE_TTL_JITTER_MAX_SECONDS).
  *
  * Uses a simple sum-of-char-codes hash so that different handles get different
@@ -128,13 +142,18 @@ export async function readBadgeSvgCacheWithStatus(
  * @param key  - Cache key built by {@link buildBadgeSvgCacheKey}
  * @param svg  - Rendered SVG string
  * @param handle - The GitHub handle (used to derive the jitter offset)
+ * @param options.ttlSeconds - #1088 — explicit TTL override, used for a
+ *   short-lived placeholder write (see {@link AVATAR_ABSENT_CACHE_TTL_SECONDS}).
+ *   When omitted, falls back to the standard 24h+jitter TTL.
  */
 export async function writeBadgeSvgCache(
   key: string,
   svg: string,
   handle: string,
+  options?: { ttlSeconds?: number },
 ): Promise<boolean> {
-  const ttl = CACHE_TTL_BASE_SECONDS + handleCacheJitterSeconds(handle);
+  const ttl =
+    options?.ttlSeconds ?? CACHE_TTL_BASE_SECONDS + handleCacheJitterSeconds(handle);
   return withCacheFallback(
     cacheSet(key, svg, ttl),
     false,

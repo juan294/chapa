@@ -15,6 +15,7 @@ const {
   mockGetTrendData,
   mockHeaders,
   mockGetOptionalServerSessionFromHeaders,
+  mockWriteBadgeSvgCache,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -30,6 +31,7 @@ const {
   mockGetTrendData: vi.fn(),
   mockHeaders: vi.fn(),
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
+  mockWriteBadgeSvgCache: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -70,6 +72,19 @@ vi.mock("@/lib/render/avatar", () => ({
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
 }));
+
+// #1088 — writeBadgeSvgCache is mocked so tests can assert on its TTL
+// argument directly; buildBadgeSvgCacheKey/readBadgeSvgCache stay real
+// (readBadgeSvgCache falls through to the real, unmocked `@/lib/cache/redis`
+// module, which no-ops without Redis credentials in the test env — matching
+// this file's existing always-cache-miss behavior).
+vi.mock("@/lib/render/badge-svg-cache", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/render/badge-svg-cache")>();
+  return {
+    ...actual,
+    writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+  };
+});
 
 vi.mock("@/lib/env", () => ({
   getBaseUrl: () => "https://chapa.thecreativetoken.com",
@@ -211,6 +226,7 @@ describe("SharePage /u/[handle]", () => {
     mockDeferProfileCacheWork.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockWriteBadgeSvgCache.mockResolvedValue(true);
     mockGetServerLocale.mockResolvedValue("en");
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
     mockHeaders.mockResolvedValue({ get: () => null });
@@ -522,6 +538,50 @@ describe("SharePage /u/[handle]", () => {
       FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ avatarDataUri: undefined }),
     );
+  });
+
+  // #1088 (PE-M1) — same root cause as the badge.svg route: a handle whose
+  // stats carry no avatarUrl at all is a PERMANENT condition, distinct from
+  // a genuine race-timeout on a real fetch. The share page's own SVG-cache
+  // write must not stay silent for it forever either.
+  describe("permanent avatar absence caching (#1088)", () => {
+    const NO_AVATAR_MATERIALIZED = {
+      ...FAKE_MATERIALIZED,
+      stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: undefined },
+    };
+
+    it("writes a short-TTL cache entry when stats.avatarUrl is absent", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+
+      await renderPage();
+
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        FAKE_SVG,
+        "testuser",
+        expect.objectContaining({ ttlSeconds: expect.any(Number) }),
+      );
+      const ttlArg = mockWriteBadgeSvgCache.mock.calls[0]![3] as { ttlSeconds: number };
+      expect(ttlArg.ttlSeconds).toBeGreaterThanOrEqual(900);
+      expect(ttlArg.ttlSeconds).toBeLessThanOrEqual(1800);
+    });
+
+    it("does not write the cache for a genuine avatar fetch failure (transient, avatarUrl present)", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("avatar down"));
+
+      await renderPage();
+
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
   });
 
   // ----------------------------------------------------------------

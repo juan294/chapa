@@ -528,6 +528,79 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
   });
 
+  // #1088 (PE-M1) — a handle whose stats carry NO avatarUrl at all (a
+  // permanent condition, not a race-timeout) was previously gated by the
+  // same `avatarResolved` check as a genuine in-flight race loss, so the
+  // shared SVG cache was NEVER populated for it — every single request
+  // forced a full materialize+render forever. This must be distinguished
+  // from the genuine race-timeout case above (#1029), which still must NOT
+  // write the cache.
+  describe("permanent avatar absence caching (#1088)", () => {
+    const NO_AVATAR_MATERIALIZED = {
+      ...FAKE_MATERIALIZED,
+      stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: undefined },
+    };
+
+    it("writes a short-TTL cache entry when stats.avatarUrl is absent (not attempted, not a race-timeout)", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      // No avatarUrl to fetch — getAvatarBase64 must never be called.
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+      const ttl = mockCacheSet.mock.calls[0]![2] as number;
+      // Short-TTL placeholder (15-30 min), not the full 24h+jitter write a
+      // resolved avatar gets, and not zero/no-write like a race-timeout.
+      expect(ttl).toBeGreaterThanOrEqual(900);
+      expect(ttl).toBeLessThanOrEqual(1800);
+    });
+
+    it("the short-TTL write does not exceed a normal full-day write's TTL floor", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      const ttl = mockCacheSet.mock.calls[0]![2] as number;
+      expect(ttl).toBeLessThan(86400);
+    });
+
+    it("does not write the cache at all for a genuine race-timeout (avatarUrl present, fetch too slow) — unaffected by the permanent-absence path", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+        await vi.advanceTimersByTimeAsync(1000);
+        await responsePromise;
+
+        expect(mockCacheSet).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("skips the cache write entirely when unverified, even with a permanently-absent avatar", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+      mockGetPublicProfileVerification.mockReturnValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+  });
+
   describe("SVG full-response cache (#717)", () => {
     it("returns cached SVG on cache hit without calling materialize or render", async () => {
       const CACHED_SVG = '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>';

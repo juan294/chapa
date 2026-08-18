@@ -11,6 +11,7 @@ import {
   rateLimit,
 } from "@/lib/cache/redis";
 import {
+  AVATAR_ABSENT_CACHE_TTL_SECONDS,
   buildBadgeSvgCacheKey,
   buildBadgeSvgRenderLockKey,
   readBadgeSvgCache,
@@ -189,16 +190,32 @@ async function finalizeMaterializedBadge(
   renderMs: number;
 }> {
   let avatarDataUri: string | undefined;
-  // #1080 — whether the avatar step reached a definitive outcome (resolved,
-  // either with data or a hard failure/404, or there was no `avatarUrl` to
-  // fetch in the first place) vs. genuinely hitting the race deadline before
-  // settling. Only the latter should withhold the SVG cache write — a retry
-  // might succeed once the CDN responds. A missing `avatarUrl` or a fetch
-  // that already failed will never resolve differently on retry either, so
-  // those are safe to cache normally instead of being permanently stuck on
-  // the cache-miss side of the latency SLO.
+  // #1080/#1088 — the avatar step has four distinct outcomes, previously
+  // conflated into one `avatarResolved` boolean (`avatarDataUri !==
+  // undefined`) that gated the shared SVG cache write shut for all of them
+  // except a clean success:
+  //   1. succeeded — got real avatar data. Cache normally (full TTL).
+  //   2. fetch failed outright before the deadline (e.g. a hard 404) — the
+  //      real promise SETTLED (with undefined, via `.catch`), it just didn't
+  //      produce data. A retry won't resolve any differently, so this is
+  //      safe to cache normally too (full TTL) — same as case 1 for caching
+  //      purposes, distinct only in that `avatarDataUri` stays undefined.
+  //   3. permanently absent — `stats.avatarUrl` was never set. PERMANENT
+  //      until the next stats refetch, never a genuine in-flight race loss.
+  //      Cache with a short TTL so a later good render (avatarUrl
+  //      reappearing) isn't shadowed for the full 24h+jitter.
+  //   4. timed out — a real `avatarUrl` fetch lost the race against
+  //      AVATAR_RACE_DEADLINE_MS without settling. Genuinely transient — do
+  //      not cache, so the next request gets a fresh attempt instead of a
+  //      stale placeholder.
+  // `avatarFetchTimedOut` distinguishes case 4 (the deadline symbol won the
+  // race) from cases 1/2 (the real promise settled, whether or not it
+  // produced data) — collapsing it into `avatarDataUri !== undefined` would
+  // wrongly withhold the cache write for case 2 as well.
+  let avatarPermanentlyAbsent = false;
   let avatarFetchTimedOut = false;
   if (!options.readOnly) {
+    avatarPermanentlyAbsent = !materialized.stats.avatarUrl;
     const avatarPromise = materialized.stats.avatarUrl
       ? getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
       : Promise.resolve(undefined);
@@ -211,7 +228,6 @@ async function finalizeMaterializedBadge(
     ]);
     if (raceResult === AVATAR_TIMEOUT) {
       avatarFetchTimedOut = true;
-      avatarDataUri = undefined;
     } else {
       avatarDataUri = raceResult;
     }
@@ -232,8 +248,29 @@ async function finalizeMaterializedBadge(
   // A missing verification record can be temporary when the first public
   // fetch is incomplete. Do not make that unverified render the terminal
   // 24-hour cache value; a later complete fetch must be able to heal it.
-  if (!options.readOnly && !avatarFetchTimedOut && verification) {
-    await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+  if (!options.readOnly && verification) {
+    if (avatarPermanentlyAbsent) {
+      // #1088 — short-TTL placeholder write: populates the cache (so a
+      // README embed with real traffic stops forcing a full
+      // materialize+render on every request) without shadowing a later good
+      // render — e.g. avatarUrl reappearing on a subsequent stats refetch —
+      // for anywhere near the 24h+jitter a normal write gets. Checked before
+      // `avatarFetchTimedOut` since a permanently-absent avatar is never
+      // actually raced against the deadline (it resolves immediately).
+      await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
+        ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+      });
+    } else if (!avatarFetchTimedOut) {
+      // #1080 — covers both a real success and a real fetch that failed
+      // outright before the deadline; both settle the race with a
+      // definitive (non-retriable-differently) outcome, so both are safe to
+      // cache at the normal full TTL.
+      await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+    }
+    // else: avatarUrl exists but its fetch lost the race against
+    // AVATAR_RACE_DEADLINE_MS (#1029, #1080) — a genuinely transient
+    // condition — do not cache; the next request gets a fresh fetch attempt
+    // instead of being stuck behind a stale avatar-less placeholder.
   }
 
   return { svg, verification, renderMs };
