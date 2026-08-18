@@ -55,7 +55,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
-      required-checks: '["Analyze Bundle Size","Bundle Analyzer Report"]'
+      required_checks: '["Analyze Bundle Size","Bundle Analyzer Report"]'
 
   analyze:
     name: Analyze Bundle Size

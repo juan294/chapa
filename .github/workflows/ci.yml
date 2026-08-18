@@ -19,7 +19,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
-      required-checks: '["Lint & Typecheck","Test","Contract (real DB)","Build","E2E Tests","Deployment Smoke"]'
+      required_checks: '["Lint & Typecheck","Test","Contract (real DB)","Build","E2E Tests","Deployment Smoke"]'
 
   lint-and-typecheck:
     name: Lint & Typecheck

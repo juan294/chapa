@@ -19,7 +19,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
-      required-checks: '["Knip Dead Code Analysis"]'
+      required_checks: '["Knip Dead Code Analysis"]'
 
   knip:
     name: Knip Dead Code Analysis

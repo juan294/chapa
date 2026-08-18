@@ -3,7 +3,7 @@ name: Validate merged PR source
 on:
   workflow_call:
     inputs:
-      required-checks:
+      required_checks:
         description: JSON array of Actions check names that must be successful
         required: true
         type: string
@@ -27,7 +27,7 @@ jobs:
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUIRED_CHECKS: ${{ inputs.required-checks }}
+          REQUIRED_CHECKS: ${{ inputs.required_checks }}
         run: |
           set -euo pipefail
           VALIDATED=false

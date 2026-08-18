@@ -21,7 +21,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/validate-merged-pr.yml
     with:
-      required-checks: '["Vulnerability scan (osv-scanner)","License compliance"]'
+      required_checks: '["Vulnerability scan (osv-scanner)","License compliance"]'
 
   audit:
     name: Vulnerability scan (osv-scanner)
