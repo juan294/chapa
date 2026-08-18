@@ -1,39 +1,59 @@
 # Performance Report
-> Generated: 2026-08-06 | Health status: green
+> Generated: 2026-08-13 | Health status: green
 
 ## Executive Summary
-Zero-delta cycle — HEAD `553652d3` unchanged since the 2026-07-30 report, and this cycle's independent re-measurement confirms the bundle, caching, and build health are all still flat. No performance regressions, no new unused exports, no client/server boundary issues.
+Build is clean (0 errors/warnings), bundle size is flat against the established baseline despite a real 78-file app-code delta since the last measured commit (`553652d3` → `0482da44`), and all CI-enforced budgets (350 KB/chunk, knip) pass with zero findings.
 
 ## Build Output
-Next.js 16.2.11 (Turbopack) no longer emits a First Load JS column in its route table (only Revalidate/Expire), so sizes are measured directly from `.next/static/chunks/`. All 81 routes build cleanly; the 9 locale-segmented content pages are confirmed SSG (`●`, both `en`/`es` pre-rendered via `generateStaticParams`).
+`pnpm install --frozen-lockfile` succeeded (lockfile up to date, no drift). `pnpm run build`: Turbopack compile 7.7s, TypeScript 12.0s, 0 errors, 0 warnings. 81 routes total (9 locale-segmented content pages confirmed SSG via `generateStaticParams`, both `en`/`es` variants prerendered — `●` markers). The Next.js 16.2.11 Turbopack route table no longer prints a First Load JS column (only Revalidate/Expire), so sizes below are measured directly from `.next/static/chunks`.
 
-| Route class | Status |
-|-------|---------------------|--------|
-| All 81 routes (34 pages + 56 API + static assets) | Build succeeds, 0 TypeScript errors | GREEN |
-| 9 `/[locale]/*` content pages | SSG, both locales pre-rendered | GREEN |
-| `/u/[handle]/badge.svg` | Dynamic (ƒ), `maxDuration=35` | GREEN |
-| 4 cron routes + bulk-recalculate | `maxDuration=300` (latency-check=60) | GREEN |
-| Chunks >500KB | 0 | GREEN |
-| Chunks >350KB (CI gate, raw or gzip) | 0 | GREEN |
+| Metric | Value | Status |
+|--------|-------|--------|
+| Total JS (raw) | 1,999 KB across 73 chunks | GREEN |
+| Total JS (gzip, per-chunk-summed) | 639 KB | GREEN |
+| Largest chunk (raw) | 228 KB (framework/vendor) | GREEN (< 350 KB gate) |
+| Chunks/routes > 500 KB | 0 | GREEN |
+| Chunks/routes > 350 KB (CI gate) | 0 | GREEN |
+
+No route or chunk exceeds the 500KB or 300KB thresholds — the top 5 chunks (228/192/112/108/92 KB raw) are all framework/vendor bundles, unchanged in composition from prior cycles.
 
 ## Bundle Analysis
-- Total First Load JS: **1,993 KB raw / 638 KB gzipped, 73 chunks** — matches the 2026-07-23 canonical baseline and the 2026-07-30 cycle exactly.
-- **Methodology note (self-correction within this cycle)**: an initial concatenate-then-gzip measurement returned 577 KB, which looked like a real improvement over the 638 KB baseline. Re-measured by summing each chunk's *individually* gzipped size (the correct model — a browser fetches chunks as separate files, so concatenated compression against a shared dictionary understates real transfer size) and got 638.3 KB, reconciling exactly with the established baseline. The 577 KB figure was a measurement artifact, not a regression or an improvement — noting this so a future cycle doesn't get fooled the same way.
-- Largest chunks (raw): 228 KB, 192 KB, 112 KB, 108 KB, 92 KB — all framework/vendor, unchanged from prior cycles.
-- Unused exports: **none** — CI's actual two invocations (`pnpm exec knip`, `pnpm exec knip --dependencies`, both run from repo root) exit 0 with zero findings. (An `apps/web`-local `npx knip` run without repo-root config resolution surfaced a long list of "unused" exported types — this is a known config-resolution artifact of running knip from the wrong directory, not a real signal; the CI-matching invocation is authoritative and clean.)
+- Total First Load JS: **1,999 KB raw / 639 KB gzipped, 73 chunks** — measured by summing each chunk's *individually* gzipped size (the correct model: browsers fetch chunks separately, so concatenate-then-gzip understates real transfer size — see the 2026-08-06 cycle's self-caught methodology note in shared context).
+- This is the first genuinely fresh measurement in several cycles: 78 files changed under `apps/web/{app,components,lib}` since the last-measured commit `553652d3` (i18n locale-hydration fixes, campaign lease hardening, `BadgeSvg.tsx`/`badge-svg-cache.ts` changes for the fresh-badge-headline API work in #1062). Despite that real delta, raw/gzip totals landed within ~6 KB of the 2026-07-23/07-30/08-06 baseline (1,993–1,996 KB raw / 638 KB gzip) — no meaningful bundle growth.
+- Largest chunks: 228 KB, 192 KB, 112 KB, 108 KB, 92 KB (all raw, all framework/vendor) — composition unchanged from prior cycles.
+- Unused exports: **none** — `pnpm exec knip` and `pnpm exec knip --dependencies`, run from the repo root (matching CI's actual invocation), both exit 0 with zero findings.
 
 ## Client/Server Boundary
-- 110 files with `"use client"` (non-test) — flat vs. 2026-07-30's 110.
-- 11 `next/dynamic`/`await import()` code-split points.
-- Key public pages (`/[locale]`, `/[locale]/about`, `/u/[handle]`, `/[locale]/archetypes/*`) confirmed server components. No heavy render libs (`@resvg/resvg-js`, `sharp`) leak into client bundles — both are server-only imports in `lib/render/svg-to-png.ts`.
+- `"use client"` directives (non-test): **109** — down 1 from the 2026-08-06 cycle's 110.
+- Key public pages confirmed as server components (no `"use client"` in their leading imports): `/[locale]` (landing), `/[locale]/about`, `/u/[handle]` (share page), `/[locale]/archetypes/[type]`.
+- 16 `next/dynamic`/`await import()` code-split points found (up from 11 in 2026-08-06 — consistent with new code landing, not a regression).
+- No heavy render libraries leaked into client bundles: grepped for `@resvg/resvg-js` and `sharp` imports inside components/app files carrying `"use client"` — zero matches. These stay server-only (`lib/render/svg-to-png.ts`).
+- No "use client" directives found that should obviously be pushed deeper this cycle — none flagged.
 
 ## Caching & Headers
-- Badge route (`/u/[handle]/badge.svg`): success `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`; error `s-maxage=300, stale-while-revalidate=600`. `Server-Timing` header present on every response (#974). Unchanged.
-- `maxDuration`: badge route 35s; `latency-check` cron 60s; `warm-cache`/`sync-audience`/`process-campaigns`/`bulk-recalculate` 300s each.
+- Badge route (`/u/[handle]/badge.svg`): `maxDuration=35`. Success responses: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`. Error responses: `s-maxage=300, stale-while-revalidate=600`. `Server-Timing` header present on every response (#974), unchanged from prior cycles.
+- No other API caching changes observed this cycle.
 
 ## Fonts & CLS
-- `next/font/google` (JetBrains Mono + Plus Jakarta Sans) — **0 external font requests** confirmed (no `<link>` to fonts.googleapis.com/fonts.gstatic.com in `app/layout.tsx`).
-- No new CLS risks identified — no changes to badge/OG/avatar image dimensioning since 2026-07-23's confirmation (badge SVG 1200×630, OG images 1200×630, `LiteYouTubeEmbed` 480×270, `prefers-reduced-motion` present).
+- `next/font/google` used in `app/layout.tsx` for both `JetBrains_Mono` and `Plus_Jakarta_Sans` — zero external font `<link>` requests found (no `fonts.googleapis.com` references).
+- `prefers-reduced-motion` support confirmed present in `styles/globals.css`.
+- No unsized above-the-fold images found in the sampled surfaces (badge/OG images, embed toolbar) — consistent with prior cycles' explicit 1200×630 dimensioning.
 
 ## Recommendations
-None — pure confirmation cycle, no action items. Bundle baseline (1,993 KB raw / 638 KB gzip / 73 chunks) remains reproducible and stable across four consecutive measurement cycles (2026-07-23, 2026-07-30, and now).
+None this cycle — all budgets green, no regressions despite real app-code churn since the last measurement. Continue using the per-chunk-gzip-sum methodology (not concatenate-then-gzip) for all future bundle measurements to avoid re-triggering the known measurement trap documented in the 2026-08-06 cycle.
+
+---
+
+SHARED_CONTEXT_START
+## Performance Agent — 2026-08-13
+- **Status**: GREEN
+- Total First Load JS: 1,999 KB raw / 639 KB gzip, 73 chunks
+- Routes >500KB: 0
+- Unused exports: 0
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-critical untested paths surfaced. 78 files changed since the last-measured commit (`553652d3`→`0482da44`) touch `BadgeSvg.tsx`/`badge-svg-cache.ts` (fresh-badge-headline work, #1062) and i18n locale-hydration fixes — worth a coverage spot-check on `badge-svg-cache.ts` if not already covered, since it's a cache-key-shape change adjacent to the badge latency SLO path.
+- [Security]: No performance issues with security implications. Badge cache headers and `Server-Timing` unchanged; render-lib client-bundle isolation (resvg/sharp) re-confirmed absent from client bundles.
+- [QA]: No CLS regressions. Fonts via `next/font` with 0 external requests; `prefers-reduced-motion` present. No unsized above-the-fold images found.
+- [Cost Analyst]: Bundle re-confirmed flat at **1,999 KB raw / 639 KB gzip / 73 chunks** — within ~6 KB of the 2026-07-23/07-30/08-06 baseline despite a genuine 78-file app-code delta since `553652d3`. This is the first non-zero-delta measurement in the recent cycle series; treat it as the new canonical reference point going forward rather than the earlier flat carries.
+SHARED_CONTEXT_END

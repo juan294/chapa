@@ -1,52 +1,50 @@
 # QA Report
-> Generated: 2026-08-05 | Health status: green
+> Generated: 2026-08-12 | Health status: green
 
 ## Executive Summary
-Full suite is clean across tests, types, and lint on HEAD `553652d3` (`develop`, unchanged since 2026-07-26 — matches the zero-delta tree the last several performance/security cycles have reported). No new accessibility or design-system regressions found.
+The codebase is in excellent shape: full test suite green (8,759/8,759), zero TypeScript errors, zero lint issues, and no accessibility or design-system violations found in production code.
 
 ## Test Results
-- Total: 8,676 tests across 513 files
-- Passed: 8,676 | Failed: 0 | Skipped: 0
-- Duration: 277.92s
+- Total: 8,759 tests across 518 files
+- Passed: 8,759 | Failed: 0 | Skipped: 0
+- Duration: 60.35s (`pnpm vitest run --maxWorkers=3`)
 
 ## TypeScript
-Clean — `pnpm run typecheck` passes with 0 errors across `packages/shared` and `apps/web`.
+Clean — `pnpm run typecheck` passed with 0 errors across `packages/shared` and `apps/web`.
 
 ## Linting
-Clean — `pnpm run lint` (`eslint .`) passes with 0 warnings/errors across `packages/shared` and `apps/web`.
+Clean — `pnpm run lint` (`eslint .`) passed with 0 errors/warnings across `packages/shared` and `apps/web`.
 
 ## Accessibility
-- **`<img>` alt attributes**: All production `<img>` usages carry `alt` — `LiteYouTubeEmbed.tsx:47` (`alt={title}`), `u/[handle]/page.tsx:263` (`alt={interpolate(t("sharePage.badgeAlt")...)}`), and the dynamic embed snippet built in `SharePageOwnerContent.tsx:118` all pass a non-empty alt. No bare `<img>` without `alt=` found in production source (only appears in test mocks/regex-escaping tests).
-- **Heading hierarchy**: Sampled `/[locale]/about/page.tsx` — clean h1 → h2 progression (`h1` at L54, `h2` sections at L63/70/85/106), no skipped levels.
-- **Interactive elements missing ARIA labels**: 2 `role="button"` custom elements found, both correctly labeled — `ActivityHeatmap.tsx:559-561` (`aria-label={interpolate(t('aria.contributionOnDate')...)}`) and `campaigns-dashboard.tsx:901-903` (`aria-label={\`Campaign: ${c.name}\`}`). No unlabeled interactive elements found.
-- **Focus indicators**: Global `*:focus-visible` rule present at `apps/web/styles/globals.css:455`, plus a scoped override at `.terminal-input-bare:focus-visible:465`.
+- **`<img>` tags missing `alt`**: none. All production `<img>` usages (`LiteYouTubeEmbed.tsx:45`, `SharePageOwnerContent.tsx:118` embed snippet, `app/u/[handle]/page.tsx:274` SVG fallback) supply `alt`. Next.js's `<img>` lint rule (`@next/next/no-img-element`) is explicitly and intentionally suppressed only where required (external YouTube thumbnail).
+- **Heading hierarchy**: sampled across content pages (`/about`, `/privacy`, `/terms`, `/verify/[hash]`, `/cli/authorize`, `/coming-soon`, admin) — all follow proper h1→h2→h3 nesting with no skipped levels. `/admin` uses a screen-reader-only `<h1 className="sr-only">` since the visible header lives in shared chrome, which is correct practice.
+- **Interactive elements without ARIA labels**: no `role="button"` elements found on non-native interactive elements (previously-flagged campaigns `<tr role="button">` gap from 2026-05-06 remains resolved). Spot-checked `onClick`-bearing components (30 files) — matches only appeared in test fixtures with visible text labels; no icon-only buttons found lacking `aria-label` in production source.
+- **Focus indicators**: `focus-visible`/`focus-visible:` present in `globals.css` plus 13+ production components (`BadgeToolbar`, `InfoTooltip`, `LanguageSwitcher`, `dashboard/ChallengeForm`, `CommandBarHint`, `BadgeOverlay`, etc.).
+- **Error/loading states**: 13 `error.tsx` route boundaries and 13 `loading.tsx` route-level loading states present across the App Router tree (`app/error.tsx`, `app/u/[handle]/error.tsx`, `app/admin/error.tsx`, `app/studio/error.tsx`, `app/verify/error.tsx`, locale-segmented pages, etc.) — consistent with Next.js App Router's error-boundary convention.
 
-**0 accessibility issues found.**
-
-## Error / Loading States
-- 13 `error.tsx` boundaries: `app/error.tsx`, `app/global-error.tsx`, `app/admin`, `app/cli/authorize`, `app/coming-soon`, `app/experiments`, `app/generating`, `app/studio`, `app/u/[handle]`, `app/verify`, `app/[locale]/about`, `app/[locale]/archetypes`, `app/[locale]/privacy`, `app/[locale]/terms`.
-- 13 `loading.tsx` states: `app/loading.tsx`, `app/admin`, `app/cli/authorize`, `app/coming-soon`, `app/experiments`, `app/generating/[handle]`, `app/studio`, `app/u/[handle]`, `app/verify`, `app/[locale]/about`, `app/[locale]/archetypes`, `app/[locale]/privacy`, `app/[locale]/terms`.
-- Coverage matches error-boundary count 1:1 across all locale-segmented and legacy routes.
+No accessibility issues found this cycle.
 
 ## Design System Compliance
-Grepped for hardcoded hex colors across `apps/web/components` and `apps/web/app`; an initial broad sweep produced 45 false-positive hits that were actually GitHub issue references (`#892`, `#1025`, etc.) matching the hex-length pattern, not colors. Narrowing to actual `color:`/`fill=`/`stroke=`/`background:` hex usages found **0 violations** in production UI components. All hex-literal color usage is confined to the same accepted-exception set prior QA cycles have documented:
-- `apple-icon.tsx`, `icon.tsx`, `global-error.tsx` — static/pre-render assets that can't consume CSS custom properties (favicon generation, global error fallback rendered outside the themed layout).
-- `experiments/**` (`aurora`, `metallic-shimmer`, `text-effects`, `particles`, `tier-visuals`) — Canvas/SVG gradient/WebGL playground pages, explicitly out of design-system scope.
+No hardcoded hex colors found in production `.tsx` components. The only `#`-prefixed hex-looking matches in `apps/web/components/**/*.tsx` were:
+- GitHub issue-number references in comments/test descriptions (e.g. `#279`, `#1025`) — false positives of the search pattern, not colors.
+- `BadgeContent.test.tsx:53,269-273` — test assertions that explicitly *forbid* hardcoded `#8B5CF6`/dimension hex values in `BadgeContent`'s source, confirming the semantic-token rule is enforced by a regression test.
 
-No new violations outside these accepted exceptions.
+Accepted exceptions (static assets, badge SVG, experiments/** Canvas/WebGL pages) remain unchanged and out of scope per design-system policy.
 
 ## Recommendations
-None — this cycle found no actionable QA issues. Codebase is in the same clean state the last several agent cycles (documentation, coverage, security, performance, cost-analyst) have independently confirmed on this HEAD.
+No action items this cycle — tests, types, lint, accessibility, and design-system compliance are all clean. Continue the existing QA cadence to catch regressions early.
 
+```
 SHARED_CONTEXT_START
-## QA Agent — 2026-08-05
+## QA Agent — 2026-08-12
 - **Status**: GREEN
-- Tests: 8676/8676 passed, 0 failed, 0 skipped (513 files)
+- Tests: 8759/8759 passed, 518 files, 0 failed, 0 skipped
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 0 — all `<img>` tags have alt; both `role="button"` custom elements have `aria-label`; global `:focus-visible` present; heading hierarchy clean; 13 error boundaries / 13 loading states, 1:1 route coverage
+- A11y issues: 0 — all `<img>` tags have alt, focus-visible present globally + in production components, heading hierarchy correct across sampled pages, 13 error boundaries + 13 loading states, no unlabeled interactive elements found
 
 **Cross-agent recommendations:**
-- [Coverage]: No undertested areas discovered this cycle — matches your last several GREEN cycles on this same HEAD (`553652d3`).
-- [Security]: No security-related quality issues found. All interactive elements accessible via keyboard + labeled; no design-system hex-color exceptions found outside the already-documented static-asset/experiments carve-outs.
+- [Coverage]: No new gaps surfaced. Test count grew slightly (8,529 → 8,759) since the 2026-07-22 baseline — worth a re-baseline next coverage cycle.
+- [Security]: No security-related quality issues found. All prior a11y/XSS-adjacent findings (campaigns `<tr role="button">` aria-label gap) remain resolved.
 SHARED_CONTEXT_END
+```
