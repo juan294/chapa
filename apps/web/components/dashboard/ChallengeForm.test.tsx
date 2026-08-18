@@ -117,14 +117,20 @@ describe("ChallengeForm", () => {
     });
   });
 
-  it("shows generic error message on 500 response", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 500 });
+  // Covers both a generic server error (500) and a dispute-email delivery
+  // failure (502, #1082) — ChallengeForm only special-cases status 429, so
+  // every other non-ok status hits this same branch and must leave the form
+  // (and its submit button) visible so the user can retry.
+  it.each([500, 502])("shows a retryable error message on a %i response", async (status) => {
+    mockFetch.mockResolvedValue({ ok: false, status });
     render(<ChallengeForm handle="octocat" />);
 
     submitChallenge();
 
     await waitFor(() => {
       expect(screen.getByText("scoreExplanation.challenge.errorText")).toBeTruthy();
+      expect(screen.getByRole("textbox")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "scoreExplanation.challenge.submit" })).toBeTruthy();
     });
   });
 
