@@ -57,6 +57,26 @@ describe("GeneratingProgress", () => {
     it("has error state", () => {
       expect(SOURCE).toContain("error");
     });
+
+    it("branches on response status instead of collapsing every failure into one message (#1108)", () => {
+      expect(SOURCE).toContain("res.status");
+      expect(SOURCE).toContain("429");
+      expect(SOURCE).toContain("401");
+    });
+
+    it("status-specific copy keys are in the English dictionary", () => {
+      expect(EN_DICT).toContain("errorRateLimited");
+      expect(EN_DICT).toContain("errorSession");
+    });
+
+    it("offers a sign-in-again link on session expiry instead of a same-URL retry (#1108)", () => {
+      expect(SOURCE).toContain("/api/auth/login");
+      expect(SOURCE).toContain("generation.signInAgain");
+    });
+
+    it("shows reassurance copy after a slow start", () => {
+      expect(SOURCE).toContain("generation.stillWorking");
+    });
   });
 
   describe("API integration", () => {
@@ -67,6 +87,11 @@ describe("GeneratingProgress", () => {
 
     it("includes credentials for session cookie", () => {
       expect(SOURCE).toContain('"include"');
+    });
+
+    it("guards the request with a ~45s timeout so a stalled request cannot hang forever (#1108)", () => {
+      expect(SOURCE).toContain("AbortController");
+      expect(SOURCE).toMatch(/GENERATE_TIMEOUT_MS\s*=\s*45[_]?000/);
     });
   });
 

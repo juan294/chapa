@@ -206,6 +206,128 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  it("surfaces an error state instead of hanging forever when the request never settles (#1108)", async () => {
+    // A fetch that never resolves and never rejects — simulates a stalled
+    // network request. Without a timeout, hasError/catch would never fire.
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(<GeneratingProgress handle="testuser" />);
+
+    // Still pinned on step 0 well before the timeout ceiling.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Advance past the ~45s timeout ceiling.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(40_000);
+    });
+
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(
+      document.querySelector('[data-step="0"]')?.getAttribute("data-status"),
+    ).toBe("error");
+    vi.unstubAllGlobals();
+  });
+
+  it("shows try-later copy on a 429 rate-limit response, keeping the retry link", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 429 }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(
+      screen.getByText(
+        "You're generating badges too quickly. Please wait a moment and try again.",
+      ),
+    ).toBeDefined();
+    // Retrying later is still a valid action for a rate limit.
+    expect(screen.getByText("Try again")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows a sign-in-again link on 401 instead of a dead same-URL retry", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 401 }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(
+      screen.getByText("Your session has expired. Please sign in again."),
+    ).toBeDefined();
+
+    const link = screen.getByText("Sign in again").closest("a");
+    expect(link?.getAttribute("href")).toBe(
+      "/api/auth/login?redirect=%2Fgenerating%2Ftestuser",
+    );
+
+    // The old same-URL retry (which cannot re-authenticate) must be gone.
+    expect(screen.queryByText("Try again")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the generic error message on a 5xx response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 503 }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(
+      screen.getByText("Something went wrong generating your badge."),
+    ).toBeDefined();
+    expect(screen.getByText("Try again")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows reassurance copy after ~5s without re-announcing it on every tick", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    const { container } = render(<GeneratingProgress handle="testuser" />);
+
+    const statusRegion = container.querySelector('[role="status"]');
+    expect(statusRegion).not.toBeNull();
+    expect(screen.queryByText(/Still working/)).toBeNull();
+
+    const contentBeforeAt5s = statusRegion?.textContent;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    const notice = screen.getByText(/Still working/);
+    expect(notice).toBeDefined();
+    // The reassurance copy lives outside the aria-live status region so it
+    // doesn't get announced on every re-render/tick.
+    expect(statusRegion?.contains(notice)).toBe(false);
+    expect(statusRegion?.textContent).toBe(contentBeforeAt5s);
+
+    const contentAfter5s = statusRegion?.textContent;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    // Live region content must be unchanged by further ticks of the notice.
+    expect(statusRegion?.textContent).toBe(contentAfter5s);
+    vi.unstubAllGlobals();
+  });
+
   it("activates each generation step before marking it done", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
     render(<GeneratingProgress handle="testuser" />);
