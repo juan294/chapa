@@ -5,7 +5,7 @@
  * for social card previews (X/Twitter, LinkedIn, etc.).
  */
 
-import { Resvg } from "@resvg/resvg-js";
+import { renderAsync } from "@resvg/resvg-js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -96,19 +96,29 @@ export function stripSvgAnimations(svg: string): string {
  * all renders, eliminating repeated disk reads per OG-image cache miss.
  * Falls back to `fontFiles` paths if buffer loading failed at startup.
  *
+ * PE-M5 (#1090): Uses resvg-js's `renderAsync`, a genuinely async native
+ * binding (offloaded to libuv's threadpool by the underlying napi-rs
+ * addon), instead of the synchronous `Resvg.render()`. The old synchronous
+ * call ran the entire rasterization on the JS main thread with no yield
+ * point, so `withTimeout`'s `setTimeout` — a macrotask — could never be
+ * serviced until rasterization finished, making its timeout branch dead
+ * code. `renderAsync` returns a real pending Promise, so the event loop
+ * (and any concurrent request on the same warm instance, including a
+ * badge.svg cache hit) stays responsive while rasterization runs, and a
+ * slow render can now actually be interrupted by `withTimeout`.
+ *
  * @param svg - Complete SVG markup string
  * @param width - Target PNG width in pixels (default: 1200)
  * @returns PNG image as a Uint8Array buffer
  */
-export function svgToPng(svg: string, width = 1200): Uint8Array {
+export async function svgToPng(svg: string, width = 1200): Promise<Uint8Array> {
   const staticSvg = stripSvgAnimations(svg);
   const fontConfig = _fontBuffers
     ? { loadSystemFonts: false, fontBuffers: _fontBuffers }
     : { loadSystemFonts: false, fontFiles: getFontPaths() };
-  const resvg = new Resvg(staticSvg, {
+  const rendered = await renderAsync(staticSvg, {
     fitTo: { mode: "width", value: width },
     font: fontConfig,
   });
-  const rendered = resvg.render();
   return rendered.asPng();
 }

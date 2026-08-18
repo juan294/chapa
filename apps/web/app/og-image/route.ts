@@ -10,7 +10,7 @@ import { svgToPng } from "@/lib/render/svg-to-png";
 export async function GET() {
   try {
     const svg = renderOgSvg();
-    const png = svgToPng(svg, 1200);
+    const png = await svgToPng(svg, 1200);
 
     return new NextResponse(Buffer.from(png), {
       headers: {
