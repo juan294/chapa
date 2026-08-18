@@ -12,6 +12,7 @@ const {
   mockRunPublicProfileSideEffects,
   mockPersistProfileSnapshot,
   mockDeferProfileCacheWork,
+  mockRedactImpactForVisitor,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -20,12 +21,15 @@ const {
   mockReadBadgeSvgCache,
   mockWriteBadgeSvgCache,
   mockGetTrendData,
+  mockHeaders,
+  mockGetOptionalServerSessionFromHeaders,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
   mockPersistProfileSnapshot: vi.fn(),
   mockDeferProfileCacheWork: vi.fn(),
+  mockRedactImpactForVisitor: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -34,6 +38,17 @@ const {
   mockReadBadgeSvgCache: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockGetTrendData: vi.fn(),
+  mockHeaders: vi.fn(),
+  mockGetOptionalServerSessionFromHeaders: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: (...args: unknown[]) => mockHeaders(...args),
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
+    mockGetOptionalServerSessionFromHeaders(...args),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -47,6 +62,8 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+  redactImpactForVisitor: (...args: unknown[]) =>
+    mockRedactImpactForVisitor(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -182,6 +199,13 @@ beforeEach(() => {
   mockReadBadgeSvgCache.mockResolvedValue(null);
   mockWriteBadgeSvgCache.mockResolvedValue(undefined);
   mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
+  mockHeaders.mockResolvedValue({ get: () => null });
+  mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+  mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
+    return rest;
+  });
 });
 
 describe("Phase 4d — Share page i18n", () => {
@@ -233,6 +257,12 @@ describe("Phase 4d — Share page i18n", () => {
 
   describe("generateMetadata — es locale (social cards use primary locale)", () => {
     it("uses interpolated handle in OG image alt (Spanish)", async () => {
+      // #1066 — locale now resolves via getServerLocale (cookie/header
+      // fallback), mocked here to "es" to preserve this test's original
+      // intent (its own precedence is covered by lib/i18n/server.test.ts
+      // and the "locale resolution (#1066)" tests in page.test.tsx).
+      mockGetServerLocale.mockResolvedValue("es");
+
       const metadata = await generateMetadata({
         params: Promise.resolve({ handle: "testuser" }),
       });
@@ -382,8 +412,13 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).toContain("@/lib/i18n/server");
     });
 
-    it("still exports revalidate = 3600", () => {
-      expect(SOURCE).toContain("export const revalidate = 3600");
+    // #1066 (FE-H2) — revalidate = 3600 was inert: both generateMetadata
+    // and the page component already unconditionally awaited searchParams,
+    // opting the route out of static rendering entirely. The route now
+    // commits to dynamic rendering instead (see page.test.ts's "dynamic
+    // rendering (#1066)" describe block for the replacement coverage).
+    it("does NOT export revalidate (genuinely dynamic, not ISR)", () => {
+      expect(SOURCE).not.toContain("export const revalidate");
     });
 
     it("delegates locale-sensitive title and labels to a client component", () => {

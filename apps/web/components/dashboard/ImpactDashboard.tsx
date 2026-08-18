@@ -1,6 +1,6 @@
 "use client";
 
-import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
@@ -15,7 +15,10 @@ import { useTranslation } from "@/lib/i18n";
 // ---------------------------------------------------------------------------
 
 interface ImpactDashboardProps {
-  impact: ImpactV6Result;
+  // #1067 — redacted PublicImpactV6Result for a non-owner visitor, full
+  // ImpactV6Result for the owner. Nothing in this component or its children
+  // reads confidence/confidencePenalties.
+  impact: ClientImpactV6Result;
   stats: StatsData;
   handle: string;
   craftResult?: CraftResult | null;

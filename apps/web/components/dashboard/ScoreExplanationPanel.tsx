@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useId, useMemo, useState } from "react";
-import type { CraftResult, DimensionScores, ImpactV6Result, Platform, StatsData } from "@chapa/shared";
+import type {
+  ClientImpactV6Result,
+  CraftResult,
+  DimensionScores,
+  Platform,
+  StatsData,
+} from "@chapa/shared";
 import {
   buildScoreExplanation,
   type DimensionExplanation,
@@ -14,7 +20,11 @@ import { ChallengeForm } from "./ChallengeForm";
 type TranslateFn = (key: string) => string | string[] | Record<string, unknown>[];
 
 interface ScoreExplanationPanelProps {
-  impact: ImpactV6Result;
+  // #1067 — the share page passes a structurally-redacted
+  // PublicImpactV6Result (confidence/confidencePenalties keys entirely
+  // absent) for non-owner visitors, and the full ImpactV6Result only for
+  // the owner. buildScoreExplanation() below narrows on field presence.
+  impact: ClientImpactV6Result;
   stats: StatsData;
   craftResult?: CraftResult | null;
   isOwner: boolean;

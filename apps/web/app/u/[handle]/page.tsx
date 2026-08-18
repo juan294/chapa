@@ -1,7 +1,6 @@
-export const revalidate = 3600;
-
 import { Suspense } from "react";
 import { after } from "next/server";
+import { headers } from "next/headers";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { isValidHandle } from "@/lib/validation";
 import { NavbarClient } from "@/components/NavbarClient";
@@ -26,13 +25,16 @@ import {
   deferProfileCacheWork,
   materializePublicProfile,
   persistProfileSnapshot,
+  redactImpactForVisitor,
 } from "@/lib/profile/public-profile";
+import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
+import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
-import { getServerT } from "@/lib/i18n/server";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { LanguageProvider, LocaleSync } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
-import { isSupportedLocale } from "@/lib/i18n/types";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { SharePageH2 } from "./SharePageH2";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
@@ -54,13 +56,16 @@ export async function generateMetadata({
     return { title: "Not Found" };
   }
 
-  // Avoid request-only locale APIs so the page stays ISR-compatible. Spanish
-  // remains the social-card default, while an explicit deep-link locale must
-  // also select matching metadata so streamed metadata cannot overwrite the
-  // client title with a different language after hydration.
+  // #1066 — the route is dynamic (see SharePage below), so locale resolves
+  // via getServerLocale: an explicit ?lang= deep-link override first (#1020
+  // contract — must win over the cookie), then the chapa-locale cookie,
+  // then Accept-Language, falling back to DEFAULT_LOCALE ('es'). This must
+  // resolve to the SAME locale as the body below, or streamed metadata
+  // could disagree with the client title after hydration.
   const resolvedSearch = searchParams ? await searchParams : {};
-  const requestedLocale = resolvedSearch.lang;
-  const locale = isSupportedLocale(requestedLocale) ? requestedLocale : "es";
+  const requestedLocale =
+    typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
+  const locale = await getServerLocale(requestedLocale);
   const t = getServerT(locale);
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
@@ -93,8 +98,22 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const { handle } = await params;
   const resolvedSearch = searchParams ? await searchParams : {};
   const queryLang = typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
-  const locale = isSupportedLocale(queryLang) ? queryLang : "es";
+  // #1066 — same resolution as generateMetadata above (query > cookie >
+  // header > default), so the body never disagrees with streamed metadata.
+  const locale = await getServerLocale(queryLang);
   const readOnly = resolvedSearch[READ_ONLY_SMOKE_PARAM] === "1";
+
+  // #1107 — every platform OAuth (Bitbucket/Codeberg/GitLab) connect/
+  // callback failure branch in lib/auth/platform-oauth.ts redirects back to
+  // this exact page as `?error=<platform>_<code>`, but nothing here read
+  // that param — a failed "Connect GitLab" click left the user with zero
+  // feedback. Read server-side (not via a client useSyncExternalStore leaf
+  // like the landing page's #982 pattern): that pattern exists solely to
+  // avoid opting a static/ISR page out of static rendering, and this route
+  // is already dynamic (#1066 above already awaits searchParams and reads
+  // the session), so there is no static-rendering cost left to avoid here.
+  const errorCode = typeof resolvedSearch.error === "string" ? resolvedSearch.error : null;
+  const errorMessage = getOAuthErrorMessage(errorCode);
 
   if (!isValidHandle(handle)) {
     notFound();
@@ -108,6 +127,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
       {/* Establish query ownership in the hydrated shell. The streamed client
           subtree then starts with the same dictionary as its server markup. */}
       <LocaleSync queryLang={queryLang} />
+      {errorMessage && <ErrorBanner message={errorMessage} />}
       <main id="main-content" className="min-h-screen bg-bg">
         <Suspense fallback={<BadgeSkeleton />}>
           <SharePageContent handle={handle} readOnly={readOnly} />
@@ -130,22 +150,37 @@ export async function SharePageContent({
   handle: string;
   readOnly?: boolean;
 }) {
-  // ISR: No dynamic request APIs (next headers/cookies) are called.
-  // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
-  // #1034 — fetch trend/diff history alongside profile materialization
+  // #1067 — resolve the requester's session server-side (the route is
+  // dynamic per #1066) so owner-only confidence data can be redacted below
+  // BEFORE it crosses into the "use client" component tree. A client-side
+  // isOwner check (still used for display gating in SharePageOwnerContent)
+  // only hides the UI — the data would already be in a visitor's
+  // view-source via the RSC payload.
+  //
+  // #1034 — trend/diff history is fetched alongside profile materialization
   // (rather than in a client `useEffect` post-hydration) so the dashboard
   // renders with this data on first paint instead of a client fetch waterfall.
   // getTrendData() already degrades gracefully (returns nulls) on any
   // history-store failure; the `.catch()` here is a belt-and-suspenders
   // guard so a future regression in that contract still can't fail the
   // whole share page render — a 500 here would be a bug (CLAUDE.md).
-  const [materialized, trendData] = await Promise.all([
+  //
+  // Session resolution has no data dependency on the other two, so all
+  // three run concurrently rather than awaiting headers() up front.
+  const [session, materialized, trendData] = await Promise.all([
+    headers().then((h) => getOptionalServerSessionFromHeaders(h)),
     materializePublicProfile(handle, { readOnly }),
     getTrendData(handle).catch(() => ({ trend: null, diff: null })),
   ]);
+  const isOwner = session?.login === handle;
   const stats = materialized?.stats ?? null;
+  // `impact` stays the FULL, unredacted result — it feeds renderBadgeSvg and
+  // personJsonLd below (and, via `materialized` itself, the snapshot/HMAC
+  // record in the deferred work further down). Only the copy handed to the
+  // client component tree is redacted, via `impactForClient` near the
+  // bottom of this function.
   const impact = materialized?.displayImpact ?? null;
   const craftResult = materialized?.craftResult ?? null;
   const verification = materialized
@@ -235,6 +270,13 @@ export async function SharePageContent({
 
   const badgeLabelId = `share-badge-label-${handle}`;
 
+  // #1067 — this is the ONE place `impact` crosses into a "use client"
+  // component tree. A projection, not a mutation: `impact` (and, more
+  // importantly, `materialized.displayImpact` it's aliased from) must stay
+  // fully intact above for the badge render, JSON-LD, and the deferred
+  // snapshot/HMAC verification-record work in `after()`.
+  const impactForClient = impact && !isOwner ? redactImpactForVisitor(impact) : impact;
+
   return (
     <>
       <SharePageShortcuts
@@ -299,7 +341,7 @@ export async function SharePageContent({
         <SharePageOwnerContentLazy
           handle={handle}
           stats={stats}
-          impact={impact}
+          impact={impactForClient}
           craftResult={craftResult}
           trend={trendData.trend}
           diff={trendData.diff}

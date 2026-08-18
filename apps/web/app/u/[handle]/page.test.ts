@@ -66,7 +66,9 @@ describe("SharePage", () => {
 
     it("passes stats, impact, and handle to SharePageOwnerContent", () => {
       expect(SOURCE).toContain("stats={stats}");
-      expect(SOURCE).toContain("impact={impact}");
+      // #1067 — impactForClient is the redacted-for-visitors projection of
+      // impact (see redactImpactForVisitor); the raw impact stays server-only.
+      expect(SOURCE).toContain("impact={impactForClient}");
       expect(SOURCE).toContain("handle={handle}");
     });
   });
@@ -124,32 +126,32 @@ describe("SharePage", () => {
     });
   });
 
-  // #555 — ISR revalidation for share pages (cuts serverless invocations 80-90%)
-  describe("ISR revalidation", () => {
-    it("exports revalidate = 3600 for Incremental Static Regeneration", () => {
-      expect(SOURCE).toContain("export const revalidate = 3600");
+  // #1066 (FE-H2) — the route was declaring `revalidate = 3600` (ISR) while
+  // both generateMetadata and the page component unconditionally awaited
+  // searchParams, which already opted the route out of static rendering
+  // entirely (confirmed via .next/prerender-manifest.json: no ISR entry).
+  // The route now commits to dynamic rendering instead of paying every ISR
+  // trade-off for a route that was never actually static.
+  describe("dynamic rendering (#1066)", () => {
+    it("does NOT export revalidate (the route is genuinely dynamic, not ISR)", () => {
+      expect(SOURCE).not.toContain("export const revalidate");
     });
 
-    it("does NOT import headers from next/headers (ISR incompatible)", () => {
-      expect(SOURCE).not.toContain('from "next/headers"');
-      expect(SOURCE).not.toContain("from 'next/headers'");
+    it("resolves locale via getServerLocale (cookie/header fallback), not a hardcoded default", () => {
+      expect(SOURCE).toContain("getServerLocale");
     });
 
-    it("does NOT call headers() anywhere (ISR incompatible)", () => {
-      // Ensure no headers() call that would force dynamic rendering
-      expect(SOURCE).not.toMatch(/\bheaders\(\)/);
+    it("imports headers from next/headers to resolve the requester's session", () => {
+      expect(SOURCE).toMatch(/from ["']next\/headers["']/);
+      expect(SOURCE).toMatch(/\bheaders\(\)/);
     });
 
-    it("does NOT import readSessionCookie (session is client-side)", () => {
-      expect(SOURCE).not.toContain("readSessionCookie");
-    });
-
-    it("uses NavbarClient instead of server-side Navbar", () => {
+    it("uses NavbarClient (unaffected by the dynamic-rendering change)", () => {
       expect(SOURCE).toContain("NavbarClient");
       expect(SOURCE).not.toMatch(/from ["']@\/components\/Navbar["']/);
     });
 
-    it("uses SharePageOwnerContent for client-side owner detection", () => {
+    it("uses SharePageOwnerContent for client-side display gating", () => {
       expect(SOURCE).toContain("SharePageOwnerContent");
     });
   });

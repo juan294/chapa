@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { makeFullStats, makeSnapshot } from "../test-helpers/fixtures";
+import { makeFullStats, makeImpact, makeSnapshot } from "../test-helpers/fixtures";
 import type { MaterializedProfile } from "./materialize-profile";
 import {
   deferProfileCacheWork,
   getPublicProfileVerification,
   materializePublicProfile,
   persistProfileSnapshot,
+  redactImpactForVisitor,
   runPublicProfileSideEffects,
 } from "./public-profile";
 
@@ -569,5 +570,66 @@ describe("runPublicProfileSideEffects", () => {
       expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
       expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// redactImpactForVisitor (#1067 FE-M1)
+// ---------------------------------------------------------------------------
+//
+// The share page (apps/web/app/u/[handle]/page.tsx) crosses `impact` into a
+// "use client" component tree. Whatever crosses that boundary is serialized
+// into the RSC payload a visitor's browser downloads, regardless of whether
+// any component actually renders it. Confidence/confidencePenalties are
+// owner-only (CLAUDE.md), so a non-owner request must never receive them —
+// not just have them hidden from display.
+describe("redactImpactForVisitor", () => {
+  it("strips confidence and confidencePenalties from the result", () => {
+    const impact = makeImpact({
+      confidence: 62,
+      confidencePenalties: [
+        { flag: "low_activity_signal", penalty: 10, reason: "Low recent activity." },
+      ],
+    });
+
+    const redacted = redactImpactForVisitor(impact);
+
+    expect("confidence" in redacted).toBe(false);
+    expect("confidencePenalties" in redacted).toBe(false);
+    expect(JSON.stringify(redacted)).not.toContain("confidence");
+  });
+
+  it("preserves every other field, including the public headline score", () => {
+    const impact = makeImpact({
+      handle: "octocat",
+      adjustedComposite: 73,
+      compositeScore: 70,
+      tier: "High",
+      archetype: "Builder",
+      profileType: "collaborative",
+    });
+
+    const redacted = redactImpactForVisitor(impact);
+
+    expect(redacted).toEqual({
+      handle: "octocat",
+      profileType: "collaborative",
+      dimensions: impact.dimensions,
+      archetype: "Builder",
+      compositeScore: 70,
+      adjustedComposite: 73,
+      tier: "High",
+      computedAt: impact.computedAt,
+    });
+  });
+
+  it("returns a new object rather than mutating the input (snapshot/HMAC record safety)", () => {
+    const impact = makeImpact({ confidence: 91 });
+
+    const redacted = redactImpactForVisitor(impact);
+
+    expect(redacted).not.toBe(impact);
+    expect(impact.confidence).toBe(91);
+    expect(impact.confidencePenalties).toEqual([]);
   });
 });
