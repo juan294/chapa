@@ -5,7 +5,7 @@ import {
   fetchReceivedEmail,
   forwardEmail,
 } from "@/lib/email/resend";
-import { cacheSetNxStatus, rateLimit } from "@/lib/cache/redis";
+import { cacheDel, cacheSetNxStatus, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { log } from "@/lib/log";
@@ -119,6 +119,12 @@ export const POST = withErrorCapture("/api/webhooks/resend", async (request: Nex
   // 5. Fetch full email
   const email = await fetchReceivedEmail(emailId);
   if (!email) {
+    // BE-H2: this 502 exists specifically so Resend retries the delivery.
+    // The dedupe key must be released, or the retry short-circuits as
+    // "already_processed" (200) instead of actually re-attempting — silently
+    // dropping the email for the full 7-day TTL despite Resend reporting a
+    // successful delivery.
+    await cacheDel(dedupeKey);
     return NextResponse.json(
       { error: "Failed to fetch received email" },
       { status: 502 },
@@ -142,6 +148,10 @@ export const POST = withErrorCapture("/api/webhooks/resend", async (request: Nex
   });
 
   if (!result) {
+    // BE-H2: same rationale as the fetch failure branch above — release the
+    // dedupe key so a genuine Resend retry can actually re-attempt the
+    // forward.
+    await cacheDel(dedupeKey);
     return NextResponse.json(
       { error: "Failed to forward email" },
       { status: 502 },
