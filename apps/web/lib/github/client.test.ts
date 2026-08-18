@@ -628,14 +628,36 @@ describe("getStats", () => {
     });
   });
 
-  it("does not write caches or user registry in read-only mode", async () => {
-    const githubStats = makeStats();
-    setupCacheMiss(githubStats);
+  it("#1083: never issues a live GitHub fetch in read-only mode, even on a cold key", async () => {
+    // No baseline exists yet — a handle that has never been fetched by a
+    // write-mode caller (badge route, warm-cache cron, refresh).
+    mockCacheGet
+      .mockResolvedValueOnce(null) // stats:v2:merged:test-user (primary)
+      .mockResolvedValueOnce(null); // stats:stale:v2:test-user (baseline)
 
     const result = await getStats("test-user", undefined, { readOnly: true });
 
-    expect(result).toEqual(githubStats);
-    expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", undefined);
+    expect(result).toBeNull();
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
+    expect(mockFetchBitbucketIfLinked).not.toHaveBeenCalled();
+    expect(mockFetchCodebergIfLinked).not.toHaveBeenCalled();
+    expect(mockFetchGitlabIfLinked).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+  });
+
+  it("#1083: serves the protected baseline in read-only mode without writing caches or fetching GitHub", async () => {
+    const baseline = makeStats();
+    mockCacheGet.mockImplementation((key: string) => {
+      if (key === "stats:v2:merged:test-user") return Promise.resolve(null);
+      if (key === "stats:stale:v2:test-user") return Promise.resolve(baseline);
+      return Promise.resolve(null);
+    });
+
+    const result = await getStats("test-user", undefined, { readOnly: true });
+
+    expect(result).toEqual(baseline);
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
     expect(mockFetchBitbucketIfLinked).not.toHaveBeenCalled();
     expect(mockFetchCodebergIfLinked).not.toHaveBeenCalled();
     expect(mockFetchGitlabIfLinked).not.toHaveBeenCalled();
