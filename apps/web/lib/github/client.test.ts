@@ -252,6 +252,107 @@ describe("getStats", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // #1087 (PE-H2) — _loadOverlays has zero data dependency on fetchStats'
+  // result, so it must be kicked off concurrently rather than strictly after
+  // fetchStats resolves. The regression-risk requirement (see CLAUDE.md's
+  // scoring-data integrity contract) is that this concurrency change must NOT
+  // let overlay data leak into the degraded-fetch guard's decision — the
+  // guard must still compare only `primary` against `baseline`.
+  // ---------------------------------------------------------------------------
+  describe("concurrent GitHub + overlay fetch (#1087 / PE-H2)", () => {
+    /** primary miss → stale=lastGood → supplemental miss, fetch returns `fresh`. */
+    function setupWithStale(fresh: StatsData, lastGood: StatsData | null) {
+      mockCacheGet
+        .mockResolvedValueOnce(null) // stats:v2:merged (primary miss)
+        .mockResolvedValueOnce(lastGood) // stats:stale (last-known-good)
+        .mockResolvedValueOnce(null); // supplemental miss
+      mockFetchStatsData.mockResolvedValue(fresh);
+    }
+
+    it("kicks off the overlay fetch before fetchStats resolves, not strictly after it", async () => {
+      mockCacheGet
+        .mockResolvedValueOnce(null) // stats:v2:merged (primary miss)
+        .mockResolvedValueOnce(null) // stats:stale (baseline miss)
+        .mockResolvedValueOnce(null); // supplemental miss
+
+      let resolveFetchStats!: (value: StatsData) => void;
+      mockFetchStatsData.mockReturnValue(
+        new Promise<StatsData>((resolve) => {
+          resolveFetchStats = resolve;
+        }),
+      );
+
+      const resultPromise = getStats("test-user");
+
+      // Flush pending microtasks (the cacheGet reads that precede fetchStats)
+      // without resolving fetchStats itself.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The overlay fetch (independent of fetchStats' result) must already
+      // have been kicked off even though fetchStats is still pending — proof
+      // the two run concurrently rather than overlays waiting on fetchStats.
+      expect(mockFetchStatsData).toHaveBeenCalled();
+      expect(mockFetchBitbucketIfLinked).toHaveBeenCalled();
+
+      resolveFetchStats(makeStats());
+      const result = await resultPromise;
+      expect(result).not.toBeNull();
+    });
+
+    it("regression: a slow concurrent overlay fetch does not influence the degraded-fetch guard's primary-vs-baseline decision", async () => {
+      const lastGood = makeStats({ prsMergedCount: 41, prsMergedWeight: 120, commitsTotal: 14000 });
+      const degraded = makeStats({
+        prsMergedCount: 0,
+        prsMergedWeight: 0,
+        commitsTotal: 15533,
+        issuesClosedCount: 5096,
+      });
+      setupWithStale(degraded, lastGood);
+
+      // The overlay resolves late, with an inflated PR count. If overlay data
+      // were ever composed onto `primary`/`baseline` before the guard ran
+      // (rather than strictly after both `Promise.all` legs settle), a large
+      // overlay like this could mask the shortfall the guard exists to catch
+      // (the #1061 failure mode this repo already hardened against).
+      let resolveBitbucket!: (value: StatsData) => void;
+      mockFetchBitbucketIfLinked.mockReturnValue(
+        new Promise<StatsData>((resolve) => {
+          resolveBitbucket = resolve;
+        }),
+      );
+
+      const resultPromise = getStats("test-user");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      resolveBitbucket(
+        makeStats({ handle: "test-user-bitbucket", prsMergedCount: 500, commitsTotal: 500 }),
+      );
+
+      await resultPromise;
+
+      // The guard compared primary (0) against baseline (41) — unaffected by
+      // the overlay's inflated count — and rejected exactly as it does with
+      // no overlay in flight at all.
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "github_degraded_pr_fetch",
+        expect.objectContaining({
+          handle: "test-user",
+          freshPrsMergedCount: 0,
+          stalePrsMergedCount: 41,
+        }),
+      );
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:stale:v2:test-user",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // #1004 phase 2 — scope-aware, non-downgrading cache writes
   // A lower-scope (public) fetch must never overwrite a higher-scope
   // (authenticated) entry already cached for this handle.

@@ -20,13 +20,15 @@ import {
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
-import { withTimeout } from "@/lib/async/with-timeout";
+import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import {
   getPublicProfileVerification,
   deferProfileCacheWork,
   materializePublicProfile,
   persistProfileSnapshot,
+  type PublicVerificationCode,
 } from "@/lib/profile/public-profile";
+import type { MaterializedProfile } from "@/lib/profile/materialize-profile";
 import {
   formatServerTiming,
   type ServerTimingEntry,
@@ -52,6 +54,24 @@ const BADGE_RENDER_WAIT_SCHEDULE_MS = [50, 75, 100, 125, 150, 200, 250];
 // for the next request — this deadline only bounds how long THIS response
 // waits before rendering the placeholder instead.
 const AVATAR_RACE_DEADLINE_MS = 1000;
+// #1086 (PE-H1) — no individual step on the cache-miss materialize path had an
+// end-to-end deadline: getStats' own inflight cap (30s) plus the GitHub fetch
+// (15s) plus a linked-platform fetch (8s) plus this route's own cache/lock/
+// avatar ceilings summed to ~34s against a declared 3000ms cache-miss SLO
+// budget — the only real ceiling was the platform's `maxDuration = 35`. This
+// deadline bounds the wait for `materializePublicProfile` to roughly that
+// budget. It is only ever raced when a stale (yesterday's) SVG is available to
+// fall back on (see the `staleSvgForDeadlineFallback` read below) — a
+// brand-new handle with no stale key falls through to a plain, unbounded
+// await so a legitimate cold GitHub fetch is never cut off artificially.
+const BADGE_MATERIALIZE_DEADLINE_MS = 2200;
+// A degraded response — short-lived so a real render (from the background
+// continuation below, or a subsequent request) replaces it quickly rather
+// than being treated as a normal 24h-cacheable badge.
+const DEADLINE_FALLBACK_HEADERS = {
+  "Content-Type": "image/svg+xml",
+  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+};
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
 type BadgeRenderResult = {
   svg: string;
@@ -150,6 +170,121 @@ function createDeferred<T>(): {
   });
 
   return { promise, resolve };
+}
+
+/**
+ * Shared post-materialize pipeline: avatar fetch (raced against its own
+ * deadline), verification, SVG render, and — when eligible — the shared SVG
+ * cache write. Used both by the normal foreground path and by the PE-H1
+ * background continuation below, so a deadline-fallback response's eventual
+ * real render warms the cache identically to a non-degraded request.
+ */
+async function finalizeMaterializedBadge(
+  handle: string,
+  materialized: MaterializedProfile,
+  options: { readOnly: boolean; svgCacheKey: string },
+): Promise<{
+  svg: string;
+  verification: PublicVerificationCode | null;
+  renderMs: number;
+}> {
+  let avatarDataUri: string | undefined;
+  let avatarResolved = false;
+  if (!options.readOnly) {
+    const avatarPromise = materialized.stats.avatarUrl
+      ? getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
+      : Promise.resolve(undefined);
+    avatarDataUri = await Promise.race([
+      avatarPromise,
+      new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), AVATAR_RACE_DEADLINE_MS),
+      ),
+    ]);
+    avatarResolved = avatarDataUri !== undefined;
+  }
+  const verification = getPublicProfileVerification(materialized);
+
+  const renderStart = Date.now();
+  const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+    avatarDataUri,
+    verificationHash: verification?.hash,
+    verificationDate: verification?.date,
+    // This SVG is always served to <img> embeds (README badges), where SMIL
+    // <animate> never runs — animated heatmap cells would stay invisible. (#760)
+    disableAnimation: true,
+  });
+  const renderMs = Date.now() - renderStart;
+
+  // A missing verification record can be temporary when the first public
+  // fetch is incomplete. Do not make that unverified render the terminal
+  // 24-hour cache value; a later complete fetch must be able to heal it.
+  if (!options.readOnly && avatarResolved && verification) {
+    await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+  }
+
+  return { svg, verification, renderMs };
+}
+
+/**
+ * The same durable side-effect sequence the foreground path runs inside
+ * `after()` on a successful materialize — extracted so the PE-H1 background
+ * continuation (deadline-fallback path) can run it identically once its own
+ * materialize call finishes, warming the cache for the next request.
+ *
+ * NOTE: this intentionally mirrors the route's own pre-existing inline
+ * sequence rather than calling `runPublicProfileSideEffects` from
+ * `lib/profile/public-profile.ts`. That function skips deferred cache work
+ * only on the dedup case (`!persisted && statsComplete`), so it still runs
+ * telemetry for an incomplete-stats view; this route has always skipped
+ * deferred work on any `!persisted`, incomplete stats included. Reconciling
+ * that behavioral difference is a separate, pre-existing concern outside the
+ * scope of this change — not introduced by it.
+ */
+async function runBadgeSideEffects(
+  handle: string,
+  materialized: MaterializedProfile,
+  options: { readOnly: boolean; verification: PublicVerificationCode | null },
+): Promise<void> {
+  const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
+    readOnly: options.readOnly,
+  });
+  if (!shouldRunDeferred) return;
+  await deferProfileCacheWork(handle, materialized, {
+    verification: options.verification,
+    readOnly: options.readOnly,
+  });
+}
+
+/**
+ * #1086 (PE-H1) background continuation for the deadline-fallback path: lets
+ * the original `materializePublicProfile` call keep running after a
+ * degraded stale-SVG response has already been sent, so the cache is warm
+ * for the NEXT request instead of abandoning the in-flight work.
+ *
+ * Deliberately a standalone top-level function (rather than an inline
+ * closure in `GET`) so it only captures its own parameters — an inline
+ * closure would keep `GET`'s entire activation record (including unrelated
+ * locals like `request`, `deferred`, `cacheTimeoutMetric`) reachable for as
+ * long as this callback is pending, which can be most of materialize's own
+ * ~30s inflight ceiling.
+ */
+async function warmBadgeCacheInBackground(
+  handle: string,
+  materializePromise: Promise<MaterializedProfile | null>,
+  options: { readOnly: boolean; svgCacheKey: string },
+): Promise<void> {
+  try {
+    const materialized = await materializePromise;
+    if (!materialized) return;
+    const { verification } = await finalizeMaterializedBadge(handle, materialized, options);
+    await runBadgeSideEffects(handle, materialized, { readOnly: options.readOnly, verification });
+  } catch (err) {
+    fireAndForget(() => captureServerError({
+      route: `/u/${handle}/badge.svg`,
+      statusCode: 500,
+      error: err,
+    }));
+  }
 }
 
 // #974: emit a Server-Timing header on every badge response so per-request
@@ -253,6 +388,17 @@ export async function GET(
 
   try {
     gotRenderLock = await acquireBadgeRenderLock(renderLockKey);
+    const yesterday = toDateString(new Date(Date.now() - 86_400_000));
+    const staleCacheKey = buildBadgeSvgCacheKey(handle, yesterday);
+    // #1086 (PE-H1) — kicked off (not awaited) below, alongside materialize,
+    // rather than awaited up front: this Redis read is independent of
+    // materialize, so starting it in parallel keeps it off materialize's own
+    // (much slower) hot-path latency instead of adding a round-trip in front
+    // of it. Only set up on the winner path when a stale fallback might exist
+    // — the loser branch below already performs its own stale-cache read as
+    // its first tier and returns early on a hit.
+    let staleSvgLookup: Promise<string | null> | null = null;
+
     if (!gotRenderLock) {
       // PE-M2: lock-loser optimisation.
       //
@@ -267,8 +413,6 @@ export async function GET(
       //
       //   2. Poll for today's SVG — shortened schedule for cases where no stale
       //      entry exists (brand-new handle, first badge ever).
-      const yesterday = toDateString(new Date(Date.now() - 86_400_000));
-      const staleCacheKey = buildBadgeSvgCacheKey(handle, yesterday);
       const staleSvg = await readBadgeSvgCache(staleCacheKey);
       if (staleSvg) {
         const sharedResult = {
@@ -294,13 +438,67 @@ export async function GET(
           { name: "cache", desc: "poll", durMs: Date.now() - startedAt },
         ]);
       }
+      // Falls through with no stale SVG (checked above, or it would have
+      // returned already) — `staleSvgLookup` stays null.
+    } else if (!readOnly) {
+      // Winner path — kick off the stale-cache read now (not awaited), so it
+      // runs concurrently with materialize below instead of in front of it.
+      staleSvgLookup = readBadgeSvgCache(staleCacheKey);
     }
 
     const materializeStart = Date.now();
-    const materialized = await materializePublicProfile(handle, {
+    const materializePromise = materializePublicProfile(handle, {
       token,
       readOnly,
     });
+    const staleSvgForDeadlineFallback = staleSvgLookup ? await staleSvgLookup : null;
+    let materialized: MaterializedProfile | null;
+
+    if (staleSvgForDeadlineFallback) {
+      // #1086 (PE-H1) — bound the wait for materialize to roughly the SLO
+      // budget instead of letting it run unbounded (up to getStats' own 30s
+      // inflight cap). This is only ever set up when a stale SVG exists to
+      // serve on expiry (see `staleSvgLookup` above) — a brand-new handle
+      // with nothing to fall back on skips this branch entirely and awaits
+      // `materializePromise` directly below, preserving the existing (much
+      // longer) timeouts as its only ceiling. `materializePromise` itself is
+      // never cancelled — on a timeout it keeps running for the after()
+      // background continuation below to pick up.
+      try {
+        materialized = await withTimeout(
+          materializePromise,
+          BADGE_MATERIALIZE_DEADLINE_MS,
+          "badge materialize",
+        );
+      } catch (err) {
+        if (!(err instanceof TimeoutError)) throw err;
+
+        const sharedResult = {
+          svg: staleSvgForDeadlineFallback,
+          headers: DEADLINE_FALLBACK_HEADERS,
+        } satisfies BadgeRenderResult;
+        deferred.resolve(sharedResult);
+
+        // Let the original materialize call keep running so the NEXT request
+        // for this handle is warm, instead of abandoning it. This mirrors the
+        // foreground success path's own after()-deferred side effects.
+        after(() =>
+          warmBadgeCacheInBackground(handle, materializePromise, { readOnly, svgCacheKey }),
+        );
+
+        return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
+          ...cacheTimeoutMetric,
+          {
+            name: "materialize",
+            desc: "deadline-fallback",
+            durMs: Date.now() - materializeStart,
+          },
+        ]);
+      }
+    } else {
+      materialized = await materializePromise;
+    }
+
     const materializeMs = Date.now() - materializeStart;
     if (!materialized) {
       const fallbackResult = {
@@ -317,64 +515,31 @@ export async function GET(
       ]);
     }
 
-    // #1029 (PE-L1) — race the avatar fetch against a tight deadline instead
-    // of awaiting it in full, mirroring the share page's pattern (#800). A
-    // slow CDN response renders with the placeholder rather than consuming
-    // most of the cache-miss latency budget. `avatarResolved` gates the SVG
-    // cache write below: a timed-out/failed fetch must NOT poison the shared
-    // cache with the placeholder for up to 24h — the next request gets a
-    // fresh chance to fetch (and cache) the real avatar.
-    let avatarDataUri: string | undefined;
-    let avatarResolved = false;
-    if (!readOnly) {
-      const avatarPromise = materialized.stats.avatarUrl
-        ? getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
-        : Promise.resolve(undefined);
-      avatarDataUri = await Promise.race([
-        avatarPromise,
-        new Promise<undefined>((resolve) =>
-          setTimeout(() => resolve(undefined), AVATAR_RACE_DEADLINE_MS),
-        ),
-      ]);
-      avatarResolved = avatarDataUri !== undefined;
-    }
-    const verification = getPublicProfileVerification(materialized);
+    // Re-bind to a `const` now that `materialized` is known non-null — `let`
+    // narrowing does not persist into the `after()` closure below.
+    const profile = materialized;
+    const { svg, verification, renderMs } = await finalizeMaterializedBadge(
+      handle,
+      profile,
+      { readOnly, svgCacheKey },
+    );
 
     // #1013 — persistProfileSnapshot is a durable Supabase write with nothing
     // in the response depending on its result; it must not block (or, on
     // failure, retroactively invalidate) an otherwise-successful render. Both
     // it and the already-deferred cache work now run in after().
     after(() => {
-      return persistProfileSnapshot(handle, materialized, { readOnly })
-        .then((shouldRunDeferred) => {
-          if (!shouldRunDeferred) return;
-          return deferProfileCacheWork(handle, materialized, { verification, readOnly });
-        })
-        .catch((err) => {
+      return runBadgeSideEffects(handle, profile, { readOnly, verification }).catch(
+        (err) => {
           fireAndForget(() => captureServerError({
             route: `/u/${handle}/badge.svg`,
             statusCode: 500,
             error: err,
           }));
-        });
+        },
+      );
     });
 
-    const renderStart = Date.now();
-    const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
-      avatarDataUri,
-      verificationHash: verification?.hash,
-      verificationDate: verification?.date,
-      // This SVG is always served to <img> embeds (README badges), where SMIL
-      // <animate> never runs — animated heatmap cells would stay invisible. (#760)
-      disableAnimation: true,
-    });
-    const renderMs = Date.now() - renderStart;
-    // A missing verification record can be temporary when the first public
-    // fetch is incomplete. Do not make that unverified render the terminal
-    // 24-hour cache value; a later complete fetch must be able to heal it.
-    if (!readOnly && avatarResolved && verification) {
-      await writeBadgeSvgCache(svgCacheKey, svg, handle);
-    }
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return badgeSvgResponse(successResult.svg, successResult.headers, startedAt, [
