@@ -150,6 +150,38 @@ async function flushAfterCallbacks(): Promise<void> {
   await Promise.all(callbacks.map((callback) => callback()));
 }
 
+/**
+ * Walks the rendered React element tree returned by an async server
+ * component (no DOM, no testing-library — this is a plain object graph of
+ * `{ type, props }` element nodes) to find a `<script>` element with the
+ * given `type` attribute (e.g. "application/ld+json"). Used to grab the
+ * JSON-LD payload out of `SharePageContent`'s returned tree for a real
+ * behavioral assertion on its content, rather than a source-text match.
+ */
+function findScriptElement(
+  node: unknown,
+  scriptType: string,
+): { props: { dangerouslySetInnerHTML?: { __html?: string } } } | null {
+  if (!node || typeof node !== "object") return null;
+  const el = node as {
+    type?: unknown;
+    props?: { type?: string; children?: unknown };
+  };
+  if (el.type === "script" && el.props?.type === scriptType) {
+    return el as { props: { dangerouslySetInnerHTML?: { __html?: string } } };
+  }
+  const children = el.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const found = findScriptElement(child, scriptType);
+      if (found) return found;
+    }
+  } else if (children) {
+    return findScriptElement(children, scriptType);
+  }
+  return null;
+}
+
 const FAKE_MATERIALIZED = {
   stats: {
     handle: "testuser",
@@ -356,20 +388,39 @@ describe("Phase 4d — Share page i18n", () => {
       expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
     });
 
-    it("keeps fallback badge image requests read-only in smoke mode", async () => {
-      mockRenderBadgeSvg.mockReturnValue("");
+    // #1106 — the only prior coverage checked that page.tsx's source text
+    // contains the string "renderJsonLd(personJsonLd)" (page.test.ts's
+    // "JSON-LD security" describe block). That protects against someone
+    // swapping out the escaping helper, but nothing fails if `confidence` or
+    // `confidencePenalties` were spread into `personJsonLd` itself — the
+    // CLAUDE.md acceptance criterion is that confidence data must be
+    // "excluded from public metadata (JSON-LD)". This test renders the real
+    // component tree (FAKE_MATERIALIZED.displayImpact carries
+    // `confidence: 85`, matching a real ImpactV6Result) and inspects the
+    // actual serialized JSON-LD payload — a behavioral assertion on output,
+    // not a source-text pattern match.
+    it("excludes confidence data from the rendered JSON-LD script (privacy boundary)", async () => {
+      const result = await SharePageContent({ handle: "testuser" });
 
-      const result = await SharePageContent({
-        handle: "testuser",
-        readOnly: true,
-      });
-      const jsxString = JSON.stringify(result);
+      const scriptEl = findScriptElement(result, "application/ld+json");
+      expect(scriptEl).not.toBeNull();
 
-      expect(jsxString).toContain("/u/testuser/badge.svg?");
-      expect(jsxString).toContain("__chapa_smoke=1");
-      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
-      expect(mockAfter).not.toHaveBeenCalled();
-      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      const html = scriptEl!.props.dangerouslySetInnerHTML?.__html;
+      expect(html).toBeTruthy();
+
+      // renderJsonLd unicode-escapes <, >, & — undo that so JSON.parse works.
+      const unescaped = html!
+        .replace(/\\u003c/g, "<")
+        .replace(/\\u003e/g, ">")
+        .replace(/\\u0026/g, "&");
+      const parsed = JSON.parse(unescaped) as Record<string, unknown>;
+
+      expect(parsed).not.toHaveProperty("confidence");
+      expect(parsed).not.toHaveProperty("confidenceReasons");
+      expect(parsed).not.toHaveProperty("confidencePenalties");
+      // Belt-and-suspenders: no field anywhere in the payload should mention
+      // confidence in its key or value.
+      expect(JSON.stringify(parsed).toLowerCase()).not.toContain("confidence");
     });
   });
 
