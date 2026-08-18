@@ -237,6 +237,33 @@ function _classifyScope(token?: string): StatsData["fetchScope"] {
 }
 
 /**
+ * Load supplemental (e.g. EMU account) data for a handle. Redis is the hot
+ * path with a 24h TTL; Supabase (#825) is the durable fallback so a missed
+ * CLI upload day no longer silently drops EMU stats from scores. On a Redis
+ * miss + DB hit, we rehydrate Redis so subsequent reads stay fast.
+ *
+ * Extracted from `_loadOverlays` (#1087 / PE-H2) so it can run concurrently
+ * with the platform fetches — the two have no data dependency on each other.
+ */
+async function _loadSupplemental(
+  lowerHandle: string,
+  readOnly: boolean | undefined,
+): Promise<SupplementalStats | null> {
+  const supplementalKey = `supplemental:${lowerHandle}`;
+  const cached = await cacheGet<SupplementalStats>(supplementalKey);
+  if (cached) return cached;
+
+  const persisted = await dbGetSupplemental(lowerHandle);
+  if (persisted && !readOnly) {
+    fireAndForget(
+      () => cacheSet(supplementalKey, persisted, SUPPLEMENTAL_TTL),
+      () => undefined,
+    );
+  }
+  return persisted;
+}
+
+/**
  * Load every non-GitHub source for a handle. Called on every path — including
  * total GitHub-fetch failure — so that whichever GitHub-derived value is served
  * is always composed from the same, current overlay inputs. Serving a
@@ -248,41 +275,36 @@ async function _loadOverlays(
   lowerHandle: string,
   readOnly: boolean | undefined,
 ): Promise<StatsOverlays> {
-  // Platform fetches run in parallel — an error in one must not block the others.
-  const [bbResult, cbResult, glResult] = readOnly
-    ? ([
+  // Platform fetches and the supplemental lookup have zero data dependency on
+  // each other (#1087 / PE-H2) — kick both waves off together rather than
+  // sequencing the supplemental lookup strictly after the platform fetches
+  // settle. An error in one platform fetch must not block the others.
+  const platformFetches: Promise<
+    readonly [
+      PromiseSettledResult<StatsData | null>,
+      PromiseSettledResult<StatsData | null>,
+      PromiseSettledResult<StatsData | null>,
+    ]
+  > = readOnly
+    ? Promise.resolve([
         { status: "fulfilled", value: null },
         { status: "fulfilled", value: null },
         { status: "fulfilled", value: null },
       ] as const)
-    : await Promise.allSettled([
+    : Promise.allSettled([
         fetchBitbucketIfLinked(handle, lowerHandle),
         fetchCodebergIfLinked(handle, lowerHandle),
         fetchGitlabIfLinked(handle, lowerHandle),
       ]);
 
+  const [[bbResult, cbResult, glResult], supplemental] = await Promise.all([
+    platformFetches,
+    _loadSupplemental(lowerHandle, readOnly),
+  ]);
+
   const bitbucket = bbResult.status === "fulfilled" ? bbResult.value : null;
   const codeberg = cbResult.status === "fulfilled" ? cbResult.value : null;
   const gitlab = glResult.status === "fulfilled" ? glResult.value : null;
-
-  // Supplemental (e.g. EMU account). Redis is the hot path with a 24h TTL;
-  // Supabase (#825) is the durable fallback so a missed CLI upload day no
-  // longer silently drops EMU stats from scores. On a Redis miss + DB hit, we
-  // rehydrate Redis so subsequent reads stay fast.
-  const supplementalKey = `supplemental:${lowerHandle}`;
-  let supplemental = await cacheGet<SupplementalStats>(supplementalKey);
-  if (!supplemental) {
-    const persisted = await dbGetSupplemental(lowerHandle);
-    if (persisted) {
-      supplemental = persisted;
-      if (!readOnly) {
-        fireAndForget(
-          () => cacheSet(supplementalKey, persisted, SUPPLEMENTAL_TTL),
-          () => undefined,
-        );
-      }
-    }
-  }
 
   // Build linkedPlatforms from DB link status (source of truth), not stats
   // fetch success. Platforms appear in Data Sources even when their stats fetch

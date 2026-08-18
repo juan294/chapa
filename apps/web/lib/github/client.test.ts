@@ -301,6 +301,45 @@ describe("getStats", () => {
       expect(result).not.toBeNull();
     });
 
+    it("kicks off the supplemental lookup concurrently with the platform fetches, not strictly after them", async () => {
+      // Collapsing _loadOverlays' own internal waves (the second half of the
+      // #1087/PE-H2 recommendation): the platform fetches (bitbucket/codeberg/
+      // gitlab) and the supplemental lookup have zero data dependency on each
+      // other, so the supplemental cacheGet must fire even while a platform
+      // fetch is still in flight — not wait for Promise.allSettled(platforms)
+      // to resolve first.
+      mockCacheGet
+        .mockResolvedValueOnce(null) // stats:v2:merged (primary miss)
+        .mockResolvedValueOnce(null) // stats:stale (baseline miss)
+        .mockResolvedValueOnce(null); // supplemental miss — must fire concurrently
+
+      mockFetchStatsData.mockResolvedValue(makeStats());
+
+      let resolveBitbucket!: (value: StatsData | null) => void;
+      mockFetchBitbucketIfLinked.mockReturnValue(
+        new Promise<StatsData | null>((resolve) => {
+          resolveBitbucket = resolve;
+        }),
+      );
+
+      const resultPromise = getStats("test-user");
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The 3rd cacheGet call (supplemental) must already have fired even
+      // though the bitbucket platform fetch — part of the same overlay load —
+      // is still pending. Proof the supplemental wave doesn't wait on the
+      // platform-fetch wave to settle.
+      expect(mockCacheGet).toHaveBeenCalledTimes(3);
+      expect(mockCacheGet).toHaveBeenNthCalledWith(3, "supplemental:test-user");
+
+      resolveBitbucket(null);
+      const result = await resultPromise;
+      expect(result).not.toBeNull();
+    });
+
     it("regression: a slow concurrent overlay fetch does not influence the degraded-fetch guard's primary-vs-baseline decision", async () => {
       const lastGood = makeStats({ prsMergedCount: 41, prsMergedWeight: 120, commitsTotal: 14000 });
       const degraded = makeStats({
