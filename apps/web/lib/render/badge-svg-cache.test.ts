@@ -7,6 +7,7 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 import {
+  AVATAR_ABSENT_CACHE_TTL_SECONDS,
   BADGE_RENDER_VARIANT,
   buildBadgeSvgCacheKey,
   buildBadgeSvgRenderLockKey,
@@ -159,6 +160,46 @@ describe("badge-svg-cache", () => {
       await expect(
         writeBadgeSvgCache("k", "<svg/>", "testuser"),
       ).resolves.not.toThrow();
+    });
+
+    // #1088 — a handle whose avatar is permanently absent (no avatarUrl at
+    // all, not a race-timeout) needs a short-TTL cache write instead of
+    // either the full 24h+jitter write or no write at all, so a README embed
+    // with real traffic stops forcing a full materialize+render on every
+    // single request while a later good render (avatarUrl reappearing on a
+    // subsequent stats refetch) isn't shadowed for anywhere near a full day.
+    describe("ttlSeconds override (#1088)", () => {
+      it("honors an explicit ttlSeconds override instead of the 24h+jitter default", async () => {
+        cacheSet.mockResolvedValueOnce(true);
+        await writeBadgeSvgCache(
+          "badge:v2:octocat:warm-amber:2026-05-01",
+          "<svg>placeholder</svg>",
+          "octocat",
+          { ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS },
+        );
+
+        expect(cacheSet).toHaveBeenCalledWith(
+          "badge:v2:octocat:warm-amber:2026-05-01",
+          "<svg>placeholder</svg>",
+          AVATAR_ABSENT_CACHE_TTL_SECONDS,
+        );
+      });
+
+      it("the short TTL constant is well under an hour so it never shadows a good render or survives a daily key rollover", () => {
+        expect(AVATAR_ABSENT_CACHE_TTL_SECONDS).toBeGreaterThanOrEqual(900); // >= 15 min
+        expect(AVATAR_ABSENT_CACHE_TTL_SECONDS).toBeLessThanOrEqual(1800); // <= 30 min
+      });
+
+      it("without an override, still falls back to the standard 24h+jitter TTL", async () => {
+        cacheSet.mockResolvedValueOnce(true);
+        await writeBadgeSvgCache(
+          "badge:v2:octocat:warm-amber:2026-05-01",
+          "<svg>fresh</svg>",
+          "octocat",
+        );
+        const ttl = cacheSet.mock.calls[0]![2] as number;
+        expect(ttl).toBeGreaterThanOrEqual(86400);
+      });
     });
   });
 

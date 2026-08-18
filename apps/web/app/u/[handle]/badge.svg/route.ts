@@ -11,6 +11,7 @@ import {
   rateLimit,
 } from "@/lib/cache/redis";
 import {
+  AVATAR_ABSENT_CACHE_TTL_SECONDS,
   buildBadgeSvgCacheKey,
   buildBadgeSvgRenderLockKey,
   readBadgeSvgCache,
@@ -190,7 +191,16 @@ async function finalizeMaterializedBadge(
 }> {
   let avatarDataUri: string | undefined;
   let avatarResolved = false;
+  // #1088 — true only when the handle's stats carry no `avatarUrl` at all: a
+  // PERMANENT condition (until the next stats refetch), never a genuine
+  // in-flight race loss on a real fetch. The two used to be conflated by
+  // `avatarResolved` alone (false in both cases), which gated the shared SVG
+  // cache write shut for both — starving a permanently-absent-avatar handle
+  // of ANY cache population, forcing a full materialize+render on every
+  // single request forever (the bug this fixes).
+  let avatarPermanentlyAbsent = false;
   if (!options.readOnly) {
+    avatarPermanentlyAbsent = !materialized.stats.avatarUrl;
     const avatarPromise = materialized.stats.avatarUrl
       ? getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
       : Promise.resolve(undefined);
@@ -218,8 +228,23 @@ async function finalizeMaterializedBadge(
   // A missing verification record can be temporary when the first public
   // fetch is incomplete. Do not make that unverified render the terminal
   // 24-hour cache value; a later complete fetch must be able to heal it.
-  if (!options.readOnly && avatarResolved && verification) {
-    await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+  if (!options.readOnly && verification) {
+    if (avatarResolved) {
+      await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+    } else if (avatarPermanentlyAbsent) {
+      // #1088 — short-TTL placeholder write: populates the cache (so a
+      // README embed with real traffic stops forcing a full
+      // materialize+render on every request) without shadowing a later good
+      // render — e.g. avatarUrl reappearing on a subsequent stats refetch —
+      // for anywhere near the 24h+jitter a normal write gets.
+      await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
+        ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+      });
+    }
+    // else: avatarUrl exists but its fetch lost the race against
+    // AVATAR_RACE_DEADLINE_MS (#1029) — a genuinely transient condition — do
+    // not cache; the next request gets a fresh fetch attempt instead of
+    // being stuck behind a stale avatar-less placeholder.
   }
 
   return { svg, verification, renderMs };

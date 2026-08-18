@@ -13,6 +13,7 @@ import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import {
+  AVATAR_ABSENT_CACHE_TTL_SECONDS,
   buildBadgeSvgCacheKey,
   readBadgeSvgCache,
   writeBadgeSvgCache,
@@ -197,6 +198,11 @@ export async function SharePageContent({
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
   let avatarResolved = false;
+  // #1088 — true only when stats carry no avatarUrl at all: a PERMANENT
+  // condition (until the next stats refetch), never a genuine race loss on a
+  // real fetch. See the identical distinction in the badge.svg route's
+  // `finalizeMaterializedBadge` for the full rationale.
+  let avatarPermanentlyAbsent = false;
 
   if (!cachedSvg && stats && impact) {
     // Cache miss — render inline. Avatar fetch is best-effort with a tight
@@ -204,6 +210,7 @@ export async function SharePageContent({
     // TTFB. The /u/[handle]/badge.svg route awaits the avatar fully on its
     // own first render and writes the avatar-bearing SVG to the same
     // cache, so warm visits to the share page get the real avatar.
+    avatarPermanentlyAbsent = !readOnly && !stats.avatarUrl;
     const avatarPromise = !readOnly && stats.avatarUrl
       ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
       : Promise.resolve(undefined);
@@ -229,15 +236,30 @@ export async function SharePageContent({
   // cache renders that fell back to a placeholder avatar or lack a
   // verification record. Either state can be temporary, and caching it would
   // prevent a later complete fetch from healing the SVG for up to 24h. (#800)
+  //
+  // #1088 — a handle with NO avatarUrl at all is different: that absence
+  // won't resolve itself on a retry within this request, so gating the write
+  // shut the same way as a genuine race-timeout meant it NEVER got cached.
+  // It still gets a write, just a short-TTL one, so it doesn't shadow a
+  // later good render for the full 24h+jitter a normal write would use.
   if (materialized && inlineSvg && !readOnly) {
-    const svgToCache =
-      renderedFresh && avatarResolved && verification ? inlineSvg : null;
+    const cacheEligible = renderedFresh && !!verification && (avatarResolved || avatarPermanentlyAbsent);
+    const svgToCache = cacheEligible ? inlineSvg : null;
+    // Short-TTL only for the permanent-absence case; a resolved avatar keeps
+    // the standard 24h+jitter TTL (writeBadgeSvgCache's own default).
+    const svgCacheTtlSeconds =
+      cacheEligible && !avatarResolved ? AVATAR_ABSENT_CACHE_TTL_SECONDS : undefined;
     const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
       readOnly,
     });
     after(() => {
       if (svgToCache) {
-        void writeBadgeSvgCache(svgCacheKey, svgToCache, handle);
+        void writeBadgeSvgCache(
+          svgCacheKey,
+          svgToCache,
+          handle,
+          svgCacheTtlSeconds !== undefined ? { ttlSeconds: svgCacheTtlSeconds } : undefined,
+        );
       }
       if (!shouldRunDeferred) return;
       return deferProfileCacheWork(handle, materialized, { verification });
