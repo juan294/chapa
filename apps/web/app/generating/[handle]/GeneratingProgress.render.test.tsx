@@ -328,6 +328,25 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  it("cancels staggered step timers on unmount so they can't later fire against a stale closure (#1074)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    const { unmount } = render(<GeneratingProgress handle="testuser" />);
+
+    // Let fetch resolve and completeRemainingSteps schedule its staggered
+    // per-step timers.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    unmount();
+
+    // Every timer the component owns — including the staggered step timers
+    // scheduled by completeRemainingSteps — must be cancelled on unmount.
+    // None should be left pending to fire later against a stale closure.
+    expect(vi.getTimerCount()).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
   it("activates each generation step before marking it done", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
     render(<GeneratingProgress handle="testuser" />);

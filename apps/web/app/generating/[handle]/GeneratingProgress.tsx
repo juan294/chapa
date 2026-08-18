@@ -60,24 +60,28 @@ export function GeneratingProgress({ handle }: { handle: string }) {
     },
   };
 
-  const completeRemainingSteps = useCallback(() => {
-    // Complete each step and activate the next one with staggered delays.
-    const remaining = [1, 2, 3];
-    remaining.forEach((idx, i) => {
-      setTimeout(() => {
-        setStepStatuses((prev) =>
-          prev.map((status, stepIndex) => {
-            if (stepIndex === idx) return 'done';
-            if (stepIndex === idx + 1) return 'active';
-            return status;
-          }),
-        );
-        if (idx === remaining[remaining.length - 1]) {
-          setDone(true);
-        }
-      }, STEP_DELAY_MS * (i + 1));
-    });
-  }, []);
+  const completeRemainingSteps = useCallback(
+    (registerTimer: (id: ReturnType<typeof setTimeout>) => void) => {
+      // Complete each step and activate the next one with staggered delays.
+      const remaining = [1, 2, 3];
+      remaining.forEach((idx, i) => {
+        const id = setTimeout(() => {
+          setStepStatuses((prev) =>
+            prev.map((status, stepIndex) => {
+              if (stepIndex === idx) return 'done';
+              if (stepIndex === idx + 1) return 'active';
+              return status;
+            }),
+          );
+          if (idx === remaining[remaining.length - 1]) {
+            setDone(true);
+          }
+        }, STEP_DELAY_MS * (i + 1));
+        registerTimer(id);
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +100,15 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         reject(new DOMException("Generation request timed out", "TimeoutError"));
       }, GENERATE_TIMEOUT_MS);
     });
+
+    // Timer ids scheduled by completeRemainingSteps (the staggered
+    // step-completion timers). Tracked here so the cleanup below can cancel
+    // them if the component unmounts mid-sequence — otherwise they'd fire
+    // later against a stale closure (#1074).
+    const stepTimerIds: ReturnType<typeof setTimeout>[] = [];
+    const registerStepTimer = (id: ReturnType<typeof setTimeout>) => {
+      stepTimerIds.push(id);
+    };
 
     async function generate() {
       try {
@@ -122,7 +135,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         }
 
         setStepStatuses(['done', 'active', 'pending', 'pending']);
-        completeRemainingSteps();
+        completeRemainingSteps(registerStepTimer);
       } catch {
         clearTimeout(timeoutId);
         if (cancelled) return;
@@ -139,6 +152,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
       cancelled = true;
       clearTimeout(timeoutId);
       controller.abort();
+      stepTimerIds.forEach(clearTimeout);
     };
   }, [completeRemainingSteps]);
 
