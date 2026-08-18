@@ -390,9 +390,19 @@ async function _fetchAndCache(
   // Read the baseline before the fetch, so it is available if the fetch fails.
   const baseline = await cacheGet<StatsData>(baselineKey);
 
-  const primary = await fetchStats(handle, token);
-
-  const overlays = await _loadOverlays(handle, lowerHandle, options.readOnly);
+  // #1087 (PE-H2) — `_loadOverlays` has zero data dependency on `primary`, so
+  // the two most expensive network legs on this path (GitHub GraphQL and the
+  // linked-platform fetches) run concurrently rather than back-to-back. This
+  // is safe for the integrity contract precisely because every guard below
+  // (`isDegradedPrFetch`, the scope-rank comparison) closes over `primary` and
+  // `baseline` only — never `overlays` — and `_compose` still runs strictly
+  // after both legs have settled, onto whichever GitHub-derived value the
+  // guards select. Overlay data is never visible to the guards, regardless of
+  // how quickly or slowly it resolves relative to the GitHub fetch.
+  const [primary, overlays] = await Promise.all([
+    fetchStats(handle, token),
+    _loadOverlays(handle, lowerHandle, options.readOnly),
+  ]);
 
   if (!primary) {
     // API failed (rate limit, network error, etc.) — serve the baseline,
