@@ -191,6 +191,22 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - i18n: `apps/web/lib/i18n/*` (dictionaries, detection, server/client translation, locale cookie, `tArray`/`tObject` typed accessors — use these, not an unchecked `t() as string[]` cast, #1026); `apps/web/proxy.ts` (locale-segmented content-page rewrite, #1023); `apps/web/app/[locale]/*` (the 9 locale-segmented content pages)
 - Dashboard components: `apps/web/lib/dashboard/generate-insights.ts`, `apps/web/components/dashboard/DimensionCard.tsx`, `apps/web/components/dashboard/InsightCard.tsx`, `apps/web/components/dashboard/SubMetricPanel.tsx`
 - Share toolbar: `apps/web/components/BadgeToolbar.tsx`
+- Badge verification: `apps/web/lib/verification/*` — HMAC-SHA256 hash generation/verification (`hmac.ts`), verification record types and Supabase persistence (`store.ts`); backs goal #6 and `/verify/:hash`, `/api/verify/:hash`
+- Analytics & error capture: `apps/web/lib/analytics/*` — PostHog client (`posthog.ts`) and `captureServerError` (`server-errors.ts`, 56+ importers — the highest-fan-in module in `lib/`) for structured server-side error/event capture
+- Email: `apps/web/lib/email/*` — Resend client (`resend.ts`), transactional templates (`challenge.ts`, `notifications.ts`, `score-bump.ts`, `templates/announcement.ts`), campaign send payloads (`campaigns.ts`), Resend audience sync (`audience.ts`), unsubscribe URL signing (`unsubscribe-url.ts`)
+- AI tool insights: `apps/web/lib/insights/*` — parses, validates, and scores uploaded AI coding tool reports (e.g. Claude Code) backing `/api/insights` and the dashboard insights panel
+- Agent tooling: `apps/web/lib/agents/*` — reads and parses agent run reports/config for `/api/admin/agents/run` and `/api/admin/agents-summary`
+- Campaigns: `apps/web/lib/campaigns/*` — campaign send payload construction/validation shared by `/api/admin/campaigns/*` and `/api/cron/process-campaigns`
+- Score challenge: `apps/web/lib/challenge/*` — validation for `/api/challenge` score dispute submissions
+- Crypto helpers: `apps/web/lib/crypto/*` — constant-time comparison (`safe-equal.ts`) for HMAC/token verification
+- Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (interactions, borders, cards, celebrations, backgrounds, counters, heatmap animations, tier visuals) behind Creator Studio's 9 customization categories
+- HTTP utilities: `apps/web/lib/http/*` — client IP extraction (`client-ip.ts`) for rate limiting
+- Keyboard shortcuts: `apps/web/lib/keyboard/*` — shortcut registry and React hook for the terminal/command-bar UI
+- Monitoring: `apps/web/lib/monitoring/*` — badge latency SLO budgets and measurement (`latency-slo.ts`) backing `/api/cron/latency-check`
+- Platform aggregation: `apps/web/lib/platform/*` — fetches and merges linked-platform (Bitbucket/Codeberg/GitLab) stats onto GitHub-derived stats
+- Profile materialization: `apps/web/lib/profile/*` — orchestrates stats fetch → impact compute → snapshot persistence (`materialize-profile.ts`, `orchestrated-profile.ts`, `public-profile.ts`, `snapshot-write.ts`, `post-write-invalidation.ts`, `persist-guard.ts`) for the badge, share page, refresh, and recalculate paths
+- Async utilities: `apps/web/lib/async/*` — fire-and-forget, timeout wrapping, and batch processing helpers used across cron/cache/warm-cache paths
+- Test helpers: `apps/web/lib/test-helpers/*` — shared fixtures and mocks (admin auth, platform auth, dynamic mocking) reused across the test suite
 
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).
