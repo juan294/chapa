@@ -174,6 +174,11 @@ async function cacheIncr(
   return incrBy(key, amount, ttlSeconds);
 }
 
+async function refundRateLimit(key: string): Promise<boolean> {
+  incrBy(key, -1);
+  return true;
+}
+
 function _resetClient(): void {
   store.clear();
   hllStore.clear();
@@ -194,6 +199,7 @@ export const redisFake = {
   cacheSetNxStatus,
   cacheSetNx,
   cacheIncr,
+  refundRateLimit,
   _resetClient,
   __reset: _resetClient,
 };

@@ -69,4 +69,22 @@ describe("POST /api/challenge contract", () => {
       "My delivery score seems off because all merged PRs are missing.",
     );
   });
+
+  it("reports failure instead of a false success when the dispute email fails to send", async () => {
+    mockSendChallengeEmail.mockResolvedValueOnce({ success: false });
+
+    const response = await invokeJson(POST, {
+      method: "POST",
+      path: "/api/challenge",
+      body: {
+        handle: "octocat",
+        reason: "My delivery score seems off because all merged PRs are missing.",
+      },
+    });
+
+    expect(response.status).toBe(502);
+    const body = bodyAsRecord(response);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("delivery_failed");
+  });
 });

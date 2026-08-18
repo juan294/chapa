@@ -248,6 +248,36 @@ export async function rateLimitStrict(
 }
 
 /**
+ * Refund one unit of quota previously consumed by `rateLimitStrict()` (or
+ * `rateLimit()`) — for use when the request that consumed it failed
+ * downstream and shouldn't cost the caller one of a scarce number of
+ * attempts. Decrements the same fixed-window counter via `INCRBY -1`,
+ * leaving its TTL untouched.
+ *
+ * Deliberately **not** built on `cacheIncr()`: that helper is fail-open
+ * (owned by the campaign-send-quota feature) and would silently drop a
+ * refund on a Redis error. This is fail-closed like `rateLimitStrict()` —
+ * it reports whether the refund actually landed so callers on fail-closed
+ * routes can surface a dropped refund (e.g. via `captureServerError`)
+ * instead of silently over-charging the user's quota.
+ *
+ * @param key - The same rate-limit key passed to `rateLimitStrict()`/`rateLimit()`
+ * @returns Whether the refund was applied
+ */
+export async function refundRateLimit(key: string): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+
+  try {
+    await redis.incrby(key, -1);
+    return true;
+  } catch (error) {
+    console.error("[cache] refundRateLimit failed:", (error as Error).message);
+    return false;
+  }
+}
+
+/**
  * Atomically reserve quota in Redis using a single pipeline for
  * read + increment + TTL refresh.
  *

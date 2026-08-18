@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { requireSession } from "@/lib/auth/require-session";
-import { rateLimitStrict } from "@/lib/cache/redis";
+import { rateLimitStrict, refundRateLimit } from "@/lib/cache/redis";
 import {
   isChallengeBody,
   MAX_CHALLENGE_BYTES,
@@ -78,7 +78,8 @@ export const POST = withErrorCapture("/api/challenge", async (request: NextReque
   }
 
   const lowerHandle = handle.toLowerCase();
-  const handleRl = await rateLimitStrict(`ratelimit:challenge:${lowerHandle}`, 3, 86400);
+  const handleRlKey = `ratelimit:challenge:${lowerHandle}`;
+  const handleRl = await rateLimitStrict(handleRlKey, 3, 86400);
   if (!handleRl.allowed) {
     return NextResponse.json(
       { error: "Too many challenges submitted. Please try again tomorrow." },
@@ -91,9 +92,20 @@ export const POST = withErrorCapture("/api/challenge", async (request: NextReque
     console.error(`[challenge] email send failed for handle=${handle}`);
     void captureServerError({
       route: "/api/challenge",
-      statusCode: 200,
+      statusCode: 502,
       error: new Error(`Challenge dispute email send failed for handle=${handle}`),
     });
+    // A failed send must not cost the user one of their limited daily
+    // attempts — refund the quota consumed by the check above.
+    const refunded = await refundRateLimit(handleRlKey);
+    if (!refunded) {
+      void captureServerError({
+        route: "/api/challenge",
+        statusCode: 502,
+        error: new Error(`Challenge quota refund failed for handle=${handle}`),
+      });
+    }
+    return NextResponse.json({ success: false, error: "delivery_failed" }, { status: 502 });
   }
 
   return NextResponse.json({ success: true });
