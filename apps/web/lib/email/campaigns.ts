@@ -22,6 +22,7 @@ import {
   dbReleaseCampaignClaim,
   dbCreateCampaignSends,
   dbClaimPendingSends,
+  dbReleaseCampaignSendLease,
   dbAcknowledgeCampaignSends,
   dbMarkSendsFailed,
   dbGetCampaignStats,
@@ -213,6 +214,29 @@ export async function processCampaignBatch(
     return { sent: 0, failed: 0, remaining: 0 };
   }
 
+  // A recovered expired-lease group is returned whole by dbClaimPendingSends,
+  // ignoring batchLimit, so a provider retry replays byte-identical
+  // membership. If that whole group can't fit in today's remaining quota,
+  // release it back to `pending` (its group_token preserves identity for a
+  // later recovery) instead of leaving it re-leased under a fresh window —
+  // otherwise it stalls until the UTC-day counter resets, burning cron
+  // invocations and deferring every other active campaign in the same run
+  // (#1085). Resend has not been called yet at this point, so releasing is
+  // always safe regardless of whether this was a grouped recovery.
+  if (claimed.length > available) {
+    const released = await dbReleaseCampaignSendLease(
+      leaseToken,
+      claimed.length,
+    );
+    if (!released) {
+      throw new Error(
+        "Failed to release oversized recovered campaign lease group",
+      );
+    }
+    const stats = await dbGetCampaignStats(campaignId);
+    return { sent: 0, failed: 0, remaining: getRemainingSends(stats) };
+  }
+
   const resend = getResend();
   if (!resend) {
     const acknowledged = await dbMarkSendsFailed(
@@ -252,8 +276,12 @@ export async function processCampaignBatch(
     86400,
   );
   if (!reservation.allowed) {
-    // Leave the claimed rows in processing until the lease expires to prevent
-    // another worker from re-sending the same recipients inside this quota window.
+    // claimed.length <= available was already confirmed above, so this is a
+    // genuine concurrent race against the shared daily counter (not the
+    // oversized-recovered-group case, which is intercepted before this
+    // point). Leave the claimed rows in processing until the lease expires
+    // to prevent another worker from re-sending the same recipients inside
+    // this quota window.
     return { sent: 0, failed: 0, remaining: -1 };
   }
 

@@ -26,6 +26,7 @@ vi.mock("@/lib/db/campaigns", () => ({
   dbReleaseCampaignClaim: vi.fn(),
   dbCreateCampaignSends: vi.fn(),
   dbClaimPendingSends: vi.fn(),
+  dbReleaseCampaignSendLease: vi.fn(),
   dbAcknowledgeCampaignSends: vi.fn(),
   dbMarkSendsFailed: vi.fn(),
   dbGetCampaignStats: vi.fn(),
@@ -47,6 +48,7 @@ import {
   dbReleaseCampaignClaim,
   dbCreateCampaignSends,
   dbClaimPendingSends,
+  dbReleaseCampaignSendLease,
   dbAcknowledgeCampaignSends,
   dbMarkSendsFailed,
   dbGetCampaignStats,
@@ -206,6 +208,64 @@ describe("processCampaignBatch", () => {
     const result = await processCampaignBatch("campaign-1");
 
     expect(result.remaining).toBe(-1);
+    expect(mockBatchSend).not.toHaveBeenCalled();
+  });
+
+  it("releases an oversized recovered lease group back to pending instead of re-leasing it (#1085)", async () => {
+    // 70 already sent today -> only 25 remaining, but the recovered expired
+    // lease group is returned WHOLE (ignoring batchLimit) with 40 rows.
+    vi.mocked(cacheGet).mockResolvedValue(70);
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    const oversizedGroup = Array.from({ length: 40 }, (_, index) => ({
+      id: `s-${index}`,
+      campaignId: "campaign-1",
+      handle: `user${index}`,
+      email: `user${index}@example.com`,
+      status: "processing" as const,
+      sentAt: null,
+      error: null,
+    }));
+    vi.mocked(dbClaimPendingSends).mockResolvedValue(oversizedGroup);
+    vi.mocked(dbReleaseCampaignSendLease).mockResolvedValue(true);
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({
+      sent: 70,
+      pending: 40,
+      processing: 0,
+      failed: 0,
+    });
+
+    const result = await processCampaignBatch("campaign-1");
+
+    expect(result).toEqual({ sent: 0, failed: 0, remaining: 40 });
+    expect(dbReleaseCampaignSendLease).toHaveBeenCalledWith(
+      expect.any(String),
+      40,
+    );
+    // Resend must never be called for a group that doesn't fit quota.
+    expect(mockBatchSend).not.toHaveBeenCalled();
+    expect(cacheReserveQuota).not.toHaveBeenCalled();
+    // The campaign isn't finalized — it still has pending work.
+    expect(dbUpdateCampaign).not.toHaveBeenCalled();
+  });
+
+  it("throws when releasing an oversized recovered lease group fails", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(70);
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    const oversizedGroup = Array.from({ length: 40 }, (_, index) => ({
+      id: `s-${index}`,
+      campaignId: "campaign-1",
+      handle: `user${index}`,
+      email: `user${index}@example.com`,
+      status: "processing" as const,
+      sentAt: null,
+      error: null,
+    }));
+    vi.mocked(dbClaimPendingSends).mockResolvedValue(oversizedGroup);
+    vi.mocked(dbReleaseCampaignSendLease).mockResolvedValue(false);
+
+    await expect(processCampaignBatch("campaign-1")).rejects.toThrow(
+      "Failed to release oversized recovered campaign lease group",
+    );
     expect(mockBatchSend).not.toHaveBeenCalled();
   });
 

@@ -38,6 +38,7 @@ export {
   dbCreateCampaignSends,
   dbGetPendingSends,
   dbClaimPendingSends,
+  dbReleaseCampaignSendLease,
   dbAcknowledgeCampaignSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
