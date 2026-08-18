@@ -12,6 +12,7 @@ import {
   materializeProfile,
   type MaterializedProfile,
 } from "./materialize-profile";
+import { guardStatsComplete } from "./persist-guard";
 import { reconcileSnapshotWrite } from "./snapshot-write";
 
 export interface PublicVerificationCode {
@@ -122,18 +123,7 @@ export async function persistProfileSnapshot(
 ): Promise<boolean> {
   if (options.readOnly) return false;
 
-  // #1003 — Never build a permanent snapshot row from stats that look
-  // incomplete (e.g. served from an old poisoned `stats:stale` entry).
-  if (!materialized.statsComplete) {
-    fireAndForget(
-      () =>
-        captureServerEvent("snapshot_skipped_incomplete_stats", {
-          handle,
-          prsMergedCount: materialized.stats.prsMergedCount,
-          commitsTotal: materialized.stats.commitsTotal,
-        }),
-      () => undefined,
-    );
+  if (!guardStatsComplete(handle, materialized)) {
     return false;
   }
 

@@ -160,7 +160,16 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             revalidatePath(`/u/${handle}`);
             recalculated++;
           } else {
-            errors.push({ handle, error: "Snapshot replace failed" });
+            // #1076 — persistOrchestratedSnapshot's #1003 gate intentionally
+            // skips persistence when the fetched stats look incomplete/
+            // poisoned. Distinguish that from a genuine write failure so an
+            // operator scanning this batch's errors can tell them apart.
+            errors.push({
+              handle,
+              error: materialized.statsComplete
+                ? "Snapshot replace failed"
+                : "Snapshot skipped: stats incomplete",
+            });
           }
         } catch (err) {
           errors.push({

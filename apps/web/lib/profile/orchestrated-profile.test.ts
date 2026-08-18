@@ -13,6 +13,8 @@ const mockMaterializeProfile = vi.fn();
 const mockDbInsertSnapshot = vi.fn();
 const mockDbReplaceSnapshot = vi.fn();
 const mockUpdateSnapshotCache = vi.fn();
+const mockCaptureServerEvent =
+  vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
 
 vi.mock("./materialize-profile", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./materialize-profile")>();
@@ -29,6 +31,10 @@ vi.mock("@/lib/db/snapshots", () => ({
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
   updateSnapshotCache: (...args: unknown[]) => mockUpdateSnapshotCache(...args),
+}));
+
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
 }));
 
 function makeMaterializedProfile(): MaterializedProfile {
@@ -140,5 +146,52 @@ describe("persistOrchestratedSnapshot", () => {
     expect(sameDayPublicRead.snapshot.adjustedComposite).toBe(
       replaced.snapshot.adjustedComposite,
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1076 — the orchestrated writer (warm-cache, /api/refresh, /api/recalculate,
+  // /api/admin/bulk-recalculate) must refuse to persist incomplete/poisoned
+  // stats, mirroring the badge path's existing #1003 gate in
+  // lib/profile/public-profile.ts's persistProfileSnapshot.
+  // ---------------------------------------------------------------------------
+
+  it("#1076: returns false and writes nothing when stats are incomplete (corrupt shape)", async () => {
+    const materialized = { ...makeMaterializedProfile(), statsComplete: false };
+
+    const persisted = await persistOrchestratedSnapshot("testuser", materialized, {
+      mode: "insert",
+    });
+
+    expect(persisted).toBe(false);
+    expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
+    expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
+    expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
+  });
+
+  it("#1076: emits snapshot_skipped_incomplete_stats telemetry when stats are incomplete", async () => {
+    const materialized = { ...makeMaterializedProfile(), statsComplete: false };
+
+    await persistOrchestratedSnapshot("testuser", materialized, { mode: "replace" });
+
+    expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+      "snapshot_skipped_incomplete_stats",
+      expect.objectContaining({
+        handle: "testuser",
+        prsMergedCount: materialized.stats.prsMergedCount,
+        commitsTotal: materialized.stats.commitsTotal,
+      }),
+    );
+  });
+
+  it("#1076: still persists normally when stats are complete (no regression)", async () => {
+    const materialized = { ...makeMaterializedProfile(), statsComplete: true };
+
+    const persisted = await persistOrchestratedSnapshot("testuser", materialized, {
+      mode: "insert",
+    });
+
+    expect(persisted).toBe(true);
+    expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
+    expect(mockCaptureServerEvent).not.toHaveBeenCalled();
   });
 });
