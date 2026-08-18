@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useContext,
   useState,
   useCallback,
   useEffect,
@@ -83,8 +84,46 @@ export function canonicalLocaleHref({
  * When `dictionary` is omitted (e.g. unit tests that render with only
  * `initialLocale`), the provider falls back to the statically-bundled English
  * dictionary, keeping the test-facing API identical.
+ *
+ * #1071 — `/u/[handle]` and `/verify/[hash]` are dynamic routes that resolve
+ * their own per-request locale and each nest a SECOND `LanguageProvider`
+ * inside the root layout's static one (which is always pinned to
+ * `DEFAULT_LOCALE`) so they can serve a locale the static root can't know
+ * about. When that per-request locale happens to match the root's, the
+ * nested provider used to still receive and serialize its own full ~650-key
+ * dictionary into the RSC payload — a second copy of data the root ancestor
+ * already provided. This component now checks for a matching ancestor
+ * `LanguageContext` and, when found, renders as a transparent pass-through
+ * instead of standing up a second provider/dictionary: descendants resolve
+ * `useTranslation()` straight to the ancestor's context. Callers should
+ * still avoid passing `dictionary` in that case (see `SharePage` /
+ * `VerifyLocaleBoundary`) so the RSC payload never serializes it in the
+ * first place; this reuse is a defense-in-depth guarantee, not a
+ * replacement for that call-site behavior. Locale mismatches (e.g. an
+ * explicit `?lang=` on a non-default page) fall through to the normal path
+ * below, unchanged.
  */
 export function LanguageProvider({
+  children,
+  initialLocale,
+  dictionary,
+}: {
+  children: ReactNode;
+  initialLocale: Locale;
+  dictionary?: Translations;
+}) {
+  const ancestor = useContext(LanguageContext);
+  if (ancestor && ancestor.locale === initialLocale) {
+    return <>{children}</>;
+  }
+  return (
+    <LanguageProviderInner initialLocale={initialLocale} dictionary={dictionary}>
+      {children}
+    </LanguageProviderInner>
+  );
+}
+
+function LanguageProviderInner({
   children,
   initialLocale,
   dictionary,

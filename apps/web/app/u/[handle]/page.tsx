@@ -32,7 +32,7 @@ import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
-import { LanguageProvider, LocaleSync } from "@/lib/i18n";
+import { DEFAULT_LOCALE, LanguageProvider, LocaleSync } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -122,7 +122,13 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   return (
     <LanguageProvider
       initialLocale={locale}
-      dictionary={locale === "es" ? es : en}
+      // #1071 — the root layout's LanguageProvider already serializes the
+      // DEFAULT_LOCALE dictionary into the RSC payload. When this page's
+      // per-request locale matches it, omit the prop entirely so it isn't
+      // serialized a second time — LanguageProvider reuses that ancestor's
+      // context instead. Only a genuine mismatch (e.g. `?lang=` override)
+      // needs its own dictionary supplied here.
+      dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
     >
       {/* Establish query ownership in the hydrated shell. The streamed client
           subtree then starts with the same dictionary as its server markup. */}
