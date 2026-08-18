@@ -58,6 +58,13 @@ export function _resetInflight(): void {
  *
  * Concurrent calls for the same handle are deduplicated — only one GitHub API
  * call is made and all callers share the same promise.
+ *
+ * `readOnly: true` never writes to the cache AND (#1083) never issues a live
+ * GitHub fetch on a cold key either — it serves the protected last-known-good
+ * baseline (or null if none exists yet). Without this, a public, rate-limited-
+ * only-by-IP caller (`/api/profile/:handle`) would repeat the same live
+ * GitHub GraphQL call on every request past the 6h primary TTL, since a
+ * readOnly fetch could never populate the cache to stop the next one.
  */
 export async function getStats(
   handle: string,
@@ -66,12 +73,6 @@ export async function getStats(
 ): Promise<StatsData | null> {
   const lowerHandle = handle.toLowerCase();
   const cacheKey = `stats:v2:merged:${lowerHandle}`;
-  const mode = options.readOnly ? "readonly" : "write";
-  const publicInflightKey = `${lowerHandle}:public:${mode}`;
-  const authenticatedInflightKey = `${lowerHandle}:authenticated:${mode}`;
-  const isPrivateInclusive =
-    (token && OAUTH_GRANTS_PRIVATE_REPO_ACCESS) || (!token && Boolean(getGithubToken()));
-  const inflightKey = isPrivateInclusive ? authenticatedInflightKey : publicInflightKey;
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
@@ -82,6 +83,16 @@ export async function getStats(
       options.readOnly ? undefined : cacheKey,
     );
   }
+
+  if (options.readOnly) {
+    return _composeFromBaselineOnly(handle, lowerHandle);
+  }
+
+  const publicInflightKey = `${lowerHandle}:public`;
+  const authenticatedInflightKey = `${lowerHandle}:authenticated`;
+  const isPrivateInclusive =
+    (token && OAUTH_GRANTS_PRIVATE_REPO_ACCESS) || (!token && Boolean(getGithubToken()));
+  const inflightKey = isPrivateInclusive ? authenticatedInflightKey : publicInflightKey;
 
   // Lower-visibility callers can share a private-inclusive fetch. A
   // private-inclusive caller must not reuse a scope-blind fetch.
@@ -95,9 +106,7 @@ export async function getStats(
   // even if the underlying fetch hangs indefinitely (e.g. GitHub never responds).
   // A timed-out promise resolves to null via the catch below, which causes the
   // caller to fall back to stale cache exactly as a failed API call would.
-  const rawPromise = _fetchAndCache(handle, lowerHandle, cacheKey, token, {
-    readOnly: options.readOnly,
-  });
+  const rawPromise = _fetchAndCache(handle, lowerHandle, cacheKey, token);
   const promise = withTimeout(rawPromise, INFLIGHT_TIMEOUT_MS, `getStats(${handle})`).catch(
     (err) => {
       console.error(`[github] inflight fetch timed out for ${handle}:`, err);
@@ -112,6 +121,26 @@ export async function getStats(
   });
 
   return promise;
+}
+
+/**
+ * #1083 — Serve a read-only caller's cold-key request from the protected
+ * baseline only, with no live GitHub call. `_loadOverlays(..., true)` is the
+ * same readOnly-safe overlay path already used by the write path's readOnly
+ * short-circuit before this fix: Redis/DB reads only, no linked-platform
+ * network calls. Returns null when no baseline exists yet (a handle that has
+ * never been fetched by a write-mode caller — badge route, warm-cache cron,
+ * refresh) — callers of a readOnly fetch already tolerate a null result.
+ */
+async function _composeFromBaselineOnly(
+  handle: string,
+  lowerHandle: string,
+): Promise<StatsData | null> {
+  const baselineKey = `stats:stale:v2:${lowerHandle}`;
+  const baseline = await cacheGet<StatsData>(baselineKey);
+  if (!baseline) return null;
+  const overlays = await _loadOverlays(handle, lowerHandle, true);
+  return _compose(baseline, overlays);
 }
 
 /**
@@ -372,13 +401,18 @@ function _compose(githubDerived: StatsData, overlays: StatsOverlays): StatsData 
   return stats;
 }
 
-/** Internal: fetch from GitHub, guard, compose overlays, cache. */
+/**
+ * Internal: fetch from GitHub, guard, compose overlays, cache.
+ *
+ * Write-mode only (#1083) — `getStats` short-circuits `readOnly` callers to
+ * `_composeFromBaselineOnly` before ever reaching this function, so every
+ * write here is safe to perform unconditionally.
+ */
 async function _fetchAndCache(
   handle: string,
   lowerHandle: string,
   cacheKey: string,
   token?: string,
-  options: { readOnly?: boolean } = {},
 ): Promise<StatsData | null> {
   // #1060 — the protected baseline holds GitHub-derived data ONLY, so that the
   // guards below compare like against like. Versioned to `v2` because pre-#1060
@@ -401,7 +435,7 @@ async function _fetchAndCache(
   // how quickly or slowly it resolves relative to the GitHub fetch.
   const [primary, overlays] = await Promise.all([
     fetchStats(handle, token),
-    _loadOverlays(handle, lowerHandle, options.readOnly),
+    _loadOverlays(handle, lowerHandle, false),
   ]);
 
   if (!primary) {
@@ -411,11 +445,9 @@ async function _fetchAndCache(
     if (!baseline) return null;
     console.warn(`[cache] serving stale data for ${lowerHandle} (API unavailable)`);
     const composed = _compose(baseline, overlays);
-    if (!options.readOnly) {
-      // Refresh only the primary key (6h TTL) so a sustained upstream problem
-      // doesn't cause a refetch on every subsequent request.
-      await cacheSet(cacheKey, composed, CACHE_TTL);
-    }
+    // Refresh only the primary key (6h TTL) so a sustained upstream problem
+    // doesn't cause a refetch on every subsequent request.
+    await cacheSet(cacheKey, composed, CACHE_TTL);
     return composed;
   }
 
@@ -464,9 +496,7 @@ async function _fetchAndCache(
   // re-read alone cannot carry the rule (it is null by construction on every
   // non-racing call), so the durable baseline is consulted too — whichever is
   // better-scoped wins.
-  const existingComposed = options.readOnly
-    ? null
-    : await cacheGet<StatsData>(cacheKey);
+  const existingComposed = await cacheGet<StatsData>(cacheKey);
   const bestKnownScopeRank = Math.max(
     scopeRank(existingComposed?.fetchScope),
     scopeRank(baseline?.fetchScope),
@@ -481,10 +511,6 @@ async function _fetchAndCache(
   const accepted = !rejected;
   const base = accepted ? primary : (baseline ?? primary);
   const composed = _compose(base, overlays);
-
-  if (options.readOnly) {
-    return composed;
-  }
 
   // A rejected fetch with no baseline to fall back on has nothing better to
   // offer the shared cache, so it writes nothing rather than persisting a
