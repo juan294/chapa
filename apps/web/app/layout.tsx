@@ -167,7 +167,12 @@ export default async function RootLayout({
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:rounded-lg focus:bg-amber focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg focus:shadow-amber/25"
         >
-          {resolveTranslation("common.skipToMainContent", dictionary) as string}
+          <span lang="es" data-document-locale="es">
+            {resolveTranslation("common.skipToMainContent", es) as string}
+          </span>
+          <span lang="en" data-document-locale="en">
+            {resolveTranslation("common.skipToMainContent", en) as string}
+          </span>
         </a>
         <ThemeProvider>
           <LanguageProvider initialLocale={locale} dictionary={dictionary}>

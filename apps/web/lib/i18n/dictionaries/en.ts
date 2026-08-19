@@ -33,6 +33,7 @@ export const en: Translations = {
     unlinkCodeberg: 'Unlink Codeberg account',
     unlinkGitlab: 'Unlink GitLab account',
     languageSwitcher: 'Language switcher',
+    madeBy: 'Made by',
     badgeTooltips: 'Badge element tooltips',
     avatarOf: '{login}',
     avatarAlt: "{handle}'s avatar",

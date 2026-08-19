@@ -24,11 +24,12 @@ function stubLocation({
   hash?: string;
 }) {
   const assign = vi.fn();
+  const reload = vi.fn();
   Object.defineProperty(window, 'location', {
     configurable: true,
-    value: { ...originalLocation, pathname, search, hash, assign },
+    value: { ...originalLocation, pathname, search, hash, assign, reload },
   });
-  return assign;
+  return { assign, reload };
 }
 
 function TestConsumer() {
@@ -111,8 +112,8 @@ describe('LanguageProvider', () => {
     );
   });
 
-  it('persists the locale and reloads the canonical route when the locale changes', async () => {
-    const assign = stubLocation({ pathname: '/' });
+  it('persists the locale and explicitly reloads when the canonical route is unchanged', async () => {
+    const { assign, reload } = stubLocation({ pathname: '/' });
 
     render(
       <LanguageProvider initialLocale="en">
@@ -125,7 +126,29 @@ describe('LanguageProvider', () => {
     });
 
     expect(setLocaleAction).toHaveBeenCalledWith('es');
-    expect(assign).toHaveBeenCalledWith('/');
+    expect(reload).toHaveBeenCalledOnce();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('explicitly reloads when an unchanged skip-link fragment would make navigation a no-op', async () => {
+    const { assign, reload } = stubLocation({
+      pathname: '/',
+      hash: '#main-content',
+    });
+
+    render(
+      <LanguageProvider initialLocale="en">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('switch-es').click();
+    });
+
+    expect(setLocaleAction).toHaveBeenCalledWith('es');
+    expect(reload).toHaveBeenCalledOnce();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('applies an explicit locale before a slow cookie persistence call finishes', async () => {
@@ -153,7 +176,7 @@ describe('LanguageProvider', () => {
   });
 
   it('still navigates to the requested query locale when cookie persistence fails', async () => {
-    const assign = stubLocation({
+    const { assign } = stubLocation({
       pathname: '/u/juan294',
       search: '?lang=en',
     });
@@ -178,7 +201,7 @@ describe('LanguageProvider', () => {
   });
 
   it('adds a locale query fallback when canonical cookie persistence fails', async () => {
-    const assign = stubLocation({ pathname: '/' });
+    const { assign } = stubLocation({ pathname: '/' });
     vi.mocked(setLocaleAction).mockRejectedValueOnce(
       new Error('cookie persistence unavailable')
     );
@@ -200,7 +223,7 @@ describe('LanguageProvider', () => {
   });
 
   it('reloads through the canonical public path after switching from an internal locale route', async () => {
-    const assign = stubLocation({
+    const { assign } = stubLocation({
       pathname: '/es',
       search: '?source=release&lang=es',
       hash: '#features',

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 // ----------------------------------------------------------------
 // CONFIGURATION
@@ -77,6 +78,7 @@ interface AuthorTypewriterProps {
 }
 
 export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
+  const { t } = useTranslation();
   const textRef = useRef<HTMLSpanElement>(null);
   const prefersReducedMotion = useRef(false);
   // The popover otherwise only opens via CSS hover/focus-within, which left
@@ -213,7 +215,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
       <button
         type="button"
         className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-lg bg-amber/10 hover:bg-amber/15 backdrop-blur-sm transition-all duration-150 border border-stroke"
-        aria-label={`Made by ${AUTHOR_NAME}`}
+        aria-label={`${t("aria.madeBy") as string} ${AUTHOR_NAME}`}
         aria-expanded={open}
         onClick={toggleOpen}
         onKeyDown={(e) => {

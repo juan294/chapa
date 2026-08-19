@@ -257,9 +257,20 @@ function LanguageProviderInner({
       // URL, while directly visited `/en` or `/es` routes never pass through
       // the locale-selecting proxy. Re-entering through the canonical path
       // makes the persisted cookie authoritative for the whole page.
-      window.location.assign(
-        canonicalLocaleHref(window.location, next, persistenceFailed),
+      const target = canonicalLocaleHref(
+        window.location,
+        next,
+        persistenceFailed,
       );
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (target === current) {
+        // A same-URL navigation with an unchanged fragment is a same-document
+        // no-op in browsers. Reload explicitly so the proxy can apply the new
+        // locale cookie to server-rendered content.
+        window.location.reload();
+        return;
+      }
+      window.location.assign(target);
     },
     [locale, applyLocale]
   );
