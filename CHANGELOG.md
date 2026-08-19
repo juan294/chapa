@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   labels also follow the active locale, and switching languages after using
   the skip link now forces the intended server-rendered locale reload. Landing
   and verification titles plus the pre-hydration document language now match
-  the selected route. Long verification hashes also wrap on mobile.
+  the selected route. Long verification hashes also wrap on mobile, and badge
+  explanation tooltips clamp to the viewport instead of clipping off-screen.
 - **A slow badge materialize no longer blocks the request when a stale SVG is
   available.** The badge route now races materialization against a 2200ms
   deadline; on timeout it serves yesterday's cached SVG with a short-TTL
@@ -83,6 +84,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and renders/writes the badge SVG cache during the cron itself (not just
   avatar pre-warming), so the first visitor after UTC rollover gets a cache
   hit instead of paying full materialize+render cost.
+- E2E matrix jobs now use the same 30-minute bounded Playwright dependency
+  setup allowance as contract and deployment-smoke jobs, avoiding false
+  cancellation on slow hosted-runner package checks.
 
 ## [2.21.0] - 2026-08-11
 

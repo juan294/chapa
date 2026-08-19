@@ -527,7 +527,9 @@ jobs:
     name: E2E Shard (${{ matrix.shard }})
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Cached Playwright browsers still require a hosted-runner apt dependency
+    # check. Give it the same bounded setup allowance as contract and smoke.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -11,7 +11,11 @@ const SOURCE = fs.readFileSync(
 
 import { InfoTooltip } from "./InfoTooltip";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("InfoTooltip", () => {
   describe("client component", () => {
@@ -283,6 +287,63 @@ describe("InfoTooltip", () => {
       expect(tooltip.style.top).toBe("224px");
       expect(tooltip.style.left).toBe("108px");
       expect(tooltip.style.transform).toContain("translate(-50%, 0)");
+    });
+
+    it("keeps a wide tooltip inside a narrow viewport", async () => {
+      vi.stubGlobal("innerWidth", 375);
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+        function (this: HTMLElement) {
+          if (this.getAttribute("role") === "tooltip") {
+            return {
+              left: -42.5,
+              top: 100,
+              right: 197.5,
+              bottom: 180,
+              width: 240,
+              height: 80,
+              x: -42.5,
+              y: 100,
+              toJSON: () => {},
+            };
+          }
+          if (this.tagName === "BUTTON") {
+            return {
+              left: 69.5,
+              top: 200,
+              right: 85.5,
+              bottom: 216,
+              width: 16,
+              height: 16,
+              x: 69.5,
+              y: 200,
+              toJSON: () => {},
+            };
+          }
+          return {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 0,
+            height: 0,
+            x: 0,
+            y: 0,
+            toJSON: () => {},
+          };
+        },
+      );
+
+      render(<InfoTooltip content="A full-width explanation" id="tt-clamped" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.getBoundingClientRect().width).toBe(240);
+      await waitFor(() => expect(tooltip.style.left).toBe("128px"));
+      expect(tooltip.style.maxWidth).toBe(
+        "min(240px, calc(100vw - 16px))",
+      );
     });
   });
 
