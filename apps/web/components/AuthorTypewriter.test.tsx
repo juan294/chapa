@@ -593,6 +593,88 @@ describe("AuthorTypewriter", () => {
     });
   });
 
+  describe("keyboard-actionable trigger button (#1117)", () => {
+    // Prior to the fix, the pill rendered as a <button> (announced as
+    // actionable by assistive tech) but had no onClick/keydown handler —
+    // pressing Enter or Space did nothing. The popover only opened via
+    // mouse hover or focus-within on an ancestor. This makes the button
+    // genuinely actionable: Enter/Space (and click) toggle a sticky-open
+    // state, in addition to the existing hover/focus-within behavior.
+
+    const getPopover = (container: HTMLElement) =>
+      container.querySelector(".absolute.bottom-full") as HTMLElement;
+
+    it("popover is not force-opened before any interaction", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const popover = getPopover(container);
+      expect(popover).not.toBeNull();
+      expect(popover.classList.contains("opacity-100")).toBe(false);
+    });
+
+    it("pressing Enter on the trigger button opens the popover", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: "Enter" });
+
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+      expect(popover.classList.contains("pointer-events-auto")).toBe(true);
+    });
+
+    it("pressing Space on the trigger button opens the popover", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: " " });
+
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+    });
+
+    it("pressing Enter again closes the popover (toggle)", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: "Enter" });
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+
+      fireEvent.keyDown(button, { key: "Enter" });
+      expect(popover.classList.contains("opacity-100")).toBe(false);
+    });
+
+    it("clicking the trigger button also toggles the popover open", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.click(button);
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+
+      fireEvent.click(button);
+      expect(popover.classList.contains("opacity-100")).toBe(false);
+    });
+
+    it("reflects open state via aria-expanded on the trigger button", () => {
+      render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+
+      expect(button.getAttribute("aria-expanded")).toBe("false");
+      fireEvent.keyDown(button, { key: "Enter" });
+      expect(button.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("does not toggle the popover on unrelated keys", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: "a" });
+      expect(popover.classList.contains("opacity-100")).toBe(false);
+    });
+  });
+
   describe("design system (UX-L2, #780)", () => {
     it("trigger pill button (has text content) uses rounded-lg, not rounded-full", () => {
       // The design system reserves rounded-full for icon-only/avatar buttons;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ----------------------------------------------------------------
 // CONFIGURATION
@@ -79,6 +79,13 @@ interface AuthorTypewriterProps {
 export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
   const textRef = useRef<HTMLSpanElement>(null);
   const prefersReducedMotion = useRef(false);
+  // The popover otherwise only opens via CSS hover/focus-within, which left
+  // the trigger <button> announced as actionable by assistive tech while
+  // Enter/Space did nothing (#1117). This sticky-open state makes the
+  // button genuinely actionable — click or Enter/Space toggles the
+  // popover open, in addition to the existing hover/focus-within reveal.
+  const [open, setOpen] = useState(false);
+  const toggleOpen = () => setOpen((prev) => !prev);
 
   useEffect(() => {
     prefersReducedMotion.current = window.matchMedia(
@@ -165,7 +172,13 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
     >
       {/* Popover card — appears above the pill on hover */}
       {SOCIAL_LINKS.length > 0 && (
-        <div className="absolute bottom-full right-0 pb-2 opacity-0 translate-y-2 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]">
+        <div
+          className={`absolute bottom-full right-0 pb-2 ${
+            open
+              ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+              : "opacity-0 translate-y-2 scale-95 pointer-events-none"
+          } group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]`}
+        >
           <div className="p-3 rounded-xl bg-card/90 backdrop-blur-xl border border-stroke">
             <p className="text-[11px] text-text-secondary font-medium whitespace-nowrap mb-2 select-none">
               {AUTHOR_NAME}
@@ -199,8 +212,16 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
       {/* Trigger pill — terminal typewriter */}
       <button
         type="button"
-        className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-lg bg-amber/10 hover:bg-amber/15 backdrop-blur-sm cursor-default transition-all duration-150 border border-stroke"
+        className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-lg bg-amber/10 hover:bg-amber/15 backdrop-blur-sm transition-all duration-150 border border-stroke"
         aria-label={`Made by ${AUTHOR_NAME}`}
+        aria-expanded={open}
+        onClick={toggleOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleOpen();
+          }
+        }}
       >
         <span className="text-[10px] font-heading text-text-secondary group-hover:text-text-primary transition-colors duration-300 select-none whitespace-nowrap">
           <span ref={textRef}>{HOME_TEXT}</span>
