@@ -19,8 +19,16 @@ export const revalidate = 3600;
 // #1065 (FE-H1) — the root layout no longer sets a blanket canonical, so
 // every page (including this one) must declare its own. `/` is the one
 // place a root-relative canonical is actually correct.
-export function generateMetadata(): Metadata {
+type HomeProps = {
+  params: Promise<{ locale: Locale }>;
+};
+
+export async function generateMetadata({ params }: HomeProps): Promise<Metadata> {
+  const { locale } = await params;
+  const t = getServerT(locale);
   return {
+    title: { absolute: t("meta.defaultTitle") as string },
+    description: t("meta.defaultDescription") as string,
     alternates: {
       canonical: "/",
     },
@@ -32,24 +40,32 @@ const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   demoMode: true,
 });
 
-export default async function Home({
-  params,
-}: {
-  params: Promise<{ locale: Locale }>;
-}) {
+export default async function Home({ params }: HomeProps) {
   const { locale } = await params;
   const t = getServerT(locale);
   return (
-    <LanguageProvider
-      initialLocale={locale}
-      // The static root provider is always Spanish. A request selected from an
-      // English Accept-Language header therefore needs a matching client
-      // provider for the navbar, controls, and document language. Spanish can
-      // reuse the root dictionary without serializing a second copy.
-      dictionary={locale === DEFAULT_LOCALE ? undefined : en}
-    >
-      <LangSync />
-      <LandingContent demoBadgeSvg={demoBadgeSvg} t={t} />
-    </LanguageProvider>
+    <>
+      {/* The root layout stays static for ISR and therefore emits the default
+          language. Run this parser-blocking, enum-only assignment before the
+          landing content so fresh English responses expose the correct
+          document language and root-level localized controls before hydration. */}
+      <script
+        data-chapa-document-locale={locale}
+        dangerouslySetInnerHTML={{
+          __html: `document.documentElement.lang=${JSON.stringify(locale)};`,
+        }}
+      />
+      <LanguageProvider
+        initialLocale={locale}
+        // The static root provider is always Spanish. A request selected from an
+        // English Accept-Language header therefore needs a matching client
+        // provider for the navbar, controls, and document language. Spanish can
+        // reuse the root dictionary without serializing a second copy.
+        dictionary={locale === DEFAULT_LOCALE ? undefined : en}
+      >
+        <LangSync />
+        <LandingContent demoBadgeSvg={demoBadgeSvg} t={t} />
+      </LanguageProvider>
+    </>
   );
 }

@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   route now gives its client controls the same locale as its server-rendered
   body and synchronizes the document language. Root-level skip-link and author
   labels also follow the active locale, and switching languages after using
-  the skip link now forces the intended server-rendered locale reload.
+  the skip link now forces the intended server-rendered locale reload. Landing
+  titles and the pre-hydration document language now match the selected route.
 - **A slow badge materialize no longer blocks the request when a stale SVG is
   available.** The badge route now races materialization against a 2200ms
   deadline; on timeout it serves yesterday's cached SVG with a short-TTL

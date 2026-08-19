@@ -85,6 +85,21 @@ async function renderHome(locale: "en" | "es" = "en") {
   );
 }
 
+describe("Home page metadata", () => {
+  it.each([
+    ["en", "Chapa — Developer Impact, Decoded", "Your developer impact"],
+    ["es", "Chapa — Impacto de desarrollador, decodificado", "Tu impacto como desarrollador"],
+  ] as const)("renders %s metadata from the selected route", async (locale, title, descriptionStart) => {
+    const { generateMetadata } = await import("./page");
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ locale }),
+    });
+
+    expect(metadata.title).toEqual({ absolute: title });
+    expect(metadata.description).toContain(descriptionStart);
+  });
+});
+
 describe("Home page render (en)", () => {
   it("renders the page with heading", async () => {
     await renderHome();
@@ -98,6 +113,14 @@ describe("Home page render (en)", () => {
     expect(navbar.dataset.locale).toBe("en");
     expect(navbar.textContent).toBe("Features");
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
+  });
+
+  it("emits an early document-language assignment for the selected route", async () => {
+    const { container } = await renderHome();
+    const script = container.querySelector(
+      'script[data-chapa-document-locale="en"]',
+    );
+    expect(script?.textContent).toBe('document.documentElement.lang="en";');
   });
 
   it("renders feature cards", async () => {
