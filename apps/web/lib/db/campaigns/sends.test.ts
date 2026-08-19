@@ -1,45 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// ---------------------------------------------------------------------------
-// Mock Supabase client — chain used by dbGetCampaignStats:
-//   from("campaign_sends").select("status").eq(...).order("id").range(from, to)
-// ---------------------------------------------------------------------------
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
-const mockOrder = vi.fn();
-const mockRange = vi.fn();
 
-let rangeResolve: { data: unknown; error: unknown };
-// Optional per-call resolver for simulating multiple distinct .range() pages.
-let rangeResolver:
-  | ((from: number, to: number) => { data: unknown; error: unknown })
-  | null;
+type CountResult = { count: number | null; error: unknown };
+let countResults: Record<string, CountResult>;
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const mockFrom = vi.fn((_table: string): any => ({
-  select: (...args: unknown[]) => {
-    mockSelect(...args);
-    return {
-      eq: (...eqArgs: unknown[]) => {
-        mockEq(...eqArgs);
-        return {
-          order: (...orderArgs: unknown[]) => {
-            mockOrder(...orderArgs);
-            return {
-              range: (...rangeArgs: unknown[]) => {
-                mockRange(...rangeArgs);
-                if (rangeResolver) {
-                  const [from, to] = rangeArgs as [number, number];
-                  return Promise.resolve(rangeResolver(from, to));
-                }
-                return Promise.resolve(rangeResolve);
-              },
-            };
-          },
-        };
+  select: (...selectArgs: unknown[]) => {
+    mockSelect(...selectArgs);
+    const query: any = {
+      eq: (field: string, value: string) => {
+        mockEq(field, value);
+        if (field === "status") {
+          return Promise.resolve(countResults[value]);
+        }
+        return query;
       },
     };
+    return query;
   },
 }));
 
@@ -52,8 +32,12 @@ import { CampaignStatsReadError, dbGetCampaignStats } from "./sends";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  rangeResolve = { data: [], error: null };
-  rangeResolver = null;
+  countResults = {
+    sent: { count: 0, error: null },
+    pending: { count: 0, error: null },
+    processing: { count: 0, error: null },
+    failed: { count: 0, error: null },
+  };
 });
 
 describe("dbGetCampaignStats", () => {
@@ -69,30 +53,50 @@ describe("dbGetCampaignStats", () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
-  it("aggregates status counts for a small campaign in a single page", async () => {
-    rangeResolve = {
-      data: [
-        { status: "sent" },
-        { status: "sent" },
-        { status: "pending" },
-        { status: "processing" },
-        { status: "failed" },
-      ],
-      error: null,
+  it("uses four exact HEAD counts without transferring send rows", async () => {
+    countResults = {
+      sent: { count: 2, error: null },
+      pending: { count: 1, error: null },
+      processing: { count: 3, error: null },
+      failed: { count: 4, error: null },
     };
 
-    const result = await dbGetCampaignStats("campaign-1");
+    await expect(dbGetCampaignStats("campaign-1")).resolves.toEqual({
+      sent: 2,
+      pending: 1,
+      processing: 3,
+      failed: 4,
+    });
 
-    expect(result).toEqual({ sent: 2, pending: 1, processing: 1, failed: 1 });
-    expect(mockFrom).toHaveBeenCalledWith("campaign_sends");
-    expect(mockSelect).toHaveBeenCalledWith("status");
+    expect(mockFrom).toHaveBeenCalledTimes(4);
+    expect(mockSelect).toHaveBeenCalledTimes(4);
+    expect(mockSelect).toHaveBeenCalledWith("*", {
+      count: "exact",
+      head: true,
+    });
+    expect(mockEq).toHaveBeenCalledTimes(8);
     expect(mockEq).toHaveBeenCalledWith("campaign_id", "campaign-1");
-    expect(mockOrder).toHaveBeenCalledWith("id");
-    expect(mockRange).toHaveBeenCalledWith(0, 999);
+    for (const status of ["sent", "pending", "processing", "failed"]) {
+      expect(mockEq).toHaveBeenCalledWith("status", status);
+    }
   });
 
-  it("propagates a typed failure on query error", async () => {
-    rangeResolve = { data: null, error: new Error("query failed") };
+  it("preserves exact counts above the PostgREST row cap", async () => {
+    countResults.sent = { count: 1250, error: null };
+
+    await expect(dbGetCampaignStats("campaign-1")).resolves.toEqual({
+      sent: 1250,
+      pending: 0,
+      processing: 0,
+      failed: 0,
+    });
+  });
+
+  it("propagates a typed failure when any count query fails", async () => {
+    countResults.processing = {
+      count: null,
+      error: new Error("query failed"),
+    };
 
     await expect(dbGetCampaignStats("campaign-1")).rejects.toEqual(
       expect.objectContaining({
@@ -103,41 +107,20 @@ describe("dbGetCampaignStats", () => {
     );
   });
 
-  it("ignores unrecognized status values instead of throwing", async () => {
-    rangeResolve = {
-      data: [{ status: "sent" }, { status: "some-unknown-status" }],
-      error: null,
-    };
+  it("treats a successful null count as zero", async () => {
+    countResults.failed = { count: null, error: null };
 
-    const result = await dbGetCampaignStats("campaign-1");
-
-    expect(result).toEqual({ sent: 1, pending: 0, processing: 0, failed: 0 });
+    await expect(dbGetCampaignStats("campaign-1")).resolves.toEqual({
+      sent: 0,
+      pending: 0,
+      processing: 0,
+      failed: 0,
+    });
   });
 
-  it("counts every send past the 1000-row max_rows cap instead of truncating (#1079)", async () => {
-    // 1000 "sent" rows (a full page) + 250 "failed" rows past the cap.
-    const page1 = Array.from({ length: 1000 }, () => ({ status: "sent" }));
-    const page2 = Array.from({ length: 250 }, () => ({ status: "failed" }));
-
-    rangeResolver = (from) =>
-      from === 0 ? { data: page1, error: null } : { data: page2, error: null };
-
-    const result = await dbGetCampaignStats("campaign-1");
-
-    expect(result).toEqual({ sent: 1000, pending: 0, processing: 0, failed: 250 });
-    expect(mockRange).toHaveBeenCalledWith(0, 999);
-    expect(mockRange).toHaveBeenCalledWith(1000, 1999);
-  });
-
-  it("a mid-pagination error fails loudly instead of returning a partial or zero count (#1079)", async () => {
-    const page1 = Array.from({ length: 1000 }, () => ({ status: "sent" }));
-    const err = new Error("connection reset");
-
-    rangeResolver = (from) =>
-      from === 0 ? { data: page1, error: null } : { data: null, error: err };
-
-    await expect(dbGetCampaignStats("campaign-1")).rejects.toBeInstanceOf(
-      CampaignStatsReadError,
-    );
+  it("keeps the exported error type stable", () => {
+    expect(
+      new CampaignStatsReadError("campaign-1", new Error("cause")),
+    ).toBeInstanceOf(CampaignStatsReadError);
   });
 });

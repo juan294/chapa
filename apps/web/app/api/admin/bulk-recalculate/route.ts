@@ -4,7 +4,7 @@ import { verifyAdminSecret } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
-import { dbGetUsers } from "@/lib/db/users";
+import { dbGetUserHandlePage } from "@/lib/db/users";
 import { isValidHandle } from "@/lib/validation";
 import {
   materializeOrchestratedProfile,
@@ -53,39 +53,35 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  // Optional cursor: ?after=<handle> to resume a partial run (BE-H7).
-  // Only handles that sort alphabetically after the cursor are processed,
-  // allowing re-invocation to pick up where a previous 504 left off.
+  // Optional cursor: ?after=<handle> continues an all-user page or resumes a
+  // time-limited run (BE-H7). The database applies this unique keyset cursor
+  // before returning at most MAX_INLINE_HANDLES + 1 handles.
   const afterCursor = request.nextUrl.searchParams.get("after") ?? undefined;
 
-  // Parse optional body for specific handles
+  // Parse optional body for specific handles.
+  const body = await request.json().catch(() => ({}));
   let handles: string[];
-  let explicitHandles = false;
-  try {
-    const body = await request.json().catch(() => ({}));
-    if (Array.isArray(body.handles) && body.handles.length > 0) {
-      explicitHandles = true;
-      handles = (body.handles as unknown[])
-        .filter((h): h is string => typeof h === "string")
-        .map((h) => h.trim())
-        .filter((h) => isValidHandle(h));
-    } else {
-      const users = await dbGetUsers();
-      handles = users.map((u) => u.handle);
+  const explicitHandles = Array.isArray(body.handles) && body.handles.length > 0;
+  let totalAvailable: number;
+
+  if (explicitHandles) {
+    handles = (body.handles as unknown[])
+      .filter((h): h is string => typeof h === "string")
+      .map((h) => h.trim())
+      .filter((h) => isValidHandle(h));
+    handles = [...new Set(handles)].sort((a, b) => a.localeCompare(b));
+    if (afterCursor) {
+      handles = handles.filter((h) => h.localeCompare(afterCursor) > 0);
     }
-  } catch {
-    const users = await dbGetUsers();
-    handles = users.map((u) => u.handle);
+    totalAvailable = handles.length;
+  } else {
+    const page = await dbGetUserHandlePage({
+      ...(afterCursor ? { after: afterCursor } : {}),
+      limit: MAX_INLINE_HANDLES + 1,
+    });
+    handles = page.handles;
+    totalAvailable = page.total;
   }
-
-  handles = [...new Set(handles)].sort((a, b) => a.localeCompare(b));
-
-  // Apply cursor filter: skip handles up to and including the cursor value.
-  if (afterCursor) {
-    handles = handles.filter((h) => h.localeCompare(afterCursor) > 0);
-  }
-
-  const totalAvailable = handles.length;
 
   if (handles.length === 0) {
     return NextResponse.json({
@@ -108,7 +104,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  const hasMore = !explicitHandles && handles.length > MAX_INLINE_HANDLES;
+  const hasMore = !explicitHandles && totalAvailable > MAX_INLINE_HANDLES;
   if (hasMore) handles = handles.slice(0, MAX_INLINE_HANDLES);
   const nextCursor = hasMore ? handles.at(-1) : undefined;
   const remaining = totalAvailable - handles.length;

@@ -1,10 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { getServiceClient } from "@/test/contract/invoke";
-import { dbGetUsers, dbGetUsersWithEmail } from "./users";
+import {
+  dbGetAllUserHandles,
+  dbGetUserHandlePage,
+  dbGetUsers,
+  dbGetUsersWithEmail,
+} from "./users";
 
 /**
- * #1079 — `dbGetUsers()` (no-opts path) and `dbGetUsersWithEmail()` previously
+ * #1079 — user-list accessors previously
  * issued a plain, unpaginated select. PostgREST's `max_rows = 1000`
  * (supabase/config.toml:18) silently truncates any such select at 1000 rows
  * with no error. Both accessors are ordered by `registered_at DESC`, so past
@@ -21,7 +26,7 @@ const RUN_ID = randomUUID();
 const HANDLE_PREFIX = `chapa-e2e-${RUN_ID}-user-`;
 const TOTAL_USERS = 1001;
 
-describe("dbGetUsers / dbGetUsersWithEmail past the 1000-row max_rows cap (contract)", () => {
+describe("user accessors past the 1000-row max_rows cap (contract)", () => {
   afterAll(async () => {
     const db = getServiceClient();
     await db.from("users").delete().like("handle", `${HANDLE_PREFIX}%`);
@@ -35,8 +40,8 @@ describe("dbGetUsers / dbGetUsersWithEmail past the 1000-row max_rows cap (contr
     // boundary without duplicating or omitting a handle.
     const registeredAt = "2020-01-01T00:00:00.000Z";
     const rows = Array.from({ length: TOTAL_USERS }, (_, i) => ({
-      handle: `${HANDLE_PREFIX}${i}`,
-      email: `${HANDLE_PREFIX}${i}@example.com`,
+      handle: `${HANDLE_PREFIX}${String(i).padStart(4, "0")}`,
+      email: `${HANDLE_PREFIX}${String(i).padStart(4, "0")}@example.com`,
       email_notifications: true,
       registered_at: registeredAt,
     }));
@@ -47,7 +52,7 @@ describe("dbGetUsers / dbGetUsersWithEmail past the 1000-row max_rows cap (contr
       expect(error).toBeNull();
     }
 
-    const boundaryHandle = `${HANDLE_PREFIX}0`;
+    const boundaryHandle = `${HANDLE_PREFIX}0000`;
 
     const allUsers = await dbGetUsers();
     const seededUsers = allUsers.filter((u) => u.handle.startsWith(HANDLE_PREFIX));
@@ -64,5 +69,27 @@ describe("dbGetUsers / dbGetUsersWithEmail past the 1000-row max_rows cap (contr
       TOTAL_USERS,
     );
     expect(seededWithEmail.map((u) => u.handle)).toContain(boundaryHandle);
+
+    const allHandles = await dbGetAllUserHandles();
+    const seededHandles = allHandles.filter((handle) =>
+      handle.startsWith(HANDLE_PREFIX),
+    );
+    expect(seededHandles).toHaveLength(TOTAL_USERS);
+    expect(new Set(seededHandles).size).toBe(TOTAL_USERS);
+
+    const firstHandlePage = await dbGetUserHandlePage({
+      after: HANDLE_PREFIX,
+      limit: 101,
+    });
+    expect(firstHandlePage.handles).toHaveLength(101);
+    expect(firstHandlePage.handles[0]).toBe(`${HANDLE_PREFIX}0000`);
+    expect(firstHandlePage.handles[100]).toBe(`${HANDLE_PREFIX}0100`);
+    expect(firstHandlePage.total).toBeGreaterThanOrEqual(TOTAL_USERS);
+
+    const secondHandlePage = await dbGetUserHandlePage({
+      after: firstHandlePage.handles[100],
+      limit: 101,
+    });
+    expect(secondHandlePage.handles[0]).toBe(`${HANDLE_PREFIX}0101`);
   });
 });

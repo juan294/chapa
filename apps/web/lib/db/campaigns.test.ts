@@ -823,33 +823,28 @@ describe("dbMarkSendsFailed", () => {
 });
 
 describe("dbGetCampaignStats", () => {
-  it("returns aggregate counts from a single status-only query", async () => {
+  it("returns aggregate counts from four exact HEAD queries", async () => {
     queryResults = [
-      {
-        data: [
-          { status: "sent" },
-          { status: "sent" },
-          { status: "pending" },
-          { status: "processing" },
-          { status: "processing" },
-          { status: "processing" },
-          { status: "failed" },
-        ],
-        error: null,
-      },
+      { count: 2 },
+      { count: 1 },
+      { count: 3 },
+      { count: 1 },
     ];
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 2, pending: 1, processing: 3, failed: 1 });
   });
 
-  it("issues exactly one round trip, selecting only the status column", async () => {
-    queryResults = [{ data: [{ status: "sent" }], error: null }];
+  it("does not request response rows", async () => {
+    queryResults = [{ count: 1 }, { count: 0 }, { count: 0 }, { count: 0 }];
 
     await dbGetCampaignStats("c-1");
 
-    expect(mockSelect).toHaveBeenCalledTimes(1);
-    expect(mockSelect).toHaveBeenCalledWith("status");
+    expect(mockSelect).toHaveBeenCalledTimes(4);
+    expect(mockSelect).toHaveBeenCalledWith("*", {
+      count: "exact",
+      head: true,
+    });
   });
 
   it("fails loudly when DB unavailable", async () => {
@@ -859,8 +854,13 @@ describe("dbGetCampaignStats", () => {
     );
   });
 
-  it("returns zeros when data is null", async () => {
-    queryResults = [{ data: null, error: null }];
+  it("returns zeros when successful counts are null", async () => {
+    queryResults = [
+      { count: null },
+      { count: null },
+      { count: null },
+      { count: null },
+    ];
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
@@ -874,28 +874,16 @@ describe("dbGetCampaignStats", () => {
     });
   });
 
-  it("counts all-sent data correctly", async () => {
+  it("counts all-sent data correctly past the row cap", async () => {
     queryResults = [
-      {
-        data: [{ status: "sent" }, { status: "sent" }, { status: "sent" }],
-        error: null,
-      },
+      { count: 1250 },
+      { count: 0 },
+      { count: 0 },
+      { count: 0 },
     ];
 
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 3, pending: 0, processing: 0, failed: 0 });
-  });
-
-  it("ignores rows with an unrecognized status instead of throwing", async () => {
-    queryResults = [
-      {
-        data: [{ status: "sent" }, { status: "bogus-status" }],
-        error: null,
-      },
-    ];
-
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 1, pending: 0, processing: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 1250, pending: 0, processing: 0, failed: 0 });
   });
 
   it("returns zeros for empty data array", async () => {

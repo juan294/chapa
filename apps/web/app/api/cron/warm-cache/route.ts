@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
 import { getWarmCachePriorityHandles } from "@/lib/env";
-import { dbGetUsers } from "@/lib/db/users";
+import { dbGetAllUserHandles } from "@/lib/db/users";
 import {
   dbGetLatestSnapshotBatch,
   dbCleanOldSnapshots,
@@ -114,8 +114,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   const start = Date.now();
 
   // Discover all known handles from Supabase (authoritative user list)
-  const users = await dbGetUsers();
-  const allHandles = users.map((u) => u.handle);
+  const allHandles = await dbGetAllUserHandles();
 
   // Rotation: read stored offset, slice with wrap-around, store next offset
   const storedOffset = await cacheGet<number>(ROTATION_KEY);

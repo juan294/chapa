@@ -5,6 +5,7 @@ import { GET } from "./route";
 const {
   mockVerifyCronSecret,
   mockDbGetUsers,
+  mockDbGetAllUserHandles,
   mockDbGetLatestSnapshotBatch,
   mockDbCleanOldSnapshots,
   mockDbCleanExpiredVerifications,
@@ -27,6 +28,7 @@ const {
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
+  mockDbGetAllUserHandles: vi.fn(),
   mockDbGetLatestSnapshotBatch: vi.fn(),
   mockDbCleanOldSnapshots: vi.fn(),
   mockDbCleanExpiredVerifications: vi.fn(),
@@ -54,6 +56,8 @@ vi.mock("@/lib/auth/cron", () => ({
 
 vi.mock("@/lib/db/users", () => ({
   dbGetUsers: (...args: unknown[]) => mockDbGetUsers(...args),
+  dbGetAllUserHandles: (...args: unknown[]) =>
+    mockDbGetAllUserHandles(...args),
 }));
 
 vi.mock("@/lib/db/snapshots", () => ({
@@ -166,6 +170,9 @@ describe("GET /api/cron/warm-cache", () => {
     vi.clearAllMocks();
     mockVerifyCronSecret.mockReturnValue(null);
     mockDbGetUsers.mockResolvedValue([user("alice"), user("bob")]);
+    mockDbGetAllUserHandles.mockImplementation(async () =>
+      (await mockDbGetUsers()).map((entry: { handle: string }) => entry.handle),
+    );
     mockDbGetLatestSnapshotBatch.mockResolvedValue(new Map());
     mockDbCleanOldSnapshots.mockResolvedValue(0);
     mockDbCleanExpiredVerifications.mockResolvedValue(0);
@@ -213,6 +220,7 @@ describe("GET /api/cron/warm-cache", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
+    expect(mockDbGetAllUserHandles).toHaveBeenCalledOnce();
     expect(body.warmed).toBe(2);
     expect(body.failed).toBe(0);
     expect(body.processedCount).toBe(2);
@@ -602,7 +610,7 @@ describe("GET /api/cron/warm-cache", () => {
     const res = await GET(makeRequest());
     const body = await res.json();
 
-    // Warm still succeeds — avatar failure is fire-and-forget
+    // Warm still succeeds — avatar warming is opportunistic and contained.
     expect(body.warmed).toBe(2);
     expect(body.failed).toBe(0);
   });

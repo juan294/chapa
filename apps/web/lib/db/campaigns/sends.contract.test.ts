@@ -9,19 +9,18 @@ import {
 } from "./sends";
 
 /**
- * #1079 — `dbGetCampaignStats` previously issued a plain, unpaginated
- * `select("status")` over every send row for a campaign. PostgREST's
- * `max_rows = 1000` (supabase/config.toml:18) silently truncates any such
- * select at 1000 rows with no error, which undercounted stats for any
+ * #1079 — `dbGetCampaignStats` previously transferred every matching status
+ * row. PostgREST's `max_rows = 1000` (supabase/config.toml:18) silently
+ * truncates such a select with no error, which undercounted stats for any
  * campaign with more than 1000 recipients. `lib/email/campaigns.ts` uses
  * those counts to decide when a campaign is done and to persist
  * `sentCount`/`failedCount` — an undercount there means a campaign can be
  * marked "sent"/"failed" while recipients past row 1000 were never actually
  * emailed.
  *
- * This proves the fix against a real local Postgres/PostgREST stack, where
- * `max_rows` actually applies — the mocked unit tests in `sends.test.ts`
- * cannot exercise PostgREST's real truncation behavior.
+ * This proves the four exact HEAD counts against a real local
+ * Postgres/PostgREST stack, where `max_rows` applies to transferred rows but
+ * cannot truncate the aggregate counts.
  */
 
 const RUN_ID = randomUUID();

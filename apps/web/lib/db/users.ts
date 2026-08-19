@@ -59,7 +59,14 @@ async function fetchAllUserPages<T extends UserPageRow>(
 
     const last = page.at(-1);
     if (!last) return rows;
-    cursor = { registeredAt: last.registered_at, id: last.id };
+    const nextCursor = { registeredAt: last.registered_at, id: last.id };
+    if (
+      cursor?.registeredAt === nextCursor.registeredAt &&
+      cursor.id === nextCursor.id
+    ) {
+      throw new Error("User keyset pagination made no progress");
+    }
+    cursor = nextCursor;
   }
 }
 
@@ -166,6 +173,107 @@ export async function dbGetUsers(
     }));
   } catch (error) {
     console.error("[db] dbGetUsers failed:", (error as Error).message);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Handle-only queries
+// ---------------------------------------------------------------------------
+
+interface UserHandleRow {
+  handle: string;
+}
+
+const USER_HANDLE_REQUIRED_KEYS: readonly (keyof UserHandleRow)[] = [
+  "handle",
+] as const;
+
+export interface UserHandlePage {
+  handles: string[];
+  /** Exact number of matching handles at or after this page's cursor. */
+  total: number;
+}
+
+/**
+ * Read one alphabetical handle page. `handle` is unique, so it is both the
+ * ordering key and the stable continuation cursor.
+ */
+export async function dbGetUserHandlePage({
+  after,
+  limit,
+}: {
+  after?: string;
+  limit: number;
+}): Promise<UserHandlePage> {
+  const db = getSupabase();
+  if (!db || limit <= 0) return { handles: [], total: 0 };
+
+  try {
+    let query = db.from("users").select("handle", { count: "exact" });
+    if (after) query = query.gt("handle", after);
+
+    const { data, error, count } = await query
+      .order("handle", { ascending: true })
+      .limit(limit);
+    if (error) throw error;
+
+    const rows = parseRows<UserHandleRow>(
+      data,
+      USER_HANDLE_REQUIRED_KEYS,
+      "users",
+    );
+    return {
+      handles: rows.map((row) => row.handle),
+      total: count ?? rows.length,
+    };
+  } catch (error) {
+    console.error(
+      "[db] dbGetUserHandlePage failed:",
+      (error as Error).message,
+    );
+    return { handles: [], total: 0 };
+  }
+}
+
+/** Read every registered handle without transferring unused profile fields. */
+export async function dbGetAllUserHandles(): Promise<string[]> {
+  const db = getSupabase();
+  if (!db) return [];
+
+  try {
+    const handles: string[] = [];
+    let after: string | undefined;
+
+    while (true) {
+      let query = db.from("users").select("handle");
+      if (after) query = query.gt("handle", after);
+
+      const { data, error } = await query
+        .order("handle", { ascending: true })
+        .limit(SUPABASE_MAX_ROWS);
+      if (error) throw error;
+
+      const rows = parseRows<UserHandleRow>(
+        data,
+        USER_HANDLE_REQUIRED_KEYS,
+        "users",
+      );
+      handles.push(...rows.map((row) => row.handle));
+      if (rows.length < SUPABASE_MAX_ROWS) return handles;
+
+      const nextAfter = rows.at(-1)?.handle;
+      if (!nextAfter) return handles;
+      if (nextAfter === after) {
+        throw new Error("User handle pagination made no progress");
+      }
+      after = nextAfter;
+    }
+  } catch (error) {
+    console.error(
+      "[db] dbGetAllUserHandles failed:",
+      (error as Error).message,
+    );
     return [];
   }
 }

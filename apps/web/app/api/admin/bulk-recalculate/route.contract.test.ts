@@ -31,7 +31,10 @@ vi.mock("@/lib/profile/post-write-invalidation", () => ({
 }));
 
 vi.mock("@/lib/db/users", () => ({
-  dbGetUsers: vi.fn(async () => [{ handle: "octocat" }]),
+  dbGetUserHandlePage: vi.fn(async () => ({
+    handles: ["octocat"],
+    total: 1,
+  })),
 }));
 
 vi.mock("next/cache", () => ({

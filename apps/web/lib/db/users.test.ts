@@ -10,12 +10,13 @@ const mockOrder = vi.fn();
 const mockRange = vi.fn();
 const mockLimit = vi.fn();
 const mockOr = vi.fn();
+const mockGt = vi.fn();
 const mockEq = vi.fn();
 const mockUpdate = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockNot = vi.fn();
 
-let listResolve: { data: unknown; error: unknown };
+let listResolve: { data: unknown; error: unknown; count?: number | null };
 let singleResolve: { data: unknown; error: unknown };
 let updateResolve: { error: unknown };
 // Optional per-call resolver for simulating multiple distinct .range() pages
@@ -26,10 +27,18 @@ let rangeResolver:
 let keysetResolver:
   | ((cursorFilter: string | null) => { data: unknown; error: unknown })
   | null;
+let handlePageResolver:
+  | ((after: string | null) => {
+      data: unknown;
+      error: unknown;
+      count?: number | null;
+    })
+  | null;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const buildOrderable = (): any => {
+const buildOrderable = (handleOnly = false): any => {
   let cursorFilter: string | null = null;
+  let afterHandle: string | null = null;
   const query: any = {
     order: (...orderArgs: unknown[]) => {
       mockOrder(...orderArgs);
@@ -40,10 +49,19 @@ const buildOrderable = (): any => {
       cursorFilter = orArgs[0] as string;
       return query;
     },
+    gt: (...gtArgs: unknown[]) => {
+      mockGt(...gtArgs);
+      afterHandle = gtArgs[1] as string;
+      return query;
+    },
     limit: (...limitArgs: unknown[]) => {
       mockLimit(...limitArgs);
       return Promise.resolve(
-        keysetResolver ? keysetResolver(cursorFilter) : listResolve,
+        handleOnly && handlePageResolver
+          ? handlePageResolver(afterHandle)
+          : keysetResolver
+            ? keysetResolver(cursorFilter)
+            : listResolve,
       );
     },
     range: (...rangeArgs: unknown[]) => {
@@ -79,6 +97,7 @@ const mockFrom = vi.fn((_table: string): any => ({
   },
   select: (...args: unknown[]) => {
     mockSelect(...args);
+    if (args[0] === "handle") return buildOrderable(true);
     return {
       eq: (...eqArgs: unknown[]) => {
         mockEq(...eqArgs);
@@ -115,6 +134,8 @@ import {
   dbGetUserEmail,
   dbUpdateEmailNotifications,
   dbGetUsersWithEmail,
+  dbGetAllUserHandles,
+  dbGetUserHandlePage,
 } from "./users";
 
 beforeEach(() => {
@@ -124,6 +145,7 @@ beforeEach(() => {
   updateResolve = { error: null };
   rangeResolver = null;
   keysetResolver = null;
+  handlePageResolver = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -338,6 +360,81 @@ describe("dbGetUsers", () => {
 
     expect(mockRange).toHaveBeenCalledTimes(1);
     expect(mockRange).toHaveBeenCalledWith(20, 29);
+  });
+
+  it("stops when a full keyset page does not advance the cursor", async () => {
+    const page = Array.from({ length: 1000 }, (_, index) => ({
+      id: 2000 - index,
+      handle: `user-${index}`,
+      registered_at: "2025-06-15T10:00:00Z",
+      display_name: null,
+      avatar_url: null,
+    }));
+    let calls = 0;
+    keysetResolver = () => {
+      calls++;
+      return calls <= 2
+        ? { data: page, error: null }
+        : { data: null, error: new Error("test safety stop") };
+    };
+
+    await expect(dbGetUsers()).resolves.toEqual([]);
+    expect(mockLimit).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Handle-only pagination
+// ---------------------------------------------------------------------------
+
+describe("dbGetUserHandlePage", () => {
+  it("returns one ordered page after a unique handle with an exact suffix count", async () => {
+    listResolve = {
+      data: [{ handle: "mona" }, { handle: "zara" }],
+      error: null,
+      count: 2,
+    };
+
+    await expect(
+      dbGetUserHandlePage({ after: "bob", limit: 101 }),
+    ).resolves.toEqual({ handles: ["mona", "zara"], total: 2 });
+
+    expect(mockSelect).toHaveBeenCalledWith("handle", {
+      count: "exact",
+    });
+    expect(mockGt).toHaveBeenCalledWith("handle", "bob");
+    expect(mockOrder).toHaveBeenCalledWith("handle", { ascending: true });
+    expect(mockLimit).toHaveBeenCalledWith(101);
+  });
+
+  it("fails open when the handle page query fails", async () => {
+    listResolve = { data: null, error: new Error("query failed"), count: null };
+
+    await expect(dbGetUserHandlePage({ limit: 101 })).resolves.toEqual({
+      handles: [],
+      total: 0,
+    });
+  });
+});
+
+describe("dbGetAllUserHandles", () => {
+  it("selects only handles and crosses the 1000-row boundary by handle", async () => {
+    const first = Array.from({ length: 1000 }, (_, index) => ({
+      handle: `user-${String(index).padStart(4, "0")}`,
+    }));
+    const second = [{ handle: "user-1000" }];
+    handlePageResolver = (after) => ({
+      data: after === null ? first : second,
+      error: null,
+    });
+
+    const result = await dbGetAllUserHandles();
+
+    expect(result).toHaveLength(1001);
+    expect(result.at(-1)).toBe("user-1000");
+    expect(mockSelect).toHaveBeenCalledWith("handle");
+    expect(mockGt).toHaveBeenCalledWith("handle", "user-0999");
+    expect(mockLimit).toHaveBeenCalledWith(1000);
   });
 });
 

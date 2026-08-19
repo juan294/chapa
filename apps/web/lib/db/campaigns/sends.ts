@@ -6,14 +6,13 @@
  */
 
 import { getSupabase } from "../supabase";
-import { fetchAllPages } from "../paginate";
 import {
   CampaignSend,
   CampaignSendRow,
+  CampaignSendStatus,
   CampaignSendStats,
   CAMPAIGN_SEND_ROW_REQUIRED_KEYS,
   CLAIM_CLEAR_FIELDS,
-  isCampaignSendStatus,
   mapSendRow,
   parseRows,
 } from "./types";
@@ -325,17 +324,12 @@ export async function dbMarkSendsFailed(
 }
 
 /**
- * Aggregate send status counts for a campaign in a single logical query.
+ * Read exact send status counts for a campaign without transferring rows.
  *
- * Fetches only the `status` column for every send row and reduces counts in
- * JS. Previously issued 4 parallel COUNT queries (one per status) — this
- * fetches once instead (cost P2-1). A campaign's recipient list can exceed
- * PostgREST's `max_rows = 1000` cap (supabase/config.toml:18), so this pages
- * through with `fetchAllPages`/`.range()` rather than silently truncating —
- * this function drives the campaign terminal-state decision in
- * `lib/email/campaigns.ts`, where an undercount could mark a campaign
- * "sent"/"failed" while recipients past row 1000 were never actually
- * emailed (#1079).
+ * Four parallel HEAD requests use PostgREST's exact count and the existing
+ * `(campaign_id, status)` index. HEAD counts are not limited by the API row
+ * cap and return no response rows, so large campaigns do not require paging
+ * every send after each processed batch.
  *
  * @param id - Campaign UUID
  * @returns Counts of sent, pending, processing, and failed sends
@@ -350,29 +344,24 @@ export async function dbGetCampaignStats(
   }
 
   try {
-    // .order("id") makes pagination deterministic across round trips —
-    // without it, Postgres doesn't guarantee stable row order between the
-    // separate .range() queries fetchAllPages issues, which could skip or
-    // double-count rows across page boundaries.
-    const data = await fetchAllPages<{ status: string }>((from, to) =>
-      db
+    const countStatus = async (status: CampaignSendStatus) => {
+      const { count, error } = await db
         .from("campaign_sends")
-        .select("status")
+        .select("*", { count: "exact", head: true })
         .eq("campaign_id", id)
-        .order("id")
-        .range(from, to),
-    );
+        .eq("status", status);
 
-    const stats: CampaignSendStats = {
-      sent: 0,
-      pending: 0,
-      processing: 0,
-      failed: 0,
+      if (error) throw error;
+      return count ?? 0;
     };
-    for (const row of data) {
-      if (isCampaignSendStatus(row.status)) stats[row.status]++;
-    }
-    return stats;
+
+    const [sent, pending, processing, failed] = await Promise.all([
+      countStatus("sent"),
+      countStatus("pending"),
+      countStatus("processing"),
+      countStatus("failed"),
+    ]);
+    return { sent, pending, processing, failed };
   } catch (error) {
     console.error(
       "[db] dbGetCampaignStats failed:",
