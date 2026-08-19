@@ -597,27 +597,27 @@ export const es: Translations = {
       metadataOgTitle: 'Política de privacidad — Chapa',
       h1Before: 'Política de ',
       h1Highlight: 'privacidad',
-      lastUpdated: 'Última actualización: febrero de 2026',
+      lastUpdated: 'Última actualización: agosto de 2026',
       sections: [
         {
           heading: '1. Información que recopilamos',
-          body: 'Cuando inicias sesión con GitHub, recibimos tu información de perfil público (nombre de usuario, nombre de pantalla, URL del avatar) y un token de acceso temporal para obtener tus datos de actividad pública. Si vinculas plataformas adicionales (Bitbucket, Codeberg), recibimos datos similares de perfil público y actividad de esos servicios.',
+          body: 'Cuando inicias sesión con GitHub, recibimos tu información de perfil público (nombre de usuario, nombre de pantalla, URL del avatar) y un token de acceso temporal para obtener tus datos de actividad pública. Si vinculas plataformas adicionales (Bitbucket, Codeberg o GitLab), recibimos datos similares de perfil público y actividad, además de credenciales de acceso, de esos servicios.',
         },
         {
           heading: '2. Cómo usamos tu información',
-          body: 'Usamos tus datos de actividad de desarrollo exclusivamente para calcular tu Perfil de Impacto de Desarrollador y generar tu Chapa. Almacenamos en caché los perfiles calculados hasta 24 horas para reducir las llamadas a la API. No vendemos, compartimos ni transferimos tus datos a terceros.',
+          body: 'Usamos tus datos de actividad de desarrollo para calcular tu Perfil de Impacto de Desarrollador, generar tu Chapa y ofrecer las funciones relacionadas de historial y verificación. Almacenamos datos en caché para reducir las llamadas a las API. No vendemos tus datos. Usamos proveedores de alojamiento, almacenamiento, envío de correo y analítica solo para operar Chapa.',
         },
         {
           heading: '3. Almacenamiento de datos',
-          body: 'Los datos de sesión se almacenan en una cookie cifrada HTTP-only en tu navegador. Las puntuaciones en caché se almacenan en Upstash Redis con un TTL de 24 horas y se eliminan automáticamente al expirar.',
+          body: 'Los datos de sesión se almacenan en una cookie cifrada HTTP-only en tu navegador. Upstash Redis almacena cachés temporales y registros de coordinación del servicio con plazos de expiración que varían según el tipo de registro. Supabase almacena registros duraderos de cuenta, credenciales de plataformas vinculadas, actividad suplementaria, configuración guardada de la Chapa, registros de verificación e instantáneas históricas del Impacto de Desarrollador. Estos registros duraderos no se eliminan cuando expira una entrada de caché de Redis.',
         },
         {
           heading: '4. Analítica',
-          body: 'Usamos PostHog para analítica básica y respetuosa con la privacidad (vistas de página y eventos clave). No se envía información personal a los servicios de analítica.',
+          body: 'Usamos PostHog y Vercel Analytics para registrar vistas de página, errores y eventos del producto. Algunos eventos pueden incluir un nombre de usuario público de GitHub o la configuración elegida para la Chapa. Usamos estos datos para operar y mejorar Chapa.',
         },
         {
           heading: '5. Tus derechos',
-          body: 'Puedes cerrar sesión en cualquier momento para borrar tu sesión. Puedes revocar el acceso de Chapa a tu cuenta de GitHub desde la configuración de GitHub en "Authorized OAuth Apps." También puedes desvincular las cuentas de Bitbucket o Codeberg de tu perfil cuando quieras.',
+          body: 'Puedes cerrar sesión en cualquier momento para borrar tu sesión. Puedes revocar el acceso de Chapa a tu cuenta de GitHub desde la configuración de GitHub en "Authorized OAuth Apps." También puedes desvincular las cuentas de Bitbucket, Codeberg o GitLab de tu perfil cuando quieras. Para solicitar la eliminación de los datos de tu cuenta de Chapa, contáctanos en la dirección que aparece más abajo.',
         },
         {
           heading: '6. Contacto',

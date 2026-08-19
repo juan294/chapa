@@ -31,7 +31,10 @@ export function InfoTooltip({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    setHovered(false);
+  }, []);
 
   const visible = open || hovered;
 
@@ -104,9 +107,10 @@ export function InfoTooltip({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open, close]);
 
-  // Close on Escape
+  // Close on Escape. Listen while the tooltip is visible, including the
+  // focus-only state before the trigger has been activated.
   useEffect(() => {
-    if (!open) return;
+    if (!visible) return;
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -114,7 +118,7 @@ export function InfoTooltip({
 
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [open, close]);
+  }, [visible, close]);
 
   const tooltip = visible && coords ? createPortal(
     <span
@@ -148,7 +152,13 @@ export function InfoTooltip({
         type="button"
         aria-label={t('aria.moreInfo') as string}
         aria-describedby={id}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          if (open) {
+            close();
+          } else {
+            setOpen(true);
+          }
+        }}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
         className="inline-flex items-center justify-center w-4 h-4 text-text-secondary hover:text-amber focus-visible:text-amber transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-full"

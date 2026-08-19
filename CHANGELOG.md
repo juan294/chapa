@@ -19,7 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the skip link now forces the intended server-rendered locale reload. Landing
   and verification titles plus the pre-hydration document language now match
   the selected route. Long verification hashes also wrap on mobile, and badge
-  explanation tooltips clamp to the viewport instead of clipping off-screen.
+  explanation tooltips clamp to the viewport instead of clipping off-screen
+  and dismiss correctly with a second keyboard activation or Escape.
+- **The privacy policy now matches Chapa's current data paths.** English and
+  Spanish copy now disclose GitLab linking, durable Supabase records, variable
+  Redis cache lifetimes, PostHog and Vercel Analytics event data, and the
+  account-data deletion request path instead of claiming all scores disappear
+  after a single 24-hour cache TTL.
 - **A slow badge materialize no longer blocks the request when a stale SVG is
   available.** The badge route now races materialization against a 2200ms
   deadline; on timeout it serves yesterday's cached SVG with a short-TTL

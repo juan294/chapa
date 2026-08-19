@@ -122,6 +122,19 @@ describe("InfoTooltip", () => {
       expect(screen.queryByRole("tooltip")).toBeNull();
     });
 
+    it("hides tooltip on a second keyboard activation while focus remains", () => {
+      render(<InfoTooltip content="Keyboard tooltip" id="tt-keyboard-toggle" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      button.focus();
+      fireEvent.click(button);
+      expect(screen.getByRole("tooltip")).toBeDefined();
+
+      fireEvent.click(button);
+      expect(document.activeElement).toBe(button);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
     it("does not show tooltip when not clicked", () => {
       render(<InfoTooltip content="Hidden tooltip" id="tt-3" />);
       expect(screen.queryByRole("tooltip")).toBeNull();
@@ -137,6 +150,19 @@ describe("InfoTooltip", () => {
       expect(screen.getByRole("tooltip")).toBeDefined();
 
       fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("closes a focused tooltip on Escape while focus remains", () => {
+      render(<InfoTooltip content="Escape focus" id="tt-esc-focus" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      button.focus();
+      fireEvent.click(button);
+      expect(screen.getByRole("tooltip")).toBeDefined();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(document.activeElement).toBe(button);
       expect(screen.queryByRole("tooltip")).toBeNull();
     });
 

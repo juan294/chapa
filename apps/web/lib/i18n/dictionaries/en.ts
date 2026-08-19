@@ -597,27 +597,27 @@ export const en: Translations = {
       metadataOgTitle: 'Privacy Policy — Chapa',
       h1Before: 'Privacy ',
       h1Highlight: 'Policy',
-      lastUpdated: 'Last updated: February 2026',
+      lastUpdated: 'Last updated: August 2026',
       sections: [
         {
           heading: '1. Information We Collect',
-          body: 'When you sign in with GitHub, we receive your public profile information (username, display name, avatar URL) and a time-limited access token to fetch your public activity data. If you link additional platforms (Bitbucket, Codeberg), we receive similar public profile and activity data from those services.',
+          body: 'When you sign in with GitHub, we receive your public profile information (username, display name, avatar URL) and a time-limited access token to fetch your public activity data. If you link additional platforms (Bitbucket, Codeberg, or GitLab), we receive similar public profile and activity data and access credentials from those services.',
         },
         {
           heading: '2. How We Use Your Information',
-          body: 'We use your development activity data solely to compute your Developer Impact Profile and generate your badge. We cache computed profiles for up to 24 hours to reduce API calls. We do not sell, share, or transfer your data to third parties.',
+          body: 'We use your development activity data to compute your Developer Impact Profile, generate your badge, and provide related history and verification features. We cache data to reduce API calls. We do not sell your data. We use service providers for hosting, storage, email delivery, and analytics only to operate Chapa.',
         },
         {
           heading: '3. Data Storage',
-          body: 'Session data is stored in an encrypted HTTP-only cookie in your browser. Cached scores are stored in Upstash Redis with a 24-hour TTL and are automatically deleted after expiration.',
+          body: 'Session data is stored in an encrypted HTTP-only cookie in your browser. Upstash Redis stores temporary caches and service-coordination records with expiration times that vary by record type. Supabase stores durable account records, linked-platform credentials, supplemental activity, saved badge configuration, verification records, and historical Developer Impact snapshots. These durable records are not deleted when a Redis cache entry expires.',
         },
         {
           heading: '4. Analytics',
-          body: 'We use PostHog for basic, privacy-friendly analytics (page views and key events). No personal information is sent to analytics services.',
+          body: 'We use PostHog and Vercel Analytics for page views, errors, and product events. Some events can include a public GitHub handle or selected badge configuration. We use this data to operate and improve Chapa.',
         },
         {
           heading: '5. Your Rights',
-          body: "You can sign out at any time to clear your session. You can revoke Chapa's access to your GitHub account through your GitHub settings under \"Authorized OAuth Apps.\" You can also unlink Bitbucket or Codeberg accounts from your profile at any time.",
+          body: "You can sign out at any time to clear your session. You can revoke Chapa's access to your GitHub account through your GitHub settings under \"Authorized OAuth Apps.\" You can unlink Bitbucket, Codeberg, or GitLab accounts from your profile at any time. To request deletion of your Chapa account data, contact us at the address below.",
         },
         {
           heading: '6. Contact',
