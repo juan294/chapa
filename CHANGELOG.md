@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-08-19
+
 ### Fixed
 
 - **A slow badge materialize no longer blocks the request when a stale SVG is
@@ -19,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Avatar-cache outcomes are now tracked as four distinct states — success,
   fetch-failed, permanently absent, race-timeout — instead of one boolean.
   Previously "no avatar at all" was never cached, forcing a full
-  materialize+render on every single request for that handle.
+  materialize+render on every single request for that handle. Transient CDN
+  and network failures are not cached, so an avatar-less fallback cannot
+  poison the shared SVG cache for a full day.
 - **Public read-only profile reads no longer trigger a live GitHub fetch on
   a cold cache key.** `/api/profile/:handle` and other read-only callers now
   compose strictly from the protected stale-stats baseline past the 6h TTL,
@@ -31,8 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   send quota is released back to `pending` as one indivisible unit instead of
   being re-leased and blocked on every cron tick.
 - **A failed Resend webhook delivery no longer permanently burns its dedup
-  key** — the key is now released on failure so a legitimate retry isn't
-  silently dropped as a duplicate.
+  key.** In-flight claims now use a separate five-minute key and completed
+  deliveries use the seven-day marker, so even a failed Redis cleanup makes
+  the provider retry later instead of silently acknowledging a dropped email.
+- **Concurrent CLI device confirmation and approval no longer overwrite each
+  other.** Redis now merges each state update atomically, preserving the
+  confirmed `device_code` latch through the approval race.
 - **A failed score-challenge dispute email now reports failure** instead of a
   false success.
 - **`fetch-retry` now retries a thrown network error** (DNS failure,
@@ -43,11 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   banner** on the share page instead of failing silently; a previously
   unregistered `session_storage` error code now surfaces its real message
   instead of falling back to a generic one.
-- Several accessibility fixes: dead `tabIndex` removed from badge hotspots,
-  a single live-region announcement per generation-progress step instead of
-  the whole step array, a redundant duplicate `aria-label` removed from
-  insight cards, the author-typewriter popover made keyboard-actionable, and
-  the terminal command input kept at ≥16px to prevent iOS Safari auto-zoom.
+- Several accessibility fixes: structural badge hotspots no longer act as
+  dead tab stops while dedicated tooltip controls keep every explanation
+  keyboard-accessible, generation progress now announces one step instead of
+  the whole array, a duplicate `aria-label` was removed from insight cards,
+  the author-typewriter popover is keyboard-actionable, and terminal command
+  input stays at ≥16px to prevent iOS Safari auto-zoom.
 
 ### Changed
 
@@ -1024,7 +1033,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.21.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.22.0...HEAD
+[2.22.0]: https://github.com/juan294/chapa/compare/v2.21.0...v2.22.0
 [2.21.0]: https://github.com/juan294/chapa/compare/v2.20.0...v2.21.0
 [2.20.0]: https://github.com/juan294/chapa/compare/v2.19.1...v2.20.0
 [2.19.1]: https://github.com/juan294/chapa/compare/v2.19.0...v2.19.1
