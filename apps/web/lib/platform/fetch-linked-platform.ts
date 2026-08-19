@@ -1,4 +1,4 @@
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheMGet, cacheSet } from "@/lib/cache/redis";
 import { withTimeout } from "@/lib/async/with-timeout";
 import type { StatsData } from "@chapa/shared";
 
@@ -87,10 +87,12 @@ export async function fetchLinkedPlatformStats(
   const cacheKey = `stats:v2:${config.platform}:${config.lowerHandle}`;
   const negKey = `${cacheKey}:neg`;
 
-  const cached = await cacheGet<StatsData>(cacheKey);
-  if (cached) return cached;
-
-  const neg = await cacheGet<boolean>(negKey);
+  // Single round-trip for both the positive and negative cache keys (#1092).
+  // cacheMGet returns `[]` (not `[null, null]`) when Redis is unavailable, so
+  // index access — which yields `undefined` past the array's length — must be
+  // treated the same as an explicit miss. Never assume a 2-element result.
+  const [cached, neg] = await cacheMGet<StatsData | boolean>([cacheKey, negKey]);
+  if (cached) return cached as StatsData;
   if (neg) return null;
 
   const enabled = await config.isEnabled();

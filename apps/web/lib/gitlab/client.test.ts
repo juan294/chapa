@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
-  mockCacheGet,
+  mockCacheMGet,
   mockCacheSet,
   mockIsGitlabEnabled,
   mockDbGetLinkedPlatform,
@@ -12,7 +12,7 @@ const {
   mockFetchGitlabUser,
   mockFetchGitlabStats,
 } = vi.hoisted(() => ({
-  mockCacheGet: vi.fn(),
+  mockCacheMGet: vi.fn(),
   mockCacheSet: vi.fn(),
   mockIsGitlabEnabled: vi.fn(),
   mockDbGetLinkedPlatform: vi.fn(),
@@ -25,7 +25,7 @@ const {
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mockCacheGet,
+  cacheMGet: mockCacheMGet,
   cacheSet: mockCacheSet,
 }));
 
@@ -86,7 +86,7 @@ const GL_USER = { id: 4242, login: "gl-user", full_name: "GL User", avatar_url: 
 describe("fetchGitlabIfLinked", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCacheGet.mockResolvedValue(null);
+    mockCacheMGet.mockResolvedValue([null, null]);
     mockCacheSet.mockResolvedValue(undefined);
     mockIsGitlabEnabled.mockResolvedValue(true);
     mockDbGetLinkedPlatform.mockResolvedValue(linkedBase);
@@ -101,7 +101,7 @@ describe("fetchGitlabIfLinked", () => {
 
   it("returns cached stats when cache hit", async () => {
     const cached = makeStats({ commitsTotal: 25 });
-    mockCacheGet.mockResolvedValue(cached);
+    mockCacheMGet.mockResolvedValue([cached, null]);
 
     const result = await fetchGitlabIfLinked(HANDLE, LOWER);
 
@@ -281,9 +281,7 @@ describe("fetchGitlabIfLinked", () => {
     });
 
     it("returns null immediately on negative cache hit without DB/flag reads", async () => {
-      mockCacheGet
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(true);
+      mockCacheMGet.mockResolvedValueOnce([null, true]);
 
       const result = await fetchGitlabIfLinked(HANDLE, LOWER);
 

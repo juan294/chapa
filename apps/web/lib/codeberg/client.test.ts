@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
-  mockCacheGet,
+  mockCacheMGet,
   mockCacheSet,
   mockIsCodebergEnabled,
   mockDbGetLinkedPlatform,
@@ -11,7 +11,7 @@ const {
   mockRefreshCodebergToken,
   mockFetchCodebergStats,
 } = vi.hoisted(() => ({
-  mockCacheGet: vi.fn(),
+  mockCacheMGet: vi.fn(),
   mockCacheSet: vi.fn(),
   mockIsCodebergEnabled: vi.fn(),
   mockDbGetLinkedPlatform: vi.fn(),
@@ -23,7 +23,7 @@ const {
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mockCacheGet,
+  cacheMGet: mockCacheMGet,
   cacheSet: mockCacheSet,
 }));
 
@@ -68,7 +68,7 @@ const linkedBase = {
 describe("fetchCodebergIfLinked", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCacheGet.mockResolvedValue(null);
+    mockCacheMGet.mockResolvedValue([null, null]);
     mockCacheSet.mockResolvedValue(undefined);
     mockIsCodebergEnabled.mockResolvedValue(true);
     mockDbGetLinkedPlatform.mockResolvedValue(linkedBase);
@@ -79,7 +79,7 @@ describe("fetchCodebergIfLinked", () => {
 
   it("returns cached stats when cache hit", async () => {
     const cached = makeStats({ commitsTotal: 25 });
-    mockCacheGet.mockResolvedValue(cached);
+    mockCacheMGet.mockResolvedValue([cached, null]);
 
     const result = await fetchCodebergIfLinked(HANDLE, LOWER);
 
@@ -235,9 +235,7 @@ describe("fetchCodebergIfLinked", () => {
     });
 
     it("returns null immediately on negative cache hit without DB/flag reads", async () => {
-      mockCacheGet
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(true);
+      mockCacheMGet.mockResolvedValueOnce([null, true]);
 
       const result = await fetchCodebergIfLinked(HANDLE, LOWER);
 
