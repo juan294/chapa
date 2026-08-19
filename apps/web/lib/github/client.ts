@@ -338,19 +338,29 @@ async function _loadOverlays(
   // Build linkedPlatforms from DB link status (source of truth), not stats
   // fetch success. Platforms appear in Data Sources even when their stats fetch
   // temporarily fails (expired token, API error). Fixes #632.
+  //
+  // #1093 (PE-L2): fetch the link row exactly once per platform, in this one
+  // wave. A platform whose stats fetch already succeeded fetches its link row
+  // unconditionally (no enabled-flag gate — a successful fetch already proves
+  // it's linked) and needs it anyway to resolve the login below; a platform
+  // whose stats fetch failed still gates on the enabled flag first. Either way
+  // the query starts here, concurrently with every other platform's lookup —
+  // previously the succeeded-fetch branch skipped this wave and re-queried in
+  // a second, strictly-later wave that serialized behind the other platforms'
+  // (unrelated) enabled-flag checks for no reason.
   const [bbDbLink, cbDbLink, glDbLink] = await Promise.all([
     bitbucket
-      ? null
+      ? dbGetLinkedPlatform(handle, "bitbucket")
       : isBitbucketEnabled().then((ok) =>
           ok ? dbGetLinkedPlatform(handle, "bitbucket") : null,
         ),
     codeberg
-      ? null
+      ? dbGetLinkedPlatform(handle, "codeberg")
       : isCodebergEnabled().then((ok) =>
           ok ? dbGetLinkedPlatform(handle, "codeberg") : null,
         ),
     gitlab
-      ? null
+      ? dbGetLinkedPlatform(handle, "gitlab")
       : isGitlabEnabled().then((ok) =>
           ok ? dbGetLinkedPlatform(handle, "gitlab") : null,
         ),
@@ -362,18 +372,9 @@ async function _loadOverlays(
   if (gitlab || glDbLink) linkedPlatforms.push("gitlab");
 
   const linkedPlatformLogins: Record<string, string> = {};
-  if (linkedPlatforms.length > 0) {
-    // bbDbLink/cbDbLink/glDbLink already have remoteLogin; only re-fetch for
-    // the stats-path.
-    const [bbLogin, cbLogin, glLogin] = await Promise.all([
-      bbDbLink ?? (bitbucket ? dbGetLinkedPlatform(handle, "bitbucket") : null),
-      cbDbLink ?? (codeberg ? dbGetLinkedPlatform(handle, "codeberg") : null),
-      glDbLink ?? (gitlab ? dbGetLinkedPlatform(handle, "gitlab") : null),
-    ]);
-    if (bbLogin) linkedPlatformLogins.bitbucket = bbLogin.remoteLogin;
-    if (cbLogin) linkedPlatformLogins.codeberg = cbLogin.remoteLogin;
-    if (glLogin) linkedPlatformLogins.gitlab = glLogin.remoteLogin;
-  }
+  if (bbDbLink) linkedPlatformLogins.bitbucket = bbDbLink.remoteLogin;
+  if (cbDbLink) linkedPlatformLogins.codeberg = cbDbLink.remoteLogin;
+  if (glDbLink) linkedPlatformLogins.gitlab = glDbLink.remoteLogin;
 
   return {
     bitbucket,

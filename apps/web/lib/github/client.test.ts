@@ -1503,6 +1503,111 @@ describe("getStats", () => {
       expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
       expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
     });
+
+    it("fetches the link row exactly once per platform, on the successful-stats-fetch path (#1093)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 30 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchBitbucketIfLinked.mockResolvedValue(bb);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "bb-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
+
+      const result = await getStats("test-user");
+
+      // Previously: one wave skipped the DB read because the stats fetch had
+      // already succeeded, then a later wave re-fetched the same row to
+      // resolve the login — two calls for one successfully-fetched platform.
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledTimes(1);
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "bitbucket");
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
+    });
+
+    it("fetches the link row exactly once per platform, on the failed-stats-fetch path (#1093, guards #632)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchBitbucketIfLinked.mockResolvedValue(null); // stats fetch failed
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "bb-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
+
+      const result = await getStats("test-user");
+
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledTimes(1);
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "bitbucket");
+
+      // #632 regression guard: the platform must still appear in Data Sources
+      // (linkedPlatforms) even though its own stats fetch failed, because the
+      // link row itself (source of truth for "is this platform linked") says
+      // it's linked.
+      expect(result!.commitsTotal).toBe(50); // GitHub-only — stats fetch failed
+      expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
+    });
+
+    it("does not gate a successfully-fetched platform's link-row query behind a slower platform's enabled-check wave (#1093)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 15 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+
+      // Bitbucket's stats fetch failed, and its enabled-check is slow (simulating
+      // a real feature-flag/DB round-trip that hasn't resolved yet).
+      mockFetchBitbucketIfLinked.mockResolvedValue(null);
+      let resolveBitbucketEnabled!: (value: boolean) => void;
+      mockIsBitbucketEnabled.mockReturnValue(
+        new Promise<boolean>((resolve) => {
+          resolveBitbucketEnabled = resolve;
+        }),
+      );
+
+      // Codeberg's stats fetch succeeded — its link-row query has zero data
+      // dependency on Bitbucket's still-pending enabled-check.
+      mockFetchCodebergIfLinked.mockResolvedValue(cb);
+      mockDbGetLinkedPlatform.mockImplementation((_handle: string, platform: string) => {
+        if (platform === "codeberg") {
+          return Promise.resolve({
+            remoteLogin: "cb-user",
+            tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      const resultPromise = getStats("test-user");
+
+      // Give microtasks a chance to settle. Bitbucket's enabled-check is still
+      // pending at this point.
+      await new Promise((r) => setTimeout(r, 20));
+
+      // The Codeberg link-row query must already have started — it has no
+      // dependency on Bitbucket's pending enabled-check and must not be
+      // serialized behind it in a second wave.
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "codeberg");
+
+      resolveBitbucketEnabled(false);
+      const result = await resultPromise;
+
+      expect(result!.linkedPlatforms).toEqual(["codeberg"]);
+      expect(result!.linkedPlatformLogins).toEqual({ codeberg: "cb-user" });
+    });
   });
 
   // -----------------------------------------------------------------------
