@@ -4,11 +4,11 @@ import { cacheMergeJson, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import {
+  CLI_DEVICE_SESSION_TTL_SECONDS,
+  CLI_DEVICE_SESSION_UNAVAILABLE_PAYLOAD,
   type CliDeviceSession,
   cliDeviceSessionKey,
 } from "@/lib/auth/cli-device-session";
-
-const DEVICE_SESSION_TTL = 300; // 5 minutes
 
 /**
  * POST /api/cli/auth/approve
@@ -65,12 +65,12 @@ export const POST = withErrorCapture("/api/cli/auth/approve", async (request: Ne
   const stored = await cacheMergeJson<CliDeviceSession>(
     key,
     approval,
-    DEVICE_SESSION_TTL,
+    CLI_DEVICE_SESSION_TTL_SECONDS,
   );
 
   if (!stored) {
     return NextResponse.json(
-      { error: "Service temporarily unavailable. Please try again." },
+      CLI_DEVICE_SESSION_UNAVAILABLE_PAYLOAD,
       { status: 503 },
     );
   }

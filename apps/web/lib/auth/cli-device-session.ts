@@ -23,6 +23,14 @@ export interface CliDeviceSession {
   deviceCodeConfirmed?: boolean;
 }
 
+/** Five-minute session lifetime shared by the poll and approval routes. */
+export const CLI_DEVICE_SESSION_TTL_SECONDS = 300;
+
+/** Shared fail-closed response body for device-session persistence failures. */
+export const CLI_DEVICE_SESSION_UNAVAILABLE_PAYLOAD = {
+  error: "Service temporarily unavailable. Please try again.",
+} as const;
+
 /** Redis key for a CLI device-authorization session. */
 export function cliDeviceSessionKey(sessionId: string): string {
   return `cli:device:${sessionId}`;

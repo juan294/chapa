@@ -3,7 +3,8 @@
  *
  * Provides:
  *   - `fetchWithRetry`: bounded jittered retry for idempotent reads (GET / GraphQL).
- *     Retries on 5xx responses only; never retries 4xx or non-idempotent writes.
+ *     Retries 5xx responses and network rejections once. It never retries 4xx,
+ *     caller-triggered AbortError/TimeoutError rejections, or non-idempotent writes.
  *   - `sanitizeLogBody`: truncates and strips control chars from upstream error bodies
  *     before writing to logs (BE-M4 / #870).
  */
@@ -59,10 +60,10 @@ function isCallerAbortError(
  *
  * - Retries once on 5xx (total: 2 attempts).
  * - Does NOT retry 4xx (auth failures, rate-limit 429 = 4xx → no retry for 429).
- * - Retries once on a rejected fetch promise (network reset, DNS failure) —
- *   same bounded/jittered policy as 5xx — EXCEPT a deliberate timeout abort
- *   from the caller's own `AbortSignal.timeout()`, which propagates
- *   immediately (see `isCallerAbortError`, #1105).
+ * - Retries once on a rejected fetch promise caused by a network failure
+ *   (connection reset, DNS failure, etc.). Caller-triggered AbortError and
+ *   TimeoutError rejections propagate immediately without retrying (see
+ *   `isCallerAbortError`, #1105).
  * - Adds a small jittered delay between attempts to avoid thundering herds.
  */
 export async function fetchWithRetry(
