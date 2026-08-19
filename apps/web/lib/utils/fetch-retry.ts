@@ -32,10 +32,33 @@ export function _setRetryDelayFn(fn: (ms: number) => Promise<void>): void {
 }
 
 /**
+ * Returns true when a thrown fetch error is a deliberate timeout abort —
+ * i.e. the caller's own `AbortSignal.timeout()` (passed via `init.signal`)
+ * fired and `fetch()` rejected as a result, rather than a network-level
+ * failure (connection reset, DNS failure, etc.).
+ *
+ * This must NOT be retried: this module's callers operate under the badge
+ * route's 3000ms cache-miss latency SLO (`apps/web/lib/monitoring/latency-slo.ts`),
+ * and retrying a timeout would double worst-case latency against that budget.
+ */
+function isTimeoutAbortError(
+  err: unknown,
+  signal: AbortSignal | null | undefined,
+): boolean {
+  return (
+    err instanceof Error && err.name === "AbortError" && signal?.aborted === true
+  );
+}
+
+/**
  * Fetch with bounded jittered retry for idempotent reads.
  *
  * - Retries once on 5xx (total: 2 attempts).
  * - Does NOT retry 4xx (auth failures, rate-limit 429 = 4xx → no retry for 429).
+ * - Retries once on a rejected fetch promise (network reset, DNS failure) —
+ *   same bounded/jittered policy as 5xx — EXCEPT a deliberate timeout abort
+ *   from the caller's own `AbortSignal.timeout()`, which propagates
+ *   immediately (see `isTimeoutAbortError`, #1105).
  * - Adds a small jittered delay between attempts to avoid thundering herds.
  */
 export async function fetchWithRetry(
@@ -51,7 +74,22 @@ export async function fetchWithRetry(
       await _retryDelayFn(jitter);
     }
 
-    const res = await fetch(url, init);
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      if (isTimeoutAbortError(err, init.signal)) {
+        throw err;
+      }
+
+      if (attempt === MAX_RETRY_ATTEMPTS - 1) {
+        // All attempts exhausted — propagate the last error to the caller.
+        throw err;
+      }
+
+      // Retry on the next loop iteration, same as a retryable 5xx.
+      continue;
+    }
 
     if (!isRetryable(res.status)) {
       // 2xx, 4xx (including 429), or any non-5xx → return immediately
