@@ -8,6 +8,7 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
+import { captureServerError } from "@/lib/analytics/server-errors";
 import {
   getPublicProfileVerification,
   materializePublicProfile,
@@ -97,9 +98,28 @@ export async function GET(
       "svgToPng",
     );
 
-    // Cache the PNG as base64 for 48h (fire-and-forget — don't block response)
+    // Cache the PNG as base64 for 48h (fire-and-forget — don't block response).
+    // #1094 (PE-L3): cacheSet never throws — it swallows Redis errors and
+    // resolves `false` on failure (e.g. an oversized base64 PNG rejected by
+    // Upstash's per-value size limit). A resolved-false outcome was
+    // previously discarded silently, permanently degrading the handle to an
+    // OG-image cache miss with no observability. Surface it via
+    // captureServerError without ever affecting the already-sent response.
     fireAndForget(
-      () => cacheSet(ogCacheKey, Buffer.from(png).toString("base64"), OG_CACHE_TTL),
+      async () => {
+        const cached = await cacheSet(
+          ogCacheKey,
+          Buffer.from(png).toString("base64"),
+          OG_CACHE_TTL,
+        );
+        if (!cached) {
+          void captureServerError({
+            route: `/u/${handle}/og-image`,
+            statusCode: 200,
+            error: new Error(`Failed to cache OG image PNG for handle: ${handle}`),
+          });
+        }
+      },
       () => undefined,
     );
 

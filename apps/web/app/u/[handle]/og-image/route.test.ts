@@ -12,6 +12,7 @@ const {
   mockCacheSet,
   mockRateLimit,
   mockGetClientIp,
+  mockCaptureServerError,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -23,6 +24,7 @@ const {
   mockCacheSet: vi.fn(),
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
+  mockCaptureServerError: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -55,6 +57,10 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: (...args: unknown[]) => mockGetClientIp(...args),
+}));
+
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
 }));
 
 import { GET } from "./route";
@@ -277,6 +283,32 @@ describe("GET /u/[handle]/og-image", () => {
     // give the fire-and-forget rejection a tick to settle so the onError
     // handler runs and is observed by coverage instrumentation
     await vi.advanceTimersByTimeAsync(0);
+  });
+
+  // #1094 (PE-L3): cacheSet never throws — it swallows Redis errors internally
+  // and resolves `false` on failure (e.g. an oversized base64 PNG rejected by
+  // Upstash's per-value size limit). That resolved-false outcome was
+  // previously discarded silently, permanently degrading the handle to an
+  // OG-image cache miss with zero observability. It must now be surfaced via
+  // captureServerError, and the write failure must never break the response.
+  it("surfaces a resolved-false cacheSet failure via captureServerError without breaking the response", async () => {
+    mockCacheSet.mockResolvedValue(false);
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+
+    // let the fire-and-forget cacheSet + observability call settle
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/u/testuser/og-image",
+        error: expect.any(Error),
+      }),
+    );
   });
 
   it("rate-limits to 30 requests per IP per 60 seconds", async () => {
