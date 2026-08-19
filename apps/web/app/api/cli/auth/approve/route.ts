@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheMergeJson, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
-
-const DEVICE_SESSION_TTL = 300; // 5 minutes
+import {
+  CLI_DEVICE_SESSION_TTL_SECONDS,
+  CLI_DEVICE_SESSION_UNAVAILABLE_PAYLOAD,
+  type CliDeviceSession,
+  cliDeviceSessionKey,
+} from "@/lib/auth/cli-device-session";
 
 /**
  * POST /api/cli/auth/approve
@@ -44,16 +48,29 @@ export const POST = withErrorCapture("/api/cli/auth/approve", async (request: Ne
     return NextResponse.json({ error: "Invalid session ID" }, { status: 400 });
   }
 
-  // 3. Store approval in Redis
-  const stored = await cacheSet(
-    `cli:device:${sessionId}`,
-    { status: "approved", handle: session.login },
-    DEVICE_SESSION_TTL,
+  // 3. Atomically merge approval into the Redis session.
+  // (BE-H3 / SE-H1, #1078 / #1097). The poll route's device_code binding
+  // (`deviceCode` / `deviceCodeConfirmed`) lives on this same session object.
+  // A plain `cacheSet({ status, handle })` here would drop those fields,
+  // silently disabling the poll route's `if (session.deviceCode)`
+  // enforcement on the very next (redeeming) poll — letting anyone who learns
+  // the bare sessionId redeem a token even for a confirmed session. If no
+  // session exists yet (approve called before any poll), there's nothing to
+  // preserve — that's the legacy path the poll route's own comments describe.
+  const key = cliDeviceSessionKey(sessionId);
+  const approval: Partial<CliDeviceSession> = {
+    status: "approved",
+    handle: session.login,
+  };
+  const stored = await cacheMergeJson<CliDeviceSession>(
+    key,
+    approval,
+    CLI_DEVICE_SESSION_TTL_SECONDS,
   );
 
   if (!stored) {
     return NextResponse.json(
-      { error: "Service temporarily unavailable. Please try again." },
+      CLI_DEVICE_SESSION_UNAVAILABLE_PAYLOAD,
       { status: 503 },
     );
   }

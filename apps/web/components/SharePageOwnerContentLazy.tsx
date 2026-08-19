@@ -1,9 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { BadgeSkeleton } from "./BadgeSkeleton";
 
 const SharePageOwnerContent = dynamic(
@@ -14,10 +14,13 @@ const SharePageOwnerContent = dynamic(
 interface Props {
   handle: string;
   stats: StatsData | null;
-  impact: ImpactV6Result | null;
+  // #1067 — the server passes a redacted PublicImpactV6Result (no
+  // confidence/confidencePenalties keys) for non-owner visitors, and the
+  // full ImpactV6Result for the owner.
+  impact: ClientImpactV6Result | null;
   craftResult?: CraftResult | null;
   trend?: TrendSummary | null;
-  diff?: SnapshotDiff | null;
+  diff?: ClientSnapshotDiff | null;
 }
 
 export function SharePageOwnerContentLazy(props: Props) {

@@ -1,11 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
-const AVATAR_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "avatar.ts"),
-  "utf-8",
-);
 
 // ---------------------------------------------------------------------------
 // Mocks for cache layer (used by getAvatarBase64 tests)
@@ -24,12 +17,26 @@ vi.mock("../cache/redis", () => ({
 import { fetchAvatarBase64, getAvatarBase64 } from "./avatar";
 
 // PE-L2: Avatar fetch timeout should be 2000ms (tighter than 5s) to keep
-// the badge render path fast under GitHub CDN slowdowns.
+// the badge render path fast under GitHub CDN slowdowns. The badge route
+// has maxDuration=35s; 5s was too generous on the cache-miss path.
 describe("fetchAvatarBase64 — fetch timeout (#961)", () => {
-  it("uses a 2000ms AbortSignal timeout (not 5000ms)", () => {
-    // The badge route has maxDuration=35s; 5s was too generous on the cache-miss path.
-    expect(AVATAR_SOURCE).toContain("AbortSignal.timeout(2000)");
-    expect(AVATAR_SOURCE).not.toContain("AbortSignal.timeout(5000)");
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("aborts the fetch via a 2000ms AbortSignal.timeout (not 5000ms)", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([137, 80, 78, 71]), {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      }),
+    );
+
+    await fetchAvatarBase64("https://avatars.githubusercontent.com/u/123");
+
+    expect(timeoutSpy).toHaveBeenCalledWith(2000);
+    expect(timeoutSpy).not.toHaveBeenCalledWith(5000);
   });
 });
 
@@ -72,11 +79,12 @@ describe("fetchAvatarBase64", () => {
     expect(result).toBeUndefined();
   });
 
-  it("returns undefined when fetch throws (network error)", async () => {
+  it("rejects when fetch throws (network error)", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
-    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/err");
-    expect(result).toBeUndefined();
+    await expect(
+      fetchAvatarBase64("https://avatars.githubusercontent.com/u/err"),
+    ).rejects.toThrow("Network error");
   });
 
   it("sanitises content-type to an allowed image MIME type", async () => {
@@ -240,16 +248,31 @@ describe("getAvatarBase64", () => {
     expect(mockCacheGet).toHaveBeenCalledWith("avatar:testuser");
   });
 
-  it("returns undefined when network fetch fails (no cache write)", async () => {
+  it("rejects when the network fetch fails so callers can retry", async () => {
     mockCacheGet.mockResolvedValue(null);
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
-    const result = await getAvatarBase64(
-      "testuser",
-      "https://avatars.githubusercontent.com/u/123",
+    await expect(
+      getAvatarBase64(
+        "testuser",
+        "https://avatars.githubusercontent.com/u/123",
+      ),
+    ).rejects.toThrow("Network error");
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("rejects on a transient GitHub CDN 5xx response", async () => {
+    mockCacheGet.mockResolvedValue(null);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("temporary failure", { status: 503 }),
     );
 
-    expect(result).toBeUndefined();
+    await expect(
+      getAvatarBase64(
+        "testuser",
+        "https://avatars.githubusercontent.com/u/123",
+      ),
+    ).rejects.toThrow(/503/);
     expect(mockCacheSet).not.toHaveBeenCalled();
   });
 

@@ -52,6 +52,11 @@ describe("PrivacyPage", () => {
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
+  it("renders a main content landmark", async () => {
+    render(await PrivacyPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(document.getElementById("main-content")).not.toBeNull();
+  });
+
   it("renders h1 highlight", async () => {
     render(await PrivacyPage({ params: Promise.resolve({ locale: "en" }) }));
     expect(screen.getByText("Policy")).toBeDefined();
@@ -137,5 +142,8 @@ describe("PrivacyPage generateMetadata", () => {
     const metadata = await generateMetadata({ params: Promise.resolve({ locale: "en" }) });
     expect(metadata.title).toBe("Privacy Policy");
     expect(metadata.description).toContain("Privacy Policy for Chapa");
+    // #1065 (FE-H1) — declares the unprefixed public path as its canonical,
+    // not the internal /[locale]/privacy path.
+    expect(metadata.alternates?.canonical).toBe("/privacy");
   });
 });

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
 export interface TerminalInputHandle {
   clear: () => void;
@@ -22,6 +24,13 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
   prompt = "chapa",
   autoFocus = false,
 }, ref) {
+  const { t } = useTranslation();
+  // `t` is a stable reference per locale (memoized in LanguageProvider), but
+  // `value`/`historyIndex` state changes on every keystroke re-render this
+  // component — memoize so the dictionary lookup only reruns on locale
+  // change, not on every keystroke.
+  const placeholder = useMemo(() => t("terminalInput.placeholder") as string, [t]);
+  const ariaLabel = useMemo(() => t("aria.terminalCommandInput") as string, [t]);
   const [value, setValue] = useState("");
   const [historyIndex, setHistoryIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -106,7 +115,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
 
   return (
     <div
-      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-terminal text-sm"
+      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-terminal text-base sm:text-sm leading-6"
     >
       <span className="text-amber select-none shrink-0">
         {prompt} &gt;
@@ -118,11 +127,14 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          id={TERMINAL_COMMAND_INPUT_ID}
           className="terminal-input-bare w-full bg-transparent text-text-primary caret-amber placeholder:text-terminal-dim outline-none focus:ring-0 focus:outline-none border-none"
           style={{ outline: "none" }}
-          placeholder="Type / for commands..."
-          aria-label="Terminal command input"
+          placeholder={placeholder}
+          aria-label={ariaLabel}
           autoComplete="off"
+          autoCapitalize="off"
+          autoCorrect="off"
           spellCheck={false}
         />
       </div>

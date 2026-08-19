@@ -7,12 +7,14 @@
 
 import { getSupabase } from "./supabase";
 import { parseRows } from "./parse-row";
+import { SUPABASE_MAX_ROWS } from "./paginate";
 
 // ---------------------------------------------------------------------------
 // Row type
 // ---------------------------------------------------------------------------
 
 interface UserRow {
+  id: number;
   handle: string;
   registered_at: string;
   display_name: string | null;
@@ -20,9 +22,60 @@ interface UserRow {
 }
 
 const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
+  "id",
   "handle",
   "registered_at",
 ] as const;
+
+interface UserPageCursor {
+  registeredAt: string;
+  id: number;
+}
+
+interface UserPageRow {
+  id: number;
+  registered_at: string;
+}
+
+/**
+ * Fetch every user with a stable composite cursor. `registered_at` is not
+ * unique, so `id` is the deterministic tie-breaker at page boundaries.
+ */
+async function fetchAllUserPages<T extends UserPageRow>(
+  fetchPage: (
+    cursor?: UserPageCursor,
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: UserPageCursor | undefined;
+
+  while (true) {
+    const { data, error } = await fetchPage(cursor);
+    if (error) throw error;
+
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < SUPABASE_MAX_ROWS) return rows;
+
+    const last = page.at(-1);
+    if (!last) return rows;
+    const nextCursor = { registeredAt: last.registered_at, id: last.id };
+    if (
+      cursor?.registeredAt === nextCursor.registeredAt &&
+      cursor.id === nextCursor.id
+    ) {
+      throw new Error("User keyset pagination made no progress");
+    }
+    cursor = nextCursor;
+  }
+}
+
+function userCursorFilter(cursor: UserPageCursor): string {
+  return [
+    `registered_at.lt.${cursor.registeredAt}`,
+    `and(registered_at.eq.${cursor.registeredAt},id.lt.${cursor.id})`,
+  ].join(",");
+}
 
 interface UpsertUserOpts {
   email?: string;
@@ -71,7 +124,16 @@ export async function dbUpsertUser(
 
 /**
  * Get registered users, ordered by registration date (newest first).
- * Supports optional pagination via limit/offset.
+ *
+ * With `opts.limit`, returns a single explicit page (caller-controlled,
+ * e.g. an admin UI page). Without it, returns EVERY registered user —
+ * PostgREST caps any single unpaginated select at `max_rows` (1000,
+ * supabase/config.toml:18), so this pages through with a composite
+ * (`registered_at`, `id`) keyset cursor rather than silently truncating
+ * (#1079). Callers of the
+ * no-opts form (warm-cache cron, bulk-recalculate) rely on seeing every
+ * registered user, including the earliest registrants past row 1000.
+ *
  * Returns empty array when DB is unavailable.
  */
 export async function dbGetUsers(
@@ -81,20 +143,27 @@ export async function dbGetUsers(
   if (!db) return [];
 
   try {
-    let query = db
-      .from("users")
-      .select("handle, registered_at, display_name, avatar_url")
-      .order("registered_at", { ascending: false });
+    const baseQuery = () =>
+      db
+        .from("users")
+        .select("id, handle, registered_at, display_name, avatar_url")
+        .order("registered_at", { ascending: false })
+        .order("id", { ascending: false });
 
+    let data: unknown[];
     if (opts?.limit) {
       const from = opts.offset ?? 0;
       const to = from + opts.limit - 1; // Supabase .range() is inclusive
-      query = query.range(from, to);
+      const { data: page, error } = await baseQuery().range(from, to);
+      if (error) throw error;
+      data = page ?? [];
+    } else {
+      data = await fetchAllUserPages<UserRow>((cursor) => {
+        let query = baseQuery();
+        if (cursor) query = query.or(userCursorFilter(cursor));
+        return query.limit(SUPABASE_MAX_ROWS);
+      });
     }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
 
     return parseRows<UserRow>(data, USER_REQUIRED_KEYS, "users").map((row) => ({
       handle: row.handle,
@@ -104,6 +173,107 @@ export async function dbGetUsers(
     }));
   } catch (error) {
     console.error("[db] dbGetUsers failed:", (error as Error).message);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Handle-only queries
+// ---------------------------------------------------------------------------
+
+interface UserHandleRow {
+  handle: string;
+}
+
+const USER_HANDLE_REQUIRED_KEYS: readonly (keyof UserHandleRow)[] = [
+  "handle",
+] as const;
+
+export interface UserHandlePage {
+  handles: string[];
+  /** Exact number of matching handles at or after this page's cursor. */
+  total: number;
+}
+
+/**
+ * Read one alphabetical handle page. `handle` is unique, so it is both the
+ * ordering key and the stable continuation cursor.
+ */
+export async function dbGetUserHandlePage({
+  after,
+  limit,
+}: {
+  after?: string;
+  limit: number;
+}): Promise<UserHandlePage> {
+  const db = getSupabase();
+  if (!db || limit <= 0) return { handles: [], total: 0 };
+
+  try {
+    let query = db.from("users").select("handle", { count: "exact" });
+    if (after) query = query.gt("handle", after);
+
+    const { data, error, count } = await query
+      .order("handle", { ascending: true })
+      .limit(limit);
+    if (error) throw error;
+
+    const rows = parseRows<UserHandleRow>(
+      data,
+      USER_HANDLE_REQUIRED_KEYS,
+      "users",
+    );
+    return {
+      handles: rows.map((row) => row.handle),
+      total: count ?? rows.length,
+    };
+  } catch (error) {
+    console.error(
+      "[db] dbGetUserHandlePage failed:",
+      (error as Error).message,
+    );
+    return { handles: [], total: 0 };
+  }
+}
+
+/** Read every registered handle without transferring unused profile fields. */
+export async function dbGetAllUserHandles(): Promise<string[]> {
+  const db = getSupabase();
+  if (!db) return [];
+
+  try {
+    const handles: string[] = [];
+    let after: string | undefined;
+
+    while (true) {
+      let query = db.from("users").select("handle");
+      if (after) query = query.gt("handle", after);
+
+      const { data, error } = await query
+        .order("handle", { ascending: true })
+        .limit(SUPABASE_MAX_ROWS);
+      if (error) throw error;
+
+      const rows = parseRows<UserHandleRow>(
+        data,
+        USER_HANDLE_REQUIRED_KEYS,
+        "users",
+      );
+      handles.push(...rows.map((row) => row.handle));
+      if (rows.length < SUPABASE_MAX_ROWS) return handles;
+
+      const nextAfter = rows.at(-1)?.handle;
+      if (!nextAfter) return handles;
+      if (nextAfter === after) {
+        throw new Error("User handle pagination made no progress");
+      }
+      after = nextAfter;
+    }
+  } catch (error) {
+    console.error(
+      "[db] dbGetAllUserHandles failed:",
+      (error as Error).message,
+    );
     return [];
   }
 }
@@ -122,6 +292,12 @@ export interface UserWithEmail {
 /**
  * Get all users who have an email AND have notifications enabled.
  * Used for campaign audience targeting.
+ *
+ * Pages through results with a composite (`registered_at`, `id`) keyset
+ * cursor instead of issuing a single unpaginated select. PostgREST's
+ * `max_rows = 1000` cap (#1079) would otherwise silently exclude eligible
+ * campaign recipients after the first page.
+ *
  * Returns empty array when DB is unavailable.
  */
 export async function dbGetUsersWithEmail(): Promise<UserWithEmail[]> {
@@ -129,24 +305,26 @@ export async function dbGetUsersWithEmail(): Promise<UserWithEmail[]> {
   if (!db) return [];
 
   try {
-    const { data, error } = await db
-      .from("users")
-      .select("handle, email, display_name, avatar_url")
-      .not("email", "is", null)
-      .eq("email_notifications", true)
-      .order("registered_at", { ascending: false });
+    const data = await fetchAllUserPages<{
+      id: number;
+      handle: string;
+      email: string;
+      registered_at: string;
+      display_name: string | null;
+      avatar_url: string | null;
+    }>((cursor) => {
+      let query = db
+        .from("users")
+        .select("id, handle, email, registered_at, display_name, avatar_url")
+        .not("email", "is", null)
+        .eq("email_notifications", true)
+        .order("registered_at", { ascending: false })
+        .order("id", { ascending: false });
+      if (cursor) query = query.or(userCursorFilter(cursor));
+      return query.limit(SUPABASE_MAX_ROWS);
+    });
 
-    if (error) throw error;
-    if (!data) return [];
-
-    return (
-      data as {
-        handle: string;
-        email: string;
-        display_name: string | null;
-        avatar_url: string | null;
-      }[]
-    ).map((row) => ({
+    return data.map((row) => ({
       handle: row.handle,
       email: row.email,
       displayName: row.display_name ?? null,
@@ -225,4 +403,3 @@ export async function dbUpdateEmailNotifications(
     );
   }
 }
-

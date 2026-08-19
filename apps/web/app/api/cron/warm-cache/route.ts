@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
 import { getWarmCachePriorityHandles } from "@/lib/env";
-import { dbGetUsers } from "@/lib/db/users";
+import { dbGetAllUserHandles } from "@/lib/db/users";
 import {
   dbGetLatestSnapshotBatch,
   dbCleanOldSnapshots,
@@ -12,7 +12,6 @@ import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
@@ -21,11 +20,23 @@ import {
   withErrorCapture,
 } from "@/lib/analytics/server-errors";
 import { getRequestId } from "@/lib/log";
-import { getAvatarBase64 } from "@/lib/render/avatar";
+import {
+  getBadgeAvatarCachePolicy,
+  getBadgeAvatarDataUri,
+  resolveBadgeAvatar,
+} from "@/lib/render/avatar-outcome";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import {
+  AVATAR_ABSENT_CACHE_TTL_SECONDS,
+  buildBadgeSvgCacheKey,
+  writeBadgeSvgCache,
+} from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
+import { getPublicProfileVerification } from "@/lib/profile/public-profile";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -56,6 +67,17 @@ const MAX_HANDLES = 50;
 
 /** Number of handles to process concurrently per batch. */
 const BATCH_SIZE = 5;
+
+/**
+ * Leave a buffer before `maxDuration` so there's time left to finish the
+ * in-flight batch, persist the rotation offset, write the heartbeat, and
+ * return a response before the platform kills the invocation mid-flight.
+ * Mirrors the same pattern in `/api/cron/process-campaigns` (#1095) — without
+ * this, a hard timeout mid-run meant the rotation offset and heartbeat never
+ * got written, and — since a platform-killed invocation isn't a thrown error
+ * this route can catch — no `cron_failure` alert fired either.
+ */
+const TIME_BUDGET_MS = (maxDuration - 30) * 1000;
 
 /** Redis key storing the rotation offset for round-robin handle processing. */
 const ROTATION_KEY = "cron:warm-cache:offset";
@@ -92,8 +114,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   const start = Date.now();
 
   // Discover all known handles from Supabase (authoritative user list)
-  const users = await dbGetUsers();
-  const allHandles = users.map((u) => u.handle);
+  const allHandles = await dbGetAllUserHandles();
 
   // Rotation: read stored offset, slice with wrap-around, store next offset
   const storedOffset = await cacheGet<number>(ROTATION_KEY);
@@ -106,13 +127,23 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   // priority handle that is also in the rotation would otherwise underfill the run.
   const priorityHandles = parsePriorityHandles(allHandles);
   let toWarm: string[];
-  let nextOffset: number;
+  // Number of leading toWarm entries reserved for priority handles (processed
+  // first, before any rotation-scanned handle). Used below to determine how
+  // many *rotation* handles — not just handles overall — actually completed
+  // when a time-budget stop cuts the run short (#1095/#750).
+  let reservedPriorityCount: number;
+  // For the k-th rotation handle appended to toWarm (1-indexed), the
+  // `inspected` scan-step count at the moment it was added. This lets the
+  // offset be recomputed as of any completed prefix of rotation handles,
+  // not just the full intended slice.
+  const rotationCheckpoints: number[] = [];
   if (allHandles.length <= MAX_HANDLES) {
     // All users fit in one run — no rotation needed
     toWarm = [...allHandles];
-    nextOffset = 0;
+    reservedPriorityCount = toWarm.length;
   } else {
     toWarm = priorityHandles.slice(0, MAX_HANDLES);
+    reservedPriorityCount = toWarm.length;
     const warmSet = new Set(toWarm);
     let inspected = 0;
     while (toWarm.length < MAX_HANDLES && inspected < allHandles.length) {
@@ -122,9 +153,9 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       if (!warmSet.has(handle)) {
         warmSet.add(handle);
         toWarm.push(handle);
+        rotationCheckpoints.push(inspected);
       }
     }
-    nextOffset = (offset + inspected) % allHandles.length;
   }
 
   // Pre-fetch all previous snapshots in one batch query (instead of N+1 individual calls)
@@ -135,16 +166,35 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   let snapshots = 0;
   let notifications = 0;
 
-  // Process handles in parallel batches for throughput.
-  // processInBatches returns { succeeded, failed } so we can identify which handles failed.
-  const { succeeded: warmResults, failed: warmFailures } = await processInBatches(
-    toWarm,
-    BATCH_SIZE,
-    async (handle) => {
-      const result = await warmHandle(handle, previousSnapshots, requestId);
-      return { handle, ...result };
-    },
-  );
+  // Process handles in parallel batches for throughput, checking the time
+  // budget before starting each batch (#1095, mirrors process-campaigns).
+  // completedCount tracks exactly how many of toWarm's handles were actually
+  // attempted this run — the rest are deferred to the next invocation rather
+  // than risking a hard platform timeout with nothing persisted.
+  type WarmOutcome = { handle: string } & HandleResult;
+  const warmResults: WarmOutcome[] = [];
+  const warmFailures: Array<{ item: string; error: Error }> = [];
+  let completedCount = 0;
+  let timedOut = false;
+
+  for (let i = 0; i < toWarm.length; i += BATCH_SIZE) {
+    if (Date.now() - start >= TIME_BUDGET_MS) {
+      timedOut = true;
+      break;
+    }
+    const batch = toWarm.slice(i, i + BATCH_SIZE);
+    const { succeeded, failed } = await processInBatches(
+      batch,
+      BATCH_SIZE,
+      async (handle) => {
+        const result = await warmHandle(handle, previousSnapshots, requestId);
+        return { handle, ...result };
+      },
+    );
+    warmResults.push(...succeeded);
+    warmFailures.push(...failed);
+    completedCount += batch.length;
+  }
 
   // Aggregate succeeded results
   for (const { warmed: w, snapshotRecorded, notified } of warmResults) {
@@ -155,11 +205,48 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     }
   }
 
-  // Only advance rotation after processInBatches completes, and only if at least one
-  // handle was processed — prevents a timeout from advancing the offset past handles
-  // that were never warmed (#750).
-  if (warmResults.length > 0) {
+  // Recompute the offset to advance to based on how many *rotation-scanned*
+  // handles actually completed this run — not the full intended slice.
+  // Priority handles never affect rotation position. A time-budget stop that
+  // lands before any rotation handle completes leaves the offset unchanged;
+  // one that lands partway through advances only as far as the last
+  // completed rotation handle's scan checkpoint (#1095/#750: never advance
+  // past handles never warmed).
+  let nextOffset = offset;
+  if (allHandles.length <= MAX_HANDLES) {
+    nextOffset = 0;
+  } else {
+    const completedRotationCount = completedCount - reservedPriorityCount;
+    if (completedRotationCount > 0) {
+      const checkpointIndex = Math.min(completedRotationCount, rotationCheckpoints.length) - 1;
+      const inspectedAtCheckpoint = rotationCheckpoints[checkpointIndex]!;
+      nextOffset = (offset + inspectedAtCheckpoint) % allHandles.length;
+    }
+  }
+
+  // Only advance rotation after the processing loop completes, and only if at
+  // least one handle was actually attempted — prevents a run that processed
+  // nothing (e.g. an empty user list) from persisting a spurious offset (#750).
+  if (completedCount > 0) {
     await cacheSet(ROTATION_KEY, nextOffset, 0);
+  }
+
+  // #1095: a time-budget stop is graceful degradation, not a crash — but it's
+  // still worth paging on if runs are consistently timing out, since a
+  // persistently-timing-out run means the rotation offset creeps forward far
+  // more slowly than the ceiling math above assumes.
+  if (timedOut) {
+    void captureOperationalAlert({
+      signal: "warm_cache_time_budget_exceeded",
+      severity: "P2",
+      summary: `warm-cache: time budget exceeded after ${completedCount}/${toWarm.length} handles — ${toWarm.length - completedCount} deferred to next run`,
+      route: "/api/cron/warm-cache",
+      properties: {
+        completedCount,
+        selectedCount: toWarm.length,
+        deferredCount: toWarm.length - completedCount,
+      },
+    });
   }
 
   // Log unexpected hard failures (warmHandle catches internally; these guard against
@@ -179,7 +266,11 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     ...warmResults.filter((r) => !r.warmed).map((r) => ({ handle: r.handle, reason: "warm returned false" })),
   ];
   const failed = failures.length;
-  const processedCount = toWarm.length;
+  // processedCount reflects handles actually attempted this run — equal to
+  // toWarm.length except when the time budget cut the run short (#1095), in
+  // which case the deferred tail was never attempted and must not count.
+  const processedCount = completedCount;
+  const deferredCount = toWarm.length - completedCount;
 
   // DO-L1 (#751): P2 alert when failure rate exceeds 50% of processed handles.
   // A cron run where every handle silently fails returns HTTP 200 with a non-empty
@@ -267,7 +358,9 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       expiredMergeOpsDeleted,
       expiredSnapshotsDeleted,
       processedCount,
-      processedSample: toWarm.slice(0, 10),
+      processedSample: toWarm.slice(0, Math.min(completedCount, 10)),
+      timedOut,
+      deferredCount,
       rotation: {
         offset,
         nextOffset,
@@ -314,13 +407,45 @@ async function warmHandle(
     let snapshotRecorded = false;
     let notified = false;
 
-    // Pre-warm avatar cache opportunistically for later public renders.
-    const avatarUrl = materialized.stats.avatarUrl;
-    if (avatarUrl) {
-      fireAndForget(
-        () => getAvatarBase64(handle, avatarUrl),
-        () => undefined,
+    // #1089 (PE-M2): render and publish the badge SVG cache entry here so the
+    // first real visitor after the UTC date rollover gets a cache hit instead
+    // of paying the full materialize+render cost the cron already just paid.
+    // Gated by the exact same outcome policy and verification check as the
+    // request path in finalizeMaterializedBadge. A transient avatar failure
+    // must not publish a placeholder, while definitive absence is safe to
+    // cache and a missing URL gets only the short placeholder TTL.
+    // The avatar fetch is awaited (not fire-and-forget as before) since its
+    // result now feeds the render; its own internal fetch abort bounds this.
+    try {
+      const avatarOutcome = await resolveBadgeAvatar(
+        handle,
+        materialized.stats.avatarUrl,
       );
+      const avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
+      const avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
+      const verification = getPublicProfileVerification(materialized);
+
+      if (avatarCachePolicy !== "skip" && verification) {
+        const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+          avatarDataUri,
+          verificationHash: verification.hash,
+          verificationDate: verification.date,
+          // Mirrors the request path — this SVG is served to <img> embeds,
+          // where SMIL <animate> never runs.
+          disableAnimation: true,
+        });
+        const today = toDateString(new Date());
+        const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+        if (avatarCachePolicy === "short") {
+          await writeBadgeSvgCache(svgCacheKey, svg, handle, {
+            ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+          });
+        } else {
+          await writeBadgeSvgCache(svgCacheKey, svg, handle);
+        }
+      }
+    } catch {
+      // Badge SVG warming is opportunistic — never fail the warm over it.
     }
 
     // Record daily metrics snapshot (fire-and-forget, deduplicates by date)

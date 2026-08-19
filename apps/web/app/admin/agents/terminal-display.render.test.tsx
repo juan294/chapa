@@ -52,7 +52,32 @@ describe("TerminalDisplay", () => {
       }),
     );
     render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
-    expect(screen.getByText("Waiting for output...")).toBeDefined();
+    const waiting = screen.getByText("Waiting for output...");
+    expect(waiting.className).toContain("animate-pulse");
+    vi.unstubAllGlobals();
+  });
+
+  it("uses card styling and a scrollable, monospace, max-height log area", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ status: "running", lines: [], totalLines: 0 }),
+      }),
+    );
+    const { container } = render(
+      <TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />,
+    );
+    const root = container.firstElementChild;
+    expect(root?.className).toContain("rounded-xl");
+    expect(root?.className).toContain("border-stroke");
+    expect(root?.className).toContain("bg-card");
+
+    const logArea = screen.getByText("Waiting for output...").parentElement;
+    expect(logArea?.className).toContain("max-h-80");
+    expect(logArea?.className).toContain("overflow-y-auto");
+    expect(logArea?.className).toContain("font-heading");
     vi.unstubAllGlobals();
   });
 
@@ -83,6 +108,37 @@ describe("TerminalDisplay", () => {
     );
     render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
     expect(screen.getByLabelText("Copy logs")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("Copy button writes the joined log text to the clipboard", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          status: "running",
+          startedAt: new Date().toISOString(),
+          lines: [
+            { timestamp: new Date().toISOString(), text: "line one", stream: "stdout" },
+            { timestamp: new Date().toISOString(), text: "line two", stream: "stderr" },
+          ],
+          totalLines: 2,
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+
+    fireEvent.click(screen.getByLabelText("Copy logs"));
+
+    expect(writeText).toHaveBeenCalledWith("line one\nline two");
     vi.unstubAllGlobals();
   });
 
@@ -142,7 +198,110 @@ describe("TerminalDisplay", () => {
     const { container } = render(
       <TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />,
     );
-    expect(container.querySelectorAll(".rounded-full").length).toBe(3);
+    const dots = container.querySelectorAll(".rounded-full");
+    expect(dots.length).toBe(3);
+    expect(dots[0]?.className).toContain("bg-terminal-red/60");
+    expect(dots[1]?.className).toContain("bg-terminal-yellow/60");
+    expect(dots[2]?.className).toContain("bg-terminal-green/60");
+    vi.unstubAllGlobals();
+  });
+
+  it("uses text-amber for the running status", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ status: "running", lines: [], totalLines: 0 }),
+      }),
+    );
+    render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
+    expect(screen.getByText("running").className).toContain("text-amber");
+    vi.unstubAllGlobals();
+  });
+
+  it("requests the agentKey and since offset as query params, polling every 2s", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          status: "running",
+          startedAt: new Date().toISOString(),
+          lines: [
+            { timestamp: new Date().toISOString(), text: "first", stream: "stdout" },
+          ],
+          totalLines: 5,
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<TerminalDisplay agentKey="my-agent" onClose={vi.fn()} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+
+    expect(mockFetch.mock.calls[0]![0]).toBe(
+      "/api/admin/agents/run?agentKey=my-agent&since=0",
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    // Second poll uses the updated offset (totalLines from the first response)
+    expect(mockFetch.mock.calls[1]![0]).toBe(
+      "/api/admin/agents/run?agentKey=my-agent&since=5",
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("stops polling once the run reaches a terminal status", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          status: "completed",
+          startedAt: new Date().toISOString(),
+          lines: [],
+          totalLines: 0,
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    const callsAfterFirstPoll = mockFetch.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6000);
+    });
+
+    // No further polls once status is a terminal one
+    expect(mockFetch.mock.calls.length).toBe(callsAfterFirstPoll);
+    vi.unstubAllGlobals();
+  });
+
+  it("clears the poll interval and initial timeout on unmount", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockReturnValue(new Promise(() => {})), // never resolves
+    );
+    const clearIntervalSpy = vi.spyOn(global, "clearInterval");
+    const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+    const { unmount } = render(
+      <TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />,
+    );
+    unmount();
+
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    expect(clearTimeoutSpy).toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
@@ -231,6 +390,37 @@ describe("TerminalDisplay", () => {
       expect(errorLine.className).toContain("text-terminal-red");
       vi.unstubAllGlobals();
     });
+
+    it("renders stdout lines with text-text-primary and a formatted timestamp", async () => {
+      const timestamp = new Date("2026-03-24T10:30:00Z").toISOString();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              status: "running",
+              startedAt: new Date().toISOString(),
+              lines: [{ timestamp, text: "Build succeeded", stream: "stdout" }],
+              totalLines: 1,
+            }),
+        }),
+      );
+
+      render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+
+      const line = screen.getByText("Build succeeded");
+      expect(line.className).toContain("text-text-primary");
+      expect(
+        screen.getByText(new Date(timestamp).toLocaleTimeString()),
+      ).toBeDefined();
+      vi.unstubAllGlobals();
+    });
   });
 
   describe("elapsed time formatting", () => {
@@ -289,6 +479,32 @@ describe("TerminalDisplay", () => {
 
       // Should show "1m 30s" format
       expect(screen.getByText("1m 30s")).toBeDefined();
+      vi.unstubAllGlobals();
+    });
+
+    it("re-renders the elapsed time on a 1-second tick", async () => {
+      const startedAt = new Date(Date.now() - 10_000).toISOString();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({ status: "running", startedAt, lines: [], totalLines: 0 }),
+        }),
+      );
+
+      render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(screen.getByText("10s")).toBeDefined();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(screen.getByText("11s")).toBeDefined();
       vi.unstubAllGlobals();
     });
   });

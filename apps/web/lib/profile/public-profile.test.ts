@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { makeFullStats, makeSnapshot } from "../test-helpers/fixtures";
+import { makeFullStats, makeImpact, makeSnapshot } from "../test-helpers/fixtures";
 import type { MaterializedProfile } from "./materialize-profile";
 import {
   deferProfileCacheWork,
   getPublicProfileVerification,
   materializePublicProfile,
   persistProfileSnapshot,
+  redactImpactForVisitor,
   runPublicProfileSideEffects,
 } from "./public-profile";
 
@@ -19,6 +20,7 @@ const mockDbReplaceSnapshot = vi.fn();
 const mockUpdateSnapshotCache = vi.fn();
 const mockDbUpsertUser = vi.fn();
 const mockCacheSetNxStatus = vi.fn();
+const mockCacheDel = vi.fn();
 const mockClearStatsDirty = vi.fn();
 const mockCaptureServerEvent =
   vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
@@ -40,6 +42,7 @@ vi.mock("@/lib/verification/store", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   trackBadgeGenerated: (...args: unknown[]) => mockTrackBadgeGenerated(...args),
   cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
+  cacheDel: (...args: unknown[]) => mockCacheDel(...args),
 }));
 
 vi.mock("@/lib/email/notifications", () => ({
@@ -288,6 +291,45 @@ describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () =>
 
       expect(result).toBe(true);
       expect(mockCaptureServerError).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #1081 — A failed durable write must release the once-per-day SETNX guard
+  // it already claimed, so the NEXT badge request the same day retries the
+  // write instead of silently forfeiting the rest of the day's snapshot.
+  // "inserted" and "duplicate" are correct terminal states and must leave the
+  // guard in place.
+  // -------------------------------------------------------------------------
+
+  describe("#1081 day-guard release on failed durable write", () => {
+    it("releases the day-guard key when the durable write genuinely fails", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("failed");
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("testuser", materialized);
+
+      expect(mockCacheDel).toHaveBeenCalledWith(
+        expect.stringMatching(/^sideeffects:done:testuser:/),
+      );
+    });
+
+    it("does NOT release the day-guard key on a genuinely fresh insert", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("inserted");
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("testuser", materialized);
+
+      expect(mockCacheDel).not.toHaveBeenCalled();
+    });
+
+    it("does NOT release the day-guard key on a benign duplicate", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("duplicate");
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("testuser", materialized);
+
+      expect(mockCacheDel).not.toHaveBeenCalled();
     });
   });
 });
@@ -569,5 +611,66 @@ describe("runPublicProfileSideEffects", () => {
       expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
       expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// redactImpactForVisitor (#1067 FE-M1)
+// ---------------------------------------------------------------------------
+//
+// The share page (apps/web/app/u/[handle]/page.tsx) crosses `impact` into a
+// "use client" component tree. Whatever crosses that boundary is serialized
+// into the RSC payload a visitor's browser downloads, regardless of whether
+// any component actually renders it. Confidence/confidencePenalties are
+// owner-only (CLAUDE.md), so a non-owner request must never receive them —
+// not just have them hidden from display.
+describe("redactImpactForVisitor", () => {
+  it("strips confidence and confidencePenalties from the result", () => {
+    const impact = makeImpact({
+      confidence: 62,
+      confidencePenalties: [
+        { flag: "low_activity_signal", penalty: 10, reason: "Low recent activity." },
+      ],
+    });
+
+    const redacted = redactImpactForVisitor(impact);
+
+    expect("confidence" in redacted).toBe(false);
+    expect("confidencePenalties" in redacted).toBe(false);
+    expect(JSON.stringify(redacted)).not.toContain("confidence");
+  });
+
+  it("preserves every other field, including the public headline score", () => {
+    const impact = makeImpact({
+      handle: "octocat",
+      adjustedComposite: 73,
+      compositeScore: 70,
+      tier: "High",
+      archetype: "Builder",
+      profileType: "collaborative",
+    });
+
+    const redacted = redactImpactForVisitor(impact);
+
+    expect(redacted).toEqual({
+      handle: "octocat",
+      profileType: "collaborative",
+      dimensions: impact.dimensions,
+      archetype: "Builder",
+      compositeScore: 70,
+      adjustedComposite: 73,
+      tier: "High",
+      computedAt: impact.computedAt,
+    });
+  });
+
+  it("returns a new object rather than mutating the input (snapshot/HMAC record safety)", () => {
+    const impact = makeImpact({ confidence: 91 });
+
+    const redacted = redactImpactForVisitor(impact);
+
+    expect(redacted).not.toBe(impact);
+    expect(impact.confidence).toBe(91);
+    expect(impact.confidencePenalties).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import type { Translations } from "@/lib/i18n/types";
 
 // Mock shared dependencies
 vi.mock("@/components/Navbar", () => ({
@@ -26,6 +27,10 @@ vi.mock("@/components/GlobalCommandBarLazy", () => ({
 
 vi.mock("@/components/LiteYouTubeEmbed", () => ({
   LiteYouTubeEmbed: () => <div data-testid="youtube-embed" />,
+}));
+
+vi.mock("./verify/VerifyForm", () => ({
+  VerifyForm: () => <div data-testid="verify-form" />,
 }));
 
 vi.mock("@/lib/i18n", async (importOriginal) => {
@@ -104,11 +109,48 @@ describe("ComingSoonPage render", () => {
 // Verify input page (server component — must await the async function)
 // ---------------------------------------------------------------------------
 describe("VerifyInputPage render", () => {
-  it("renders with verify heading", async () => {
+  it("renders with verify heading, main landmark, complement-token styling, and the verify form", async () => {
     const { default: VerifyInputPage } = await import("./verify/page");
     const jsx = await VerifyInputPage();
     render(jsx);
     expect(screen.getByTestId("navbar")).toBeDefined();
+    expect(document.getElementById("main-content")).not.toBeNull();
+    expect(screen.getByTestId("verify-form")).toBeDefined();
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.querySelector(".text-complement")).not.toBeNull();
+
+    expect(screen.getByText("chapa verify")).toBeDefined();
+  });
+
+  it("generateMetadata returns the real verify title/description with noindex robots", async () => {
+    const { generateMetadata } = await import("./verify/page");
+    const meta = await generateMetadata();
+    const { en } = await import("@/lib/i18n/dictionaries/en");
+    const enVerify = en.verify as Translations;
+    expect(meta.title).toBe(enVerify.title as string);
+    expect(meta.description).toBe(enVerify.description as string);
+    expect(meta.robots).toEqual({ index: false, follow: true });
+  });
+
+  it("dictionary copy explains hash format, where to find it, and the verified-vs-public claim limit (EN and ES)", async () => {
+    const { en } = await import("@/lib/i18n/dictionaries/en");
+    const { es } = await import("@/lib/i18n/dictionaries/es");
+    const enContent = JSON.stringify(en.verify);
+    const esContent = JSON.stringify(es.verify);
+
+    expect(enContent).toContain("8, 16, or 32-character");
+    expect(enContent).toContain("right edge");
+    expect(enContent).toContain("badge marked Verified metrics");
+    expect(enContent).toContain(
+      "Badges marked Public metrics do not claim cryptographic verification",
+    );
+    expect(enContent).not.toContain("from any Chapa badge");
+
+    expect(esContent).toContain("Métricas verificadas");
+    expect(esContent).toContain(
+      "Métricas públicas» no afirman tener verificación criptográfica",
+    );
   });
 });
 
@@ -143,7 +185,7 @@ describe("Loading page renders", () => {
 
   it("renders StudioLoading", async () => {
     const { default: StudioLoading } = await import("./studio/loading");
-    render(<StudioLoading />);
+    render(await StudioLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
@@ -167,7 +209,7 @@ describe("Loading page renders", () => {
 
   it("renders GeneratingLoading", async () => {
     const { default: GeneratingLoading } = await import("./generating/[handle]/loading");
-    render(<GeneratingLoading />);
+    render(await GeneratingLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 });

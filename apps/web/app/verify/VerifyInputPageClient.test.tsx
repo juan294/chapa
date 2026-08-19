@@ -26,16 +26,14 @@ import { VerifyInputPageClient } from "./VerifyInputPageClient";
 
 afterEach(() => {
   cleanup();
-  document.title = "";
 });
 
 describe("VerifyInputPageClient", () => {
-  it("applies the pinned query locale and synchronizes the document title", () => {
+  it("applies the pinned query locale", () => {
     render(<VerifyInputPageClient />);
 
     expect(screen.getByTestId("locale-sync").getAttribute("data-query-lang")).toBe(
       "es",
     );
-    expect(document.title).toBe("Verificar una Chapa — Chapa");
   });
 });

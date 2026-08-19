@@ -1,8 +1,20 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-07-15 | Audit: v42
+> Last reviewed: 2026-08-18 | Audit: v43
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
+
+---
+
+## Project scale policy: no new gates, monitoring infra, or disproportionate hardening (2026-08-18)
+
+- **Risk:** Chapa is maintained by a single developer with a very small user base. Pre-launch audits are written from a general "public launch under scrutiny" posture and will keep proposing things that are good practice for a funded team with an on-call rotation and real attack surface at scale: new CI gates, expanded coverage-floor enforcement, third-party uptime monitors, alert deduplication/throttling systems, paid log-retention integrations, secret-rotation runbooks, supply-chain checksum pinning, least-privilege CI permission audits, and defensive hardening against threat models (sustained abuse traffic, tail-latency SLO breaches, IP-spoofing edge cases) that don't apply at this project's actual scale.
+- **Why accepted:** More gates and more process are themselves a cost — for a solo maintainer, every new CI check, coverage floor, monitoring dashboard, or runbook is something *they* personally have to maintain, and a false-positive/red gate blocks *their own* ability to ship, with no team to absorb the friction. This project has already accumulated more CI/release-process machinery (E2E Pro release verification, multi-stage evidence pipeline, license/vulnerability scanning, migration-drift gates, contract tests, bundle-size budgets, etc.) than a solo project with barely any users needs, and the explicit direction going forward is to *not* add to that pile. A finding that only makes sense under a "large team, many users, adversarial attacker, formal incident response" threat model is out of scope here, even if it would be correct advice for a bigger project.
+- **What this covers (reject, do not re-raise as findings):** proposals to add new CI gates, git hooks, or lint/typecheck/coverage enforcement scope; new external monitoring/alerting services or infrastructure (uptime monitors, alert dedup/throttling, log-retention/APM integrations, multi-sample SLO monitoring); security/privacy hardening sized for an adversary or user volume this project doesn't have (rate-limit tightening against abuse with no realistic attacker, IP-spoofing edge cases, CI supply-chain checksum pinning, GitHub Actions least-privilege permission audits, secret-rotation documentation, Node-version dashboard-drift insurance); and architecture-purity refactors proposed for their own sake (e.g., "consolidate N duplicate implementations into one contract") where the current code works and nothing is actually broken.
+- **What this does NOT cover:** genuine bugs that affect the product or data — a route that returns wrong data, a cache that never gets invalidated, a UI state a real visitor can hit, data corruption, or a durable write that silently fails. Those get fixed regardless of user count. The line is "does this fix something that's actually broken" vs. "does this add ceremony/infrastructure that only pays off at a scale or threat level this project isn't at."
+- **Mitigation:** None needed — this is a standing policy, not a specific technical risk. `/pre-launch` and `/remediate` should read this entry and not raise or re-raise findings in the categories above for this project.
+- **Severity:** N/A (process policy, not a technical risk)
+- **Accepted:** 2026-08-18
 
 ---
 
@@ -13,6 +25,16 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** The tolerance is pinned to the exact statement pair, whitespace-normalized, in `TOLERATED_MIGRA_ARTIFACT` (`scripts/check-pending-migrations.ts`). Three regression tests in `check-pending-migrations.test.ts` assert that the gate still blocks when the artifact is accompanied by any other statement, when the `admin_users` body genuinely changes, and when the same body shape appears for a different view. Real drift in any other object is unaffected. The proper fix is replacing migra with schema introspection, tracked in #1064.
 - **Severity:** Low (one admin-only view, pinned body, blocking behavior preserved everywhere else)
 - **Accepted:** 2026-08-11
+
+---
+
+## Production migration-history label mismatch on version 004 (#1064)
+
+- **Risk:** Production's applied-migrations history records version `004` under the name `add_agent_feature_flags` — the name that belongs to `005` — while the repository file at that version is `004_add_user_email.sql`. A history table entry has the wrong label for its version.
+- **Why accepted:** This is bookkeeping only, not schema drift. The schema production actually holds matches the repository file exactly: `users.email` (text, nullable) and `users.email_notifications` (boolean, NOT NULL, default true) both exist as `004_add_user_email.sql` specifies, verified read-only against production on 2026-08-11. `check:pending-migrations` diffs schema state, not migration-history labels, so this mismatch does not affect the gate — confirmed passing on PR #1063's linked-production CI run after the `032_reconcile_remote_schema.sql` reconciliation.
+- **Mitigation:** None required — correcting a Supabase migration-history label retroactively risks its own drift for zero schema benefit. Re-evaluate only if the Supabase CLI ever begins validating history labels against file names as part of `db diff`.
+- **Severity:** Low (cosmetic, no schema or gate impact)
+- **Accepted:** 2026-08-18
 
 ---
 
@@ -187,12 +209,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** Low
 - **Accepted:** 2026-07-15
 
-## `packages/shared` has no build step (#450)
+## `packages/shared` build step exists but does not drive runtime resolution (#450, #1099)
 
-- **Risk:** The shared types package has no `tsc` build or compiled output.
-- **Mitigation:** Next.js `transpilePackages` handles TypeScript compilation of workspace packages at build time. Adding a separate build step would add complexity and staleness risk without benefit. `pnpm run typecheck` validates the shared package.
+- **Risk (resolved #748, corrected #1099):** `packages/shared` originally had no `tsc` build or compiled output. #748 added `tsconfig.build.json` and a `build` script (`tsc -p tsconfig.build.json`, emitting to `dist/`), but nothing invoked it — the root `build` script filtered to `@chapa/web` only, so the build step existed but was never exercised, and this entry (until #1099) still described it as absent.
+- **Current state:** The root `build` script now runs `pnpm --filter @chapa/shared build` before `pnpm --filter @chapa/web build`, so `packages/shared`'s `tsc` emit is exercised on every CI `build` job and local `pnpm run build`, giving a real regression signal if the package fails to compile standalone.
+- **Deliberately unchanged:** `package.json`'s `main`/`types` still resolve to `src/index.ts` (not `dist/`) for every workspace consumer — Next.js `transpilePackages` still compiles the package from source at app build time. Only `publishConfig.main`/`publishConfig.types` point at `dist/`, for a hypothetical external npm consumer. Switching the top-level `main`/`types` to `dist/` would introduce a staleness class (built output going stale relative to source) that this design deliberately avoids; the build is invoked for verification only, not to change what gets resolved.
 - **Severity:** None
-- **Accepted:** 2026-02-21
+- **Accepted:** 2026-02-21 (original gap), corrected 2026-08-18 (#1099 — build wired into root `build` script)
 
 ## pnpm build warnings (core-js, protobufjs) (#450)
 

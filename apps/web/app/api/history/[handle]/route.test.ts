@@ -25,9 +25,13 @@ vi.mock("@/lib/history/history", () => ({
 }));
 
 const mockCompareSnapshots = vi.fn();
-vi.mock("@/lib/history/diff", () => ({
-  compareSnapshots: (...args: unknown[]) => mockCompareSnapshots(...args),
-}));
+vi.mock("@/lib/history/diff", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/history/diff")>();
+  return {
+    ...actual,
+    compareSnapshots: (...args: unknown[]) => mockCompareSnapshots(...args),
+  };
+});
 
 const mockComputeTrend = vi.fn();
 vi.mock("@/lib/history/trend", () => ({
@@ -128,6 +132,36 @@ describe("GET /api/history/[handle]", () => {
     const body = await res.json();
     expect(body.diff).toBeDefined();
     expect(body.diff.direction).toBe("improving");
+  });
+
+  it("strips confidence and penalty changes from the public diff", async () => {
+    const s1 = makeSnapshot({ date: "2025-06-14", confidence: 90 });
+    const s2 = makeSnapshot({ date: "2025-06-15", confidence: 75 });
+    mockGetSnapshots.mockResolvedValue([s1, s2]);
+    mockCompareSnapshots.mockReturnValue({
+      direction: "declining",
+      adjustedComposite: -5,
+      confidence: -15,
+      penaltyChanges: {
+        added: ["burst_activity"],
+        removed: [],
+      },
+      daysBetween: 1,
+    });
+
+    const res = await GET(makeRequest("testuser", { include: "diff" }), {
+      params: Promise.resolve({ handle: "testuser" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.diff).toMatchObject({
+      direction: "declining",
+      adjustedComposite: -5,
+      daysBetween: 1,
+    });
+    expect(body.diff).not.toHaveProperty("confidence");
+    expect(body.diff).not.toHaveProperty("penaltyChanges");
   });
 
   it("omits trend when include=snapshots", async () => {

@@ -1,12 +1,27 @@
+// Deliberately a server component with no client-side hooks (#1109 / UX-H3
+// vs. the "lightweight implementation" invariant below) — this is the
+// top-level Suspense fallback shown across every route, so it must render
+// instantly without waiting on client JS. The visible/aria text is still
+// sourced from the i18n dictionary (not a hardcoded English literal): since
+// this static shell always renders at DEFAULT_LOCALE ('es', #861) like the
+// rest of the root layout, the resolved dictionary is read directly rather
+// than via useTranslation()/LanguageProvider.
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+
+const dictionary = DEFAULT_LOCALE === "es" ? es : en;
+
 export default function RootLoading() {
   return (
     <main
       id="main-content"
       className="flex min-h-screen items-center justify-center bg-bg px-6"
       role="status"
-      aria-label="Loading"
+      aria-label={resolveTranslation("aria.loading", dictionary) as string}
     >
-      <span className="sr-only">Loading Chapa...</span>
+      <span className="sr-only">{resolveTranslation("common.loadingChapa", dictionary) as string}</span>
 
       <div className="w-full max-w-md">
         {/* Terminal window chrome */}

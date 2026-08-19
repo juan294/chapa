@@ -13,6 +13,7 @@ vi.mock("@/components/Navbar", () => ({
 }));
 
 vi.mock("@/lib/i18n", () => ({
+  DEFAULT_LOCALE: "es",
   LanguageProvider: ({
     children,
     initialLocale,
@@ -205,6 +206,22 @@ describe("VerifyPage", () => {
         screen.getByText("No verification record found for this hash."),
       ).toBeDefined();
       expect(screen.getByText("a1b2c3d4")).toBeDefined();
+    });
+
+    it("wraps a supported 32-character hash on narrow viewports", async () => {
+      vi.mocked(getVerificationRecord).mockResolvedValue(null);
+      const hash = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      expect(screen.getByText(hash).className).toContain("break-all");
+      expect(
+        document.querySelector('script[data-chapa-document-locale="en"]'),
+      ).not.toBeNull();
     });
   });
 

@@ -38,6 +38,7 @@ const mockFrom = vi.fn((): any => ({
       in: () => Promise.resolve(nextQueryResult()),
       maybeSingle: () => Promise.resolve(nextQueryResult()),
       limit: () => chainable,
+      range: () => Promise.resolve(nextQueryResult()),
       then: (resolve: (v: unknown) => void) => resolve(nextQueryResult()),
     };
     return chainable;
@@ -100,11 +101,13 @@ import {
   dbDeleteCampaign,
   dbCreateCampaignSends,
   dbClaimPendingSends,
+  dbReleaseCampaignSendLease,
   dbAcknowledgeCampaignSends,
   dbGetPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
   dbGetCampaignStats,
+  CampaignStatsReadError,
   dbGetActiveEngagementCampaign,
   mapCampaignRow,
   mapSendRow,
@@ -677,6 +680,58 @@ describe("dbClaimPendingSends", () => {
   });
 });
 
+describe("dbReleaseCampaignSendLease", () => {
+  it("releases a lease group back to pending through the RPC", async () => {
+    mockRpc.mockResolvedValueOnce({ data: 3, error: null });
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(mockRpc).toHaveBeenCalledWith("release_campaign_send_lease", {
+      p_lease_token: "lease-token",
+    });
+    expect(result).toBe(true);
+  });
+
+  it("fails closed when the released count does not match the caller's expectation", async () => {
+    mockRpc.mockResolvedValueOnce({ data: 2, error: null });
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when DB unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(result).toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("returns false on RPC error", async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error("rpc failed") });
+
+    const result = await dbReleaseCampaignSendLease("lease-token", 3);
+
+    expect(result).toBe(false);
+  });
+
+  it("fails closed before the RPC when the lease token is blank", async () => {
+    const result = await dbReleaseCampaignSendLease("   ", 3);
+
+    expect(result).toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before the RPC when the expected count is not positive", async () => {
+    const result = await dbReleaseCampaignSendLease("lease-token", 0);
+
+    expect(result).toBe(false);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("dbAcknowledgeCampaignSends", () => {
   it("delegates the complete provider result set to one RPC", async () => {
     mockRpc.mockResolvedValueOnce({ data: true, error: null });
@@ -768,81 +823,54 @@ describe("dbMarkSendsFailed", () => {
 });
 
 describe("dbGetCampaignStats", () => {
-  it("returns aggregate counts from a single status-only query", async () => {
-    queryResults = [
-      {
-        data: [
-          { status: "sent" },
-          { status: "sent" },
-          { status: "pending" },
-          { status: "processing" },
-          { status: "processing" },
-          { status: "processing" },
-          { status: "failed" },
-        ],
-        error: null,
-      },
-    ];
+  it("returns counts from one aggregate RPC", async () => {
+    mockRpc.mockResolvedValue({
+      data: [{ sent: 2, pending: 1, processing: 3, failed: 1 }],
+      error: null,
+    });
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 2, pending: 1, processing: 3, failed: 1 });
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith("get_campaign_send_stats", {
+      p_campaign_id: "c-1",
+    });
   });
 
-  it("issues exactly one round trip, selecting only the status column", async () => {
-    queryResults = [{ data: [{ status: "sent" }], error: null }];
-
-    await dbGetCampaignStats("c-1");
-
-    expect(mockSelect).toHaveBeenCalledTimes(1);
-    expect(mockSelect).toHaveBeenCalledWith("status");
-  });
-
-  it("returns zeros when DB unavailable", async () => {
+  it("fails loudly when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+    await expect(dbGetCampaignStats("c-1")).rejects.toBeInstanceOf(
+      CampaignStatsReadError,
+    );
   });
 
-  it("returns zeros when data is null", async () => {
-    queryResults = [{ data: null, error: null }];
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+  it("fails loudly on query error", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: new Error("query failed") });
+    await expect(dbGetCampaignStats("c-1")).rejects.toMatchObject({
+      name: "CampaignStatsReadError",
+      campaignId: "c-1",
+      cause: expect.objectContaining({ message: "query failed" }),
+    });
   });
 
-  it("returns zeros on query error", async () => {
-    queryResults = [{ error: new Error("query failed") }];
+  it("counts all-sent data correctly past the row cap", async () => {
+    mockRpc.mockResolvedValue({
+      data: [{ sent: 1250, pending: 0, processing: 0, failed: 0 }],
+      error: null,
+    });
+
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 1250, pending: 0, processing: 0, failed: 0 });
   });
 
-  it("counts all-sent data correctly", async () => {
-    queryResults = [
-      {
-        data: [{ status: "sent" }, { status: "sent" }, { status: "sent" }],
-        error: null,
-      },
-    ];
-
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 3, pending: 0, processing: 0, failed: 0 });
-  });
-
-  it("ignores rows with an unrecognized status instead of throwing", async () => {
-    queryResults = [
-      {
-        data: [{ status: "sent" }, { status: "bogus-status" }],
-        error: null,
-      },
-    ];
-
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 1, pending: 0, processing: 0, failed: 0 });
-  });
-
-  it("returns zeros for empty data array", async () => {
-    queryResults = [{ data: [], error: null }];
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+  it("fails loudly for an incomplete aggregate response", async () => {
+    mockRpc.mockResolvedValue({
+      data: [{ sent: 1, pending: 0, processing: 0 }],
+      error: null,
+    });
+    await expect(dbGetCampaignStats("c-1")).rejects.toBeInstanceOf(
+      CampaignStatsReadError,
+    );
   });
 });
 

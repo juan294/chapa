@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const imageResponses = vi.hoisted(() => [] as unknown[]);
 
@@ -14,6 +14,15 @@ vi.mock("next/og", () => ({
   }),
 }));
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Manual side-channel array, not a vi mock — vi.clearAllMocks() doesn't
+  // touch it, so it needs its own reset. Without this, "renders the Apple
+  // icon..." only passes when it runs second (order-dependent: it asserted
+  // a cumulative count across both tests instead of its own render).
+  imageResponses.length = 0;
+});
+
 describe("dynamic app icons", () => {
   it("renders the favicon ImageResponse at 32px", async () => {
     const { default: Icon, size, contentType } = await import("./icon");
@@ -25,6 +34,7 @@ describe("dynamic app icons", () => {
     expect(response).toEqual(
       expect.objectContaining({ init: { width: 32, height: 32 } }),
     );
+    expect(imageResponses).toHaveLength(1);
   });
 
   it("renders the Apple icon ImageResponse at 180px", async () => {
@@ -39,6 +49,6 @@ describe("dynamic app icons", () => {
     expect(response).toEqual(
       expect.objectContaining({ init: { width: 180, height: 180 } }),
     );
-    expect(imageResponses).toHaveLength(2);
+    expect(imageResponses).toHaveLength(1);
   });
 });

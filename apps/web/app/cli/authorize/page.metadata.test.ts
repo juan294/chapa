@@ -28,7 +28,10 @@ describe("CliAuthorizePage generateMetadata", () => {
   it("returns title and robots noindex", async () => {
     const { generateMetadata } = await import("./page");
     const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
-    expect(meta.title).toBeTruthy();
+    // getServerT is mocked to return the key itself, so this also confirms
+    // generateMetadata reads the cliAuthorize.metadataTitle key (not some
+    // other key) to build the page title.
+    expect(meta.title).toBe("cliAuthorize.metadataTitle");
     expect((meta.robots as { index: boolean }).index).toBe(false);
   });
 

@@ -50,12 +50,22 @@ describe("GeneratingProgress", () => {
 
   it("renders initial steps", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
-    render(<GeneratingProgress handle="testuser" />);
-    // English dict (useTranslation falls back to English without LanguageProvider)
-    expect(screen.getByText("Checking GitHub session")).toBeDefined();
-    expect(screen.getByText("Collecting contribution data")).toBeDefined();
-    expect(screen.getByText("Computing impact profile")).toBeDefined();
-    expect(screen.getByText("Rendering badge")).toBeDefined();
+    const { container } = render(<GeneratingProgress handle="testuser" />);
+    // English dict (useTranslation falls back to English without LanguageProvider).
+    // Scoped to each visual step row via data-step, since step 0's label is
+    // also mirrored (once) in the visually-hidden live status line (#1114).
+    expect(container.querySelector('[data-step="0"]')?.textContent).toContain(
+      "Checking GitHub session",
+    );
+    expect(container.querySelector('[data-step="1"]')?.textContent).toContain(
+      "Collecting contribution data",
+    );
+    expect(container.querySelector('[data-step="2"]')?.textContent).toContain(
+      "Computing impact profile",
+    );
+    expect(container.querySelector('[data-step="3"]')?.textContent).toContain(
+      "Rendering badge",
+    );
     vi.unstubAllGlobals();
   });
 
@@ -203,6 +213,215 @@ describe("GeneratingProgress", () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith("/u/testuser");
+    vi.unstubAllGlobals();
+  });
+
+  it("surfaces an error state instead of hanging forever when the request never settles (#1108)", async () => {
+    // A fetch that never resolves and never rejects — simulates a stalled
+    // network request. Without a timeout, hasError/catch would never fire.
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(<GeneratingProgress handle="testuser" />);
+
+    // Still pinned on step 0 well before the timeout ceiling.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Advance past the ~45s timeout ceiling.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(40_000);
+    });
+
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(
+      document.querySelector('[data-step="0"]')?.getAttribute("data-status"),
+    ).toBe("error");
+    vi.unstubAllGlobals();
+  });
+
+  it("shows try-later copy on a 429 rate-limit response, keeping the retry link", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 429 }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(
+      screen.getByText(
+        "You're generating badges too quickly. Please wait a moment and try again.",
+      ),
+    ).toBeDefined();
+    // Retrying later is still a valid action for a rate limit.
+    expect(screen.getByText("Try again")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows a sign-in-again link on 401 instead of a dead same-URL retry", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 401 }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(
+      screen.getByText("Your session has expired. Please sign in again."),
+    ).toBeDefined();
+
+    const link = screen.getByText("Sign in again").closest("a");
+    expect(link?.getAttribute("href")).toBe(
+      "/api/auth/login?redirect=%2Fgenerating%2Ftestuser",
+    );
+
+    // The old same-URL retry (which cannot re-authenticate) must be gone.
+    expect(screen.queryByText("Try again")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the generic error message on a 5xx response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 503 }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(
+      screen.getByText("Something went wrong generating your badge."),
+    ).toBeDefined();
+    expect(screen.getByText("Try again")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows reassurance copy after ~5s without re-announcing it on every tick", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    const { container } = render(<GeneratingProgress handle="testuser" />);
+
+    const statusRegion = container.querySelector('[role="status"]');
+    expect(statusRegion).not.toBeNull();
+    expect(screen.queryByText(/Still working/)).toBeNull();
+
+    const contentBeforeAt5s = statusRegion?.textContent;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    const notice = screen.getByText(/Still working/);
+    expect(notice).toBeDefined();
+    // The reassurance copy lives outside the aria-live status region so it
+    // doesn't get announced on every re-render/tick.
+    expect(statusRegion?.contains(notice)).toBe(false);
+    expect(statusRegion?.textContent).toBe(contentBeforeAt5s);
+
+    const contentAfter5s = statusRegion?.textContent;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    // Live region content must be unchanged by further ticks of the notice.
+    expect(statusRegion?.textContent).toBe(contentAfter5s);
+    vi.unstubAllGlobals();
+  });
+
+  it("cancels staggered step timers on unmount so they can't later fire against a stale closure (#1074)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    const { unmount } = render(<GeneratingProgress handle="testuser" />);
+
+    // Let fetch resolve and completeRemainingSteps schedule its staggered
+    // per-step timers.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    unmount();
+
+    // Every timer the component owns — including the staggered step timers
+    // scheduled by completeRemainingSteps — must be cancelled on unmount.
+    // None should be left pending to fire later against a stale closure.
+    expect(vi.getTimerCount()).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("uses a single visually-hidden status line for live announcements, separate from the visible (aria-hidden) step list (#1114)", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    const { container } = render(<GeneratingProgress handle="testuser" />);
+
+    const statusRegion = screen.getByRole("status");
+    // Exactly one step's worth of text is exposed to the accessibility tree
+    // at a time -- not a burst covering every step in the visible list.
+    expect(statusRegion.textContent).toBe("Checking GitHub session");
+    expect(statusRegion.textContent).not.toContain("Collecting contribution data");
+    expect(statusRegion.textContent).not.toContain("Computing impact profile");
+    expect(statusRegion.textContent).not.toContain("Rendering badge");
+
+    // The visible step list is hidden from the accessibility tree; the live
+    // status line lives outside it so the two can't double-announce.
+    const stepList = container.querySelector('[data-step="0"]')?.parentElement;
+    expect(stepList?.getAttribute("aria-hidden")).toBe("true");
+    expect(stepList?.getAttribute("role")).not.toBe("status");
+    expect(stepList?.contains(statusRegion)).toBe(false);
+    expect(statusRegion.contains(stepList ?? null)).toBe(false);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("announces exactly one step transition at a time as generation progresses, never the whole list at once (#1114)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    const statusRegion = screen.getByRole("status");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(statusRegion.textContent).toBe("Collecting contribution data");
+    expect(statusRegion.textContent).not.toContain("Checking GitHub session");
+    expect(statusRegion.textContent).not.toContain("Computing impact profile");
+    expect(statusRegion.textContent).not.toContain("Rendering badge");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(statusRegion.textContent).toBe("Computing impact profile");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(statusRegion.textContent).toBe("Rendering badge");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the error alert as a separate, independently-announced role, not nested in the status line (#1114)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Something went wrong generating your badge.");
+
+    const statusRegion = screen.getByRole("status");
+    expect(statusRegion.contains(alert)).toBe(false);
+    expect(alert.contains(statusRegion)).toBe(false);
+
     vi.unstubAllGlobals();
   });
 

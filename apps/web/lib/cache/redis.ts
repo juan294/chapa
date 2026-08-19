@@ -98,6 +98,49 @@ export async function cacheSet<T>(
 }
 
 /**
+ * Atomically merge fields into a JSON object stored in Redis.
+ *
+ * The read, merge, and TTL refresh run in one Lua script, so concurrent
+ * callers cannot overwrite fields written by another request between a
+ * separate GET and SET. Returns false when Redis is unavailable or the
+ * update fails.
+ */
+export async function cacheMergeJson<T extends object>(
+  key: string,
+  patch: Partial<T>,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+
+  const script = `
+local raw = redis.call("GET", KEYS[1])
+local value = {}
+if raw then
+  value = cjson.decode(raw)
+end
+local patch = cjson.decode(ARGV[1])
+for field, field_value in pairs(patch) do
+  value[field] = field_value
+end
+redis.call("SET", KEYS[1], cjson.encode(value), "EX", ARGV[2])
+return 1
+`;
+
+  try {
+    await redis.eval<[string, string], number>(
+      script,
+      [key],
+      [JSON.stringify(patch), String(ttlSeconds)],
+    );
+    return true;
+  } catch (error) {
+    console.error("[cache] cacheMergeJson failed:", (error as Error).message);
+    return false;
+  }
+}
+
+/**
  * Delete a cached key.
  * Silently no-ops if Redis is unavailable.
  */
@@ -244,6 +287,36 @@ export async function rateLimitStrict(
   } catch {
     // Fail closed — block requests if Redis is down on security-sensitive routes
     return { allowed: false, current: 0, limit };
+  }
+}
+
+/**
+ * Refund one unit of quota previously consumed by `rateLimitStrict()` (or
+ * `rateLimit()`) — for use when the request that consumed it failed
+ * downstream and shouldn't cost the caller one of a scarce number of
+ * attempts. Decrements the same fixed-window counter via `INCRBY -1`,
+ * leaving its TTL untouched.
+ *
+ * Deliberately **not** built on `cacheIncr()`: that helper is fail-open
+ * (owned by the campaign-send-quota feature) and would silently drop a
+ * refund on a Redis error. This is fail-closed like `rateLimitStrict()` —
+ * it reports whether the refund actually landed so callers on fail-closed
+ * routes can surface a dropped refund (e.g. via `captureServerError`)
+ * instead of silently over-charging the user's quota.
+ *
+ * @param key - The same rate-limit key passed to `rateLimitStrict()`/`rateLimit()`
+ * @returns Whether the refund was applied
+ */
+export async function refundRateLimit(key: string): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+
+  try {
+    await redis.incrby(key, -1);
+    return true;
+  } catch (error) {
+    console.error("[cache] refundRateLimit failed:", (error as Error).message);
+    return false;
   }
 }
 

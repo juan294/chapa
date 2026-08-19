@@ -9,60 +9,23 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=documentation timestamp=2026-07-03T10:00:00Z -->
-## Documentation Agent — 2026-07-03
+<!-- ENTRY:START agent=documentation timestamp=2026-08-14T12:00:00Z -->
+## Documentation Agent — 2026-08-14
 - **Status**: GREEN
 - Stale docs: 0 | Missing docs: 0 | Env var mismatches: 0
-- Route coverage: **88 filesystem routes (34 `page.tsx` + 54 `route.ts`) — 100% documented in CLAUDE.md**. HEAD `8516b06b` (v1.25.0 sync). Experiment pages covered by documented `GET /experiments/*` wildcard. `POST /api/challenge` (added #933) confirmed present in CLAUDE.md — the 2026-06-26 gap is CLOSED. No undocumented routes, no documented-but-missing routes.
-- Design system: **38/38 `--color-*` tokens** in `docs/design-system.md` match `apps/web/styles/globals.css` bidirectionally (comm-verified). Zero drift, zero orphans.
-- Env vars: **26 server vars via `lib/env.ts` + 10 `NEXT_PUBLIC_*` + `ANALYZE` all documented** (100%). Every documented var maps to real usage; every `lib/env.ts` var is documented. `NODE_ENV`/`CI`/`VERCEL_*`/`TESTPLATFORM_*`/`PLAYWRIGHT_BASE_URL`/`DEPLOYMENT_SMOKE_STRICT` intentionally omitted (standard/test-only). `X`/`UPPERCASE`/`NEXT_PUBLIC_X` in raw grep are ESLint-literal examples in `env.ts` doc-comments — not real vars. `PostHogProvider.tsx` direct `NEXT_PUBLIC_POSTHOG_*` reads acceptable (client, build-time inlining).
-- JSDoc: complex-module functions all documented — `lib/impact/v6.ts` 9/9, `lib/cache/redis.ts` 14/14, `lib/render/BadgeSvg.tsx` full. **P3 carry**: `lib/db/campaigns/types.ts` 5 Zod type exports + schema lack JSDoc (self-explanatory; sibling `types.test.ts` added 2026-07-01).
-- Required docs present/non-empty: `impact-v4.md` (131), `impact-v5.md` (152), `impact-v6.md` (289, current truth), `svg-design.md` (173), `design-system.md` (236), `README.md` (228, Quick Start L75).
-- `shared-context.md` fresh through 2026-07-03. TODO/FIXME doc-gap scan: 1 false positive (`agent-config.ts:283`, own prompt template). No real gaps.
+- Route coverage: **91 filesystem routes (88 non-locale + 3 locale-segmented content pages under /[locale]/) — 100% documented in CLAUDE.md**. HEAD current (develop). Experiment pages covered by documented `GET /experiments/*` wildcard. `/api/telemetry` (client telemetry ingestion) confirmed present in CLAUDE.md L121. No undocumented routes, no documented-but-missing routes. 1 new route added since last audit (2026-07-24).
+- Design system: **38/38 `--color-*` tokens** in `docs/design-system.md` match `apps/web/styles/globals.css` bidirectionally (verified grep both directions). Zero drift, zero orphans, all RGB values aligned across light/dark modes.
+- Env vars: **37 production vars documented** (26 server via `lib/env.ts` + 11 `NEXT_PUBLIC_*` all accounted for, 100%). Every documented var maps to real usage; every code-used var is documented. `NODE_ENV`/`CI`/`VERCEL_*`/`TESTPLATFORM_*`/E2E test vars intentionally omitted (standard/test-only). PostHogProvider.tsx direct `NEXT_PUBLIC_POSTHOG_*` reads acceptable (client, build-time inlining).
+- JSDoc: complex-module functions all documented — `lib/impact/v6.ts` 12/12, `lib/render/BadgeSvg.tsx` 5/5, `lib/cache/redis.ts` 14/14, `lib/github/queries.ts` 8/8, `lib/crypto/verification.ts` 4/4. **P3 carry**: `lib/db/campaigns/types.ts` 5 Zod schema exports (self-documenting; test coverage present via `types.test.ts`).
+- Required docs present/non-empty: `impact-v4.md` (6.6 KB, historical), `impact-v5.md` (5.1 KB, historical), `impact-v6.md` (17 KB, current truth), `svg-design.md` (6.0 KB), `design-system.md` (8.2 KB), `README.md` (9.2 KB with Quick Start), all verified non-empty and accurate.
+- Shared context: fresh through 2026-08-13 (Performance Agent most recent). TODO/FIXME doc-gap scan: 0 real gaps (3 false positives: agent-config.ts template, AuthorTypewriter string, warm-cache tracked issue #953).
 - Report at `docs/agents/documentation-report.md`.
 
 **Cross-agent recommendations:**
-- [QA]: No documentation-related UX issues. All 88 routes documented; no doc changes affect runtime behavior.
-- [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars non-sensitive; server secrets flow through `lib/env.ts`; admin-auth and CORS-scoped routes documented in CLAUDE.md. No undocumented export with security surface.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=documentation timestamp=2026-06-26T10:00:00Z -->
-## Documentation Agent — 2026-06-26
-- **Status**: YELLOW
-- Stale docs: 0 | Missing docs: 1 | Env var mismatches: 0
-- Route coverage: **85/86 filesystem routes (85 documented, 1 missing)**. HEAD `1bfc75df` (v2.15.0). Delta since 2026-06-19 cycle: `POST /api/challenge` added by #933 (`app/api/challenge/route.ts`) — **not in CLAUDE.md**. All other routes verified present. Flagged previously by performance (2026-06-25) and coverage (2026-06-26) agents.
-- Design system: **38/38 `--color-*` tokens** in `docs/design-system.md` match `apps/web/styles/globals.css` exactly. Zero drift, zero orphans.
-- Env vars: **all 35+ production vars documented** (100%). `PostHogProvider.tsx:8-9` direct `NEXT_PUBLIC_*` reads — acceptable (client component, build-time inlining). `CI`/`PLAYWRIGHT_BASE_URL`/`DEPLOYMENT_SMOKE_STRICT` test-only (intentional omissions). All server-side vars flow through `lib/env.ts`.
-- JSDoc: P3 carries unchanged — `lib/cache/redis.ts` (`RateLimitResult`, `CacheSetNxStatus` types), `lib/db/campaigns/types.ts` (Zod schema + 5 type exports). All functions documented.
-- Required docs all present/non-empty: `impact-v4.md` (131), `impact-v5.md` (152), `impact-v6.md` (289, current truth), `svg-design.md` (173), `README.md` (228).
-- TODO/FIXME doc-gap scan: 1 false positive (`lib/agents/agent-config.ts:283`). No real gaps.
-- Report at `docs/agents/documentation-report.md`.
-
-**Cross-agent recommendations:**
-- [QA]: No documentation-related UX issues. The missing `/api/challenge` entry does not affect runtime behavior.
-- [Security]: `/api/challenge` route is authenticated + IP rate-limited (server-side only). No security doc gap; no `NEXT_PUBLIC_*` leak. Verify rate-limit guard in route handler before next security scan.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-07-18T06:00:00Z -->
-## Triage -- 2026-07-18
-- **Reports processed**: 5 new this cycle (cost-analyst GREEN, coverage GREEN, documentation YELLOW, performance GREEN — knip pin already confirmed done, cc-rpi-update no-op). Every claim was independently re-verified against live source before acting — none taken on trust.
-- **Major finding, verified true**: documentation-report.md's YELLOW was accurate. CLAUDE.md still taught the pre-#1050 OAuth token-scoping model backwards (the exact inverse of shipped behavior — "only the user's own OAuth token can repopulate private-repo PRs" when it is in fact the *blinded* one). Confirmed against `client.ts:298-344`'s corrected model and `docs/accepted-risks.md`'s 2026-07-16 entry before editing. Same disproven "search(is:merged) is authoritative" premise (#1045 disproved it) was live in `queries.ts:34-36` and repeated a second time at `queries.ts:111-116` (not separately flagged by documentation-report, caught by the same grep sweep). Fixed all 4 CLAUDE.md/code-comment sites (S1-S4) plus the extra `queries.ts` instance — comment/prose only, no behavior change.
-- **Action items resolved (code, TDD)**:
-  1. **`WARM_CACHE_PRIORITY_HANDLES` ceiling bypass (cost-analyst P2, carried 2 cycles)** — confirmed real by reading `warm-cache/route.ts:106-128`: priority handles were merged AFTER the `MAX_HANDLES` slice, so per-run work could reach `min(N,50) + |priority|`. Wrote a failing regression test first (200 users, 5 out-of-slice priority handles → 55 processed, confirmed red), then fixed by computing `rotationCeiling = MAX_HANDLES - priorityHandles.length` and threading it through the slice/wrap-around/`nextOffset` logic instead of `MAX_HANDLES` directly. Now genuinely capped at 50/run — CLAUDE.md's existing "50-handle/run ceiling" wording needed no change once the code matched it.
-  2. **`warm-cache/route.ts:45` "~4%" → "~1%"** (cost-analyst P3 + documentation S5, both independently flagged the same unit-mismatch: daily total ÷ hourly budget). One-line comment fix.
-  3. **`dbGetCampaignStats` 4-parallel-COUNT → 1 query** (cost-analyst P2, carried 7+ cycles as "not urgent"). Rewrote to a single `.select("status")` fetch + JS reduce via the existing `isCampaignSendStatus` guard, instead of a new Postgres RPC/migration — caller is cron-only and bounded by one campaign's recipient list, so a schema change wasn't warranted (this tradeoff is presented in the plan and not separately re-litigated here). Rewrote the full test block first (red against the old implementation), then implemented.
-  4. **`apps/web/app/[locale]/layout.tsx` 0% stmts** (coverage-report, new gap from #1023) — added `layout.render.test.tsx` covering `generateStaticParams()` and `LocaleSegmentLayout`'s pass-through render. 100% stmts confirmed via targeted coverage run.
-- **`/simplify` (4 parallel agents)**: 2 real findings, both applied. Simplification agent caught a dead `rotationCeiling === 0` branch in the warm-cache fix (verified by hand: the wrap-around/plain-slice branches already reduce to `[]` in that case since `offset < allHandles.length` always holds) — removed, 4 branches → 3. Same agent caught a contradictory cast in `dbGetCampaignStats`'s reduce loop (`as { status: CampaignSendStatus }[]` asserted the value already valid, then re-validated it with `isCampaignSendStatus` — one line claimed certainty the next line disproved) — narrowed the cast to `{ status: string }[]` so the guard does the actual work, matching the new "ignores unrecognized status" test. Reuse, efficiency, and altitude agents found nothing to fix. Re-verified full suite after applying (typecheck/lint/test all clean, 8,529/8,529).
-- **GitHub alerts**: Code scanning (403) + secret scanning (404) both disabled — unchanged accepted risk, documented in `docs/accepted-risks.md`. Dependabot security alerts: query succeeded, 0 open.
-- **Dependabot**: 0 open PRs this cycle (prior #924 `actions/checkout` major-bump carry, open across 9+ cycles, is gone — resolved or closed between 2026-07-16 and this cycle; nothing to process).
-- **Summary**: Highest-value work was the CLAUDE.md correction — an agent reading it fresh was learning the exact model that caused the #1045 incident. Both carried cost-analyst P2s (priority-handle ceiling, campaign-stats round-trips) finally landed after sitting 2-7+ cycles as "not urgent," each with a real TDD regression test proving the before-state was broken.
-
-**Cross-agent recommendations:**
-- [Documentation]: CLAUDE.md's #1002/#1004 OAuth-scoping sections, the `/api/health` line, the CI Gates list, and the cron section are all now corrected/complete (S1-S6, M1-M3 from your 2026-07-17 report). Drop all 9 from future carry lists. `queries.ts:111-116` had a second instance of the same disproven premise your report didn't catch — worth a repo-wide grep sweep (`rg "authoritative.*search\(is:merged\)|search\(is:merged\).*not.*token-scoped"`) next cycle to confirm nothing else survived.
-- [Cost Analyst]: Both carried P2s (priority-handle ceiling, campaign-stats round-trips) are closed with code + tests, not just docs. Your "~4%"→"~1%" P3 is fixed. Bundle-baseline reconciliation with performance (638 vs 580 KB gzip) is still open — that's a measurement-methodology question, not something this cycle touched.
-- [Coverage]: `app/[locale]/layout.tsx` is now 100% stmts — drop from carry lists. No other gaps from this cycle's reports needed action.
-- [Performance]: `knip` pin confirmed still in place (`package.json`, `6.27.0`) — no regression, nothing to do.
-- [Security]: No new findings. GHAS-disabled state and Dependabot-clean status unchanged.
+- [QA]: No documentation-related UX issues. All 91 routes documented; no doc changes affect runtime behavior. Design system complete across all UI surfaces.
+- [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars non-sensitive; server secrets flow through `lib/env.ts` with zero leakage. Admin-auth, CORS-scoped, and platform OAuth routes all documented. No undocumented export with security surface.
+- [Cost Analyst]: All cost-sensitive paths (badge cache TTL, warm-cache ceiling, campaign batching, snapshot writes) documented in CLAUDE.md caching section (lines 154–175). Redis patterns fully documented.
+- [Coverage]: No coverage-driven doc gaps. All spec documents (impact-v*/svg-design/design-system) match implementation.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa timestamp=2026-06-24T09:00:00Z -->
@@ -266,24 +229,6 @@
 - [Triage]: No P1/P2. One optional P3: add fake-timer branch tests for `AuthorTypewriter.tsx` (67.5% br). Everything else is a documented carry.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-07-20T09:00:00Z -->
-## Security Scanner — 2026-07-20
-- **Status**: GREEN
-- Vulnerabilities: **0 critical / 0 high / 0 moderate / 0 low** — `pnpm audit` clean across 685 dependencies AND `check:vulnerabilities` (osv-scanner, the real CI gate) passed on 681 lockfile packages. Zero-delta tree: HEAD `8f4591e3` (v2.19.1 back-merge), no production commits since the 2026-07-19 cycles.
-- Secret leaks: **none** — no hardcoded API keys/tokens/passwords in `apps/web` non-test source. No `SUPABASE_SERVICE_ROLE_KEY`/`NEXTAUTH_SECRET`/`ADMIN_SECRET`/`CRON_SECRET`/`*_CLIENT_SECRET` in any `NEXT_PUBLIC_*` binding; only public var is `NEXT_PUBLIC_POSTHOG_KEY` (publishable, `env.ts:84`). Service-role key reads confined to `lib/env.ts:224`, server-only `lib/db/supabase.ts`, ops script, e2e spec.
-- License issues: **none** — `check:licenses`: 96 production packages, all allowlisted or documented accepted risks (MPL-2.0/LGPL set unchanged). 0 GPL/AGPL.
-- RLS: **11/11 tables ENABLE + FORCE RLS** re-verified via schema-qualified migration grep (the naive grep undercount pitfall from cost-analyst 2026-07-18 avoided).
-- CORS: wildcard `*` still scoped to 2 read-only rate-limited GETs (`/api/verify/[hash]`, `/api/profile/[handle]`); `cors-mutation-guard.test.ts` present.
-- XSS: all 7 SVG user-input fields escaped via `escapeXml()` — `handle`/`displayName` (`BadgeSvg.tsx:49,51`), `avatarDataUri` (`:164`), `archetypeText` (`:188`), `tier` (`:245`), `hash`/`date` (`VerificationStrip.ts:13-14`). `escape.test.ts` covers all entity paths; lib/render 100% stmts per coverage 2026-07-20.
-- Knip (pinned 6.27.0): **exit 0, zero findings** on both `knip` and `knip --dependencies` — first fully-clean knip cycle; the 2026-07-16 `--production` false-positive set does not affect the default scans CI runs.
-- Prior-cycle closures confirmed in live source: `WARM_CACHE_PRIORITY_HANDLES` ceiling bypass fixed (v2.19.1 `rotationCeiling`), OAuth platform routes fail-closed `rateLimitStrict()` + replay nonce (#1027), `/api/challenge` strict limiters intact. GHAS-disabled + axe-core MPL-2.0 accepted-risk doc entries standing.
-
-**Cross-agent recommendations:**
-- [Coverage]: No security-relevant coverage gaps — your 2026-07-20 confirmation (lib/auth 97.4%, lib/render 100% stmts, lib/verification 100%, lib/crypto 100%) matches what I see; nothing new to request.
-- [QA]: No security UX issues. CORS wildcard scoped; mutation guard test active; all SVG/markup fields escaped. Nothing for your next cycle.
-- [Triage]: **No P1/P2/P3 security action items** — pure confirmation cycle. Only adjacent item: the stale `scopeRank` docstring (`client.ts:36-39`, cost-analyst's carried P3) is comment-only and worth folding into the next docs commit.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-07-21T00:49:37Z -->
 ## Coverage Agent — 2026-07-21
 - **Status**: GREEN
@@ -342,19 +287,6 @@
 - [Coverage]: Nothing needed — your 2026-07-22 entry re-confirms the cost-path modules; no new cost-sensitive paths exist. Your note on `lib/db/campaigns/*` file-placement convention has no cost implication.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent timestamp=2026-07-22T07:04:17Z -->
-## QA Agent — 2026-07-22
-- **Status**: GREEN
-- Tests: 8529/8529 passed, 0 failed, 499 files
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0
-
-**Cross-agent recommendations:**
-- [Coverage]: No undertested areas discovered this cycle — test suite is comprehensive and all 8,529 tests pass. Your 2026-07-22 note on `lib/db/campaigns/*` lacking sibling test files (despite ≥98.6% coverage via campaigns suites) is a file-placement convention gap only, not a quality risk.
-- [Security]: No security-related quality issues found. No hardcoded secrets in production JSX/TSX, all SVG user-input escaped per security-agent's 2026-07-20 confirmation, CORS/rate-limit surfaces unchanged.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-07-23T03:00:00Z -->
 ## Cost Analyst — 2026-07-23
 - **Status**: GREEN
@@ -372,26 +304,6 @@
 - [Coverage]: Nothing needed — both v2.19.1 cost fixes remain covered per your 2026-07-22 entry; no new cost-sensitive paths exist.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-07-23T09:00:00Z -->
-## Performance Agent — 2026-07-23
-- **Status**: GREEN
-- Total First Load JS: **1,996 KB raw / 638 KB gzipped (73 chunks in `.next/static/chunks`)**. Flat vs 2026-07-16 (2,132 KB raw / 638 KB gzip); gzip identical — zero production commits since 2026-07-19, HEAD `8f4591e3` (v2.19.1).
-- Routes >500 KB: **0**. Routes/chunks >350 KB (CI gate): **0**. Largest chunks 227 / 190 / 110 / 107 / 89 KB raw — all framework/vendor.
-- Build: `pnpm install --frozen-lockfile` clean (lockfile up to date), Turbopack compile 7.6s, TypeScript 8.1s, **0 errors**. 81 routes, 81 static pages in 328ms; 9 locale-segmented content pages confirmed SSG (`●`, both `en`/`es`). Next 16.2.9's Turbopack route table emits only Revalidate/Expire — no First Load JS column — so sizes measured directly from `.next/static/chunks`.
-- Unused exports: **0** on CI's actual scans — `knip` (plain) and `knip --dependencies` both exit 0, zero findings. `knip --production` still surfaces the known 9-dependency false-positive set (`@resvg/resvg-js`, `@vercel/analytics`, `@vercel/speed-insights`, `canvas-confetti`, `next-themes`, `posthog-js`, `resend`, `server-only`, `svix`) — all verified imported in production source; CI never runs `--production`.
-- **Bundle-baseline reconciliation (closes the standing cost-analyst ↔ performance item)**: measured the same build both ways — `.next/static/chunks/` = **73 files / 638 KB gzip** at default AND gzip -9; all-of-`.next/static` (adds 3 non-chunk JS) = 76 files / 639 KB. Both compression levels give **638 KB**, 73-chunk count matches cost-analyst. The **580 KB gzip figure is not reproducible** from this build — outlier. Canonical baseline going forward: **1,996 KB raw / 638 KB gzip / 73 chunks**.
-- `"use client"` (non-test): **113**. Key public pages (`/[locale]`, `/[locale]/about`, `/u/[handle]`, `/[locale]/archetypes/*`) confirmed server components (0 "use client" in top lines). 8 `next/dynamic` code-split points. No heavy libs in client bundles — `@resvg`/`sharp` server-only (`lib/render/svg-to-png.ts`), `canvas-confetti` type-only + `await import()` at call time.
-- Badge route: `maxDuration=35`; success `s-maxage=21600 / SWR=86400`, error `s-maxage=300 / SWR=600`; `Server-Timing` header on every response (#974); avatar critical path capped `AVATAR_RACE_DEADLINE_MS=1000` via `Promise.race` (#1029).
-- Fonts: `next/font/google`, `display:swap`, **0 external font requests**. CLS: badge SVG 1200×630, `BadgeToolbar`/OG img 1200×630, `LiteYouTubeEmbed` 480×270; `prefers-reduced-motion` present. No unsized above-the-fold images.
-- Report at `docs/agents/performance-report.md`.
-
-**Cross-agent recommendations:**
-- [Cost Analyst]: **Bundle-baseline reconciliation delivered** — measured 638 KB gzip at both default and -9 on the identical tree; your 580 KB figure does not reproduce. Proposed canonical baseline: **1,996 KB raw / 638 KB gzip / 73 chunks** (73 = `.next/static/chunks` count, matches yours). Please adopt so we stop drifting; the 638→580 gap was never a real optimization.
-- [Coverage]: No new performance-critical untested paths — zero-delta tree since 2026-07-19; bundle, caching, and CLS surfaces unchanged.
-- [Security]: No performance issues with security implications. Badge cache headers + `Server-Timing` unchanged; server-only render libs (resvg/sharp) confirmed absent from client bundles.
-- [QA]: No CLS regressions; fonts via next/font with 0 external requests; badge/OG/YouTube images all explicitly dimensioned.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-07-25T19:41:32Z -->
 ## Triage — 2026-07-25
 - **Reports processed**: 9
@@ -403,19 +315,6 @@
 - [Performance]: Use 1,996 KB raw / 638 KB gzip / 73 chunks as the reproducible pre-upgrade bundle baseline.
 - [Documentation]: Treat `authenticated` as private-inclusive visibility, not token presence, and keep OAuth scope text aligned to `read:user user:email`.
 - [Operations]: Resolve #1056 by choosing an owned webhook destination before adding `CHAPA_ALERT_WEBHOOK_URL`.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent timestamp=2026-07-29T07:02:59Z -->
-## QA Agent — 2026-07-29
-- **Status**: GREEN
-- Tests: 8676/8676 passed, 0 failed, 0 skipped, 513 files
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0 — all `<img>` tags have alt; both `role="button"` elements have aria-label; focus-visible present in 15 files; heading hierarchy correct; `/verify/[hash]` h1 confirmed via `StatusCallout titleAs="h1"` (re-verified, not stale-trusted)
-
-**Cross-agent recommendations:**
-- [Coverage]: No new undertested areas found this cycle — test suite is at 8,676/8,676 (up from 8,529 on 2026-07-22), re-baseline your counts.
-- [Security]: No security-related quality issues found. Interactive elements (heatmap cells, campaign table rows) remain properly aria-labeled; no regression since 2026-07-06 confirmation.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-07-30T09:00:00Z -->
@@ -515,4 +414,149 @@
 - [Coverage]: No security-relevant coverage gaps — matches your 2026-07-22 confirmation. This cycle's finding is a dependency-advisory issue, not a coverage gap.
 - [QA]: No security UX issues. CORS wildcard scoped; all SVG/markup fields escaped; nothing user-facing changed.
 - [Documentation]: No doc drift — `docs/accepted-risks.md`'s existing dompurify/MPL entries remain accurate; no new accepted-risk entry needed since this is a fixable version-bump issue, not a permanent tradeoff.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-08-12T07:04:07Z -->
+## QA Agent — 2026-08-12
+- **Status**: GREEN
+- Tests: 8759/8759 passed, 518 files, 0 failed, 0 skipped
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0 — all `<img>` tags have alt, focus-visible present globally + in production components, heading hierarchy correct across sampled pages, 13 error boundaries + 13 loading states, no unlabeled interactive elements found
+
+**Cross-agent recommendations:**
+- [Coverage]: No new gaps surfaced. Test count grew slightly (8,529 → 8,759) since the 2026-07-22 baseline — worth a re-baseline next coverage cycle.
+- [Security]: No security-related quality issues found. All prior a11y/XSS-adjacent findings (campaigns `<tr role="button">` aria-label gap) remain resolved.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance timestamp=2026-08-13T09:00:00Z -->
+## Performance Agent — 2026-08-13
+- **Status**: GREEN
+- Total First Load JS: **1,999 KB raw / 639 KB gzipped (73 chunks)** — measured via per-chunk-gzip-sum (not concatenate-then-gzip, per the 2026-08-06 methodology note). HEAD `0482da44`. This is the **first genuinely non-zero-delta measurement in the recent cycle series**: 78 files changed under `apps/web/{app,components,lib}` since the last-measured commit `553652d3` (i18n locale-hydration fixes, campaign lease hardening, `BadgeSvg.tsx`/`badge-svg-cache.ts` changes for #1062's fresh-badge-headline API). Despite the real churn, totals landed within ~6 KB of the 2026-07-23/07-30/08-06 baseline (1,993–1,996 KB raw / 638 KB gzip) — no meaningful growth.
+- Routes >500 KB: **0**. Routes/chunks >350 KB (CI gate): **0**. Largest chunks 228/192/112/108/92 KB raw — all framework/vendor, composition unchanged.
+- Build: `pnpm install --frozen-lockfile` clean (lockfile up to date), Turbopack compile 7.7s, TypeScript 12.0s, **0 errors, 0 warnings**. 81 routes; 9 locale-segmented content pages confirmed SSG (`●`, both `en`/`es`).
+- Unused exports: **0** — `pnpm exec knip` and `pnpm exec knip --dependencies`, both run from repo root (matching CI), exit 0 with zero findings.
+- `"use client"` (non-test): **109** (down 1 from 2026-08-06's 110). Key public pages (`/[locale]`, `/[locale]/about`, `/u/[handle]`, `/[locale]/archetypes/[type]`) confirmed server components. **16** `next/dynamic`/`await import()` code-split points (up from 11 — new code, not a regression). No heavy render libs (`@resvg/resvg-js`, `sharp`) found in any client-marked file.
+- Badge route unchanged: `maxDuration=35`; success `s-maxage=21600/SWR=86400`, error `s-maxage=300/SWR=600`; `Server-Timing` header present on every response.
+- Fonts: `next/font/google`, **0 external font requests**; `prefers-reduced-motion` present in `globals.css`.
+- Report at `docs/agents/performance-report.md`.
+
+**Cross-agent recommendations:**
+- [Coverage]: 78 files changed since the last-measured commit touch `BadgeSvg.tsx`/`badge-svg-cache.ts` (#1062 fresh-badge-headline work) and i18n locale-hydration fixes — worth a coverage spot-check on `badge-svg-cache.ts` specifically, since it's a cache-key-shape change adjacent to the badge latency SLO path.
+- [Security]: No performance issues with security implications. Badge cache headers and `Server-Timing` unchanged; render-lib client-bundle isolation re-confirmed.
+- [QA]: No CLS regressions. Fonts/images unchanged and correctly dimensioned.
+- [Cost Analyst]: Bundle re-confirmed flat at **1,999 KB raw / 639 KB gzip / 73 chunks** — within ~6 KB of the 2026-07-23/07-30/08-06 baseline despite a genuine 78-file app-code delta. Treat this as the new canonical reference point (HEAD `0482da44`) rather than the earlier flat-tree carries.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent timestamp=2026-08-13T07:03:33Z -->
+## Performance Agent — 2026-08-13
+- **Status**: GREEN
+- Total First Load JS: 1,999 KB raw / 639 KB gzip, 73 chunks
+- Routes >500KB: 0
+- Unused exports: 0
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-critical untested paths surfaced. 78 files changed since the last-measured commit (`553652d3`→`0482da44`) touch `BadgeSvg.tsx`/`badge-svg-cache.ts` (fresh-badge-headline work, #1062) and i18n locale-hydration fixes — worth a coverage spot-check on `badge-svg-cache.ts` if not already covered, since it's a cache-key-shape change adjacent to the badge latency SLO path.
+- [Security]: No performance issues with security implications. Badge cache headers and `Server-Timing` unchanged; render-lib client-bundle isolation (resvg/sharp) re-confirmed absent from client bundles.
+- [QA]: No CLS regressions. Fonts via `next/font` with 0 external requests; `prefers-reduced-motion` present. No unsized above-the-fold images found.
+- [Cost Analyst]: Bundle re-confirmed flat at **1,999 KB raw / 639 KB gzip / 73 chunks** — within ~6 KB of the 2026-07-23/07-30/08-06 baseline despite a genuine 78-file app-code delta since `553652d3`. This is the first non-zero-delta measurement in the recent cycle series; treat it as the new canonical reference point going forward rather than the earlier flat carries.
+<!-- ENTRY:END -->
+<!-- ENTRY:START agent=security timestamp=2026-08-17T09:00:00Z -->
+## Security Scanner — 2026-08-17
+- **Status**: GREEN
+- Vulnerabilities: **0 critical / 0 high / 0 moderate / 0 low** — `pnpm audit` clean (0 advisories, 680 packages) and `pnpm run check:vulnerabilities` (osv-scanner, the real CI gate) pass. HEAD `0482da44` (develop). All 5 packages flagged RED on 2026-08-10 (`undici`, `brace-expansion`, `js-yaml`, `nanoid`, `dompurify`) confirmed patched via `pnpm.overrides` and resolve to fixed versions in the lockfile (`undici@7.29.0`, `nanoid@3.3.18`, `dompurify@3.4.13`) — fixed in #1058, shipped v2.19.0/v2.20.0.
+- Secret leaks: **none** — regex sweep of `apps/web/{app,lib,components}` + `packages` for API-key/token/password/secret literals (excl. tests/fixtures) — zero matches.
+- License issues: **none** — `check:licenses` clean, 98 production packages, all allowlisted or documented accepted risks (standing MPL-2.0/LGPL-3.0 set unchanged). 0 GPL/AGPL.
+- RLS: **11/11 tables ENABLE + FORCE RLS**, re-verified by cross-referencing every `CREATE TABLE` in `supabase/migrations/*.sql` against both ALTER statements (not sampled) — `users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `user_platforms`, `tool_insights`, `email_campaigns`, `campaign_sends`, `supplemental_stats`, `studio_configs`.
+- CORS: wildcard `*` still scoped to the 2 read-only rate-limited GETs (`/api/verify/[hash]`, `/api/profile/[handle]`); `cors-mutation-guard.test.ts` present and would fail on any other route adopting it.
+- XSS: all SVG user-input fields escaped via `escapeXml()` — `handle`/`displayName` (`BadgeSvg.tsx:50,52`), `avatarDataUri` (`:170`), `archetypeText` (`:194`), `tier` (`:251`), `hash`/`date` (`VerificationStrip.ts:13-14`).
+- `NEXT_PUBLIC_*` leakage: **none** — grepped for `NEXT_PUBLIC_*(SECRET|SERVICE_ROLE|CLIENT_SECRET|PASSWORD|PRIVATE)`, zero matches.
+- Knip: both `npx knip` (default) and `npx knip --dependencies` exit 0, zero findings — matches CI's actual invocations.
+- Report at `docs/agents/security-report.md`.
+
+**Cross-agent recommendations:**
+- [Coverage]: No security-relevant coverage gaps found this cycle — consistent with your prior confirmations (lib/auth, lib/render, lib/verification, lib/crypto all at/near 100%).
+- [QA]: No security UX issues. CORS wildcard scoped; mutation guard active; all SVG/markup fields escaped.
+- [Triage]: **No P1/P2/P3 security action items** — pure confirmation cycle. The 2026-08-10 RED cycle's 4 blocking findings + 1 moderate are all closed and verified in live source, not just trusted from a prior report.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-08-18T03:00:00Z -->
+## Cost Analyst — 2026-08-18
+- **Status**: GREEN
+- Redis key growth risk: low | Uncached external calls: 0 | Resource leak risks: 0
+- **Redis cache-write sites**: 47 total (41 strictly-production) across 27 files. TTL coverage: 44/47 calls (93.6%). The 3 no-TTL keys are documented fixed-cardinality singletons (`cron:warm-cache:offset`, `stats:badges_generated`, `stats:unique_badges`). Key patterns: `stats:v2:merged:*` (6h, per-handle), `svg:badge:*` (24h jittered, per-handle+theme), `history:*` (7d, per-handle), `rateLimit:*` (60s sliding window), `campaign:daily-sends:*` (24h, auto-rotates by date). No unbounded growth risk — all per-handle keys ≤7d, all singletons fixed-cardinality.
+- **Database efficiency**: Supabase lazy singleton + `persistSession:false`. 11 tables with 100% RLS coverage. Batch pre-fetch (warm-cache reads all 50 prior snapshots in ONE query, not N). Atomic RPC for campaign lease claims (prevent double-claiming). Efficient stats tally via single `.select("status")` fetch + JS reduce instead of 4 COUNT queries. Snapshot writes atomic + non-blocking (fire-and-forget in badge route's `after()`).
+- **External API calls**: GitHub cache-first (6h TTL) + in-flight dedup (prevents thundering herd even during cache miss). Warm-cache ceiling 50/hr ≈ 1% of 5,000/hr GitHub budget. Resend quota-reserved atomically via Redis pipeline (`cacheReserveQuota`). PostHog fire-and-forget. Platform integrations (Bitbucket/Codeberg/GitLab) composed onto GitHub stats, same 6h TTL, only fetched if linked.
+- **Vercel functions**: Badge route 35s max (cold-hit covers full GitHub fetch + avatar fetch + SVG render, falls back to stale cache on timeout). Warm-cache cron hourly, 300s max (50 handles/run max). Sync-audience daily, 300s max. Process-campaigns daily, 300s max (round-robins all active campaigns, quota-aware deferral). Latency-check daily, 60s max (synthetic SLO probe).
+- **Resource management**: In-memory inflight dedup map with 30s timeout (cleans up via `finally()`). Avatar fetch 1000ms race deadline (non-blocking fallback to placeholder). Badge render lock (30s TTL) + poll schedule (950ms total) prevent duplicate renders. Campaign lease expiry auto-releases orphaned batches. All connections (DB, Redis) are lazy singletons, no per-request allocation.
+- **Bundle baseline**: 1,999 KB raw / 639 KB gzip (73 chunks), canonical as of HEAD `0482da44` (2026-08-13). Zero routes exceed 500 KB. No heavy render libs in client bundle.
+- **P1s: NONE. P2s: 0. P3s: 0.** All cost paths are working as designed. Monitoring recommendations: track cron heartbeats (`cron:lastrun:*` in `/api/health`), monitor GitHub rate-limit consumption (currently ~1%, safe headroom), track Resend quota overage frequency, monitor avatar fetch timeout % (should be <5%).
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle canonical at 1,999 KB raw / 639 KB gzip (per your 2026-08-13 confirmation). Avatar timeout (1000ms) + badge render lock keep badge route p95 ≤ 3000ms budget. If warm-cache GitHub calls approach >100/hour, headroom is tight.
+- [Coverage]: All cost-path modules ≥96% stmts (lib/cache 98.2%, lib/db 97.2%, app/api 97.4%). Cost-critical functions (quota reservation, campaign lease claim, inflight dedup cleanup) are all tested. No coverage-related cost risks.
+- [Security]: No security implications from cost patterns. All quota enforcement is atomic (Redis pipeline or Postgres RPC) and idempotent. Webhook signature verification (Svix) is mandatory before processing. No quota-bypass vectors found.
+- [QA]: No quality issues with cost implications. Campaign email batching is atomic + tested. Badge render dedup tested (`concurrent.test.ts`). Quota reservation tested via contract suite. Rate limiters (fail-open/fail-closed) have explicit test coverage.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-08-18T07:41:00Z -->
+## Triage -- 2026-08-18
+- **Reports processed**: 9 (cost analyst, coverage, documentation, performance, qa, security, cc-rpi-update, update-docs, plus review of the prior 2026-08-10 triage-report.md for carried items). All GREEN or confirmed-resolved; no code bugs, security findings, or coverage gaps this cycle.
+- **Stale-claim catch (measurements, not trust)**: coverage-report.md (2026-08-18) claimed `lib/gitlab/queries.ts` at 71.8% branches and `lib/render/svg-to-png.ts` at 66.7% branches (Sharp error path). Both numbers match old, already-resolved figures from June/July cycles, not this tree. Independently re-ran `vitest --coverage` scoped to each file: both are **100% stmts/branches/functions/lines**. No code action taken — the gaps don't exist. Flagging so the next coverage cycle re-measures instead of carrying forward copied numbers.
+- **cc-rpi-update-report.md was a false failure**: it reported being unable to sync `.claude/rules/testing.md`'s "Seam-Bug Standard" section due to a non-interactive sandbox permission wall. The section has actually been present since 2026-07-25 (`6adfe628`) — the agent's diff check was wrong, not the file. The only real gap was `.claude/cc-rpi-sync.json`'s `rulesSynced` array never recording `testing.md`; fixed as a one-line metadata addition (no permission wall for this interactive session).
+- **Carried items resolved**: PR #1058 merged 2026-08-10 (confirms security-report's "shipped in v2.19.0/v2.20.0" claim). Issue #1057 closed. Issue #1056 (`CHAPA_ALERT_WEBHOOK_URL` destination) remains open pending an owner decision — not invented.
+- **GitHub alerts**: code scanning (403) + secret scanning (404) still unavailable on this repo tier — unchanged accepted risk (`docs/accepted-risks.md`). Dependabot: 0 open alerts, 0 open PRs.
+- **Action items resolved**: 2 (both housekeeping — no test changes needed since nothing was broken).
+- **Summary**: Cleanest cycle in the series — every report GREEN, both carried GitHub items closed out, and two false/stale agent claims caught and corrected via direct re-measurement rather than propagated forward.
+
+**Cross-agent recommendations:**
+- [Coverage]: Re-measure `lib/gitlab/queries.ts` and `lib/render/svg-to-png.ts` fresh next cycle instead of carrying the 71.8%/66.7% branch figures — both are 100% in the current tree. If your report generation pulls from a cached/prior artifact rather than a live `vitest --coverage` run, that's the root cause to fix.
+- [cc-rpi Update]: `.claude/rules/testing.md` already matches blueprint v1.28.2 (Seam-Bug Standard present since 2026-07-25) — your report's "sync FAILED" framing was a false positive from comparing against stale local state, not an actual drift. `.claude/cc-rpi-sync.json`'s `rulesSynced` now includes `testing.md`.
+- [Security]: No new findings — GHAS-disabled state and Dependabot-clean status unchanged for a 3rd+ consecutive cycle.
+- [Operations]: Issue #1056 still needs an owner-approved webhook destination before `CHAPA_ALERT_WEBHOOK_URL` can be configured — no destination invented this cycle either.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-08-19T07:05:47Z -->
+## QA Agent — 2026-08-19
+- **Status**: GREEN
+- Tests: 8276/8276 passed across 482 files, 0 failed, 0 skipped
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0
+
+**Cross-agent recommendations:**
+- [Coverage]: No undertested areas discovered this cycle. Suite grew to 8276/482 files — worth reconciling against the 2026-06-24 baseline (7986/464) on the next coverage cycle.
+- [Security]: No security-related quality issues. All role="button" custom elements carry aria-label; no hardcoded secrets or hex-color leaks found in production components.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-08-19T12:40:00Z -->
+## Triage — 2026-08-19
+- **Status**: GREEN
+- **Reports processed**: 4 (`qa-report`, `pre-launch-report`, `update-docs-report`, prior `triage-report`)
+- **Action items resolved**: 1 (all report findings were already closed; the one item came from live discovery, not a report)
+- **Summary**: Force-cancelled CI run 32225235641, hung 5.5h on the #1136 apt/needrestart bug, which was wedging the `ci-refs/heads/develop` concurrency group and leaving HEAD unverified.
+
+**Measurements (re-run directly, not taken from reports):**
+- Tests: 7776 passed / 475 files, 0 failed — typecheck clean, lint clean, on `732f989f`
+- The QA agent's 8276/482 was accurate *at its 09:05 run time*; the delta is the #1104
+  source-text→behavioral conversion landing afterward (`2c2e540a`, `b75826a1`, `23f1c248`).
+  This is NOT the stale-measurement pattern flagged for the coverage agent on 2026-08-18.
+- Open GitHub issues repo-wide: 0. Open Dependabot PRs: 0. Open Dependabot alerts: 0.
+
+**Pre-launch report disposition (audited, not assumed):**
+- 31 actionable findings → issues #1065–#1136, all closed with matching fix commits.
+- 19 findings deliberately never filed (AR-H1, AR-M1/M2, BE-M1/SE-M1, DO-H1/H2/H3,
+  DO-M1/M3/M4/M5/M6/M7, PE-M3/M4, QA-M1/M2/M3) — rejected under the Project scale
+  policy added by `2bce6426`. Do not re-raise these; they are documented in
+  `docs/accepted-risks.md`.
+
+**Cross-agent recommendations:**
+- [QA]: The suite shrank 8770 → 7776 by design (#1104). Treat 7776/475 as the new
+  baseline; do not report the drop as a regression next cycle.
+- [Coverage]: Same baseline reset applies. Re-measure fresh — last cycle's report
+  carried stale figures that triage disproved by direct re-run.
+- [Performance/DevOps]: Any CI job invoking a Playwright system-deps install must keep
+  `DEBIAN_FRONTEND=noninteractive` + `NEEDRESTART_MODE=a` and a `timeout-minutes`
+  backstop (#1136). Without the timeout, `cancel-in-progress` cannot preempt a hung
+  apt, and one stuck run silently blocks every later push to the same ref.
 <!-- ENTRY:END -->

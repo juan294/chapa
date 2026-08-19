@@ -6,42 +6,21 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
-const LOCALE_CONTENT_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "SharePageLocaleContent.tsx"),
-  "utf-8",
-);
 
-describe("SharePage", () => {
-  // W1 — share page must have an h1 for WCAG 2.1 Level A compliance
-  describe("heading hierarchy", () => {
-    it("has an h1 element", () => {
-      expect(SOURCE).toContain("SharePageLocaleContent");
-      expect(LOCALE_CONTENT_SOURCE).toMatch(/<h1[\s>]/);
-    });
-
-    it("h1 is screen-reader only", () => {
-      const h1Match = LOCALE_CONTENT_SOURCE.match(/<h1[^>]*>/);
-      expect(h1Match).not.toBeNull();
-      expect(h1Match![0]).toContain("sr-only");
-    });
-  });
-
-  // W4 — h2 elements must use font-heading per design system
-  describe("design system typography", () => {
-    it("SharePageH2 h2 includes font-heading class", () => {
-      const h2Source = fs.readFileSync(
-        path.resolve(__dirname, "SharePageH2.tsx"),
-        "utf-8",
-      );
-      const h2Matches = h2Source.match(/<h2[^>]*>/g) ?? [];
-      expect(h2Matches.length).toBeGreaterThan(0);
-      for (const h2 of h2Matches) {
-        expect(h2).toContain("font-heading");
-      }
-    });
-  });
-
-  // Phase 5 — Share page integration with Creator Studio
+// #1104: most of this file's former source-text assertions are now covered
+// by real render+invocation assertions — h1 presence/text/locale-swap in
+// SharePageLocaleContent.test.tsx, h2 text/styling in SharePageH2.test.tsx,
+// generateMetadata's real title/description/OG-image/Twitter/canonical
+// output and the JSON-LD payload's privacy boundary in
+// share-page.render.test.tsx, and the fallback badge <img>'s
+// fetchPriority/embed wiring in the same file's "SharePageContent" tests.
+// What remains here has no runtime-observable equivalent: negative
+// import-boundary checks (an accidental unused import wouldn't change
+// anything observable at render time), Next.js route-segment config, and a
+// full Suspense-streaming proof (which would need a real DOM render with a
+// deliberately-stalled async dependency — out of proportion to add here
+// given the harness this file's render sibling already has).
+describe("SharePage — non-renderable architecture checks", () => {
   describe("config-aware badge rendering", () => {
     it("does not fetch Studio config on the public share route", () => {
       expect(SOURCE).not.toContain("cacheGet<BadgeConfig>");
@@ -52,44 +31,17 @@ describe("SharePage", () => {
       expect(SOURCE).not.toContain("ShareBadgePreview");
       expect(SOURCE).not.toContain("@/app/studio/BadgePreviewCard");
     });
-
-    it("renders the public badge with server SVG output", () => {
-      expect(SOURCE).toContain("renderBadgeSvg");
-      expect(SOURCE).toContain("dangerouslySetInnerHTML");
-    });
   });
 
   describe("owner content delegation", () => {
     it("delegates owner/visitor sections to SharePageOwnerContent", () => {
       expect(SOURCE).toContain("SharePageOwnerContent");
     });
-
-    it("passes stats, impact, and handle to SharePageOwnerContent", () => {
-      expect(SOURCE).toContain("stats={stats}");
-      expect(SOURCE).toContain("impact={impact}");
-      expect(SOURCE).toContain("handle={handle}");
-    });
   });
 
   describe("toolbar with share + customize", () => {
     it("uses BadgeToolbar component", () => {
       expect(SOURCE).toContain("BadgeToolbar");
-    });
-
-    it("passes handle to toolbar", () => {
-      expect(SOURCE).toContain("handle=");
-    });
-  });
-
-  // #230 — badge img must have fetchpriority="high" (LCP element)
-  describe("badge img fetchpriority", () => {
-    it("has fetchpriority=\"high\" on the badge img tag", () => {
-      expect(SOURCE).toContain("badgeImageSrc");
-      expect(SOURCE).toContain("badge.svg?");
-      // Find the fallback badge JSX <img (multi-line JSX with \n between attrs).
-      const imgMatch = SOURCE.match(/<img\n[\s\S]*?src=\{badgeImageSrc\}[\s\S]*?\/>/);
-      expect(imgMatch).not.toBeNull();
-      expect(imgMatch![0]).toContain('fetchPriority="high"');
     });
   });
 
@@ -101,56 +53,25 @@ describe("SharePage", () => {
     });
   });
 
-  describe("OG image cache busting", () => {
-    it("appends a daily version parameter to og-image URL", () => {
-      expect(SOURCE).toContain("og-image?v=");
-    });
-  });
-
-  describe("Twitter meta description", () => {
-    it("uses i18n key for Twitter card description (sharePage.metadataDescription)", () => {
-      // Description is now loaded from i18n — not hardcoded
-      expect(SOURCE).toContain("sharePage.metadataDescription");
-    });
-  });
-
-  // #120/#731 — JSON-LD script injection prevention via shared renderJsonLd helper
-  describe("JSON-LD security", () => {
-    it("uses renderJsonLd to escape <, >, & in JSON-LD", () => {
-      // renderJsonLd() unicode-escapes <, >, and & — covers </script> injection
-      // and &-based vectors that bare JSON.stringify misses.
-      expect(SOURCE).toContain("renderJsonLd(personJsonLd)");
-      expect(SOURCE).toContain("renderJsonLd");
-    });
-  });
-
-  // #555 — ISR revalidation for share pages (cuts serverless invocations 80-90%)
-  describe("ISR revalidation", () => {
-    it("exports revalidate = 3600 for Incremental Static Regeneration", () => {
-      expect(SOURCE).toContain("export const revalidate = 3600");
+  // #1066 (FE-H2) — the route was declaring `revalidate = 3600` (ISR) while
+  // both generateMetadata and the page component unconditionally awaited
+  // searchParams, which already opted the route out of static rendering
+  // entirely (confirmed via .next/prerender-manifest.json: no ISR entry).
+  // The route now commits to dynamic rendering instead of paying every ISR
+  // trade-off for a route that was never actually static.
+  describe("dynamic rendering (#1066)", () => {
+    it("does NOT export revalidate (the route is genuinely dynamic, not ISR)", () => {
+      expect(SOURCE).not.toContain("export const revalidate");
     });
 
-    it("does NOT import headers from next/headers (ISR incompatible)", () => {
-      expect(SOURCE).not.toContain('from "next/headers"');
-      expect(SOURCE).not.toContain("from 'next/headers'");
+    it("imports headers from next/headers to resolve the requester's session", () => {
+      expect(SOURCE).toMatch(/from ["']next\/headers["']/);
+      expect(SOURCE).toMatch(/\bheaders\(\)/);
     });
 
-    it("does NOT call headers() anywhere (ISR incompatible)", () => {
-      // Ensure no headers() call that would force dynamic rendering
-      expect(SOURCE).not.toMatch(/\bheaders\(\)/);
-    });
-
-    it("does NOT import readSessionCookie (session is client-side)", () => {
-      expect(SOURCE).not.toContain("readSessionCookie");
-    });
-
-    it("uses NavbarClient instead of server-side Navbar", () => {
+    it("uses NavbarClient (unaffected by the dynamic-rendering change)", () => {
       expect(SOURCE).toContain("NavbarClient");
       expect(SOURCE).not.toMatch(/from ["']@\/components\/Navbar["']/);
-    });
-
-    it("uses SharePageOwnerContent for client-side owner detection", () => {
-      expect(SOURCE).toContain("SharePageOwnerContent");
     });
   });
 

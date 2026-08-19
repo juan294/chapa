@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* The root layout is static in the default locale, while locale-segmented
+   pages synchronize <html lang> after hydration. Keep root-level copy that
+   sits outside a page locale boundary coherent with the active document. */
+html[lang="es"] [data-document-locale="en"],
+html[lang="en"] [data-document-locale="es"] {
+  display: none;
+}
+
 @theme {
   /* Light defaults — Tailwind reads these to generate utility classes (bg-bg, text-text-primary, etc.).
      Runtime values are overridden below in unlayered :root / [data-theme="dark"] blocks. */

@@ -38,6 +38,7 @@ Thumbs.db
 
 # testing
 coverage/
+coverage-self-agent/
 .vitest-reports/
 playwright-report/
 test-results/

@@ -30,6 +30,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const getPopover = (container: HTMLElement) =>
+  container.querySelector(".absolute.bottom-full") as HTMLElement;
+
 describe("AuthorTypewriter", () => {
   describe("client component", () => {
     it("has 'use client' directive", () => {
@@ -38,66 +41,64 @@ describe("AuthorTypewriter", () => {
   });
 
   describe("accessibility", () => {
-    it("has aria-label on trigger pill", () => {
-      expect(SOURCE).toContain("aria-label=");
+    it("trigger pill has a non-empty aria-label", () => {
+      render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      expect(button.getAttribute("aria-label")).toBeTruthy();
     });
 
-    it("social links have aria-label attributes", () => {
-      expect(SOURCE).toContain('aria-label={link.label}');
+    it("social links each have an aria-label matching their link text", () => {
+      render(<AuthorTypewriter />);
+      const links = screen.getAllByRole("link");
+      const labels = links.map((link) => link.getAttribute("aria-label"));
+      expect(labels).toEqual(["X (Twitter)", "LinkedIn", "Medium", "GitHub"]);
     });
 
-    it("decorative SVGs are aria-hidden", () => {
-      expect(SOURCE).toContain('aria-hidden="true"');
+    it("decorative social icons are aria-hidden", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const icons = container.querySelectorAll("a svg");
+      expect(icons.length).toBeGreaterThan(0);
+      icons.forEach((icon) => {
+        expect(icon.getAttribute("aria-hidden")).toBe("true");
+      });
     });
 
     it("outer wrapper does not carry role=presentation alongside interactive handlers (#891)", () => {
       // UX-L3: role="presentation" contradicts onClick/onKeyDown handlers.
-      // Removed the conflicting role — the div has no semantic role.
-      expect(SOURCE).not.toContain('role="presentation"');
+      const { container } = render(<AuthorTypewriter />);
+      const rootDiv = container.firstElementChild as HTMLElement;
+      expect(rootDiv.getAttribute("role")).not.toBe("presentation");
     });
   });
 
   describe("keyboard accessibility (#219)", () => {
-    it("popover becomes visible on focus-within (not just hover)", () => {
-      // The popover container must use group-focus-within: alongside group-hover:
-      // to make social links reachable by keyboard
-      expect(SOURCE).toContain("group-focus-within:opacity-100");
+    it("popover carries focus-within reveal classes so it's reachable by keyboard, not just hover", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const popover = getPopover(container);
+      expect(popover.className).toContain("group-focus-within:opacity-100");
+      expect(popover.className).toContain(
+        "group-focus-within:pointer-events-auto",
+      );
+      expect(popover.className).toContain("group-focus-within:translate-y-0");
+      expect(popover.className).toContain("group-focus-within:scale-100");
     });
 
-    it("popover becomes interactive on focus-within (pointer-events)", () => {
-      // pointer-events must be auto on focus-within so links are clickable/tabbable
-      expect(SOURCE).toContain("group-focus-within:pointer-events-auto");
-    });
-
-    it("popover translates into position on focus-within", () => {
-      expect(SOURCE).toContain("group-focus-within:translate-y-0");
-    });
-
-    it("popover scales to full size on focus-within", () => {
-      expect(SOURCE).toContain("group-focus-within:scale-100");
-    });
-
-    it("trigger pill is a button element (natively focusable)", () => {
-      expect(SOURCE).toContain('<button');
-      expect(SOURCE).toContain('type="button"');
+    it("trigger pill is a native button element (natively focusable)", () => {
+      render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      expect(button.tagName).toBe("BUTTON");
+      expect(button.getAttribute("type")).toBe("button");
     });
   });
 
   describe("existing hover behavior preserved", () => {
-    it("still has group-hover:opacity-100", () => {
-      expect(SOURCE).toContain("group-hover:opacity-100");
-    });
-
-    it("still has group-hover:pointer-events-auto", () => {
-      expect(SOURCE).toContain("group-hover:pointer-events-auto");
-    });
-
-    it("still has group-hover:translate-y-0", () => {
-      expect(SOURCE).toContain("group-hover:translate-y-0");
-    });
-
-    it("still has group-hover:scale-100", () => {
-      expect(SOURCE).toContain("group-hover:scale-100");
+    it("popover carries hover reveal classes", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const popover = getPopover(container);
+      expect(popover.className).toContain("group-hover:opacity-100");
+      expect(popover.className).toContain("group-hover:pointer-events-auto");
+      expect(popover.className).toContain("group-hover:translate-y-0");
+      expect(popover.className).toContain("group-hover:scale-100");
     });
   });
 
@@ -590,6 +591,85 @@ describe("AuthorTypewriter", () => {
       ) as HTMLElement;
       // textRef is set — initial content should be HOME_TEXT
       expect(textSpan.textContent).toBe("</> JG");
+    });
+  });
+
+  describe("keyboard-actionable trigger button (#1117)", () => {
+    // Prior to the fix, the pill rendered as a <button> (announced as
+    // actionable by assistive tech) but had no onClick/keydown handler —
+    // pressing Enter or Space did nothing. The popover only opened via
+    // mouse hover or focus-within on an ancestor. This makes the button
+    // genuinely actionable: Enter/Space (and click) toggle a sticky-open
+    // state, in addition to the existing hover/focus-within behavior.
+
+    it("popover is not force-opened before any interaction", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const popover = getPopover(container);
+      expect(popover).not.toBeNull();
+      expect(popover.classList.contains("opacity-100")).toBe(false);
+    });
+
+    it("pressing Enter on the trigger button opens the popover", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: "Enter" });
+
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+      expect(popover.classList.contains("pointer-events-auto")).toBe(true);
+    });
+
+    it("pressing Space on the trigger button opens the popover", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: " " });
+
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+    });
+
+    it("pressing Enter again closes the popover (toggle)", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: "Enter" });
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+
+      fireEvent.keyDown(button, { key: "Enter" });
+      expect(popover.classList.contains("opacity-100")).toBe(false);
+    });
+
+    it("clicking the trigger button also toggles the popover open", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.click(button);
+      expect(popover.classList.contains("opacity-100")).toBe(true);
+
+      fireEvent.click(button);
+      expect(popover.classList.contains("opacity-100")).toBe(false);
+    });
+
+    it("reflects open state via aria-expanded on the trigger button", () => {
+      render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+
+      expect(button.getAttribute("aria-expanded")).toBe("false");
+      fireEvent.keyDown(button, { key: "Enter" });
+      expect(button.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("does not toggle the popover on unrelated keys", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const button = screen.getByRole("button");
+      const popover = getPopover(container);
+
+      fireEvent.keyDown(button, { key: "a" });
+      expect(popover.classList.contains("opacity-100")).toBe(false);
     });
   });
 

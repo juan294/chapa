@@ -12,6 +12,9 @@ const {
   mockForwardEmail,
   mockRateLimit,
   mockCacheSetNxStatus,
+  mockCacheGet,
+  mockCacheSet,
+  mockCacheDel,
 } = vi.hoisted(() => ({
   mockVerifyWebhookSignature: vi.fn(),
   mockFetchReceivedEmail: vi.fn(),
@@ -19,6 +22,10 @@ const {
   mockRateLimit: vi.fn(),
   // BE-L2: route now uses cacheSetNxStatus (not cacheSetNx + cacheGet)
   mockCacheSetNxStatus: vi.fn(),
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
+  // BE-H2: route releases the dedupe key on the 502 failure branches
+  mockCacheDel: vi.fn(),
 }));
 
 vi.mock("@/lib/email/resend", () => ({
@@ -30,6 +37,9 @@ vi.mock("@/lib/email/resend", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
   cacheSetNxStatus: mockCacheSetNxStatus,
+  cacheGet: mockCacheGet,
+  cacheSet: mockCacheSet,
+  cacheDel: mockCacheDel,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -93,6 +103,9 @@ beforeEach(() => {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
   // Default: key newly acquired — first delivery
   mockCacheSetNxStatus.mockResolvedValue("acquired");
+  mockCacheGet.mockResolvedValue(null);
+  mockCacheSet.mockResolvedValue(true);
+  mockCacheDel.mockResolvedValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -218,8 +231,7 @@ describe("POST /api/webhooks/resend", () => {
 
   it("returns 200 and skips forwarding when the svix event was already processed", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
-    // BE-L2: cacheSetNxStatus returns "exists" → already processed
-    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
+    mockCacheGet.mockResolvedValueOnce(1);
 
     const req = makeRequest(emailReceivedPayload, validHeaders);
 
@@ -255,7 +267,7 @@ describe("POST /api/webhooks/resend", () => {
 
   it("BE-L2: does NOT duplicate-forward when Redis confirms the event is known (exists)", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
-    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
+    mockCacheGet.mockResolvedValueOnce(1);
 
     const req = makeRequest(emailReceivedPayload, validHeaders);
 
@@ -340,6 +352,172 @@ describe("POST /api/webhooks/resend", () => {
     expect(entry.count).toBe(1);
 
     errorSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BE-H2: dedupe key must be released on the 502 failure branches so a real
+// Resend retry can actually re-attempt the fetch/forward instead of being
+// short-circuited as "already_processed".
+// ---------------------------------------------------------------------------
+
+describe("POST /api/webhooks/resend — dedupe key release on failure (BE-H2)", () => {
+  beforeEach(() => {
+    // Guard against cross-test pollution from queued mockResolvedValueOnce
+    // values: vi.clearAllMocks() (outer beforeEach) clears call records but
+    // NOT any unconsumed queued implementations, and a dedup short-circuit
+    // (the exact bug under test) can leave a queued value unconsumed.
+    mockFetchReceivedEmail.mockReset();
+    mockForwardEmail.mockReset();
+  });
+
+  it("does not mark a retry processed when cleanup of a failed claim fails", async () => {
+    mockVerifyWebhookSignature.mockReturnValue(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(null);
+    mockCacheDel.mockResolvedValueOnce(false);
+    mockCacheSetNxStatus
+      .mockResolvedValueOnce("acquired")
+      .mockResolvedValueOnce("exists");
+
+    const first = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(first.status).toBe(502);
+
+    const retry = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(retry.status).toBe(503);
+    expect((await retry.json()).status).toBe("processing");
+  });
+
+  it("releases the dedupe key when fetchReceivedEmail fails (502)", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(null);
+
+    const req = makeRequest(emailReceivedPayload, validHeaders);
+    const res = await POST(req);
+
+    expect(res.status).toBe(502);
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123:processing",
+    );
+  });
+
+  it("releases the dedupe key when forwardEmail fails (502)", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce(null);
+
+    const req = makeRequest(emailReceivedPayload, validHeaders);
+    const res = await POST(req);
+
+    expect(res.status).toBe(502);
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123:processing",
+    );
+  });
+
+  it("marks completion before releasing the processing claim on success", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_123" });
+
+    const req = makeRequest(emailReceivedPayload, validHeaders);
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123",
+      1,
+      60 * 60 * 24 * 7,
+    );
+    expect(mockCacheSet.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCacheDel.mock.invocationCallOrder[0]!,
+    );
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123:processing",
+    );
+  });
+
+  // Integration-style tests below use a small in-memory fake for the Redis
+  // dedupe primitives so a second POST() call with the same svix-id genuinely
+  // observes the effect of the first call's cacheSetNxStatus/cacheDel calls —
+  // this is what actually proves a Resend retry recovers instead of being
+  // short-circuited as "already_processed".
+  function useFakeDedupeStore() {
+    const store = new Set<string>();
+    mockCacheGet.mockImplementation(async (key: string) =>
+      store.has(key) ? 1 : null,
+    );
+    mockCacheSetNxStatus.mockImplementation(async (key: string) => {
+      if (store.has(key)) return "exists";
+      store.add(key);
+      return "acquired";
+    });
+    mockCacheSet.mockImplementation(async (key: string) => {
+      store.add(key);
+      return true;
+    });
+    mockCacheDel.mockImplementation(async (key: string) => {
+      store.delete(key);
+      return true;
+    });
+    return store;
+  }
+
+  it("allows a retried delivery to actually re-fetch after fetchReceivedEmail failed on the first attempt", async () => {
+    useFakeDedupeStore();
+    mockVerifyWebhookSignature.mockReturnValue(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(null); // first attempt: transient failure
+    mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail); // Resend retry: succeeds
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_retry_fetch" });
+
+    const first = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(first.status).toBe(502);
+
+    // Resend retries the same delivery (same svix-id)
+    const second = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(second.status).toBe(200);
+    const body = await second.json();
+    expect(body.status).toBe("forwarded");
+    expect(body.status).not.toBe("already_processed");
+    expect(mockFetchReceivedEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows a retried delivery to actually re-forward after forwardEmail failed on the first attempt", async () => {
+    useFakeDedupeStore();
+    mockVerifyWebhookSignature.mockReturnValue(true);
+    mockFetchReceivedEmail.mockResolvedValue(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce(null); // first attempt: transient failure
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_retry_forward" }); // Resend retry: succeeds
+
+    const first = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(first.status).toBe(502);
+
+    const second = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(second.status).toBe(200);
+    const body = await second.json();
+    expect(body.status).toBe("forwarded");
+    expect(body.status).not.toBe("already_processed");
+    expect(mockForwardEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it("still deduplicates a retried delivery after a genuine success (no duplicate forward)", async () => {
+    useFakeDedupeStore();
+    mockVerifyWebhookSignature.mockReturnValue(true);
+    mockFetchReceivedEmail.mockResolvedValue(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_once" });
+
+    const first = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(first.status).toBe(200);
+    const firstBody = await first.json();
+    expect(firstBody.status).toBe("forwarded");
+
+    // Resend retries even though the first attempt already succeeded
+    const second = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(second.status).toBe(200);
+    const secondBody = await second.json();
+    expect(secondBody.status).toBe("already_processed");
+
+    expect(mockFetchReceivedEmail).toHaveBeenCalledTimes(1);
+    expect(mockForwardEmail).toHaveBeenCalledTimes(1);
   });
 });
 

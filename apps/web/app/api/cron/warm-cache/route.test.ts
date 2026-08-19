@@ -5,6 +5,7 @@ import { GET } from "./route";
 const {
   mockVerifyCronSecret,
   mockDbGetUsers,
+  mockDbGetAllUserHandles,
   mockDbGetLatestSnapshotBatch,
   mockDbCleanOldSnapshots,
   mockDbCleanExpiredVerifications,
@@ -20,9 +21,14 @@ const {
   mockCaptureServerError,
   mockCaptureServerEvent,
   mockCaptureOperationalAlert,
+  mockRenderBadgeSvg,
+  mockGetPublicProfileVerification,
+  mockBuildBadgeSvgCacheKey,
+  mockWriteBadgeSvgCache,
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
+  mockDbGetAllUserHandles: vi.fn(),
   mockDbGetLatestSnapshotBatch: vi.fn(),
   mockDbCleanOldSnapshots: vi.fn(),
   mockDbCleanExpiredVerifications: vi.fn(),
@@ -38,6 +44,10 @@ const {
   mockCaptureServerError: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
   mockCaptureOperationalAlert: vi.fn(),
+  mockRenderBadgeSvg: vi.fn(),
+  mockGetPublicProfileVerification: vi.fn(),
+  mockBuildBadgeSvgCacheKey: vi.fn(),
+  mockWriteBadgeSvgCache: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cron", () => ({
@@ -46,6 +56,8 @@ vi.mock("@/lib/auth/cron", () => ({
 
 vi.mock("@/lib/db/users", () => ({
   dbGetUsers: (...args: unknown[]) => mockDbGetUsers(...args),
+  dbGetAllUserHandles: (...args: unknown[]) =>
+    mockDbGetAllUserHandles(...args),
 }));
 
 vi.mock("@/lib/db/snapshots", () => ({
@@ -89,6 +101,21 @@ vi.mock("@/lib/render/avatar", () => ({
   getAvatarBase64: (...args: unknown[]) => mockGetAvatarBase64(...args),
 }));
 
+vi.mock("@/lib/render/BadgeSvg", () => ({
+  renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
+}));
+
+vi.mock("@/lib/profile/public-profile", () => ({
+  getPublicProfileVerification: (...args: unknown[]) =>
+    mockGetPublicProfileVerification(...args),
+}));
+
+vi.mock("@/lib/render/badge-svg-cache", () => ({
+  AVATAR_ABSENT_CACHE_TTL_SECONDS: 900,
+  buildBadgeSvgCacheKey: (...args: unknown[]) => mockBuildBadgeSvgCacheKey(...args),
+  writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+}));
+
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
   captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
@@ -125,6 +152,7 @@ const FAKE_MATERIALIZED = {
     computedAt: "2026-04-17T12:00:00.000Z",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 66, tier: "Solid" },
+  statsComplete: true,
 };
 
 function makeRequest(): NextRequest {
@@ -142,6 +170,9 @@ describe("GET /api/cron/warm-cache", () => {
     vi.clearAllMocks();
     mockVerifyCronSecret.mockReturnValue(null);
     mockDbGetUsers.mockResolvedValue([user("alice"), user("bob")]);
+    mockDbGetAllUserHandles.mockImplementation(async () =>
+      (await mockDbGetUsers()).map((entry: { handle: string }) => entry.handle),
+    );
     mockDbGetLatestSnapshotBatch.mockResolvedValue(new Map());
     mockDbCleanOldSnapshots.mockResolvedValue(0);
     mockDbCleanExpiredVerifications.mockResolvedValue(0);
@@ -157,6 +188,15 @@ describe("GET /api/cron/warm-cache", () => {
     mockCaptureServerError.mockResolvedValue(undefined);
     mockCaptureServerEvent.mockResolvedValue(undefined);
     mockCaptureOperationalAlert.mockResolvedValue(undefined);
+    mockRenderBadgeSvg.mockReturnValue("<svg>rendered</svg>");
+    mockGetPublicProfileVerification.mockReturnValue({
+      hash: "verified-hash",
+      date: "2026-04-17",
+    });
+    mockBuildBadgeSvgCacheKey.mockImplementation(
+      (handle: string, date: string) => `badge:v1:${handle}:warm-amber-v3:${date}`,
+    );
+    mockWriteBadgeSvgCache.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -180,6 +220,7 @@ describe("GET /api/cron/warm-cache", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
+    expect(mockDbGetAllUserHandles).toHaveBeenCalledOnce();
     expect(body.warmed).toBe(2);
     expect(body.failed).toBe(0);
     expect(body.processedCount).toBe(2);
@@ -569,9 +610,120 @@ describe("GET /api/cron/warm-cache", () => {
     const res = await GET(makeRequest());
     const body = await res.json();
 
-    // Warm still succeeds — avatar failure is fire-and-forget
+    // Warm still succeeds — avatar warming is opportunistic and contained.
     expect(body.warmed).toBe(2);
     expect(body.failed).toBe(0);
+  });
+
+  // #1089 (PE-M2): the cron previously never rendered/wrote the badge SVG
+  // cache, guaranteeing a cold miss for every handle at the UTC date
+  // rollover. warmHandle must now render and write the SVG, gated by the
+  // exact same quality gates that protect the request-path write in
+  // finalizeMaterializedBadge (apps/web/app/u/[handle]/badge.svg/route.ts):
+  // the avatar outcome must be cache-safe AND a verification record must
+  // exist (which itself requires materialized.statsComplete).
+  describe("badge SVG cache warming (#1089)", () => {
+    it("renders and writes the badge SVG cache when the avatar resolves and stats look complete", async () => {
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          avatarDataUri: "data:image/png;base64,abc",
+          verificationHash: "verified-hash",
+          verificationDate: "2026-04-17",
+          disableAnimation: true,
+        }),
+      );
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.stringContaining("alice"),
+        "<svg>rendered</svg>",
+        "alice",
+      );
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.stringContaining("bob"),
+        "<svg>rendered</svg>",
+        "bob",
+      );
+    });
+
+    it("withholds the SVG cache write when verification is null (degraded/incomplete stats)", async () => {
+      mockGetPublicProfileVerification.mockReturnValue(null);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      // The warm itself still succeeds — only the SVG publish is gated.
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("withholds the SVG cache write when the avatar fails to resolve", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("avatar fetch timeout"));
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("writes the standard cache entry when remote avatar absence is definitive", async () => {
+      mockGetAvatarBase64.mockResolvedValue(undefined);
+
+      await GET(makeRequest());
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ avatarDataUri: undefined }),
+      );
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        "<svg>rendered</svg>",
+        expect.any(String),
+      );
+    });
+
+    it("writes a short-TTL SVG cache entry when the handle has no avatarUrl", async () => {
+      mockMaterializeOrchestratedProfile.mockResolvedValue({
+        ...FAKE_MATERIALIZED,
+        stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: null },
+      });
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        "<svg>rendered</svg>",
+        expect.any(String),
+        expect.objectContaining({ ttlSeconds: expect.any(Number) }),
+      );
+    });
+
+    it("does not let a badge SVG render/write failure fail the warm", async () => {
+      mockWriteBadgeSvgCache.mockRejectedValue(new Error("redis write boom"));
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(body.failed).toBe(0);
+    });
   });
 
   // DO-M5: PostHog cron_warm_cache_complete event
@@ -856,6 +1008,136 @@ describe("GET /api/cron/warm-cache", () => {
           }),
         }),
       );
+    });
+  });
+
+  // #1095: warm-cache had no wall-clock budget check, unlike process-campaigns'
+  // 30s-reserved-buffer pattern. A hard platform timeout mid-run meant the
+  // rotation offset and heartbeat never got written, and — since it's not a
+  // thrown error — no cron_failure alert fired either.
+  describe("time budget (#1095)", () => {
+    const BUDGET_MS = (300 - 30) * 1000; // maxDuration=300, mirrors process-campaigns' 30s buffer
+
+    it("stops processing further handles once the time budget is exhausted, defers the rest, writes the heartbeat, and does not throw", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10); // offset=10, no priority handles -> toWarm = user10..user59 (50)
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0) // start
+        .mockReturnValueOnce(T0) // time-budget check before batch 0 (elapsed 0) -> proceed
+        .mockReturnValueOnce(T0 + BUDGET_MS) // check before batch 1 -> exceeded -> stop
+        .mockReturnValue(T0 + BUDGET_MS); // durationMs / heartbeat / any further calls
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.timedOut).toBe(true);
+      // Only the first batch (5 handles) was actually processed before the budget check tripped.
+      expect(body.processedCount).toBe(5);
+      expect(body.warmed).toBe(5);
+      expect(body.deferredCount).toBe(45);
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(5);
+      // Heartbeat still written despite the early stop — graceful degradation, not a crash.
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "cron:lastrun:warm-cache",
+        expect.any(Number),
+        172800,
+      );
+
+      nowSpy.mockRestore();
+    });
+
+    it("advances the rotation offset only past the genuinely-completed handles, not the full intended slice (#750)", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10);
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0 + BUDGET_MS)
+        .mockReturnValue(T0 + BUDGET_MS);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      // Only 5 of the intended 50 rotation handles (offset 10..59) actually completed
+      // (user10..user14) -> next offset must be 15, NOT 60 (the full intended slice).
+      expect(body.rotation.nextOffset).toBe(15);
+      expect(mockCacheSet).toHaveBeenCalledWith("cron:warm-cache:offset", 15, 0);
+
+      nowSpy.mockRestore();
+    });
+
+    it("does not advance the offset at all when the budget is exhausted before any rotation handle completes", async () => {
+      // Priority handles fill the first batch; the budget runs out before any
+      // rotation-scanned handle is processed.
+      vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user70,user71,user72,user73,user74");
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10);
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0) // check before batch 0 (priority handles) -> proceed
+        .mockReturnValueOnce(T0 + BUDGET_MS) // check before batch 1 (first rotation batch) -> exceeded
+        .mockReturnValue(T0 + BUDGET_MS);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(body.processedCount).toBe(5);
+      expect(body.rotation.nextOffset).toBe(10); // unchanged from stored offset
+      expect(mockCacheSet).toHaveBeenCalledWith("cron:warm-cache:offset", 10, 0);
+
+      nowSpy.mockRestore();
+    });
+
+    it("emits a P2 operational alert when the time budget is exhausted, without throwing", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheGet.mockResolvedValue(10);
+
+      const T0 = 1_000_000;
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0)
+        .mockReturnValueOnce(T0 + BUDGET_MS)
+        .mockReturnValue(T0 + BUDGET_MS);
+
+      const res = await GET(makeRequest());
+
+      expect(res.status).toBe(200);
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_time_budget_exceeded",
+          severity: "P2",
+          route: "/api/cron/warm-cache",
+        }),
+      );
+
+      nowSpy.mockRestore();
+    });
+
+    it("reports timedOut: false and zero deferrals when the run completes within budget", async () => {
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(body.timedOut).toBe(false);
+      expect(body.deferredCount).toBe(0);
     });
   });
 });

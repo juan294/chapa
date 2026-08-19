@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockGet = vi.fn();
 const mockSet = vi.fn();
+const mockEval = vi.fn();
 const mockDel = vi.fn();
 const mockIncr = vi.fn();
 const mockExpire = vi.fn();
@@ -30,6 +31,7 @@ vi.mock("@upstash/redis", () => ({
   Redis: class MockRedis {
     get = mockGet;
     set = mockSet;
+    eval = mockEval;
     del = mockDel;
     incr = mockIncr;
     expire = mockExpire;
@@ -46,6 +48,7 @@ vi.mock("@upstash/redis", () => ({
 import {
   cacheGet,
   cacheSet,
+  cacheMergeJson,
   cacheDel,
   rateLimit,
   rateLimitStrict,
@@ -175,6 +178,41 @@ describe("cacheSet", () => {
 
     expect(result).toBe(false);
     expect(mockSet).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cacheMergeJson
+// ---------------------------------------------------------------------------
+
+describe("cacheMergeJson", () => {
+  it("runs the JSON merge and TTL refresh atomically in Redis", async () => {
+    mockEval.mockResolvedValueOnce(1);
+
+    const result = await cacheMergeJson(
+      "cli:device:session",
+      { status: "approved", handle: "octocat" },
+      300,
+    );
+
+    expect(result).toBe(true);
+    expect(mockEval).toHaveBeenCalledOnce();
+    const [script, keys, args] = mockEval.mock.calls[0]!;
+    expect(script).toContain('redis.call("GET", KEYS[1])');
+    expect(script).toContain('redis.call("SET", KEYS[1]');
+    expect(keys).toEqual(["cli:device:session"]);
+    expect(args).toEqual([
+      JSON.stringify({ status: "approved", handle: "octocat" }),
+      "300",
+    ]);
+  });
+
+  it("returns false when the atomic merge fails", async () => {
+    mockEval.mockRejectedValueOnce(new Error("Connection refused"));
+
+    await expect(
+      cacheMergeJson("cli:device:session", { deviceCodeConfirmed: true }, 300),
+    ).resolves.toBe(false);
   });
 });
 

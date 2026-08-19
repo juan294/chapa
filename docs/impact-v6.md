@@ -6,6 +6,8 @@
 
 V5 measured developer impact through 4 GitHub-derived dimensions. But modern developers increasingly work *through* AI tools — the quality of that collaboration is itself a signal of developer sophistication. V6 adds a 5th "Craft" dimension that captures AI tool mastery, bringing the total profile to 5 dimensions.
 
+Background research on why traditional activity-based metrics (commits, LOC, raw PR counts) are losing relevance in an AI-assisted era, and on emerging alternatives (DORA, SPACE, AI-specific signals): see [`docs/evolving-developer-metrics-in-the-ai-assisted-era.md`](./evolving-developer-metrics-in-the-ai-assisted-era.md).
+
 ## Changes from V5
 
 ### 1. Fifth Dimension: Craft (Optional)

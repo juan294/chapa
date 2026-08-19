@@ -15,6 +15,7 @@ vi.mock("@/lib/auth/require-session", () => ({
 }));
 vi.mock("@/lib/cache/redis", () => ({
   rateLimitStrict: vi.fn(async () => ({ allowed: true, current: 1, limit: 3 })),
+  refundRateLimit: vi.fn(async () => true),
 }));
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: vi.fn(() => "1.2.3.4"),
@@ -35,7 +36,7 @@ vi.mock("@/lib/analytics/server-errors", async (importOriginal) => {
 });
 
 import { requireSession } from "@/lib/auth/require-session";
-import { rateLimitStrict } from "@/lib/cache/redis";
+import { rateLimitStrict, refundRateLimit } from "@/lib/cache/redis";
 import { sendChallengeEmail } from "@/lib/email/challenge";
 import { isValidHandle } from "@/lib/validation";
 
@@ -57,6 +58,7 @@ describe("POST /api/challenge", () => {
     vi.mocked(rateLimitStrict).mockResolvedValue({ allowed: true, current: 1, limit: 3 });
     vi.mocked(sendChallengeEmail).mockResolvedValue({ success: true });
     vi.mocked(isValidHandle).mockReturnValue(true);
+    vi.mocked(refundRateLimit).mockResolvedValue(true);
     mockCaptureServerError.mockClear();
     mockCaptureServerError.mockResolvedValue(undefined);
   });
@@ -249,7 +251,7 @@ describe("POST /api/challenge", () => {
     );
   });
 
-  it("returns 200 { success: true } even when email send fails, but captures the failure", async () => {
+  it("returns 502 { success: false }, captures the failure, and refunds the per-handle quota when email send fails", async () => {
     vi.mocked(sendChallengeEmail).mockResolvedValue({ success: false });
     const req = makeRequest({
       handle: "octocat",
@@ -258,22 +260,44 @@ describe("POST /api/challenge", () => {
 
     const res = await POST(req);
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(502);
     const body = await res.json();
-    expect(body).toEqual({ success: true });
+    expect(body).toEqual({ success: false, error: "delivery_failed" });
     expect(mockCaptureServerError).toHaveBeenCalledTimes(1);
     expect(mockCaptureServerError).toHaveBeenCalledWith(
       expect.objectContaining({
         route: "/api/challenge",
-        statusCode: 200,
+        statusCode: 502,
         error: expect.any(Error),
       }),
     );
     const capturedArg = mockCaptureServerError.mock.calls[0]![0];
     expect((capturedArg.error as Error).message).toMatch(/handle=octocat/);
+    expect(refundRateLimit).toHaveBeenCalledWith("ratelimit:challenge:octocat");
   });
 
-  it("does not capture a server error when the email send succeeds", async () => {
+  it("captures a second error when the quota refund itself fails, without masking the delivery failure response", async () => {
+    vi.mocked(sendChallengeEmail).mockResolvedValue({ success: false });
+    vi.mocked(refundRateLimit).mockResolvedValue(false);
+    const req = makeRequest({
+      handle: "octocat",
+      reason: "My delivery score seems off because all my PRs were merged in March.",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body).toEqual({ success: false, error: "delivery_failed" });
+    expect(mockCaptureServerError).toHaveBeenCalledTimes(2);
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({ message: expect.stringMatching(/refund failed/i) }),
+      }),
+    );
+  });
+
+  it("does not refund the per-handle quota or capture a server error when the email send succeeds", async () => {
     const req = makeRequest({
       handle: "octocat",
       reason: "My delivery score seems off because all my PRs were merged in March.",
@@ -281,6 +305,7 @@ describe("POST /api/challenge", () => {
 
     await POST(req);
 
+    expect(refundRateLimit).not.toHaveBeenCalled();
     expect(mockCaptureServerError).not.toHaveBeenCalled();
   });
 });

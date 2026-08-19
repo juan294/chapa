@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
-  mockCacheGet,
+  mockCacheMGet,
   mockCacheSet,
   mockIsBitbucketEnabled,
   mockDbGetLinkedPlatform,
@@ -11,7 +11,7 @@ const {
   mockRefreshBitbucketToken,
   mockFetchBitbucketStats,
 } = vi.hoisted(() => ({
-  mockCacheGet: vi.fn(),
+  mockCacheMGet: vi.fn(),
   mockCacheSet: vi.fn(),
   mockIsBitbucketEnabled: vi.fn(),
   mockDbGetLinkedPlatform: vi.fn(),
@@ -23,7 +23,7 @@ const {
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mockCacheGet,
+  cacheMGet: mockCacheMGet,
   cacheSet: mockCacheSet,
 }));
 
@@ -65,7 +65,7 @@ const linkedBase = {
 describe("fetchBitbucketIfLinked", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCacheGet.mockResolvedValue(null);
+    mockCacheMGet.mockResolvedValue([null, null]);
     mockCacheSet.mockResolvedValue(undefined);
     mockIsBitbucketEnabled.mockResolvedValue(true);
     mockDbGetLinkedPlatform.mockResolvedValue(linkedBase);
@@ -76,7 +76,7 @@ describe("fetchBitbucketIfLinked", () => {
 
   it("returns cached stats when cache hit", async () => {
     const cached = makeStats({ commitsTotal: 20 });
-    mockCacheGet.mockResolvedValue(cached);
+    mockCacheMGet.mockResolvedValue([cached, null]);
 
     const result = await fetchBitbucketIfLinked(HANDLE, LOWER);
 
@@ -211,9 +211,7 @@ describe("fetchBitbucketIfLinked", () => {
     });
 
     it("returns null immediately on negative cache hit without DB/flag reads", async () => {
-      mockCacheGet
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(true);
+      mockCacheMGet.mockResolvedValueOnce([null, true]);
 
       const result = await fetchBitbucketIfLinked(HANDLE, LOWER);
 

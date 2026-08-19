@@ -20,7 +20,20 @@ const URL_EFFECTS_SOURCE = fs.readFileSync(
 // The one remaining genuinely-interactive piece (the ?lang=/error
 // query-param handling, which must stay client-side to preserve the #982
 // static/ISR contract) is isolated in the LandingUrlEffects client leaf.
-describe("LandingContent (server component)", () => {
+//
+// #1104: everything renderable this file used to check (NavbarClient,
+// main-content landmark, the demo badge SVG, BadgeOverlay, LandingTerminal,
+// footer, the verification CTA's href/styling, and the error-banner flow
+// through LandingUrlEffects/getOAuthErrorMessage/ErrorBanner) is now covered
+// by real render+query assertions in app/[locale]/page.render.test.tsx,
+// which renders the actual page tree. What remains here has no
+// render-observable equivalent: whether LandingContent is a server or
+// client component, and whether it reads window.location directly vs.
+// delegating to LandingUrlEffects, can't be told apart by a jsdom render —
+// both would render identically either way. LocaleSync is mocked to a no-op
+// across the render-test suite, so its presence inside LandingUrlEffects
+// (the sticky ?lang= query override) isn't render-observable there either.
+describe("LandingContent (server component) — non-renderable architecture checks", () => {
   describe("component type", () => {
     it("is NOT a client component (no 'use client')", () => {
       expect(SOURCE).not.toMatch(/^["']use client["']/m);
@@ -31,10 +44,6 @@ describe("LandingContent (server component)", () => {
       expect(SOURCE).not.toContain('from "@/lib/i18n"');
       expect(SOURCE).toContain("t: TFunction");
     });
-
-    it("accepts the server-computed demo badge SVG as a prop", () => {
-      expect(SOURCE).toContain("demoBadgeSvg");
-    });
   });
 
   // #982 / #1023 — query params (error, lang) are still read client-side via
@@ -42,95 +51,13 @@ describe("LandingContent (server component)", () => {
   // stays statically renderable. useSearchParams is intentionally avoided
   // (it would require a Suspense boundary / CSR bailout).
   describe("client-side query param handling (#982) — isolated in LandingUrlEffects", () => {
-    it("LandingContent delegates query-param handling to the LandingUrlEffects client leaf", () => {
+    it("LandingContent delegates query-param handling to the LandingUrlEffects client leaf, not window.location directly", () => {
       expect(SOURCE).toContain("LandingUrlEffects");
       expect(SOURCE).not.toContain("window.location");
     });
 
-    it("LandingUrlEffects reads query params from window.location (no server searchParams)", () => {
-      expect(URL_EFFECTS_SOURCE).toMatch(/^["']use client["']/m);
-      expect(URL_EFFECTS_SOURCE).toContain("window.location");
-    });
-
-    it("LandingUrlEffects maps the OAuth error param to a message and renders ErrorBanner", () => {
-      expect(URL_EFFECTS_SOURCE).toContain("getOAuthErrorMessage");
-      expect(URL_EFFECTS_SOURCE).toContain("ErrorBanner");
-    });
-
     it("LandingUrlEffects renders LocaleSync for the sticky ?lang= query override", () => {
       expect(URL_EFFECTS_SOURCE).toContain("LocaleSync");
-    });
-  });
-
-  describe("rendering", () => {
-    it("renders NavbarClient", () => {
-      expect(SOURCE).toContain("NavbarClient");
-    });
-
-    it("renders the main content area", () => {
-      expect(SOURCE).toContain('id="main-content"');
-    });
-
-    it("renders the badge preview via the demoBadgeSvg prop", () => {
-      expect(SOURCE).toContain("demoBadgeSvg");
-    });
-
-    it("renders BadgeOverlay", () => {
-      expect(SOURCE).toContain("BadgeOverlay");
-    });
-
-    it("renders the GitHub login CTA via LoginCtaButton", () => {
-      expect(SOURCE).toContain("LoginCtaButton");
-    });
-
-    it("renders LandingTerminal", () => {
-      expect(SOURCE).toContain("LandingTerminal");
-    });
-
-    it("renders the footer", () => {
-      expect(SOURCE).toContain("<footer");
-    });
-  });
-
-  // #740 — UX-M3: verification CTA uses complement (teal) tokens
-  describe("verification CTA uses complement tokens (#740)", () => {
-    it("Verify a Badge button uses bg-complement", () => {
-      expect(SOURCE).toContain("bg-complement");
-    });
-
-    it("Verify a Badge button links to /verify", () => {
-      expect(SOURCE).toContain('href="/verify"');
-    });
-  });
-
-  describe("archetype links", () => {
-    it("links to all seven archetype pages", () => {
-      expect(SOURCE).toContain("/archetypes/builder");
-      expect(SOURCE).toContain("/archetypes/guardian");
-      expect(SOURCE).toContain("/archetypes/marathoner");
-      expect(SOURCE).toContain("/archetypes/polymath");
-      expect(SOURCE).toContain("/archetypes/artificer");
-      expect(SOURCE).toContain("/archetypes/balanced");
-      expect(SOURCE).toContain("/archetypes/emerging");
-    });
-  });
-
-  // Phase 9 — optical icon alignment on CTA buttons
-  describe("optical icon alignment (Phase 9)", () => {
-    it("CTA buttons use asymmetric padding for optical icon alignment", () => {
-      expect(SOURCE).toContain("pl-6 pr-5");
-    });
-  });
-
-  // #741 — visible section labels for landmark sections
-  describe("visible section labels (#741)", () => {
-    it("Features section has a visible label element (not only sr-only)", () => {
-      expect(SOURCE).toContain("tracking-widest");
-    });
-
-    it("section labels use text-text-secondary and font-heading", () => {
-      expect(SOURCE).toContain("text-text-secondary");
-      expect(SOURCE).toContain("font-heading");
     });
   });
 });

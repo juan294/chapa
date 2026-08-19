@@ -32,7 +32,7 @@ const PNG_MAGIC = new Uint8Array([
 ]);
 
 describe("badge reference PNG", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     // Generate the reference PNG using the production rendering pipeline
     mkdirSync(dirname(REFERENCE_PNG_PATH), { recursive: true });
 
@@ -41,7 +41,7 @@ describe("badge reference PNG", () => {
       demoMode: true,
     });
 
-    const png = svgToPng(svg, 1200);
+    const png = await svgToPng(svg, 1200);
     writeFileSync(REFERENCE_PNG_PATH, png);
   });
 

@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { Translations } from "@/lib/i18n/types";
 
 const {
   mockMaterializePublicProfile,
@@ -12,6 +13,7 @@ const {
   mockRunPublicProfileSideEffects,
   mockPersistProfileSnapshot,
   mockDeferProfileCacheWork,
+  mockRedactImpactForVisitor,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -20,12 +22,15 @@ const {
   mockReadBadgeSvgCache,
   mockWriteBadgeSvgCache,
   mockGetTrendData,
+  mockHeaders,
+  mockGetOptionalServerSessionFromHeaders,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
   mockPersistProfileSnapshot: vi.fn(),
   mockDeferProfileCacheWork: vi.fn(),
+  mockRedactImpactForVisitor: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -34,6 +39,17 @@ const {
   mockReadBadgeSvgCache: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockGetTrendData: vi.fn(),
+  mockHeaders: vi.fn(),
+  mockGetOptionalServerSessionFromHeaders: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: (...args: unknown[]) => mockHeaders(...args),
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
+    mockGetOptionalServerSessionFromHeaders(...args),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -47,6 +63,8 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+  redactImpactForVisitor: (...args: unknown[]) =>
+    mockRedactImpactForVisitor(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -133,6 +151,38 @@ async function flushAfterCallbacks(): Promise<void> {
   await Promise.all(callbacks.map((callback) => callback()));
 }
 
+/**
+ * Walks the rendered React element tree returned by an async server
+ * component (no DOM, no testing-library — this is a plain object graph of
+ * `{ type, props }` element nodes) to find a `<script>` element with the
+ * given `type` attribute (e.g. "application/ld+json"). Used to grab the
+ * JSON-LD payload out of `SharePageContent`'s returned tree for a real
+ * behavioral assertion on its content, rather than a source-text match.
+ */
+function findScriptElement(
+  node: unknown,
+  scriptType: string,
+): { props: { dangerouslySetInnerHTML?: { __html?: string } } } | null {
+  if (!node || typeof node !== "object") return null;
+  const el = node as {
+    type?: unknown;
+    props?: { type?: string; children?: unknown };
+  };
+  if (el.type === "script" && el.props?.type === scriptType) {
+    return el as { props: { dangerouslySetInnerHTML?: { __html?: string } } };
+  }
+  const children = el.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const found = findScriptElement(child, scriptType);
+      if (found) return found;
+    }
+  } else if (children) {
+    return findScriptElement(children, scriptType);
+  }
+  return null;
+}
+
 const FAKE_MATERIALIZED = {
   stats: {
     handle: "testuser",
@@ -182,57 +232,70 @@ beforeEach(() => {
   mockReadBadgeSvgCache.mockResolvedValue(null);
   mockWriteBadgeSvgCache.mockResolvedValue(undefined);
   mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
+  mockHeaders.mockResolvedValue({ get: () => null });
+  mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+  mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
+    return rest;
+  });
 });
 
 describe("Phase 4d — Share page i18n", () => {
+  // #1104 — importing the dictionary modules and asserting on the actual
+  // runtime translation values is strictly better than regexing
+  // dictionaries/en.ts and es.ts as text: it reflects what the app really
+  // ships (not source comments/formatting) and would catch a value moved to
+  // the wrong key just as well as a missing one.
   describe("dictionary presence", () => {
-    const EN_DICT = fs.readFileSync(
-      path.resolve(__dirname, "../../../lib/i18n/dictionaries/en.ts"),
-      "utf-8",
-    );
-    const ES_DICT = fs.readFileSync(
-      path.resolve(__dirname, "../../../lib/i18n/dictionaries/es.ts"),
-      "utf-8",
-    );
-
-    it("en.ts has sharePage namespace", () => {
-      expect(EN_DICT).toContain("sharePage:");
+    it("en.ts sharePage has metadataTitle with {handle} placeholder", async () => {
+      const { en } = await import("@/lib/i18n/dictionaries/en");
+      const sharePage = en.sharePage as Translations;
+      expect(sharePage.metadataTitle as string).toContain("Developer Impact, Decoded");
+      expect(sharePage.metadataTitle as string).toContain("{handle}");
     });
 
-    it("es.ts has sharePage namespace", () => {
-      expect(ES_DICT).toContain("sharePage:");
+    it("es.ts sharePage has metadataTitle in Spanish", async () => {
+      const { es } = await import("@/lib/i18n/dictionaries/es");
+      const sharePage = es.sharePage as Translations;
+      expect(sharePage.metadataTitle as string).toContain(
+        "Impacto de desarrollador, decodificado",
+      );
     });
 
-    it("en.ts sharePage has metadataTitle with {handle} placeholder", () => {
-      expect(EN_DICT).toContain("Developer Impact, Decoded");
-      expect(EN_DICT).toContain("{handle}");
+    it("en.ts sharePage has srH1 key", async () => {
+      const { en } = await import("@/lib/i18n/dictionaries/en");
+      const sharePage = en.sharePage as Translations;
+      expect(sharePage.srH1 as string).toBeTruthy();
     });
 
-    it("es.ts sharePage has metadataTitle in Spanish", () => {
-      expect(ES_DICT).toContain("Impacto de desarrollador, decodificado");
+    it("es.ts sharePage has srH1 key in Spanish", async () => {
+      const { es } = await import("@/lib/i18n/dictionaries/es");
+      const sharePage = es.sharePage as Translations;
+      expect(sharePage.srH1 as string).toContain("Impacto de desarrollador de {handle}");
     });
 
-    it("en.ts sharePage has srH1 key", () => {
-      expect(EN_DICT).toContain("srH1:");
+    it("en.ts shareOwner has ariaBusy key", async () => {
+      const { en } = await import("@/lib/i18n/dictionaries/en");
+      const shareOwner = en.shareOwner as Translations;
+      expect(shareOwner.ariaBusy as string).toContain("Regenerating badge");
     });
 
-    it("es.ts sharePage has srH1 key in Spanish", () => {
-      expect(ES_DICT).toContain("Impacto de desarrollador de {handle}");
-    });
-
-    it("en.ts shareOwner has new ariaBusy key", () => {
-      expect(EN_DICT).toContain("ariaBusy:");
-      expect(EN_DICT).toContain("Regenerating badge");
-    });
-
-    it("es.ts shareOwner has ariaBusy key in Spanish", () => {
-      expect(ES_DICT).toContain("ariaBusy:");
-      expect(ES_DICT).toContain("Regenerando Chapa");
+    it("es.ts shareOwner has ariaBusy key in Spanish", async () => {
+      const { es } = await import("@/lib/i18n/dictionaries/es");
+      const shareOwner = es.shareOwner as Translations;
+      expect(shareOwner.ariaBusy as string).toContain("Regenerando Chapa");
     });
   });
 
   describe("generateMetadata — es locale (social cards use primary locale)", () => {
     it("uses interpolated handle in OG image alt (Spanish)", async () => {
+      // #1066 — locale now resolves via getServerLocale (cookie/header
+      // fallback), mocked here to "es" to preserve this test's original
+      // intent (its own precedence is covered by lib/i18n/server.test.ts
+      // and the "locale resolution (#1066)" tests in page.test.tsx).
+      mockGetServerLocale.mockResolvedValue("es");
+
       const metadata = await generateMetadata({
         params: Promise.resolve({ handle: "testuser" }),
       });
@@ -247,6 +310,16 @@ describe("Phase 4d — Share page i18n", () => {
       });
 
       expect(metadata.title).toContain("jdoe");
+    });
+
+    it("cache-busts the OG image URL with a daily version param and shares the same description with the Twitter card", async () => {
+      const metadata = await generateMetadata({
+        params: Promise.resolve({ handle: "jdoe" }),
+      });
+
+      const images = metadata.openGraph?.images as Array<{ url?: string }>;
+      expect(images[0]?.url).toMatch(/\/u\/jdoe\/og-image\?v=/);
+      expect(metadata.twitter?.description).toBe(metadata.description);
     });
 
     it("uses English metadata for an explicit ?lang=en deep link", async () => {
@@ -286,11 +359,74 @@ describe("Phase 4d — Share page i18n", () => {
       expect(jsxString).toContain("devuser");
     });
 
+    it("embeds the server-rendered badge SVG via dangerouslySetInnerHTML", async () => {
+      const result = await SharePageContent({ handle: "testuser" });
+      const jsxString = JSON.stringify(result);
+      // mockRenderBadgeSvg (set in beforeEach) returns this exact SVG markup.
+      expect(jsxString).toContain("BADGE");
+    });
+
     it("does not hardcode sharePage.h2 text — delegates to SharePageH2 client component", async () => {
       const result = await SharePageContent({ handle: "testuser" });
       const jsxString = JSON.stringify(result);
       expect(jsxString).not.toContain("Tu Impacto, Decodificado");
       expect(jsxString).not.toContain("Your Impact, Decoded");
+    });
+
+    // #800/#1104 — the avatar fetch races a ~250ms deadline against the real
+    // GitHub avatar CDN so a slow response can't block TTFB. These two tests
+    // bracket that deadline with fake timers and exercise the actual
+    // Promise.race, rather than regexing the magic number out of source:
+    // an avatar that resolves just inside the deadline gets cached, one
+    // that resolves just outside it doesn't.
+    it("treats an avatar fetch that resolves just past the ~250ms deadline as timed out and skips caching the placeholder-avatar render", async () => {
+      vi.useFakeTimers();
+      try {
+        mockGetAvatarBase64.mockImplementation(
+          () =>
+            new Promise((resolve) =>
+              setTimeout(() => resolve("data:image/png;base64,slow"), 251),
+            ),
+        );
+        const resultPromise = SharePageContent({ handle: "testuser" });
+        await vi.advanceTimersByTimeAsync(251);
+        await resultPromise;
+        await flushAfterCallbacks();
+
+        expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+          FAKE_MATERIALIZED.stats,
+          FAKE_MATERIALIZED.displayImpact,
+          expect.objectContaining({ avatarDataUri: undefined }),
+        );
+        expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("caches a render whose avatar resolved just within the ~250ms deadline", async () => {
+      vi.useFakeTimers();
+      try {
+        mockGetAvatarBase64.mockImplementation(
+          () =>
+            new Promise((resolve) =>
+              setTimeout(() => resolve("data:image/png;base64,fast"), 249),
+            ),
+        );
+        const resultPromise = SharePageContent({ handle: "testuser" });
+        await vi.advanceTimersByTimeAsync(249);
+        await resultPromise;
+        await flushAfterCallbacks();
+
+        expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+          FAKE_MATERIALIZED.stats,
+          FAKE_MATERIALIZED.displayImpact,
+          expect.objectContaining({ avatarDataUri: "data:image/png;base64,fast" }),
+        );
+        expect(mockWriteBadgeSvgCache).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("does not cache an unverified badge so a later complete fetch can heal", async () => {
@@ -321,38 +457,67 @@ describe("Phase 4d — Share page i18n", () => {
 
       expect(jsxString).toContain("/u/testuser/badge.svg?");
       expect(jsxString).toContain("__chapa_smoke=1");
+      // #230 — the fallback <img> is the LCP element, so it must be
+      // prioritized.
+      expect(jsxString).toContain('"fetchPriority":"high"');
       expect(mockGetAvatarBase64).not.toHaveBeenCalled();
       expect(mockAfter).not.toHaveBeenCalled();
       expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
     });
 
-    it("keeps fallback badge image requests read-only in smoke mode", async () => {
-      mockRenderBadgeSvg.mockReturnValue("");
+    // #1106 — the only prior coverage checked that page.tsx's source text
+    // contains the string "renderJsonLd(personJsonLd)" (page.test.ts's
+    // "JSON-LD security" describe block). That protects against someone
+    // swapping out the escaping helper, but nothing fails if `confidence` or
+    // `confidencePenalties` were spread into `personJsonLd` itself — the
+    // CLAUDE.md acceptance criterion is that confidence data must be
+    // "excluded from public metadata (JSON-LD)". This test renders the real
+    // component tree (FAKE_MATERIALIZED.displayImpact carries
+    // `confidence: 85`, matching a real ImpactV6Result) and inspects the
+    // actual serialized JSON-LD payload — a behavioral assertion on output,
+    // not a source-text pattern match.
+    it("excludes confidence data from the rendered JSON-LD script (privacy boundary)", async () => {
+      const result = await SharePageContent({ handle: "testuser" });
 
-      const result = await SharePageContent({
-        handle: "testuser",
-        readOnly: true,
-      });
-      const jsxString = JSON.stringify(result);
+      const scriptEl = findScriptElement(result, "application/ld+json");
+      expect(scriptEl).not.toBeNull();
 
-      expect(jsxString).toContain("/u/testuser/badge.svg?");
-      expect(jsxString).toContain("__chapa_smoke=1");
-      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
-      expect(mockAfter).not.toHaveBeenCalled();
-      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      const html = scriptEl!.props.dangerouslySetInnerHTML?.__html;
+      expect(html).toBeTruthy();
+
+      // renderJsonLd unicode-escapes <, >, & — undo that so JSON.parse works.
+      const unescaped = html!
+        .replace(/\\u003c/g, "<")
+        .replace(/\\u003e/g, ">")
+        .replace(/\\u0026/g, "&");
+      const parsed = JSON.parse(unescaped) as Record<string, unknown>;
+
+      expect(parsed).not.toHaveProperty("confidence");
+      expect(parsed).not.toHaveProperty("confidenceReasons");
+      expect(parsed).not.toHaveProperty("confidencePenalties");
+      // Belt-and-suspenders: no field anywhere in the payload should mention
+      // confidence in its key or value.
+      expect(JSON.stringify(parsed).toLowerCase()).not.toContain("confidence");
     });
   });
 
-  describe("page.tsx source — LocaleSync hydration boundary", () => {
+  // #1104 — most of this file's former source-text assertions are now
+  // subsumed by real behavioral coverage: SharePageLocaleContent.test.tsx
+  // and SharePageH2.test.tsx render those two client components directly
+  // and assert on their translated output, and the "generateMetadata" /
+  // "SharePageContent" describe blocks above already prove interpolation
+  // and locale-driven text end-to-end. What remains here has no
+  // render-observable equivalent (route-segment config; the ordering of
+  // context providers/Suspense boundaries around SharePageContent, which
+  // leaves no DOM footprint since LocaleSync/LanguageProvider render
+  // nothing themselves; and SharePageH2 as a component reference, which
+  // JSON.stringify on the JSX tree silently drops since functions don't
+  // serialize to JSON).
+  describe("page.tsx source — non-renderable architecture checks", () => {
     const SOURCE = fs.readFileSync(
       path.resolve(__dirname, "page.tsx"),
       "utf-8",
     );
-
-    it("imports LocaleSync from @/lib/i18n", () => {
-      expect(SOURCE).toContain("LocaleSync");
-      expect(SOURCE).toContain("@/lib/i18n");
-    });
 
     it("establishes a query-initialized provider before streamed content", () => {
       const pageStart = SOURCE.indexOf("export default async function SharePage");
@@ -372,55 +537,17 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE.slice(contentStart)).not.toContain("<LocaleSync");
     });
 
-    it("imports interpolate from @/lib/i18n/interpolate", () => {
-      expect(SOURCE).toContain("interpolate");
-      expect(SOURCE).toContain("@/lib/i18n/interpolate");
-    });
-
-    it("imports getServerT from @/lib/i18n/server", () => {
-      expect(SOURCE).toContain("getServerT");
-      expect(SOURCE).toContain("@/lib/i18n/server");
-    });
-
-    it("still exports revalidate = 3600", () => {
-      expect(SOURCE).toContain("export const revalidate = 3600");
-    });
-
-    it("delegates locale-sensitive title and labels to a client component", () => {
-      expect(SOURCE).toContain("SharePageLocaleContent");
-      const localeSource = fs.readFileSync(
-        path.resolve(__dirname, "SharePageLocaleContent.tsx"),
-        "utf-8",
-      );
-      expect(localeSource).toContain("sharePage.srH1");
-      expect(localeSource).toContain("sharePage.badgeAriaLabel");
+    // #1066 (FE-H2) — revalidate = 3600 was inert: both generateMetadata
+    // and the page component already unconditionally awaited searchParams,
+    // opting the route out of static rendering entirely. The route now
+    // commits to dynamic rendering instead (see page.test.ts's "dynamic
+    // rendering (#1066)" describe block for the replacement coverage).
+    it("does NOT export revalidate (genuinely dynamic, not ISR)", () => {
+      expect(SOURCE).not.toContain("export const revalidate");
     });
 
     it("renders SharePageH2 client component for the badge section heading", () => {
       expect(SOURCE).toContain("SharePageH2");
-    });
-
-    it("uses sharePage.metadataOgImageAlt in generateMetadata", () => {
-      expect(SOURCE).toContain("sharePage.metadataOgImageAlt");
-    });
-  });
-
-  describe("SharePageH2.tsx source", () => {
-    const H2_SOURCE = fs.readFileSync(
-      path.resolve(__dirname, "SharePageH2.tsx"),
-      "utf-8",
-    );
-
-    it("is a client component", () => {
-      expect(H2_SOURCE).toContain("'use client'");
-    });
-
-    it("uses sharePage.h2 key", () => {
-      expect(H2_SOURCE).toContain("sharePage.h2");
-    });
-
-    it("uses useTranslation", () => {
-      expect(H2_SOURCE).toContain("useTranslation");
     });
   });
 });

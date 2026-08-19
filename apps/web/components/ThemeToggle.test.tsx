@@ -2,8 +2,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { ThemeToggle } from "./ThemeToggle";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 afterEach(cleanup);
 
@@ -15,10 +13,21 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: mockTheme, setTheme: mockSetTheme }),
 }));
 
+// Mock the shared useIsClient hook — controllable per-test so we can exercise
+// both the hydrated render and the pre-hydration placeholder branch. If
+// ThemeToggle stopped importing the hook from "@/hooks/useIsClient" (e.g. it
+// reimplemented its own local hydration check instead), this mock would have
+// no effect and the placeholder test below would fail to trigger.
+const isClientState = vi.hoisted(() => ({ current: true }));
+vi.mock("@/hooks/useIsClient", () => ({
+  useIsClient: () => isClientState.current,
+}));
+
 describe("ThemeToggle", () => {
   beforeEach(() => {
     mockTheme = "light";
     mockSetTheme.mockClear();
+    isClientState.current = true;
   });
 
   it("renders a button", () => {
@@ -71,55 +80,61 @@ describe("ThemeToggle", () => {
   });
 });
 
-const THEME_TOGGLE_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "ThemeToggle.tsx"),
-  "utf-8",
-);
-
 describe("ThemeToggle — icon transition (Phase 6)", () => {
-  it("renders both theme icons for CSS cross-fade transition", () => {
-    const svgCount = (THEME_TOGGLE_SOURCE.match(/<svg/g) ?? []).length;
-    expect(svgCount).toBeGreaterThanOrEqual(2);
-    expect(THEME_TOGGLE_SOURCE).toContain("transition-[opacity,transform] duration-200");
+  it("renders both theme icons wrapped for CSS cross-fade transition", () => {
+    render(<ThemeToggle />);
+    const button = screen.getByRole("button");
+    const svgs = button.querySelectorAll("svg");
+    expect(svgs).toHaveLength(2);
+    // Each icon's wrapping <span> drives the cross-fade.
+    svgs.forEach((svg) => {
+      const wrapper = svg.parentElement as HTMLElement;
+      expect(wrapper.className).toContain("transition-[opacity,transform] duration-200");
+    });
   });
 
-  it("uses opacity and scale for icon cross-fade", () => {
-    expect(THEME_TOGGLE_SOURCE).toContain("opacity-0 scale-75");
-    expect(THEME_TOGGLE_SOURCE).toContain("opacity-100 scale-100");
+  it("uses opacity and scale for icon cross-fade, flipped per theme", () => {
+    mockTheme = "light";
+    const { unmount } = render(<ThemeToggle />);
+    let button = screen.getByRole("button");
+    let [firstIcon, secondIcon] = Array.from(
+      button.querySelectorAll("svg"),
+    ).map((svg) => svg.parentElement as HTMLElement);
+    // In light mode: the first (dark-mode) icon is hidden, the second
+    // (light-mode) icon is shown.
+    expect(firstIcon!.className).toContain("opacity-0 scale-75");
+    expect(secondIcon!.className).toContain("opacity-100 scale-100");
+    unmount();
+
+    mockTheme = "dark";
+    render(<ThemeToggle />);
+    button = screen.getByRole("button");
+    [firstIcon, secondIcon] = Array.from(button.querySelectorAll("svg")).map(
+      (svg) => svg.parentElement as HTMLElement,
+    );
+    // In dark mode the two flip.
+    expect(firstIcon!.className).toContain("opacity-100 scale-100");
+    expect(secondIcon!.className).toContain("opacity-0 scale-75");
   });
 });
 
 describe("ThemeToggle — mobile responsiveness (#240)", () => {
   it("button uses h-11 w-11 for 44px touch target (WCAG 2.5.8)", () => {
-    expect(THEME_TOGGLE_SOURCE).toContain("h-11 w-11");
+    render(<ThemeToggle />);
+    const button = screen.getByRole("button");
+    expect(button.className).toContain("h-11 w-11");
     // Ensure the old smaller sizes are not used
-    expect(THEME_TOGGLE_SOURCE).not.toContain("h-8 w-8");
-    expect(THEME_TOGGLE_SOURCE).not.toContain("h-10 w-10");
+    expect(button.className).not.toContain("h-8 w-8");
+    expect(button.className).not.toContain("h-10 w-10");
   });
 
-  it("hydration placeholder also uses h-11 w-11", () => {
-    // The placeholder div should match the button size to prevent layout shift
-    const placeholderMatch = THEME_TOGGLE_SOURCE.match(
-      /className="h-11 w-11"[\s\S]*?aria-hidden="true"/,
-    );
-    expect(placeholderMatch).not.toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// FE-H4: ThemeToggle must use the shared useIsClient hook (#730)
-// ---------------------------------------------------------------------------
-describe("ThemeToggle — shared useIsClient hook (#730)", () => {
-  it("imports useIsClient from the shared hooks directory", () => {
-    expect(THEME_TOGGLE_SOURCE).toContain("useIsClient");
-    expect(THEME_TOGGLE_SOURCE).toContain("@/hooks/useIsClient");
-  });
-
-  it("does not define its own local useHydrated function", () => {
-    expect(THEME_TOGGLE_SOURCE).not.toContain("useHydrated");
-  });
-
-  it("does not use useSyncExternalStore directly (delegated to useIsClient)", () => {
-    expect(THEME_TOGGLE_SOURCE).not.toContain("useSyncExternalStore");
+  it("hydration placeholder also uses h-11 w-11 to prevent layout shift", () => {
+    isClientState.current = false;
+    const { container } = render(<ThemeToggle />);
+    // Pre-hydration: no button yet, just an invisible sized placeholder.
+    expect(screen.queryByRole("button")).toBeNull();
+    const placeholder = container.firstElementChild as HTMLElement;
+    expect(placeholder.className).toContain("h-11 w-11");
+    expect(placeholder.getAttribute("aria-hidden")).toBe("true");
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo, type SyntheticEvent } from "react";
+import { createPortal } from "react-dom";
 import { InfoTooltip } from "./InfoTooltip";
 import { useTranslation } from "@/lib/i18n";
 
@@ -34,6 +35,8 @@ interface LeaderLineConfig {
 interface HotspotBase {
   id: string;
   dictKey: string;
+  /** Dictionary key for the desktop panel's uppercase heading (#1109 / UX-H3) — resolved via t(), never derived from `id`. */
+  labelKey: string;
   position: "top" | "bottom";
   top: string;
   left: string;
@@ -46,6 +49,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-archetype",
     dictKey: "badgeOverlay.archetype",
+    labelKey: "badgeOverlayLabels.archetype",
     position: "bottom",
     // Pill at x=60, y=143, ~170×34 → center (144, 159)
     top: "22.5%",
@@ -62,6 +66,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-watchers",
     dictKey: "badgeOverlay.watchers",
+    labelKey: "badgeOverlayLabels.watchers",
     position: "bottom",
     // Pill after archetype + dot separator → center (312, 159)
     top: "22.5%",
@@ -78,6 +83,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-forks",
     dictKey: "badgeOverlay.forks",
+    labelKey: "badgeOverlayLabels.forks",
     position: "bottom",
     // center (450, 159)
     top: "22.5%",
@@ -94,6 +100,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-stars",
     dictKey: "badgeOverlay.stars",
+    labelKey: "badgeOverlayLabels.stars",
     position: "bottom",
     // center (594, 159)
     top: "22.5%",
@@ -110,6 +117,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-heatmap",
     dictKey: "badgeOverlay.heatmap",
+    labelKey: "badgeOverlayLabels.heatmap",
     position: "top",
     // Grid at x=60, y=190, 622×328 → bottom-center (372, 517)
     top: "30%",
@@ -127,6 +135,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-radar",
     dictKey: "badgeOverlay.radar",
+    labelKey: "badgeOverlayLabels.radar",
     position: "top",
     // Center (870,275) r=85 → center (864, 277)
     top: "28%",
@@ -143,6 +152,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-score",
     dictKey: "badgeOverlay.score",
+    labelKey: "badgeOverlayLabels.score",
     position: "top",
     // Ring center (870,460) r=46 → center (864, 458)
     top: "65%",
@@ -159,6 +169,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-tier",
     dictKey: "badgeOverlay.tier",
+    labelKey: "badgeOverlayLabels.tier",
     position: "top",
     // Label at (870, ~530) → center (864, 524)
     top: "80%",
@@ -175,6 +186,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-verification",
     dictKey: "badgeOverlay.verification",
+    labelKey: "badgeOverlayLabels.verification",
     position: "top",
     // Strip at x=1145-1190, y=30-600 → center (1164, 315)
     top: "5%",
@@ -191,6 +203,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-craft",
     dictKey: "badgeOverlay.craft",
+    labelKey: "badgeOverlayLabels.craft",
     position: "top",
     // Pill at x=60, y=530, ~110×24 → center (115, 542)
     top: "84%",
@@ -207,6 +220,7 @@ const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-github",
     dictKey: "badgeOverlay.github",
+    labelKey: "badgeOverlayLabels.github",
     position: "top",
     // Footer: GitHub logo+text at x=60, y≈575 → center (156, 589)
     top: "90%",
@@ -230,13 +244,63 @@ function parsePathStart(d: string): { cx: string; cy: string } {
   return { cx: mx, cy: my };
 }
 
+/** Live pixel position + resolved anchor for the portal-rendered desktop panel. */
+interface PanelPosition {
+  left: number;
+  top: number;
+  panelAnchor: "above" | "below";
+}
+
+/**
+ * Converts a hotspot's viewBox-space `panelTop`/`panelLeft` percentages into
+ * viewport-relative pixel coordinates via the overlay container's live
+ * `getBoundingClientRect()` — the same conversion the browser already does
+ * for CSS `top`/`left` percentages, just computed in JS so the result can be
+ * handed to a `position: fixed` element portaled outside the container's
+ * (transformed, animated) DOM subtree (#1069 / #1110).
+ *
+ * Mirrors InfoTooltip's `rect.top < 120` flip guard: an "above"-anchored
+ * panel that would still clip above the viewport falls back to anchoring
+ * below the hovered hotspot region itself, using that element's own rect.
+ */
+function computePanelPosition(
+  base: HotspotBase,
+  overlayEl: HTMLElement,
+  hotspotEl: HTMLElement | null,
+): PanelPosition {
+  const overlayRect = overlayEl.getBoundingClientRect();
+  const leftPct = parseFloat(base.leaderLine.panelLeft) / 100;
+  const topPct = parseFloat(base.leaderLine.panelTop) / 100;
+  const left = overlayRect.left + leftPct * overlayRect.width;
+  let top = overlayRect.top + topPct * overlayRect.height;
+  let panelAnchor = base.leaderLine.panelAnchor;
+
+  if (panelAnchor === "above" && top < 120 && hotspotEl) {
+    top = hotspotEl.getBoundingClientRect().bottom;
+    panelAnchor = "below";
+  }
+
+  return { left, top, panelAnchor };
+}
+
 export function BadgeOverlay() {
   const [activeLeaderLine, setActiveLeaderLine] = useState<string | null>(null);
+  const [panelPos, setPanelPos] = useState<PanelPosition | null>(null);
   const { t } = useTranslation();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  // Only the currently-active hotspot's element is ever needed (for the
+  // flip-guard fallback in computePanelPosition) — captured directly from
+  // the triggering event's currentTarget in onMouseEnter below, rather than
+  // tracking every hotspot's ref in a Map.
+  const activeHotspotElRef = useRef<HTMLDivElement | null>(null);
 
-  // Build tooltip map from dictionary
-  const TOOLTIP_MAP: Record<string, string> = Object.fromEntries(
-    HOTSPOT_BASES.map((h) => [h.id, t(h.dictKey) as string])
+  // Build tooltip map from dictionary. Memoized on `t` (stable per locale)
+  // since every hotspot's always-present sr-only description (below) needs
+  // all 11 entries — unlike the panel heading, which only ever needs the
+  // active hotspot's label and is resolved inline where it's used.
+  const TOOLTIP_MAP: Record<string, string> = useMemo(
+    () => Object.fromEntries(HOTSPOT_BASES.map((h) => [h.id, t(h.dictKey) as string])),
+    [t],
   );
 
   // Lazy lookup: only resolve the active hotspot's data when needed (#323)
@@ -244,8 +308,35 @@ export function BadgeOverlay() {
     ? HOTSPOT_BASES.find((h) => h.id === activeLeaderLine)
     : null;
 
+  // Recompute the portal-rendered panel's live position whenever the active
+  // hotspot changes, and keep it pinned while active on scroll/resize —
+  // same pattern as InfoTooltip's own position effect (design-system.md
+  // mandatory tooltip pattern).
+  useEffect(() => {
+    const update = () => {
+      if (!activeBase) {
+        setPanelPos(null);
+        return;
+      }
+      const overlayEl = overlayRef.current;
+      if (!overlayEl) return;
+      setPanelPos(computePanelPosition(activeBase, overlayEl, activeHotspotElRef.current));
+    };
+
+    update();
+
+    if (!activeBase) return;
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [activeBase]);
+
   return (
     <div
+      ref={overlayRef}
       className="absolute inset-0 z-10 group/badge"
       style={{ overflow: "visible" }}
       role="group"
@@ -292,55 +383,83 @@ export function BadgeOverlay() {
         })()}
       </svg>
 
-      {/* ── Desktop: leader line annotation panel (hidden on mobile) ── */}
-      {/* Only the active hotspot's panel renders (#323 — lazy render) */}
-      <div className="hidden md:contents">
-        {activeBase && (() => {
-          const isAbove = activeBase.leaderLine.panelAnchor === "above";
+      {/* leader line annotation panel (hidden on mobile) */}
+      {/* Only the active hotspot's panel renders (#323 — lazy render).
+          Portal-rendered to document.body with position: fixed, viewport
+          coordinates from computePanelPosition()/getBoundingClientRect(),
+          and z-index 99999 (design-system.md mandatory tooltip pattern —
+          #1069 / #1110). This escapes the badge preview's transformed,
+          animated `animate-scale-in` ancestor and its `z-10` stacking
+          context, both of which previously defeated the panel's `absolute`
+          positioning and made its z-[99999] ineffective against the fixed
+          navbar. `hidden md:block` keeps it desktop-only even though the
+          portal target (document.body) sits outside this component's own
+          `md:` tree. */}
+      {activeBase && panelPos && createPortal(
+        (() => {
           const tooltip = TOOLTIP_MAP[activeBase.id] ?? '';
+          // Resolved inline (not via a full id→label map) — only the active
+          // hotspot's label is ever needed, matching the lazy-render intent
+          // above (#323).
+          const label = t(activeBase.labelKey) as string;
           return (
             <div
               key={`panel-${activeBase.id}`}
               role="tooltip"
               id={`${activeBase.id}-panel`}
-              className="absolute z-[99999] max-w-[220px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg shadow-black/20 p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none transition-all duration-300 ease-out opacity-100 translate-y-0"
+              className="hidden md:block fixed z-[99999] max-w-[220px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg shadow-black/20 p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none transition-all duration-300 ease-out opacity-100 translate-y-0"
               style={{
-                top: activeBase.leaderLine.panelTop,
-                left: activeBase.leaderLine.panelLeft,
-                transform: isAbove
+                top: panelPos.top,
+                left: panelPos.left,
+                transform: panelPos.panelAnchor === "above"
                   ? "translate(-50%, -100%)"
                   : "translate(-50%, 0%)",
                 transitionDelay: "0.35s",
               }}
             >
               <span className="text-amber font-heading text-[10px] uppercase tracking-wider block mb-1">
-                {activeBase.id.replace("badge-", "")}
+                {label}
               </span>
               {tooltip}
             </div>
           );
-        })()}
-      </div>
+        })(),
+        document.body,
+      )}
 
       {/* ── Hotspot regions ── */}
+      {/* #1116 (UX-L2): these 11 regions are structural annotations, not
+          widgets — they perform no action, so they are intentionally left
+          unfocusable and excluded from the keyboard tab order. Their content
+          is already exposed to assistive tech via the always-present
+          sr-only <span> below (aria-describedby), reachable in normal
+          reading order without any interaction — so removing them from the
+          tab order strands no screen-reader-only functionality. The
+          keyboard focus/blur handlers that used to drive the desktop
+          leader-line reveal were removed since they can no longer fire;
+          hover (onMouseEnter/onMouseLeave) remains the desktop
+          leader-line/panel reveal for sighted mouse users, and the
+          InfoTooltip buttons cover touch and keyboard access at all viewport
+          sizes without making the structural regions themselves tab stops. */}
       {HOTSPOT_BASES.map((hotspot) => {
         const tooltip = TOOLTIP_MAP[hotspot.id] ?? '';
+        const activate = (e: SyntheticEvent<HTMLDivElement>) => {
+          activeHotspotElRef.current = e.currentTarget;
+          setActiveLeaderLine(hotspot.id);
+        };
         return (
           <div
             key={hotspot.id}
             role="group"
-            tabIndex={0}
-            className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber"
+            className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150"
             style={{
               top: hotspot.top,
               left: hotspot.left,
               width: hotspot.width,
               height: hotspot.height,
             }}
-            onMouseEnter={() => setActiveLeaderLine(hotspot.id)}
+            onMouseEnter={activate}
             onMouseLeave={() => setActiveLeaderLine(null)}
-            onFocus={() => setActiveLeaderLine(hotspot.id)}
-            onBlur={() => setActiveLeaderLine(null)}
             aria-describedby={`${hotspot.id}-desc`}
             aria-label={`${hotspot.id.replace("badge-", "")} info`}
           >
@@ -351,12 +470,14 @@ export function BadgeOverlay() {
             <span id={`${hotspot.id}-desc`} className="sr-only">
               {tooltip}
             </span>
-            {/* Mobile: standard InfoTooltip (hidden on desktop via md:hidden) */}
+            {/* One real tooltip control per explanation. On desktop it stays
+                visually hidden until keyboard focus; mouse hover uses the
+                larger leader-line panel. */}
             <InfoTooltip
               id={hotspot.id}
               content={tooltip}
               position={hotspot.position}
-              className={`opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 md:hidden`}
+              className="opacity-0 group-hover/badge:opacity-100 focus-within:opacity-100 transition-opacity duration-300 md:group-hover/badge:opacity-0 md:pointer-events-none"
             />
           </div>
         );

@@ -135,6 +135,17 @@ describe("AdminDashboardClient", () => {
       const tablist = screen.getByRole("tablist");
       expect(tablist.getAttribute("aria-label")).toBe("Admin sections");
     });
+
+    it("tab buttons have unique ids and aria-controls pointing to their panel", () => {
+      render(<AdminDashboardClient />);
+      const usersTab = screen.getByRole("tab", { name: "Users" });
+      expect(usersTab.getAttribute("id")).toBe("tab-users");
+      expect(usersTab.getAttribute("aria-controls")).toBe("tabpanel-users");
+
+      const agentsTab = screen.getByRole("tab", { name: "Agents" });
+      expect(agentsTab.getAttribute("id")).toBe("tab-agents");
+      expect(agentsTab.getAttribute("aria-controls")).toBe("tabpanel-agents");
+    });
   });
 
   // ─── Loading state ────────────────────────────────────────────────────
@@ -240,12 +251,57 @@ describe("AdminDashboardClient", () => {
     });
   });
 
+  // ─── Heading hierarchy (a11y, #465) ─────────────────────────────────────
+  // The page-level <h1> lives in page.tsx (sr-only); this client component
+  // must use <h2> in every branch to avoid a duplicate h1 landmark.
+
+  describe("heading hierarchy", () => {
+    it("loading state uses an h2 (not h1) with font-heading", () => {
+      mockState = createMockState({ loading: true, activeTab: "users" });
+      render(<AdminDashboardClient />);
+      expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
+      const headings = screen.getAllByRole("heading", { level: 2 });
+      expect(headings.length).toBeGreaterThan(0);
+      expect(headings.some((h) => h.className.includes("font-heading"))).toBe(true);
+    });
+
+    it("error state uses an h2 (not h1) with font-heading", () => {
+      mockState = createMockState({ error: "Failed to load", activeTab: "users" });
+      render(<AdminDashboardClient />);
+      expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
+      const headings = screen.getAllByRole("heading", { level: 2 });
+      expect(headings.length).toBeGreaterThan(0);
+      expect(headings.some((h) => h.className.includes("font-heading"))).toBe(true);
+    });
+
+    it("main dashboard view uses an h2 (not h1)", () => {
+      render(<AdminDashboardClient />);
+      expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
+      expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(0);
+    });
+
+    it("never renders an h1 across tabs", () => {
+      for (const activeTab of ["agents", "engagement", "campaigns"] as const) {
+        mockState = createMockState({ activeTab });
+        const { unmount } = render(<AdminDashboardClient />);
+        expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(0);
+        unmount();
+      }
+    });
+  });
+
   // ─── Refresh button ───────────────────────────────────────────────────
 
   describe("refresh button", () => {
     it("renders refresh button with aria-label", () => {
       render(<AdminDashboardClient />);
       expect(screen.getByLabelText("Refresh data")).toBeDefined();
+    });
+
+    it("uses aria-label instead of a title attribute", () => {
+      render(<AdminDashboardClient />);
+      const button = screen.getByLabelText("Refresh data");
+      expect(button.hasAttribute("title")).toBe(false);
     });
 
     it("calls fetchUsers(true) on click", () => {

@@ -1,6 +1,12 @@
 "use client";
 
-import type { ImpactV6Result, StatsData, Platform, DimensionScores } from "@chapa/shared";
+import type {
+  ClientImpactV6Result,
+  ImpactV6Result,
+  StatsData,
+  Platform,
+  DimensionScores,
+} from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
 import { useTranslation } from "@/lib/i18n";
@@ -155,7 +161,9 @@ function toArchetypeKey(archetype: string): string {
  * actionable tip for the developer's weakest dimension.
  */
 export function getArchetypeProfile(
-  impact: ImpactV6Result,
+  // #1067 — may be a redacted PublicImpactV6Result for a non-owner
+  // share-page visitor; this function never reads confidence.
+  impact: ClientImpactV6Result,
   t: (key: string) => string | string[] | Record<string, unknown>[],
 ): string {
   const profile = t(`archetypeProfiles.${toArchetypeKey(impact.archetype)}`) as string;

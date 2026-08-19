@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "@/lib/i18n";
 
@@ -29,8 +29,12 @@ export function InfoTooltip({
   );
   const wrapperRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    setHovered(false);
+  }, []);
 
   const visible = open || hovered;
 
@@ -63,6 +67,29 @@ export function InfoTooltip({
     };
   }, [visible, position]);
 
+  // The trigger can sit close to either viewport edge (notably inside the
+  // badge overlay on mobile). Measure the rendered panel before paint and
+  // clamp its center so the full tooltip stays at least 8px on-screen.
+  useLayoutEffect(() => {
+    if (!visible || !coords || !tooltipRef.current) return;
+
+    const width = tooltipRef.current.getBoundingClientRect().width;
+    if (width <= 0) return;
+
+    const margin = 8;
+    const minX = margin + width / 2;
+    const maxX = window.innerWidth - margin - width / 2;
+    const clampedX = minX > maxX
+      ? window.innerWidth / 2
+      : Math.min(Math.max(coords.x, minX), maxX);
+
+    if (clampedX !== coords.x) {
+      setCoords((current) => current && current.x === coords.x
+        ? { ...current, x: clampedX }
+        : current);
+    }
+  }, [visible, coords, content]);
+
   // Close on outside click (mobile)
   useEffect(() => {
     if (!open) return;
@@ -80,9 +107,10 @@ export function InfoTooltip({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open, close]);
 
-  // Close on Escape
+  // Close on Escape. Listen while the tooltip is visible, including the
+  // focus-only state before the trigger has been activated.
   useEffect(() => {
-    if (!open) return;
+    if (!visible) return;
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -90,16 +118,18 @@ export function InfoTooltip({
 
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [open, close]);
+  }, [visible, close]);
 
   const tooltip = visible && coords ? createPortal(
     <span
+      ref={tooltipRef}
       id={id}
       role="tooltip"
-      className="fixed z-[99999] w-max max-w-[240px] rounded-lg bg-card/95 backdrop-blur-xl shadow-card p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none"
+      className="fixed z-[99999] w-max rounded-lg bg-card/95 backdrop-blur-xl shadow-card p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none"
       style={{
         left: coords.x,
         top: resolvedPosition === "top" ? coords.y - 8 : coords.y + 8,
+        maxWidth: "min(240px, calc(100vw - 16px))",
         transform: resolvedPosition === "top"
           ? "translate(-50%, -100%)"
           : "translate(-50%, 0)",
@@ -122,7 +152,12 @@ export function InfoTooltip({
         type="button"
         aria-label={t('aria.moreInfo') as string}
         aria-describedby={id}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          // Functional state avoids losing a rapid second keyboard activation
+          // before React has refreshed this handler's render-time closure.
+          setOpen((current) => !current);
+          setHovered(false);
+        }}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
         className="inline-flex items-center justify-center w-4 h-4 text-text-secondary hover:text-amber focus-visible:text-amber transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-full"

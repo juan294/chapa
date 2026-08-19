@@ -90,6 +90,7 @@ const record: VerificationRecord = {
 };
 
 beforeEach(() => {
+  vi.useRealTimers();
   vi.clearAllMocks();
   terminalResolve = { data: null, error: null };
 });
@@ -101,8 +102,14 @@ beforeEach(() => {
 describe("dbStoreVerification", () => {
   it("upserts the record with flattened dimensions", async () => {
     mockUpsert.mockResolvedValue({ error: null });
+    const before = Date.now() + 30 * 24 * 60 * 60 * 1000;
 
     await dbStoreVerification("abc12345", record);
+
+    const after = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    const storedRecord = mockUpsert.mock.calls[0]?.[0] as {
+      expires_at: string;
+    };
 
     expect(mockFrom).toHaveBeenCalledWith("verification_records");
     expect(mockUpsert).toHaveBeenCalledWith(
@@ -119,6 +126,28 @@ describe("dbStoreVerification", () => {
       }),
       { onConflict: "hash" },
     );
+    expect(Date.parse(storedRecord.expires_at)).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(storedRecord.expires_at)).toBeLessThanOrEqual(after);
+  });
+
+  it("renews expires_at when an existing hash is upserted", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T00:00:00.000Z"));
+
+    await dbStoreVerification("abc12345", record);
+    const firstExpiry = (
+      mockUpsert.mock.calls[0]?.[0] as { expires_at: string }
+    ).expires_at;
+
+    vi.setSystemTime(new Date("2026-08-19T00:01:00.000Z"));
+    await dbStoreVerification("abc12345", record);
+    const renewedExpiry = (
+      mockUpsert.mock.calls[1]?.[0] as { expires_at: string }
+    ).expires_at;
+
+    expect(Date.parse(renewedExpiry)).toBeGreaterThan(Date.parse(firstExpiry));
+    vi.useRealTimers();
   });
 
   it("normalizes handle to lowercase", async () => {

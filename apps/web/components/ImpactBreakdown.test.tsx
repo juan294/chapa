@@ -7,6 +7,16 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+// Assertions that duplicated ImpactBreakdown.render.test.tsx (progressbar
+// role/aria-valuenow, the null-guard branches, props/exports/type imports
+// implicit in the render test's typed usage, craft-dimension count,
+// DataSources link/URL construction, and the confidence-absence invariant)
+// have been converted to real render + query assertions there, or deleted
+// as no-ops. What's left is either genuinely non-renderable (the client
+// directive, CSS-class-only design-system checks with no behavioral
+// signal, the specific SVG icon path data, an implementation-detail
+// variable name) or not yet worth the render-test investment (tooltip ID
+// wiring — InfoTooltip itself isn't rendered by these tests).
 describe("ImpactBreakdown", () => {
   // Issue #18 — now a client component (uses useTranslation hook for i18n)
   describe("client component (i18n)", () => {
@@ -28,90 +38,13 @@ describe("ImpactBreakdown", () => {
 
   // Issue #279 — confidence is internal-only, hidden from developer-facing UI
   describe("confidence hidden (#279)", () => {
-    it("does not render confidence score or label", () => {
-      expect(SOURCE).not.toContain("impact.confidence");
-      expect(SOURCE).not.toContain("Confidence");
-    });
-
     it("does not render confidence penalties", () => {
       expect(SOURCE).not.toContain("confidencePenalties");
     });
   });
 
-  // Issue #20 — progress bars need ARIA attributes
-  describe("accessibility (#20)", () => {
-    it("dimension bars have role=progressbar", () => {
-      const matches = SOURCE.match(/role="progressbar"/g);
-      expect(matches).not.toBeNull();
-      expect(matches!.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("dimension bars have aria-valuenow with the dimension score", () => {
-      expect(SOURCE).toMatch(
-        /aria-valuenow=\{dims\[key\]\}/,
-      );
-    });
-
-    it("breakdown bars have aria-label with the signal name", () => {
-      // aria-label is now provided via interpolate(t('aria.impactScore'), ...) for i18n support
-      expect(SOURCE).toMatch(/aria-label=\{interpolate\(/);
-    });
-  });
-
-  // WCAG #667 — B2: role="progressbar" and aria-label must be on the container, not the fill div
-  describe("WCAG progressbar placement (#667)", () => {
-    it("role=progressbar is on the outer track element, not the fill div", () => {
-      // The container div (track) must have role=progressbar.
-      // The fill div must NOT have role=progressbar.
-      // Pattern: outer div has role + aria attrs, inner div has only style/class.
-      // outer: <div ... role="progressbar" aria-valuenow ... aria-label ...>
-      // inner: <div ... style={{ width, background }} />
-      // We check: the element with role="progressbar" must NOT also contain "animate-bar-fill"
-      // on itself — that class belongs to the fill child.
-      const progressbarMatch = SOURCE.match(
-        /<div[^>]*role="progressbar"[^>]*>/g,
-      );
-      expect(progressbarMatch).not.toBeNull();
-      // Each progressbar container should NOT have animate-bar-fill (that's on the fill child)
-      for (const tag of progressbarMatch!) {
-        expect(tag).not.toContain("animate-bar-fill");
-      }
-    });
-
-    it("aria-label is on the progressbar container, not the fill div", () => {
-      // The fill div (the one with animate-bar-fill) must NOT carry aria-label
-      const fillDivMatch = SOURCE.match(
-        /<div[^>]*animate-bar-fill[^>]*>/g,
-      );
-      expect(fillDivMatch).not.toBeNull();
-      for (const tag of fillDivMatch!) {
-        expect(tag).not.toContain("aria-label");
-      }
-    });
-  });
-
   // Issue #202 — accepts StatsData for extended stats display
   describe("athlete dashboard (#202)", () => {
-    it("accepts stats: StatsData prop", () => {
-      expect(SOURCE).toContain("stats: StatsData");
-    });
-
-    it("displays forks and watchers", () => {
-      expect(SOURCE).toContain("stats.totalForks");
-      expect(SOURCE).toContain("stats.totalWatchers");
-    });
-
-    it("displays all 8 key stats", () => {
-      expect(SOURCE).toContain("stats.totalStars");
-      expect(SOURCE).toContain("stats.totalForks");
-      expect(SOURCE).toContain("stats.totalWatchers");
-      expect(SOURCE).toContain("stats.activeDays");
-      expect(SOURCE).toContain("stats.commitsTotal");
-      expect(SOURCE).toContain("stats.prsMergedCount");
-      expect(SOURCE).toContain("stats.reviewsSubmittedCount");
-      expect(SOURCE).toContain("stats.reposContributed");
-    });
-
     it("does not contain a circular score gauge (score shown in badge)", () => {
       expect(SOURCE).not.toContain("GAUGE_CIRCUMFERENCE");
       expect(SOURCE).not.toContain("strokeDasharray");
@@ -146,10 +79,6 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toContain('"stat-reviews"');
       expect(SOURCE).toContain('"stat-repos"');
     });
-
-    it("has 'use client' directive (component uses hooks)", () => {
-      expect(SOURCE).toMatch(/^["']use client["']/m);
-    });
   });
 
   describe("tooltip z-index elevation (#285)", () => {
@@ -177,71 +106,14 @@ describe("ImpactBreakdown", () => {
 
   // Data Sources is a standalone exported component (rendered on share page above breakdown)
   describe("data sources component", () => {
-    it("exports a DataSources component", () => {
-      expect(SOURCE).toContain("export function DataSources");
-    });
-
-    it("imports Platform type from @chapa/shared", () => {
-      expect(SOURCE).toContain("Platform");
-      expect(SOURCE).toMatch(/from\s+["']@chapa\/shared["']/);
-    });
-
-    it("has a PLATFORM_DISPLAY config map", () => {
-      expect(SOURCE).toContain("PLATFORM_DISPLAY");
-    });
-
     it("includes GitHub and Bitbucket SVG paths", () => {
       expect(SOURCE).toContain("M8 0c4.42 0 8 3.58 8 8");
       expect(SOURCE).toContain("M.778 1.211");
     });
 
-    it("references stats.linkedPlatforms for additional platforms", () => {
-      expect(SOURCE).toContain("stats.linkedPlatforms");
-    });
-
     it("platform cards use design system tokens", () => {
       expect(SOURCE).toContain("border-stroke");
       expect(SOURCE).toContain("bg-card");
-    });
-
-    it("does not render Data Sources inside ImpactBreakdown", () => {
-      // The ImpactBreakdown function body should not contain "Data Sources"
-      const fnBody = SOURCE.slice(SOURCE.indexOf("export function ImpactBreakdown"));
-      expect(fnBody).not.toContain("Data Sources");
-    });
-
-    it("accepts a handle prop for building profile URLs", () => {
-      expect(SOURCE).toContain("handle: string");
-    });
-
-    it("renders GitHub as a clickable link", () => {
-      expect(SOURCE).toContain("github.com/");
-      expect(SOURCE).toMatch(/<a\s/);
-    });
-
-    it("has URL builders for all three platforms", () => {
-      // PLATFORM_URLS should contain builders for github, bitbucket, and codeberg.
-      // Bitbucket/Codeberg use the platform-specific username from linkedPlatformLogins.
-      const urlsStart = SOURCE.indexOf("PLATFORM_URLS");
-      const urlsEnd = SOURCE.indexOf("};", urlsStart);
-      const urlsBlock = SOURCE.slice(urlsStart, urlsEnd);
-      expect(urlsBlock).toContain("github");
-      expect(urlsBlock).toContain("bitbucket");
-      expect(urlsBlock).toContain("codeberg");
-    });
-
-    it("uses linkedPlatformLogins for platform-specific usernames", () => {
-      // DataSources must read stats.linkedPlatformLogins to resolve the correct
-      // username per platform (GitHub handle !== Bitbucket/Codeberg username).
-      expect(SOURCE).toContain("linkedPlatformLogins");
-    });
-
-    it("builds Bitbucket profile URL with bitbucket.org", () => {
-      expect(SOURCE).toContain("bitbucket.org/");
-    });
-
-    it("builds Codeberg profile URL with codeberg.org", () => {
-      expect(SOURCE).toContain("codeberg.org/");
     });
   });
 
@@ -258,40 +130,6 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).not.toContain('"#f97316"');
       expect(SOURCE).not.toContain('"#06b6d4"');
       expect(SOURCE).not.toContain('"#ec4899"');
-    });
-  });
-
-  describe("null safety (#QA-4)", () => {
-    it("guards stats values with ?? 0 fallback for formatCompact", () => {
-      // formatCompact(undefined) would produce "NaNM" — stats fields must
-      // default to 0 when absent. Each stat.value must use ?? 0 or similar.
-      const statFields = [
-        "stats.totalStars",
-        "stats.totalForks",
-        "stats.totalWatchers",
-        "stats.activeDays",
-        "stats.commitsTotal",
-        "stats.prsMergedCount",
-        "stats.reviewsSubmittedCount",
-        "stats.reposContributed",
-      ];
-      for (const field of statFields) {
-        expect(SOURCE).toContain(`${field} ?? 0`);
-      }
-    });
-  });
-
-  describe("null guard for props (#577)", () => {
-    it("guards against null/undefined impact prop early", () => {
-      expect(SOURCE).toMatch(/if\s*\(\s*!impact/);
-    });
-
-    it("guards against null/undefined stats prop early", () => {
-      expect(SOURCE).toMatch(/!\s*stats\b/);
-    });
-
-    it("renders a fallback message when data is missing", () => {
-      expect(SOURCE).toContain("dashboard.noImpactData");
     });
   });
 
@@ -317,17 +155,6 @@ describe("ImpactBreakdown", () => {
   });
 
   describe("craft dimension (Impact v6)", () => {
-    it("iterates only active dimensions — 4 when craft absent", () => {
-      // The dimension iteration must filter based on craft presence.
-      // When craft is absent, only delivery/quality/consistency/breadth render.
-      // Source should NOT hardcode the 4 keys without a filter mechanism.
-      const fnBody = SOURCE.slice(SOURCE.indexOf("export function ImpactBreakdown"));
-      // Must have craft label and color entries
-      expect(SOURCE).toContain('"craft"');
-      // Must have a filtering mechanism for active dimensions
-      expect(fnBody).toMatch(/filter|dimensions\.craft|craft\s*!=|craft\s*!==|hasCraft/);
-    });
-
     it("has craft entries in dimension colors and tooltips", () => {
       // Craft label is sourced via dynamic translation key: t(`dimensions.${key}.label`)
       // The craft color CSS variable must be present in the DIMENSION_COLORS map

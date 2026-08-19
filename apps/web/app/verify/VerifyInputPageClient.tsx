@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync, useTranslation } from "@/lib/i18n";
@@ -8,10 +8,6 @@ import { VerifyForm } from "./VerifyForm";
 
 export function VerifyInputPageClient() {
   const { t } = useTranslation();
-
-  useEffect(() => {
-    document.title = `${t('verify.title') as string} — Chapa`;
-  }, [t]);
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">

@@ -6,24 +6,34 @@ const {
   mockRunPublicProfileSideEffects,
   mockPersistProfileSnapshot,
   mockDeferProfileCacheWork,
+  mockRedactImpactForVisitor,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
   mockAfter,
   mockGetServerLocale,
   mockGetTrendData,
+  mockHeaders,
+  mockGetOptionalServerSessionFromHeaders,
+  mockWriteBadgeSvgCache,
+  mockCaptureServerError,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
   mockPersistProfileSnapshot: vi.fn(),
   mockDeferProfileCacheWork: vi.fn(),
+  mockRedactImpactForVisitor: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockAfter: vi.fn(),
   mockGetServerLocale: vi.fn(),
   mockGetTrendData: vi.fn(),
+  mockHeaders: vi.fn(),
+  mockGetOptionalServerSessionFromHeaders: vi.fn(),
+  mockWriteBadgeSvgCache: vi.fn(),
+  mockCaptureServerError: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -36,10 +46,27 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+  redactImpactForVisitor: (...args: unknown[]) =>
+    mockRedactImpactForVisitor(...args),
+}));
+
+vi.mock("next/headers", () => ({
+  headers: (...args: unknown[]) => mockHeaders(...args),
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
+    mockGetOptionalServerSessionFromHeaders(...args),
 }));
 
 vi.mock("@/lib/history/get-trend-data", () => ({
   getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
+}));
+
+// #1091 — the after()-deferred snapshot write must escalate a genuine
+// failure via captureServerError, mirroring the badge route's #1013 pattern.
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -53,6 +80,19 @@ vi.mock("@/lib/render/avatar", () => ({
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
 }));
+
+// #1088 — writeBadgeSvgCache is mocked so tests can assert on its TTL
+// argument directly; buildBadgeSvgCacheKey/readBadgeSvgCache stay real
+// (readBadgeSvgCache falls through to the real, unmocked `@/lib/cache/redis`
+// module, which no-ops without Redis credentials in the test env — matching
+// this file's existing always-cache-miss behavior).
+vi.mock("@/lib/render/badge-svg-cache", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/render/badge-svg-cache")>();
+  return {
+    ...actual,
+    writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+  };
+});
 
 vi.mock("@/lib/env", () => ({
   getBaseUrl: () => "https://chapa.thecreativetoken.com",
@@ -89,6 +129,11 @@ vi.mock("@/lib/i18n/server", async () => {
 vi.mock("@/lib/i18n", () => ({
   DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
+  LanguageProvider: (props: { children?: unknown }) => props.children,
+}));
+
+vi.mock("@/components/ErrorBanner", () => ({
+  ErrorBanner: () => null,
 }));
 
 vi.mock("@/components/CommandBarHint", () => ({
@@ -112,6 +157,7 @@ vi.mock("@/components/BadgeSkeleton", () => ({
 
 import SharePage, { SharePageContent, generateMetadata } from "./page";
 import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
+import { ErrorBanner } from "@/components/ErrorBanner";
 
 /**
  * Recursively walk a rendered React element tree (as returned by an async
@@ -188,11 +234,28 @@ describe("SharePage /u/[handle]", () => {
     mockDeferProfileCacheWork.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockWriteBadgeSvgCache.mockResolvedValue(true);
     mockGetServerLocale.mockResolvedValue("en");
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
+    mockHeaders.mockResolvedValue({ get: () => null });
+    mockCaptureServerError.mockResolvedValue(undefined);
+    // No session by default — most tests exercise the visitor path. Tests
+    // that need owner behavior override this per-test.
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+    mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
+      return rest;
+    });
   });
 
   it("generates metadata with the daily OG cache buster", async () => {
+    // #1066 — locale now resolves via getServerLocale (mocked here to the
+    // "es" cookie/header-fallback default) rather than a hardcoded literal;
+    // this test is about the OG cache-buster URL, not locale resolution
+    // itself (see the "locale resolution (#1066)" describe block for that).
+    mockGetServerLocale.mockResolvedValue("es");
+
     const metadata = await generateMetadata({
       params: Promise.resolve({ handle: "testuser" }),
     });
@@ -214,6 +277,219 @@ describe("SharePage /u/[handle]", () => {
       SharePage({ params: Promise.resolve({ handle: "bad!!handle" }) }),
     ).rejects.toThrow("NOT_FOUND");
     expect(mockNotFound).toHaveBeenCalled();
+  });
+
+  // #1066 (FE-H2) — the route now commits to dynamic rendering and resolves
+  // locale via getServerLocale (query override > chapa-locale cookie >
+  // Accept-Language > DEFAULT_LOCALE — see lib/i18n/server.ts, already
+  // covered by its own unit tests). These tests assert page.tsx wires the
+  // query param through correctly and that generateMetadata/body agree.
+  describe("locale resolution (#1066)", () => {
+    it("generateMetadata resolves locale via getServerLocale using the ?lang= override", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      await generateMetadata({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      // #1020 contract: an explicit ?lang= must win over any cookie —
+      // asserting the literal value is forwarded (not dropped) is what
+      // guarantees that precedence downstream in getServerLocale.
+      expect(mockGetServerLocale).toHaveBeenCalledWith("en");
+    });
+
+    it("generateMetadata falls through to cookie/header resolution when ?lang= is absent", async () => {
+      mockGetServerLocale.mockResolvedValue("es");
+
+      await generateMetadata({
+        params: Promise.resolve({ handle: "testuser" }),
+      });
+
+      expect(mockGetServerLocale).toHaveBeenCalledWith(null);
+    });
+
+    it("SharePage's LanguageProvider uses the ?lang= override for the body locale", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      expect(mockGetServerLocale).toHaveBeenCalledWith("en");
+      const provider = findElement(
+        result,
+        (el) => !!el.props && "initialLocale" in el.props,
+      );
+      expect(provider).not.toBeNull();
+      expect(provider!.props.initialLocale).toBe("en");
+    });
+
+    it("SharePage's LanguageProvider falls back to the cookie-resolved locale when ?lang= is absent", async () => {
+      // getServerLocale is mocked here to stand in for a real cookie read
+      // (its own precedence order is covered by lib/i18n/server.test.ts) —
+      // this test only asserts page.tsx defers to it rather than
+      // hardcoding "es".
+      mockGetServerLocale.mockResolvedValue("es");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
+
+      expect(mockGetServerLocale).toHaveBeenCalledWith(null);
+      const provider = findElement(
+        result,
+        (el) => !!el.props && "initialLocale" in el.props,
+      );
+      expect(provider!.props.initialLocale).toBe("es");
+    });
+
+    it("generateMetadata and the body resolve to the same locale for an identical request", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      await generateMetadata({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+      const bodyResult = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      const forwardedValues = mockGetServerLocale.mock.calls.map((args) => args[0]);
+      expect(forwardedValues.every((value) => value === "en")).toBe(true);
+      const provider = findElement(
+        bodyResult,
+        (el) => !!el.props && "initialLocale" in el.props,
+      );
+      expect(provider!.props.initialLocale).toBe("en");
+    });
+  });
+
+  // #1107 (UX-H1) — every platform OAuth (Bitbucket/Codeberg/GitLab)
+  // connect/callback failure branch in lib/auth/platform-oauth.ts redirects
+  // back to this exact page as `?error=<platform>_<code>`. Read server-side
+  // (the route is already dynamic per #1066), not via the client
+  // useSyncExternalStore leaf the landing page uses — that pattern exists
+  // solely to avoid opting a static page out of ISR, which is moot here.
+  describe("platform OAuth error banner (#1107)", () => {
+    it("renders an ErrorBanner with a platform-aware message when ?error=<platform>_<code> is present", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ error: "gitlab_token_exchange" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).not.toBeNull();
+      expect(banner!.props.message as string).toContain("GitLab");
+    });
+
+    it("renders the OAuth error in the resolved Spanish locale", async () => {
+      mockGetServerLocale.mockResolvedValue("es");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ error: "gitlab_token_exchange", lang: "es" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner!.props.message).toBe(
+        "No pudimos conectar tu cuenta de GitLab. Inténtalo de nuevo.",
+      );
+    });
+
+    it("renders no ErrorBanner when there is no error query param", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).toBeNull();
+    });
+
+    it("renders no ErrorBanner for an unrelated query string", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).toBeNull();
+    });
+
+    it("recognizes the base GitHub session_storage code too (#1107 gap fix)", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ error: "session_storage" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner).not.toBeNull();
+      expect(typeof banner!.props.message).toBe("string");
+    });
+  });
+
+  // #1067 (FE-M1) — confidence/confidencePenalties must never reach the
+  // client-serialized props for a non-owner request. Ownership is resolved
+  // server-side (via the session cookie), not client-side, so it can gate
+  // what data is SENT, not just what is displayed.
+  describe("owner-only confidence redaction (#1067)", () => {
+    it("resolves the session via headers() + getOptionalServerSessionFromHeaders", async () => {
+      const fakeHeaderStore = { get: () => null };
+      mockHeaders.mockResolvedValue(fakeHeaderStore);
+
+      await renderPage("testuser");
+
+      expect(mockGetOptionalServerSessionFromHeaders).toHaveBeenCalledWith(fakeHeaderStore);
+    });
+
+    it("passes the redacted impact when there is no session (anonymous visitor)", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      const result = await renderPage("testuser");
+
+      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_MATERIALIZED.displayImpact);
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
+      expect("confidence" in impactProp).toBe(false);
+      expect("confidencePenalties" in impactProp).toBe(false);
+    });
+
+    it("passes the redacted impact when a different user's session is present", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "someone-else" });
+
+      const result = await renderPage("testuser");
+
+      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_MATERIALIZED.displayImpact);
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
+      expect("confidence" in impactProp).toBe(false);
+    });
+
+    it("passes the FULL impact (including confidence) when the session matches the handle", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+
+      const result = await renderPage("testuser");
+
+      expect(mockRedactImpactForVisitor).not.toHaveBeenCalled();
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      expect(ownerEl!.props.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
+    });
+
+    it("never redacts the impact used to render the inline badge SVG (server-only, not client-serialized)", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      await renderPage("testuser");
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.anything(),
+      );
+    });
   });
 
   it("renders the inline badge from displayImpact, not rawImpact", async () => {
@@ -252,6 +528,61 @@ describe("SharePage /u/[handle]", () => {
     );
   });
 
+  // #1091 (PE-M6) — persistProfileSnapshot is a durable Supabase write with
+  // nothing in the rendered HTML depending on its result. It must not hold
+  // TTFB open, mirroring the badge route's #1013 fix.
+  describe("durable snapshot write deferred to after() (#1091)", () => {
+    it("does not await the durable snapshot write on the render path — only after() invokes it", async () => {
+      await renderPage();
+
+      // The render call itself must return without having invoked the
+      // durable write directly.
+      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED,
+        { readOnly: false },
+      );
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED,
+        { verification: { hash: "abc12345", date: "2026-04-17" } },
+      );
+    });
+
+    it("skips deferProfileCacheWork when persistProfileSnapshot resolves false", async () => {
+      mockPersistProfileSnapshot.mockResolvedValue(false);
+
+      await renderPage();
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
+    });
+
+    it("escalates a deferred snapshot-write failure via captureServerError instead of swallowing it", async () => {
+      const writeError = new Error("supabase write failed");
+      mockPersistProfileSnapshot.mockRejectedValue(writeError);
+
+      await renderPage();
+      const callback = mockAfter.mock.calls[0][0];
+
+      // The after() callback itself must never throw/reject — a durable
+      // write failure must be observable, not surfaced as an unhandled
+      // rejection in the after() runtime.
+      await expect(callback()).resolves.not.toThrow();
+
+      expect(mockCaptureServerError).toHaveBeenCalledWith(
+        expect.objectContaining({ error: writeError }),
+      );
+    });
+  });
+
   it("does not register side effects in read-only smoke mode", async () => {
     await SharePageContent({ handle: "testuser", readOnly: true });
 
@@ -285,6 +616,64 @@ describe("SharePage /u/[handle]", () => {
       FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ avatarDataUri: undefined }),
     );
+  });
+
+  // #1088 (PE-M1) — same root cause as the badge.svg route: a handle whose
+  // stats carry no avatarUrl at all is a PERMANENT condition, distinct from
+  // a genuine race-timeout on a real fetch. The share page's own SVG-cache
+  // write must not stay silent for it forever either.
+  describe("permanent avatar absence caching (#1088)", () => {
+    const NO_AVATAR_MATERIALIZED = {
+      ...FAKE_MATERIALIZED,
+      stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: undefined },
+    };
+
+    it("writes a short-TTL cache entry when stats.avatarUrl is absent", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+
+      await renderPage();
+
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        FAKE_SVG,
+        "testuser",
+        expect.objectContaining({ ttlSeconds: expect.any(Number) }),
+      );
+      const ttlArg = mockWriteBadgeSvgCache.mock.calls[0]![3] as { ttlSeconds: number };
+      expect(ttlArg.ttlSeconds).toBeGreaterThanOrEqual(900);
+      expect(ttlArg.ttlSeconds).toBeLessThanOrEqual(1800);
+    });
+
+    it("does not write the cache for a genuine avatar fetch failure (transient, avatarUrl present)", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("avatar down"));
+
+      await renderPage();
+
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
+
+    it("writes the standard cache entry for a definitive remote avatar absence", async () => {
+      mockGetAvatarBase64.mockResolvedValue(undefined);
+
+      await renderPage();
+      await mockAfter.mock.calls[0][0]();
+
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        FAKE_SVG,
+        "testuser",
+        undefined,
+      );
+    });
   });
 
   // ----------------------------------------------------------------
@@ -331,7 +720,7 @@ describe("SharePage /u/[handle]", () => {
       penaltyChanges: null,
     };
 
-    it("fetches trend data alongside profile materialization and passes it to owner content (no client fetch required)", async () => {
+    it("redacts confidence fields from anonymous trend diff props", async () => {
       mockGetTrendData.mockResolvedValue({ trend: FAKE_TREND, diff: FAKE_DIFF });
 
       const result = await renderPage();
@@ -344,6 +733,20 @@ describe("SharePage /u/[handle]", () => {
       );
       expect(ownerEl).not.toBeNull();
       expect(ownerEl!.props.trend).toEqual(FAKE_TREND);
+      expect(ownerEl!.props.diff).not.toHaveProperty("confidence");
+      expect(ownerEl!.props.diff).not.toHaveProperty("penaltyChanges");
+    });
+
+    it("preserves confidence fields in an owner's trend diff props", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+      mockGetTrendData.mockResolvedValue({ trend: FAKE_TREND, diff: FAKE_DIFF });
+
+      const result = await renderPage();
+      const ownerEl = findElement(
+        result,
+        (el) => el.type === SharePageOwnerContentLazy,
+      );
+
       expect(ownerEl!.props.diff).toEqual(FAKE_DIFF);
     });
 
@@ -362,7 +765,17 @@ describe("SharePage /u/[handle]", () => {
       // Impact/stats sections are still present — the page doesn't omit the
       // dashboard just because history is missing.
       expect(ownerEl!.props.stats).toEqual(FAKE_MATERIALIZED.stats);
-      expect(ownerEl!.props.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
+      // #1067 — the default test session is a visitor (no session), so the
+      // page redacts confidence/confidencePenalties before this crosses
+      // into the client component tree. See "owner-only confidence
+      // redaction (#1067)" below for dedicated coverage of that behavior.
+      expect(ownerEl!.props.impact).toEqual({
+        adjustedComposite: 65,
+        tier: "Solid",
+        archetype: "Builder",
+        dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+        profileType: "collaborative",
+      });
     });
 
     it("degrades gracefully (renders, does not throw) when getTrendData itself rejects", async () => {

@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { useContext } from "react";
+import { LanguageContext, LanguageProvider } from "@/lib/i18n/provider";
+import { LangSync } from "@/lib/i18n/lang-sync";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 // page.tsx computes the demo badge SVG at module scope, resolves the
 // [locale] route param, and calls the REAL getServerT(locale) — this is the
@@ -32,7 +36,17 @@ vi.mock("@/components/ErrorBanner", () => ({
 }));
 
 vi.mock("@/components/NavbarClient", () => ({
-  NavbarClient: () => <nav data-testid="navbar" />,
+  NavbarClient: () => {
+    const language = useContext(LanguageContext);
+    const links = language?.t("landing.navLinks") as
+      | { label: string; href: string }[]
+      | undefined;
+    return (
+      <nav data-testid="navbar" data-locale={language?.locale}>
+        {links?.[0]?.label}
+      </nav>
+    );
+  },
 }));
 
 vi.mock("@/lib/auth/error-messages", () => ({
@@ -54,14 +68,37 @@ vi.mock("@/lib/i18n", async (importOriginal) => {
 
 beforeEach(() => {
   window.history.pushState({}, "", "/");
+  document.cookie = "chapa-locale=; Max-Age=0; path=/";
 });
 afterEach(cleanup);
 
 async function renderHome(locale: "en" | "es" = "en") {
   const { default: Home } = await import("./page");
   const jsx = await Home({ params: Promise.resolve({ locale }) });
-  return render(jsx);
+  // Match production: the static root layout owns the default Spanish
+  // provider, while the locale-segmented page may need to override it.
+  return render(
+    <LanguageProvider initialLocale="es" dictionary={es}>
+      <LangSync />
+      {jsx}
+    </LanguageProvider>,
+  );
 }
+
+describe("Home page metadata", () => {
+  it.each([
+    ["en", "Chapa — Developer Impact, Decoded", "Your developer impact"],
+    ["es", "Chapa — Impacto de desarrollador, decodificado", "Tu impacto como desarrollador"],
+  ] as const)("renders %s metadata from the selected route", async (locale, title, descriptionStart) => {
+    const { generateMetadata } = await import("./page");
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ locale }),
+    });
+
+    expect(metadata.title).toEqual({ absolute: title });
+    expect(metadata.description).toContain(descriptionStart);
+  });
+});
 
 describe("Home page render (en)", () => {
   it("renders the page with heading", async () => {
@@ -72,7 +109,18 @@ describe("Home page render (en)", () => {
 
   it("renders the navbar", async () => {
     await renderHome();
-    expect(screen.getByTestId("navbar")).toBeDefined();
+    const navbar = screen.getByTestId("navbar");
+    expect(navbar.dataset.locale).toBe("en");
+    expect(navbar.textContent).toBe("Features");
+    await waitFor(() => expect(document.documentElement.lang).toBe("en"));
+  });
+
+  it("emits an early document-language assignment for the selected route", async () => {
+    const { container } = await renderHome();
+    const script = container.querySelector(
+      'script[data-chapa-document-locale="en"]',
+    );
+    expect(script?.textContent).toBe('document.documentElement.lang="en";');
   });
 
   it("renders feature cards", async () => {
@@ -117,6 +165,24 @@ describe("Home page render (en)", () => {
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);
   });
+
+  // #1104 — converted from LandingContent.test.ts source-text assertions:
+  // these elements/links are now queried on the actual rendered page tree.
+  it("renders the main content landmark, the demo badge, its overlay, and the terminal", async () => {
+    const { container } = await renderHome();
+    expect(document.getElementById("main-content")).not.toBeNull();
+    expect(screen.getByTestId("demo-badge")).toBeDefined();
+    expect(screen.getByTestId("badge-overlay")).toBeDefined();
+    expect(screen.getByTestId("landing-terminal")).toBeDefined();
+    expect(container.querySelector("footer")).not.toBeNull();
+  });
+
+  it("links the Verify a Badge CTA to /verify with the complement token", async () => {
+    await renderHome();
+    const verifyLink = screen.getByRole("link", { name: /verify a badge/i });
+    expect(verifyLink.getAttribute("href")).toBe("/verify");
+    expect(verifyLink.className).toContain("bg-complement");
+  });
 });
 
 // #1023 (FE-H1) — this is the core flash-elimination proof: the [locale]
@@ -132,6 +198,9 @@ describe("Home page render (es) — locale-segmented RSC, no client re-render", 
 
   it("renders the navbar for the es render too", async () => {
     await renderHome("es");
-    expect(screen.getByTestId("navbar")).toBeDefined();
+    const navbar = screen.getByTestId("navbar");
+    expect(navbar.dataset.locale).toBe("es");
+    expect(navbar.textContent).toBe("Funciones");
+    await waitFor(() => expect(document.documentElement.lang).toBe("es"));
   });
 });

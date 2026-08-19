@@ -4,7 +4,7 @@
   "packageManager": "pnpm@10.29.2",
   "scripts": {
     "dev": "pnpm --filter @chapa/web dev",
-    "build": "pnpm --filter @chapa/web build",
+    "build": "pnpm --filter @chapa/shared build && pnpm --filter @chapa/web build",
     "start": "pnpm --filter @chapa/web start",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",

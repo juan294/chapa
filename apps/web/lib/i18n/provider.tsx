@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useContext,
   useState,
   useCallback,
   useEffect,
@@ -83,8 +84,70 @@ export function canonicalLocaleHref({
  * When `dictionary` is omitted (e.g. unit tests that render with only
  * `initialLocale`), the provider falls back to the statically-bundled English
  * dictionary, keeping the test-facing API identical.
+ *
+ * #1071 — `/u/[handle]` and `/verify/[hash]` are dynamic routes that resolve
+ * their own per-request locale and each nest a SECOND `LanguageProvider`
+ * inside the root layout's static one (which is always pinned to
+ * `DEFAULT_LOCALE`) so they can serve a locale the static root can't know
+ * about. When that per-request locale happens to match the root's, the
+ * nested provider used to still receive and serialize its own full ~650-key
+ * dictionary into the RSC payload — a second copy of data the root ancestor
+ * already provided. This component now checks for a matching ancestor
+ * `LanguageContext` and, when found, renders as a transparent pass-through
+ * instead of standing up a second provider/dictionary: descendants resolve
+ * `useTranslation()` straight to the ancestor's context. Callers should
+ * still avoid passing `dictionary` in that case (see `SharePage` /
+ * `VerifyLocaleBoundary`) so the RSC payload never serializes it in the
+ * first place; this reuse is a defense-in-depth guarantee, not a
+ * replacement for that call-site behavior. Locale mismatches (e.g. an
+ * explicit `?lang=` on a non-default page) fall through to the normal path
+ * below, unchanged.
  */
 export function LanguageProvider({
+  children,
+  initialLocale,
+  dictionary,
+}: {
+  children: ReactNode;
+  initialLocale: Locale;
+  dictionary?: Translations;
+}) {
+  const ancestor = useContext(LanguageContext);
+  // #1108-repro — capture the pass-through decision ONCE, at mount, instead
+  // of recomputing `ancestor.locale === initialLocale` on every render. The
+  // ancestor is a LIVE context value: the root `LanguageProviderInner`'s own
+  // mount effect can apply a persisted locale cookie shortly after mount,
+  // changing ITS `locale` from `DEFAULT_LOCALE` to whatever was persisted.
+  // If that happens to land on this nested provider's `initialLocale` after
+  // it already mounted as a real provider (SSR and the first client render
+  // both correctly took the "REAL" branch — ancestor was still
+  // `DEFAULT_LOCALE` at that point), re-deriving the decision on the next
+  // render would flip it to "PASS-THROUGH" mid-lifecycle: React sees the
+  // element type at this position change from `LanguageProviderInner` to a
+  // bare `Fragment` and unmounts/remounts the ENTIRE subtree below —
+  // including this page's own Suspense boundary. If that boundary's first
+  // streamed resolution was still in flight when the remount happened, the
+  // remount's fresh copy could land in the DOM alongside the still-settling
+  // original instead of cleanly replacing it, producing duplicate content
+  // (confirmed via `ancestor`/`initialLocale` render tracing: the decision
+  // observably flipped from "REAL" to "PASS-THROUGH" after mount in a
+  // reproducing run). Freezing the decision at mount (matching what SSR
+  // already committed to) makes it immune to the ancestor's locale changing
+  // later for any reason — cookie sync, a future locale switch, etc.
+  const [usePassThrough] = useState(
+    () => !!ancestor && ancestor.locale === initialLocale,
+  );
+  if (usePassThrough) {
+    return <>{children}</>;
+  }
+  return (
+    <LanguageProviderInner initialLocale={initialLocale} dictionary={dictionary}>
+      {children}
+    </LanguageProviderInner>
+  );
+}
+
+function LanguageProviderInner({
   children,
   initialLocale,
   dictionary,
@@ -194,9 +257,20 @@ export function LanguageProvider({
       // URL, while directly visited `/en` or `/es` routes never pass through
       // the locale-selecting proxy. Re-entering through the canonical path
       // makes the persisted cookie authoritative for the whole page.
-      window.location.assign(
-        canonicalLocaleHref(window.location, next, persistenceFailed),
+      const target = canonicalLocaleHref(
+        window.location,
+        next,
+        persistenceFailed,
       );
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (target === current) {
+        // A same-URL navigation with an unchanged fragment is a same-document
+        // no-op in browsers. Reload explicitly so the proxy can apply the new
+        // locale cookie to server-rendered content.
+        window.location.reload();
+        return;
+      }
+      window.location.assign(target);
     },
     [locale, applyLocale]
   );

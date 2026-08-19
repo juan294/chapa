@@ -1,8 +1,8 @@
 "use client";
 
-import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { DimensionCardsRow } from "./DimensionCardsRow";
 import { CoachingInsights } from "./CoachingInsights";
@@ -15,9 +15,11 @@ import { useTranslation } from "@/lib/i18n";
 // ---------------------------------------------------------------------------
 
 interface ImpactDashboardProps {
-  impact: ImpactV6Result;
+  // #1067 — redacted PublicImpactV6Result for a non-owner visitor, full
+  // ImpactV6Result for the owner. Nothing in this component or its children
+  // reads confidence/confidencePenalties.
+  impact: ClientImpactV6Result;
   stats: StatsData;
-  handle: string;
   craftResult?: CraftResult | null;
   /**
    * Trend/diff history data, fetched server-side (#1034) by the share page
@@ -28,7 +30,7 @@ interface ImpactDashboardProps {
    * fetch showed while loading or on a fetch error.
    */
   trend?: TrendSummary | null;
-  diff?: SnapshotDiff | null;
+  diff?: ClientSnapshotDiff | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import type { ImpactV6Result } from "@chapa/shared";
+import type { ClientImpactV6Result } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { generateInsights } from "@/lib/dashboard/generate-insights";
 import { InsightCard } from "./InsightCard";
 import { useTranslation } from "@/lib/i18n";
@@ -13,9 +13,11 @@ import { useTranslation } from "@/lib/i18n";
 // ---------------------------------------------------------------------------
 
 interface CoachingInsightsProps {
-  impact: ImpactV6Result;
+  // #1067 — redacted PublicImpactV6Result for a non-owner visitor, full
+  // ImpactV6Result for the owner. generateInsights() never reads confidence.
+  impact: ClientImpactV6Result;
   trend: TrendSummary | null;
-  diff: SnapshotDiff | null;
+  diff: ClientSnapshotDiff | null;
   className?: string;
 }
 

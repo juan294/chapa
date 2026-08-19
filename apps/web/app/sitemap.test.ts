@@ -35,6 +35,15 @@ describe("sitemap", () => {
     expect(home?.changeFrequency).toBe("weekly");
   });
 
+  it("includes the /about/verification page (#1075 / FE-L4)", async () => {
+    vi.mocked(dbGetUsers).mockResolvedValue([]);
+
+    const entries = await sitemap();
+    const urls = entries.map((e) => e.url);
+
+    expect(urls).toContain(`${BASE_URL}/about/verification`);
+  });
+
   it("includes all 7 archetype pages", async () => {
     vi.mocked(dbGetUsers).mockResolvedValue([]);
 

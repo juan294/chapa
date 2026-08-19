@@ -93,6 +93,7 @@ const FAKE_MATERIALIZED = {
     computedAt: "2026-04-17T12:00:00.000Z",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 58, tier: "Solid" },
+  statsComplete: true,
 };
 
 function makeRequest(): NextRequest {
@@ -223,6 +224,29 @@ describe("POST /api/recalculate", () => {
     const resp = await POST(makeRequest());
 
     expect(resp.status).toBe(500);
+    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1076 — the route checks materialized.statsComplete up front (the #1003
+  // persist-boundary gate) so an intentional skip is distinguishable from a
+  // genuine write failure, not a bare 500, and persistOrchestratedSnapshot is
+  // never even called.
+  // ---------------------------------------------------------------------------
+
+  it("#1076: returns 422 with reason stats_incomplete without attempting to persist", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue({
+      ...FAKE_MATERIALIZED,
+      statsComplete: false,
+    });
+
+    const resp = await POST(makeRequest());
+    const body = await resp.json();
+
+    expect(resp.status).toBe(422);
+    expect(body.reason).toBe("stats_incomplete");
+    expect(mockPersistOrchestratedSnapshot).not.toHaveBeenCalled();
     expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });

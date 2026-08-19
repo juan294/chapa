@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-08-19
+
+### Fixed
+
+- **Fresh English-language visits no longer mix an English landing page with
+  Spanish navigation and document metadata.** The locale-selected landing
+  route now gives its client controls the same locale as its server-rendered
+  body and synchronizes the document language. Root-level skip-link and author
+  labels also follow the active locale, and switching languages after using
+  the skip link now forces the intended server-rendered locale reload. Landing
+  and verification titles plus the pre-hydration document language now match
+  the selected route. Long verification hashes also wrap on mobile, and badge
+  explanation tooltips clamp to the viewport instead of clipping off-screen
+  and dismiss correctly with a second keyboard activation or Escape.
+- **The privacy policy now matches Chapa's current data paths.** English and
+  Spanish copy now disclose GitLab linking, durable Supabase records, variable
+  Redis cache lifetimes, PostHog and Vercel Analytics event data, and the
+  account-data deletion request path instead of claiming all scores disappear
+  after a single 24-hour cache TTL.
+- **A slow badge materialize no longer blocks the request when a stale SVG is
+  available.** The badge route now races materialization against a 2200ms
+  deadline; on timeout it serves yesterday's cached SVG with a short-TTL
+  header while the original materialize call keeps running in the background,
+  so the next request picks up the fresh result instead of paying the same
+  cost again.
+- **A permanently avatar-less handle (e.g. a README embed) now gets cached.**
+  Avatar-cache outcomes are now tracked as four distinct states — success,
+  fetch-failed, permanently absent, race-timeout — instead of one boolean.
+  Previously "no avatar at all" was never cached, forcing a full
+  materialize+render on every single request for that handle. Transient CDN
+  and network failures are not cached, so an avatar-less fallback cannot
+  poison the shared SVG cache for a full day.
+- **Public read-only profile reads no longer trigger a live GitHub fetch on
+  a cold cache key.** `/api/profile/:handle` and other read-only callers now
+  compose strictly from the protected stale-stats baseline past the 6h TTL,
+  closing a path where a high-traffic handle could repeatedly hammer GitHub's
+  API on every cold hit.
+- **An oversized recovered campaign-send batch no longer stalls forever.** A
+  new `group_token` tracks a recovered lease group's membership across
+  processing↔pending transitions, so a batch that exceeds the day's remaining
+  send quota is released back to `pending` as one indivisible unit instead of
+  being re-leased and blocked on every cron tick.
+- **A failed Resend webhook delivery no longer permanently burns its dedup
+  key.** In-flight claims now use a separate five-minute key and completed
+  deliveries use the seven-day marker, so even a failed Redis cleanup makes
+  the provider retry later instead of silently acknowledging a dropped email.
+- **Concurrent CLI device confirmation and approval no longer overwrite each
+  other.** Redis now merges each state update atomically, preserving the
+  confirmed `device_code` latch through the approval race.
+- **A failed score-challenge dispute email now reports failure** instead of a
+  false success.
+- **`fetch-retry` now retries a thrown network error** (DNS failure,
+  connection reset), not just an HTTP 5xx response — except a deliberate
+  `AbortSignal.timeout()` abort, which still propagates immediately so it
+  can't double-count against the badge route's cache-miss latency budget.
+- **A failed OAuth connect (Bitbucket/Codeberg/GitLab) now shows an error
+  banner** on the share page instead of failing silently; a previously
+  unregistered `session_storage` error code now surfaces its real message
+  instead of falling back to a generic one.
+- Several accessibility fixes: structural badge hotspots no longer act as
+  dead tab stops while dedicated tooltip controls keep every explanation
+  keyboard-accessible, generation progress now announces one step instead of
+  the whole array, a duplicate `aria-label` was removed from insight cards,
+  the author-typewriter popover is keyboard-actionable, and terminal command
+  input stays at ≥16px to prevent iOS Safari auto-zoom.
+
+### Changed
+
+- **Confidence data is now redacted server-side, not just hidden in the UI.**
+  New `PublicImpactV6Result`/`ClientImpactV6Result` types and
+  `redactImpactForVisitor()` strip `confidence`/`confidencePenalties` before
+  the impact object crosses into the client component tree, so a visitor's
+  view-source never contains confidence data.
+- **The share page is fully dynamic** (no longer ISR), with locale resolution
+  unified through `getServerLocale()` and the durable snapshot write moved
+  into `after()` so it no longer blocks time-to-first-byte.
+- The badge-generation loading screen now distinguishes rate-limited,
+  session-expired, and generic failures with a 45s client-side timeout and a
+  5s "still working" notice, instead of one generic error state.
+- The warm-cache cron now checks a wall-clock time budget before each batch
+  and renders/writes the badge SVG cache during the cron itself (not just
+  avatar pre-warming), so the first visitor after UTC rollover gets a cache
+  hit instead of paying full materialize+render cost.
+- E2E matrix jobs now use the same 30-minute bounded Playwright dependency
+  setup allowance as contract and deployment-smoke jobs, avoiding false
+  cancellation on slow hosted-runner package checks. Release-PR E2E shards
+  also run after a successful build when the develop-push classifier is
+  intentionally skipped for pull-request events. Playwright setup now removes
+  an unreachable Azure Ubuntu mirror from the hosted runner's mirror list and
+  uses the canonical Ubuntu fallback instead of waiting for the job timeout.
+
 ## [2.21.0] - 2026-08-11
 
 ### Fixed
@@ -964,7 +1055,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.21.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.22.0...HEAD
+[2.22.0]: https://github.com/juan294/chapa/compare/v2.21.0...v2.22.0
 [2.21.0]: https://github.com/juan294/chapa/compare/v2.20.0...v2.21.0
 [2.20.0]: https://github.com/juan294/chapa/compare/v2.19.1...v2.20.0
 [2.19.1]: https://github.com/juan294/chapa/compare/v2.19.0...v2.19.1

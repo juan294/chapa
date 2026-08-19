@@ -3,6 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import {
+  DEFAULT_LOCALE,
   LangSync,
   LanguageProvider,
   LocaleSync,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
+import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -89,14 +91,20 @@ function VerifyLocaleBoundary({
   queryLang?: string;
 }) {
   return (
-    <LanguageProvider
-      initialLocale={locale}
-      dictionary={locale === "es" ? es : en}
-    >
-      <LangSync />
-      <LocaleSync queryLang={queryLang} />
-      <div className="min-h-screen bg-bg text-text-primary">{children}</div>
-    </LanguageProvider>
+    <>
+      <DocumentLocaleScript locale={locale} />
+      <LanguageProvider
+        initialLocale={locale}
+        // #1071 — same reasoning as the share page: skip re-serializing the
+        // dictionary the root layout's LanguageProvider already provides when
+        // this page's resolved locale matches DEFAULT_LOCALE.
+        dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
+      >
+        <LangSync />
+        <LocaleSync queryLang={queryLang} />
+        <div className="min-h-screen bg-bg text-text-primary">{children}</div>
+      </LanguageProvider>
+    </>
   );
 }
 
@@ -139,7 +147,7 @@ function VerifiedCard({
       {/* Hash display */}
       <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.verificationCode') as string}</p>
-        <p className="font-heading text-lg tracking-widest text-complement">
+        <p className="break-all font-heading text-lg tracking-widest text-complement">
           {hash}
         </p>
       </div>
@@ -260,7 +268,7 @@ function NotFoundCard({ hash, t }: { hash: string; t: TFunc }) {
     >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.hashLabel') as string}</p>
-        <p className="font-heading text-lg tracking-widest text-text-secondary">
+        <p className="break-all font-heading text-lg tracking-widest text-text-secondary">
           {hash}
         </p>
       </div>
@@ -281,7 +289,7 @@ function InvalidHashCard({ hash, t }: { hash: string; t: TFunc }) {
     >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.provided') as string}</p>
-        <p className="font-heading text-sm text-terminal-red">{hash}</p>
+        <p className="break-all font-heading text-sm text-terminal-red">{hash}</p>
       </div>
     </StatusCallout>
   );

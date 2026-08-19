@@ -1,7 +1,4 @@
-import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-const SOURCE = readFileSync(new URL("./route.ts", import.meta.url), "utf8");
 
 const { mockGetVerificationRecord, mockRateLimit } = vi.hoisted(() => ({
   mockGetVerificationRecord: vi.fn(),
@@ -25,7 +22,7 @@ vi.mock("@/lib/env", () => ({
   getBaseUrl: () => "https://chapa.thecreativetoken.com",
 }));
 
-import { GET, OPTIONS } from "./route";
+import { GET, OPTIONS, LEGACY_PRE_V2_DEADLINE } from "./route";
 import { NextRequest } from "next/server";
 
 function makeRequest(
@@ -105,8 +102,7 @@ describe("GET /api/verify/[hash]", () => {
     });
 
     it("documents the legacy 32-char acceptance window through 2026-07-19", () => {
-      expect(SOURCE).toContain("LEGACY_PRE_V2_DEADLINE");
-      expect(SOURCE).toContain("2026-07-19");
+      expect(LEGACY_PRE_V2_DEADLINE).toBe("2026-07-19");
     });
 
     it("returns 400 for hash shorter than 8 characters", async () => {

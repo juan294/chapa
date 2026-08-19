@@ -36,6 +36,40 @@ function mockFetchSessionFailure() {
   );
 }
 
+/** First call rejects (network error); every call after that succeeds. */
+function mockFetchFailsOnceThenSucceeds(user: {
+  login: string;
+  name?: string | null;
+  avatar_url?: string;
+}) {
+  const fn = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("Network error"))
+    .mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ user }),
+    });
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
+
+/** First call resolves with a non-ok (429) response; every call after that succeeds. */
+function mockFetch429ThenSucceeds(user: {
+  login: string;
+  name?: string | null;
+  avatar_url?: string;
+}) {
+  const fn = vi
+    .fn()
+    .mockResolvedValueOnce({ ok: false, status: 429 })
+    .mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ user }),
+    });
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
+
 describe("useSession", () => {
   describe("initial state", () => {
     it("starts with session = null and loading = true", () => {
@@ -226,6 +260,101 @@ describe("useSession", () => {
 
       expect(result.current.session).toEqual(user2);
       expect(result.current.loading).toBe(false);
+    });
+  });
+
+  describe("failure recovery (#1070)", () => {
+    it("does not permanently poison the cache after a network error — a later mount's fetch succeeds", async () => {
+      const user = {
+        login: "testuser",
+        name: "Test",
+        avatar_url: "https://example.com/avatar.png",
+      };
+      const fetchMock = mockFetchFailsOnceThenSucceeds(user);
+
+      const { result: first } = renderHook(() => useSession());
+      await waitFor(() => expect(first.current.loading).toBe(false));
+      // The failed attempt surfaces as logged-out for that instance...
+      expect(first.current.session).toBeNull();
+
+      // ...but a subsequent mount must retry against the network rather than
+      // reusing the permanently-cached negative result.
+      const { result: second } = renderHook(() => useSession());
+      await waitFor(() => expect(second.current.loading).toBe(false));
+      expect(second.current.session).toEqual(user);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not permanently poison the cache after a 429 (fail-closed rate limit) — a later mount's fetch succeeds", async () => {
+      const user = {
+        login: "testuser",
+        name: "Test",
+        avatar_url: "https://example.com/avatar.png",
+      };
+      const fetchMock = mockFetch429ThenSucceeds(user);
+
+      const { result: first } = renderHook(() => useSession());
+      await waitFor(() => expect(first.current.loading).toBe(false));
+      expect(first.current.session).toBeNull();
+
+      const { result: second } = renderHook(() => useSession());
+      await waitFor(() => expect(second.current.loading).toBe(false));
+      expect(second.current.session).toEqual(user);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("dedupes retries: multiple callers mounted after a failure share a single retry request", async () => {
+      const user = {
+        login: "testuser",
+        name: "Test",
+        avatar_url: "https://example.com/avatar.png",
+      };
+      const fetchMock = mockFetchFailsOnceThenSucceeds(user);
+
+      const { result: first } = renderHook(() => useSession());
+      await waitFor(() => expect(first.current.loading).toBe(false));
+      expect(first.current.session).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Several consumers mount "at once" after the failure (no await between
+      // them) — they must share one retry, not fire one each.
+      const { result: second } = renderHook(() => useSession());
+      const { result: third } = renderHook(() => useSession());
+      const { result: fourth } = renderHook(() => useSession());
+
+      await waitFor(() => expect(second.current.loading).toBe(false));
+      await waitFor(() => expect(third.current.loading).toBe(false));
+      await waitFor(() => expect(fourth.current.loading).toBe(false));
+
+      expect(second.current.session).toEqual(user);
+      expect(third.current.session).toEqual(user);
+      expect(fourth.current.session).toEqual(user);
+
+      // 1 failed attempt + exactly 1 shared retry = 2 total.
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps every new mount hydration-safe (session: null, loading: true) even right after a prior failure", async () => {
+      const user = {
+        login: "testuser",
+        name: "Test",
+        avatar_url: "https://example.com/avatar.png",
+      };
+      mockFetchFailsOnceThenSucceeds(user);
+
+      const { result: first } = renderHook(() => useSession());
+      await waitFor(() => expect(first.current.loading).toBe(false));
+      expect(first.current.session).toBeNull();
+
+      // The very next mount's FIRST synchronous render — before any
+      // microtask has a chance to run — must still be the hydration-safe
+      // snapshot, not a synchronously-reused cached value.
+      const { result: second } = renderHook(() => useSession());
+      expect(second.current.session).toBeNull();
+      expect(second.current.loading).toBe(true);
+
+      await waitFor(() => expect(second.current.loading).toBe(false));
+      expect(second.current.session).toEqual(user);
     });
   });
 });

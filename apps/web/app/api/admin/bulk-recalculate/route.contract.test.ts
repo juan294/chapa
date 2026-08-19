@@ -9,6 +9,10 @@ const {
   mockInvalidateProfileReadModels: vi.fn(async () => undefined),
   mockMaterializeOrchestratedProfile: vi.fn(async (handle: string) => ({
     craftResult: null,
+    // #1076: persistOrchestratedSnapshot now gates on statsComplete via the
+    // shared guardStatsComplete() — this fixture represents the happy path
+    // (complete stats), not the incomplete-stats case, so it must be true.
+    statsComplete: true,
     displayImpact: { adjustedComposite: 70 },
     rawImpact: { adjustedComposite: 72 },
     snapshot: { date: "2026-07-03", adjustedComposite: 70, tier: "Solid" },
@@ -27,7 +31,10 @@ vi.mock("@/lib/profile/post-write-invalidation", () => ({
 }));
 
 vi.mock("@/lib/db/users", () => ({
-  dbGetUsers: vi.fn(async () => [{ handle: "octocat" }]),
+  dbGetUserHandlePage: vi.fn(async () => ({
+    handles: ["octocat"],
+    total: 1,
+  })),
 }));
 
 vi.mock("next/cache", () => ({

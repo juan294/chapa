@@ -1,11 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "layout.tsx"),
-  "utf-8",
-);
 
 const mockNotFound = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -36,14 +29,6 @@ describe("experiments layout", () => {
   it("exports a default layout component", async () => {
     const mod = await import("./layout");
     expect(typeof mod.default).toBe("function");
-  });
-
-  it("gates on isExperimentsEnabled feature flag", () => {
-    expect(SOURCE).toContain("isExperimentsEnabled");
-  });
-
-  it("calls notFound when flag is disabled", () => {
-    expect(SOURCE).toContain("notFound");
   });
 
   it("calls notFound when experiments flag returns false", async () => {

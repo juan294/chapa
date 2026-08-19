@@ -252,6 +252,146 @@ describe("getStats", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // #1087 (PE-H2) — _loadOverlays has zero data dependency on fetchStats'
+  // result, so it must be kicked off concurrently rather than strictly after
+  // fetchStats resolves. The regression-risk requirement (see CLAUDE.md's
+  // scoring-data integrity contract) is that this concurrency change must NOT
+  // let overlay data leak into the degraded-fetch guard's decision — the
+  // guard must still compare only `primary` against `baseline`.
+  // ---------------------------------------------------------------------------
+  describe("concurrent GitHub + overlay fetch (#1087 / PE-H2)", () => {
+    /** primary miss → stale=lastGood → supplemental miss, fetch returns `fresh`. */
+    function setupWithStale(fresh: StatsData, lastGood: StatsData | null) {
+      mockCacheGet
+        .mockResolvedValueOnce(null) // stats:v2:merged (primary miss)
+        .mockResolvedValueOnce(lastGood) // stats:stale (last-known-good)
+        .mockResolvedValueOnce(null); // supplemental miss
+      mockFetchStatsData.mockResolvedValue(fresh);
+    }
+
+    it("kicks off the overlay fetch before fetchStats resolves, not strictly after it", async () => {
+      mockCacheGet
+        .mockResolvedValueOnce(null) // stats:v2:merged (primary miss)
+        .mockResolvedValueOnce(null) // stats:stale (baseline miss)
+        .mockResolvedValueOnce(null); // supplemental miss
+
+      let resolveFetchStats!: (value: StatsData) => void;
+      mockFetchStatsData.mockReturnValue(
+        new Promise<StatsData>((resolve) => {
+          resolveFetchStats = resolve;
+        }),
+      );
+
+      const resultPromise = getStats("test-user");
+
+      // Flush pending microtasks (the cacheGet reads that precede fetchStats)
+      // without resolving fetchStats itself.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The overlay fetch (independent of fetchStats' result) must already
+      // have been kicked off even though fetchStats is still pending — proof
+      // the two run concurrently rather than overlays waiting on fetchStats.
+      expect(mockFetchStatsData).toHaveBeenCalled();
+      expect(mockFetchBitbucketIfLinked).toHaveBeenCalled();
+
+      resolveFetchStats(makeStats());
+      const result = await resultPromise;
+      expect(result).not.toBeNull();
+    });
+
+    it("kicks off the supplemental lookup concurrently with the platform fetches, not strictly after them", async () => {
+      // Collapsing _loadOverlays' own internal waves (the second half of the
+      // #1087/PE-H2 recommendation): the platform fetches (bitbucket/codeberg/
+      // gitlab) and the supplemental lookup have zero data dependency on each
+      // other, so the supplemental cacheGet must fire even while a platform
+      // fetch is still in flight — not wait for Promise.allSettled(platforms)
+      // to resolve first.
+      mockCacheGet
+        .mockResolvedValueOnce(null) // stats:v2:merged (primary miss)
+        .mockResolvedValueOnce(null) // stats:stale (baseline miss)
+        .mockResolvedValueOnce(null); // supplemental miss — must fire concurrently
+
+      mockFetchStatsData.mockResolvedValue(makeStats());
+
+      let resolveBitbucket!: (value: StatsData | null) => void;
+      mockFetchBitbucketIfLinked.mockReturnValue(
+        new Promise<StatsData | null>((resolve) => {
+          resolveBitbucket = resolve;
+        }),
+      );
+
+      const resultPromise = getStats("test-user");
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The 3rd cacheGet call (supplemental) must already have fired even
+      // though the bitbucket platform fetch — part of the same overlay load —
+      // is still pending. Proof the supplemental wave doesn't wait on the
+      // platform-fetch wave to settle.
+      expect(mockCacheGet).toHaveBeenCalledTimes(3);
+      expect(mockCacheGet).toHaveBeenNthCalledWith(3, "supplemental:test-user");
+
+      resolveBitbucket(null);
+      const result = await resultPromise;
+      expect(result).not.toBeNull();
+    });
+
+    it("regression: a slow concurrent overlay fetch does not influence the degraded-fetch guard's primary-vs-baseline decision", async () => {
+      const lastGood = makeStats({ prsMergedCount: 41, prsMergedWeight: 120, commitsTotal: 14000 });
+      const degraded = makeStats({
+        prsMergedCount: 0,
+        prsMergedWeight: 0,
+        commitsTotal: 15533,
+        issuesClosedCount: 5096,
+      });
+      setupWithStale(degraded, lastGood);
+
+      // The overlay resolves late, with an inflated PR count. If overlay data
+      // were ever composed onto `primary`/`baseline` before the guard ran
+      // (rather than strictly after both `Promise.all` legs settle), a large
+      // overlay like this could mask the shortfall the guard exists to catch
+      // (the #1061 failure mode this repo already hardened against).
+      let resolveBitbucket!: (value: StatsData) => void;
+      mockFetchBitbucketIfLinked.mockReturnValue(
+        new Promise<StatsData>((resolve) => {
+          resolveBitbucket = resolve;
+        }),
+      );
+
+      const resultPromise = getStats("test-user");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      resolveBitbucket(
+        makeStats({ handle: "test-user-bitbucket", prsMergedCount: 500, commitsTotal: 500 }),
+      );
+
+      await resultPromise;
+
+      // The guard compared primary (0) against baseline (41) — unaffected by
+      // the overlay's inflated count — and rejected exactly as it does with
+      // no overlay in flight at all.
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "github_degraded_pr_fetch",
+        expect.objectContaining({
+          handle: "test-user",
+          freshPrsMergedCount: 0,
+          stalePrsMergedCount: 41,
+        }),
+      );
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:stale:v2:test-user",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // #1004 phase 2 — scope-aware, non-downgrading cache writes
   // A lower-scope (public) fetch must never overwrite a higher-scope
   // (authenticated) entry already cached for this handle.
@@ -488,14 +628,36 @@ describe("getStats", () => {
     });
   });
 
-  it("does not write caches or user registry in read-only mode", async () => {
-    const githubStats = makeStats();
-    setupCacheMiss(githubStats);
+  it("#1083: never issues a live GitHub fetch in read-only mode, even on a cold key", async () => {
+    // No baseline exists yet — a handle that has never been fetched by a
+    // write-mode caller (badge route, warm-cache cron, refresh).
+    mockCacheGet
+      .mockResolvedValueOnce(null) // stats:v2:merged:test-user (primary)
+      .mockResolvedValueOnce(null); // stats:stale:v2:test-user (baseline)
 
     const result = await getStats("test-user", undefined, { readOnly: true });
 
-    expect(result).toEqual(githubStats);
-    expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", undefined);
+    expect(result).toBeNull();
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
+    expect(mockFetchBitbucketIfLinked).not.toHaveBeenCalled();
+    expect(mockFetchCodebergIfLinked).not.toHaveBeenCalled();
+    expect(mockFetchGitlabIfLinked).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+  });
+
+  it("#1083: serves the protected baseline in read-only mode without writing caches or fetching GitHub", async () => {
+    const baseline = makeStats();
+    mockCacheGet.mockImplementation((key: string) => {
+      if (key === "stats:v2:merged:test-user") return Promise.resolve(null);
+      if (key === "stats:stale:v2:test-user") return Promise.resolve(baseline);
+      return Promise.resolve(null);
+    });
+
+    const result = await getStats("test-user", undefined, { readOnly: true });
+
+    expect(result).toEqual(baseline);
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
     expect(mockFetchBitbucketIfLinked).not.toHaveBeenCalled();
     expect(mockFetchCodebergIfLinked).not.toHaveBeenCalled();
     expect(mockFetchGitlabIfLinked).not.toHaveBeenCalled();
@@ -1340,6 +1502,111 @@ describe("getStats", () => {
       expect(result!.commitsTotal).toBe(50); // GitHub-only
       expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
       expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
+    });
+
+    it("fetches the link row exactly once per platform, on the successful-stats-fetch path (#1093)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 30 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchBitbucketIfLinked.mockResolvedValue(bb);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "bb-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
+
+      const result = await getStats("test-user");
+
+      // Previously: one wave skipped the DB read because the stats fetch had
+      // already succeeded, then a later wave re-fetched the same row to
+      // resolve the login — two calls for one successfully-fetched platform.
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledTimes(1);
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "bitbucket");
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
+    });
+
+    it("fetches the link row exactly once per platform, on the failed-stats-fetch path (#1093, guards #632)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchBitbucketIfLinked.mockResolvedValue(null); // stats fetch failed
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "bb-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
+
+      const result = await getStats("test-user");
+
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledTimes(1);
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "bitbucket");
+
+      // #632 regression guard: the platform must still appear in Data Sources
+      // (linkedPlatforms) even though its own stats fetch failed, because the
+      // link row itself (source of truth for "is this platform linked") says
+      // it's linked.
+      expect(result!.commitsTotal).toBe(50); // GitHub-only — stats fetch failed
+      expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
+    });
+
+    it("does not gate a successfully-fetched platform's link-row query behind a slower platform's enabled-check wave (#1093)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 15 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+
+      // Bitbucket's stats fetch failed, and its enabled-check is slow (simulating
+      // a real feature-flag/DB round-trip that hasn't resolved yet).
+      mockFetchBitbucketIfLinked.mockResolvedValue(null);
+      let resolveBitbucketEnabled!: (value: boolean) => void;
+      mockIsBitbucketEnabled.mockReturnValue(
+        new Promise<boolean>((resolve) => {
+          resolveBitbucketEnabled = resolve;
+        }),
+      );
+
+      // Codeberg's stats fetch succeeded — its link-row query has zero data
+      // dependency on Bitbucket's still-pending enabled-check.
+      mockFetchCodebergIfLinked.mockResolvedValue(cb);
+      mockDbGetLinkedPlatform.mockImplementation((_handle: string, platform: string) => {
+        if (platform === "codeberg") {
+          return Promise.resolve({
+            remoteLogin: "cb-user",
+            tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      const resultPromise = getStats("test-user");
+
+      // Give microtasks a chance to settle. Bitbucket's enabled-check is still
+      // pending at this point.
+      await new Promise((r) => setTimeout(r, 20));
+
+      // The Codeberg link-row query must already have started — it has no
+      // dependency on Bitbucket's pending enabled-check and must not be
+      // serialized behind it in a second wave.
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "codeberg");
+
+      resolveBitbucketEnabled(false);
+      const result = await resultPromise;
+
+      expect(result!.linkedPlatforms).toEqual(["codeberg"]);
+      expect(result!.linkedPlatformLogins).toEqual({ codeberg: "cb-user" });
     });
   });
 

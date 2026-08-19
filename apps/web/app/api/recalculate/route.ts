@@ -64,6 +64,20 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     );
   }
 
+  // #1076 — persistOrchestratedSnapshot's #1003 gate would refuse to persist
+  // stats that look incomplete/poisoned anyway; check it here so the
+  // intentional skip (422) is distinguishable from a genuine write failure
+  // (500) up front, rather than inferring the reason from a bare `!persisted`.
+  if (!materialized.statsComplete) {
+    return NextResponse.json(
+      {
+        error: "Recalculated data looks incomplete and was not saved. Try again later.",
+        reason: "stats_incomplete",
+      },
+      { status: 422 },
+    );
+  }
+
   const persisted = await persistOrchestratedSnapshot(handle, materialized, {
     mode: "replace",
   });

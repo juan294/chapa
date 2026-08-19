@@ -3,7 +3,8 @@
  *
  * Provides:
  *   - `fetchWithRetry`: bounded jittered retry for idempotent reads (GET / GraphQL).
- *     Retries on 5xx responses only; never retries 4xx or non-idempotent writes.
+ *     Retries 5xx responses and network rejections once. It never retries 4xx,
+ *     caller-triggered AbortError/TimeoutError rejections, or non-idempotent writes.
  *   - `sanitizeLogBody`: truncates and strips control chars from upstream error bodies
  *     before writing to logs (BE-M4 / #870).
  */
@@ -32,10 +33,37 @@ export function _setRetryDelayFn(fn: (ms: number) => Promise<void>): void {
 }
 
 /**
+ * Returns true when a thrown fetch error is a deliberate caller abort —
+ * i.e. the signal passed through `init.signal` was aborted and `fetch()`
+ * rejected as a result, rather than a network-level failure (connection reset,
+ * DNS failure, etc.). Native `AbortSignal.timeout()` rejects with `TimeoutError`
+ * in Node, while explicit aborts commonly use `AbortError`, so both names are
+ * part of the non-retry contract.
+ *
+ * This must NOT be retried: this module's callers operate under the badge
+ * route's 3000ms cache-miss latency SLO (`apps/web/lib/monitoring/latency-slo.ts`),
+ * and retrying a timeout would double worst-case latency against that budget.
+ */
+function isCallerAbortError(
+  err: unknown,
+  signal: AbortSignal | null | undefined,
+): boolean {
+  return (
+    err instanceof Error &&
+    (err.name === "AbortError" || err.name === "TimeoutError") &&
+    signal?.aborted === true
+  );
+}
+
+/**
  * Fetch with bounded jittered retry for idempotent reads.
  *
  * - Retries once on 5xx (total: 2 attempts).
  * - Does NOT retry 4xx (auth failures, rate-limit 429 = 4xx → no retry for 429).
+ * - Retries once on a rejected fetch promise caused by a network failure
+ *   (connection reset, DNS failure, etc.). Caller-triggered AbortError and
+ *   TimeoutError rejections propagate immediately without retrying (see
+ *   `isCallerAbortError`, #1105).
  * - Adds a small jittered delay between attempts to avoid thundering herds.
  */
 export async function fetchWithRetry(
@@ -51,7 +79,22 @@ export async function fetchWithRetry(
       await _retryDelayFn(jitter);
     }
 
-    const res = await fetch(url, init);
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      if (isCallerAbortError(err, init.signal)) {
+        throw err;
+      }
+
+      if (attempt === MAX_RETRY_ATTEMPTS - 1) {
+        // All attempts exhausted — propagate the last error to the caller.
+        throw err;
+      }
+
+      // Retry on the next loop iteration, same as a retryable 5xx.
+      continue;
+    }
 
     if (!isRetryable(res.status)) {
       // 2xx, 4xx (including 429), or any non-5xx → return immediately

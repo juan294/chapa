@@ -3,7 +3,10 @@ import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getSnapshots } from "@/lib/history/history";
-import { compareSnapshots } from "@/lib/history/diff";
+import {
+  compareSnapshots,
+  redactSnapshotDiffForVisitor,
+} from "@/lib/history/diff";
 import { computeTrend } from "@/lib/history/trend";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
@@ -100,7 +103,9 @@ export const GET = withErrorCapture("/api/history/[handle]", async (request: Nex
     if (snapshots.length >= 2) {
       const prev = snapshots[snapshots.length - 2]!;
       const curr = snapshots[snapshots.length - 1]!;
-      response.diff = compareSnapshots(prev, curr);
+      response.diff = redactSnapshotDiffForVisitor(
+        compareSnapshots(prev, curr),
+      );
     } else {
       response.diff = null;
     }

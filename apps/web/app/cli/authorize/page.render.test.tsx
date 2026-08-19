@@ -43,8 +43,12 @@ vi.mock("./AuthorizeClient", () => ({
 }));
 
 // Mock @/lib/i18n to avoid importing client-side React hooks (useRouter etc.)
+// LocaleSync renders a detectable marker (rather than null) so tests can
+// confirm it's actually mounted on the page, not just imported.
 vi.mock("@/lib/i18n", () => ({
-  LocaleSync: () => null,
+  LocaleSync: ({ queryLang }: { queryLang?: string }) => (
+    <span data-testid="locale-sync" data-query-lang={queryLang ?? ""} />
+  ),
   LanguageProvider: (props: { children: unknown }) => props.children,
   LanguageContext: null,
   useTranslation: () => ({
@@ -117,6 +121,36 @@ describe("CliAuthorizePage", () => {
   it("does not redirect when session param is missing", async () => {
     await renderPage({});
     expect(mockRedirect).not.toHaveBeenCalled();
+  });
+
+  it("has a main landmark with id=main-content", async () => {
+    const { container } = await renderPage({});
+    expect(container.querySelector("#main-content")).not.toBeNull();
+  });
+
+  it("renders the missing-session message as an h1 heading", async () => {
+    await renderPage({});
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toBe("Authorize Chapa CLI");
+  });
+
+  it("applies design-system tokens to the missing-session card", async () => {
+    const { container } = await renderPage({});
+    const main = container.querySelector("#main-content");
+    expect(main?.className).toContain("bg-bg");
+    const card = main?.querySelector(":scope > div");
+    expect(card?.className).toContain("bg-card");
+    expect(card?.className).toContain("border-stroke");
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.className).toContain("font-heading");
+    const errorText = screen.getByText(/Missing session parameter/);
+    expect(errorText.className).toContain("text-terminal-red");
+  });
+
+  it("mounts LocaleSync with the query lang param", async () => {
+    await renderPage({ lang: "es" });
+    const sync = screen.getByTestId("locale-sync");
+    expect(sync.getAttribute("data-query-lang")).toBe("es");
   });
 
   // ─── Missing NEXTAUTH_SECRET ──────────────────────────────────────────

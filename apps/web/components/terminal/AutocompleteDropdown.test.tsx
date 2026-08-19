@@ -43,140 +43,133 @@ describe("AutocompleteDropdown", () => {
     });
   });
 
-  describe("terminal layout", () => {
-    it("uses compact padding on items (py-1.5, not py-2.5)", () => {
-      expect(SOURCE).toContain("py-1.5");
-      expect(SOURCE).not.toContain("py-2.5");
-    });
-
-    it("uses terminal font (font-terminal) on the entire dropdown", () => {
-      expect(SOURCE).toContain("font-terminal");
-    });
-
-    it("uses same font size for command name and description (text-sm)", () => {
-      // Both should be text-sm, no text-xs on description
-      expect(SOURCE).not.toContain("text-xs");
-    });
-
-    it("uses fixed-width column for command name to align descriptions", () => {
-      // A min-width or w- class on the command name ensures alignment
-      expect(SOURCE).toMatch(/min-w-|w-\[/);
-    });
-  });
-
-  describe("keyboard event handling", () => {
-    it("uses capture phase for keydown listener to intercept before TerminalInput", () => {
-      // The third argument `true` enables capture phase
-      expect(SOURCE).toContain("addEventListener(\"keydown\", handleKeyDown, true)");
-    });
-
-    it("removes listener with capture phase flag", () => {
-      expect(SOURCE).toContain("removeEventListener(\"keydown\", handleKeyDown, true)");
-    });
-
-    it("stops propagation on arrow keys to prevent TerminalInput history handling", () => {
-      expect(SOURCE).toContain("stopPropagation");
-    });
-
-    it("handles Escape key to dismiss dropdown via onDismiss callback", () => {
-      // Escape should call onDismiss and stopPropagation so TerminalInput doesn't clear input
-      expect(SOURCE).toContain("onDismiss");
-      expect(SOURCE).toMatch(/Escape/);
-    });
-  });
-
-  describe("dismiss behavior", () => {
-    it("accepts an onDismiss prop", () => {
-      expect(SOURCE).toContain("onDismiss");
-    });
-
-    it("listens for mousedown on document to dismiss on click-outside", () => {
-      // Should add a mousedown listener to detect clicks outside the dropdown
-      expect(SOURCE).toContain('"mousedown"');
-    });
-
-    it("uses a ref to detect clicks outside the dropdown container", () => {
-      // Needs a ref on the container to check if click target is inside
-      expect(SOURCE).toContain("useRef");
-      expect(SOURCE).toContain("containerRef");
-      expect(SOURCE).toContain(".contains(");
-    });
-
-    it("calls onDismiss when clicking outside", () => {
-      // The mousedown handler should call onDismiss for outside clicks
-      expect(SOURCE).toMatch(/onDismiss/);
-    });
-  });
-
-  describe("Tab vs Enter distinction", () => {
-    it("accepts an onFill prop for Tab completion", () => {
-      expect(SOURCE).toContain("onFill");
-    });
-
-    it("calls onFill (not onSelect) on Tab key", () => {
-      // Tab should fill the command into input, not execute it
-      // The Tab branch should reference onFill
-      expect(SOURCE).toMatch(/Tab[\s\S]*onFill|onFill[\s\S]*Tab/);
-    });
-
-    it("calls onSelect on Enter key (execute)", () => {
-      // Enter should execute (select) the command
-      expect(SOURCE).toMatch(/Enter[\s\S]*onSelect|onSelect[\s\S]*Enter/);
-    });
-
-    it("Tab and Enter are handled in separate branches", () => {
-      // They should NOT be combined in the same condition anymore
-      expect(SOURCE).not.toMatch(
-        /e\.key === "Tab" \|\| e\.key === "Enter"/,
+  describe("terminal layout (runtime)", () => {
+    it("uses compact padding on option items (py-1.5, not py-2.5)", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/h"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
       );
+      const options = screen.getAllByRole("option");
+      expect(options[0]!.className).toContain("py-1.5");
+      expect(options[0]!.className).not.toContain("py-2.5");
+    });
+
+    it("uses terminal font on the dropdown container", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/h"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      const listbox = screen.getByRole("listbox");
+      expect(listbox.className).toContain("font-terminal");
+    });
+
+    it("command name, description, and usage hint share the same font size (no text-xs override)", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/he"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      const options = screen.getAllByRole("option");
+      const spans = options[0]!.querySelectorAll("span");
+      spans.forEach((span) => {
+        expect(span.className).not.toContain("text-xs");
+      });
+    });
+
+    it("uses a fixed-width column for the command name to align descriptions", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/h"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      const options = screen.getAllByRole("option");
+      const nameSpan = options[0]!.querySelector("span");
+      expect(nameSpan!.className).toMatch(/min-w-|w-\[/);
     });
   });
 
-  describe("argument hints", () => {
-    it("renders usage hint from command definition", () => {
-      // Should display cmd.usage when available
-      expect(SOURCE).toContain("cmd.usage");
-    });
-
-    it("uses dim styling for usage hints", () => {
-      // Hints should be visually distinct (dimmer) from the description
-      expect(SOURCE).toMatch(/text-text-secondary|text-terminal-dim/);
+  describe("argument hints (runtime)", () => {
+    it("uses dim styling for the usage hint, distinct from the description", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/he"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      const options = screen.getAllByRole("option");
+      const spans = options[0]!.querySelectorAll("span");
+      const usageSpan = spans[spans.length - 1]!;
+      expect(usageSpan.textContent).toBe("[topic]");
+      expect(usageSpan.className).toMatch(/text-text-secondary|text-terminal-dim/);
     });
   });
 
   describe("alias support via getMatchingCommands (issue #118)", () => {
-    it("imports getMatchingCommands from command-registry", () => {
-      expect(SOURCE).toContain("getMatchingCommands");
-    });
-
-    it("does NOT have inline c.name.startsWith filter", () => {
-      expect(SOURCE).not.toContain("c.name.startsWith");
+    it("matches commands by alias, not just by name prefix", () => {
+      const commandsWithAlias: CommandDef[] = [
+        ...testCommands,
+        { name: "/exit", aliases: ["/q"], description: "Quit terminal", execute: noop },
+      ];
+      render(
+        <AutocompleteDropdown
+          commands={commandsWithAlias}
+          partial="/q"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      // "/exit" does not start with "/q" — it only matches via its alias,
+      // which is only possible through getMatchingCommands' alias-aware
+      // filtering, not an inline c.name.startsWith check.
+      expect(screen.getByText("/exit")).toBeDefined();
     });
   });
 
-  describe("accessibility", () => {
-    it("has listbox role", () => {
-      expect(SOURCE).toContain('role="listbox"');
+  describe("accessibility (runtime)", () => {
+    it("renders options as non-interactive <div> elements, not <button> (#421)", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/h"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      const options = screen.getAllByRole("option");
+      options.forEach((option) => {
+        expect(option.tagName).toBe("DIV");
+      });
     });
 
-    it("has option role on items", () => {
-      expect(SOURCE).toContain('role="option"');
-    });
-
-    it("marks active item with aria-selected", () => {
-      expect(SOURCE).toContain("aria-selected");
-    });
-
-    it("options use <div> not <button> (listbox children must not be interactive elements) (#421)", () => {
-      // role="option" elements inside a role="listbox" should not be
-      // interactive elements like <button>. Use <div role="option"> instead.
-      expect(SOURCE).not.toMatch(/<button[^>]*role="option"/);
-      expect(SOURCE).toMatch(/<div[^>]*role="option"/);
-    });
-
-    it("options have tabIndex={-1} for programmatic focus", () => {
-      // div[role="option"] elements need tabIndex so they can be focused programmatically
-      expect(SOURCE).toMatch(/role="option"[\s\S]*?tabIndex=\{-1\}/);
+    it("sets tabIndex={-1} on options for programmatic focus", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/h"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      const options = screen.getAllByRole("option");
+      options.forEach((option) => {
+        expect(option.getAttribute("tabindex")).toBe("-1");
+      });
     });
   });
 
@@ -421,6 +414,51 @@ describe("AutocompleteDropdown", () => {
         );
       });
       expect(onDismiss).toHaveBeenCalledOnce();
+    });
+
+    it("intercepts arrow keys in the capture phase, stopping propagation to other document listeners", () => {
+      render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/h"
+          onSelect={vi.fn()}
+          visible={true}
+        />,
+      );
+      const bubbleListener = vi.fn();
+      window.addEventListener("keydown", bubbleListener);
+      act(() => {
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+        );
+      });
+      window.removeEventListener("keydown", bubbleListener);
+
+      // The dropdown's capture-phase handler stops propagation, so a
+      // bubble-phase listener on window (simulating TerminalInput's own
+      // history navigation) never sees the event.
+      expect(bubbleListener).not.toHaveBeenCalled();
+      const options = screen.getAllByRole("option");
+      expect(options[1]!.getAttribute("aria-selected")).toBe("true");
+    });
+
+    it("removes the keydown listener on unmount", () => {
+      const onSelect = vi.fn();
+      const { unmount } = render(
+        <AutocompleteDropdown
+          commands={testCommands}
+          partial="/h"
+          onSelect={onSelect}
+          visible={true}
+        />,
+      );
+      unmount();
+      act(() => {
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        );
+      });
+      expect(onSelect).not.toHaveBeenCalled();
     });
 
     it("ignores keyboard events when not visible", () => {

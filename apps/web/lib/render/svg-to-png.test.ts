@@ -1,25 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 
 // ---------------------------------------------------------------------------
 // Mock @resvg/resvg-js BEFORE importing the module under test.
 // vi.hoisted() ensures these are available inside the vi.mock factory.
+//
+// PE-M5 (#1090): svgToPng now uses resvg-js's `renderAsync` — a genuinely
+// async native binding offloaded to libuv's threadpool — instead of the
+// synchronous `Resvg.render()`, so the OG-image route's `withTimeout` can
+// actually interrupt a slow rasterization instead of the timeout branch
+// being dead code.
 // ---------------------------------------------------------------------------
 
-const { mockAsPng, mockRender } = vi.hoisted(() => ({
+const { mockAsPng, mockRenderAsync } = vi.hoisted(() => ({
   mockAsPng: vi.fn(),
-  mockRender: vi.fn(),
+  mockRenderAsync: vi.fn(),
 }));
 
 vi.mock("@resvg/resvg-js", () => ({
-  Resvg: vi.fn(function (this: Record<string, unknown>) {
-    this.render = mockRender;
-  }),
+  renderAsync: mockRenderAsync,
 }));
 
 import { svgToPng, stripSvgAnimations, getFontPaths, getFontBuffers } from "./svg-to-png";
-import { Resvg } from "@resvg/resvg-js";
-
-const MockResvg = vi.mocked(Resvg);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -128,41 +130,34 @@ describe("svgToPng", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAsPng.mockReturnValue(FAKE_PNG);
-    mockRender.mockReturnValue({ asPng: mockAsPng });
-    // Restore constructor mock — vi.clearAllMocks removes the implementation.
-    // Cast needed because vi.fn() typing doesn't match `new Resvg(...)` constructor signature.
-    (MockResvg as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-      function (this: { render: typeof mockRender }) {
-        this.render = mockRender;
-      },
-    );
+    mockRenderAsync.mockResolvedValue({ asPng: mockAsPng });
   });
 
-  it("returns a Uint8Array PNG buffer for valid SVG input", () => {
-    const result = svgToPng(MINIMAL_SVG);
+  it("returns a Promise resolving to a Uint8Array PNG buffer for valid SVG input", async () => {
+    const result = await svgToPng(MINIMAL_SVG);
     expect(result).toBeInstanceOf(Uint8Array);
     expect(result).toBe(FAKE_PNG);
   });
 
-  it("creates Resvg with fitTo width mode using the given width", () => {
-    svgToPng(MINIMAL_SVG, 800);
-    expect(MockResvg).toHaveBeenCalledWith(
+  it("calls renderAsync with fitTo width mode using the given width", async () => {
+    await svgToPng(MINIMAL_SVG, 800);
+    expect(mockRenderAsync).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ fitTo: { mode: "width", value: 800 } }),
     );
   });
 
-  it("defaults to width 1200 when no width is provided", () => {
-    svgToPng(MINIMAL_SVG);
-    expect(MockResvg).toHaveBeenCalledWith(
+  it("defaults to width 1200 when no width is provided", async () => {
+    await svgToPng(MINIMAL_SVG);
+    expect(mockRenderAsync).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ fitTo: { mode: "width", value: 1200 } }),
     );
   });
 
-  it("passes font configuration to Resvg using pre-loaded buffers when available (PE-L3)", () => {
-    svgToPng(MINIMAL_SVG);
-    const opts = MockResvg.mock.calls[0]![1] as Record<string, unknown>;
+  it("passes font configuration to renderAsync using pre-loaded buffers when available (PE-L3)", async () => {
+    await svgToPng(MINIMAL_SVG);
+    const opts = mockRenderAsync.mock.calls[0]![1] as Record<string, unknown>;
     const font = opts.font as {
       loadSystemFonts: boolean;
       fontBuffers?: Buffer[];
@@ -185,15 +180,16 @@ describe("svgToPng", () => {
     }
   });
 
-  it("fonts are read at most once across multiple svgToPng calls (PE-L3)", () => {
-    // Call svgToPng three times and verify Resvg is constructed with the same
-    // font config each time — no per-call disk reads (verified by stability of
-    // the font option object, not by mocking readFileSync which is pre-module).
-    svgToPng(MINIMAL_SVG);
-    svgToPng(MINIMAL_SVG);
-    svgToPng(MINIMAL_SVG);
+  it("fonts are read at most once across multiple svgToPng calls (PE-L3)", async () => {
+    // Call svgToPng three times and verify renderAsync is invoked with the
+    // same font config each time — no per-call disk reads (verified by
+    // stability of the font option object, not by mocking readFileSync
+    // which is pre-module).
+    await svgToPng(MINIMAL_SVG);
+    await svgToPng(MINIMAL_SVG);
+    await svgToPng(MINIMAL_SVG);
     const useBuffers = getFontBuffers() !== undefined;
-    for (const call of MockResvg.mock.calls) {
+    for (const call of mockRenderAsync.mock.calls) {
       const font = (call[1] as Record<string, unknown>).font as {
         fontBuffers?: Buffer[];
         fontFiles?: string[];
@@ -206,36 +202,100 @@ describe("svgToPng", () => {
     }
   });
 
-  it("strips animations before passing SVG to Resvg", () => {
+  it("strips animations before passing SVG to renderAsync", async () => {
     const animatedSvg = `<svg><rect opacity="0"/><animate attributeName="x" from="0" to="100" dur="1s"/></svg>`;
-    svgToPng(animatedSvg, 600);
+    await svgToPng(animatedSvg, 600);
 
-    const passedSvg = MockResvg.mock.calls[0]![0] as string;
+    const passedSvg = mockRenderAsync.mock.calls[0]![0] as string;
     expect(passedSvg).not.toContain("<animate");
     expect(passedSvg).not.toContain('opacity="0"');
     expect(passedSvg).toContain('opacity="1"');
   });
 
-  it("calls render() and asPng() on the Resvg instance", () => {
-    svgToPng(MINIMAL_SVG);
-    expect(mockRender).toHaveBeenCalledOnce();
+  it("calls renderAsync() and asPng() on the resolved image", async () => {
+    await svgToPng(MINIMAL_SVG);
+    expect(mockRenderAsync).toHaveBeenCalledOnce();
     expect(mockAsPng).toHaveBeenCalledOnce();
   });
 
-  it("propagates errors from Resvg constructor", () => {
-    (MockResvg as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-      function () {
-        throw new Error("Invalid SVG");
-      },
-    );
-    expect(() => svgToPng("<not-svg>")).toThrow("Invalid SVG");
+  it("propagates errors from renderAsync", async () => {
+    mockRenderAsync.mockRejectedValue(new Error("Invalid SVG"));
+    await expect(svgToPng("<not-svg>")).rejects.toThrow("Invalid SVG");
   });
 
-  it("propagates errors from render()", () => {
-    mockRender.mockImplementation(() => {
+  it("propagates errors from asPng()", async () => {
+    mockAsPng.mockImplementation(() => {
       throw new Error("Render failed");
     });
-    expect(() => svgToPng(MINIMAL_SVG)).toThrow("Render failed");
+    await expect(svgToPng(MINIMAL_SVG)).rejects.toThrow("Render failed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: event-loop non-blocking behavior (#1090 / PE-M5)
+//
+// The core regression this issue targets: the OLD synchronous `Resvg.render()`
+// call ran the entire rasterization on the JS main thread with no yield
+// point. `withTimeout` races the wrapped promise against a `setTimeout`
+// macrotask — but a macrotask can never be serviced while a synchronous
+// call is still running, so the timeout branch was unreachable dead code.
+//
+// `renderAsync` returns a genuinely pending Promise (backed by napi-rs's
+// libuv threadpool offload), so a slow rasterization can actually be
+// interrupted by `withTimeout`. These tests would fail against the old
+// synchronous implementation, because `svgToPng` would resolve immediately
+// (synchronously) regardless of how long the mocked renderAsync claims to
+// take, and `withTimeout`'s race would never reject.
+// ---------------------------------------------------------------------------
+
+describe("svgToPng — non-blocking rasterization (#1090)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAsPng.mockReturnValue(FAKE_PNG);
+  });
+
+  it("allows withTimeout to actually fire when rasterization exceeds the budget", async () => {
+    mockRenderAsync.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ asPng: mockAsPng }), 100);
+        }),
+    );
+
+    await expect(
+      withTimeout(svgToPng(MINIMAL_SVG), 20, "svgToPng"),
+    ).rejects.toThrow(TimeoutError);
+  });
+
+  it("does not resolve before the underlying async render settles", async () => {
+    mockRenderAsync.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ asPng: mockAsPng }), 30);
+        }),
+    );
+
+    const settled = { done: false };
+    const pngPromise = svgToPng(MINIMAL_SVG).then((result) => {
+      settled.done = true;
+      return result;
+    });
+
+    // A concurrent timer scheduled after svgToPng is called must still be
+    // able to run while rasterization is in flight — proving the call does
+    // not block the event loop synchronously.
+    let concurrentTimerRan = false;
+    setTimeout(() => {
+      concurrentTimerRan = true;
+    }, 5);
+
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(concurrentTimerRan).toBe(true);
+    expect(settled.done).toBe(false);
+
+    const result = await pngPromise;
+    expect(result).toBe(FAKE_PNG);
+    expect(settled.done).toBe(true);
   });
 });
 
@@ -253,17 +313,15 @@ describe("svgToPng — font buffer load failure fallback", () => {
     }));
 
     const mod = await import("./svg-to-png");
-    const { Resvg: FreshResvg } = await import("@resvg/resvg-js");
-    const FreshMockResvg = vi.mocked(FreshResvg);
-    FreshMockResvg.mockImplementation(function (this: { render: () => unknown }) {
-      this.render = () => ({ asPng: () => FAKE_PNG });
-    });
+    const { renderAsync: freshRenderAsync } = await import("@resvg/resvg-js");
+    const freshMockRenderAsync = vi.mocked(freshRenderAsync);
+    freshMockRenderAsync.mockResolvedValue({ asPng: () => FAKE_PNG } as never);
 
     expect(mod.getFontBuffers()).toBeUndefined();
 
-    const result = mod.svgToPng(MINIMAL_SVG);
+    const result = await mod.svgToPng(MINIMAL_SVG);
     expect(result).toBeInstanceOf(Uint8Array);
-    const font = FreshMockResvg.mock.calls.at(-1)![1]!.font as {
+    const font = freshMockRenderAsync.mock.calls.at(-1)![1]!.font as {
       loadSystemFonts: boolean;
       fontBuffers?: Buffer[];
       fontFiles?: string[];

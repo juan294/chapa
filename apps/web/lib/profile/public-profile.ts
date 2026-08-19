@@ -1,6 +1,6 @@
-import { captureServerError, captureServerEvent } from "@/lib/analytics/server-errors";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
-import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
+import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
+import { captureServerError } from "@/lib/analytics/server-errors";
+import { cacheDel, cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
 import { dbUpsertUser } from "@/lib/db/users";
 import { notifyFirstBadge } from "@/lib/email/notifications";
@@ -11,11 +11,34 @@ import {
   materializeProfile,
   type MaterializedProfile,
 } from "./materialize-profile";
+import { guardStatsComplete } from "./persist-guard";
 import { reconcileSnapshotWrite } from "./snapshot-write";
 
 export interface PublicVerificationCode {
   hash: string;
   date: string;
+}
+
+/**
+ * Strip owner-only confidence data before an `ImpactV6Result` crosses into a
+ * "use client" component's serialized props for a non-owner share-page
+ * visitor (#1067 FE-M1). Whatever is passed as a client-component prop is
+ * serialized into the RSC payload the browser downloads regardless of
+ * whether any component renders it — a client-side `isOwner` display gate is
+ * not sufficient on its own.
+ *
+ * Returns a NEW object; never mutates `impact`. The same
+ * `MaterializedProfile.displayImpact` reference this is called on also feeds
+ * the persisted snapshot and the HMAC verification record in the same
+ * request (see `runPublicProfileSideEffects` / `buildVerificationRecord`
+ * above), both of which require the real confidence value.
+ */
+export function redactImpactForVisitor(
+  impact: ImpactV6Result,
+): PublicImpactV6Result {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...publicImpact } = impact;
+  return publicImpact;
 }
 
 export async function materializePublicProfile(
@@ -99,18 +122,7 @@ export async function persistProfileSnapshot(
 ): Promise<boolean> {
   if (options.readOnly) return false;
 
-  // #1003 — Never build a permanent snapshot row from stats that look
-  // incomplete (e.g. served from an old poisoned `stats:stale` entry).
-  if (!materialized.statsComplete) {
-    fireAndForget(
-      () =>
-        captureServerEvent("snapshot_skipped_incomplete_stats", {
-          handle,
-          prsMergedCount: materialized.stats.prsMergedCount,
-          commitsTotal: materialized.stats.commitsTotal,
-        }),
-      () => undefined,
-    );
+  if (!guardStatsComplete(handle, materialized)) {
     return false;
   }
 
@@ -120,10 +132,8 @@ export async function persistProfileSnapshot(
   // #826 — When inputs have legitimately changed mid-day (supplemental upload),
   // bypass the guard so today's snapshot can be replaced with the fresh score.
   const today = new Date().toISOString().slice(0, 10);
-  const guardStatus = await cacheSetNxStatus(
-    `sideeffects:done:${handle}:${today}`,
-    86400,
-  );
+  const guardKey = `sideeffects:done:${handle}:${today}`;
+  const guardStatus = await cacheSetNxStatus(guardKey, 86400);
   if (guardStatus === "exists" && !materialized.inputsChanged) return false;
 
   // #826 — replace today's row when inputs changed; otherwise insert and
@@ -149,6 +159,15 @@ export async function persistProfileSnapshot(
       statusCode: 200,
       error: new Error(`Failed to persist profile snapshot for handle: ${handle}`),
     });
+
+    // #1081 — The SETNX day-guard above was already claimed for this
+    // handle+day before the durable write ran. A genuine write failure must
+    // release it (rather than leaving it in place until its 24h TTL expires)
+    // so the NEXT badge request today retries the write instead of silently
+    // forfeiting the rest of the day's snapshot history to the next
+    // warm-cache rotation. "inserted" and "duplicate" are correct terminal
+    // states and must NOT release the guard.
+    void cacheDel(guardKey);
   }
 
   if (persisted && materialized.inputsChanged) {
@@ -165,6 +184,7 @@ export async function deferProfileCacheWork(
     verification?: PublicVerificationCode | null;
     readOnly?: boolean;
     sendFirstBadgeNotification?: boolean;
+    verificationOnly?: boolean;
   } = {},
 ): Promise<void> {
   if (options.readOnly) return;
@@ -180,6 +200,15 @@ export async function deferProfileCacheWork(
         buildVerificationRecord(materialized, verification),
       ),
     );
+  }
+
+  // Snapshot persistence is deduplicated once per day, but the rendered
+  // verification hash can still change after a refresh or linked-platform
+  // update. Store that hash without repeating telemetry, notifications, or
+  // user metadata writes that already ran for today's snapshot.
+  if (options.verificationOnly) {
+    await Promise.allSettled(ops);
+    return;
   }
 
   ops.push(trackBadgeGenerated(handle));

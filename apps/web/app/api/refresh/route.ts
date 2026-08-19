@@ -13,6 +13,10 @@ import {
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
+import {
+  deferProfileCacheWork,
+  getPublicProfileVerification,
+} from "@/lib/profile/public-profile";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -85,6 +89,21 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
+  // #1076 — persistOrchestratedSnapshot's #1003 gate would refuse to persist
+  // stats that look incomplete/poisoned anyway (and already emits its own
+  // snapshot_skipped_incomplete_stats telemetry); check it here so the
+  // intentional skip (422) is distinguishable from a genuine write failure
+  // (500) up front, rather than inferring the reason from a bare `!persisted`.
+  if (!materialized.statsComplete) {
+    return NextResponse.json(
+      {
+        error: "Refreshed data looks incomplete and was not saved. Try again later.",
+        reason: "stats_incomplete",
+      },
+      { status: 422 },
+    );
+  }
+
   const persisted = await persistOrchestratedSnapshot(handle, materialized, {
     mode: "replace",
   });
@@ -100,6 +119,14 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
       { status: 500 },
     );
   }
+
+  // A refresh can produce a new verification hash after today's snapshot
+  // side-effect guard has already run. Store that hash now without repeating
+  // badge telemetry, notifications, or user metadata writes.
+  await deferProfileCacheWork(handle, materialized, {
+    verification: getPublicProfileVerification(materialized),
+    verificationOnly: true,
+  });
 
   // Post-persist invalidation: clear the artifacts derived from the snapshot
   // just written. Deliberately separate from the pre-fetch call above, which

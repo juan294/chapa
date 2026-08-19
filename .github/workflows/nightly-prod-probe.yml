@@ -10,6 +10,8 @@ jobs:
     name: Read-only prod probe
     runs-on: ubuntu-latest
     env:
+      DEBIAN_FRONTEND: noninteractive
+      NEEDRESTART_MODE: a
       DEPLOYMENT_SMOKE_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
       PLAYWRIGHT_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
       DEPLOYMENT_SMOKE_STRICT: "true"

@@ -7,162 +7,29 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+// Export shape, prop types (guarded by typecheck via the render test's
+// typed usage), table structure, the master/individual toggle rows,
+// pending/disabled state, aria-checked/aria-label wiring, and all
+// styling classes are exercised behaviorally by
+// agent-toggles-table.render.test.tsx. React's `key` prop is consumed
+// internally by the reconciler and never appears on rendered DOM, so
+// "uses agent key as React key" had no behavioral equivalent to convert
+// to and was removed as a no-op. Whether pending state is tracked via an
+// internal ToggleSwitch sub-component or inlined is an implementation
+// choice with no observable difference once the switch's rendered
+// role/aria-checked/aria-label/disabled behavior is covered, so that
+// check was also removed as a duplicate.
 describe("AgentTogglesTable", () => {
-  describe("exports", () => {
-    it("exports a named AgentTogglesTable component", () => {
-      expect(SOURCE).toContain("export function AgentTogglesTable");
-    });
-
-    it("is a client component", () => {
-      expect(SOURCE).toContain('"use client"');
-    });
+  it("is a client component", () => {
+    expect(SOURCE).toContain('"use client"');
   });
 
-  describe("props interface", () => {
-    it("accepts agents array", () => {
-      expect(SOURCE).toContain("agents: AgentStatus[]");
-    });
-
-    it("accepts masterEnabled boolean", () => {
-      expect(SOURCE).toContain("masterEnabled: boolean");
-    });
-
-    it("accepts onToggle async callback", () => {
-      expect(SOURCE).toContain(
-        "onToggle: (key: string, enabled: boolean) => Promise<void>",
-      );
-    });
-  });
-
-  describe("table structure", () => {
-    it("renders a table element", () => {
-      expect(SOURCE).toContain("<table");
-    });
-
-    it("has Agent column header", () => {
-      expect(SOURCE).toContain("Agent");
-    });
-
-    it("has Schedule column header", () => {
-      expect(SOURCE).toContain("Schedule");
-    });
-
-    it("has Status column header", () => {
-      expect(SOURCE).toContain("Status");
-    });
-
-    it("uses uppercase tracking-wider on headers", () => {
-      expect(SOURCE).toContain("uppercase tracking-wider");
-    });
-  });
-
-  describe("master toggle row", () => {
-    it("renders a master toggle row for all agents", () => {
-      expect(SOURCE).toContain("All Agents (master)");
-    });
-
-    it("highlights master row with purple tint", () => {
-      expect(SOURCE).toContain("bg-purple-tint");
-    });
-
-    it("uses amber color for master label", () => {
-      expect(SOURCE).toContain("text-amber");
-    });
-
-    it("sends automated_agents key for master toggle", () => {
-      expect(SOURCE).toContain('"automated_agents"');
-    });
-  });
-
-  describe("individual agent rows", () => {
-    it("maps over agents array", () => {
-      expect(SOURCE).toContain("agents.map");
-    });
-
-    it("renders agent label", () => {
-      expect(SOURCE).toContain("{agent.label}");
-    });
-
-    it("renders agent schedule", () => {
-      expect(SOURCE).toContain("{agent.schedule}");
-    });
-
-    it("uses agent key as React key", () => {
-      expect(SOURCE).toContain("key={agent.key}");
-    });
-  });
-
-  describe("pending state", () => {
-    it("tracks pending state for toggle operations", () => {
-      expect(SOURCE).toContain("useState<string | null>(null)");
-    });
-
-    it("sets pending before calling onToggle", () => {
-      expect(SOURCE).toContain("setPending(key)");
-    });
-
-    it("clears pending after onToggle completes", () => {
-      expect(SOURCE).toContain("setPending(null)");
-    });
-
-    it("uses try/finally to ensure pending is cleared", () => {
-      expect(SOURCE).toContain("finally");
-    });
-  });
-
-  describe("ToggleSwitch sub-component", () => {
-    it("defines an internal ToggleSwitch component", () => {
-      expect(SOURCE).toContain("function ToggleSwitch");
-    });
-
-    it("uses role=switch for accessibility", () => {
-      expect(SOURCE).toContain('role="switch"');
-    });
-
-    it("sets aria-checked based on enabled state", () => {
-      expect(SOURCE).toContain("aria-checked={enabled}");
-    });
-
-    it("has aria-label for accessibility", () => {
-      expect(SOURCE).toContain("aria-label={label}");
-    });
-
-    it("is disabled when loading", () => {
-      expect(SOURCE).toContain("disabled={loading}");
-    });
-
-    it("toggles to opposite value on click", () => {
-      expect(SOURCE).toContain("onToggle(!enabled)");
-    });
-
-    it("uses amber background when enabled", () => {
-      expect(SOURCE).toContain('enabled ? "bg-amber"');
-    });
-
-    it("translates knob based on enabled state", () => {
-      expect(SOURCE).toContain("translate-x-4");
-      expect(SOURCE).toContain("translate-x-0.5");
-    });
-
-    it("shows reduced opacity when loading", () => {
-      expect(SOURCE).toContain("opacity-50");
-      expect(SOURCE).toContain("cursor-not-allowed");
-    });
-  });
-
-  describe("responsive design", () => {
-    it("hides Schedule column on small screens", () => {
-      expect(SOURCE).toContain("hidden sm:table-cell");
-    });
-  });
-
-  describe("styling", () => {
-    it("uses card styling for the container", () => {
-      expect(SOURCE).toContain("rounded-xl border border-stroke bg-card");
-    });
-
-    it("uses border-stroke for row dividers", () => {
-      expect(SOURCE).toContain("border-b border-stroke");
-    });
+  it("uses try/finally to ensure pending is cleared even if onToggle rejects", () => {
+    // The render suite covers the happy path (pending clears once the
+    // returned promise resolves). Driving a real rejected onToggle
+    // through fireEvent would require either an unhandled-rejection
+    // workaround or a production-code change to swallow the error, so
+    // the failure-path robustness of try/finally stays a source check.
+    expect(SOURCE).toContain("finally");
   });
 });

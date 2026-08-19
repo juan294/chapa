@@ -82,6 +82,22 @@ describe("AgentStatusGrid", () => {
     expect(grid!.children).toHaveLength(0);
   });
 
+  it("uses a responsive grid layout with a gap between cards", () => {
+    const { container } = render(
+      <AgentStatusGrid
+        agents={[]}
+        runningAgent={null}
+        onRun={vi.fn()}
+        onStop={vi.fn()}
+      />,
+    );
+    const grid = container.firstElementChild;
+    expect(grid?.className).toContain("grid-cols-1");
+    expect(grid?.className).toContain("sm:grid-cols-2");
+    expect(grid?.className).toContain("lg:grid-cols-3");
+    expect(grid?.className).toContain("gap-4");
+  });
+
   it("passes onRun and onStop callbacks through to AgentCard", () => {
     const onRun = vi.fn();
     const onStop = vi.fn();

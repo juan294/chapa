@@ -30,11 +30,28 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html lang="en">
+    // DEFAULT_LOCALE ('es') — this page can't reach the i18n provider (see note above),
+    // so the document lang matches the app default rather than a hardcoded "en".
+    <html lang="es">
+      <head>
+        {/*
+          No Tailwind/next-themes here (global-error replaces the root layout), so
+          light/dark is done with a plain inline prefers-color-scheme media query.
+          Values mirror design-system.md's --color-bg / --color-text-primary /
+          --color-text-secondary tokens (light default, dark override).
+        */}
+        <style>{`
+          .global-error-body { background-color: #FFFFFF; color: #1A1A2E; }
+          .global-error-subtext { color: #6B7280; }
+          @media (prefers-color-scheme: dark) {
+            .global-error-body { background-color: #0A0A0F; color: #E2E4E9; }
+            .global-error-subtext { color: #6B6F7B; }
+          }
+        `}</style>
+      </head>
       <body
+        className="global-error-body"
         style={{
-          backgroundColor: "#0A0A0F",
-          color: "#E2E4E9",
           fontFamily: "system-ui, sans-serif",
           margin: 0,
         }}
@@ -60,17 +77,19 @@ export default function GlobalError({
               margin: 0,
             }}
           >
-            {/* Bilingual: global-error replaces root layout — i18n provider unavailable */}
-            Algo salió mal / Something went wrong
+            {/* Bilingual: global-error replaces root layout — i18n provider unavailable.
+                Each language gets its own lang span rather than one blanket lang="en". */}
+            <span lang="es">Algo salió mal</span> / <span lang="en">Something went wrong</span>
           </h1>
           <p
+            className="global-error-subtext"
             style={{
               marginTop: "1rem",
               fontSize: "0.875rem",
-              color: "#6B6F7B",
             }}
           >
-            Ocurrió un error crítico. Por favor, inténtalo de nuevo. / A critical error occurred. Please try again.
+            <span lang="es">Ocurrió un error crítico. Por favor, inténtalo de nuevo.</span>{" "}
+            / <span lang="en">A critical error occurred. Please try again.</span>
           </p>
           <div
             style={{
@@ -93,7 +112,7 @@ export default function GlobalError({
                 cursor: "pointer",
               }}
             >
-              Intentar de nuevo / Try again
+              <span lang="es">Intentar de nuevo</span> / <span lang="en">Try again</span>
             </button>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error replaces root layout; next/link may not be available */}
             <a
@@ -109,7 +128,7 @@ export default function GlobalError({
                 cursor: "pointer",
               }}
             >
-              Volver al inicio / Go home
+              <span lang="es">Volver al inicio</span> / <span lang="en">Go home</span>
             </a>
           </div>
         </main>

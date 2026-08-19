@@ -55,6 +55,14 @@ describe("CrossAgentInsights render", () => {
       render(<CrossAgentInsights entries={[]} />);
       expect(screen.getByText(/agents\/insights/)).toBeDefined();
     });
+
+    it("uses card styling on the empty-state container", () => {
+      const { container } = render(<CrossAgentInsights entries={[]} />);
+      const root = container.firstElementChild;
+      expect(root?.className).toContain("rounded-xl");
+      expect(root?.className).toContain("border-stroke");
+      expect(root?.className).toContain("bg-card");
+    });
   });
 
   describe("with entries", () => {
@@ -66,6 +74,20 @@ describe("CrossAgentInsights render", () => {
       expect(buttons.length).toBe(2);
       expect(buttons[0]?.textContent).toBe("coverage");
       expect(buttons[1]?.textContent).toBe("security");
+    });
+
+    it("uses card styling on the container with a bottom border on the pill bar", () => {
+      const { container } = render(
+        <CrossAgentInsights entries={[coverageEntry, securityEntry]} />,
+      );
+      const root = container.firstElementChild;
+      expect(root?.className).toContain("rounded-xl");
+      expect(root?.className).toContain("border-stroke");
+      expect(root?.className).toContain("bg-card");
+
+      const pillBar = screen.getAllByRole("button")[0]?.parentElement;
+      expect(pillBar?.className).toContain("border-b");
+      expect(pillBar?.className).toContain("border-stroke");
     });
 
     it("selects first agent by default", () => {

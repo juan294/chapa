@@ -64,6 +64,69 @@ describe("fetchWithRetry", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(res.status).toBe(500);
   });
+
+  it("retries once when fetch rejects with a network-level error and returns the successful 2nd response (#1105)", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const res = await fetchWithRetry("https://example.com/api", {});
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(res.status).toBe(200);
+  });
+
+  it("propagates the error after exhausting retries when fetch keeps rejecting with network-level errors (#1105)", async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      fetchWithRetry("https://example.com/api", {}),
+    ).rejects.toThrow("fetch failed");
+
+    // MAX_RETRY_ATTEMPTS = 2 (1 initial + 1 retry)
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry when fetch throws an AbortError from the caller's own timeout signal (#1105)", async () => {
+    // Simulates AbortSignal.timeout() having already fired before/during the
+    // fetch call — the same shape callers like fetchContributionData() use.
+    const controller = new AbortController();
+    controller.abort();
+    const signal = controller.signal;
+
+    const mockFetch = vi
+      .fn()
+      .mockRejectedValue(new DOMException("The operation was aborted.", "AbortError"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      fetchWithRetry("https://example.com/api", { signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    // No retry — retrying a deliberate timeout would double worst-case
+    // latency against the badge route's 3000ms cache-miss SLO.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT retry the native TimeoutError from AbortSignal.timeout", async () => {
+    const signal = AbortSignal.timeout(1);
+    await new Promise<void>((resolve) => {
+      signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    expect(signal.reason).toMatchObject({ name: "TimeoutError" });
+
+    const mockFetch = vi.fn().mockRejectedValue(signal.reason);
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      fetchWithRetry("https://example.com/api", { signal }),
+    ).rejects.toMatchObject({ name: "TimeoutError" });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("sanitizeLogBody", () => {

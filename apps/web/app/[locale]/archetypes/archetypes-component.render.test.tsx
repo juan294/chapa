@@ -258,6 +258,7 @@ describe("Archetype pages — [locale] route param rendering", () => {
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("El arquetipo Marathoner");
     expect(meta.description).toBe("Los Marathoner aparecen cada dia.");
+    expect(meta.alternates?.canonical).toBe("/archetypes/marathoner");
   });
 
   it("PolymathPage generateMetadata returns locale-aware metadata", async () => {
@@ -271,6 +272,7 @@ describe("Archetype pages — [locale] route param rendering", () => {
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("El arquetipo Polymath");
     expect(meta.description).toBe("Los Polymath extienden su impacto.");
+    expect(meta.alternates?.canonical).toBe("/archetypes/polymath");
   });
 });
 
@@ -286,6 +288,7 @@ describe("generateMetadata — [locale] route param", () => {
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("El arquetipo Builder");
     expect(meta.description).toBe("Los Builder son el motor.");
+    expect(meta.alternates?.canonical).toBe("/archetypes/builder");
   });
 
   it("GuardianPage generates metadata from the [locale] route param", async () => {
@@ -299,6 +302,7 @@ describe("generateMetadata — [locale] route param", () => {
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("El arquetipo Quality Champion");
     expect(meta.description).toBe("Los Quality Champion lideran la disciplina.");
+    expect(meta.alternates?.canonical).toBe("/archetypes/guardian");
   });
 
   it("BalancedPage generates metadata from the [locale] route param", async () => {
@@ -311,6 +315,7 @@ describe("generateMetadata — [locale] route param", () => {
     const { generateMetadata } = await import("./balanced/page");
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("El arquetipo Balanced");
+    expect(meta.alternates?.canonical).toBe("/archetypes/balanced");
   });
 
   it("ArtificerPage generates metadata from the [locale] route param", async () => {
@@ -324,6 +329,7 @@ describe("generateMetadata — [locale] route param", () => {
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("El arquetipo Artificer");
     expect(meta.description).toBe("Los Artificer aprovechan la IA.");
+    expect(meta.alternates?.canonical).toBe("/archetypes/artificer");
   });
 
   it("EmergingPage generates locale-aware metadata", async () => {
@@ -337,6 +343,42 @@ describe("generateMetadata — [locale] route param", () => {
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("El arquetipo Emerging");
     expect(meta.description).toBe("Los Emerging estan construyendo impulso.");
+    expect(meta.alternates?.canonical).toBe("/archetypes/emerging");
+  });
+});
+
+// Structural/behavioral checks that source-text assertions in
+// archetypes-render.test.ts and archetypes-scoring-signals.test.ts
+// previously covered by regexing ArchetypePage.tsx/ArchetypePageClient.tsx
+// source — converted to real render+query assertions against the actual
+// mocked component tree (#1104).
+describe("ArchetypePage — structure and links (render)", () => {
+  it("renders the badge as an accessible role=img with the mocked SVG content, inside an article, under the main-content landmark, alongside the lazy command bar", async () => {
+    const { ArchetypePage } = await import("./_components/ArchetypePage");
+    await renderServerComponent(ArchetypePage, { archetypeKey: "builder", locale: "en" });
+
+    const main = document.getElementById("main-content");
+    expect(main).not.toBeNull();
+    expect(main?.querySelector("article")).not.toBeNull();
+
+    const badge = screen.getByRole("img");
+    expect(badge.getAttribute("aria-label")).toBe(
+      "Example Chapa badge for The Builder archetype",
+    );
+    expect(screen.getByTestId("mock-badge")).toBeDefined();
+
+    expect(screen.getByTestId("command-bar-lazy")).toBeDefined();
+  });
+
+  it("links back to features and to the scoring methodology page", async () => {
+    const { ArchetypePage } = await import("./_components/ArchetypePage");
+    await renderServerComponent(ArchetypePage, { archetypeKey: "builder", locale: "en" });
+
+    const backLink = screen.getByText("Back to features").closest("a");
+    expect(backLink?.getAttribute("href")).toBe("/#features");
+
+    const methodologyLink = screen.getByText("Full scoring methodology").closest("a");
+    expect(methodologyLink?.getAttribute("href")).toBe("/about/scoring");
   });
 });
 

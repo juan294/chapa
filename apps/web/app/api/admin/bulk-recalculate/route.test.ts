@@ -5,7 +5,7 @@ import { POST } from "./route";
 const {
   mockRateLimit,
   mockGetClientIp,
-  mockDbGetUsers,
+  mockDbGetUserHandlePage,
   mockMaterializeOrchestratedProfile,
   mockPersistOrchestratedSnapshot,
   mockVerifyAdminSecret,
@@ -14,7 +14,7 @@ const {
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
-  mockDbGetUsers: vi.fn(),
+  mockDbGetUserHandlePage: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
   mockPersistOrchestratedSnapshot: vi.fn(),
   mockVerifyAdminSecret: vi.fn(),
@@ -31,7 +31,8 @@ vi.mock("@/lib/http/client-ip", () => ({
 }));
 
 vi.mock("@/lib/db/users", () => ({
-  dbGetUsers: (...args: unknown[]) => mockDbGetUsers(...args),
+  dbGetUserHandlePage: (...args: unknown[]) =>
+    mockDbGetUserHandlePage(...args),
 }));
 
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
@@ -80,6 +81,7 @@ const FAKE_MATERIALIZED = {
     computedAt: "2026-04-17T12:00:00.000Z",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 42, tier: "Solid" },
+  statsComplete: true,
 };
 
 const VALID_SECRET = "test-admin-secret";
@@ -105,7 +107,10 @@ describe("POST /api/admin/bulk-recalculate", () => {
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
     mockVerifyAdminSecret.mockReturnValue(null);
-    mockDbGetUsers.mockResolvedValue([{ handle: "alice" }, { handle: "bob" }]);
+    mockDbGetUserHandlePage.mockResolvedValue({
+      handles: ["alice", "bob"],
+      total: 2,
+    });
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
@@ -135,7 +140,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.recalculated).toBe(2);
     expect(body.failed).toBe(0);
     expect(body.total).toBe(2);
-    expect(mockDbGetUsers).toHaveBeenCalled();
+    expect(mockDbGetUserHandlePage).toHaveBeenCalledWith({ limit: 101 });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
       ignoreSnapshot: true,
     });
@@ -162,12 +167,10 @@ describe("POST /api/admin/bulk-recalculate", () => {
   });
 
   it("sorts handles before applying the alphabetical resume cursor", async () => {
-    mockDbGetUsers.mockResolvedValue([
-      { handle: "zara" },
-      { handle: "alice" },
-      { handle: "mona" },
-      { handle: "bob" },
-    ]);
+    mockDbGetUserHandlePage.mockResolvedValue({
+      handles: ["mona", "zara"],
+      total: 2,
+    });
     const request = new NextRequest(
       "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=bob",
       {
@@ -204,7 +207,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.partial).toBe(false);
     expect(body.completed).toEqual(["alice"]);
     expect(body.total).toBe(1);
-    expect(mockDbGetUsers).not.toHaveBeenCalled();
+    expect(mockDbGetUserHandlePage).not.toHaveBeenCalled();
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(1);
   });
 
@@ -233,6 +236,108 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(res.status).toBe(413);
     expect(body.error).toMatch(/max 100 handles/i);
     expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalled();
+  });
+
+  it("paginates an omitted-handles all-users run instead of rejecting above 100", async () => {
+    const handles = Array.from(
+      { length: 205 },
+      (_, index) => `user${String(index).padStart(3, "0")}`,
+    );
+    mockDbGetUserHandlePage.mockResolvedValue({
+      handles: handles.slice(0, 101),
+      total: 205,
+    });
+
+    const first = await POST(makeRequest());
+    const firstBody = await first.json();
+
+    expect(first.status).toBe(202);
+    expect(firstBody).toEqual(
+      expect.objectContaining({
+        partial: true,
+        total: 205,
+        recalculated: 100,
+        remaining: 105,
+        nextCursor: "user099",
+      }),
+    );
+    expect(firstBody.completed).toHaveLength(100);
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(100);
+
+    vi.clearAllMocks();
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 2, limit: 5 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockVerifyAdminSecret.mockReturnValue(null);
+    mockDbGetUserHandlePage.mockResolvedValue({
+      handles: handles.slice(100, 201),
+      total: 105,
+    });
+    mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+    mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+
+    const secondRequest = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=user099",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    const second = await POST(secondRequest);
+    const secondBody = await second.json();
+
+    expect(second.status).toBe(202);
+    expect(secondBody).toEqual(
+      expect.objectContaining({
+        partial: true,
+        total: 105,
+        recalculated: 100,
+        remaining: 5,
+        cursor: "user099",
+        nextCursor: "user199",
+      }),
+    );
+    expect(secondBody.completed).toHaveLength(100);
+
+    vi.clearAllMocks();
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 3, limit: 5 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockVerifyAdminSecret.mockReturnValue(null);
+    mockDbGetUserHandlePage.mockResolvedValue({
+      handles: handles.slice(200),
+      total: 5,
+    });
+    mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+    mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+
+    const finalRequest = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=user199",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    const final = await POST(finalRequest);
+    const finalBody = await final.json();
+
+    expect(final.status).toBe(200);
+    expect(finalBody).toEqual(
+      expect.objectContaining({
+        partial: false,
+        total: 5,
+        recalculated: 5,
+        cursor: "user199",
+      }),
+    );
+    expect(finalBody.completed).toHaveLength(5);
+    expect(finalBody).not.toHaveProperty("nextCursor");
   });
 
   it("returns completed handles for successful inline runs", async () => {
@@ -293,6 +398,23 @@ describe("POST /api/admin/bulk-recalculate", () => {
     });
   });
 
+  it("#1084: does not mark a handle that errored as completed", async () => {
+    // "alice" fails the materialize step; "bob" succeeds. If `completed`
+    // wrongly includes "alice", a resume's `pending` calculation (handles
+    // minus completed) would silently skip retrying the failed handle.
+    mockMaterializeOrchestratedProfile.mockResolvedValueOnce(null);
+    mockMaterializeOrchestratedProfile.mockResolvedValueOnce(FAKE_MATERIALIZED);
+
+    const res = await POST(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.recalculated).toBe(1);
+    expect(body.failed).toBe(1);
+    expect(body.completed).not.toContain("alice");
+    expect(body.completed).toEqual(["bob"]);
+  });
+
   it("reports snapshot replace failures explicitly", async () => {
     mockPersistOrchestratedSnapshot.mockResolvedValue(false);
 
@@ -304,6 +426,31 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.errors[0]).toEqual({
       handle: "alice",
       error: "Snapshot replace failed",
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1076 — persistOrchestratedSnapshot's #1003 gate intentionally skips
+  // persistence when materialized.statsComplete is false. Distinguish that
+  // from a genuine write failure in the per-handle error message so an
+  // operator scanning bulk-recalculate output can tell them apart.
+  // ---------------------------------------------------------------------------
+
+  it("#1076: reports an incomplete-stats skip distinctly from a genuine snapshot replace failure", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue({
+      ...FAKE_MATERIALIZED,
+      statsComplete: false,
+    });
+    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(body.recalculated).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.errors[0]).toEqual({
+      handle: "alice",
+      error: "Snapshot skipped: stats incomplete",
     });
   });
 
@@ -347,11 +494,10 @@ describe("POST /api/admin/bulk-recalculate", () => {
       // Handles sorted alphabetically: ['a', 'b', 'c']
       // completed = ['b', 'a'] (out-of-order) after first batch succeeds but order differs
       // pending should be ['c'] — with slice(2) it would be ['c'] here, but test the intent
-      mockDbGetUsers.mockResolvedValue([
-        { handle: "a" },
-        { handle: "b" },
-        { handle: "c" },
-      ]);
+      mockDbGetUserHandlePage.mockResolvedValue({
+        handles: ["a", "b", "c"],
+        total: 3,
+      });
 
       // Simulate deadline exceeded after first batch (b+a completed out of insertion order)
       let callCount = 0;
@@ -386,12 +532,15 @@ describe("POST /api/admin/bulk-recalculate", () => {
 
   describe("BE-H7: ?after= cursor — resumes from alphabetic position", () => {
     beforeEach(() => {
-      mockDbGetUsers.mockResolvedValue([
-        { handle: "alice" },
-        { handle: "bob" },
-        { handle: "carol" },
-        { handle: "dave" },
-      ]);
+      const handles = ["alice", "bob", "carol", "dave"];
+      mockDbGetUserHandlePage.mockImplementation(
+        async ({ after }: { after?: string }) => {
+          const remaining = after
+            ? handles.filter((handle) => handle.localeCompare(after) > 0)
+            : handles;
+          return { handles: remaining, total: remaining.length };
+        },
+      );
     });
 
     it("processes all handles when no after cursor is provided", async () => {

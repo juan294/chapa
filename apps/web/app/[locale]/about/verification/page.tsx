@@ -30,6 +30,9 @@ export async function generateMetadata({
       title: t('about.verification.twitterTitle') as string,
       description: t('about.verification.twitterDescription') as string,
     },
+    alternates: {
+      canonical: "/about/verification",
+    },
   };
 }
 

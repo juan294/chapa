@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockCacheGet, mockCacheSet } = vi.hoisted(() => ({
-  mockCacheGet: vi.fn(),
+const { mockCacheMGet, mockCacheSet } = vi.hoisted(() => ({
+  mockCacheMGet: vi.fn(),
   mockCacheSet: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mockCacheGet,
+  cacheMGet: mockCacheMGet,
   cacheSet: mockCacheSet,
 }));
 
@@ -50,13 +50,22 @@ function makeConfig(
 describe("fetchLinkedPlatformStats", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCacheGet.mockResolvedValue(null);
+    mockCacheMGet.mockResolvedValue([null, null]);
     mockCacheSet.mockResolvedValue(undefined);
+  });
+
+  it("looks up positive + negative cache in a single cacheMGet round-trip", async () => {
+    const config = makeConfig();
+
+    await fetchLinkedPlatformStats(config);
+
+    expect(mockCacheMGet).toHaveBeenCalledTimes(1);
+    expect(mockCacheMGet).toHaveBeenCalledWith([CACHE_KEY, NEG_KEY]);
   });
 
   it("returns cached stats on positive cache hit without any other work", async () => {
     const cached = makeStats({ commitsTotal: 42 });
-    mockCacheGet.mockResolvedValueOnce(cached);
+    mockCacheMGet.mockResolvedValueOnce([cached, null]);
     const config = makeConfig();
 
     const result = await fetchLinkedPlatformStats(config);
@@ -69,9 +78,7 @@ describe("fetchLinkedPlatformStats", () => {
   });
 
   it("returns null on negative cache hit without flag/db reads", async () => {
-    mockCacheGet
-      .mockResolvedValueOnce(null) // positive miss
-      .mockResolvedValueOnce(true); // neg hit
+    mockCacheMGet.mockResolvedValueOnce([null, true]);
     const config = makeConfig();
 
     const result = await fetchLinkedPlatformStats(config);
@@ -79,6 +86,22 @@ describe("fetchLinkedPlatformStats", () => {
     expect(result).toBeNull();
     expect(config.isEnabled).not.toHaveBeenCalled();
     expect(config.getLinkedPlatform).not.toHaveBeenCalled();
+  });
+
+  it("treats an empty array from cacheMGet (Redis unavailable) as a full cache miss and falls through to a live fetch", async () => {
+    // cacheMGet returns [] (not [null, null]) when Redis is unreachable —
+    // destructuring/indexing must not throw or misread this as a cache hit.
+    mockCacheMGet.mockResolvedValueOnce([]);
+    const stats = makeStats({ commitsTotal: 7 });
+    const config = makeConfig({ fetchStats: vi.fn().mockResolvedValue(stats) });
+
+    const result = await fetchLinkedPlatformStats(config);
+
+    expect(result).toEqual(stats);
+    expect(config.isEnabled).toHaveBeenCalled();
+    expect(config.getLinkedPlatform).toHaveBeenCalled();
+    expect(config.fetchStats).toHaveBeenCalled();
+    expect(mockCacheSet).toHaveBeenCalledWith(CACHE_KEY, stats, CACHE_TTL);
   });
 
   it("sets neg cache and returns null when not enabled", async () => {

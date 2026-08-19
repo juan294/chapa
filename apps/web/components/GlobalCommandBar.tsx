@@ -16,6 +16,7 @@ import type { OutputLine } from "@/components/terminal/command-registry";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { useTranslation } from "@/lib/i18n";
 import { tObject } from "@/lib/i18n/typed-accessors";
+import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
 const OUTPUT_TIMEOUT_MS = 5000;
 
@@ -25,8 +26,17 @@ const OUTPUT_TIMEOUT_MS = 5000;
  */
 export function GlobalCommandBar({
   isAdmin,
+  skipShortcutsListener,
 }: {
   isAdmin?: boolean;
+  /**
+   * Skip mounting an internal `KeyboardShortcutsListener` — set this when
+   * the caller has already mounted one as a sibling (e.g. `CommandBarHint`,
+   * #1068). Mounting it twice would publish the module store twice, and the
+   * second instance's cleanup on unmount would kill the survivor's
+   * registrations.
+   */
+  skipShortcutsListener?: boolean;
 } = {}) {
   const router = useRouter();
   const { studioEnabled } = useClientFeatureFlags();
@@ -117,7 +127,7 @@ export function GlobalCommandBar({
   const handleAutocompleteFill = useCallback((command: string) => {
     setShowAutocomplete(false);
     const input = document.querySelector<HTMLInputElement>(
-      'input[aria-label="Terminal command input"]',
+      `#${TERMINAL_COMMAND_INPUT_ID}`,
     );
     if (input) {
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
@@ -132,7 +142,7 @@ export function GlobalCommandBar({
 
   return (
     <>
-      <KeyboardShortcutsListener />
+      {!skipShortcutsListener && <KeyboardShortcutsListener />}
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
         <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
           <AuthorTypewriter />

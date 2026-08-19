@@ -14,6 +14,14 @@ type CacheSetOptions = number | { ex?: number } | undefined;
 
 const store = new Map<string, StoredValue>();
 const hllStore = new Map<string, Set<string>>();
+type FaultableOperation = "cacheSet" | "cacheMergeJson";
+const failNextOperations = new Set<FaultableOperation>();
+
+function consumeFailure(operation: FaultableOperation): boolean {
+  if (!failNextOperations.has(operation)) return false;
+  failNextOperations.delete(operation);
+  return true;
+}
 
 function now(): number {
   return Date.now();
@@ -79,7 +87,23 @@ async function cacheSet<T>(
   value: T,
   options?: CacheSetOptions,
 ): Promise<boolean> {
+  if (consumeFailure("cacheSet")) return false;
   writeRaw(key, value, ttlFromOptions(options));
+  return true;
+}
+
+async function cacheMergeJson<T extends object>(
+  key: string,
+  patch: Partial<T>,
+  ttlSeconds: number,
+): Promise<boolean> {
+  if (consumeFailure("cacheMergeJson")) return false;
+  const current = readRaw(key);
+  const base =
+    current !== null && typeof current === "object" && !Array.isArray(current)
+      ? current
+      : {};
+  writeRaw(key, { ...base, ...patch }, ttlSeconds);
   return true;
 }
 
@@ -174,14 +198,25 @@ async function cacheIncr(
   return incrBy(key, amount, ttlSeconds);
 }
 
+async function refundRateLimit(key: string): Promise<boolean> {
+  incrBy(key, -1);
+  return true;
+}
+
 function _resetClient(): void {
   store.clear();
   hllStore.clear();
+  failNextOperations.clear();
+}
+
+function __failNext(operation: FaultableOperation): void {
+  failNextOperations.add(operation);
 }
 
 export const redisFake = {
   cacheGet,
   cacheSet,
+  cacheMergeJson,
   cacheDel,
   cacheMGet,
   rateLimit,
@@ -194,6 +229,8 @@ export const redisFake = {
   cacheSetNxStatus,
   cacheSetNx,
   cacheIncr,
+  refundRateLimit,
   _resetClient,
   __reset: _resetClient,
+  __failNext,
 };

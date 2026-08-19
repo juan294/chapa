@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { act, render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -11,7 +11,11 @@ const SOURCE = fs.readFileSync(
 
 import { InfoTooltip } from "./InfoTooltip";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("InfoTooltip", () => {
   describe("client component", () => {
@@ -21,83 +25,60 @@ describe("InfoTooltip", () => {
   });
 
   describe("design system compliance", () => {
-    it("uses semantic color tokens (no hardcoded hex)", () => {
-      // Should use tokens like text-text-secondary, text-amber, bg-card, shadow-card
-      expect(SOURCE).toContain("text-text-secondary");
-      expect(SOURCE).toContain("text-amber");
-      expect(SOURCE).toContain("bg-card");
-      expect(SOURCE).toContain("shadow-card");
+    it("trigger button uses semantic color tokens (no hardcoded hex)", () => {
+      render(<InfoTooltip content="Test tooltip" id="tt-tokens-button" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      expect(button.className).toContain("text-text-secondary");
+      expect(button.className).toContain("text-amber");
     });
 
-    it("uses font-body for tooltip text", () => {
-      expect(SOURCE).toContain("font-body");
+    it("tooltip panel uses semantic color tokens and font-body", () => {
+      render(<InfoTooltip content="Test tooltip" id="tt-tokens-panel" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.className).toContain("bg-card");
+      expect(tooltip.className).toContain("shadow-card");
+      expect(tooltip.className).toContain("font-body");
     });
   });
 
   describe("accessibility", () => {
-    it("uses a button element as trigger", () => {
-      expect(SOURCE).toContain("<button");
-    });
-
-    it("has aria-label on the trigger button", () => {
-      expect(SOURCE).toContain("aria-label");
-    });
-
-    it("has role=tooltip on the panel", () => {
-      expect(SOURCE).toContain('role="tooltip"');
-    });
-
-    it("has aria-describedby linking trigger to panel", () => {
-      expect(SOURCE).toContain("aria-describedby");
+    it("renders a native button element as the trigger", () => {
+      render(<InfoTooltip content="Test tooltip" id="tt-button-el" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      expect(button.tagName).toBe("BUTTON");
     });
 
     it("SVG icon has aria-hidden=true", () => {
-      expect(SOURCE).toContain('aria-hidden="true"');
+      render(<InfoTooltip content="Test tooltip" id="tt-svg-hidden" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      const svg = button.querySelector("svg");
+      expect(svg?.getAttribute("aria-hidden")).toBe("true");
     });
 
     it("focus ring uses ring-2 and ring-amber for visibility (#435)", () => {
-      expect(SOURCE).toContain("focus-visible:ring-2");
-      expect(SOURCE).toContain("focus-visible:ring-amber");
+      render(<InfoTooltip content="Test tooltip" id="tt-focus-ring" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      expect(button.className).toContain("focus-visible:ring-2");
+      expect(button.className).toContain("focus-visible:ring-amber");
       // Should not use the weaker ring-1 ring-amber/50
-      expect(SOURCE).not.toContain("ring-amber/50");
+      expect(button.className).not.toContain("ring-amber/50");
     });
   });
 
   describe("SVG icon conventions", () => {
-    it("uses strokeWidth=1.5 per design system", () => {
-      expect(SOURCE).toContain('strokeWidth="1.5"');
-    });
+    it("uses strokeWidth=1.5, strokeLinecap=round, strokeLinejoin=round per design system", () => {
+      render(<InfoTooltip content="Test tooltip" id="tt-svg-stroke" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      const svg = button.querySelector("svg");
 
-    it("uses strokeLinecap=round", () => {
-      expect(SOURCE).toContain('strokeLinecap="round"');
-    });
-
-    it("uses strokeLinejoin=round", () => {
-      expect(SOURCE).toContain('strokeLinejoin="round"');
-    });
-  });
-
-  describe("props interface", () => {
-    it("accepts content prop", () => {
-      expect(SOURCE).toContain("content:");
-    });
-
-    it("accepts id prop", () => {
-      expect(SOURCE).toContain("id:");
-    });
-
-    it("accepts optional position prop", () => {
-      expect(SOURCE).toMatch(/position\??\s*:/);
-    });
-  });
-
-  describe("mobile support", () => {
-    it("handles click toggle via useState", () => {
-      expect(SOURCE).toContain("useState");
-    });
-
-    it("handles Escape key to dismiss", () => {
-      expect(SOURCE).toMatch(/Escape/);
+      expect(svg?.getAttribute("stroke-width")).toBe("1.5");
+      expect(svg?.getAttribute("stroke-linecap")).toBe("round");
+      expect(svg?.getAttribute("stroke-linejoin")).toBe("round");
     });
   });
 
@@ -106,7 +87,12 @@ describe("InfoTooltip", () => {
       // Parent containers (stat labels, dimension labels) use CSS uppercase.
       // The tooltip panel must reset with normal-case so tooltip text renders
       // as sentence case regardless of parent text-transform.
-      expect(SOURCE).toContain("normal-case");
+      render(<InfoTooltip content="Test tooltip" id="tt-normal-case" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.className).toContain("normal-case");
     });
   });
 
@@ -136,6 +122,33 @@ describe("InfoTooltip", () => {
       expect(screen.queryByRole("tooltip")).toBeNull();
     });
 
+    it("hides tooltip on a second keyboard activation while focus remains", () => {
+      render(<InfoTooltip content="Keyboard tooltip" id="tt-keyboard-toggle" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      button.focus();
+      fireEvent.click(button);
+      expect(screen.getByRole("tooltip")).toBeDefined();
+
+      fireEvent.click(button);
+      expect(document.activeElement).toBe(button);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("toggles closed when two activations arrive before a rerender", () => {
+      render(<InfoTooltip content="Rapid keyboard tooltip" id="tt-rapid-toggle" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      button.focus();
+      act(() => {
+        button.click();
+        button.click();
+      });
+
+      expect(document.activeElement).toBe(button);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
     it("does not show tooltip when not clicked", () => {
       render(<InfoTooltip content="Hidden tooltip" id="tt-3" />);
       expect(screen.queryByRole("tooltip")).toBeNull();
@@ -151,6 +164,19 @@ describe("InfoTooltip", () => {
       expect(screen.getByRole("tooltip")).toBeDefined();
 
       fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("closes a focused tooltip on Escape while focus remains", () => {
+      render(<InfoTooltip content="Escape focus" id="tt-esc-focus" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      button.focus();
+      fireEvent.click(button);
+      expect(screen.getByRole("tooltip")).toBeDefined();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(document.activeElement).toBe(button);
       expect(screen.queryByRole("tooltip")).toBeNull();
     });
 
@@ -302,6 +328,63 @@ describe("InfoTooltip", () => {
       expect(tooltip.style.left).toBe("108px");
       expect(tooltip.style.transform).toContain("translate(-50%, 0)");
     });
+
+    it("keeps a wide tooltip inside a narrow viewport", async () => {
+      vi.stubGlobal("innerWidth", 375);
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+        function (this: HTMLElement) {
+          if (this.getAttribute("role") === "tooltip") {
+            return {
+              left: -42.5,
+              top: 100,
+              right: 197.5,
+              bottom: 180,
+              width: 240,
+              height: 80,
+              x: -42.5,
+              y: 100,
+              toJSON: () => {},
+            };
+          }
+          if (this.tagName === "BUTTON") {
+            return {
+              left: 69.5,
+              top: 200,
+              right: 85.5,
+              bottom: 216,
+              width: 16,
+              height: 16,
+              x: 69.5,
+              y: 200,
+              toJSON: () => {},
+            };
+          }
+          return {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 0,
+            height: 0,
+            x: 0,
+            y: 0,
+            toJSON: () => {},
+          };
+        },
+      );
+
+      render(<InfoTooltip content="A full-width explanation" id="tt-clamped" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      fireEvent.click(button);
+
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.getBoundingClientRect().width).toBe(240);
+      await waitFor(() => expect(tooltip.style.left).toBe("128px"));
+      expect(tooltip.style.maxWidth).toBe(
+        "min(240px, calc(100vw - 16px))",
+      );
+    });
   });
 
   describe("auto-flip near viewport top (Fix #1021 / UX-L2)", () => {
@@ -406,18 +489,18 @@ describe("InfoTooltip", () => {
   });
 
   describe("portal rendering (UX-L1: #958 — safe inside CSS-transformed ancestors)", () => {
-    it("uses createPortal to render outside transformed ancestor", () => {
+    it("uses position:fixed via z-[99999] class on the portaled panel", () => {
       // InfoTooltip is used inside DimensionCard which has animate-fade-in-up
       // (a CSS transform). position:fixed breaks inside transformed ancestors,
-      // so the tooltip panel MUST be portaled to document.body.
-      expect(SOURCE).toContain("createPortal");
-      expect(SOURCE).toContain("document.body");
-    });
+      // so the tooltip panel must be fixed-positioned with a very high z-index
+      // to stay above transformed/animated/sticky ancestors once portaled out.
+      render(<InfoTooltip content="Fixed position test" id="tt-fixed-pos" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      fireEvent.click(button);
 
-    it("uses position:fixed via z-[99999] class on the portaled panel", () => {
-      // z-[99999] implies position:fixed positioning — both must be present.
-      expect(SOURCE).toContain("fixed");
-      expect(SOURCE).toContain("z-[99999]");
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.className).toContain("fixed");
+      expect(tooltip.className).toContain("z-[99999]");
     });
 
     it("renders tooltip into document.body via createPortal", () => {

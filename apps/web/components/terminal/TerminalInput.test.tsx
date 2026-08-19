@@ -1,16 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { TerminalInput } from "./TerminalInput";
+import { createRef } from "react";
+import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { TerminalInput, type TerminalInputHandle } from "./TerminalInput";
 
 afterEach(cleanup);
-
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "TerminalInput.tsx"),
-  "utf-8",
-);
 
 describe("TerminalInput", () => {
   it("renders with default prompt", () => {
@@ -101,54 +95,37 @@ describe("TerminalInput", () => {
     expect(input.getAttribute("spellcheck")).toBe("false");
   });
 
-  describe("component directive", () => {
-    it("has 'use client' directive", () => {
-      expect(SOURCE).toMatch(/^["']use client["']/m);
-    });
-  });
-
   describe("autoFocus default (#228)", () => {
     it("defaults autoFocus to false so it does not steal focus on mount", () => {
-      expect(SOURCE).toMatch(/autoFocus\s*=\s*false/);
-    });
-
-    it("does NOT default autoFocus to true", () => {
-      expect(SOURCE).not.toMatch(/autoFocus\s*=\s*true/);
-    });
-  });
-
-  describe("wrapper div keyboard accessibility (#231)", () => {
-    it("does not have onClick on the wrapper div without keyboard equivalent", () => {
-      const hasOnClick = SOURCE.includes("onClick={() => inputRef.current?.focus()}");
-      const hasOnKeyDown = SOURCE.includes("onKeyDown");
-
-      if (hasOnClick) {
-        expect(hasOnKeyDown).toBe(true);
-      }
-    });
-  });
-
-  describe("accessibility (source)", () => {
-    it("has aria-label on the input", () => {
-      expect(SOURCE).toContain("aria-label=");
+      vi.useFakeTimers();
+      const onSubmit = vi.fn();
+      render(<TerminalInput onSubmit={onSubmit} />);
+      const input = screen.getByLabelText("Terminal command input");
+      // The component's autoFocus effect (when enabled) focuses after a
+      // 300ms delay — advance well past that and confirm nothing focused it.
+      vi.advanceTimersByTime(500);
+      expect(document.activeElement).not.toBe(input);
+      vi.useRealTimers();
     });
   });
 
   describe("imperative handle (#283)", () => {
-    it("exports TerminalInputHandle type", () => {
-      // Parent components need the handle type to create typed refs
-      expect(SOURCE).toMatch(/export\s+(interface|type)\s+TerminalInputHandle/);
-    });
+    it("exposes clear() and focus() methods via the forwarded ref", () => {
+      const onSubmit = vi.fn();
+      const ref = createRef<TerminalInputHandle>();
+      render(<TerminalInput ref={ref} onSubmit={onSubmit} />);
+      const input = screen.getByLabelText(
+        "Terminal command input",
+      ) as HTMLInputElement;
 
-    it("uses forwardRef to expose imperative handle", () => {
-      expect(SOURCE).toContain("forwardRef");
-      expect(SOURCE).toContain("useImperativeHandle");
-    });
+      fireEvent.change(input, { target: { value: "/help" } });
+      expect(input.value).toBe("/help");
 
-    it("exposes clear() and focus() methods via ref", () => {
-      // The imperative handle must expose clear() and focus()
-      expect(SOURCE).toMatch(/clear\s*\(\)/);
-      expect(SOURCE).toMatch(/focus\s*\(\)/);
+      act(() => ref.current!.clear());
+      expect(input.value).toBe("");
+
+      act(() => ref.current!.focus());
+      expect(document.activeElement).toBe(input);
     });
   });
 });

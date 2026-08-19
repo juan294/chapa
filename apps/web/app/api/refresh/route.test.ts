@@ -15,6 +15,8 @@ const {
   mockMaterializeOrchestratedProfile,
   mockPersistOrchestratedSnapshot,
   mockGetSessionGitHubToken,
+  mockGetPublicProfileVerification,
+  mockDeferProfileCacheWork,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockCacheDel: vi.fn(),
@@ -28,6 +30,8 @@ const {
   mockMaterializeOrchestratedProfile: vi.fn(),
   mockPersistOrchestratedSnapshot: vi.fn(),
   mockGetSessionGitHubToken: vi.fn(),
+  mockGetPublicProfileVerification: vi.fn(),
+  mockDeferProfileCacheWork: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -73,6 +77,13 @@ vi.mock("@/lib/auth/github-session-token", () => ({
   getSessionGitHubToken: (...args: unknown[]) => mockGetSessionGitHubToken(...args),
 }));
 
+vi.mock("@/lib/profile/public-profile", () => ({
+  getPublicProfileVerification: (...args: unknown[]) =>
+    mockGetPublicProfileVerification(...args),
+  deferProfileCacheWork: (...args: unknown[]) =>
+    mockDeferProfileCacheWork(...args),
+}));
+
 const SESSION = {
   login: "testuser",
   name: "Test User",
@@ -113,6 +124,7 @@ const FAKE_MATERIALIZED = {
     computedAt: "2026-04-17T12:00:00.000Z",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 72, tier: "Solid" },
+  statsComplete: true,
 };
 
 function makeRequest(handle?: string): NextRequest {
@@ -135,6 +147,11 @@ describe("POST /api/refresh", () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockGetSessionGitHubToken.mockResolvedValue("oauth-token");
+    mockGetPublicProfileVerification.mockReturnValue({
+      hash: "refreshed-hash",
+      date: "2026-04-17",
+    });
+    mockDeferProfileCacheWork.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -207,6 +224,14 @@ describe("POST /api/refresh", () => {
       "testuser",
       FAKE_MATERIALIZED,
       { mode: "replace" },
+    );
+    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      {
+        verification: { hash: "refreshed-hash", date: "2026-04-17" },
+        verificationOnly: true,
+      },
     );
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
       badgeSvg: true,
@@ -337,6 +362,37 @@ describe("POST /api/refresh", () => {
     expect(res.status).toBe(500);
     // The pre-fetch `{stats}` invalidation has already run by this point; what
     // must NOT run is the post-persist artifact invalidation.
+    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalledWith(
+      "testuser",
+      expect.objectContaining({ badgeSvg: true }),
+    );
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1076 — the route checks materialized.statsComplete up front (the #1003
+  // persist-boundary gate) so an intentional skip is distinguishable from a
+  // genuine write failure: no 500, no captureServerError escalation (the
+  // shared guard already emits snapshot_skipped_incomplete_stats telemetry),
+  // and persistOrchestratedSnapshot is never even called.
+  // ---------------------------------------------------------------------------
+
+  it("#1076: returns 422 with reason stats_incomplete without attempting to persist, and without escalating as a genuine failure", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue({
+      ...FAKE_MATERIALIZED,
+      statsComplete: false,
+    });
+
+    const res = await POST(makeRequest("testuser"));
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body.reason).toBe("stats_incomplete");
+    expect(mockPersistOrchestratedSnapshot).not.toHaveBeenCalled();
+    // Not a genuine failure — the shared guard already reports this via
+    // snapshot_skipped_incomplete_stats telemetry, so this must not also
+    // fire captureServerError (would double-report the same skip).
+    expect(mockCaptureServerError).not.toHaveBeenCalled();
     expect(mockInvalidateProfileReadModels).not.toHaveBeenCalledWith(
       "testuser",
       expect.objectContaining({ badgeSvg: true }),

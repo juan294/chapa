@@ -21,6 +21,7 @@ import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 // locale is loaded on-demand client-side only when the user switches (#862).
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -72,9 +73,6 @@ export const metadata: Metadata = {
     description:
       "Your developer impact, decoded into multiple dimensions. Live, embeddable SVG badge.",
     images: ["/og-image"],
-  },
-  alternates: {
-    canonical: BASE_URL,
   },
 };
 
@@ -156,11 +154,25 @@ export default async function RootLayout({
             })
           }}
         />
+        {/*
+          Rendered at DEFAULT_LOCALE ('es') like the rest of this static
+          layout (#861) — `dictionary` above is already resolved to that
+          locale, so this reads the resolved string directly rather than
+          going through client-side useTranslation()/LanguageProvider. This
+          is the first thing a keyboard/screen-reader user hits (#1109 /
+          UX-H3); it must not stay hardcoded English while the layout
+          otherwise commits to serving DEFAULT_LOCALE-first.
+        */}
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:rounded-lg focus:bg-amber focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg focus:shadow-amber/25"
         >
-          Skip to main content
+          <span lang="es" data-document-locale="es">
+            {resolveTranslation("common.skipToMainContent", es) as string}
+          </span>
+          <span lang="en" data-document-locale="en">
+            {resolveTranslation("common.skipToMainContent", en) as string}
+          </span>
         </a>
         <ThemeProvider>
           <LanguageProvider initialLocale={locale} dictionary={dictionary}>

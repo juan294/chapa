@@ -19,6 +19,9 @@ export async function generateMetadata({
   return {
     title: t('archetypes.polymath.metadataTitle') as string,
     description: t('archetypes.polymath.metadataDescription') as string,
+    alternates: {
+      canonical: "/archetypes/polymath",
+    },
   };
 }
 

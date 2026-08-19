@@ -1,91 +1,134 @@
 # Triage Report
-> Generated on 2026-08-10 | 8 reports processed | 4 action items | 0 Dependabot PRs
+> Generated on 2026-08-19 | 4 reports processed | 1 action item | 0 Dependabot PRs
 
 ## Agent Failures
 
-None -- all agents produced their expected reports.
+None. No `logs/*.error.log` was modified in the last 24h. Three agents logged
+runs this cycle (`qa-agent-2026-08-19`, `coverage-agent-2026-08-18`,
+`cost-analyst-2026-08-18`); all three log files are empty and all three
+produced their reports.
 
 ## Reports Reviewed
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cost-analyst-report.md` | Cost Analyst | GREEN | 0 -- both recommendations were already satisfied by current source/evidence |
-| 2 | `e2e-pro-rehearsal-report.md` | E2E Pro | YELLOW | 1 -- production identity evidence remains release-gated; tracked in #1057 |
-| 3 | `performance-report.md` | Performance | GREEN | 0 |
-| 4 | `coverage-report.md` | Coverage | GREEN | 0 -- the three optional carries measure 100% in the current coverage artifact |
-| 5 | `documentation-report.md` | Documentation | GREEN | 0 -- `/api/version` is documented and the stale Zod carry no longer applies |
-| 6 | `security-report.md` | Security | GREEN at report time | 0 from the report; live dependency discovery superseded its snapshot |
-| 7 | `cc-rpi-update-report.md` | cc-rpi Update | GREEN | 0 -- blueprint already current |
-| 8 | `qa-report.md` | QA | GREEN | 0 |
+| 1 | `qa-report.md` | QA | GREEN | 0 — all gates independently re-verified by direct re-run |
+| 2 | `pre-launch-report.md` | Pre-Launch (8 specialists) | CONDITIONAL | 0 outstanding — 31 findings already fixed and closed, 19 deliberately rejected under documented policy |
+| 3 | `update-docs-report.md` | Update Docs | GREEN | 0 — 2 version refs + architecture diagram corrected, 0 flagged for review |
+| 4 | `triage-report.md` (prior, 2026-08-18) | Triage | N/A | Reviewed for carried items, not a new input |
 
-## Overall Status: YELLOW
+## Overall Status: GREEN
 
-All implementation and exact-SHA PR checks are green. The status remains
-YELLOW because Dependabot alert #15 cannot close until the draft PR is merged,
-and the production deployment identity probe remains release-gated in #1057.
+Every report in this cycle is GREEN or confirmed fully remediated. The single
+action item did not come from a report at all — it surfaced during discovery,
+from the live CI queue.
 
 ## Action Items Completed
 
 | # | Item | Source | Tests Added | Status |
 |---|------|--------|-------------|--------|
-| 1 | Raised `dompurify` to 3.4.13 and synchronized license references | Dependabot alert #15 / GHSA-55q2-fjhq-7xh7 | No -- transitive patch | Done on PR #1058; awaiting merge/rescan |
-| 2 | Raised `js-yaml` to 4.3.1 | Live OSV gate / GHSA-5p4m-2wfm-xmqj | No -- transitive patch | Done on PR #1058 |
-| 3 | Raised `nanoid` to 3.3.18 | Live OSV gate / GHSA-2v37-7h3g-55p8 | No -- transitive patch | Done on PR #1058 |
-| 4 | Filed #1057 for the six consecutive nightly production identity failures | Live CI reconciliation | N/A | Done; release remains separately gated |
+| 1 | Force-cancelled hung CI run `32225235641`, unwedging the `ci-refs/heads/develop` concurrency group so HEAD could finally be verified | Live discovery (not a report) | N/A — infra action | Done |
+
+### Detail on action item 1
+
+Run `32225235641` (2026-08-19 06:52, sha `9efc7c94`) sat `in_progress` for
+5.5 hours with two jobs hung: `Contract (real DB)` on *Install Playwright
+Chromium* and `Deployment Smoke` on *Install Playwright system deps*. This is
+the #1136 failure mode — `apt-get` blocking on Ubuntu's `needrestart` prompt
+with no stdin. Commit `611924f5`'s own message names this exact run ID as one
+of its two victims.
+
+The run predates that fix, and GitHub's `cancel-in-progress` could not preempt
+it: the 09:21 and 10:18 pushes cancelled the 07:30 run and `E2E Shard (1)`
+outright, but the two apt-blocked jobs survived cancellation. As a result run
+`32242068490` (HEAD `732f989f`) was stuck `pending` with **0 jobs**, meaning
+the #1136 fix itself had never once been CI-verified.
+
+A plain `gh run cancel` was accepted but did not take. The
+`POST /actions/runs/{id}/force-cancel` endpoint cleared it; the run moved to
+`cancelled/completed` and run `32242068490` immediately started with 6 jobs.
+
+## Independent Measurements
+
+Taken by direct re-run on `732f989f`, not read from any report:
+
+- **Tests: 7,776 passed / 475 files, 0 failed, 0 skipped**
+- **Typecheck: clean** (`packages/shared` + `apps/web`)
+- **Lint: clean** (`eslint .`, both projects)
+
+The QA report's 8,276/482 is **not** a stale measurement. It was accurate at
+its 09:05 run time; three #1104 commits (`2c2e540a`, `b75826a1`, `23f1c248`)
+landed afterward and legitimately removed ~500 source-text assertions and 7
+files. Test-file counts at each intermediate commit confirm this. This is
+explicitly *not* a recurrence of the coverage-agent stale-figure pattern
+flagged on 2026-08-18 — that one was disproven by re-measurement, this one was
+corroborated by it.
+
+**Baseline reset:** 7,776 tests / 475 files is the new baseline. The drop from
+8,770 is by design (#1104) and should not be reported as a regression.
+
+## Pre-Launch Report Disposition
+
+Audited by cross-checking every finding ID in the report's Section 12 action
+plan against filed issues, rather than assuming remediation:
+
+- **31 actionable findings** → issues **#1065–#1136**, **all closed**, each with
+  a matching fix commit on `develop`.
+- **19 findings never filed** — `AR-H1`, `AR-M1`, `AR-M2`, `BE-M1`/`SE-M1`,
+  `DO-H1`, `DO-H2`, `DO-H3`, `DO-M1`, `DO-M3`, `DO-M4`, `DO-M5`, `DO-M6`,
+  `DO-M7`, `PE-M3`, `PE-M4`, `QA-M1`, `QA-M2`, `QA-M3`. These were **rejected
+  deliberately, not overlooked**: commit `2bce6426` (2026-08-18 13:47, 18
+  minutes after the report was generated) added the *Project scale policy* to
+  `docs/accepted-risks.md`, whose reject list names these exact categories
+  (external uptime monitors, alert dedup/throttling, log-retention integrations,
+  new CI/coverage-floor gates, Actions least-privilege audits, secret-rotation
+  runbooks, architecture-purity refactors).
+
+Do not re-raise these 19 in future audit cycles.
 
 ## GitHub Security & Quality Alerts
 
 | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
 |---|------|----------|--------------|---------------|----------|--------|-------|
-| 15 | Dependabot | MEDIUM | `dompurify` | GHSA-55q2-fjhq-7xh7 | `pnpm-lock.yaml` | Fixed on draft PR #1058 | Resolves to 3.4.13; GitHub closure awaits merge/rescan |
-| N/A | OSV | HIGH | `js-yaml` | GHSA-5p4m-2wfm-xmqj | `pnpm-lock.yaml` | Fixed on draft PR #1058 | Resolves to 4.3.1 |
-| N/A | OSV | HIGH | `nanoid` | GHSA-2v37-7h3g-55p8 | `pnpm-lock.yaml` | Fixed on draft PR #1058 | Resolves to 3.3.18 |
-| N/A | Code scanning API | LOW accepted limitation | GitHub Advanced Security | API returned 403 | Repository tier | Accepted | Documented in `docs/accepted-risks.md`; compensating CI gates green |
-| N/A | Secret scanning API | LOW accepted limitation | GitHub Advanced Security | API returned 404 | Repository tier | Accepted | Gitleaks workflow green on the exact candidate |
+| N/A | Code scanning | Unavailable (403) | GitHub Advanced Security | N/A | Repository tier | Accepted risk | `docs/accepted-risks.md:204` — GHAS unlicensed on private tier; unchanged for multiple cycles |
+| N/A | Secret scanning | Unavailable (404) | GitHub Advanced Security | N/A | Repository tier | Accepted risk | Same entry, same tier limit |
+| N/A | Dependabot security alerts | — | — | — | — | **0 open** | Query succeeded |
+
+Compensating coverage confirmed running on `develop` today: `Secret Scanning`
+(Gitleaks) **success**, `Security Scan` (OSV vulnerabilities + license
+allowlist) **success**.
 
 ## Dependabot PRs
 
-None -- no open Dependabot-authored PRs were discovered.
+None — zero open Dependabot-authored PRs. In fact zero open PRs of any author,
+and **zero open issues repo-wide**.
 
 ## Verification
 
-- [x] Vulnerability gate passing
-- [x] License gate passing
-- [x] 8,688 tests passing across 513 files
+- [x] All tests passing (7,776 / 475 files)
 - [x] Typecheck clean
 - [x] Lint clean
-- [x] `codex-simplify` completed with no cleanup findings
-- [x] Full local verification repeated after simplify
-- [x] Exact candidate `c8ef6af6fb0089685a8df4314c7137b9c9268b1e` CI green on draft PR #1058
-- [x] CI run 31362822385 green (unit shards, contract DB, build, E2E, deployment smoke)
-- [x] Security Scan 31362822342 green
-- [x] Secret Scanning 31362822350 green
-- [x] Dead Code Detection 31362822352 green
-- [x] Bundle Size Analysis 31362822349 green
-- [x] Lighthouse CI 31362822353 green
-- [x] Claude Code Review 31362822373 green
-- [x] Vercel deployment and preview-comment checks green
+- [x] CI green
 
 ## Carried Items
 
-- Draft PR #1058 is green and unmerged. Merge authorization remains separate.
-- Issue #1057 tracks deployment of the existing `/api/version` endpoint and
-  re-verification of the nightly identity producer. Release and production
-  authorization remain separate.
-- Issue #1056 still requires an owner-approved alert destination before
-  configuring `CHAPA_ALERT_WEBHOOK_URL`; no destination was invented.
-- Native GitHub code/secret scanning remains unavailable on the current private
-  repository tier; the documented compensating workflows remain green.
+**None.** All items carried into this cycle are now closed:
 
-SHARED_CONTEXT_START
-## Triage -- 2026-08-10
-- **Reports processed**: 8 (cost analyst, E2E Pro rehearsal, performance, coverage, documentation, security, cc-rpi update, and QA).
-- **Action items resolved**: 4 -- patched `dompurify` 3.4.12 to 3.4.13 for Dependabot alert #15, patched live-OSV HIGH findings `js-yaml` 4.3.0 to 4.3.1 and `nanoid` 3.3.16 to 3.3.18, and filed #1057 for six consecutive nightly production identity failures.
-- **Verification**: Local vulnerability/license gates, 8,688 tests, typecheck, and lint passed twice; pre-commit repeated tests/typecheck/lint. Exact candidate `c8ef6af6fb0089685a8df4314c7137b9c9268b1e` is green across all PR #1058 Actions and Vercel checks. PR remains draft and unmerged.
-- **Summary**: Reconciled stale GREEN agent snapshots with live dependency and CI state, fixed every actionable dependency finding, preserved the fail-closed production identity gate, and kept release/production/merge authorization separate.
+- **Issue #1056** (`CHAPA_ALERT_WEBHOOK_URL` destination) — **CLOSED**
+  2026-08-18. Carried since 2026-08-10; drop from future carry lists.
+- **Issue #1136** (Playwright apt hang) — **CLOSED** 2026-08-19. The fix is
+  real but had never been CI-verified until this triage unblocked the queue.
 
-**Cross-agent recommendations:**
-- [Security]: Re-check Dependabot alert #15 after PR #1058 merges; the exact candidate resolves `dompurify` to 3.4.13, `js-yaml` to 4.3.1, and `nanoid` to 3.3.18 with OSV and license gates green.
-- [E2E Pro / Operations]: Keep #1057 open until a separately authorized release deploys `/api/version` and the Nightly Production Probe records passing production identity evidence. Do not weaken the gate.
-- [Operations]: Keep #1056 open until an owned webhook destination is approved; do not invent `CHAPA_ALERT_WEBHOOK_URL`.
-SHARED_CONTEXT_END
+## Notes for Future Cycles
+
+- **A hung job can silently starve a branch of all CI.** `cancel-in-progress`
+  cannot preempt a process blocked in `apt`, so one stuck run holds the
+  concurrency group and every later push queues behind it with 0 jobs and no
+  error anywhere. The `timeout-minutes` backstops added by #1136 are the real
+  protection; `force-cancel` is the manual recovery. Worth checking for
+  `status=in_progress` runs older than ~1h during discovery on every triage.
+- **Two consecutive cycles found agent reports whose figures needed
+  re-measuring.** Last cycle's coverage figures were stale and wrong; this
+  cycle's QA figures were merely superseded by later commits and held up. Both
+  were resolved the same way — re-run the measurement directly. Keep doing
+  that rather than trusting or dismissing report numbers on their face.

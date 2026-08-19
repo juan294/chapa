@@ -1,3 +1,5 @@
+import { interpolate, useTranslation } from "@/lib/i18n";
+
 interface DeltaIndicatorProps {
   /** The numeric change (positive, negative, or zero) */
   delta: number;
@@ -19,6 +21,7 @@ export function DeltaIndicator({
   label,
   size = "sm",
 }: DeltaIndicatorProps) {
+  const { t } = useTranslation();
   const isPositive = delta >= 0.5;
   const isNegative = delta <= -0.5;
   const isUnchanged = !isPositive && !isNegative;
@@ -35,8 +38,10 @@ export function DeltaIndicator({
   const sizeClass = size === "md" ? "text-sm" : "text-xs";
 
   const ariaLabel = isUnchanged
-    ? "Score unchanged"
-    : `Score changed by ${formatDelta(delta)} points`;
+    ? (t("dashboard.scoreUnchanged") as string)
+    : interpolate(t("dashboard.scoreChangedBy") as string, {
+        delta: formatDelta(delta),
+      });
 
   return (
     <span

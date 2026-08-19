@@ -35,14 +35,22 @@ vi.mock("@/lib/effects/tier/TierVisuals", () => ({
 }));
 
 vi.mock("@/lib/effects/heatmap/HeatmapGrid", () => ({
-  HeatmapGrid: ({ animation }: { animation: string }) => (
-    <div data-testid="heatmap-grid" data-animation={animation} />
+  HeatmapGrid: ({ animation, data }: { animation: string; data?: unknown[] }) => (
+    <div data-testid="heatmap-grid" data-animation={animation} data-count={data?.length ?? 0} />
   ),
   HEATMAP_GRID_CSS: ".heatmap-stub {}",
 }));
 
+const { useAnimatedCounterMock } = vi.hoisted(() => ({
+  useAnimatedCounterMock: vi.fn(
+    (...args: [target: number, duration?: number, easing?: string, startOnMount?: boolean]) => ({
+      value: args[0],
+    }),
+  ),
+}));
+
 vi.mock("@/lib/effects/counters/use-animated-counter", () => ({
-  useAnimatedCounter: (target: number) => ({ value: target }),
+  useAnimatedCounter: useAnimatedCounterMock,
 }));
 
 vi.mock("@/lib/effects/counters/use-in-view", () => ({
@@ -56,219 +64,36 @@ vi.mock("@/lib/render/theme", () => ({
 // Lazy import after mocks are set up
 const { BadgeContent } = await import("./BadgeContent");
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useAnimatedCounterMock.mockClear();
+});
 
 const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "BadgeContent.tsx"),
   "utf-8",
 );
 
+// ---------------------------------------------------------------------------
+// Genuinely non-renderable checks — build-time/type-level or source-hygiene
+// constraints with no observable difference in rendered output.
+// ---------------------------------------------------------------------------
+
 describe("BadgeContent", () => {
   describe("component directive", () => {
     it("has 'use client' directive", () => {
+      // "use client" only affects the Next.js server/client bundling boundary —
+      // it has no observable effect on jsdom render output.
       expect(SOURCE).toMatch(/^["']use client["']/m);
-    });
-  });
-
-  describe("props interface", () => {
-    it("accepts StatsData prop", () => {
-      expect(SOURCE).toContain("stats: StatsData");
-    });
-
-    it("accepts ImpactV6Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV6Result");
-    });
-
-    it("has optional scoreEffect prop", () => {
-      expect(SOURCE).toContain('scoreEffect?:');
-    });
-
-    it("has optional heatmapAnimation prop", () => {
-      expect(SOURCE).toContain('heatmapAnimation?:');
-    });
-
-    it("has optional statsDisplay prop", () => {
-      expect(SOURCE).toContain('statsDisplay?:');
-    });
-
-    it("has optional tierTreatment prop", () => {
-      expect(SOURCE).toContain('tierTreatment?:');
-    });
-
-    it("has optional className prop", () => {
-      expect(SOURCE).toContain('className?:');
-    });
-
-    it("has optional style prop", () => {
-      expect(SOURCE).toContain('style?:');
-    });
-  });
-
-  describe("default prop values", () => {
-    it("defaults scoreEffect to standard", () => {
-      expect(SOURCE).toContain('scoreEffect = "standard"');
-    });
-
-    it("defaults heatmapAnimation to fade-in", () => {
-      expect(SOURCE).toContain('heatmapAnimation = "fade-in"');
-    });
-
-    it("defaults statsDisplay to static", () => {
-      expect(SOURCE).toContain('statsDisplay = "static"');
-    });
-
-    it("defaults tierTreatment to standard", () => {
-      expect(SOURCE).toContain('tierTreatment = "standard"');
-    });
-  });
-
-  describe("testability", () => {
-    it("has badge-content test id", () => {
-      expect(SOURCE).toContain('data-testid="badge-content"');
-    });
-
-    it("tracks score effect via data attribute", () => {
-      expect(SOURCE).toContain("data-score-effect={scoreEffect}");
-    });
-  });
-
-  describe("header elements", () => {
-    it("renders avatar with descriptive alt text", () => {
-      expect(SOURCE).toContain("stats.handle");
-      expect(SOURCE).toMatch(/alt=.*avatar/i);
-    });
-
-    it("renders displayName with handle fallback", () => {
-      expect(SOURCE).toContain("stats.displayName");
-      expect(SOURCE).toMatch(/@.*stats\.handle/);
-    });
-
-    it("renders verified shield icon", () => {
-      expect(SOURCE).toContain("M12 1L3 5v6c0 5.55");
-    });
-
-    it("renders Chapa_ logo text", () => {
-      expect(SOURCE).toContain("Chapa");
-      expect(SOURCE).toMatch(/Chapa.*_/);
-    });
-
-    it("shows Last 12 months subtitle", () => {
-      expect(SOURCE).toContain("Last 12 months");
-    });
-  });
-
-  describe("heatmap", () => {
-    it("renders HeatmapGrid component", () => {
-      expect(SOURCE).toContain("HeatmapGrid");
-    });
-
-    it("passes heatmap data from stats", () => {
-      expect(SOURCE).toContain("stats.heatmapData");
-    });
-
-    it("uses Activity label", () => {
-      expect(SOURCE).toContain("Activity");
-      expect(SOURCE).not.toContain('"Contributions"');
-    });
-  });
-
-  describe("radar chart", () => {
-    it("renders SVG with correct viewBox", () => {
-      expect(SOURCE).toContain('viewBox="0 0 140 140"');
-    });
-
-    it("renders 4 guide ring diamonds", () => {
-      expect(SOURCE).toContain("[0.25, 0.5, 0.75, 1]");
-    });
-
-    it("renders data polygon from dimensions", () => {
-      expect(SOURCE).toContain("impact.dimensions.delivery");
-      expect(SOURCE).toContain("impact.dimensions.quality");
-      expect(SOURCE).toContain("impact.dimensions.consistency");
-      expect(SOURCE).toContain("impact.dimensions.breadth");
-    });
-
-    it("renders axis labels", () => {
-      expect(SOURCE).toContain("Delivery");
-      expect(SOURCE).toContain("Quality");
-      expect(SOURCE).toContain("Consist");
-      expect(SOURCE).toContain("Breadth");
-    });
-
-    it("shows Developer Profile label", () => {
-      expect(SOURCE).toContain("Developer Profile");
-    });
-  });
-
-  describe("archetype display", () => {
-    it("renders archetype from impact", () => {
-      expect(SOURCE).toContain("impact.archetype");
-    });
-
-    it("renders tier symbol from TIER_SYMBOLS map", () => {
-      expect(SOURCE).toContain("TIER_SYMBOLS[impact.tier]");
-    });
-  });
-
-  describe("score rendering", () => {
-    it("uses ScoreEffectText component", () => {
-      expect(SOURCE).toContain("ScoreEffectText");
-    });
-
-    it("renders adjustedComposite from impact", () => {
-      expect(SOURCE).toContain("impact.adjustedComposite");
-    });
-  });
-
-  describe("tier display", () => {
-    it("uses tierPillClasses", () => {
-      expect(SOURCE).toContain("tierPillClasses");
-    });
-  });
-
-  // Issue #279 — confidence is internal-only, hidden from developer-facing UI
-  describe("confidence hidden (#279)", () => {
-    it("does not show confidence percentage", () => {
-      expect(SOURCE).not.toContain("impact.confidence");
-      expect(SOURCE).not.toMatch(/Confidence/);
-    });
-  });
-
-  describe("dimension cards", () => {
-    it("renders 4 AnimatedStatCards", () => {
-      expect(SOURCE).toContain('"Delivery"');
-      expect(SOURCE).toContain('"Quality"');
-      expect(SOURCE).toContain('"Consistency"');
-      expect(SOURCE).toContain('"Breadth"');
-    });
-
-    it("supports animated counters", () => {
-      expect(SOURCE).toContain("useAnimatedCounter");
-    });
-  });
-
-  describe("footer", () => {
-    it("has GitHub branding", () => {
-      expect(SOURCE).toContain("Powered by GitHub");
-    });
-
-    it("has domain URL", () => {
-      expect(SOURCE).toContain("chapa.thecreativetoken.com");
-    });
-  });
-
-  describe("tier sparkles", () => {
-    it("conditionally renders SparkleDots for enhanced tier", () => {
-      expect(SOURCE).toContain("SparkleDots");
-      expect(SOURCE).toContain('tierTreatment === "enhanced"');
     });
   });
 
   // Issue #289 — no hardcoded accent hex in component; use WARM_AMBER.accent
   describe("accent color constant (#289)", () => {
     it("does not hardcode #8B5CF6 in SVG markup", () => {
-      // Remove import lines and string literals from consideration —
-      // only SVG attributes should reference the accent color via the constant
+      // The rendered SVG shows the same hex value either way (WARM_AMBER.accent
+      // resolves to "#8B5CF6") — hardcoding vs. importing a constant is a
+      // source-level distinction with no observable render difference.
       const withoutImports = SOURCE.replace(/^import .*/gm, "");
       expect(withoutImports).not.toContain('"#8B5CF6"');
     });
@@ -276,29 +101,6 @@ describe("BadgeContent", () => {
     it("imports WARM_AMBER from the render theme", () => {
       expect(SOURCE).toMatch(/import\s+.*WARM_AMBER.*from\s+["']@\/lib\/render\/theme["']/);
     });
-  });
-});
-
-describe("getBadgeContentCSS", () => {
-  it("is exported as a function", () => {
-    expect(SOURCE).toContain("export function getBadgeContentCSS");
-  });
-
-  it("always includes HEATMAP_GRID_CSS in the output array", () => {
-    expect(SOURCE).toMatch(/const css = \[HEATMAP_GRID_CSS\]/);
-  });
-
-  it("conditionally includes SCORE_EFFECT_CSS for non-standard effects", () => {
-    expect(SOURCE).toMatch(/scoreEffect[\s\S]*!==[\s\S]*"standard"[\s\S]*SCORE_EFFECT_CSS/);
-  });
-
-  it("conditionally includes TIER_VISUALS_CSS for enhanced tier treatment", () => {
-    expect(SOURCE).toMatch(/tierTreatment[\s\S]*===[\s\S]*"enhanced"[\s\S]*TIER_VISUALS_CSS/);
-  });
-
-  it("accepts scoreEffect and tierTreatment options", () => {
-    expect(SOURCE).toContain('scoreEffect?: BadgeConfig["scoreEffect"]');
-    expect(SOURCE).toContain('tierTreatment?: BadgeConfig["tierTreatment"]');
   });
 });
 
@@ -352,6 +154,13 @@ function makeImpact(overrides?: Partial<ImpactV6Result>): ImpactV6Result {
   };
 }
 
+function expectedDataPolygonPoints(dimensions: ImpactV6Result["dimensions"]): string {
+  const cx = 70;
+  const cy = 70;
+  const r = 55;
+  return `${cx},${cy - (dimensions.delivery / 100) * r} ${cx + (dimensions.quality / 100) * r},${cy} ${cx},${cy + (dimensions.consistency / 100) * r} ${cx - (dimensions.breadth / 100) * r},${cy}`;
+}
+
 describe("BadgeContent — render-based", () => {
   describe("avatar rendering", () => {
     it("renders an img element when avatarUrl is present", () => {
@@ -388,6 +197,30 @@ describe("BadgeContent — render-based", () => {
         <BadgeContent stats={makeStats({ displayName: undefined })} impact={makeImpact()} />,
       );
       expect(screen.getByText("@testuser")).toBeDefined();
+    });
+  });
+
+  describe("header branding", () => {
+    it("renders the verified shield icon", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const shieldPath = container.querySelector(
+        'path[d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z"]',
+      );
+      expect(shieldPath).not.toBeNull();
+    });
+
+    it("renders the Chapa_ logo text with amber underscore", () => {
+      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(screen.getByText("Chapa")).toBeDefined();
+      const underscore = screen.getByText("_");
+      expect(underscore.className).toContain("text-amber");
+    });
+
+    it("shows the Last 12 months subtitle", () => {
+      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(screen.getByText("Last 12 months")).toBeDefined();
     });
   });
 
@@ -446,6 +279,13 @@ describe("BadgeContent — render-based", () => {
       );
       expect(screen.queryByTestId("sparkle-dots")).toBeNull();
     });
+
+    it("does NOT render SparkleDots for High tier when tierTreatment is omitted (defaults to standard)", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ tier: "High" })} />,
+      );
+      expect(screen.queryByTestId("sparkle-dots")).toBeNull();
+    });
   });
 
   describe("score effect data attribute", () => {
@@ -478,6 +318,19 @@ describe("BadgeContent — render-based", () => {
     });
   });
 
+  // Issue #279 — confidence is internal-only, hidden from developer-facing UI
+  describe("confidence hidden (#279)", () => {
+    it("does not render confidence anywhere on the badge", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({ confidence: 99, confidencePenalties: [] })}
+        />,
+      );
+      expect(screen.queryByText(/confidence/i)).toBeNull();
+    });
+  });
+
   describe("archetype and tier display", () => {
     it("renders archetype label", () => {
       render(
@@ -491,7 +344,7 @@ describe("BadgeContent — render-based", () => {
         <BadgeContent stats={makeStats()} impact={makeImpact({ tier: "Elite" })} />,
       );
       // TIER_SYMBOLS for Elite is ★
-      expect(screen.getByText(/\u2605/)).toBeDefined();
+      expect(screen.getByText(/★/)).toBeDefined();
     });
 
     it("renders the tier pill with correct text", () => {
@@ -499,6 +352,14 @@ describe("BadgeContent — render-based", () => {
         <BadgeContent stats={makeStats()} impact={makeImpact({ tier: "High" })} />,
       );
       expect(screen.getByText("High")).toBeDefined();
+    });
+
+    it("applies tierPillClasses output as the tier pill's class", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ tier: "High" })} />,
+      );
+      // Mocked tierPillClasses returns `tier-pill-${tier.toLowerCase()}`
+      expect(container.querySelector(".tier-pill-high")).not.toBeNull();
     });
   });
 
@@ -530,7 +391,49 @@ describe("BadgeContent — render-based", () => {
     });
   });
 
-  describe("heatmap animation prop passthrough", () => {
+  describe("stats display animation (statsDisplay prop)", () => {
+    it("threads isAnimated=false to useAnimatedCounter by default (statsDisplay defaults to static)", () => {
+      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(useAnimatedCounterMock).toHaveBeenCalled();
+      const [, , , isAnimated] = useAnimatedCounterMock.mock.calls[0]!;
+      expect(isAnimated).toBe(false);
+    });
+
+    it("threads statsDisplay=animated-spring to isAnimated/easing args", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} statsDisplay="animated-spring" />,
+      );
+      expect(useAnimatedCounterMock).toHaveBeenCalled();
+      const [, , easing, isAnimated] = useAnimatedCounterMock.mock.calls[0]!;
+      expect(isAnimated).toBe(true);
+      expect(easing).toBe("spring");
+    });
+  });
+
+  describe("heatmap", () => {
+    it("passes heatmapData from stats to HeatmapGrid", () => {
+      render(
+        <BadgeContent
+          stats={makeStats({
+            heatmapData: [
+              { date: "2025-01-01", count: 1 },
+              { date: "2025-01-02", count: 2 },
+              { date: "2025-01-03", count: 3 },
+            ],
+          })}
+          impact={makeImpact()}
+        />,
+      );
+      const grid = screen.getByTestId("heatmap-grid");
+      expect(grid.getAttribute("data-count")).toBe("3");
+    });
+
+    it("labels the heatmap section 'Activity', not 'Contributions'", () => {
+      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(screen.getByText("Activity")).toBeDefined();
+      expect(screen.queryByText(/Contributions/)).toBeNull();
+    });
+
     it("passes heatmapAnimation to HeatmapGrid", () => {
       render(
         <BadgeContent stats={makeStats()} impact={makeImpact()} heatmapAnimation="ripple" />,
@@ -545,6 +448,46 @@ describe("BadgeContent — render-based", () => {
       );
       const grid = screen.getByTestId("heatmap-grid");
       expect(grid.getAttribute("data-animation")).toBe("fade-in");
+    });
+  });
+
+  describe("radar chart", () => {
+    it("renders the radar SVG with viewBox 0 0 140 140", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      expect(container.querySelector('svg[viewBox="0 0 140 140"]')).not.toBeNull();
+    });
+
+    it("renders 4 guide ring polygons", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const guideRings = container.querySelectorAll('svg polygon[fill="none"]');
+      expect(guideRings.length).toBe(4);
+    });
+
+    it("renders the data polygon at coordinates derived from the impact dimensions", () => {
+      const dimensions = { delivery: 90, quality: 40, consistency: 65, breadth: 10 };
+      const { container } = render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({ dimensions })}
+        />,
+      );
+      const dataPolygon = container.querySelector('svg polygon[fill="var(--color-purple-tint)"]');
+      expect(dataPolygon).not.toBeNull();
+      expect(dataPolygon!.getAttribute("points")).toBe(expectedDataPolygonPoints(dimensions));
+    });
+
+    it("shows the Developer Profile label", () => {
+      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(screen.getByText("Developer Profile")).toBeDefined();
+    });
+
+    it("renders the abbreviated 'Consist' radar axis label", () => {
+      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(screen.getByText("Consist")).toBeDefined();
     });
   });
 
@@ -563,6 +506,13 @@ describe("BadgeContent — render-based", () => {
       );
       const root = screen.getByTestId("badge-content");
       expect(root.style.maxWidth).toBe("400px");
+    });
+  });
+
+  describe("footer", () => {
+    it("shows the domain URL", () => {
+      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(screen.getByText("chapa.thecreativetoken.com")).toBeDefined();
     });
   });
 

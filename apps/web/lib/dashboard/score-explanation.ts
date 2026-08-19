@@ -1,9 +1,9 @@
 import type {
+  ClientImpactV6Result,
   ConfidenceFlag,
   CraftResult,
   DimensionScores,
   ImpactTier,
-  ImpactV6Result,
   Platform,
   StatsData,
 } from "@chapa/shared";
@@ -127,7 +127,10 @@ function buildPlatformProvenance(platform: Platform, stats: StatsData): Platform
 }
 
 export function buildScoreExplanation(
-  impact: ImpactV6Result,
+  // #1067 — impact may be a redacted PublicImpactV6Result (no
+  // confidence/confidencePenalties keys at all) for a non-owner share-page
+  // visitor. Narrow with "in" below rather than assuming the field exists.
+  impact: ClientImpactV6Result,
   stats: StatsData,
   craftResult: CraftResult | null = null,
 ): ScoreExplanation {
@@ -158,9 +161,15 @@ export function buildScoreExplanation(
     },
     dimensions,
     dataSources: platforms.map((platform) => buildPlatformProvenance(platform, stats)),
+    // #1067 — a redacted (visitor) impact has neither key at all. This
+    // section is never rendered to a visitor (ScoreExplanationPanel gates
+    // it on isOwner), so the 0/[] defaults below are never displayed —
+    // they only keep this function total over both impact shapes.
     confidence: {
-      value: impact.confidence,
-      penalties: (impact.confidencePenalties ?? []).map(({ flag, penalty }) => ({ flag, penalty })),
+      value: "confidence" in impact ? impact.confidence : 0,
+      penalties: (
+        "confidencePenalties" in impact ? impact.confidencePenalties ?? [] : []
+      ).map(({ flag, penalty }) => ({ flag, penalty })),
     },
   };
 }

@@ -472,6 +472,140 @@ describe("GET /u/[handle]/badge.svg", () => {
         expect.any(Number),
       );
     });
+
+    it("writes the standard SVG cache when remote avatar absence is definitive", async () => {
+      mockGetAvatarBase64.mockResolvedValue(undefined);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+      expect(mockCacheSet.mock.calls[0]![2]).toBeGreaterThanOrEqual(86400);
+    });
+
+    // A transient avatar failure that settles before the deadline can still
+    // heal on retry. It must not make the avatar-less SVG the 24-hour value.
+    it("#1080: writes the SVG cache when the handle has no avatarUrl at all (nothing to fetch)", async () => {
+      mockMaterializePublicProfile.mockResolvedValue({
+        ...FAKE_MATERIALIZED,
+        stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: undefined },
+      });
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+    });
+
+    it("withholds the SVG cache when the avatar fetch fails transiently before the deadline", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("503 from CDN"));
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("#1080: still withholds the SVG cache write when the avatar fetch genuinely times out against the deadline", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await responsePromise;
+
+        expect(mockCacheSet).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  // #1088 (PE-M1) — a handle whose stats carry NO avatarUrl at all (a
+  // permanent condition, not a race-timeout) was previously gated by the
+  // same `avatarResolved` check as a genuine in-flight race loss, so the
+  // shared SVG cache was NEVER populated for it — every single request
+  // forced a full materialize+render forever. This must be distinguished
+  // from the genuine race-timeout case above (#1029), which still must NOT
+  // write the cache.
+  describe("permanent avatar absence caching (#1088)", () => {
+    const NO_AVATAR_MATERIALIZED = {
+      ...FAKE_MATERIALIZED,
+      stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: undefined },
+    };
+
+    it("writes a short-TTL cache entry when stats.avatarUrl is absent (not attempted, not a race-timeout)", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      // No avatarUrl to fetch — getAvatarBase64 must never be called.
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+      const ttl = mockCacheSet.mock.calls[0]![2] as number;
+      // Short-TTL placeholder (15-30 min), not the full 24h+jitter write a
+      // resolved avatar gets, and not zero/no-write like a race-timeout.
+      expect(ttl).toBeGreaterThanOrEqual(900);
+      expect(ttl).toBeLessThanOrEqual(1800);
+    });
+
+    it("the short-TTL write does not exceed a normal full-day write's TTL floor", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      const ttl = mockCacheSet.mock.calls[0]![2] as number;
+      expect(ttl).toBeLessThan(86400);
+    });
+
+    it("does not write the cache at all for a genuine race-timeout (avatarUrl present, fetch too slow) — unaffected by the permanent-absence path", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+        await vi.advanceTimersByTimeAsync(1000);
+        await responsePromise;
+
+        expect(mockCacheSet).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("skips the cache write entirely when unverified, even with a permanently-absent avatar", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(NO_AVATAR_MATERIALIZED);
+      mockGetPublicProfileVerification.mockReturnValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
   });
 
   describe("SVG full-response cache (#717)", () => {
@@ -692,6 +826,138 @@ describe("GET /u/[handle]/badge.svg", () => {
       const res = await GET(req, ctx);
 
       expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+    });
+  });
+
+  // #1086 (PE-H1) — nothing bounded the SUM of the cache-miss path's steps;
+  // materializePublicProfile alone could take up to the 30s inflight cap, on
+  // top of the route's own cache/lock/avatar ceilings. The route now races
+  // materialize against a hard deadline, but ONLY when a stale (yesterday's)
+  // SVG exists to fall back on — a brand-new handle with no stale key must
+  // not be starved by a cutoff shorter than a legitimate cold GitHub fetch.
+  describe("materialize deadline fallback (#1086 / PE-H1)", () => {
+    const STALE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">STALE</svg>';
+
+    function deferredMaterialize() {
+      let resolve!: (value: typeof FAKE_MATERIALIZED) => void;
+      const promise = new Promise<typeof FAKE_MATERIALIZED>((res) => {
+        resolve = res;
+      });
+      mockMaterializePublicProfile.mockReturnValue(promise);
+      return { resolve };
+    }
+
+    it("serves yesterday's stale SVG once materialize exceeds the deadline, then finishes materializing (and warms the cache) in the background", async () => {
+      vi.useFakeTimers();
+      try {
+        mockCacheGet
+          .mockResolvedValueOnce(null) // today's SVG cache: miss
+          .mockResolvedValueOnce(STALE_SVG); // yesterday's stale SVG: hit
+        const { resolve } = deferredMaterialize();
+
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        // Past the deadline — materialize still hasn't resolved.
+        await vi.advanceTimersByTimeAsync(2300);
+        const res = await responsePromise;
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe(STALE_SVG);
+        // A short s-maxage — this is a degraded response, not the normal
+        // 24h-cacheable badge.
+        const cacheControl = res.headers.get("Cache-Control");
+        expect(cacheControl).toMatch(/s-maxage=\d+/);
+        expect(cacheControl).not.toBe(
+          "public, s-maxage=21600, stale-while-revalidate=86400",
+        );
+        // The full render pipeline has not run yet — we returned before
+        // materialize settled.
+        expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+
+        // Now let the original materialize call finish in the background.
+        resolve(FAKE_MATERIALIZED);
+        await flushAfterCallbacks();
+
+        expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+          FAKE_MATERIALIZED.stats,
+          FAKE_MATERIALIZED.displayImpact,
+          expect.objectContaining({ disableAnimation: true }),
+        );
+        // The next request for this handle is warmed with the real render.
+        expect(mockCacheSet).toHaveBeenCalledWith(
+          expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+          FAKE_SVG,
+          expect.any(Number),
+        );
+        expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+          "testuser",
+          FAKE_MATERIALIZED,
+          { readOnly: false },
+        );
+        expect(mockDeferProfileCacheWork).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not apply the deadline when no stale SVG exists — first-time badge generation is not starved", async () => {
+      vi.useFakeTimers();
+      try {
+        // Neither today's nor yesterday's key has anything cached.
+        mockCacheGet.mockResolvedValue(null);
+        mockMaterializePublicProfile.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              // Resolves well past the deadline, but this is a legitimate
+              // cold fetch — it must not be cut off early.
+              setTimeout(() => resolve(FAKE_MATERIALIZED), 2500);
+            }),
+        );
+
+        const [req, ctx] = makeRequest("brandnewhandle", { "x-forwarded-for": "9.9.9.9" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(2500);
+        const res = await responsePromise;
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe(FAKE_SVG);
+        expect(mockRenderBadgeSvg).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not race a read-only (smoke) request against the deadline even when a stale SVG exists", async () => {
+      vi.useFakeTimers();
+      try {
+        mockCacheGet
+          .mockResolvedValueOnce(null) // today's SVG cache: miss
+          .mockResolvedValueOnce(STALE_SVG); // yesterday's stale SVG: hit
+        mockMaterializePublicProfile.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              setTimeout(() => resolve(FAKE_MATERIALIZED), 2500);
+            }),
+        );
+
+        const [req, ctx] = makeRequest(
+          "testuser",
+          { "x-forwarded-for": "1.2.3.4" },
+          "?__chapa_smoke=1",
+        );
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(2500);
+        const res = await responsePromise;
+
+        // The smoke request waited for the real (slow) materialize result
+        // rather than short-circuiting to the stale SVG.
+        expect(await res.text()).toBe(FAKE_SVG);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

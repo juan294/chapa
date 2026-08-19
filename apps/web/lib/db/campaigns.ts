@@ -25,6 +25,7 @@ export type {
 export {
   CampaignRowSchema,
   CampaignSendRowSchema,
+  CampaignStatsReadError,
   mapCampaignRow,
   mapSendRow,
   dbGetCampaigns,
@@ -38,6 +39,7 @@ export {
   dbCreateCampaignSends,
   dbGetPendingSends,
   dbClaimPendingSends,
+  dbReleaseCampaignSendLease,
   dbAcknowledgeCampaignSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,

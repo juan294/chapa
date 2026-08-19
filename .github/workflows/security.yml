@@ -3,14 +3,34 @@ name: Security Scan
 on:
   push:
     branches: [develop, main]
+    paths-ignore:
+      - "docs/research/**"
+      - "docs/plans/**"
+      - "docs/agents/**"
   pull_request:
     branches: [develop, main]
   schedule:
     - cron: "0 8 * * 1" # Weekly Monday 08:00 UTC
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' && github.ref != 'refs/heads/main' }}
+
 jobs:
+  develop_push_source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    uses: ./.github/workflows/validate-merged-pr.yml
+    with:
+      required_checks: '["Vulnerability scan (osv-scanner)","License compliance"]'
+
   audit:
     name: Vulnerability scan (osv-scanner)
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -37,6 +57,8 @@ jobs:
 
   license-check:
     name: License compliance
+    needs: develop_push_source
+    if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

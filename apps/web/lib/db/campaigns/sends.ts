@@ -1,7 +1,8 @@
 /**
  * Supabase data access — campaign send operations (recipients, claim/ack lifecycle).
  *
- * All operations fail-open (return sensible defaults when DB is unavailable).
+ * Mutating and queue-reading operations fail-open when the DB is unavailable.
+ * Campaign stats fail loudly because they govern terminal campaign state.
  */
 
 import { getSupabase } from "../supabase";
@@ -11,10 +12,23 @@ import {
   CampaignSendStats,
   CAMPAIGN_SEND_ROW_REQUIRED_KEYS,
   CLAIM_CLEAR_FIELDS,
-  isCampaignSendStatus,
   mapSendRow,
   parseRows,
 } from "./types";
+
+/**
+ * A campaign's terminal state cannot be decided when its send counts cannot
+ * be read. Callers must treat this as a retryable processing failure.
+ */
+export class CampaignStatsReadError extends Error {
+  readonly campaignId: string;
+
+  constructor(campaignId: string, cause: unknown) {
+    super(`Failed to read campaign stats for "${campaignId}"`, { cause });
+    this.name = "CampaignStatsReadError";
+    this.campaignId = campaignId;
+  }
+}
 
 /**
  * Upsert `campaign_sends` rows for each recipient. Uses `onConflict: campaign_id,handle`
@@ -139,6 +153,47 @@ export async function dbClaimPendingSends(
       (error as Error).message,
     );
     return [];
+  }
+}
+
+/**
+ * Release a claimed lease group back to `pending`.
+ *
+ * Used when a recovered expired-lease group — returned whole by
+ * `claim_campaign_sends`, ignoring the requested limit, to preserve an
+ * identical payload for provider idempotency (see `dbClaimPendingSends`) —
+ * exceeds the remaining daily send quota. Re-claiming that group again would
+ * just refresh its lease under a fresh window without making progress, so it
+ * is released back to `pending` instead. The database function deliberately
+ * leaves `group_token` untouched so a later claim recovers the exact same
+ * membership rather than splitting it across smaller batches, which would
+ * break provider-side idempotency for an earlier ambiguous attempt (#1085).
+ *
+ * @param expectedCount - Number of rows the caller expects to release (from
+ *   its own claim result). A mismatch fails closed (returns false) so a
+ *   caller never silently under- or over-releases the group it holds.
+ */
+export async function dbReleaseCampaignSendLease(
+  leaseToken: string,
+  expectedCount: number,
+): Promise<boolean> {
+  if (!leaseToken.trim() || expectedCount <= 0) return false;
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const { data, error } = await db.rpc("release_campaign_send_lease", {
+      p_lease_token: leaseToken,
+    });
+
+    if (error) throw error;
+    return data === expectedCount;
+  } catch (error) {
+    console.error(
+      "[db] dbReleaseCampaignSendLease failed:",
+      (error as Error).message,
+    );
+    return false;
   }
 }
 
@@ -268,46 +323,57 @@ export async function dbMarkSendsFailed(
 }
 
 /**
- * Aggregate send status counts for a campaign in a single round trip.
+ * Read exact send status counts for a campaign from one database snapshot.
  *
- * Fetches only the `status` column for every send row and reduces counts in
- * JS. Previously issued 4 parallel COUNT queries (one per status) — this
- * fetches once instead (cost P2-1). Callers are the `process-campaigns` cron
- * batch path only, so row volume per call is bounded by a campaign's
- * recipient list, not unbounded traffic.
+ * The aggregate RPC returns one row and uses the existing
+ * `(campaign_id, status)` index. A single SQL statement prevents independent
+ * status reads from observing different sides of a concurrent transition.
  *
  * @param id - Campaign UUID
- * @returns Counts of sent, pending, processing, and failed sends (defaults to 0)
+ * @returns Counts of sent, pending, processing, and failed sends
+ * @throws {CampaignStatsReadError} when the complete count cannot be read
  */
 export async function dbGetCampaignStats(
   id: string,
 ): Promise<CampaignSendStats> {
   const db = getSupabase();
-  if (!db) return { sent: 0, pending: 0, processing: 0, failed: 0 };
+  if (!db) {
+    throw new CampaignStatsReadError(id, new Error("Supabase unavailable"));
+  }
 
   try {
-    const { data, error } = await db
-      .from("campaign_sends")
-      .select("status")
-      .eq("campaign_id", id);
-
+    const { data, error } = await db.rpc("get_campaign_send_stats", {
+      p_campaign_id: id,
+    });
     if (error) throw error;
 
-    const stats: CampaignSendStats = {
-      sent: 0,
-      pending: 0,
-      processing: 0,
-      failed: 0,
-    };
-    for (const row of (data ?? []) as { status: string }[]) {
-      if (isCampaignSendStatus(row.status)) stats[row.status]++;
+    const row = Array.isArray(data) ? data[0] : undefined;
+    const keys = ["sent", "pending", "processing", "failed"] as const;
+    if (
+      !row ||
+      typeof row !== "object" ||
+      !keys.every(
+        (key) =>
+          typeof (row as Record<string, unknown>)[key] === "number" &&
+          Number.isSafeInteger((row as Record<string, unknown>)[key]) &&
+          ((row as Record<string, unknown>)[key] as number) >= 0,
+      )
+    ) {
+      throw new Error("Malformed campaign stats response");
     }
-    return stats;
+
+    const stats = row as unknown as CampaignSendStats;
+    return {
+      sent: stats.sent,
+      pending: stats.pending,
+      processing: stats.processing,
+      failed: stats.failed,
+    };
   } catch (error) {
     console.error(
       "[db] dbGetCampaignStats failed:",
       (error as Error).message,
     );
-    return { sent: 0, pending: 0, processing: 0, failed: 0 };
+    throw new CampaignStatsReadError(id, error);
   }
 }

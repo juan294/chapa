@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { ScoreExplanationPanel } from "@/components/dashboard/ScoreExplanationPanel";
@@ -89,10 +89,12 @@ function EmptyImpactState({ handle }: { handle: string }) {
 interface SharePageOwnerContentProps {
   handle: string;
   stats: StatsData | null;
-  impact: ImpactV6Result | null;
+  // #1067 — redacted PublicImpactV6Result for a non-owner visitor, full
+  // ImpactV6Result for the owner (see SharePageOwnerContentLazy).
+  impact: ClientImpactV6Result | null;
   craftResult?: CraftResult | null;
   trend?: TrendSummary | null;
-  diff?: SnapshotDiff | null;
+  diff?: ClientSnapshotDiff | null;
 }
 
 export function SharePageOwnerContent({
@@ -138,7 +140,6 @@ export function SharePageOwnerContent({
           <ImpactDashboard
             impact={impact}
             stats={stats}
-            handle={handle}
             craftResult={craftResult}
             trend={trend}
             diff={diff}

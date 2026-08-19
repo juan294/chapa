@@ -127,6 +127,7 @@ vi.mock("@/components/terminal/TerminalInput", () => ({
   }) => (
     <div data-testid="terminal-input">
       <input
+        id="terminal-command-input"
         aria-label="Terminal command input"
         data-prompt={prompt}
         onChange={(e) => onPartialChange(e.target.value)}
@@ -281,6 +282,20 @@ describe("StudioClient render", () => {
       );
       const heading = screen.getByRole("heading", { level: 1 });
       expect(heading.textContent).toBe("Creator Studio");
+      expect(heading.className).toContain("sr-only");
+    });
+  });
+
+  describe("responsive layout", () => {
+    it("uses a two-column grid on large screens", () => {
+      const { container } = render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(container.firstElementChild?.className).toContain("lg:grid-cols-2");
     });
   });
 
@@ -487,10 +502,14 @@ describe("StudioClient render", () => {
         expect(screen.getByText("Saving...")).toBeDefined();
       });
 
+      const previewPane = screen.getByTestId("badge-preview").closest("[aria-busy]");
+      expect(previewPane?.getAttribute("aria-busy")).toBe("true");
+
       fetchSpy.mockRestore();
     });
 
-    it("adds success line to output on save success", async () => {
+    it("adds success line to output on save success, PUTs the config as JSON, and tracks config_saved", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(new Response("{}", { status: 200 }));
@@ -521,6 +540,21 @@ describe("StudioClient render", () => {
         const lineCount = parseInt(output.textContent?.match(/(\d+) lines/)?.[1] ?? "0", 10);
         expect(lineCount).toBeGreaterThanOrEqual(4);
       });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/studio/config",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(defaultConfig),
+        }),
+      );
+      expect(trackEvent).toHaveBeenCalledWith(
+        "config_saved",
+        expect.objectContaining({ config: defaultConfig }),
+      );
+
+      const previewPane = screen.getByTestId("badge-preview").closest("[aria-busy]");
+      expect(previewPane?.getAttribute("aria-busy")).toBe("false");
 
       fetchSpy.mockRestore();
     });
@@ -960,6 +994,54 @@ describe("StudioClient render", () => {
         />,
       );
       expect(screen.getByText("Creator Studio")).toBeDefined();
+    });
+  });
+
+  describe("reduced motion", () => {
+    it("shows the reduced-motion notice and disables preview interactivity when the media query matches", () => {
+      const original = window.matchMedia;
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      try {
+        render(
+          <StudioClient
+            initialConfig={defaultConfig}
+            stats={stats}
+            impact={impact}
+          />,
+        );
+
+        expect(
+          screen.getByText(/Reduced motion detected/),
+        ).toBeDefined();
+        const preview = screen.getByTestId("badge-preview");
+        expect(preview.getAttribute("data-interactive")).toBe("false");
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+
+    it("hides the reduced-motion notice and keeps preview interactive when the media query does not match", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      expect(screen.queryByText(/Reduced motion detected/)).toBeNull();
+      const preview = screen.getByTestId("badge-preview");
+      expect(preview.getAttribute("data-interactive")).toBe("true");
     });
   });
 });

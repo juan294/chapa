@@ -95,7 +95,15 @@ describe("RootLayout render", () => {
       }),
     );
 
-    expect(screen.getByText("Skip to main content")).toBeTruthy();
+    // Root-level copy sits outside per-page locale providers. Both supported
+    // labels are present and CSS selects the one matching <html lang> after a
+    // locale-segmented page synchronizes the document language.
+    const spanishSkip = screen.getByText("Saltar al contenido principal");
+    const englishSkip = screen.getByText("Skip to main content");
+    expect(spanishSkip.getAttribute("lang")).toBe("es");
+    expect(spanishSkip.getAttribute("data-document-locale")).toBe("es");
+    expect(englishSkip.getAttribute("lang")).toBe("en");
+    expect(englishSkip.getAttribute("data-document-locale")).toBe("en");
     expect(screen.getByTestId("theme-provider")).toBeTruthy();
     expect(
       screen.getByTestId("feature-flags").getAttribute("data-studio"),

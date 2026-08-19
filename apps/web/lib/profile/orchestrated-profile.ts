@@ -2,6 +2,7 @@ import {
   materializeProfile,
   type MaterializedProfile,
 } from "./materialize-profile";
+import { guardStatsComplete } from "./persist-guard";
 import {
   reconcileSnapshotWrite,
   type SnapshotPersistenceMode,
@@ -31,6 +32,14 @@ export async function persistOrchestratedSnapshot(
   materialized: MaterializedProfile,
   options: { mode: SnapshotPersistenceMode },
 ): Promise<boolean> {
+  // #1076 — This orchestrated writer backs warm-cache, /api/refresh,
+  // /api/recalculate, and /api/admin/bulk-recalculate, and previously
+  // bypassed the shared persist-boundary gate entirely (only
+  // lib/profile/public-profile.ts's persistProfileSnapshot enforced it).
+  if (!guardStatsComplete(handle, materialized)) {
+    return false;
+  }
+
   // The durable Supabase write and the Redis cache mirror are reconciled as
   // one envelope: a partial failure (durable ok, cache stale) emits an
   // operational alert rather than being swallowed (#975). Callers branch on

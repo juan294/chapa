@@ -6,154 +6,37 @@ const SOURCE = [
   fs.readFileSync(path.resolve(__dirname, "page.tsx"), "utf-8"),
   fs.readFileSync(path.resolve(__dirname, "VerifyInputPageClient.tsx"), "utf-8"),
 ].join("\n");
-const EN_DICT = fs.readFileSync(
-  path.resolve(__dirname, "../../lib/i18n/dictionaries/en.ts"),
-  "utf-8",
-);
-const ES_DICT = fs.readFileSync(
-  path.resolve(__dirname, "../../lib/i18n/dictionaries/es.ts"),
-  "utf-8",
-);
 
-describe("Verify input page", () => {
-  describe("metadata", () => {
-    it("exports generateMetadata (locale-aware, async)", () => {
-      expect(SOURCE).toContain("generateMetadata");
+// #1104: generateMetadata's actual output (title/description/robots), the
+// dictionary copy (hash-format instructions, verified-vs-public limits, EN
+// and ES), the h1 heading, VerifyForm rendering, and the main-content
+// landmark are now covered by real invocation/render+query assertions in
+// simple-pages.render.test.tsx. What remains here has no runtime-observable
+// equivalent: route-segment config and the client query synchronization leaf.
+describe("Verify input page — non-renderable architecture checks", () => {
+  describe("request-locale rendering", () => {
+    it("resolves metadata and the initial provider from the request locale", () => {
+      expect(SOURCE).toContain('export const dynamic = "force-dynamic"');
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).toContain("searchParams");
+      expect(SOURCE).toContain("initialLocale={locale}");
     });
 
-    it("uses getServerT for metadata title", () => {
-      expect(SOURCE).toContain("getServerT");
-    });
-
-    it("includes description in metadata", () => {
-      expect(SOURCE).toContain("description:");
-    });
-
-    it("disables indexing (robots noindex)", () => {
-      expect(SOURCE).toContain("index: false");
+    it("does not use static default-locale metadata", () => {
+      expect(SOURCE).not.toContain('export const dynamic = "force-static"');
+      expect(SOURCE).not.toContain("export const revalidate = 3600");
     });
   });
 
-  describe("static/ISR rendering", () => {
-    it("renders from DEFAULT_LOCALE instead of request-time locale APIs", () => {
-      expect(SOURCE).toContain('export const dynamic = "force-static"');
-      expect(SOURCE).toContain("export const revalidate = 3600");
-      expect(SOURCE).toContain("DEFAULT_LOCALE");
-      expect(SOURCE).not.toContain("getServerLocale");
-    });
-
-    it("does not force dynamic rendering", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
-    });
-
-    it("does not use the old SPANISH_PUBLIC_COPY import", () => {
-      expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
-    });
-  });
-
-  describe("default export", () => {
-    it("exports a default function component", () => {
-      expect(SOURCE).toContain("export default function VerifyInputPage");
-    });
-
+  describe("query-locale override (client-side, not render-harness-observable)", () => {
     it("applies an explicit query locale on the static landing page", () => {
       expect(SOURCE).toContain("useSearchParams");
       expect(SOURCE).toContain('searchParams?.get("lang")');
       expect(SOURCE).toContain("<LocaleSync queryLang=");
     });
 
-    it("keeps the static metadata title coherent with the active locale", () => {
-      expect(SOURCE).toContain("document.title =");
-      expect(SOURCE).toContain("t('verify.title')");
-    });
-  });
-
-  describe("heading hierarchy", () => {
-    it("has an h1 heading", () => {
-      expect(SOURCE).toContain("<h1");
-    });
-
-    it("heading includes complement color for verification CTA", () => {
-      expect(SOURCE).toContain("text-complement");
-    });
-
-    it("verify page title copy is in the English dictionary", () => {
-      expect(EN_DICT).toContain("badge");
-    });
-  });
-
-  describe("form integration", () => {
-    it("renders VerifyForm component", () => {
-      expect(SOURCE).toContain("<VerifyForm");
-    });
-
-    it("imports VerifyForm", () => {
-      expect(SOURCE).toContain("VerifyForm");
-    });
-  });
-
-  describe("instructions", () => {
-    it("hash format instructions are in the English dictionary", () => {
-      expect(EN_DICT).toContain("8, 16, or 32-character");
-    });
-
-    it("hint about where to find the hash is in the English dictionary", () => {
-      expect(EN_DICT).toContain("right edge");
-    });
-
-    it("limits hash claims to badges marked Verified metrics", () => {
-      expect(EN_DICT).toContain("badge marked Verified metrics");
-      expect(EN_DICT).toContain(
-        "Badges marked Public metrics do not claim cryptographic verification",
-      );
-      expect(EN_DICT).not.toContain("from any Chapa badge");
-    });
-
-    it("states the same verified-versus-public limit in Spanish", () => {
-      expect(ES_DICT).toContain("Métricas verificadas");
-      expect(ES_DICT).toContain(
-        "Métricas públicas» no afirman tener verificación criptográfica",
-      );
-    });
-
-    it("uses getServerT() for all page copy (i18n-integrated)", () => {
-      expect(SOURCE).toContain("getServerT");
-    });
-  });
-
-  describe("terminal command pattern", () => {
-    it("has terminal command line for verify", () => {
-      expect(SOURCE).toContain("chapa verify");
-    });
-
-    it("uses $ prefix in terminal-dim", () => {
-      expect(SOURCE).toContain("text-terminal-dim");
-    });
-  });
-
-  describe("design system compliance", () => {
-    it("uses semantic background token", () => {
-      expect(SOURCE).toContain("bg-bg");
-    });
-
-    it("uses NavbarClient (ISR-compatible)", () => {
-      expect(SOURCE).toContain("NavbarClient");
-    });
-
-    it("has main landmark with id", () => {
-      expect(SOURCE).toContain('id="main-content"');
-    });
-
-    it("uses font-heading", () => {
-      expect(SOURCE).toContain("font-heading");
-    });
-
-    it("uses border-l border-stroke for content", () => {
-      expect(SOURCE).toContain("border-l border-stroke");
-    });
-
-    it("uses animate-fade-in-up", () => {
-      expect(SOURCE).toContain("animate-fade-in-up");
+    it("leaves title ownership with request-resolved server metadata", () => {
+      expect(SOURCE).not.toContain("document.title =");
     });
   });
 });

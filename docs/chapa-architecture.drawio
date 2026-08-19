@@ -59,7 +59,7 @@
     <mxCell id="cookiepol" value="Cookie Policy&#10;lib/auth/cookie-policy" style="rounded=1;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="oauth">
       <mxGeometry x="225" y="90" width="195" height="38" as="geometry"/>
     </mxCell>
-    <mxCell id="oauthstate" value="OAuth State&#10;Redis-backed CSRF" style="rounded=1;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="oauth">
+    <mxCell id="oauthstate" value="OAuth State&#10;Per-platform cookie CSRF" style="rounded=1;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="oauth">
       <mxGeometry x="430" y="90" width="200" height="38" as="geometry"/>
     </mxCell>
     <mxCell id="tokenstore" value="GitHub Token Store&#10;lib/auth/github-session-token" style="rounded=1;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="oauth">
@@ -71,8 +71,8 @@
     <mxCell id="authep" value="Auth Endpoints&#10;/api/auth/*" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="api">
       <mxGeometry x="20" y="35" width="160" height="45" as="geometry"/>
     </mxCell>
-    <mxCell id="pubep" value="Public Endpoints&#10;/api/profile · /api/version&#10;/u/:handle/badge.svg" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
-      <mxGeometry x="210" y="35" width="180" height="45" as="geometry"/>
+    <mxCell id="pubep" value="Public Endpoints&#10;/api/profile · /api/history&#10;/api/version · /u/:handle/badge.svg" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="api">
+      <mxGeometry x="210" y="35" width="180" height="52" as="geometry"/>
     </mxCell>
     <mxCell id="privep" value="Authenticated Endpoints&#10;/api/refresh, /api/generate, /api/supplemental" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
       <mxGeometry x="420" y="35" width="200" height="45" as="geometry"/>
@@ -125,7 +125,7 @@
     <mxCell id="emailcampaign" value="Email + Campaigns · lib/email/ · lib/campaigns/&#10;Atomic lease claim · full-batch ack · stable retry identity" style="rounded=1;whiteSpace=wrap;fillColor=#edf7ed;strokeColor=#82b366;fontSize=10;" vertex="1" parent="engine">
       <mxGeometry x="440" y="157" width="420" height="44" as="geometry"/>
     </mxCell>
-    <mxCell id="i18nmod" value="i18n System&#10;(lib/i18n/)&#10;detect · en/es dicts · cookie · server + client t()" style="rounded=1;whiteSpace=wrap;fillColor=#fff8e6;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
+    <mxCell id="i18nmod" value="i18n System&#10;(lib/i18n/) · proxy.ts rewrite&#10;9 app/[locale]/* SSG content pages" style="rounded=1;whiteSpace=wrap;fillColor=#fff8e6;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
       <mxGeometry x="20" y="210" width="260" height="44" as="geometry"/>
     </mxCell>
     <mxCell id="dashmod" value="Dashboard Components&#10;(lib/dashboard/)&#10;generate-insights · DimensionCard · SubMetric" style="rounded=1;whiteSpace=wrap;fillColor=#fff8e6;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
@@ -143,10 +143,10 @@
     <mxCell id="redis" value="Upstash&#10;Redis" style="shape=cylinder3;whiteSpace=wrap;fillColor=#fff;strokeColor=#9673a6;size=12;fontSize=11;" vertex="1" parent="data">
       <mxGeometry x="220" y="35" width="140" height="70" as="geometry"/>
     </mxCell>
-    <mxCell id="supatables" value="Tables:&#10;users · user_platforms&#10;metrics_snapshots · tool_insights&#10;email_campaigns · campaign_sends&#10;merge_operations · feature_flags&#10;verification_records · studio_configs&#10;supplemental_stats" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
+    <mxCell id="supatables" value="Tables:&#10;users · user_platforms&#10;metrics_snapshots · tool_insights&#10;email_campaigns · campaign_sends&#10;merge_operations · feature_flags&#10;verification_records · studio_configs&#10;supplemental_stats&#10;Views: admin_users · latest_snapshots" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
       <mxGeometry x="15" y="115" width="170" height="135" as="geometry"/>
     </mxCell>
-    <mxCell id="rediskeys" value="Keys:&#10;stats:v2:* · stats:stale:*&#10;ratelimit:* · oauthstate:*&#10;sideeffects:done:*&#10;supplemental:&lt;handle&gt; (24h)&#10;stats:dirty:&lt;handle&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
+    <mxCell id="rediskeys" value="Keys:&#10;stats:v2:merged:* · stats:stale:v2:*&#10;ratelimit:* · svg:badge:*&#10;sideeffects:done:*&#10;supplemental:&lt;handle&gt; (24h)&#10;stats:dirty:&lt;handle&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#f0e8f5;strokeColor=#9673a6;fontSize=9;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="data">
       <mxGeometry x="205" y="115" width="200" height="135" as="geometry"/>
     </mxCell>
     <mxCell id="cli" value="CLI (packages/cli/)" style="swimlane;startSize=26;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">

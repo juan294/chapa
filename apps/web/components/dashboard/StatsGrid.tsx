@@ -2,7 +2,7 @@
 
 import type { StatsData } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { DeltaIndicator } from "./DeltaIndicator";
 import { useTranslation } from "@/lib/i18n";
@@ -16,7 +16,7 @@ interface StatItem {
 
 interface StatsGridProps {
   stats: StatsData;
-  diff: SnapshotDiff | null;
+  diff: ClientSnapshotDiff | null;
 }
 
 export function StatsGrid({ stats, diff }: StatsGridProps) {

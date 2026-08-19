@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
 import { AuthorTypewriter } from "./AuthorTypewriter";
+import { LanguageProvider } from "@/lib/i18n/provider";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 let matchMediaResult = true; // true = reduced motion (skip animation)
 
@@ -38,6 +40,15 @@ describe("AuthorTypewriter", () => {
     it("has aria-label with author name", () => {
       render(<AuthorTypewriter />);
       expect(screen.getByLabelText(/Made by/)).toBeDefined();
+    });
+
+    it("localizes the author trigger label", () => {
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <AuthorTypewriter />
+        </LanguageProvider>,
+      );
+      expect(screen.getByLabelText("Hecho por Juan González")).toBeDefined();
     });
 
     it("renders initial home text", () => {
