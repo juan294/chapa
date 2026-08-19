@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { useContext } from "react";
+import { LanguageContext, LanguageProvider } from "@/lib/i18n/provider";
+import { LangSync } from "@/lib/i18n/lang-sync";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 // page.tsx computes the demo badge SVG at module scope, resolves the
 // [locale] route param, and calls the REAL getServerT(locale) — this is the
@@ -32,7 +36,17 @@ vi.mock("@/components/ErrorBanner", () => ({
 }));
 
 vi.mock("@/components/NavbarClient", () => ({
-  NavbarClient: () => <nav data-testid="navbar" />,
+  NavbarClient: () => {
+    const language = useContext(LanguageContext);
+    const links = language?.t("landing.navLinks") as
+      | { label: string; href: string }[]
+      | undefined;
+    return (
+      <nav data-testid="navbar" data-locale={language?.locale}>
+        {links?.[0]?.label}
+      </nav>
+    );
+  },
 }));
 
 vi.mock("@/lib/auth/error-messages", () => ({
@@ -54,13 +68,21 @@ vi.mock("@/lib/i18n", async (importOriginal) => {
 
 beforeEach(() => {
   window.history.pushState({}, "", "/");
+  document.cookie = "chapa-locale=; Max-Age=0; path=/";
 });
 afterEach(cleanup);
 
 async function renderHome(locale: "en" | "es" = "en") {
   const { default: Home } = await import("./page");
   const jsx = await Home({ params: Promise.resolve({ locale }) });
-  return render(jsx);
+  // Match production: the static root layout owns the default Spanish
+  // provider, while the locale-segmented page may need to override it.
+  return render(
+    <LanguageProvider initialLocale="es" dictionary={es}>
+      <LangSync />
+      {jsx}
+    </LanguageProvider>,
+  );
 }
 
 describe("Home page render (en)", () => {
@@ -72,7 +94,10 @@ describe("Home page render (en)", () => {
 
   it("renders the navbar", async () => {
     await renderHome();
-    expect(screen.getByTestId("navbar")).toBeDefined();
+    const navbar = screen.getByTestId("navbar");
+    expect(navbar.dataset.locale).toBe("en");
+    expect(navbar.textContent).toBe("Features");
+    await waitFor(() => expect(document.documentElement.lang).toBe("en"));
   });
 
   it("renders feature cards", async () => {
@@ -150,6 +175,9 @@ describe("Home page render (es) — locale-segmented RSC, no client re-render", 
 
   it("renders the navbar for the es render too", async () => {
     await renderHome("es");
-    expect(screen.getByTestId("navbar")).toBeDefined();
+    const navbar = screen.getByTestId("navbar");
+    expect(navbar.dataset.locale).toBe("es");
+    expect(navbar.textContent).toBe("Funciones");
+    await waitFor(() => expect(document.documentElement.lang).toBe("es"));
   });
 });

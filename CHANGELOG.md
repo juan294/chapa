@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Fresh English-language visits no longer mix an English landing page with
+  Spanish navigation and document metadata.** The locale-selected landing
+  route now gives its client controls the same locale as its server-rendered
+  body and synchronizes the document language.
 - **A slow badge materialize no longer blocks the request when a stale SVG is
   available.** The badge route now races materialization against a 2200ms
   deadline; on timeout it serves yesterday's cached SVG with a short-TTL

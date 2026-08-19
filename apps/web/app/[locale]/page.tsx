@@ -1,6 +1,8 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingContent } from "../LandingContent";
+import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
+import { en } from "@/lib/i18n/dictionaries/en";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
@@ -37,5 +39,17 @@ export default async function Home({
 }) {
   const { locale } = await params;
   const t = getServerT(locale);
-  return <LandingContent demoBadgeSvg={demoBadgeSvg} t={t} />;
+  return (
+    <LanguageProvider
+      initialLocale={locale}
+      // The static root provider is always Spanish. A request selected from an
+      // English Accept-Language header therefore needs a matching client
+      // provider for the navbar, controls, and document language. Spanish can
+      // reuse the root dictionary without serializing a second copy.
+      dictionary={locale === DEFAULT_LOCALE ? undefined : en}
+    >
+      <LangSync />
+      <LandingContent demoBadgeSvg={demoBadgeSvg} t={t} />
+    </LanguageProvider>
+  );
 }
