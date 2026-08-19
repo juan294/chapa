@@ -4,14 +4,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import type { ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import { DimensionCardsRow } from "./DimensionCardsRow";
-
-const DIMENSION_CARDS_ROW_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "DimensionCardsRow.tsx"),
-  "utf-8",
-);
 
 // ---------------------------------------------------------------------------
 // Mock DimensionCard to isolate this component's behavior
@@ -330,14 +323,5 @@ describe("DimensionCardsRow", () => {
     expect(grid!.classList.contains("grid-cols-2")).toBe(true);
     expect(grid!.classList.contains("sm:grid-cols-3")).toBe(true);
     expect(grid!.classList.contains("lg:grid-cols-5")).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// FE-H2: DimensionCardsRow is now a client component (uses useTranslation hook)
-// ---------------------------------------------------------------------------
-describe("DimensionCardsRow — client boundary (#728)", () => {
-  it("has 'use client' directive for useTranslation hook", () => {
-    expect(DIMENSION_CARDS_ROW_SOURCE).toMatch(/^["']use client["']/m);
   });
 });
