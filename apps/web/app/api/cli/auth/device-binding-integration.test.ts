@@ -10,11 +10,14 @@ import { NextRequest } from "next/server";
 // approve route's actual read/write behavior is what's under test.
 // ---------------------------------------------------------------------------
 
-const { store, approvedWriteGate } = vi.hoisted(() => ({
+const { store, approvedWriteGate, writeFailures } = vi.hoisted(() => ({
   store: new Map<string, unknown>(),
   approvedWriteGate: {
     beforeWrite: null as null | (() => Promise<void>),
     started: null as null | (() => void),
+  },
+  writeFailures: {
+    nextConfirmationMerge: false,
   },
 }));
 
@@ -33,6 +36,10 @@ vi.mock("@/lib/cache/redis", () => ({
     return true;
   }),
   cacheMergeJson: vi.fn(async (key: string, patch: Record<string, unknown>) => {
+    if (writeFailures.nextConfirmationMerge && patch.deviceCodeConfirmed === true) {
+      writeFailures.nextConfirmationMerge = false;
+      return false;
+    }
     await waitBeforeApprovedWrite(patch);
     const existing = (store.get(key) as Record<string, unknown> | undefined) ?? {};
     store.set(key, { ...existing, ...patch });
@@ -86,6 +93,7 @@ beforeEach(() => {
   store.clear();
   approvedWriteGate.beforeWrite = null;
   approvedWriteGate.started = null;
+  writeFailures.nextConfirmationMerge = false;
   vi.clearAllMocks();
   vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
 });
@@ -180,6 +188,32 @@ describe("CLI device-code binding survives approval (#1078, #1097)", () => {
     const redeem = await pollGET(pollRequest());
     expect(redeem.status).toBe(200);
     const body = await redeem.json();
+    expect(body.status).toBe("approved");
+    expect(typeof body.token).toBe("string");
+  });
+
+  it("does not acknowledge a failed confirmation and allows a bound retry", async () => {
+    const first = await pollGET(pollRequest());
+    const deviceCode: string = (await first.json()).device_code;
+
+    writeFailures.nextConfirmationMerge = true;
+    const failedConfirmation = await pollGET(pollRequest(deviceCode));
+    expect(failedConfirmation.status).toBe(503);
+    expect((await failedConfirmation.json()).error).toMatch(/temporarily unavailable/i);
+
+    expect(store.get(`cli:device:${SESSION_ID}`)).toEqual(
+      expect.objectContaining({ status: "pending", deviceCode }),
+    );
+    expect(store.get(`cli:device:${SESSION_ID}`)).not.toEqual(
+      expect.objectContaining({ deviceCodeConfirmed: true }),
+    );
+
+    const approve = await approvePOST(approveRequest());
+    expect(approve.status).toBe(200);
+
+    const retryFromBoundDevice = await pollGET(pollRequest(deviceCode));
+    expect(retryFromBoundDevice.status).toBe(200);
+    const body = await retryFromBoundDevice.json();
     expect(body.status).toBe("approved");
     expect(typeof body.token).toBe("string");
   });

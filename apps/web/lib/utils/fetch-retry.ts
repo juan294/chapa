@@ -32,21 +32,25 @@ export function _setRetryDelayFn(fn: (ms: number) => Promise<void>): void {
 }
 
 /**
- * Returns true when a thrown fetch error is a deliberate timeout abort —
- * i.e. the caller's own `AbortSignal.timeout()` (passed via `init.signal`)
- * fired and `fetch()` rejected as a result, rather than a network-level
- * failure (connection reset, DNS failure, etc.).
+ * Returns true when a thrown fetch error is a deliberate caller abort —
+ * i.e. the signal passed through `init.signal` was aborted and `fetch()`
+ * rejected as a result, rather than a network-level failure (connection reset,
+ * DNS failure, etc.). Native `AbortSignal.timeout()` rejects with `TimeoutError`
+ * in Node, while explicit aborts commonly use `AbortError`, so both names are
+ * part of the non-retry contract.
  *
  * This must NOT be retried: this module's callers operate under the badge
  * route's 3000ms cache-miss latency SLO (`apps/web/lib/monitoring/latency-slo.ts`),
  * and retrying a timeout would double worst-case latency against that budget.
  */
-function isTimeoutAbortError(
+function isCallerAbortError(
   err: unknown,
   signal: AbortSignal | null | undefined,
 ): boolean {
   return (
-    err instanceof Error && err.name === "AbortError" && signal?.aborted === true
+    err instanceof Error &&
+    (err.name === "AbortError" || err.name === "TimeoutError") &&
+    signal?.aborted === true
   );
 }
 
@@ -58,7 +62,7 @@ function isTimeoutAbortError(
  * - Retries once on a rejected fetch promise (network reset, DNS failure) —
  *   same bounded/jittered policy as 5xx — EXCEPT a deliberate timeout abort
  *   from the caller's own `AbortSignal.timeout()`, which propagates
- *   immediately (see `isTimeoutAbortError`, #1105).
+ *   immediately (see `isCallerAbortError`, #1105).
  * - Adds a small jittered delay between attempts to avoid thundering herds.
  */
 export async function fetchWithRetry(
@@ -78,7 +82,7 @@ export async function fetchWithRetry(
     try {
       res = await fetch(url, init);
     } catch (err) {
-      if (isTimeoutAbortError(err, init.signal)) {
+      if (isCallerAbortError(err, init.signal)) {
         throw err;
       }
 

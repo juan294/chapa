@@ -110,6 +110,23 @@ describe("fetchWithRetry", () => {
     // latency against the badge route's 3000ms cache-miss SLO.
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("does NOT retry the native TimeoutError from AbortSignal.timeout", async () => {
+    const signal = AbortSignal.timeout(1);
+    await new Promise<void>((resolve) => {
+      signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    expect(signal.reason).toMatchObject({ name: "TimeoutError" });
+
+    const mockFetch = vi.fn().mockRejectedValue(signal.reason);
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      fetchWithRetry("https://example.com/api", { signal }),
+    ).rejects.toMatchObject({ name: "TimeoutError" });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("sanitizeLogBody", () => {

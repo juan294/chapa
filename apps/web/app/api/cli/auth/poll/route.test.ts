@@ -51,6 +51,10 @@ function makeRequest(session?: string, ip?: string, deviceCode?: string): NextRe
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
+  vi.mocked(cacheSet).mockResolvedValue(true);
+  vi.mocked(cacheMergeJson).mockResolvedValue(true);
+  vi.mocked(cacheDel).mockResolvedValue(undefined);
+  vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
 });
 
 // ---------------------------------------------------------------------------
@@ -107,6 +111,18 @@ describe("GET /api/cli/auth/poll", () => {
     const body = await res.json();
     expect(body.status).toBe("pending");
     expect(cacheGet).toHaveBeenCalledWith(`cli:device:${VALID_UUID}`);
+  });
+
+  it("returns 503 without a device_code when the initial session write fails", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(null);
+    vi.mocked(cacheSet).mockResolvedValue(false);
+
+    const res = await GET(makeRequest(VALID_UUID));
+
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toMatch(/temporarily unavailable/i);
+    expect(body.device_code).toBeUndefined();
   });
 
   it("returns pending status when session exists but is still pending", async () => {
@@ -245,6 +261,7 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
     vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
     vi.mocked(cacheSet).mockResolvedValue(true);
+    vi.mocked(cacheMergeJson).mockResolvedValue(true);
     vi.mocked(cacheDel).mockResolvedValue(undefined);
   });
 
@@ -296,6 +313,42 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
       { deviceCodeConfirmed: true },
       expect.any(Number),
     );
+  });
+
+  it("returns 503 when the device_code confirmation cannot be persisted", async () => {
+    const deviceCode = "correct-device-code-abc123def456xxx";
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode,
+    });
+    vi.mocked(cacheMergeJson).mockResolvedValue(false);
+
+    const res = await GET(makeRequest(VALID_UUID, undefined, deviceCode));
+
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toMatch(/temporarily unavailable/i);
+    expect(body.token).toBeUndefined();
+  });
+
+  it("does not redeem an approved session when confirmation persistence fails", async () => {
+    const deviceCode = "correct-device-code-abc123def456xxx";
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "approved",
+      handle: "octocat",
+      deviceCode,
+    });
+    vi.mocked(cacheMergeJson).mockResolvedValue(false);
+    vi.mocked(generateCliToken).mockReturnValue("cli-token.signature");
+
+    const res = await GET(makeRequest(VALID_UUID, undefined, deviceCode));
+
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toMatch(/temporarily unavailable/i);
+    expect(body.token).toBeUndefined();
+    expect(generateCliToken).not.toHaveBeenCalled();
+    expect(cacheDel).not.toHaveBeenCalled();
   });
 
   it("returns pending when device_code matches the stored one", async () => {
@@ -365,7 +418,6 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
   // -------------------------------------------------------------------------
 
   it("(b) legacy client that never presents device_code still succeeds (pending) — no 401", async () => {
-    // Unconfirmed session (device_code was offered but never echoed back).
     vi.mocked(cacheGet).mockResolvedValue({
       status: "pending",
       deviceCode: "offered-but-never-echoed-abc123",
@@ -374,7 +426,6 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
 
     const res = await GET(makeRequest(VALID_UUID));
 
-    // Legacy CLI: no device_code param → must fall back to sessionId-only.
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("pending");
@@ -463,6 +514,7 @@ describe("GET /api/cli/auth/poll — rate limiting", () => {
     vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
     vi.mocked(cacheGet).mockResolvedValue(null);
+    vi.mocked(cacheSet).mockResolvedValue(true);
   });
 
   it("returns 429 when rate limited by sessionId", async () => {

@@ -109,9 +109,17 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
       status: "pending",
       deviceCode: newDeviceCode,
     };
-    // Best-effort store — if Redis is unavailable, fall through to pending response
-    // without device_code (fail-open, consistent with existing rate-limit fail-open).
-    await cacheSet(cliDeviceSessionKey(sessionId), pendingSession, DEVICE_SESSION_TTL);
+    const stored = await cacheSet(
+      cliDeviceSessionKey(sessionId),
+      pendingSession,
+      DEVICE_SESSION_TTL,
+    );
+    if (!stored) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again." },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ status: "pending", device_code: newDeviceCode });
   }
 
@@ -136,11 +144,17 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
       if (!session.deviceCodeConfirmed) {
         // Merge only the confirmation latch. A concurrent approval can update
         // status/handle without either request overwriting the other's fields.
-        await cacheMergeJson<DeviceSession>(
+        const confirmed = await cacheMergeJson<DeviceSession>(
           cliDeviceSessionKey(sessionId),
           { deviceCodeConfirmed: true },
           DEVICE_SESSION_TTL,
         );
+        if (!confirmed) {
+          return NextResponse.json(
+            { error: "Service temporarily unavailable. Please try again." },
+            { status: 503 },
+          );
+        }
       }
     } else if (session.deviceCodeConfirmed) {
       // No code presented, but the client previously proved possession → enforce.
