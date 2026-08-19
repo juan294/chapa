@@ -83,6 +83,20 @@ async function cacheSet<T>(
   return true;
 }
 
+async function cacheMergeJson<T extends object>(
+  key: string,
+  patch: Partial<T>,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const current = readRaw(key);
+  const base =
+    current !== null && typeof current === "object" && !Array.isArray(current)
+      ? current
+      : {};
+  writeRaw(key, { ...base, ...patch }, ttlSeconds);
+  return true;
+}
+
 async function cacheDel(key: string): Promise<void> {
   store.delete(key);
   hllStore.delete(key);
@@ -187,6 +201,7 @@ function _resetClient(): void {
 export const redisFake = {
   cacheGet,
   cacheSet,
+  cacheMergeJson,
   cacheDel,
   cacheMGet,
   rateLimit,
