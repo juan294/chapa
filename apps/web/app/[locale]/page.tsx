@@ -2,6 +2,7 @@ import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingContent } from "../LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
+import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
@@ -49,12 +50,7 @@ export default async function Home({ params }: HomeProps) {
           language. Run this parser-blocking, enum-only assignment before the
           landing content so fresh English responses expose the correct
           document language and root-level localized controls before hydration. */}
-      <script
-        data-chapa-document-locale={locale}
-        dangerouslySetInnerHTML={{
-          __html: `document.documentElement.lang=${JSON.stringify(locale)};`,
-        }}
-      />
+      <DocumentLocaleScript locale={locale} />
       <LanguageProvider
         initialLocale={locale}
         // The static root provider is always Spanish. A request selected from an

@@ -12,21 +12,19 @@ const SOURCE = [
 // and ES), the h1 heading, VerifyForm rendering, and the main-content
 // landmark are now covered by real invocation/render+query assertions in
 // simple-pages.render.test.tsx. What remains here has no runtime-observable
-// equivalent: route-segment config, and the query-param locale override
-// (useSearchParams + LocaleSync + a client-side document.title write) which
-// would require simulating a query-string navigation the existing render
-// harness doesn't set up.
+// equivalent: route-segment config and the client query synchronization leaf.
 describe("Verify input page — non-renderable architecture checks", () => {
-  describe("static/ISR rendering", () => {
-    it("renders from DEFAULT_LOCALE instead of request-time locale APIs", () => {
-      expect(SOURCE).toContain('export const dynamic = "force-static"');
-      expect(SOURCE).toContain("export const revalidate = 3600");
-      expect(SOURCE).toContain("DEFAULT_LOCALE");
-      expect(SOURCE).not.toContain("getServerLocale");
+  describe("request-locale rendering", () => {
+    it("resolves metadata and the initial provider from the request locale", () => {
+      expect(SOURCE).toContain('export const dynamic = "force-dynamic"');
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).toContain("searchParams");
+      expect(SOURCE).toContain("initialLocale={locale}");
     });
 
-    it("does not force dynamic rendering", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
+    it("does not use static default-locale metadata", () => {
+      expect(SOURCE).not.toContain('export const dynamic = "force-static"');
+      expect(SOURCE).not.toContain("export const revalidate = 3600");
     });
   });
 
@@ -37,9 +35,8 @@ describe("Verify input page — non-renderable architecture checks", () => {
       expect(SOURCE).toContain("<LocaleSync queryLang=");
     });
 
-    it("keeps the static metadata title coherent with the active locale", () => {
-      expect(SOURCE).toContain("document.title =");
-      expect(SOURCE).toContain("t('verify.title')");
+    it("leaves title ownership with request-resolved server metadata", () => {
+      expect(SOURCE).not.toContain("document.title =");
     });
   });
 });

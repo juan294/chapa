@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { getServerLocale } from "@/lib/i18n/server";
 
 vi.mock("@/lib/i18n/server", () => ({
   getServerLocale: vi.fn().mockResolvedValue("en"),
@@ -24,8 +25,11 @@ describe("VerifyInputPage generateMetadata", () => {
 
   it("returns metadata when lang param is provided", async () => {
     const { generateMetadata } = await import("./page");
-    const meta = await generateMetadata();
+    const meta = await generateMetadata({
+      searchParams: Promise.resolve({ lang: "en" }),
+    });
     expect(meta.title).toBeTruthy();
+    expect(getServerLocale).toHaveBeenCalledWith("en");
   });
 
   it("declares its own canonical path instead of inheriting the bare origin (#1065 / FE-H1)", async () => {
