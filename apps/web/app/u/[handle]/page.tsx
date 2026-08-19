@@ -216,8 +216,8 @@ export async function SharePageContent({
   if (!cachedSvg && stats && impact) {
     // Cache miss — render inline. Avatar fetch is best-effort with a tight
     // 250ms deadline (#800) so a slow external image server can't block
-    // TTFB. The /u/[handle]/badge.svg route awaits the avatar fully on its
-    // own first render and writes the avatar-bearing SVG to the same
+    // TTFB. The /u/[handle]/badge.svg route uses a longer bounded deadline on
+    // its own first render and writes the avatar-bearing SVG to the same
     // cache, so warm visits to the share page get the real avatar.
     const AVATAR_DEADLINE_MS = 250;
     let avatarDataUri: string | undefined;
@@ -259,7 +259,7 @@ export async function SharePageContent({
     const cacheEligible =
       renderedFresh && !!verification && avatarCachePolicy !== "skip";
     const svgToCache = cacheEligible ? inlineSvg : null;
-    // Short-TTL only for the permanent-absence case; a resolved avatar keeps
+    // Short-TTL only when stats have no avatar URL; a resolved avatar keeps
     // the standard 24h+jitter TTL (writeBadgeSvgCache's own default).
     const svgCacheTtlSeconds =
       cacheEligible && avatarCachePolicy === "short"

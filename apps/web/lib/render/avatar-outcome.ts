@@ -1,4 +1,5 @@
 import { getAvatarBase64 } from "./avatar";
+import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
 
 export type BadgeAvatarOutcome =
   | { status: "resolved"; dataUri: string }
@@ -26,19 +27,15 @@ export async function resolveBadgeAvatar(
 
   if (options.deadlineMs === undefined) return fetchOutcome;
 
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([
+    return await withTimeout(
       fetchOutcome,
-      new Promise<BadgeAvatarOutcome>((resolve) => {
-        timeoutId = setTimeout(
-          () => resolve({ status: "timeout" }),
-          options.deadlineMs,
-        );
-      }),
-    ]);
-  } finally {
-    if (timeoutId !== undefined) clearTimeout(timeoutId);
+      options.deadlineMs,
+      "badge avatar fetch",
+    );
+  } catch (error) {
+    if (error instanceof TimeoutError) return { status: "timeout" };
+    throw error;
   }
 }
 

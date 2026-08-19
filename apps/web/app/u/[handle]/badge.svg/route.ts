@@ -241,9 +241,8 @@ async function finalizeMaterializedBadge(
       // README embed with real traffic stops forcing a full
       // materialize+render on every request) without shadowing a later good
       // render — e.g. avatarUrl reappearing on a subsequent stats refetch —
-      // for anywhere near the 24h+jitter a normal write gets. Checked before
-      // `avatarFetchTimedOut` since a permanently-absent avatar is never
-      // actually raced against the deadline (it resolves immediately).
+      // for anywhere near the 24h+jitter a normal write gets. The shared
+      // outcome policy distinguishes this from transient failure and timeout.
       await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
         ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
       });
