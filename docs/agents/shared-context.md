@@ -229,7 +229,6 @@
 - [Triage]: No P1/P2. One optional P3: add fake-timer branch tests for `AuthorTypewriter.tsx` (67.5% br). Everything else is a documented carry.
 <!-- ENTRY:END -->
 
-
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-07-21T00:49:37Z -->
 ## Coverage Agent — 2026-07-21
 - **Status**: GREEN
@@ -316,19 +315,6 @@
 - [Performance]: Use 1,996 KB raw / 638 KB gzip / 73 chunks as the reproducible pre-upgrade bundle baseline.
 - [Documentation]: Treat `authenticated` as private-inclusive visibility, not token presence, and keep OAuth scope text aligned to `read:user user:email`.
 - [Operations]: Resolve #1056 by choosing an owned webhook destination before adding `CHAPA_ALERT_WEBHOOK_URL`.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent timestamp=2026-07-29T07:02:59Z -->
-## QA Agent — 2026-07-29
-- **Status**: GREEN
-- Tests: 8676/8676 passed, 0 failed, 0 skipped, 513 files
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0 — all `<img>` tags have alt; both `role="button"` elements have aria-label; focus-visible present in 15 files; heading hierarchy correct; `/verify/[hash]` h1 confirmed via `StatusCallout titleAs="h1"` (re-verified, not stale-trusted)
-
-**Cross-agent recommendations:**
-- [Coverage]: No new undertested areas found this cycle — test suite is at 8,676/8,676 (up from 8,529 on 2026-07-22), re-baseline your counts.
-- [Security]: No security-related quality issues found. Interactive elements (heatmap cells, campaign table rows) remain properly aria-labeled; no regression since 2026-07-06 confirmation.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-07-30T09:00:00Z -->
@@ -528,4 +514,49 @@
 - [cc-rpi Update]: `.claude/rules/testing.md` already matches blueprint v1.28.2 (Seam-Bug Standard present since 2026-07-25) — your report's "sync FAILED" framing was a false positive from comparing against stale local state, not an actual drift. `.claude/cc-rpi-sync.json`'s `rulesSynced` now includes `testing.md`.
 - [Security]: No new findings — GHAS-disabled state and Dependabot-clean status unchanged for a 3rd+ consecutive cycle.
 - [Operations]: Issue #1056 still needs an owner-approved webhook destination before `CHAPA_ALERT_WEBHOOK_URL` can be configured — no destination invented this cycle either.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-08-19T07:05:47Z -->
+## QA Agent — 2026-08-19
+- **Status**: GREEN
+- Tests: 8276/8276 passed across 482 files, 0 failed, 0 skipped
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0
+
+**Cross-agent recommendations:**
+- [Coverage]: No undertested areas discovered this cycle. Suite grew to 8276/482 files — worth reconciling against the 2026-06-24 baseline (7986/464) on the next coverage cycle.
+- [Security]: No security-related quality issues. All role="button" custom elements carry aria-label; no hardcoded secrets or hex-color leaks found in production components.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-08-19T12:40:00Z -->
+## Triage — 2026-08-19
+- **Status**: GREEN
+- **Reports processed**: 4 (`qa-report`, `pre-launch-report`, `update-docs-report`, prior `triage-report`)
+- **Action items resolved**: 1 (all report findings were already closed; the one item came from live discovery, not a report)
+- **Summary**: Force-cancelled CI run 32225235641, hung 5.5h on the #1136 apt/needrestart bug, which was wedging the `ci-refs/heads/develop` concurrency group and leaving HEAD unverified.
+
+**Measurements (re-run directly, not taken from reports):**
+- Tests: 7776 passed / 475 files, 0 failed — typecheck clean, lint clean, on `732f989f`
+- The QA agent's 8276/482 was accurate *at its 09:05 run time*; the delta is the #1104
+  source-text→behavioral conversion landing afterward (`2c2e540a`, `b75826a1`, `23f1c248`).
+  This is NOT the stale-measurement pattern flagged for the coverage agent on 2026-08-18.
+- Open GitHub issues repo-wide: 0. Open Dependabot PRs: 0. Open Dependabot alerts: 0.
+
+**Pre-launch report disposition (audited, not assumed):**
+- 31 actionable findings → issues #1065–#1136, all closed with matching fix commits.
+- 19 findings deliberately never filed (AR-H1, AR-M1/M2, BE-M1/SE-M1, DO-H1/H2/H3,
+  DO-M1/M3/M4/M5/M6/M7, PE-M3/M4, QA-M1/M2/M3) — rejected under the Project scale
+  policy added by `2bce6426`. Do not re-raise these; they are documented in
+  `docs/accepted-risks.md`.
+
+**Cross-agent recommendations:**
+- [QA]: The suite shrank 8770 → 7776 by design (#1104). Treat 7776/475 as the new
+  baseline; do not report the drop as a regression next cycle.
+- [Coverage]: Same baseline reset applies. Re-measure fresh — last cycle's report
+  carried stale figures that triage disproved by direct re-run.
+- [Performance/DevOps]: Any CI job invoking a Playwright system-deps install must keep
+  `DEBIAN_FRONTEND=noninteractive` + `NEEDRESTART_MODE=a` and a `timeout-minutes`
+  backstop (#1136). Without the timeout, `cancel-in-progress` cannot preempt a hung
+  apt, and one stuck run silently blocks every later push to the same ref.
 <!-- ENTRY:END -->
