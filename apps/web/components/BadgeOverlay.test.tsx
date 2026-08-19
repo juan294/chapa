@@ -158,6 +158,17 @@ describe("BadgeOverlay — rendering", () => {
     }
   });
 
+  it("prevents the nested tooltip from competing with the desktop hover panel", () => {
+    render(<BadgeOverlay />);
+    const explanationButtons = screen.getAllByRole("button", {
+      name: / explanation$/,
+    });
+
+    for (const button of explanationButtons) {
+      expect(button.closest("span")?.className).toContain("md:pointer-events-none");
+    }
+  });
+
   it("switching between hotspots shows the correct tooltip content", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(

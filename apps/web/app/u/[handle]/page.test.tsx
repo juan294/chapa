@@ -386,6 +386,20 @@ describe("SharePage /u/[handle]", () => {
       expect(banner!.props.message as string).toContain("GitLab");
     });
 
+    it("renders the OAuth error in the resolved Spanish locale", async () => {
+      mockGetServerLocale.mockResolvedValue("es");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ error: "gitlab_token_exchange", lang: "es" }),
+      });
+
+      const banner = findElement(result, (el) => el.type === ErrorBanner);
+      expect(banner!.props.message).toBe(
+        "No pudimos conectar tu cuenta de GitLab. Inténtalo de nuevo.",
+      );
+    });
+
     it("renders no ErrorBanner when there is no error query param", async () => {
       const result = await SharePage({
         params: Promise.resolve({ handle: "testuser" }),
@@ -646,6 +660,20 @@ describe("SharePage /u/[handle]", () => {
 
       expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
     });
+
+    it("writes the standard cache entry for a definitive remote avatar absence", async () => {
+      mockGetAvatarBase64.mockResolvedValue(undefined);
+
+      await renderPage();
+      await mockAfter.mock.calls[0][0]();
+
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        FAKE_SVG,
+        "testuser",
+        undefined,
+      );
+    });
   });
 
   // ----------------------------------------------------------------
@@ -692,7 +720,7 @@ describe("SharePage /u/[handle]", () => {
       penaltyChanges: null,
     };
 
-    it("fetches trend data alongside profile materialization and passes it to owner content (no client fetch required)", async () => {
+    it("redacts confidence fields from anonymous trend diff props", async () => {
       mockGetTrendData.mockResolvedValue({ trend: FAKE_TREND, diff: FAKE_DIFF });
 
       const result = await renderPage();
@@ -705,6 +733,20 @@ describe("SharePage /u/[handle]", () => {
       );
       expect(ownerEl).not.toBeNull();
       expect(ownerEl!.props.trend).toEqual(FAKE_TREND);
+      expect(ownerEl!.props.diff).not.toHaveProperty("confidence");
+      expect(ownerEl!.props.diff).not.toHaveProperty("penaltyChanges");
+    });
+
+    it("preserves confidence fields in an owner's trend diff props", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+      mockGetTrendData.mockResolvedValue({ trend: FAKE_TREND, diff: FAKE_DIFF });
+
+      const result = await renderPage();
+      const ownerEl = findElement(
+        result,
+        (el) => el.type === SharePageOwnerContentLazy,
+      );
+
       expect(ownerEl!.props.diff).toEqual(FAKE_DIFF);
     });
 

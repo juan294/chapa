@@ -18,7 +18,11 @@ import {
   readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
-import { getAvatarBase64 } from "@/lib/render/avatar";
+import {
+  getBadgeAvatarCachePolicy,
+  getBadgeAvatarDataUri,
+  resolveBadgeAvatar,
+} from "@/lib/render/avatar-outcome";
 import { CommandBarHint } from "@/components/CommandBarHint";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
@@ -34,6 +38,7 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
+import { redactSnapshotDiffForVisitor } from "@/lib/history/diff";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LanguageProvider, LocaleSync } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
@@ -116,7 +121,8 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   // is already dynamic (#1066 above already awaits searchParams and reads
   // the session), so there is no static-rendering cost left to avoid here.
   const errorCode = typeof resolvedSearch.error === "string" ? resolvedSearch.error : null;
-  const errorMessage = getOAuthErrorMessage(errorCode);
+  const t = getServerT(locale);
+  const errorMessage = getOAuthErrorMessage(errorCode, (key) => t(key) as string);
 
   if (!isValidHandle(handle)) {
     notFound();
@@ -205,12 +211,7 @@ export async function SharePageContent({
 
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
-  let avatarResolved = false;
-  // #1088 — true only when stats carry no avatarUrl at all: a PERMANENT
-  // condition (until the next stats refetch), never a genuine race loss on a
-  // real fetch. See the identical distinction in the badge.svg route's
-  // `finalizeMaterializedBadge` for the full rationale.
-  let avatarPermanentlyAbsent = false;
+  let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
 
   if (!cachedSvg && stats && impact) {
     // Cache miss — render inline. Avatar fetch is best-effort with a tight
@@ -218,18 +219,15 @@ export async function SharePageContent({
     // TTFB. The /u/[handle]/badge.svg route awaits the avatar fully on its
     // own first render and writes the avatar-bearing SVG to the same
     // cache, so warm visits to the share page get the real avatar.
-    avatarPermanentlyAbsent = !readOnly && !stats.avatarUrl;
-    const avatarPromise = !readOnly && stats.avatarUrl
-      ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
-      : Promise.resolve(undefined);
     const AVATAR_DEADLINE_MS = 250;
-    const avatarDataUri = await Promise.race([
-      avatarPromise,
-      new Promise<undefined>((resolve) =>
-        setTimeout(() => resolve(undefined), AVATAR_DEADLINE_MS),
-      ),
-    ]);
-    avatarResolved = avatarDataUri !== undefined;
+    let avatarDataUri: string | undefined;
+    if (!readOnly) {
+      const avatarOutcome = await resolveBadgeAvatar(handle, stats.avatarUrl, {
+        deadlineMs: AVATAR_DEADLINE_MS,
+      });
+      avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
+      avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
+    }
     inlineSvg = renderBadgeSvg(stats, impact, {
       avatarDataUri,
       verificationHash: verification?.hash,
@@ -238,12 +236,11 @@ export async function SharePageContent({
     renderedFresh = true;
   }
 
-  // Deferred work: verification storage, tracking, snapshots, and (on a
-  // fresh render where the avatar resolved) cache write so future requests
-  // and the badge.svg route can hit the cache. We deliberately do NOT
-  // cache renders that fell back to a placeholder avatar or lack a
-  // verification record. Either state can be temporary, and caching it would
-  // prevent a later complete fetch from healing the SVG for up to 24h. (#800)
+  // Deferred work: verification storage, tracking, snapshots, and an eligible
+  // fresh-render cache write so future requests and the badge.svg route can
+  // hit the cache. Transient avatar failures and timeouts stay uncached; a
+  // definitive remote absence is stable enough for the normal cache, while a
+  // missing URL gets the short placeholder TTL. (#800)
   //
   // #1088 — a handle with NO avatarUrl at all is different: that absence
   // won't resolve itself on a retry within this request, so gating the write
@@ -259,12 +256,15 @@ export async function SharePageContent({
   // swallowed — persistProfileSnapshot already does this internally for its
   // own "failed" write outcome; this outer catch covers any other error.
   if (materialized && inlineSvg && !readOnly) {
-    const cacheEligible = renderedFresh && !!verification && (avatarResolved || avatarPermanentlyAbsent);
+    const cacheEligible =
+      renderedFresh && !!verification && avatarCachePolicy !== "skip";
     const svgToCache = cacheEligible ? inlineSvg : null;
     // Short-TTL only for the permanent-absence case; a resolved avatar keeps
     // the standard 24h+jitter TTL (writeBadgeSvgCache's own default).
     const svgCacheTtlSeconds =
-      cacheEligible && !avatarResolved ? AVATAR_ABSENT_CACHE_TTL_SECONDS : undefined;
+      cacheEligible && avatarCachePolicy === "short"
+        ? AVATAR_ABSENT_CACHE_TTL_SECONDS
+        : undefined;
     after(() => {
       if (svgToCache) {
         void writeBadgeSvgCache(
@@ -323,6 +323,10 @@ export async function SharePageContent({
   // fully intact above for the badge render, JSON-LD, and the deferred
   // snapshot/HMAC verification-record work in `after()`.
   const impactForClient = impact && !isOwner ? redactImpactForVisitor(impact) : impact;
+  const diffForClient =
+    trendData.diff && !isOwner
+      ? redactSnapshotDiffForVisitor(trendData.diff)
+      : trendData.diff;
 
   return (
     <>
@@ -391,7 +395,7 @@ export async function SharePageContent({
           impact={impactForClient}
           craftResult={craftResult}
           trend={trendData.trend}
-          diff={trendData.diff}
+          diff={diffForClient}
         />
       </div>
     </>

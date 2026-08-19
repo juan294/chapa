@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { BadgeSkeleton } from "./BadgeSkeleton";
 
 const SharePageOwnerContent = dynamic(
@@ -20,7 +20,7 @@ interface Props {
   impact: ClientImpactV6Result | null;
   craftResult?: CraftResult | null;
   trend?: TrendSummary | null;
-  diff?: SnapshotDiff | null;
+  diff?: ClientSnapshotDiff | null;
 }
 
 export function SharePageOwnerContentLazy(props: Props) {

@@ -107,6 +107,7 @@ vi.mock("@/lib/profile/public-profile", () => ({
 }));
 
 vi.mock("@/lib/render/badge-svg-cache", () => ({
+  AVATAR_ABSENT_CACHE_TTL_SECONDS: 900,
   buildBadgeSvgCacheKey: (...args: unknown[]) => mockBuildBadgeSvgCacheKey(...args),
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
 }));
@@ -611,8 +612,8 @@ describe("GET /api/cron/warm-cache", () => {
   // rollover. warmHandle must now render and write the SVG, gated by the
   // exact same quality gates that protect the request-path write in
   // finalizeMaterializedBadge (apps/web/app/u/[handle]/badge.svg/route.ts):
-  // the avatar must have resolved AND a verification record must exist
-  // (which itself requires materialized.statsComplete).
+  // the avatar outcome must be cache-safe AND a verification record must
+  // exist (which itself requires materialized.statsComplete).
   describe("badge SVG cache warming (#1089)", () => {
     it("renders and writes the badge SVG cache when the avatar resolves and stats look complete", async () => {
       const res = await GET(makeRequest());
@@ -668,7 +669,24 @@ describe("GET /api/cron/warm-cache", () => {
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });
 
-    it("withholds the SVG cache write when the handle has no avatarUrl (mirrors the request path's avatarResolved gate)", async () => {
+    it("writes the standard cache entry when remote avatar absence is definitive", async () => {
+      mockGetAvatarBase64.mockResolvedValue(undefined);
+
+      await GET(makeRequest());
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ avatarDataUri: undefined }),
+      );
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        "<svg>rendered</svg>",
+        expect.any(String),
+      );
+    });
+
+    it("writes a short-TTL SVG cache entry when the handle has no avatarUrl", async () => {
       mockMaterializeOrchestratedProfile.mockResolvedValue({
         ...FAKE_MATERIALIZED,
         stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: null },
@@ -680,7 +698,12 @@ describe("GET /api/cron/warm-cache", () => {
       expect(res.status).toBe(200);
       expect(body.warmed).toBe(2);
       expect(mockGetAvatarBase64).not.toHaveBeenCalled();
-      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
+        expect.any(String),
+        "<svg>rendered</svg>",
+        expect.any(String),
+        expect.objectContaining({ ttlSeconds: expect.any(Number) }),
+      );
     });
 
     it("does not let a badge SVG render/write failure fail the warm", async () => {

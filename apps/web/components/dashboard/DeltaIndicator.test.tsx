@@ -2,6 +2,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { DeltaIndicator } from "./DeltaIndicator";
+import { LanguageProvider } from "@/lib/i18n";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 afterEach(cleanup);
 
@@ -37,6 +39,16 @@ describe("DeltaIndicator", () => {
     const el = screen.getByLabelText("Score unchanged");
     expect(el.classList.contains("text-text-secondary")).toBe(true);
     expect(el.textContent).toContain("\u2192"); // →
+  });
+
+  it("localizes the unchanged aria-label in Spanish", () => {
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <DeltaIndicator delta={0} />
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByLabelText("Puntuación sin cambios")).toBeDefined();
   });
 
   it("formats delta to 1 decimal if fractional", () => {

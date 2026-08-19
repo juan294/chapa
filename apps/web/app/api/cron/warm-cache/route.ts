@@ -20,9 +20,14 @@ import {
   withErrorCapture,
 } from "@/lib/analytics/server-errors";
 import { getRequestId } from "@/lib/log";
-import { getAvatarBase64 } from "@/lib/render/avatar";
+import {
+  getBadgeAvatarCachePolicy,
+  getBadgeAvatarDataUri,
+  resolveBadgeAvatar,
+} from "@/lib/render/avatar-outcome";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import {
+  AVATAR_ABSENT_CACHE_TTL_SECONDS,
   buildBadgeSvgCacheKey,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
@@ -406,22 +411,22 @@ async function warmHandle(
     // #1089 (PE-M2): render and publish the badge SVG cache entry here so the
     // first real visitor after the UTC date rollover gets a cache hit instead
     // of paying the full materialize+render cost the cron already just paid.
-    // Gated by the exact same quality checks that protect the request-path
-    // write in finalizeMaterializedBadge (apps/web/app/u/[handle]/badge.svg/
-    // route.ts): the avatar must have resolved AND a verification record must
-    // exist (which itself requires materialized.statsComplete, #1003) — a
-    // degraded cron fetch must never publish a lower-quality badge for 24h.
+    // Gated by the exact same outcome policy and verification check as the
+    // request path in finalizeMaterializedBadge. A transient avatar failure
+    // must not publish a placeholder, while definitive absence is safe to
+    // cache and a missing URL gets only the short placeholder TTL.
     // The avatar fetch is awaited (not fire-and-forget as before) since its
     // result now feeds the render; its own internal fetch abort bounds this.
     try {
-      const avatarUrl = materialized.stats.avatarUrl;
-      const avatarDataUri = avatarUrl
-        ? await getAvatarBase64(handle, avatarUrl).catch(() => undefined)
-        : undefined;
-      const avatarResolved = avatarDataUri !== undefined;
+      const avatarOutcome = await resolveBadgeAvatar(
+        handle,
+        materialized.stats.avatarUrl,
+      );
+      const avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
+      const avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
       const verification = getPublicProfileVerification(materialized);
 
-      if (avatarResolved && verification) {
+      if (avatarCachePolicy !== "skip" && verification) {
         const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
           avatarDataUri,
           verificationHash: verification.hash,
@@ -431,7 +436,14 @@ async function warmHandle(
           disableAnimation: true,
         });
         const today = toDateString(new Date());
-        await writeBadgeSvgCache(buildBadgeSvgCacheKey(handle, today), svg, handle);
+        const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+        if (avatarCachePolicy === "short") {
+          await writeBadgeSvgCache(svgCacheKey, svg, handle, {
+            ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+          });
+        } else {
+          await writeBadgeSvgCache(svgCacheKey, svg, handle);
+        }
       }
     } catch {
       // Badge SVG warming is opportunistic — never fail the warm over it.

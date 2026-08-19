@@ -7,7 +7,7 @@ import type {
   DimensionScores,
 } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { DimensionCard } from "./DimensionCard";
 import { useTranslation } from "@/lib/i18n";
 
@@ -20,7 +20,7 @@ export interface DimensionCardsRowProps {
   impact: ClientImpactV6Result;
   stats: StatsData;
   trend?: TrendSummary | null;
-  diff?: SnapshotDiff | null;
+  diff?: ClientSnapshotDiff | null;
   activeDimension?: keyof DimensionScores | null;
   className?: string;
   craftResult?: CraftResult | null;

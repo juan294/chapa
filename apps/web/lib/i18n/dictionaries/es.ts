@@ -1104,6 +1104,8 @@ export const es: Translations = {
     insightsCoaching: 'Perspectivas y coaching',
     keyNumbers: 'Números clave',
     vsLastWeek: 'vs semana anterior',
+    scoreUnchanged: 'Puntuación sin cambios',
+    scoreChangedBy: 'La puntuación cambió {delta} puntos',
     breakdown: 'Desglose',
     noImpactData: 'No hay datos de impacto disponibles',
     activity: {

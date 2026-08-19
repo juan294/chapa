@@ -2,7 +2,7 @@
 
 import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { DimensionCardsRow } from "./DimensionCardsRow";
 import { CoachingInsights } from "./CoachingInsights";
@@ -30,7 +30,7 @@ interface ImpactDashboardProps {
    * fetch showed while loading or on a fetch error.
    */
   trend?: TrendSummary | null;
-  diff?: SnapshotDiff | null;
+  diff?: ClientSnapshotDiff | null;
 }
 
 // ---------------------------------------------------------------------------

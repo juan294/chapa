@@ -477,7 +477,7 @@ export function BadgeOverlay() {
               id={hotspot.id}
               content={tooltip}
               position={hotspot.position}
-              className="opacity-0 group-hover/badge:opacity-100 focus-within:opacity-100 transition-opacity duration-300 md:group-hover/badge:opacity-0"
+              className="opacity-0 group-hover/badge:opacity-100 focus-within:opacity-100 transition-opacity duration-300 md:group-hover/badge:opacity-0 md:pointer-events-none"
             />
           </div>
         );

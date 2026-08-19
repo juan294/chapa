@@ -57,6 +57,21 @@ export interface SnapshotDiff {
   penaltyChanges: PenaltyChanges | null;
 }
 
+export type PublicSnapshotDiff = Omit<
+  SnapshotDiff,
+  "confidence" | "penaltyChanges"
+>;
+
+export type ClientSnapshotDiff = SnapshotDiff | PublicSnapshotDiff;
+
+export function redactSnapshotDiffForVisitor(
+  diff: SnapshotDiff,
+): PublicSnapshotDiff {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { confidence: _confidence, penaltyChanges: _penaltyChanges, ...visitorDiff } = diff;
+  return visitorDiff;
+}
+
 // ---------------------------------------------------------------------------
 // Direction threshold
 // ---------------------------------------------------------------------------

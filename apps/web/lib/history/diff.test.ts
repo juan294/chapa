@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareSnapshots, explainDiff } from "./diff";
+import { compareSnapshots, explainDiff, redactSnapshotDiffForVisitor } from "./diff";
 import { makeSnapshot } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
@@ -204,6 +204,26 @@ describe("compareSnapshots", () => {
     const diff = compareSnapshots(prev, curr);
 
     expect(diff.dimensions.craft).toBeUndefined();
+  });
+});
+
+describe("redactSnapshotDiffForVisitor", () => {
+  it("removes confidence deltas and penalty changes without mutating the owner diff", () => {
+    const ownerDiff = compareSnapshots(
+      makeSnapshot({ confidence: 90, date: "2025-06-14" }),
+      makeSnapshot({
+        confidence: 75,
+        confidencePenalties: [{ flag: "burst_activity", penalty: 15 }],
+        date: "2025-06-15",
+      }),
+    );
+
+    const visitorDiff = redactSnapshotDiffForVisitor(ownerDiff);
+
+    expect(visitorDiff).not.toHaveProperty("confidence");
+    expect(visitorDiff).not.toHaveProperty("penaltyChanges");
+    expect(ownerDiff).toHaveProperty("confidence", -15);
+    expect(ownerDiff).toHaveProperty("penaltyChanges");
   });
 });
 

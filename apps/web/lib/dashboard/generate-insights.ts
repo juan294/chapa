@@ -4,7 +4,7 @@ import type {
   ImpactTier,
 } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { interpolate } from "@/lib/i18n/interpolate";
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ function findWorstDimension(trend: TrendSummary): string {
 export function generateInsights(
   impact: ClientImpactV6Result,
   trend: TrendSummary | null,
-  diff: SnapshotDiff | null,
+  diff: ClientSnapshotDiff | null,
   t: (key: string) => string | string[] | Record<string, unknown>[] = (key) => key,
 ): Insight[] {
   const insights: Insight[] = [];

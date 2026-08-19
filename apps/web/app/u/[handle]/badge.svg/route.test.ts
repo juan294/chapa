@@ -473,6 +473,20 @@ describe("GET /u/[handle]/badge.svg", () => {
       );
     });
 
+    it("writes the standard SVG cache when remote avatar absence is definitive", async () => {
+      mockGetAvatarBase64.mockResolvedValue(undefined);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+      expect(mockCacheSet.mock.calls[0]![2]).toBeGreaterThanOrEqual(86400);
+    });
+
     // A transient avatar failure that settles before the deadline can still
     // heal on retry. It must not make the avatar-less SVG the 24-hour value.
     it("#1080: writes the SVG cache when the handle has no avatarUrl at all (nothing to fetch)", async () => {

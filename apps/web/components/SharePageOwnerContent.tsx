@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { ScoreExplanationPanel } from "@/components/dashboard/ScoreExplanationPanel";
@@ -94,7 +94,7 @@ interface SharePageOwnerContentProps {
   impact: ClientImpactV6Result | null;
   craftResult?: CraftResult | null;
   trend?: TrendSummary | null;
-  diff?: SnapshotDiff | null;
+  diff?: ClientSnapshotDiff | null;
 }
 
 export function SharePageOwnerContent({

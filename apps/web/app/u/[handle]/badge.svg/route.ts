@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { getAvatarBase64 } from "@/lib/render/avatar";
+import {
+  getBadgeAvatarCachePolicy,
+  getBadgeAvatarDataUri,
+  resolveBadgeAvatar,
+} from "@/lib/render/avatar-outcome";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
@@ -189,8 +193,7 @@ async function finalizeMaterializedBadge(
   verification: PublicVerificationCode | null;
   renderMs: number;
 }> {
-  let avatarDataUri: string | undefined;
-  // #1080/#1088 — the avatar step has four distinct outcomes, previously
+  // #1080/#1088 — the avatar step has distinct outcomes, previously
   // conflated into one `avatarResolved` boolean (`avatarDataUri !==
   // undefined`) that gated the shared SVG cache write shut for all of them
   // except a clean success:
@@ -203,31 +206,18 @@ async function finalizeMaterializedBadge(
   //      reappearing) isn't shadowed for the full 24h+jitter.
   //   4. transient failure or timeout — do not cache, so the next request gets
   //      a fresh attempt instead of a stale placeholder.
-  // Separate flags distinguish a definitive empty result from a transient
-  // failure and from the deadline winning the race.
-  let avatarPermanentlyAbsent = false;
-  let avatarFetchTimedOut = false;
-  let avatarFetchFailed = false;
+  let avatarDataUri: string | undefined;
+  let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
   if (!options.readOnly) {
-    avatarPermanentlyAbsent = !materialized.stats.avatarUrl;
-    const avatarPromise = materialized.stats.avatarUrl
-      ? getAvatarBase64(handle, materialized.stats.avatarUrl)
-          .then((dataUri) => ({ dataUri, failed: false }))
-          .catch(() => ({ dataUri: undefined, failed: true }))
-      : Promise.resolve({ dataUri: undefined, failed: false });
-    const AVATAR_TIMEOUT = Symbol("avatar-race-timeout");
-    const raceResult = await Promise.race([
-      avatarPromise,
-      new Promise<typeof AVATAR_TIMEOUT>((resolve) =>
-        setTimeout(() => resolve(AVATAR_TIMEOUT), AVATAR_RACE_DEADLINE_MS),
-      ),
-    ]);
-    if (raceResult === AVATAR_TIMEOUT) {
-      avatarFetchTimedOut = true;
-    } else {
-      avatarDataUri = raceResult.dataUri;
-      avatarFetchFailed = raceResult.failed;
-    }
+    const avatarOutcome = await resolveBadgeAvatar(
+      handle,
+      materialized.stats.avatarUrl,
+      {
+        deadlineMs: AVATAR_RACE_DEADLINE_MS,
+      },
+    );
+    avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
+    avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
   }
   const verification = getPublicProfileVerification(materialized);
 
@@ -246,7 +236,7 @@ async function finalizeMaterializedBadge(
   // fetch is incomplete. Do not make that unverified render the terminal
   // 24-hour cache value; a later complete fetch must be able to heal it.
   if (!options.readOnly && verification) {
-    if (avatarPermanentlyAbsent) {
+    if (avatarCachePolicy === "short") {
       // #1088 — short-TTL placeholder write: populates the cache (so a
       // README embed with real traffic stops forcing a full
       // materialize+render on every request) without shadowing a later good
@@ -257,7 +247,7 @@ async function finalizeMaterializedBadge(
       await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
         ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
       });
-    } else if (!avatarFetchTimedOut && !avatarFetchFailed) {
+    } else if (avatarCachePolicy === "standard") {
       // Covers a real success or a definitive empty result such as 404.
       await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
     }
