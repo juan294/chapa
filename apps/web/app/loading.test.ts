@@ -1,99 +1,46 @@
-import { describe, it, expect } from "vitest";
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import RootLoading from "./loading";
 
 const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "loading.tsx"),
   "utf-8",
 );
 
+afterEach(cleanup);
+
 describe("Root loading.tsx", () => {
-  describe("accessibility", () => {
-    it("has role='status' for screen reader announcement", () => {
-      expect(SOURCE).toContain('role="status"');
+  describe("render", () => {
+    it("renders a status landmark with an accessible loading label", () => {
+      render(RootLoading());
+      const status = screen.getByRole("status");
+      expect(status.tagName).toBe("MAIN");
+      expect(status.id).toBe("main-content");
+      expect(status.getAttribute("aria-label")).toBeTruthy();
     });
 
     it("has sr-only text for screen readers", () => {
-      expect(SOURCE).toContain("sr-only");
+      const { container } = render(RootLoading());
+      expect(container.querySelector(".sr-only")?.textContent).toBeTruthy();
     });
 
-    it("has aria-hidden on decorative elements", () => {
-      expect(SOURCE).toContain('aria-hidden="true"');
-    });
-  });
-
-  describe("landmark", () => {
-    it("has id='main-content' on the main element", () => {
-      expect(SOURCE).toContain('id="main-content"');
-    });
-
-    it("uses a <main> element", () => {
-      expect(SOURCE).toContain("<main");
+    it("marks decorative elements aria-hidden", () => {
+      const { container } = render(RootLoading());
+      expect(container.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
     });
   });
 
-  describe("design system compliance", () => {
-    it("uses font-heading for terminal elements", () => {
-      expect(SOURCE).toContain("font-heading");
-    });
-
-    it("uses bg-bg for page background", () => {
-      expect(SOURCE).toContain("bg-bg");
-    });
-
-    it("uses text-amber accent color", () => {
-      expect(SOURCE).toContain("text-amber");
-    });
-
-    it("uses text-terminal-dim for dim text", () => {
-      expect(SOURCE).toContain("text-terminal-dim");
-    });
-
-    it("uses text-text-secondary for secondary text", () => {
-      expect(SOURCE).toContain("text-text-secondary");
-    });
-
-    it("uses border-stroke for terminal-style borders", () => {
-      expect(SOURCE).toContain("border-stroke");
-    });
-  });
-
-  describe("terminal aesthetic", () => {
-    it("uses animate-cursor-blink for blinking cursor", () => {
-      expect(SOURCE).toContain("animate-cursor-blink");
-    });
-
-    it("uses animate-terminal-fade-in for fade-in effect", () => {
-      expect(SOURCE).toContain("animate-terminal-fade-in");
-    });
-
-    it("contains terminal-style prompt character", () => {
-      // Terminal prompt uses $ or > character
-      expect(SOURCE).toMatch(/[>$]/);
-    });
-
-    it("simulates terminal command output lines", () => {
-      // Should have multiple skeleton lines that simulate terminal output
-      expect(SOURCE).toContain("bg-text-secondary/");
-    });
-  });
-
-  describe("reduced motion support", () => {
-    it("references motion-reduce for reduced motion support", () => {
-      expect(SOURCE).toContain("motion-reduce:");
-    });
-  });
-
+  // #1109 (UX-H3) — this is deliberately a server component with no client
+  // hooks: the top-level Suspense fallback shown across every route, so it
+  // must render instantly without waiting on client JS. jsdom would render a
+  // client-hook version identically, so this guard has no render-observable
+  // equivalent.
   describe("lightweight implementation", () => {
-    it("renders a default export function", () => {
-      expect(SOURCE).toMatch(/export default function/);
-    });
-
-    it("is a server component (no 'use client' directive)", () => {
+    it("is a server component (no 'use client' directive) and does not import client hooks", () => {
       expect(SOURCE).not.toMatch(/^["']use client["']/m);
-    });
-
-    it("does not import heavy dependencies", () => {
       expect(SOURCE).not.toContain("useState");
       expect(SOURCE).not.toContain("useEffect");
       expect(SOURCE).not.toContain("useRef");

@@ -37,9 +37,11 @@ describe("SharePageLocaleContent", () => {
     );
 
     expect(document.title).toBe("@octocat — Developer impact, decoded — Chapa");
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "Developer impact of octocat",
-    );
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toBe("Developer impact of octocat");
+    // W1 — the h1 exists for WCAG heading-hierarchy compliance but is
+    // visually hidden; the badge label above it is the visible heading.
+    expect(heading.className).toContain("sr-only");
     expect(screen.getByText("Chapa impact badge for octocat").id).toBe("badge-label");
 
     activeLocale = "es";

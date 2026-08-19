@@ -1,21 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
+import type { Translations } from "@/lib/i18n/types";
 
 /**
  * These tests ensure archetype pages do NOT expose specific scoring methodology details
  * (weights, caps, formulas, thresholds) that constitute proprietary IP.
+ *
+ * #1023 (FE-H1) moved all archetype guide copy (essays, key signals, section
+ * headings) out of page.tsx (now a thin, textless wrapper delegating to
+ * ArchetypePage/ArchetypePageClient) and into the i18n dictionaries. The
+ * dictionaries' `archetypes` namespace — not page.tsx — is now the only place
+ * this content can leak from, so that's what must be checked.
  */
 
-const ARCHETYPE_DIR = join(__dirname);
 const ARCHETYPE_NAMES = [
   "builder",
   "guardian",
   "marathoner",
   "polymath",
+  "artificer",
   "balanced",
   "emerging",
-];
+] as const;
 
 /** Patterns that reveal scoring methodology — none should appear in archetype pages */
 const FORBIDDEN_PATTERNS = [
@@ -61,15 +68,22 @@ const FORBIDDEN_PATTERNS = [
   /sqrt\(/,
 ];
 
-describe("Archetype pages do not expose scoring methodology", () => {
-  for (const archetype of ARCHETYPE_NAMES) {
-    describe(archetype, () => {
-      const filePath = join(ARCHETYPE_DIR, archetype, "page.tsx");
-      const content = readFileSync(filePath, "utf-8");
+describe("Archetype dictionary content does not expose scoring methodology", () => {
+  for (const [localeName, dict] of [
+    ["en", en],
+    ["es", es],
+  ] as const) {
+    describe(localeName, () => {
+      for (const archetype of ARCHETYPE_NAMES) {
+        describe(archetype, () => {
+          const entry = (dict.archetypes as Translations)[archetype];
+          const content = JSON.stringify(entry);
 
-      for (const pattern of FORBIDDEN_PATTERNS) {
-        it(`does not contain pattern: ${pattern.source}`, () => {
-          expect(content).not.toMatch(pattern);
+          for (const pattern of FORBIDDEN_PATTERNS) {
+            it(`does not contain pattern: ${pattern.source}`, () => {
+              expect(content).not.toMatch(pattern);
+            });
+          }
         });
       }
     });

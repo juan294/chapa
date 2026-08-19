@@ -258,6 +258,37 @@ describe("AboutPage render (en)", () => {
     expect(screen.getByText("Dimensions")).toBeDefined();
   });
 
+  it("renders a main content landmark", async () => {
+    const { default: AboutPage } = await import("./page");
+    render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(document.getElementById("main-content")).not.toBeNull();
+  });
+
+  it("links the archetype names and scoring/verification labels to their real pages", async () => {
+    const { default: AboutPage } = await import("./page");
+    render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
+
+    const archetypeHrefs: Record<string, string> = {
+      Builder: "/archetypes/builder",
+      "Quality Champion": "/archetypes/guardian",
+      Marathoner: "/archetypes/marathoner",
+      Polymath: "/archetypes/polymath",
+      Artificer: "/archetypes/artificer",
+      Balanced: "/archetypes/balanced",
+      Emerging: "/archetypes/emerging",
+    };
+    for (const [name, href] of Object.entries(archetypeHrefs)) {
+      expect(screen.getByText(name).getAttribute("href")).toBe(href);
+    }
+
+    expect(screen.getByText("scoring methodology").getAttribute("href")).toBe(
+      "/about/scoring",
+    );
+    expect(screen.getByText("badge verification").getAttribute("href")).toBe(
+      "/about/verification",
+    );
+  });
+
   it("renders all section headings", async () => {
     const { default: AboutPage } = await import("./page");
     render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
@@ -367,6 +398,11 @@ describe("generateMetadata (about/index)", () => {
     const { generateMetadata } = await import("./page");
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "es" }) });
     expect(meta.title).toBe("Acerca de");
+    expect(meta.openGraph).toBeTruthy();
+    expect(meta.twitter).toBeTruthy();
+    // #1065 (FE-H1) — declares the unprefixed public path as its canonical,
+    // not the internal /[locale]/about path.
+    expect(meta.alternates?.canonical).toBe("/about");
   });
 });
 

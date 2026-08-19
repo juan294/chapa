@@ -8,7 +8,10 @@ describe("SharePageH2", () => {
     render(<SharePageH2 />);
     // useTranslation falls back to English when LanguageProvider is absent
     // English key: sharePage.h2 = 'Your Impact, Decoded'
-    expect(screen.getByRole("heading", { level: 2 })).toBeDefined();
+    const heading = screen.getByRole("heading", { level: 2 });
+    expect(heading).toBeDefined();
     expect(screen.getByText("Your Impact, Decoded")).toBeDefined();
+    // W4 — h2 elements must use font-heading per design system.
+    expect(heading.className).toContain("font-heading");
   });
 });
