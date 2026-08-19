@@ -92,7 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hit instead of paying full materialize+render cost.
 - E2E matrix jobs now use the same 30-minute bounded Playwright dependency
   setup allowance as contract and deployment-smoke jobs, avoiding false
-  cancellation on slow hosted-runner package checks.
+  cancellation on slow hosted-runner package checks. Release-PR E2E shards
+  also run after a successful build when the develop-push classifier is
+  intentionally skipped for pull-request events.
 
 ## [2.21.0] - 2026-08-11
 

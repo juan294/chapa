@@ -526,6 +526,7 @@ jobs:
   e2e-shard:
     name: E2E Shard (${{ matrix.shard }})
     needs: [build]
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     # Cached Playwright browsers still require a hosted-runner apt dependency
     # check. Give it the same bounded setup allowance as contract and smoke.
