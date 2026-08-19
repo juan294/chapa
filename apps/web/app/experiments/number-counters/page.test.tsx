@@ -7,13 +7,6 @@ import {
   screen,
   act,
 } from "@testing-library/react";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "page.tsx"),
-  "utf-8",
-);
 
 // Mock requestAnimationFrame for counter animations
 beforeEach(() => {
@@ -103,11 +96,19 @@ describe("number-counters experiment page", () => {
     expect(screen.getByDisplayValue("91")).toBeTruthy();
   });
 
-  it("hero score aria-label uses i18n key (not hardcoded English)", () => {
-    // Verify the page uses the i18n aria.impactScoreValue key instead of a
-    // hardcoded template literal `Impact score: ${hero.value}`.
-    expect(SOURCE).toContain("aria.impactScoreValue");
-    expect(SOURCE).not.toMatch(/aria-label=\{`Impact score: \$/);
+  it("hero score aria-label resolves the impactScoreValue i18n key with the live value", async () => {
+    const { default: Page } = await import("./page");
+    let container: HTMLElement;
+    await act(async () => {
+      const result = render(<Page />);
+      container = result.container;
+    });
+    const hero = container!.querySelector('[aria-live="polite"]') as HTMLElement;
+    expect(hero).toBeTruthy();
+    // English dictionary: aria.impactScoreValue = "Impact score: {score}" —
+    // this would fail if the label reverted to a hardcoded template literal
+    // producing different text, or if the key failed to resolve.
+    expect(hero.getAttribute("aria-label")).toBe(`Impact score: ${hero.textContent}`);
   });
 
   it("animates in-view counters when sections intersect", async () => {

@@ -4,18 +4,6 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { LanguageProvider } from "@/lib/i18n";
 import { es } from "@/lib/i18n/dictionaries/es";
-import fs from "fs";
-import { resolve } from "path";
-
-const SOURCE = fs.readFileSync(
-  resolve(__dirname, "ActivityHeatmap.tsx"),
-  "utf-8"
-);
-
-const DIMENSION_COLORS_SOURCE = fs.readFileSync(
-  resolve(__dirname, "../../lib/utils/dimension-colors.ts"),
-  "utf-8"
-);
 
 afterEach(cleanup);
 
@@ -194,25 +182,34 @@ describe("ActivityHeatmap", () => {
   // 10. Uses CSS variables instead of hardcoded hex colors
   // ----------------------------------------------------------------
   it("uses CSS variables for dimension colors, not hardcoded hex", () => {
-    // DIMENSION_COLORS is now centralized in the shared dimension-colors
-    // module (single source of truth, see issue #1040 / UX-L3) rather than
-    // redefined locally in this file — ActivityHeatmap only imports it.
-    expect(SOURCE).toContain(
-      'import { DIMENSION_COLORS } from "@/lib/utils/dimension-colors"'
+    // DIMENSION_COLORS is centralized in the shared dimension-colors module
+    // (single source of truth, see issue #1040 / UX-L3). Render the legend
+    // swatches and confirm each one's inline background resolves to the
+    // shared CSS custom property, not a hardcoded hex literal — this would
+    // fail if the component fell back to a locally-redefined color map.
+    const { container } = render(
+      <ActivityHeatmap
+        heatmapData={mockHeatmapData}
+        activeDays={2}
+        dimensions={mockDimensions}
+      />,
     );
-    expect(SOURCE).not.toMatch(/const DIMENSION_COLORS/);
 
-    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-delivery)");
-    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-quality)");
-    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-consistency)");
-    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-breadth)");
-
-    const dimColorsBlock =
-      DIMENSION_COLORS_SOURCE.match(/DIMENSION_COLORS[\s\S]*?};/)?.[0] ?? "";
-    expect(dimColorsBlock).not.toContain('"#22c55e"');
-    expect(dimColorsBlock).not.toContain('"#f97316"');
-    expect(dimColorsBlock).not.toContain('"#06b6d4"');
-    expect(dimColorsBlock).not.toContain('"#ec4899"');
+    const swatches = Array.from(
+      container.querySelectorAll(".h-2.w-2.rounded-full"),
+    ).filter((el) => (el as HTMLElement).style.backgroundColor);
+    expect(swatches).toHaveLength(4);
+    const expectedVars = [
+      "var(--color-dimension-delivery)",
+      "var(--color-dimension-quality)",
+      "var(--color-dimension-consistency)",
+      "var(--color-dimension-breadth)",
+    ];
+    swatches.forEach((swatch, i) => {
+      const bg = (swatch as HTMLElement).style.backgroundColor;
+      expect(bg).toBe(expectedVars[i]);
+      expect(bg).not.toMatch(/^#/);
+    });
   });
 
   // ----------------------------------------------------------------

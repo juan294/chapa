@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 // ---------------------------------------------------------------------------
 // Module mocks — needed to render the component in JSDOM
@@ -42,15 +40,6 @@ vi.mock("./AdminSortableHeader", () => ({
   AdminSortableHeader: ({ label }: { label: string }) => <th>{label}</th>,
   AdminHeaderCell: ({ children }: { children: React.ReactNode }) => <th>{children}</th>,
 }));
-
-// ---------------------------------------------------------------------------
-// Source-level static assertions
-// ---------------------------------------------------------------------------
-
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "AdminUserTable.tsx"),
-  "utf-8",
-);
 
 import { AdminUserTable } from "./AdminUserTable";
 import type { AdminUser, SortField, SortDir } from "./admin-types";
@@ -100,44 +89,20 @@ const defaultTableProps = {
 describe("AdminUserTable", () => {
   describe("#518 — aria-label on table", () => {
     it("table element has aria-label 'Registered users'", () => {
-      expect(SOURCE).toContain('aria-label="Registered users"');
+      render(<AdminUserTable {...defaultTableProps} users={[makeUser()]} />);
+      expect(screen.getByRole("table", { name: "Registered users" })).toBeDefined();
     });
   });
 
   describe("#519 — ARIA progressbar on confidence bar", () => {
-    it("confidence bar has role='progressbar'", () => {
-      const confidenceStart = SOURCE.indexOf("{/* Confidence */}");
-      const confidenceEnd = SOURCE.indexOf("{/* Stats columns */}");
-      const section = SOURCE.slice(confidenceStart, confidenceEnd);
-      expect(section).toContain('role="progressbar"');
-    });
-
-    it("confidence bar has aria-valuenow bound to user.confidence", () => {
-      const confidenceStart = SOURCE.indexOf("{/* Confidence */}");
-      const confidenceEnd = SOURCE.indexOf("{/* Stats columns */}");
-      const section = SOURCE.slice(confidenceStart, confidenceEnd);
-      expect(section).toContain("aria-valuenow={user.confidence}");
-    });
-
-    it("confidence bar has aria-valuemin={0}", () => {
-      const confidenceStart = SOURCE.indexOf("{/* Confidence */}");
-      const confidenceEnd = SOURCE.indexOf("{/* Stats columns */}");
-      const section = SOURCE.slice(confidenceStart, confidenceEnd);
-      expect(section).toContain("aria-valuemin={0}");
-    });
-
-    it("confidence bar has aria-valuemax={100}", () => {
-      const confidenceStart = SOURCE.indexOf("{/* Confidence */}");
-      const confidenceEnd = SOURCE.indexOf("{/* Stats columns */}");
-      const section = SOURCE.slice(confidenceStart, confidenceEnd);
-      expect(section).toContain("aria-valuemax={100}");
-    });
-
-    it("confidence bar has aria-label 'Confidence score'", () => {
-      const confidenceStart = SOURCE.indexOf("{/* Confidence */}");
-      const confidenceEnd = SOURCE.indexOf("{/* Stats columns */}");
-      const section = SOURCE.slice(confidenceStart, confidenceEnd);
-      expect(section).toContain('aria-label="Confidence score"');
+    it("confidence bar has role='progressbar', bound aria-valuenow, min/max, and label", () => {
+      render(
+        <AdminUserTable {...defaultTableProps} users={[makeUser({ confidence: 63 })]} />,
+      );
+      const progressbar = screen.getByRole("progressbar", { name: "Confidence score" });
+      expect(progressbar.getAttribute("aria-valuenow")).toBe("63");
+      expect(progressbar.getAttribute("aria-valuemin")).toBe("0");
+      expect(progressbar.getAttribute("aria-valuemax")).toBe("100");
     });
   });
 

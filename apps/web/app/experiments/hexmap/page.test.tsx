@@ -1,51 +1,64 @@
 // @vitest-environment jsdom
 import { afterEach, describe, it, expect } from "vitest";
-import fs from "fs";
-import { resolve } from "path";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import HexmapExperimentPage from "./page";
-
-const SOURCE = fs.readFileSync(
-  resolve(__dirname, "page.tsx"),
-  "utf-8"
-);
 
 afterEach(cleanup);
 
 describe("HexmapExperimentPage — no hardcoded colors", () => {
-  it("uses CSS variables for dimension colors, not hardcoded hex", () => {
-    expect(SOURCE).toContain("var(--color-dimension-delivery)");
-    expect(SOURCE).toContain("var(--color-dimension-quality)");
-    expect(SOURCE).toContain("var(--color-dimension-consistency)");
-    expect(SOURCE).toContain("var(--color-dimension-breadth)");
+  it("legend swatches use CSS variables for dimension colors, not hardcoded hex", () => {
+    render(<HexmapExperimentPage />);
 
-    const dimColorsBlock = SOURCE.match(
-      /DIMENSION_COLORS[\s\S]*?};/
-    )?.[0] ?? "";
-    expect(dimColorsBlock).not.toContain('"#22c55e"');
-    expect(dimColorsBlock).not.toContain('"#f97316"');
-    expect(dimColorsBlock).not.toContain('"#06b6d4"');
-    expect(dimColorsBlock).not.toContain('"#ec4899"');
+    const swatches = Array.from(
+      document.querySelectorAll(".h-2\\.5.w-2\\.5.rounded-full"),
+    ).filter((el) => (el as HTMLElement).style.backgroundColor);
+    expect(swatches).toHaveLength(4);
+    const expectedVars = [
+      "var(--color-dimension-delivery)",
+      "var(--color-dimension-quality)",
+      "var(--color-dimension-consistency)",
+      "var(--color-dimension-breadth)",
+    ];
+    swatches.forEach((swatch, i) => {
+      const bg = (swatch as HTMLElement).style.backgroundColor;
+      expect(bg).toBe(expectedVars[i]);
+      expect(bg).not.toMatch(/^#/);
+    });
   });
 
-  it("does not use hardcoded bg-[#06060A] — uses bg-dark-section instead", () => {
-    expect(SOURCE).not.toContain("bg-[#06060A]");
-  });
+  it("uses bg-dark-section (not a hardcoded hex) for the glow variant's showcase background", () => {
+    render(<HexmapExperimentPage />);
 
-  it("does not use hardcoded rgba() colors — uses CSS variable tokens instead", () => {
-    // The glow variant's empty cell color should use a CSS variable, not raw rgba()
-    // Allowed: rgba() inside cssVarAlpha() calls (those reference CSS variables already)
-    // Disallowed: raw string literals like "rgba(255, 255, 255, 0.03)"
-    const lines = SOURCE.split("\n");
-    const rawRgbaLiterals = lines.filter(
-      (line) =>
-        line.includes("rgba(") &&
-        !line.includes("cssVarAlpha") &&
-        !line.includes("//") &&
-        !line.includes("/*") &&
-        !line.includes("var(--")
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Radial Glow" })[0]!,
     );
-    expect(rawRgbaLiterals).toHaveLength(0);
+
+    const heading = screen.getByRole("heading", {
+      level: 2,
+      name: "Radial Glow",
+    });
+    const showcase = heading.closest("div")!.parentElement as HTMLElement;
+    expect(showcase.className).toContain("bg-dark-section");
+    expect(showcase.className).not.toMatch(/#06060A/i);
+  });
+
+  it("does not use hardcoded rgba() colors for cell backgrounds — uses CSS variable / color-mix tokens instead", () => {
+    render(<HexmapExperimentPage />);
+
+    // Sample every rendered hex cell across all 4 showcase grids (dominant,
+    // blend, glow, and the "all variants" comparison row) — this would fail
+    // if DIMENSION_COLORS or cssVarAlpha reverted to emitting raw rgba().
+    const grids = screen.getAllByRole("img", { name: /Hexagonal heatmap/ });
+    const cells = grids.flatMap((grid) =>
+      Array.from(grid.querySelectorAll("div[style]")),
+    );
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      const bg = (cell as HTMLElement).style.background;
+      if (bg) {
+        expect(bg).not.toMatch(/^rgba\(/);
+      }
+    }
   });
 });
 

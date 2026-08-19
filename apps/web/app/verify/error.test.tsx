@@ -1,65 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "error.tsx"),
-  "utf-8",
-);
-
-describe("verify error.tsx — error boundary (source)", () => {
-  it("has 'use client' directive", () => {
-    expect(SOURCE).toContain('"use client"');
-  });
-
-  it("exports a default function", () => {
-    expect(SOURCE).toContain("export default function");
-  });
-
-  it("uses useTranslation for i18n", () => {
-    expect(SOURCE).toContain("useTranslation");
-  });
-
-  it("uses errors.general.title key for heading", () => {
-    expect(SOURCE).toContain("errors.general.title");
-  });
-
-  it("uses errors.general.description key for body", () => {
-    expect(SOURCE).toContain("errors.general.description");
-  });
-
-  it("uses common.tryAgain key for retry button", () => {
-    expect(SOURCE).toContain("common.tryAgain");
-  });
-
-  it("uses common.goHome key for home link", () => {
-    expect(SOURCE).toContain("common.goHome");
-  });
-
-  it("calls reset on retry button click", () => {
-    expect(SOURCE).toContain("onClick={reset}");
-  });
-
-  it("links to the root path", () => {
-    expect(SOURCE).toContain('href="/"');
-  });
-
-  it("uses complement (teal) tokens, not amber, for verification-related error UI", () => {
-    // Design system rule: verification-related UI must use text-complement /
-    // bg-complement tokens, never amber/purple (docs/design-system.md).
-    expect(SOURCE).toContain("text-complement");
-    expect(SOURCE).toContain("bg-complement");
-    expect(SOURCE).not.toContain("text-amber");
-    expect(SOURCE).not.toContain("bg-amber");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Render tests — confirm the boundary actually resolves translated copy at
-// runtime rather than the old hardcoded English strings (#1022).
-// ---------------------------------------------------------------------------
 // @vitest-environment jsdom
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { LanguageProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -101,11 +42,52 @@ describe("verify error.tsx — render", () => {
     expect(
       screen.getByText("An unexpected error occurred. Please try again."),
     ).toBeDefined();
+    expect(screen.getByText("Try again")).toBeDefined();
+    expect(screen.getByText("Go home")).toBeDefined();
   });
 
   it("falls back to the English dictionary without a LanguageProvider (no crash)", () => {
     const noop = vi.fn();
     render(<VerifyError error={makeError()} reset={noop} />);
     expect(screen.getByText("Something went wrong")).toBeDefined();
+  });
+
+  it("calls reset when the retry button is clicked", () => {
+    const reset = vi.fn();
+    render(
+      <LanguageProvider initialLocale="en" dictionary={en}>
+        <VerifyError error={makeError()} reset={reset} />
+      </LanguageProvider>,
+    );
+    fireEvent.click(screen.getByText("Try again"));
+    expect(reset).toHaveBeenCalledOnce();
+  });
+
+  it("the go-home link points to the root path", () => {
+    render(
+      <LanguageProvider initialLocale="en" dictionary={en}>
+        <VerifyError error={makeError()} reset={vi.fn()} />
+      </LanguageProvider>,
+    );
+    expect(screen.getByText("Go home").closest("a")?.getAttribute("href")).toBe(
+      "/",
+    );
+  });
+
+  it("uses complement (teal) tokens, not amber, for verification-related error UI", () => {
+    // Design system rule: verification-related UI must use text-complement /
+    // bg-complement tokens, never amber/purple (docs/design-system.md).
+    render(
+      <LanguageProvider initialLocale="en" dictionary={en}>
+        <VerifyError error={makeError()} reset={vi.fn()} />
+      </LanguageProvider>,
+    );
+    const heading = screen.getByText("Something went wrong");
+    const retryButton = screen.getByText("Try again");
+    expect(heading.className).toContain("text-complement");
+    expect(retryButton.className).toContain("text-complement");
+    expect(retryButton.className).toContain("bg-complement/10");
+    expect(heading.className).not.toContain("text-amber");
+    expect(retryButton.className).not.toContain("bg-amber");
   });
 });
