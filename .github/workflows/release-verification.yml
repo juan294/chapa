@@ -523,6 +523,8 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     env:
+      DEBIAN_FRONTEND: noninteractive
+      NEEDRESTART_MODE: a
       EXPECTED_DEPLOYMENT_COMMIT: ${{ inputs.developCommit }}
       EXPECTED_DEPLOYMENT_ENV: "preview"
       PLAYWRIGHT_BASE_URL: ${{ inputs.previewUrl }}

@@ -327,7 +327,10 @@ jobs:
     needs: develop_push_source
     if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
+      DEBIAN_FRONTEND: noninteractive
+      NEEDRESTART_MODE: a
       NEXTAUTH_SECRET: contract-nextauth-secret-32-characters
       CHAPA_VERIFICATION_SECRET: test-verification-secret
       CRON_SECRET: test-cron-secret
@@ -521,11 +524,14 @@ jobs:
     name: E2E Shard (${{ matrix.shard }})
     needs: [build]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2]
     env:
+      DEBIAN_FRONTEND: noninteractive
+      NEEDRESTART_MODE: a
       GITHUB_CLIENT_ID: dummy
       GITHUB_CLIENT_SECRET: dummy
       NEXTAUTH_SECRET: dummy-secret-for-ci-32-characters
@@ -647,7 +653,10 @@ jobs:
     needs: [develop_push_source, build]
     if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
+      DEBIAN_FRONTEND: noninteractive
+      NEEDRESTART_MODE: a
       DEPLOYMENT_SMOKE_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
     steps:
       - name: Require deployment smoke URL for production
