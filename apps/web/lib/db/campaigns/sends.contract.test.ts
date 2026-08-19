@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { getServiceClient } from "@/test/contract/invoke";
 import {
@@ -23,7 +24,8 @@ import {
  * cannot exercise PostgREST's real truncation behavior.
  */
 
-const CAMPAIGN_NAME = "contract-1079-campaign-stats";
+const RUN_ID = randomUUID();
+const CAMPAIGN_NAME = `chapa-e2e-${RUN_ID}-campaign-stats`;
 
 describe("dbGetCampaignStats past the 1000-row max_rows cap (contract)", () => {
   let campaignId: string | undefined;
@@ -116,7 +118,7 @@ describe("dbGetCampaignStats past the 1000-row max_rows cap (contract)", () => {
  * whitespace-safe guard) against local Postgres — the string-matching
  * migration-contract test can't catch a logic bug in the CTE wiring itself.
  */
-const RECOVERY_CAMPAIGN_NAME = "contract-1085-lease-recovery";
+const RECOVERY_CAMPAIGN_NAME = `chapa-e2e-${RUN_ID}-lease-recovery`;
 
 describe("expired-lease group recovery and quota-shortfall release (contract, #1085)", () => {
   let campaignId: string | undefined;
@@ -158,7 +160,7 @@ describe("expired-lease group recovery and quota-shortfall release (contract, #1
     expect(insertError).toBeNull();
 
     // 1. Original claim: takes the whole group under lease A.
-    const leaseA = "contract-1085-lease-a";
+    const leaseA = `chapa-e2e-${RUN_ID}-lease-a`;
     const originalClaim = await dbClaimPendingSends(
       campaignId,
       GROUP_SIZE,
@@ -180,7 +182,7 @@ describe("expired-lease group recovery and quota-shortfall release (contract, #1
 
     // 3. Next attempt: quota only allows 2, but the expired group must be
     // recovered WHOLE (all 5), ignoring the requested limit.
-    const leaseB = "contract-1085-lease-b";
+    const leaseB = `chapa-e2e-${RUN_ID}-lease-b`;
     const recovered = await dbClaimPendingSends(
       campaignId,
       2,
@@ -214,7 +216,7 @@ describe("expired-lease group recovery and quota-shortfall release (contract, #1
 
     // 5. A later attempt (quota still tight: limit=1) must recover the
     // released group whole again as a `pending_group`, not split it.
-    const leaseC = "contract-1085-lease-c";
+    const leaseC = `chapa-e2e-${RUN_ID}-lease-c`;
     const reRecovered = await dbClaimPendingSends(
       campaignId,
       1,

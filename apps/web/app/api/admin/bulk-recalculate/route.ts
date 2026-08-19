@@ -33,7 +33,8 @@ const INLINE_DEADLINE_MS = 250_000;
  *
  * Body (optional JSON):
  * - `handles?: string[]` — specific handles to recalculate. If omitted,
- *   recalculates all users from Supabase.
+ *   recalculates all users from Supabase in bounded pages. A 202 response
+ *   includes `nextCursor`; pass it as `?after=` to continue.
  */
 export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (request: NextRequest) => {
   // Auth first: Bearer token must match ADMIN_SECRET.
@@ -59,9 +60,11 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
 
   // Parse optional body for specific handles
   let handles: string[];
+  let explicitHandles = false;
   try {
     const body = await request.json().catch(() => ({}));
     if (Array.isArray(body.handles) && body.handles.length > 0) {
+      explicitHandles = true;
       handles = (body.handles as unknown[])
         .filter((h): h is string => typeof h === "string")
         .map((h) => h.trim())
@@ -79,8 +82,10 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
 
   // Apply cursor filter: skip handles up to and including the cursor value.
   if (afterCursor) {
-    handles = handles.filter((h) => h > afterCursor);
+    handles = handles.filter((h) => h.localeCompare(afterCursor) > 0);
   }
+
+  const totalAvailable = handles.length;
 
   if (handles.length === 0) {
     return NextResponse.json({
@@ -94,7 +99,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     });
   }
 
-  if (handles.length > MAX_INLINE_HANDLES) {
+  if (explicitHandles && handles.length > MAX_INLINE_HANDLES) {
     return NextResponse.json(
       {
         error: `Payload too large. Max ${MAX_INLINE_HANDLES} handles per call.`,
@@ -102,6 +107,11 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       { status: 413 },
     );
   }
+
+  const hasMore = !explicitHandles && handles.length > MAX_INLINE_HANDLES;
+  if (hasMore) handles = handles.slice(0, MAX_INLINE_HANDLES);
+  const nextCursor = hasMore ? handles.at(-1) : undefined;
+  const remaining = totalAvailable - handles.length;
 
   const errors: { handle: string; error: string }[] = [];
   let recalculated = 0;
@@ -122,7 +132,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
           pending: handles.filter((h) => !completedSet.has(h)),
           recalculated,
           failed: errors.length,
-          total: handles.length,
+          total: totalAvailable,
           errors: errors.length > 0 ? errors : undefined,
           ...(afterCursor ? { cursor: afterCursor } : {}),
         },
@@ -182,13 +192,17 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  return NextResponse.json({
-    partial: false,
-    completed,
-    recalculated,
-    failed: errors.length,
-    total: handles.length,
-    errors: errors.length > 0 ? errors : undefined,
-    ...(afterCursor ? { cursor: afterCursor } : {}),
-  });
+  return NextResponse.json(
+    {
+      partial: hasMore,
+      completed,
+      recalculated,
+      failed: errors.length,
+      total: totalAvailable,
+      errors: errors.length > 0 ? errors : undefined,
+      ...(afterCursor ? { cursor: afterCursor } : {}),
+      ...(hasMore ? { remaining, nextCursor } : {}),
+    },
+    { status: hasMore ? 202 : 200 },
+  );
 });

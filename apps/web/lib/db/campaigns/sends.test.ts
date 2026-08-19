@@ -48,7 +48,7 @@ vi.mock("../supabase", () => ({
 }));
 
 import { getSupabase } from "../supabase";
-import { dbGetCampaignStats } from "./sends";
+import { CampaignStatsReadError, dbGetCampaignStats } from "./sends";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -57,12 +57,15 @@ beforeEach(() => {
 });
 
 describe("dbGetCampaignStats", () => {
-  it("returns zeroed stats when DB is unavailable", async () => {
+  it("fails loudly when DB is unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
 
-    const result = await dbGetCampaignStats("campaign-1");
-
-    expect(result).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+    await expect(dbGetCampaignStats("campaign-1")).rejects.toEqual(
+      expect.objectContaining({
+        name: "CampaignStatsReadError",
+        campaignId: "campaign-1",
+      }),
+    );
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
@@ -88,12 +91,16 @@ describe("dbGetCampaignStats", () => {
     expect(mockRange).toHaveBeenCalledWith(0, 999);
   });
 
-  it("returns zeroed stats on query error", async () => {
+  it("propagates a typed failure on query error", async () => {
     rangeResolve = { data: null, error: new Error("query failed") };
 
-    const result = await dbGetCampaignStats("campaign-1");
-
-    expect(result).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+    await expect(dbGetCampaignStats("campaign-1")).rejects.toEqual(
+      expect.objectContaining({
+        name: "CampaignStatsReadError",
+        campaignId: "campaign-1",
+        cause: expect.objectContaining({ message: "query failed" }),
+      }),
+    );
   });
 
   it("ignores unrecognized status values instead of throwing", async () => {
@@ -122,18 +129,15 @@ describe("dbGetCampaignStats", () => {
     expect(mockRange).toHaveBeenCalledWith(1000, 1999);
   });
 
-  it("a mid-pagination error still surfaces as zeroed stats, not a partial undercount (#1079)", async () => {
+  it("a mid-pagination error fails loudly instead of returning a partial or zero count (#1079)", async () => {
     const page1 = Array.from({ length: 1000 }, () => ({ status: "sent" }));
     const err = new Error("connection reset");
 
     rangeResolver = (from) =>
       from === 0 ? { data: page1, error: null } : { data: null, error: err };
 
-    const result = await dbGetCampaignStats("campaign-1");
-
-    // Must NOT report { sent: 1000, ... } as if that were the complete
-    // count — a partial page-1-only result would silently undercount and
-    // could prematurely mark the campaign complete.
-    expect(result).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+    await expect(dbGetCampaignStats("campaign-1")).rejects.toBeInstanceOf(
+      CampaignStatsReadError,
+    );
   });
 });

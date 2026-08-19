@@ -37,6 +37,7 @@ export {
 } from "./crud";
 
 export {
+  CampaignStatsReadError,
   dbCreateCampaignSends,
   dbGetPendingSends,
   dbClaimPendingSends,

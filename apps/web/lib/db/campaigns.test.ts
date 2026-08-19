@@ -107,6 +107,7 @@ import {
   dbMarkSendsSent,
   dbMarkSendsFailed,
   dbGetCampaignStats,
+  CampaignStatsReadError,
   dbGetActiveEngagementCampaign,
   mapCampaignRow,
   mapSendRow,
@@ -851,10 +852,11 @@ describe("dbGetCampaignStats", () => {
     expect(mockSelect).toHaveBeenCalledWith("status");
   });
 
-  it("returns zeros when DB unavailable", async () => {
+  it("fails loudly when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+    await expect(dbGetCampaignStats("c-1")).rejects.toBeInstanceOf(
+      CampaignStatsReadError,
+    );
   });
 
   it("returns zeros when data is null", async () => {
@@ -863,10 +865,13 @@ describe("dbGetCampaignStats", () => {
     expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
 
-  it("returns zeros on query error", async () => {
+  it("fails loudly on query error", async () => {
     queryResults = [{ error: new Error("query failed") }];
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+    await expect(dbGetCampaignStats("c-1")).rejects.toMatchObject({
+      name: "CampaignStatsReadError",
+      campaignId: "c-1",
+      cause: expect.objectContaining({ message: "query failed" }),
+    });
   });
 
   it("counts all-sent data correctly", async () => {

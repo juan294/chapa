@@ -603,6 +603,20 @@ describe("processCampaignBatch", () => {
     );
   });
 
+  it("does not mark a campaign terminal when completion stats cannot be read", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbClaimPendingSends).mockResolvedValue([]);
+    vi.mocked(dbGetCampaignStats).mockRejectedValue(
+      new Error("campaign stats unavailable"),
+    );
+
+    await expect(processCampaignBatch("campaign-1")).rejects.toThrow(
+      "campaign stats unavailable",
+    );
+
+    expect(dbUpdateCampaign).not.toHaveBeenCalled();
+  });
+
   it("does not finalize while another worker still holds claimed sends", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends).mockResolvedValue([]);

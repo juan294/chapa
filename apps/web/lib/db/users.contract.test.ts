@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { getServiceClient } from "@/test/contract/invoke";
 import { dbGetUsers, dbGetUsersWithEmail } from "./users";
@@ -16,7 +17,8 @@ import { dbGetUsers, dbGetUsersWithEmail } from "./users";
  * cannot exercise PostgREST's real truncation behavior.
  */
 
-const HANDLE_PREFIX = "contract-1079-user-";
+const RUN_ID = randomUUID();
+const HANDLE_PREFIX = `chapa-e2e-${RUN_ID}-user-`;
 const TOTAL_USERS = 1001;
 
 describe("dbGetUsers / dbGetUsersWithEmail past the 1000-row max_rows cap (contract)", () => {
@@ -28,15 +30,15 @@ describe("dbGetUsers / dbGetUsersWithEmail past the 1000-row max_rows cap (contr
   it("seeds past the max_rows cap and returns every row from both accessors", async () => {
     const db = getServiceClient();
 
-    // Older `registered_at` first so the earliest registrant (the one that
-    // truncation at 1000 would drop, since both queries order DESC) is
-    // deterministically identifiable by index 0.
-    const baseTime = Date.parse("2020-01-01T00:00:00Z");
+    // Give every row the same primary sort value. Correct pagination must use
+    // the unique id tie-breaker in its keyset cursor to cross the 1000-row
+    // boundary without duplicating or omitting a handle.
+    const registeredAt = "2020-01-01T00:00:00.000Z";
     const rows = Array.from({ length: TOTAL_USERS }, (_, i) => ({
       handle: `${HANDLE_PREFIX}${i}`,
       email: `${HANDLE_PREFIX}${i}@example.com`,
       email_notifications: true,
-      registered_at: new Date(baseTime + i * 1000).toISOString(),
+      registered_at: registeredAt,
     }));
 
     const CHUNK = 500;
@@ -45,18 +47,22 @@ describe("dbGetUsers / dbGetUsersWithEmail past the 1000-row max_rows cap (contr
       expect(error).toBeNull();
     }
 
-    const earliestHandle = `${HANDLE_PREFIX}0`;
+    const boundaryHandle = `${HANDLE_PREFIX}0`;
 
     const allUsers = await dbGetUsers();
     const seededUsers = allUsers.filter((u) => u.handle.startsWith(HANDLE_PREFIX));
     expect(seededUsers).toHaveLength(TOTAL_USERS);
-    expect(seededUsers.map((u) => u.handle)).toContain(earliestHandle);
+    expect(new Set(seededUsers.map((u) => u.handle)).size).toBe(TOTAL_USERS);
+    expect(seededUsers.map((u) => u.handle)).toContain(boundaryHandle);
 
     const usersWithEmail = await dbGetUsersWithEmail();
     const seededWithEmail = usersWithEmail.filter((u) =>
       u.handle.startsWith(HANDLE_PREFIX),
     );
     expect(seededWithEmail).toHaveLength(TOTAL_USERS);
-    expect(seededWithEmail.map((u) => u.handle)).toContain(earliestHandle);
+    expect(new Set(seededWithEmail.map((u) => u.handle)).size).toBe(
+      TOTAL_USERS,
+    );
+    expect(seededWithEmail.map((u) => u.handle)).toContain(boundaryHandle);
   });
 });

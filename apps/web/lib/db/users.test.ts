@@ -8,6 +8,8 @@ const mockUpsert = vi.fn();
 const mockSelect = vi.fn();
 const mockOrder = vi.fn();
 const mockRange = vi.fn();
+const mockLimit = vi.fn();
+const mockOr = vi.fn();
 const mockEq = vi.fn();
 const mockUpdate = vi.fn();
 const mockMaybeSingle = vi.fn();
@@ -21,25 +23,47 @@ let updateResolve: { error: unknown };
 let rangeResolver:
   | ((from: number, to: number) => { data: unknown; error: unknown })
   | null;
+let keysetResolver:
+  | ((cursorFilter: string | null) => { data: unknown; error: unknown })
+  | null;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const buildOrderable = (): any => ({
-  range: (...rangeArgs: unknown[]) => {
-    mockRange(...rangeArgs);
-    if (rangeResolver) {
-      const [from, to] = rangeArgs as [number, number];
-      return Promise.resolve(rangeResolver(from, to));
-    }
-    return Promise.resolve(listResolve);
-  },
-  then: (
-    resolve: (v: unknown) => void,
-    reject: (e: unknown) => void,
-  ) => {
-    if (listResolve.error) reject(listResolve.error);
-    else resolve(listResolve);
-  },
-});
+const buildOrderable = (): any => {
+  let cursorFilter: string | null = null;
+  const query: any = {
+    order: (...orderArgs: unknown[]) => {
+      mockOrder(...orderArgs);
+      return query;
+    },
+    or: (...orArgs: unknown[]) => {
+      mockOr(...orArgs);
+      cursorFilter = orArgs[0] as string;
+      return query;
+    },
+    limit: (...limitArgs: unknown[]) => {
+      mockLimit(...limitArgs);
+      return Promise.resolve(
+        keysetResolver ? keysetResolver(cursorFilter) : listResolve,
+      );
+    },
+    range: (...rangeArgs: unknown[]) => {
+      mockRange(...rangeArgs);
+      if (rangeResolver) {
+        const [from, to] = rangeArgs as [number, number];
+        return Promise.resolve(rangeResolver(from, to));
+      }
+      return Promise.resolve(listResolve);
+    },
+    then: (
+      resolve: (v: unknown) => void,
+      reject: (e: unknown) => void,
+    ) => {
+      if (listResolve.error) reject(listResolve.error);
+      else resolve(listResolve);
+    },
+  };
+  return query;
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const mockFrom = vi.fn((_table: string): any => ({
@@ -70,19 +94,12 @@ const mockFrom = vi.fn((_table: string): any => ({
         return {
           eq: (...eqArgs: unknown[]) => {
             mockEq(...eqArgs);
-            return {
-              order: (...orderArgs: unknown[]) => {
-                mockOrder(...orderArgs);
-                return buildOrderable();
-              },
-            };
+            return buildOrderable();
           },
         };
       },
-      order: (...orderArgs: unknown[]) => {
-        mockOrder(...orderArgs);
-        return buildOrderable();
-      },
+      order: (...orderArgs: unknown[]) =>
+        buildOrderable().order(...orderArgs),
     };
   },
 }));
@@ -106,6 +123,7 @@ beforeEach(() => {
   singleResolve = { data: null, error: null };
   updateResolve = { error: null };
   rangeResolver = null;
+  keysetResolver = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -217,8 +235,8 @@ describe("dbUpsertUser", () => {
 describe("dbGetUsers", () => {
   it("returns mapped user rows ordered by registered_at desc", async () => {
     const rows = [
-      { handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
-      { handle: "bob", registered_at: "2025-06-14T10:00:00Z", display_name: null, avatar_url: null },
+      { id: 2, handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
+      { id: 1, handle: "bob", registered_at: "2025-06-14T10:00:00Z", display_name: null, avatar_url: null },
     ];
 
     listResolve = { data: rows, error: null };
@@ -229,10 +247,11 @@ describe("dbGetUsers", () => {
       { handle: "alice", registeredAt: "2025-06-15T10:00:00Z", displayName: "Alice", avatarUrl: "https://example.com/alice.png" },
       { handle: "bob", registeredAt: "2025-06-14T10:00:00Z", displayName: null, avatarUrl: null },
     ]);
-    expect(mockSelect).toHaveBeenCalledWith("handle, registered_at, display_name, avatar_url");
+    expect(mockSelect).toHaveBeenCalledWith("id, handle, registered_at, display_name, avatar_url");
     expect(mockOrder).toHaveBeenCalledWith("registered_at", {
       ascending: false,
     });
+    expect(mockOrder).toHaveBeenCalledWith("id", { ascending: false });
   });
 
   it("returns empty array when DB is unavailable", async () => {
@@ -268,39 +287,45 @@ describe("dbGetUsers", () => {
     expect(mockRange).toHaveBeenCalledWith(0, 9);
   });
 
-  it("pages via .range() even with no options provided (#1079 — no-opts path must not silently truncate)", async () => {
+  it("uses a bounded keyset page when no options are provided", async () => {
     listResolve = { data: [], error: null };
 
     await dbGetUsers();
 
-    expect(mockRange).toHaveBeenCalledWith(0, 999);
+    expect(mockLimit).toHaveBeenCalledWith(1000);
+    expect(mockRange).not.toHaveBeenCalled();
   });
 
-  it("returns every user past the 1000-row max_rows cap when no options are provided (#1079)", async () => {
+  it("uses the complete registered_at/id cursor across equal-timestamp pages (#1079)", async () => {
+    const registeredAt = "2025-06-15T10:00:00Z";
     const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      id: 2000 - i,
       handle: `user-${i}`,
-      registered_at: "2025-06-15T10:00:00Z",
+      registered_at: registeredAt,
       display_name: null,
       avatar_url: null,
     }));
     const page2 = [
       {
+        id: 1000,
         handle: "user-1000",
-        registered_at: "2025-06-14T10:00:00Z",
+        registered_at: registeredAt,
         display_name: null,
         avatar_url: null,
       },
     ];
 
-    rangeResolver = (from) =>
-      from === 0 ? { data: page1, error: null } : { data: page2, error: null };
+    keysetResolver = (cursor) =>
+      cursor == null ? { data: page1, error: null } : { data: page2, error: null };
 
     const result = await dbGetUsers();
 
     expect(result).toHaveLength(1001);
     expect(result.map((u) => u.handle)).toContain("user-1000");
-    expect(mockRange).toHaveBeenCalledWith(0, 999);
-    expect(mockRange).toHaveBeenCalledWith(1000, 1999);
+    expect(mockOr).toHaveBeenCalledWith(
+      `registered_at.lt.${registeredAt},and(registered_at.eq.${registeredAt},id.lt.1001)`,
+    );
+    expect(mockLimit).toHaveBeenCalledTimes(2);
   });
 
   it("does not page past a single explicit .range() page when limit/offset are provided", async () => {
@@ -426,8 +451,8 @@ describe("dbUpdateEmailNotifications", () => {
 describe("dbGetUsersWithEmail", () => {
   it("returns users with email and notifications enabled", async () => {
     const rows = [
-      { handle: "alice", email: "alice@example.com", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
-      { handle: "bob", email: "bob@example.com", display_name: null, avatar_url: null },
+      { id: 2, registered_at: "2025-06-15T10:00:00Z", handle: "alice", email: "alice@example.com", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
+      { id: 1, registered_at: "2025-06-14T10:00:00Z", handle: "bob", email: "bob@example.com", display_name: null, avatar_url: null },
     ];
     listResolve = { data: rows, error: null };
 
@@ -437,10 +462,11 @@ describe("dbGetUsersWithEmail", () => {
       { handle: "alice", email: "alice@example.com", displayName: "Alice", avatarUrl: "https://example.com/alice.png" },
       { handle: "bob", email: "bob@example.com", displayName: null, avatarUrl: null },
     ]);
-    expect(mockSelect).toHaveBeenCalledWith("handle, email, display_name, avatar_url");
+    expect(mockSelect).toHaveBeenCalledWith("id, handle, email, registered_at, display_name, avatar_url");
     expect(mockNot).toHaveBeenCalledWith("email", "is", null);
     expect(mockEq).toHaveBeenCalledWith("email_notifications", true);
     expect(mockOrder).toHaveBeenCalledWith("registered_at", { ascending: false });
+    expect(mockOrder).toHaveBeenCalledWith("id", { ascending: false });
   });
 
   it("returns empty array when DB is unavailable", async () => {
@@ -459,7 +485,7 @@ describe("dbGetUsersWithEmail", () => {
 
   it("maps snake_case to camelCase correctly", async () => {
     const rows = [
-      { handle: "alice", email: "alice@example.com", display_name: "Alice W", avatar_url: "https://a.com/a.png" },
+      { id: 1, registered_at: "2025-06-15T10:00:00Z", handle: "alice", email: "alice@example.com", display_name: "Alice W", avatar_url: "https://a.com/a.png" },
     ];
     listResolve = { data: rows, error: null };
 
@@ -471,39 +497,46 @@ describe("dbGetUsersWithEmail", () => {
     expect(result[0]).not.toHaveProperty("avatar_url");
   });
 
-  it("pages via .range()", async () => {
+  it("uses a bounded keyset page", async () => {
     listResolve = { data: [], error: null };
 
     await dbGetUsersWithEmail();
 
-    expect(mockRange).toHaveBeenCalledWith(0, 999);
+    expect(mockLimit).toHaveBeenCalledWith(1000);
+    expect(mockRange).not.toHaveBeenCalled();
   });
 
   it("returns every eligible user past the 1000-row max_rows cap (#1079)", async () => {
+    const registeredAt = "2025-06-15T10:00:00Z";
     const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      id: 2000 - i,
       handle: `user-${i}`,
       email: `user-${i}@example.com`,
+      registered_at: registeredAt,
       display_name: null,
       avatar_url: null,
     }));
     const page2 = [
       {
+        id: 1000,
         handle: "user-1000",
         email: "user-1000@example.com",
+        registered_at: registeredAt,
         display_name: null,
         avatar_url: null,
       },
     ];
 
-    rangeResolver = (from) =>
-      from === 0 ? { data: page1, error: null } : { data: page2, error: null };
+    keysetResolver = (cursor) =>
+      cursor == null ? { data: page1, error: null } : { data: page2, error: null };
 
     const result = await dbGetUsersWithEmail();
 
     expect(result).toHaveLength(1001);
     expect(result.map((u) => u.handle)).toContain("user-1000");
-    expect(mockRange).toHaveBeenCalledWith(0, 999);
-    expect(mockRange).toHaveBeenCalledWith(1000, 1999);
+    expect(mockOr).toHaveBeenCalledWith(
+      `registered_at.lt.${registeredAt},and(registered_at.eq.${registeredAt},id.lt.1001)`,
+    );
+    expect(mockLimit).toHaveBeenCalledTimes(2);
   });
 });
-

@@ -1,7 +1,8 @@
 /**
  * Supabase data access — campaign send operations (recipients, claim/ack lifecycle).
  *
- * All operations fail-open (return sensible defaults when DB is unavailable).
+ * Mutating and queue-reading operations fail-open when the DB is unavailable.
+ * Campaign stats fail loudly because they govern terminal campaign state.
  */
 
 import { getSupabase } from "../supabase";
@@ -16,6 +17,20 @@ import {
   mapSendRow,
   parseRows,
 } from "./types";
+
+/**
+ * A campaign's terminal state cannot be decided when its send counts cannot
+ * be read. Callers must treat this as a retryable processing failure.
+ */
+export class CampaignStatsReadError extends Error {
+  readonly campaignId: string;
+
+  constructor(campaignId: string, cause: unknown) {
+    super(`Failed to read campaign stats for "${campaignId}"`, { cause });
+    this.name = "CampaignStatsReadError";
+    this.campaignId = campaignId;
+  }
+}
 
 /**
  * Upsert `campaign_sends` rows for each recipient. Uses `onConflict: campaign_id,handle`
@@ -323,13 +338,16 @@ export async function dbMarkSendsFailed(
  * emailed (#1079).
  *
  * @param id - Campaign UUID
- * @returns Counts of sent, pending, processing, and failed sends (defaults to 0)
+ * @returns Counts of sent, pending, processing, and failed sends
+ * @throws {CampaignStatsReadError} when the complete count cannot be read
  */
 export async function dbGetCampaignStats(
   id: string,
 ): Promise<CampaignSendStats> {
   const db = getSupabase();
-  if (!db) return { sent: 0, pending: 0, processing: 0, failed: 0 };
+  if (!db) {
+    throw new CampaignStatsReadError(id, new Error("Supabase unavailable"));
+  }
 
   try {
     // .order("id") makes pagination deterministic across round trips —
@@ -360,6 +378,6 @@ export async function dbGetCampaignStats(
       "[db] dbGetCampaignStats failed:",
       (error as Error).message,
     );
-    return { sent: 0, pending: 0, processing: 0, failed: 0 };
+    throw new CampaignStatsReadError(id, error);
   }
 }

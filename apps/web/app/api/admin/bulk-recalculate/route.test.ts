@@ -236,6 +236,98 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalled();
   });
 
+  it("paginates an omitted-handles all-users run instead of rejecting above 100", async () => {
+    const users = Array.from({ length: 205 }, (_, index) => ({
+      handle: `user${String(index).padStart(3, "0")}`,
+    }));
+    mockDbGetUsers.mockResolvedValue(users);
+
+    const first = await POST(makeRequest());
+    const firstBody = await first.json();
+
+    expect(first.status).toBe(202);
+    expect(firstBody).toEqual(
+      expect.objectContaining({
+        partial: true,
+        total: 205,
+        recalculated: 100,
+        remaining: 105,
+        nextCursor: "user099",
+      }),
+    );
+    expect(firstBody.completed).toHaveLength(100);
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(100);
+
+    vi.clearAllMocks();
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 2, limit: 5 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockVerifyAdminSecret.mockReturnValue(null);
+    mockDbGetUsers.mockResolvedValue(users);
+    mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+    mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+
+    const secondRequest = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=user099",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    const second = await POST(secondRequest);
+    const secondBody = await second.json();
+
+    expect(second.status).toBe(202);
+    expect(secondBody).toEqual(
+      expect.objectContaining({
+        partial: true,
+        total: 105,
+        recalculated: 100,
+        remaining: 5,
+        cursor: "user099",
+        nextCursor: "user199",
+      }),
+    );
+    expect(secondBody.completed).toHaveLength(100);
+
+    vi.clearAllMocks();
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 3, limit: 5 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockVerifyAdminSecret.mockReturnValue(null);
+    mockDbGetUsers.mockResolvedValue(users);
+    mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+    mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+
+    const finalRequest = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=user199",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    const final = await POST(finalRequest);
+    const finalBody = await final.json();
+
+    expect(final.status).toBe(200);
+    expect(finalBody).toEqual(
+      expect.objectContaining({
+        partial: false,
+        total: 5,
+        recalculated: 5,
+        cursor: "user199",
+      }),
+    );
+    expect(finalBody.completed).toHaveLength(5);
+    expect(finalBody).not.toHaveProperty("nextCursor");
+  });
+
   it("returns completed handles for successful inline runs", async () => {
     const res = await POST(
       makeRequest(VALID_SECRET, { handles: ["alice", "bob"] }),

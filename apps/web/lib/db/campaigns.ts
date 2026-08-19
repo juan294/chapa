@@ -25,6 +25,7 @@ export type {
 export {
   CampaignRowSchema,
   CampaignSendRowSchema,
+  CampaignStatsReadError,
   mapCampaignRow,
   mapSendRow,
   dbGetCampaigns,

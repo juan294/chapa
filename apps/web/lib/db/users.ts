@@ -7,13 +7,14 @@
 
 import { getSupabase } from "./supabase";
 import { parseRows } from "./parse-row";
-import { fetchAllPages } from "./paginate";
+import { SUPABASE_MAX_ROWS } from "./paginate";
 
 // ---------------------------------------------------------------------------
 // Row type
 // ---------------------------------------------------------------------------
 
 interface UserRow {
+  id: number;
   handle: string;
   registered_at: string;
   display_name: string | null;
@@ -21,9 +22,53 @@ interface UserRow {
 }
 
 const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
+  "id",
   "handle",
   "registered_at",
 ] as const;
+
+interface UserPageCursor {
+  registeredAt: string;
+  id: number;
+}
+
+interface UserPageRow {
+  id: number;
+  registered_at: string;
+}
+
+/**
+ * Fetch every user with a stable composite cursor. `registered_at` is not
+ * unique, so `id` is the deterministic tie-breaker at page boundaries.
+ */
+async function fetchAllUserPages<T extends UserPageRow>(
+  fetchPage: (
+    cursor?: UserPageCursor,
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: UserPageCursor | undefined;
+
+  while (true) {
+    const { data, error } = await fetchPage(cursor);
+    if (error) throw error;
+
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < SUPABASE_MAX_ROWS) return rows;
+
+    const last = page.at(-1);
+    if (!last) return rows;
+    cursor = { registeredAt: last.registered_at, id: last.id };
+  }
+}
+
+function userCursorFilter(cursor: UserPageCursor): string {
+  return [
+    `registered_at.lt.${cursor.registeredAt}`,
+    `and(registered_at.eq.${cursor.registeredAt},id.lt.${cursor.id})`,
+  ].join(",");
+}
 
 interface UpsertUserOpts {
   email?: string;
@@ -76,8 +121,9 @@ export async function dbUpsertUser(
  * With `opts.limit`, returns a single explicit page (caller-controlled,
  * e.g. an admin UI page). Without it, returns EVERY registered user —
  * PostgREST caps any single unpaginated select at `max_rows` (1000,
- * supabase/config.toml:18), so this pages through with `.range()` via
- * `fetchAllPages` rather than silently truncating (#1079). Callers of the
+ * supabase/config.toml:18), so this pages through with a composite
+ * (`registered_at`, `id`) keyset cursor rather than silently truncating
+ * (#1079). Callers of the
  * no-opts form (warm-cache cron, bulk-recalculate) rely on seeing every
  * registered user, including the earliest registrants past row 1000.
  *
@@ -93,8 +139,9 @@ export async function dbGetUsers(
     const baseQuery = () =>
       db
         .from("users")
-        .select("handle, registered_at, display_name, avatar_url")
-        .order("registered_at", { ascending: false });
+        .select("id, handle, registered_at, display_name, avatar_url")
+        .order("registered_at", { ascending: false })
+        .order("id", { ascending: false });
 
     let data: unknown[];
     if (opts?.limit) {
@@ -104,7 +151,11 @@ export async function dbGetUsers(
       if (error) throw error;
       data = page ?? [];
     } else {
-      data = await fetchAllPages<UserRow>((from, to) => baseQuery().range(from, to));
+      data = await fetchAllUserPages<UserRow>((cursor) => {
+        let query = baseQuery();
+        if (cursor) query = query.or(userCursorFilter(cursor));
+        return query.limit(SUPABASE_MAX_ROWS);
+      });
     }
 
     return parseRows<UserRow>(data, USER_REQUIRED_KEYS, "users").map((row) => ({
@@ -134,10 +185,10 @@ export interface UserWithEmail {
  * Get all users who have an email AND have notifications enabled.
  * Used for campaign audience targeting.
  *
- * Pages through results with `fetchAllPages` instead of issuing a single
- * unpaginated select — PostgREST's `max_rows = 1000` cap (#1079) would
- * otherwise silently exclude any campaign audience past the first 1000
- * eligible users.
+ * Pages through results with a composite (`registered_at`, `id`) keyset
+ * cursor instead of issuing a single unpaginated select. PostgREST's
+ * `max_rows = 1000` cap (#1079) would otherwise silently exclude eligible
+ * campaign recipients after the first page.
  *
  * Returns empty array when DB is unavailable.
  */
@@ -146,20 +197,24 @@ export async function dbGetUsersWithEmail(): Promise<UserWithEmail[]> {
   if (!db) return [];
 
   try {
-    const data = await fetchAllPages<{
+    const data = await fetchAllUserPages<{
+      id: number;
       handle: string;
       email: string;
+      registered_at: string;
       display_name: string | null;
       avatar_url: string | null;
-    }>((from, to) =>
-      db
+    }>((cursor) => {
+      let query = db
         .from("users")
-        .select("handle, email, display_name, avatar_url")
+        .select("id, handle, email, registered_at, display_name, avatar_url")
         .not("email", "is", null)
         .eq("email_notifications", true)
         .order("registered_at", { ascending: false })
-        .range(from, to),
-    );
+        .order("id", { ascending: false });
+      if (cursor) query = query.or(userCursorFilter(cursor));
+      return query.limit(SUPABASE_MAX_ROWS);
+    });
 
     return data.map((row) => ({
       handle: row.handle,
@@ -240,4 +295,3 @@ export async function dbUpdateEmailNotifications(
     );
   }
 }
-
