@@ -94,7 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setup allowance as contract and deployment-smoke jobs, avoiding false
   cancellation on slow hosted-runner package checks. Release-PR E2E shards
   also run after a successful build when the develop-push classifier is
-  intentionally skipped for pull-request events.
+  intentionally skipped for pull-request events. Playwright setup now removes
+  an unreachable Azure Ubuntu mirror from the hosted runner's mirror list and
+  uses the canonical Ubuntu fallback instead of waiting for the job timeout.
 
 ## [2.21.0] - 2026-08-11
 

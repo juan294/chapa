@@ -376,6 +376,11 @@ jobs:
       - name: Contract tests
         id: contract-tests
         run: pnpm run test:contract
+      - name: Prefer reachable Ubuntu mirror for Playwright dependencies
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ] && grep -q 'azure.archive.ubuntu.com' /etc/apt/apt-mirrors.txt; then
+            sudo sed -i '\|azure.archive.ubuntu.com|d' /etc/apt/apt-mirrors.txt
+          fi
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
         working-directory: apps/web
@@ -562,6 +567,12 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
+      - name: Prefer reachable Ubuntu mirror for Playwright dependencies
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ] && grep -q 'azure.archive.ubuntu.com' /etc/apt/apt-mirrors.txt; then
+            sudo sed -i '\|azure.archive.ubuntu.com|d' /etc/apt/apt-mirrors.txt
+          fi
+
       - name: Install Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium --with-deps
@@ -699,6 +710,13 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
           restore-keys: |
             playwright-${{ runner.os }}-
+
+      - name: Prefer reachable Ubuntu mirror for Playwright dependencies
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ] && grep -q 'azure.archive.ubuntu.com' /etc/apt/apt-mirrors.txt; then
+            sudo sed -i '\|azure.archive.ubuntu.com|d' /etc/apt/apt-mirrors.txt
+          fi
 
       - name: Install Playwright Chromium
         if: env.DEPLOYMENT_SMOKE_BASE_URL != '' && steps.deployment-playwright-cache.outputs.cache-hit != 'true'
