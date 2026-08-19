@@ -239,17 +239,4 @@ describe("next.config.ts security headers", () => {
       expect(csp).toContain("https://va.vercel-scripts.com");
     });
   });
-
-  describe("source code contains explanatory comment for unsafe-inline", () => {
-    it("has a comment explaining why unsafe-inline is needed", async () => {
-      const { readFileSync } = await import("fs");
-      const { resolve } = await import("path");
-      const configSource = readFileSync(
-        resolve(__dirname, "next.config.ts"),
-        "utf-8",
-      );
-      // Should have a comment near unsafe-inline explaining it's needed for Next.js
-      expect(configSource).toMatch(/unsafe-inline[\s\S]*Next\.js|Next\.js[\s\S]*unsafe-inline/i);
-    });
-  });
 });

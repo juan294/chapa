@@ -117,6 +117,24 @@ describe("Home page render (en)", () => {
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);
   });
+
+  // #1104 — converted from LandingContent.test.ts source-text assertions:
+  // these elements/links are now queried on the actual rendered page tree.
+  it("renders the main content landmark, the demo badge, its overlay, and the terminal", async () => {
+    const { container } = await renderHome();
+    expect(document.getElementById("main-content")).not.toBeNull();
+    expect(screen.getByTestId("demo-badge")).toBeDefined();
+    expect(screen.getByTestId("badge-overlay")).toBeDefined();
+    expect(screen.getByTestId("landing-terminal")).toBeDefined();
+    expect(container.querySelector("footer")).not.toBeNull();
+  });
+
+  it("links the Verify a Badge CTA to /verify with the complement token", async () => {
+    await renderHome();
+    const verifyLink = screen.getByRole("link", { name: /verify a badge/i });
+    expect(verifyLink.getAttribute("href")).toBe("/verify");
+    expect(verifyLink.className).toContain("bg-complement");
+  });
 });
 
 // #1023 (FE-H1) — this is the core flash-elimination proof: the [locale]

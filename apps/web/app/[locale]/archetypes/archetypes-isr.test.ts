@@ -37,5 +37,13 @@ describe("archetype pages — static/ISR", () => {
       expect(source).toContain("params");
       expect(source).toContain("getServerT");
     });
+
+    it(`${archetype}/page.tsx uses ISR with no query-string searchParams (static-friendly)`, () => {
+      const source = fs.readFileSync(
+        path.resolve(__dirname, archetype, "page.tsx"),
+        "utf-8",
+      );
+      expect(source).not.toContain("searchParams={searchParams}");
+    });
   }
 });

@@ -1,136 +1,21 @@
 import { describe, it, expect } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
-const REEXPORT_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "LandingTerminal.tsx"),
-  "utf-8",
-);
-
-const GLOBAL_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "../components/GlobalCommandBar.tsx"),
-  "utf-8",
-);
-
+// LandingTerminal.tsx is a pure re-export shim (see its own comment) with no
+// logic of its own — importing both symbols and asserting reference equality
+// is a real, strictly-better check than regexing the re-export's source: it
+// would catch e.g. a re-export under the right name pointing at the wrong
+// module, which a substring match on "GlobalCommandBarLazy" would miss.
+//
+// #1104: the GlobalCommandBar behavioral assertions that used to live here
+// (reading components/GlobalCommandBar.tsx's source — the wrong file for
+// this test to be touching in the first place) are already covered by real
+// render+interaction tests in components/GlobalCommandBar.render.test.tsx.
 describe("LandingTerminal", () => {
-  describe("re-export", () => {
-    it("re-exports the lazy command bar", () => {
-      expect(REEXPORT_SOURCE).toContain("GlobalCommandBarLazy");
-      expect(REEXPORT_SOURCE).toContain("LandingTerminal");
-    });
-  });
-});
-
-describe("GlobalCommandBar", () => {
-  describe("component directive", () => {
-    it("has 'use client' directive", () => {
-      expect(GLOBAL_SOURCE).toMatch(/^["']use client["']/m);
-    });
-  });
-
-  describe("autocomplete integration", () => {
-    it("imports AutocompleteDropdown", () => {
-      expect(GLOBAL_SOURCE).toContain("AutocompleteDropdown");
-    });
-
-    it("imports createNavigationCommands", () => {
-      expect(GLOBAL_SOURCE).toContain("createNavigationCommands");
-    });
-
-    it("imports executeCommand", () => {
-      expect(GLOBAL_SOURCE).toContain("executeCommand");
-    });
-
-    it("has partial state for autocomplete filtering", () => {
-      expect(GLOBAL_SOURCE).toContain("partial");
-      expect(GLOBAL_SOURCE).toContain("setPartial");
-    });
-
-    it("has showAutocomplete state", () => {
-      expect(GLOBAL_SOURCE).toContain("showAutocomplete");
-      expect(GLOBAL_SOURCE).toContain("setShowAutocomplete");
-    });
-
-    it("uses createNavigationCommands via useMemo", () => {
-      expect(GLOBAL_SOURCE).toContain("createNavigationCommands");
-      expect(GLOBAL_SOURCE).toContain("useMemo");
-    });
-
-    it("passes onPartialChange to TerminalInput", () => {
-      expect(GLOBAL_SOURCE).toContain("onPartialChange");
-    });
-
-    it("renders AutocompleteDropdown with correct props", () => {
-      expect(GLOBAL_SOURCE).toContain("visible={showAutocomplete}");
-    });
-  });
-
-  describe("command execution", () => {
-    it("uses executeCommand instead of manual switch", () => {
-      expect(GLOBAL_SOURCE).toContain("executeCommand");
-      expect(GLOBAL_SOURCE).not.toContain("switch (parsed.name)");
-    });
-
-    it("handles OAuth redirect via window.location.href", () => {
-      expect(GLOBAL_SOURCE).toContain("window.location.href");
-    });
-
-    it("handles SPA navigation via router.push", () => {
-      expect(GLOBAL_SOURCE).toContain("router.push");
-    });
-  });
-
-  describe("transient output panel (issue #116)", () => {
-    it("imports TerminalOutput component", () => {
-      expect(GLOBAL_SOURCE).toContain("TerminalOutput");
-    });
-
-    it("imports OutputLine type", () => {
-      expect(GLOBAL_SOURCE).toContain("OutputLine");
-    });
-
-    it("has outputLines state", () => {
-      expect(GLOBAL_SOURCE).toContain("outputLines");
-      expect(GLOBAL_SOURCE).toContain("setOutputLines");
-    });
-
-    it("stores result.lines for non-navigate commands", () => {
-      // handleSubmit should set outputLines from result.lines
-      // instead of silently returning
-      expect(GLOBAL_SOURCE).toContain("setOutputLines");
-      // Must not early-return when action is missing or non-navigate
-      expect(GLOBAL_SOURCE).not.toMatch(
-        /if\s*\(\s*!action\s*\|\|\s*action\.type\s*!==\s*["']navigate["']\s*\)\s*return/,
-      );
-    });
-
-    it("auto-clears output after timeout", () => {
-      // Should have a useEffect that clears outputLines
-      expect(GLOBAL_SOURCE).toMatch(/setTimeout/);
-      expect(GLOBAL_SOURCE).toMatch(/setOutputLines\s*\(\s*\[\s*\]\s*\)/);
-    });
-
-    it("clears output on next keystroke", () => {
-      // handlePartialChange should clear outputLines
-      const partialChangeMatch = GLOBAL_SOURCE.match(
-        /handlePartialChange[\s\S]*?setOutputLines/,
-      );
-      expect(partialChangeMatch).not.toBeNull();
-    });
-
-    it("renders TerminalOutput conditionally when outputLines is non-empty", () => {
-      expect(GLOBAL_SOURCE).toContain("<TerminalOutput");
-      expect(GLOBAL_SOURCE).toMatch(/outputLines\.length\s*>\s*0/);
-    });
-  });
-
-  describe("layout", () => {
-    it("has relative container for dropdown positioning", () => {
-      expect(GLOBAL_SOURCE).toContain("relative");
-    });
-
-    it("includes AuthorTypewriter pill", () => {
-      expect(GLOBAL_SOURCE).toContain("AuthorTypewriter");
-    });
+  it("re-exports GlobalCommandBarLazy as LandingTerminal", async () => {
+    const { LandingTerminal } = await import("./LandingTerminal");
+    const { GlobalCommandBarLazy } = await import(
+      "@/components/GlobalCommandBarLazy"
+    );
+    expect(LandingTerminal).toBe(GlobalCommandBarLazy);
   });
 });

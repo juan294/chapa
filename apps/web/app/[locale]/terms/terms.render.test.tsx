@@ -48,6 +48,11 @@ describe("TermsPage", () => {
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
+  it("renders a main content landmark", async () => {
+    render(await TermsPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(document.getElementById("main-content")).not.toBeNull();
+  });
+
   it("renders h1 highlight in English", async () => {
     render(await TermsPage({ params: Promise.resolve({ locale: "en" }) }));
     expect(screen.getByText("Service")).toBeDefined();
@@ -131,5 +136,8 @@ describe("TermsPage generateMetadata", () => {
     const metadata = await generateMetadata({ params: Promise.resolve({ locale: "en" }) });
     expect(metadata.title).toBe("Terms of Service");
     expect(metadata.description).toContain("Terms of Service for Chapa");
+    // #1065 (FE-H1) — declares the unprefixed public path as its canonical,
+    // not the internal /[locale]/terms path.
+    expect(metadata.alternates?.canonical).toBe("/terms");
   });
 });
