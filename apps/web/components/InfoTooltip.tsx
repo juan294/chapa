@@ -153,11 +153,10 @@ export function InfoTooltip({
         aria-label={t('aria.moreInfo') as string}
         aria-describedby={id}
         onClick={() => {
-          if (open) {
-            close();
-          } else {
-            setOpen(true);
-          }
+          // Functional state avoids losing a rapid second keyboard activation
+          // before React has refreshed this handler's render-time closure.
+          setOpen((current) => !current);
+          setHovered(false);
         }}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}

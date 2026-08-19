@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -131,6 +131,20 @@ describe("InfoTooltip", () => {
       expect(screen.getByRole("tooltip")).toBeDefined();
 
       fireEvent.click(button);
+      expect(document.activeElement).toBe(button);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("toggles closed when two activations arrive before a rerender", () => {
+      render(<InfoTooltip content="Rapid keyboard tooltip" id="tt-rapid-toggle" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      button.focus();
+      act(() => {
+        button.click();
+        button.click();
+      });
+
       expect(document.activeElement).toBe(button);
       expect(screen.queryByRole("tooltip")).toBeNull();
     });
