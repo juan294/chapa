@@ -192,10 +192,42 @@ describe("OverallHealthBanner", () => {
   // ─── Terminal-style prefix ────────────────────────────────────────────
 
   describe("terminal prefix", () => {
-    it("shows the terminal command prefix", () => {
+    it("shows the terminal command prefix with font-heading", () => {
       const agents = [createAgent({ key: "a", health: "green" })];
       render(<OverallHealthBanner agents={agents} />);
-      expect(screen.getByText("$ agents/health")).toBeDefined();
+      const prefix = screen.getByText("$ agents/health");
+      expect(prefix.className).toContain("font-heading");
+    });
+  });
+
+  // ─── Terminal color classes ───────────────────────────────────────────
+
+  describe("terminal color classes", () => {
+    it("uses terminal-green for the dot and label when healthy", () => {
+      const agents = [createAgent({ key: "a", health: "green" })];
+      render(<OverallHealthBanner agents={agents} />);
+      const label = screen.getByText("All systems healthy");
+      expect(label.className).toContain("text-terminal-green");
+      const dot = label.previousElementSibling;
+      expect(dot?.className).toContain("bg-terminal-green");
+    });
+
+    it("uses terminal-red for the dot and label when critical", () => {
+      const agents = [createAgent({ key: "a", health: "red" })];
+      render(<OverallHealthBanner agents={agents} />);
+      const label = screen.getByText("Critical issues detected");
+      expect(label.className).toContain("text-terminal-red");
+      const dot = label.previousElementSibling;
+      expect(dot?.className).toContain("bg-terminal-red");
+    });
+
+    it("uses terminal-yellow for the dot and label when degraded", () => {
+      const agents = [createAgent({ key: "a", health: "yellow" })];
+      render(<OverallHealthBanner agents={agents} />);
+      const label = screen.getByText("Some agents need attention");
+      expect(label.className).toContain("text-terminal-yellow");
+      const dot = label.previousElementSibling;
+      expect(dot?.className).toContain("bg-terminal-yellow");
     });
   });
 });

@@ -7,79 +7,15 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+// Export shape, prop types (guarded by typecheck via the render test's
+// typed usage), the agents.map rendering, isRunning derivation,
+// onRun/onStop wiring, and grid layout classes are all exercised
+// behaviorally by agent-status-grid.test.tsx. React's `key` prop is
+// consumed internally by the reconciler and never appears on rendered
+// DOM or as an observable prop, so "passes agent key as React key" had
+// no behavioral equivalent to convert to and was removed as a no-op.
 describe("AgentStatusGrid", () => {
-  describe("exports", () => {
-    it("exports a named AgentStatusGrid component", () => {
-      expect(SOURCE).toContain("export function AgentStatusGrid");
-    });
-
-    it("is a client component", () => {
-      expect(SOURCE).toContain('"use client"');
-    });
-  });
-
-  describe("props interface", () => {
-    it("accepts agents array of AgentStatus", () => {
-      expect(SOURCE).toContain("agents: AgentStatus[]");
-    });
-
-    it("accepts runningAgent as string or null", () => {
-      expect(SOURCE).toContain("runningAgent: string | null");
-    });
-
-    it("accepts onRun callback", () => {
-      expect(SOURCE).toContain("onRun: (agentKey: string) => void");
-    });
-
-    it("accepts onStop callback", () => {
-      expect(SOURCE).toContain("onStop: (agentKey: string) => void");
-    });
-  });
-
-  describe("rendering", () => {
-    it("maps over agents array", () => {
-      expect(SOURCE).toContain("agents.map");
-    });
-
-    it("renders AgentCard for each agent", () => {
-      expect(SOURCE).toContain("<AgentCard");
-      expect(SOURCE).toContain("AgentCard");
-    });
-
-    it("passes agent key as React key", () => {
-      expect(SOURCE).toContain("key={agent.key}");
-    });
-
-    it("determines isRunning by comparing runningAgent to agent.key", () => {
-      expect(SOURCE).toContain("runningAgent === agent.key");
-    });
-
-    it("passes onRun and onStop to AgentCard", () => {
-      expect(SOURCE).toContain("onRun={onRun}");
-      expect(SOURCE).toContain("onStop={onStop}");
-    });
-  });
-
-  describe("layout", () => {
-    it("uses responsive grid layout", () => {
-      expect(SOURCE).toContain("grid");
-      expect(SOURCE).toContain("grid-cols-1");
-      expect(SOURCE).toContain("sm:grid-cols-2");
-      expect(SOURCE).toContain("lg:grid-cols-3");
-    });
-
-    it("has gap between cards", () => {
-      expect(SOURCE).toContain("gap-4");
-    });
-  });
-
-  describe("imports", () => {
-    it("imports AgentStatus type", () => {
-      expect(SOURCE).toContain('import type { AgentStatus } from "../agents-types"');
-    });
-
-    it("imports AgentCard component", () => {
-      expect(SOURCE).toContain('import { AgentCard } from "./agent-card"');
-    });
+  it("is a client component", () => {
+    expect(SOURCE).toContain('"use client"');
   });
 });

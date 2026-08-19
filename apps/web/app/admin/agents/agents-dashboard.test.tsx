@@ -180,6 +180,20 @@ describe("AgentsDashboard", () => {
       });
     });
 
+    it("styles the error text with terminal-red", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ error: "Unauthorized" }),
+      });
+
+      render(<AgentsDashboard />);
+
+      await waitFor(() => {
+        const errorText = screen.getByText(/Unauthorized/);
+        expect(errorText.className).toContain("text-terminal-red");
+      });
+    });
+
     it("retry button re-fetches data", async () => {
       mockFetch
         .mockResolvedValueOnce({
@@ -508,6 +522,28 @@ describe("AgentsDashboard", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agentKey: "coverage" }),
       });
+    });
+
+    it("removes the event listener on unmount", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockData),
+      });
+
+      const { unmount } = render(<AgentsDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status-grid")).toBeDefined();
+      });
+
+      const removeSpy = vi.spyOn(window, "removeEventListener");
+      unmount();
+
+      expect(removeSpy).toHaveBeenCalledWith(
+        "chapa:admin-run-agent",
+        expect.any(Function),
+      );
+      removeSpy.mockRestore();
     });
 
     it("ignores custom event without agentKey in detail", async () => {

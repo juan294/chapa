@@ -39,6 +39,26 @@ describe("AgentCard", () => {
     expect(screen.getByText("All checks passing")).toBeDefined();
   });
 
+  it("renders the agent label as an h3 heading with font-heading", () => {
+    const agent = createAgent();
+    render(
+      <AgentCard agent={agent} isRunning={false} onRun={vi.fn()} onStop={vi.fn()} />,
+    );
+    const heading = screen.getByRole("heading", { level: 3, name: "Coverage Agent" });
+    expect(heading.className).toContain("font-heading");
+  });
+
+  it("uses card styling on the root container", () => {
+    const agent = createAgent();
+    const { container } = render(
+      <AgentCard agent={agent} isRunning={false} onRun={vi.fn()} onStop={vi.fn()} />,
+    );
+    const root = container.firstElementChild;
+    expect(root?.className).toContain("rounded-xl");
+    expect(root?.className).toContain("border-stroke");
+    expect(root?.className).toContain("bg-card");
+  });
+
   describe("health dot color", () => {
     it.each([
       ["green", "bg-terminal-green"],
@@ -65,9 +85,12 @@ describe("AgentCard", () => {
     expect(dot.className).toContain("animate-pulse");
     expect(screen.getByText("Stop")).toBeDefined();
     expect(screen.queryByText("Run")).toBeNull();
+
+    const stopButton = screen.getByLabelText("Stop Coverage Agent");
+    expect(stopButton.className).toContain("text-terminal-red");
   });
 
-  it("when not running: shows Run button with play icon", () => {
+  it("when not running: shows Run button with a decorative play icon", () => {
     const agent = createAgent();
     render(
       <AgentCard agent={agent} isRunning={false} onRun={vi.fn()} onStop={vi.fn()} />,
@@ -78,6 +101,7 @@ describe("AgentCard", () => {
     // Check for the SVG play icon (path with d="M8 5v14l11-7z")
     const svg = runButton.querySelector("svg");
     expect(svg).not.toBeNull();
+    expect(svg?.getAttribute("aria-hidden")).toBe("true");
     expect(screen.queryByText("Stop")).toBeNull();
   });
 
@@ -108,6 +132,8 @@ describe("AgentCard", () => {
     );
     const runButton = screen.getByLabelText(`Run ${agent.label}`);
     expect(runButton.hasAttribute("disabled")).toBe(true);
+    expect(runButton.className).toContain("disabled:opacity-30");
+    expect(runButton.className).toContain("disabled:cursor-not-allowed");
   });
 
   it("shows 'Never run' when lastRun is null", () => {

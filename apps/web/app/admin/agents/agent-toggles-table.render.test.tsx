@@ -53,6 +53,35 @@ describe("AgentTogglesTable", () => {
       expect(headers[1]!.textContent).toBe("Schedule");
       expect(headers[2]!.textContent).toBe("Status");
     });
+
+    it("headers use uppercase tracking-wider styling", () => {
+      render(<AgentTogglesTable {...defaultProps} />);
+      for (const header of screen.getAllByRole("columnheader")) {
+        expect(header.className).toContain("uppercase");
+        expect(header.className).toContain("tracking-wider");
+      }
+    });
+
+    it("hides the Schedule column on small screens", () => {
+      render(<AgentTogglesTable {...defaultProps} />);
+      const headers = screen.getAllByRole("columnheader");
+      expect(headers[1]!.className).toContain("hidden");
+      expect(headers[1]!.className).toContain("sm:table-cell");
+    });
+
+    it("uses card styling for the table container and border-stroke row dividers", () => {
+      const { container } = render(<AgentTogglesTable {...defaultProps} />);
+      const root = container.firstElementChild;
+      expect(root?.className).toContain("rounded-xl");
+      expect(root?.className).toContain("border-stroke");
+      expect(root?.className).toContain("bg-card");
+
+      const rows = container.querySelectorAll("tbody tr");
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row.className).toContain("border-stroke");
+      }
+    });
   });
 
   // ─── Master toggle row ────────────────────────────────────────────────
@@ -91,6 +120,14 @@ describe("AgentTogglesTable", () => {
       });
 
       expect(onToggle).toHaveBeenCalledWith("automated_agents", false);
+    });
+
+    it("highlights the master row with purple tint and amber label styling", () => {
+      render(<AgentTogglesTable {...defaultProps} />);
+      const label = screen.getByText("All Agents (master)");
+      expect(label.className).toContain("text-amber");
+      const row = label.closest("tr");
+      expect(row?.className).toContain("bg-purple-tint");
     });
   });
 
@@ -148,6 +185,18 @@ describe("AgentTogglesTable", () => {
 
       expect(onToggle).toHaveBeenCalledWith("cost-analyst", true);
     });
+
+    it("uses amber background and a translated knob when enabled, muted styling when disabled", () => {
+      render(<AgentTogglesTable {...defaultProps} />);
+      const coverageSwitch = screen.getByRole("switch", { name: "Toggle Coverage" }); // enabled
+      const costSwitch = screen.getByRole("switch", { name: "Toggle Cost Analyst" }); // disabled
+
+      expect(coverageSwitch.className).toContain("bg-amber");
+      expect(coverageSwitch.querySelector("span")?.className).toContain("translate-x-4");
+
+      expect(costSwitch.className).not.toContain("bg-amber");
+      expect(costSwitch.querySelector("span")?.className).toContain("translate-x-0.5");
+    });
   });
 
   // ─── Pending/loading state ────────────────────────────────────────────
@@ -180,6 +229,29 @@ describe("AgentTogglesTable", () => {
       // After resolution, the switch should be enabled again
       await waitFor(() => {
         expect(coverageSwitch.hasAttribute("disabled")).toBe(false);
+      });
+    });
+
+    it("shows reduced opacity and not-allowed cursor while pending", async () => {
+      let resolveToggle!: () => void;
+      const onToggle = vi.fn().mockImplementation(
+        () => new Promise<void>((resolve) => { resolveToggle = resolve; }),
+      );
+
+      render(<AgentTogglesTable {...defaultProps} onToggle={onToggle} />);
+      const coverageSwitch = screen.getByRole("switch", { name: "Toggle Coverage" });
+
+      act(() => {
+        fireEvent.click(coverageSwitch);
+      });
+
+      await waitFor(() => {
+        expect(coverageSwitch.className).toContain("opacity-50");
+        expect(coverageSwitch.className).toContain("cursor-not-allowed");
+      });
+
+      await act(async () => {
+        resolveToggle();
       });
     });
 

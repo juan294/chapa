@@ -143,6 +143,63 @@ describe("ImpactBreakdown", () => {
     expect(screen.getByText("Forks")).toBeDefined();
     expect(screen.getByText("Watchers")).toBeDefined();
   });
+
+  it("displays all 8 key stats (#202)", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    // SAMPLE_STATS: totalStars=500, totalForks=120, totalWatchers=45,
+    // activeDays=180, commitsTotal=320, prsMergedCount=65,
+    // reviewsSubmittedCount=30, reposContributed=6
+    expect(screen.getByText("500")).toBeDefined();
+    expect(screen.getByText("120")).toBeDefined();
+    expect(screen.getByText("45")).toBeDefined();
+    expect(screen.getByText("180")).toBeDefined();
+    expect(screen.getByText("320")).toBeDefined();
+    expect(screen.getByText("65")).toBeDefined();
+    expect(screen.getByText("30")).toBeDefined();
+    expect(screen.getByText("6")).toBeDefined();
+  });
+
+  it("falls back to 0 (never NaN) for missing stat fields (#QA-4)", () => {
+    const sparseStats: StatsData = {
+      handle: "testuser",
+      heatmapData: [],
+      fetchedAt: "2025-01-01T00:00:00Z",
+    } as unknown as StatsData;
+    const { container } = render(
+      <ImpactBreakdown impact={SAMPLE_IMPACT} stats={sparseStats} />,
+    );
+    expect(container.textContent).not.toContain("NaN");
+    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+  });
+
+  it("does not render confidence anywhere (#279)", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    expect(screen.queryByText(/Confidence/)).toBeNull();
+  });
+
+  it("does not render the DataSources platform list inside ImpactBreakdown", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    expect(screen.queryByText("GitHub")).toBeNull();
+  });
+
+  it("progress bars carry a descriptive aria-label naming the dimension", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    const bars = screen.getAllByRole("progressbar");
+    expect(bars[0]!.getAttribute("aria-label")).toContain("Delivery");
+    expect(bars[1]!.getAttribute("aria-label")).toContain("Quality");
+  });
+
+  it("puts role=progressbar and aria-label on the track, not the fill div (WCAG #667)", () => {
+    const { container } = render(
+      <ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />,
+    );
+    const fillDivs = container.querySelectorAll(".animate-bar-fill");
+    expect(fillDivs.length).toBeGreaterThan(0);
+    for (const fill of Array.from(fillDivs)) {
+      expect(fill.getAttribute("role")).toBeNull();
+      expect(fill.getAttribute("aria-label")).toBeNull();
+    }
+  });
 });
 
 describe("ImpactBreakdown — null guard branch", () => {

@@ -7,6 +7,18 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+// The bulk of this file used to source-text-match logic that is now
+// exercised behaviorally in StudioClient.render.test.tsx: state
+// management, layout composition, props usage, save (PUT + body +
+// config_saved tracking), reset, PostHog analytics, aria-busy while
+// saving, the sr-only heading, and terminal/command-registry
+// integration are all covered by rendering the real component and
+// querying the DOM or asserting on mocked calls. What's left here is
+// genuinely non-renderable: the client/server boundary directive, and
+// React's `key` prop (consumed internally by React, never surfaced as
+// a DOM attribute a render test can query) and the SSR-safe
+// useSyncExternalStore pattern (jsdom only ever renders client-side,
+// so it can't distinguish this from a hydration-unsafe alternative).
 describe("StudioClient", () => {
   describe("component directive", () => {
     it("has 'use client' directive", () => {
@@ -14,123 +26,7 @@ describe("StudioClient", () => {
     });
   });
 
-  describe("state management", () => {
-    it("uses useState for config state", () => {
-      expect(SOURCE).toContain("useState<BadgeConfig>");
-    });
-
-    it("accepts initial config as prop", () => {
-      expect(SOURCE).toContain("initialConfig");
-    });
-
-    it("has save handler", () => {
-      expect(SOURCE).toContain("/api/studio/config");
-    });
-
-    it("tracks saving state", () => {
-      expect(SOURCE).toContain("saving");
-    });
-  });
-
-  describe("layout", () => {
-    it("renders BadgePreviewCard in preview pane", () => {
-      expect(SOURCE).toContain("BadgePreviewCard");
-    });
-
-    it("renders terminal components", () => {
-      expect(SOURCE).toContain("TerminalOutput");
-      expect(SOURCE).toContain("TerminalInput");
-    });
-
-    it("renders QuickControls for mouse fallback", () => {
-      expect(SOURCE).toContain("QuickControls");
-    });
-
-    it("has responsive split layout classes", () => {
-      expect(SOURCE).toContain("lg:grid-cols");
-    });
-  });
-
-  describe("accessibility", () => {
-    it("has sr-only h1 heading for accessibility", () => {
-      expect(SOURCE).toContain('className="sr-only"');
-      expect(SOURCE).toContain("Creator Studio");
-    });
-  });
-
-  describe("props interface", () => {
-    it("accepts StatsData prop", () => {
-      expect(SOURCE).toContain("stats: StatsData");
-    });
-
-    it("accepts ImpactV6Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV6Result");
-    });
-
-    it("accepts BadgeConfig initial config", () => {
-      expect(SOURCE).toContain("initialConfig: BadgeConfig");
-    });
-
-    it("accepts handle prop", () => {
-      expect(SOURCE).toContain("handle");
-    });
-  });
-
-  describe("save functionality", () => {
-    it("uses PUT method for saving", () => {
-      expect(SOURCE).toContain('method: "PUT"');
-    });
-
-    it("sends JSON body", () => {
-      expect(SOURCE).toContain("JSON.stringify");
-    });
-  });
-
-  describe("reset functionality", () => {
-    it("imports DEFAULT_BADGE_CONFIG for reset", () => {
-      expect(SOURCE).toContain("DEFAULT_BADGE_CONFIG");
-    });
-  });
-
-  describe("PostHog analytics", () => {
-    it("imports trackEvent from posthog analytics", () => {
-      expect(SOURCE).toContain("trackEvent");
-    });
-
-    it("tracks studio_opened on mount", () => {
-      expect(SOURCE).toContain('"studio_opened"');
-    });
-
-    it("tracks effect_changed when config changes", () => {
-      expect(SOURCE).toContain('"effect_changed"');
-    });
-
-    it("tracks preset_selected when a preset is chosen", () => {
-      expect(SOURCE).toContain('"preset_selected"');
-    });
-
-    it("tracks config_saved on successful save", () => {
-      expect(SOURCE).toContain('"config_saved"');
-    });
-  });
-
   describe("reduced motion", () => {
-    it("has useReducedMotion hook", () => {
-      expect(SOURCE).toContain("useReducedMotion");
-    });
-
-    it("detects prefers-reduced-motion media query", () => {
-      expect(SOURCE).toContain("prefers-reduced-motion");
-    });
-
-    it("passes interactive flag based on reduced motion and client hydration", () => {
-      expect(SOURCE).toContain("interactive={isClient && !reducedMotion}");
-    });
-
-    it("shows reduced motion notice when detected", () => {
-      expect(SOURCE).toContain("Reduced motion detected");
-    });
-
     it("avoids SSR hydration mismatch by using useSyncExternalStore with server snapshot returning false", () => {
       // Must use useSyncExternalStore — no useState initializer accessing window
       expect(SOURCE).toContain("useSyncExternalStore");
@@ -144,60 +40,18 @@ describe("StudioClient", () => {
         /useState\(\(\)\s*=>\s*typeof window/,
       );
     });
-
-    it("subscribes to matchMedia changes via useSyncExternalStore", () => {
-      // Subscribe function listens for changes to the media query
-      expect(SOURCE).toContain("subscribeReducedMotion");
-      expect(SOURCE).toContain("getReducedMotionSnapshot");
-      // The snapshot reads from matchMedia
-      expect(SOURCE).toContain("matchMedia");
-    });
-  });
-
-  describe("aria-busy on saving state", () => {
-    it("applies aria-busy to the preview area when saving", () => {
-      expect(SOURCE).toContain("aria-busy");
-    });
-  });
-
-  describe("shared useIsClient hook (#730)", () => {
-    it("imports useIsClient from the shared hooks directory", () => {
-      expect(SOURCE).toContain("useIsClient");
-      expect(SOURCE).toContain("@/hooks/useIsClient");
-    });
   });
 
   describe("preview animation replay", () => {
     it("uses previewKey state for animation replay", () => {
+      // React's `key` prop is consumed internally by the reconciler and
+      // never appears on the rendered DOM node or the mocked child's
+      // props snapshot, so this can't be observed via render + query.
       expect(SOURCE).toContain("previewKey");
     });
 
     it("passes previewKey as key to BadgePreviewCard", () => {
       expect(SOURCE).toContain("key={previewKey}");
-    });
-  });
-
-  describe("terminal integration", () => {
-    it("uses useStudioCommands hook", () => {
-      expect(SOURCE).toContain("useStudioCommands");
-    });
-
-    it("uses executeCommand from command registry", () => {
-      expect(SOURCE).toContain("executeCommand");
-    });
-
-    it("handles command actions", () => {
-      expect(SOURCE).toContain("handleAction");
-    });
-
-    it("supports autocomplete", () => {
-      expect(SOURCE).toContain("AutocompleteDropdown");
-    });
-
-    it("registers keyboard shortcuts via global provider", () => {
-      expect(SOURCE).toContain("registerPageShortcuts");
-      expect(SOURCE).toContain('"studio"');
-      expect(SOURCE).toContain('"focus-terminal"');
     });
   });
 });
