@@ -327,7 +327,10 @@ jobs:
     needs: develop_push_source
     if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Fresh hosted runners can spend more than 15 minutes in Playwright's apt
+    # dependency install. Keep a bounded backstop without cancelling a healthy
+    # contract + journey run during runner setup.
+    timeout-minutes: 30
     env:
       DEBIAN_FRONTEND: noninteractive
       NEEDRESTART_MODE: a
@@ -653,7 +656,9 @@ jobs:
     needs: [develop_push_source, build]
     if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Same runner-setup variance as the contract job above. The smoke test is
+    # short once Chromium's system dependencies are available.
+    timeout-minutes: 30
     env:
       DEBIAN_FRONTEND: noninteractive
       NEEDRESTART_MODE: a
