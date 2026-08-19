@@ -70,15 +70,17 @@ vi.mock("./ConfirmDialog", () => ({
     onConfirm,
     onCancel,
     loading,
+    variant,
   }: {
     open: boolean;
     title: string;
     onConfirm: () => void;
     onCancel: () => void;
     loading: boolean;
+    variant?: string;
   }) =>
     open ? (
-      <div data-testid="confirm-dialog" data-title={title} data-loading={String(loading)}>
+      <div data-testid="confirm-dialog" data-title={title} data-loading={String(loading)} data-variant={variant}>
         <button data-testid="confirm-btn" onClick={onConfirm}>
           Confirm
         </button>
@@ -94,6 +96,7 @@ vi.mock("./Toast", () => ({
     message,
     type,
     detail,
+    duration,
   }: {
     message: string;
     type: string;
@@ -101,7 +104,7 @@ vi.mock("./Toast", () => ({
     duration?: number;
     onDismiss?: () => void;
   }) => (
-    <div data-testid="toast" data-type={type}>
+    <div data-testid="toast" data-type={type} data-duration={String(duration)}>
       {message}
       {detail && <span data-testid="toast-detail">{detail}</span>}
     </div>
@@ -135,103 +138,23 @@ afterEach(() => {
 });
 
 // ---------- Source-code static assertions ----------
+// These check facts with no DOM-observable equivalent: where a module-level
+// store is declared relative to the component, which module an icon/hook is
+// imported from, code-reuse between near-identical handlers, and that an old
+// state pattern was fully removed. Everything with a DOM-observable outcome
+// lives in the "Runtime tests" section below instead.
 
 const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "UserMenu.tsx"),
   "utf-8",
 );
 
-describe("UserMenu — admin link", () => {
-  it("accepts isAdmin prop", () => {
-    expect(SOURCE).toContain("isAdmin");
-  });
-
-  it("renders Admin Panel link conditionally on isAdmin", () => {
-    expect(SOURCE).toContain("{isAdmin && (");
-    expect(SOURCE).toContain('href="/admin"');
-    expect(SOURCE).toContain("userMenu.adminPanel");
-  });
-
-  it("Admin Panel section has role=menuitem and aria-hidden icon", () => {
-    const start = SOURCE.indexOf("{isAdmin && (");
-    const end = SOURCE.indexOf("userMenu.adminPanel") + 30;
-    const section = SOURCE.slice(start, end);
-    expect(section).toContain('role="menuitem"');
-    expect(section).toContain('aria-hidden="true"');
-  });
-});
-
-describe("UserMenu — Bitbucket integration", () => {
-  it("fetches Bitbucket status on mount (server decides if enabled)", () => {
-    expect(SOURCE).toContain("/api/auth/${platform}/status");
-    expect(SOURCE).toContain("fetchPlatformStatus");
-  });
-
-  it("renders Link Bitbucket item when status is loaded", () => {
-    expect(SOURCE).toContain("bbStatus");
-    expect(SOURCE).toContain("userMenu.linkBitbucket");
-    expect(SOURCE).toContain('href="/api/auth/bitbucket/connect"');
-  });
-
-  it("renders Bitbucket linked state with remoteLogin and Unlink button", () => {
-    expect(SOURCE).toContain("bbStatus.remoteLogin");
-    expect(SOURCE).toContain("Unlink");
-    expect(SOURCE).toContain("/api/auth/bitbucket/disconnect");
-    // Confirmation dialog state exists
-    expect(SOURCE).toContain("showUnlinkConfirm");
-    // ConfirmDialog component is imported
-    expect(SOURCE).toContain("ConfirmDialog");
-  });
-
+describe("UserMenu — platform icon imports", () => {
   it("uses the shared Bitbucket SVG icon (no icon library)", () => {
     // The Bitbucket logo now lives in the shared icon module (#756); the
     // component references it by name and imports from @/components/icons.
     expect(SOURCE).toContain("BitbucketIcon");
     expect(SOURCE).toContain("@/components/icons");
-  });
-
-  it("Bitbucket section appears after Creator Studio and before Admin Panel", () => {
-    const studioIdx = SOURCE.indexOf("userMenu.creatorStudio");
-    const bitbucketIdx = SOURCE.indexOf("userMenu.linkBitbucket");
-    const adminIdx = SOURCE.indexOf("userMenu.adminPanel");
-    expect(studioIdx).toBeLessThan(bitbucketIdx);
-    expect(bitbucketIdx).toBeLessThan(adminIdx);
-  });
-
-  it("Bitbucket unlink opens confirmation dialog instead of directly unlinking", () => {
-    expect(SOURCE).toContain("setShowUnlinkConfirm(true)");
-    expect(SOURCE).toContain("open={showUnlinkConfirm}");
-  });
-
-  it("Unlink action uses hover:text-terminal-red (not permanent red)", () => {
-    expect(SOURCE).toContain("hover:text-terminal-red");
-    // Should NOT have permanent text-terminal-red on the Unlink button
-    expect(SOURCE).not.toContain("text-xs text-terminal-red hover:underline");
-  });
-
-  it("ConfirmDialog has correct props for unlink", () => {
-    expect(SOURCE).toContain("userMenu.confirmUnlinkBitbucketTitle");
-    expect(SOURCE).toContain("userMenu.confirmBtn");
-    expect(SOURCE).toContain('variant="destructive"');
-  });
-});
-
-describe("UserMenu — Codeberg integration", () => {
-  it("fetches Codeberg status on mount (server decides if enabled)", () => {
-    expect(SOURCE).toContain("fetchPlatformStatus");
-    expect(SOURCE).toContain('"codeberg"');
-  });
-
-  it("renders Link Codeberg item when status is loaded", () => {
-    expect(SOURCE).toContain("cbStatus");
-    expect(SOURCE).toContain("userMenu.linkCodeberg");
-    expect(SOURCE).toContain('href="/api/auth/codeberg/connect"');
-  });
-
-  it("renders Codeberg linked state with remoteLogin and Unlink button", () => {
-    expect(SOURCE).toContain("cbStatus.remoteLogin");
-    expect(SOURCE).toContain("/api/auth/codeberg/disconnect");
-    expect(SOURCE).toContain("showCbUnlinkConfirm");
   });
 
   it("uses the shared Codeberg SVG icon (no icon library)", () => {
@@ -241,132 +164,11 @@ describe("UserMenu — Codeberg integration", () => {
     expect(SOURCE).toContain("@/components/icons");
   });
 
-  it("Codeberg section appears after Bitbucket and before Admin Panel", () => {
-    const bitbucketIdx = SOURCE.indexOf("userMenu.linkBitbucket");
-    const codebergIdx = SOURCE.indexOf("userMenu.linkCodeberg");
-    const adminIdx = SOURCE.indexOf("userMenu.adminPanel");
-    expect(bitbucketIdx).toBeLessThan(codebergIdx);
-    expect(codebergIdx).toBeLessThan(adminIdx);
-  });
-
-  it("Codeberg unlink opens confirmation dialog instead of directly unlinking", () => {
-    expect(SOURCE).toContain("setShowCbUnlinkConfirm(true)");
-    expect(SOURCE).toContain("open={showCbUnlinkConfirm}");
-  });
-
-  it("ConfirmDialog has correct props for Codeberg unlink", () => {
-    expect(SOURCE).toContain("userMenu.confirmUnlinkCodebergTitle");
-    expect(SOURCE).toContain("userMenu.confirmBtn");
-    expect(SOURCE).toContain("handleUnlinkCodeberg");
-    expect(SOURCE).toContain("cbUnlinkLoading");
-  });
-
-  it("Codeberg unlink handler calls disconnect endpoint", () => {
-    expect(SOURCE).toContain("/api/auth/codeberg/disconnect");
-    expect(SOURCE).toContain("setCbStatus");
-    expect(SOURCE).toContain("setCbUnlinkLoading");
-  });
-});
-
-describe("UserMenu — GitLab integration", () => {
-  it("fetches GitLab status on mount (server decides if enabled)", () => {
-    expect(SOURCE).toContain("fetchPlatformStatus");
-    expect(SOURCE).toContain('"gitlab"');
-  });
-
-  it("renders Link GitLab item when status is loaded", () => {
-    expect(SOURCE).toContain("glStatus");
-    expect(SOURCE).toContain("userMenu.linkGitlab");
-    expect(SOURCE).toContain('href="/api/auth/gitlab/connect"');
-  });
-
-  it("renders GitLab linked state with remoteLogin and Unlink button", () => {
-    expect(SOURCE).toContain("glStatus.remoteLogin");
-    expect(SOURCE).toContain("/api/auth/gitlab/disconnect");
-    expect(SOURCE).toContain("showGlUnlinkConfirm");
-  });
-
   it("uses the shared GitLab SVG icon (no icon library)", () => {
     // The GitLab tanuki logo now lives in the shared icon module (#756); the
     // component references it by name and imports from @/components/icons.
     expect(SOURCE).toContain("GitlabIcon");
     expect(SOURCE).toContain("@/components/icons");
-  });
-
-  it("GitLab section appears after Codeberg and before Admin Panel", () => {
-    const codebergIdx = SOURCE.indexOf("userMenu.linkCodeberg");
-    const gitlabIdx = SOURCE.indexOf("userMenu.linkGitlab");
-    const adminIdx = SOURCE.indexOf("userMenu.adminPanel");
-    expect(codebergIdx).toBeLessThan(gitlabIdx);
-    expect(gitlabIdx).toBeLessThan(adminIdx);
-  });
-
-  it("GitLab unlink opens confirmation dialog instead of directly unlinking", () => {
-    expect(SOURCE).toContain("setShowGlUnlinkConfirm(true)");
-    expect(SOURCE).toContain("open={showGlUnlinkConfirm}");
-  });
-
-  it("ConfirmDialog has correct props for GitLab unlink", () => {
-    expect(SOURCE).toContain("userMenu.confirmUnlinkGitlabTitle");
-    expect(SOURCE).toContain("handleUnlinkGitlab");
-    expect(SOURCE).toContain("glUnlinkLoading");
-  });
-
-  it("GitLab unlink handler calls disconnect endpoint", () => {
-    expect(SOURCE).toContain("/api/auth/gitlab/disconnect");
-    expect(SOURCE).toContain("setGlStatus");
-    expect(SOURCE).toContain("setGlUnlinkLoading");
-  });
-});
-
-describe("UserMenu — #520 aria-label on dropdown menu", () => {
-  it("dropdown menu has aria-label 'User menu options'", () => {
-    expect(SOURCE).toContain("aria.userMenuOptions");
-  });
-});
-
-describe("UserMenu — #521 distinguishing aria-labels on Unlink buttons", () => {
-  it("Bitbucket Unlink button has aria-label 'Unlink Bitbucket account'", () => {
-    expect(SOURCE).toContain("aria.unlinkBitbucket");
-  });
-
-  it("Codeberg Unlink button has aria-label 'Unlink Codeberg account'", () => {
-    expect(SOURCE).toContain("aria.unlinkCodeberg");
-  });
-
-  it("GitLab Unlink button has aria-label 'Unlink GitLab account'", () => {
-    expect(SOURCE).toContain("aria.unlinkGitlab");
-  });
-});
-
-describe("UserMenu — linked platform profile links", () => {
-  it("renders Bitbucket username as a clickable link to bitbucket.org profile", () => {
-    expect(SOURCE).toContain("https://bitbucket.org/");
-    // The link should include the remoteLogin in the href
-    expect(SOURCE).toContain("bbStatus.remoteLogin");
-    // Extract the Bitbucket linked state block
-    const bbLinkedStart = SOURCE.indexOf("bbStatus.linked ?");
-    const bbLinkedEnd = SOURCE.indexOf("Link Bitbucket");
-    const bbBlock = SOURCE.slice(bbLinkedStart, bbLinkedEnd);
-    expect(bbBlock).toContain("<a");
-    expect(bbBlock).toContain("bitbucket.org/");
-  });
-
-  it("renders Codeberg username as a clickable link to codeberg.org profile", () => {
-    expect(SOURCE).toContain("https://codeberg.org/");
-    // The link should include the remoteLogin in the href
-    expect(SOURCE).toContain("cbStatus.remoteLogin");
-    // Extract the Codeberg linked state block
-    const cbLinkedStart = SOURCE.indexOf("cbStatus.linked ?");
-    const cbLinkedEnd = SOURCE.indexOf("Link Codeberg");
-    const cbBlock = SOURCE.slice(cbLinkedStart, cbLinkedEnd);
-    expect(cbBlock).toContain("<a");
-    expect(cbBlock).toContain("codeberg.org/");
-  });
-
-  it("profile links open in new tab", () => {
-    expect(SOURCE).toContain('target="_blank"');
-    expect(SOURCE).toContain('rel="noopener noreferrer"');
   });
 });
 
@@ -374,15 +176,6 @@ describe("UserMenu — page refresh after unlink", () => {
   it("imports useRouter from next/navigation", () => {
     expect(SOURCE).toContain("useRouter");
     expect(SOURCE).toContain("next/navigation");
-  });
-
-  it("calls router.refresh() after a successful unlink (shared helper)", () => {
-    // The unlink flow is collapsed into the shared unlinkPlatform helper (#884),
-    // which performs the success transition (cache clear + router.refresh()).
-    const fnStart = SOURCE.indexOf("const unlinkPlatform");
-    const fnEnd = SOURCE.indexOf("async function handleUnlinkBitbucket");
-    const fnBody = SOURCE.slice(fnStart, fnEnd);
-    expect(fnBody).toContain("router.refresh()");
   });
 
   it("Bitbucket and Codeberg handlers delegate to the shared unlink helper", () => {
@@ -414,64 +207,11 @@ describe("UserMenu — platform status cache", () => {
     // The cache type should track platform statuses
     expect(SOURCE).toMatch(/PlatformStatusCache\b/);
   });
-
-  it("useEffect checks each platform cache entry before fetching", () => {
-    expect(SOURCE).toContain("platformStatusStore.getSnapshot()[platform].fetched");
-  });
-
-  it("unlink flow invalidates the cache (shared helper)", () => {
-    // The shared unlinkPlatform helper invalidates the cache on success (#884).
-    const helperStart = SOURCE.indexOf("const unlinkPlatform");
-    const helperEnd = SOURCE.indexOf("async function handleUnlinkBitbucket");
-    const helperBody = SOURCE.slice(helperStart, helperEnd);
-    expect(helperBody).toContain("clearPlatformStatusCache()");
-  });
-
-  it("exports a clearPlatformStatusCache function for external invalidation", () => {
-    expect(SOURCE).toContain("export function clearPlatformStatusCache");
-  });
 });
-
-// ---------------------------------------------------------------------------
-// Upload flow with Toast + recalculate
-// ---------------------------------------------------------------------------
 
 describe("UserMenu — insights upload with Toast", () => {
   it("imports Toast component", () => {
     expect(SOURCE).toContain('import { Toast } from "./Toast"');
-  });
-
-  it("renders Toast component conditionally on toast state", () => {
-    expect(SOURCE).toContain("{toast && (");
-    expect(SOURCE).toContain("<Toast");
-  });
-
-  it("Toast receives message, detail, type, duration, and onDismiss props", () => {
-    expect(SOURCE).toContain("message={toast.message}");
-    expect(SOURCE).toContain("detail={toast.detail}");
-    expect(SOURCE).toContain("type={toast.type}");
-    expect(SOURCE).toContain("onDismiss={");
-  });
-
-  it("loading toast has duration=0 (persistent until state changes)", () => {
-    expect(SOURCE).toContain('toast.type === "loading" ? 0');
-  });
-
-  it("calls /api/recalculate after successful upload", () => {
-    expect(SOURCE).toContain('"/api/recalculate"');
-    expect(SOURCE).toContain('method: "POST"');
-  });
-
-  it("shows craft score and tier in success toast", () => {
-    const fnStart = SOURCE.indexOf("async function handleInsightsFile");
-    const fnEnd = SOURCE.indexOf("setTimeout(() => window.location.reload()");
-    const fnBody = SOURCE.slice(fnStart, fnEnd);
-    expect(fnBody).toContain("craftScore");
-    expect(fnBody).toContain("craftTier");
-  });
-
-  it("reloads page after showing success toast", () => {
-    expect(SOURCE).toContain("window.location.reload()");
   });
 
   it("does NOT use insightsStatus state (replaced by toast state)", () => {
@@ -482,36 +222,6 @@ describe("UserMenu — insights upload with Toast", () => {
   it("menu label always shows 'Import Claude Code Insights' (no inline status)", () => {
     expect(SOURCE).not.toContain('"Processing…"');
     expect(SOURCE).not.toContain('"Uploaded!"');
-  });
-
-  it("shows error toast for oversized files", () => {
-    const fnStart = SOURCE.indexOf("async function handleInsightsFile");
-    const fnEnd = SOURCE.indexOf("setOpen(false)", SOURCE.indexOf("async function handleInsightsFile"));
-    const fnBody = SOURCE.slice(fnStart, fnEnd);
-    expect(fnBody).toContain("userMenu.insightsFileTooLarge");
-  });
-
-  it("shows error toast when upload fails", () => {
-    expect(SOURCE).toContain("userMenu.insightsImportFailed");
-  });
-
-  it("handles recalculate failure gracefully (still shows upload success)", () => {
-    expect(SOURCE).toContain("userMenu.insightsImportedDetail");
-  });
-});
-
-describe("UserMenu — semantic HTML (#578)", () => {
-  it("does not use <label> as a menu item", () => {
-    // <label role="menuitem"> is a semantic HTML anti-pattern — use <button> instead
-    expect(SOURCE).not.toMatch(/<label\s[^>]*role="menuitem"/);
-  });
-
-  it("insights import trigger is a <button> with role=menuitem", () => {
-    // The Import Claude Code Insights item should be a button
-    const insightsStart = SOURCE.indexOf("userMenu.importInsights");
-    const blockStart = SOURCE.lastIndexOf("<button", insightsStart);
-    const block = SOURCE.slice(blockStart, insightsStart);
-    expect(block).toContain('role="menuitem"');
   });
 });
 
@@ -560,6 +270,7 @@ describe("UserMenu — Bitbucket disconnect handler (runtime)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("confirm-dialog")).toBeDefined();
       expect(screen.getByTestId("confirm-dialog").getAttribute("data-title")).toBe("Unlink Bitbucket?");
+      expect(screen.getByTestId("confirm-dialog").getAttribute("data-variant")).toBe("destructive");
     });
 
     // Click confirm to trigger disconnect
@@ -617,6 +328,199 @@ describe("UserMenu — Codeberg disconnect handler (runtime)", () => {
     });
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/auth/codeberg/disconnect", { method: "POST" });
+  });
+});
+
+describe("UserMenu — GitLab status fetch and link states (runtime)", () => {
+  afterEach(() => {
+    clearPlatformStatusCache();
+  });
+
+  it("fetches GitLab status on mount and renders 'Link GitLab' when not linked", async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/gitlab/status");
+      expect(screen.getByText("Link GitLab")).toBeDefined();
+    });
+
+    const link = screen.getByText("Link GitLab").closest("a");
+    expect(link?.getAttribute("href")).toBe("/api/auth/gitlab/connect");
+
+    fetchSpy.mockRestore();
+  });
+
+  it("shows GitLab remoteLogin as a clickable link to gitlab.com profile when linked", async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("gl-user")).toBeDefined();
+    });
+
+    const link = screen.getByText("gl-user").closest("a");
+    expect(link?.getAttribute("href")).toBe("https://gitlab.com/gl-user");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+
+    fetchSpy.mockRestore();
+  });
+});
+
+describe("UserMenu — GitLab disconnect handler (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/gitlab/disconnect")) {
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("calls /api/auth/gitlab/disconnect with POST when unlink is confirmed", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink GitLab account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+      expect(screen.getByTestId("confirm-dialog").getAttribute("data-title")).toBe("Unlink GitLab?");
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/auth/gitlab/disconnect", { method: "POST" });
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Unlink GitLab account")).toBeNull();
+    });
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it("cancelling the GitLab confirm dialog dismisses it without disconnecting", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink GitLab account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId("cancel-btn"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    const disconnectCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/gitlab/disconnect"),
+    );
+    expect(disconnectCalls.length).toBe(0);
+  });
+});
+
+describe("UserMenu — menu item ordering (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+  });
+
+  it("renders Creator Studio, then platform links, then Admin Panel in that order", async () => {
+    render(<UserMenu {...baseProps} isAdmin={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Link GitLab")).toBeDefined();
+    });
+
+    const studioToBb = screen
+      .getByText("Creator Studio")
+      .compareDocumentPosition(screen.getByText("Link Bitbucket"));
+    expect(studioToBb & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const bbToCb = screen
+      .getByText("Link Bitbucket")
+      .compareDocumentPosition(screen.getByText("Link Codeberg"));
+    expect(bbToCb & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const cbToGl = screen
+      .getByText("Link Codeberg")
+      .compareDocumentPosition(screen.getByText("Link GitLab"));
+    expect(cbToGl & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const glToAdmin = screen
+      .getByText("Link GitLab")
+      .compareDocumentPosition(screen.getByText("Admin Panel"));
+    expect(glToAdmin & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -1205,6 +1109,14 @@ describe("UserMenu — Bitbucket linked state display (runtime)", () => {
     expect(link?.getAttribute("target")).toBe("_blank");
     expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
   });
+
+  it("Unlink button uses hover:text-terminal-red styling (not permanent red)", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const unlinkBtn = await screen.findByLabelText("Unlink Bitbucket account");
+    expect(unlinkBtn.className).toContain("hover:text-terminal-red");
+    expect(unlinkBtn.className).not.toBe("text-xs text-terminal-red hover:underline");
+  });
 });
 
 describe("UserMenu — Codeberg linked state display (runtime)", () => {
@@ -1409,6 +1321,15 @@ describe("UserMenu — Admin Panel link (runtime)", () => {
 
     expect(screen.queryByText("Admin Panel")).toBeNull();
   });
+
+  it("Admin Panel link has role=menuitem and an aria-hidden icon", () => {
+    render(<UserMenu {...baseProps} isAdmin={true} />);
+
+    const link = screen.getByText("Admin Panel").closest("a");
+    expect(link?.getAttribute("role")).toBe("menuitem");
+    const icon = link?.querySelector("svg");
+    expect(icon?.getAttribute("aria-hidden")).toBe("true");
+  });
 });
 
 describe("UserMenu — Insights menu item (runtime)", () => {
@@ -1518,6 +1439,15 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
       expect(toast.getAttribute("data-type")).toBe("success");
       expect(toast.textContent).toContain("Craft");
     });
+
+    // The recalculate step runs after a successful insights upload
+    expect(fetchSpy).toHaveBeenCalledWith("/api/recalculate", { method: "POST" });
+
+    // The page reloads a fixed delay after the success toast appears
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(reloadSpy).toHaveBeenCalled();
   });
 
   it("shows error toast when upload fails", async () => {
@@ -1620,6 +1550,93 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
       expect(toast.textContent).toContain("Insights uploaded");
       expect(screen.getByTestId("toast-detail")?.textContent).toContain("Score will update on next badge view");
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Insights loading toast duration (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — insights loading toast duration (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let resolveInsights: (value: Response) => void;
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return new Promise<Response>((resolve) => {
+          resolveInsights = resolve;
+        });
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("loading toast has duration=0 while the upload is in flight", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("loading");
+      expect(toast.getAttribute("data-duration")).toBe("0");
+    });
+
+    // Resolve to clean up the pending fetch
+    await act(async () => {
+      resolveInsights(new Response(JSON.stringify({}), { status: 200 }));
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Semantic HTML for menu items (#578, runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — semantic HTML for menu items (runtime, #578)", () => {
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
+  });
+
+  it("every role=menuitem element is a <button> or <a>, never a <label>", () => {
+    render(<UserMenu {...baseProps} isAdmin={true} />);
+
+    const menuItems = screen.getAllByRole("menuitem");
+    expect(menuItems.length).toBeGreaterThan(0);
+    menuItems.forEach((item) => {
+      expect(["BUTTON", "A"]).toContain(item.tagName);
+    });
+  });
+
+  it("insights import trigger is a <button> with role=menuitem", () => {
+    render(<UserMenu {...baseProps} />);
+
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(btn).not.toBeNull();
+    expect(btn?.getAttribute("role")).toBe("menuitem");
   });
 });
 
@@ -2465,6 +2482,12 @@ describe("UserMenu — dropdown visibility (runtime)", () => {
     dropdownOpen = true;
     render(<UserMenu {...baseProps} />);
     expect(screen.getByRole("menu")).toBeDefined();
+  });
+
+  it("dropdown menu has aria-label 'User menu options'", () => {
+    dropdownOpen = true;
+    render(<UserMenu {...baseProps} />);
+    expect(screen.getByRole("menu").getAttribute("aria-label")).toBe("User menu options");
   });
 
   it("trigger button has correct aria-expanded state when closed", () => {

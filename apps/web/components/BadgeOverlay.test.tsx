@@ -1,17 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "BadgeOverlay.tsx"),
-  "utf-8",
-);
-const EN_DICT = fs.readFileSync(
-  path.resolve(__dirname, "../lib/i18n/dictionaries/en.ts"),
-  "utf-8",
-);
 
 // Minimal InfoTooltip stub — avoids dependency on portal/positioning logic
 vi.mock("./InfoTooltip", () => ({
@@ -31,38 +20,52 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("BadgeOverlay — static structure", () => {
-  it("exports BadgeOverlay function", () => {
-    expect(SOURCE).toContain("export function BadgeOverlay");
-  });
-
-  it("has role=group with aria-label on root element", () => {
-    expect(SOURCE).toContain('role="group"');
-    expect(SOURCE).toContain("t('aria.badgeTooltips')");
+  it("root element is a group labeled for badge tooltips", () => {
+    render(<BadgeOverlay />);
+    expect(
+      screen.getByRole("group", { name: "Badge element tooltips" }),
+    ).not.toBeNull();
   });
 
   it("leader lines SVG is aria-hidden", () => {
-    expect(SOURCE).toContain('aria-hidden="true"');
-    expect(SOURCE).toContain('id="leader-lines-svg"');
+    const { container } = render(<BadgeOverlay />);
+    const svg = container.querySelector("#leader-lines-svg");
+    expect(svg).not.toBeNull();
+    expect(svg!.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("hotspots have sr-only description spans", () => {
-    expect(SOURCE).toContain('className="sr-only"');
+    render(<BadgeOverlay />);
+    const descSpan = document.getElementById("badge-archetype-desc");
+    expect(descSpan).not.toBeNull();
+    expect(descSpan!.className).toContain("sr-only");
   });
 
-  it("hotspots use aria-describedby referencing the sr-only span", () => {
-    expect(SOURCE).toContain("aria-describedby={`${hotspot.id}-desc`}");
-    expect(SOURCE).toContain('id={`${hotspot.id}-desc`}');
+  it("hotspots use aria-describedby referencing an existing sr-only span", () => {
+    render(<BadgeOverlay />);
+    const hotspots = screen.getAllByRole("group").filter(
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+    );
+    for (const hotspot of hotspots) {
+      const describedById = hotspot.getAttribute("aria-describedby");
+      expect(describedById).not.toBeNull();
+      expect(document.getElementById(describedById!)).not.toBeNull();
+    }
   });
 
-  it("panelAnchor check drives tooltip transform (above vs below)", () => {
-    expect(SOURCE).toContain('panelAnchor === "above"');
-    expect(SOURCE).toContain('translate(-50%, -100%)');
-    expect(SOURCE).toContain('translate(-50%, 0%)');
-  });
+  it("renders the leader line's circle at the path's parsed M x y start point", () => {
+    const { container } = render(<BadgeOverlay />);
+    const archetypeHotspot = screen
+      .getAllByRole("group")
+      .find((el) => el.getAttribute("aria-label") === "archetype info")!;
 
-  it("parsePathStart extracts M x y from SVG path", () => {
-    expect(SOURCE).toContain("function parsePathStart");
-    expect(SOURCE).toContain('/^M\\s+(\\d+)/');
+    fireEvent.mouseEnter(archetypeHotspot);
+
+    // badge-archetype's leaderLine.path starts "M 144 159 ..."
+    const circle = container.querySelector("circle");
+    expect(circle).not.toBeNull();
+    expect(circle!.getAttribute("cx")).toBe("144");
+    expect(circle!.getAttribute("cy")).toBe("159");
   });
 });
 
@@ -333,17 +336,12 @@ describe("BadgeOverlay — archetype tooltip completeness (#735)", () => {
     "Emerging",
   ];
 
-  it('archetype tooltip says "Seven types" (not Six)', () => {
-    // Tooltip copy lives in en.ts dictionary (badgeOverlay.archetype key)
-    expect(EN_DICT).toContain("Seven types");
-    expect(EN_DICT).not.toContain("Six types");
-  });
-
-  it("archetype tooltip includes all 7 archetype names", () => {
-    // Archetype names live in en.ts dictionary (badgeOverlay.archetype key)
-    for (const name of EXPECTED_ARCHETYPES) {
-      expect(EN_DICT).toContain(name);
-    }
+  it('archetype hotspot tooltip text says "Seven types" (not Six)', () => {
+    render(<BadgeOverlay />);
+    const descSpan = document.getElementById("badge-archetype-desc");
+    expect(descSpan).not.toBeNull();
+    expect(descSpan!.textContent).toContain("Seven types");
+    expect(descSpan!.textContent).not.toContain("Six types");
   });
 
   it("archetype hotspot tooltip text contains Artificer", () => {
@@ -399,9 +397,26 @@ describe("BadgeOverlay — desktop panel heading translation (#1109)", () => {
     expect(panel.textContent).toContain("HEATMAP");
   });
 
-  it("every hotspot has a labelKey resolving to a non-empty string in en.ts", () => {
-    // Static assertion: labelKey must be a dictionary key, not a raw id.
-    expect(SOURCE).toContain("labelKey:");
-    expect(SOURCE).not.toContain('activeBase.id.replace("badge-", "")');
+  it("every hotspot's panel heading resolves to a non-empty translated string, never the raw hotspot id", () => {
+    render(<BadgeOverlay />);
+    mockOverlayRect();
+    const hotspots = screen.getAllByRole("group").filter(
+      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+    );
+    expect(hotspots.length).toBe(11);
+
+    for (const hotspot of hotspots) {
+      // e.g. aria-label "archetype info" -> raw slug "archetype", the
+      // buggy pre-#1109 heading (activeBase.id.replace("badge-", "")).
+      const rawSlug = hotspot.getAttribute("aria-label")!.replace(" info", "");
+
+      fireEvent.mouseEnter(hotspot);
+      const panel = screen.getByRole("tooltip");
+      const heading = panel.querySelector("span")!.textContent;
+      expect(heading).toBeTruthy();
+      expect(heading).not.toBe(rawSlug);
+      expect(heading).not.toContain("badge-");
+      fireEvent.mouseLeave(hotspot);
+    }
   });
 });
