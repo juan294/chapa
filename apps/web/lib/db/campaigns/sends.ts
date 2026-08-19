@@ -9,7 +9,6 @@ import { getSupabase } from "../supabase";
 import {
   CampaignSend,
   CampaignSendRow,
-  CampaignSendStatus,
   CampaignSendStats,
   CAMPAIGN_SEND_ROW_REQUIRED_KEYS,
   CLAIM_CLEAR_FIELDS,
@@ -324,12 +323,11 @@ export async function dbMarkSendsFailed(
 }
 
 /**
- * Read exact send status counts for a campaign without transferring rows.
+ * Read exact send status counts for a campaign from one database snapshot.
  *
- * Four parallel HEAD requests use PostgREST's exact count and the existing
- * `(campaign_id, status)` index. HEAD counts are not limited by the API row
- * cap and return no response rows, so large campaigns do not require paging
- * every send after each processed batch.
+ * The aggregate RPC returns one row and uses the existing
+ * `(campaign_id, status)` index. A single SQL statement prevents independent
+ * status reads from observing different sides of a concurrent transition.
  *
  * @param id - Campaign UUID
  * @returns Counts of sent, pending, processing, and failed sends
@@ -344,24 +342,33 @@ export async function dbGetCampaignStats(
   }
 
   try {
-    const countStatus = async (status: CampaignSendStatus) => {
-      const { count, error } = await db
-        .from("campaign_sends")
-        .select("*", { count: "exact", head: true })
-        .eq("campaign_id", id)
-        .eq("status", status);
+    const { data, error } = await db.rpc("get_campaign_send_stats", {
+      p_campaign_id: id,
+    });
+    if (error) throw error;
 
-      if (error) throw error;
-      return count ?? 0;
+    const row = Array.isArray(data) ? data[0] : undefined;
+    const keys = ["sent", "pending", "processing", "failed"] as const;
+    if (
+      !row ||
+      typeof row !== "object" ||
+      !keys.every(
+        (key) =>
+          typeof (row as Record<string, unknown>)[key] === "number" &&
+          Number.isSafeInteger((row as Record<string, unknown>)[key]) &&
+          ((row as Record<string, unknown>)[key] as number) >= 0,
+      )
+    ) {
+      throw new Error("Malformed campaign stats response");
+    }
+
+    const stats = row as unknown as CampaignSendStats;
+    return {
+      sent: stats.sent,
+      pending: stats.pending,
+      processing: stats.processing,
+      failed: stats.failed,
     };
-
-    const [sent, pending, processing, failed] = await Promise.all([
-      countStatus("sent"),
-      countStatus("pending"),
-      countStatus("processing"),
-      countStatus("failed"),
-    ]);
-    return { sent, pending, processing, failed };
   } catch (error) {
     console.error(
       "[db] dbGetCampaignStats failed:",

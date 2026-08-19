@@ -823,27 +823,17 @@ describe("dbMarkSendsFailed", () => {
 });
 
 describe("dbGetCampaignStats", () => {
-  it("returns aggregate counts from four exact HEAD queries", async () => {
-    queryResults = [
-      { count: 2 },
-      { count: 1 },
-      { count: 3 },
-      { count: 1 },
-    ];
+  it("returns counts from one aggregate RPC", async () => {
+    mockRpc.mockResolvedValue({
+      data: [{ sent: 2, pending: 1, processing: 3, failed: 1 }],
+      error: null,
+    });
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 2, pending: 1, processing: 3, failed: 1 });
-  });
-
-  it("does not request response rows", async () => {
-    queryResults = [{ count: 1 }, { count: 0 }, { count: 0 }, { count: 0 }];
-
-    await dbGetCampaignStats("c-1");
-
-    expect(mockSelect).toHaveBeenCalledTimes(4);
-    expect(mockSelect).toHaveBeenCalledWith("*", {
-      count: "exact",
-      head: true,
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith("get_campaign_send_stats", {
+      p_campaign_id: "c-1",
     });
   });
 
@@ -854,19 +844,8 @@ describe("dbGetCampaignStats", () => {
     );
   });
 
-  it("returns zeros when successful counts are null", async () => {
-    queryResults = [
-      { count: null },
-      { count: null },
-      { count: null },
-      { count: null },
-    ];
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
-  });
-
   it("fails loudly on query error", async () => {
-    queryResults = [{ error: new Error("query failed") }];
+    mockRpc.mockResolvedValue({ data: null, error: new Error("query failed") });
     await expect(dbGetCampaignStats("c-1")).rejects.toMatchObject({
       name: "CampaignStatsReadError",
       campaignId: "c-1",
@@ -875,21 +854,23 @@ describe("dbGetCampaignStats", () => {
   });
 
   it("counts all-sent data correctly past the row cap", async () => {
-    queryResults = [
-      { count: 1250 },
-      { count: 0 },
-      { count: 0 },
-      { count: 0 },
-    ];
+    mockRpc.mockResolvedValue({
+      data: [{ sent: 1250, pending: 0, processing: 0, failed: 0 }],
+      error: null,
+    });
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 1250, pending: 0, processing: 0, failed: 0 });
   });
 
-  it("returns zeros for empty data array", async () => {
-    queryResults = [{ data: [], error: null }];
-    const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
+  it("fails loudly for an incomplete aggregate response", async () => {
+    mockRpc.mockResolvedValue({
+      data: [{ sent: 1, pending: 0, processing: 0 }],
+      error: null,
+    });
+    await expect(dbGetCampaignStats("c-1")).rejects.toBeInstanceOf(
+      CampaignStatsReadError,
+    );
   });
 });
 
