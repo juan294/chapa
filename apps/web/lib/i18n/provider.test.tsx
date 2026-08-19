@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, cleanup, waitFor } from '@testing-library/react';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { LanguageContext, LanguageProvider, type LanguageContextValue } from './provider';
 import { es } from './dictionaries/es';
 import type { Translations } from './types';
@@ -376,6 +376,109 @@ describe('LanguageProvider', () => {
       expect(captured.inner).not.toBe(captured.outer);
       expect(captured.inner?.locale).toBe('en');
       expect(captured.outer?.locale).toBe('es');
+    });
+  });
+
+  describe('mount-time decision freeze (#1108-repro — /u/:handle duplicate-DOM regression)', () => {
+    /**
+     * Mirrors the real root layout's own mount effect (provider.tsx lines
+     * ~169-191): shortly after mount, it can apply a persisted locale to
+     * ITS OWN state — e.g. a `chapa-locale` cookie read once `LocaleSync`'s
+     * dataset marker isn't present. Here that's simulated directly via the
+     * outer provider's own `setLocale`, changing the ANCESTOR's locale
+     * *after* a nested provider has already mounted below it.
+     */
+    function OuterLocaleFlipper({ to }: { to: 'en' | 'es' }) {
+      const ctx = useContext(LanguageContext);
+      useEffect(() => {
+        void ctx?.setLocale(to, { navigate: false });
+        // Only ever run once — flipping on `ctx` identity change would loop.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    }
+
+    it('keeps the nested subtree mounted exactly once when the ancestor locale later comes to match it (no unmount/remount)', async () => {
+      let mountCount = 0;
+      function MarkerChild() {
+        useEffect(() => {
+          mountCount += 1;
+        }, []);
+        return <div data-testid="marker" />;
+      }
+
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <OuterLocaleFlipper to="en" />
+          {/* At mount, the ancestor is still "es" — this nested provider
+              correctly mounts as a REAL provider (its own state/context),
+              matching what SSR committed to for a genuine `?lang=en`
+              mismatch page. */}
+          <LanguageProvider initialLocale="en">
+            <MarkerChild />
+          </LanguageProvider>
+        </LanguageProvider>
+      );
+
+      expect(mountCount).toBe(1);
+
+      // Let the outer's setLocale (and its dictionary import) resolve, so
+      // its context value's locale actually becomes "en" — now matching the
+      // nested provider's initialLocale for the first time, post-mount.
+      await waitFor(() => expect(setLocaleAction).toHaveBeenCalledWith('en'));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Before the fix: re-deriving `ancestor.locale === initialLocale` on
+      // this later render flips the nested provider from a real provider to
+      // a pass-through Fragment. That's a different element type at the same
+      // position, so React unmounts the old subtree (including MarkerChild)
+      // and mounts a fresh one — mountCount would become 2. On the real
+      // share page this is exactly what let a still-streaming Suspense
+      // boundary's original content and a freshly remounted copy both end
+      // up in the DOM (duplicate headings, one left `hidden`).
+      expect(mountCount).toBe(1);
+    });
+
+    it('keeps the nested provider a real, independent context (not reused from the ancestor) even after the ancestor catches up', async () => {
+      let innerCtx: LanguageContextValue | null = null;
+      let outerCtx: LanguageContextValue | null = null;
+      function ContextCapture({
+        onCapture,
+      }: {
+        onCapture: (ctx: LanguageContextValue | null) => void;
+      }) {
+        onCapture(useContext(LanguageContext));
+        return null;
+      }
+
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <OuterLocaleFlipper to="en" />
+          <ContextCapture onCapture={(ctx) => { outerCtx = ctx; }} />
+          <LanguageProvider initialLocale="en">
+            <ContextCapture onCapture={(ctx) => { innerCtx = ctx; }} />
+          </LanguageProvider>
+        </LanguageProvider>
+      );
+
+      const firstInnerCtx = innerCtx;
+      expect(firstInnerCtx).not.toBeNull();
+      expect(firstInnerCtx).not.toBe(outerCtx);
+
+      await waitFor(() => expect(setLocaleAction).toHaveBeenCalledWith('en'));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // The nested provider must still be the SAME independent context
+      // instance it mounted with — never swapped out for the (now-matching)
+      // ancestor's context object after the fact.
+      expect(innerCtx).toBe(firstInnerCtx);
+      expect(innerCtx).not.toBe(outerCtx);
     });
   });
 });
