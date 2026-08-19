@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cacheGet, cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
+import {
+  cacheGet,
+  cacheSet,
+  cacheDel,
+  cacheMergeJson,
+  rateLimit,
+} from "@/lib/cache/redis";
 import { getNextauthSecret } from "@/lib/env";
 import { generateCliToken } from "@/lib/auth/cli-token";
 import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
@@ -128,9 +134,13 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
       }
       // Correct code: confirm the session so future polls must keep presenting it.
       if (!session.deviceCodeConfirmed) {
-        const confirmed: DeviceSession = { ...session, deviceCodeConfirmed: true };
-        // Best-effort persist; if it fails the enforcement simply isn't latched yet.
-        await cacheSet(cliDeviceSessionKey(sessionId), confirmed, DEVICE_SESSION_TTL);
+        // Merge only the confirmation latch. A concurrent approval can update
+        // status/handle without either request overwriting the other's fields.
+        await cacheMergeJson<DeviceSession>(
+          cliDeviceSessionKey(sessionId),
+          { deviceCodeConfirmed: true },
+          DEVICE_SESSION_TTL,
+        );
       }
     } else if (session.deviceCodeConfirmed) {
       // No code presented, but the client previously proved possession → enforce.

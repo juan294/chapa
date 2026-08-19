@@ -439,7 +439,8 @@ export function BadgeOverlay() {
           leader-line reveal were removed since they can no longer fire;
           hover (onMouseEnter/onMouseLeave) remains the desktop
           leader-line/panel reveal for sighted mouse users, and the
-          InfoTooltip tap fallback covers mobile. */}
+          InfoTooltip buttons cover touch and keyboard access at all viewport
+          sizes without making the structural regions themselves tab stops. */}
       {HOTSPOT_BASES.map((hotspot) => {
         const tooltip = TOOLTIP_MAP[hotspot.id] ?? '';
         const activate = (e: SyntheticEvent<HTMLDivElement>) => {
@@ -469,12 +470,14 @@ export function BadgeOverlay() {
             <span id={`${hotspot.id}-desc`} className="sr-only">
               {tooltip}
             </span>
-            {/* Mobile: standard InfoTooltip (hidden on desktop via md:hidden) */}
+            {/* One real tooltip control per explanation. On desktop it stays
+                visually hidden until keyboard focus; mouse hover uses the
+                larger leader-line panel. */}
             <InfoTooltip
               id={hotspot.id}
               content={tooltip}
               position={hotspot.position}
-              className={`opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 md:hidden`}
+              className="opacity-0 group-hover/badge:opacity-100 focus-within:opacity-100 transition-opacity duration-300 md:group-hover/badge:opacity-0"
             />
           </div>
         );

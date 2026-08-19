@@ -79,11 +79,12 @@ describe("fetchAvatarBase64", () => {
     expect(result).toBeUndefined();
   });
 
-  it("returns undefined when fetch throws (network error)", async () => {
+  it("rejects when fetch throws (network error)", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
-    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/err");
-    expect(result).toBeUndefined();
+    await expect(
+      fetchAvatarBase64("https://avatars.githubusercontent.com/u/err"),
+    ).rejects.toThrow("Network error");
   });
 
   it("sanitises content-type to an allowed image MIME type", async () => {
@@ -247,16 +248,31 @@ describe("getAvatarBase64", () => {
     expect(mockCacheGet).toHaveBeenCalledWith("avatar:testuser");
   });
 
-  it("returns undefined when network fetch fails (no cache write)", async () => {
+  it("rejects when the network fetch fails so callers can retry", async () => {
     mockCacheGet.mockResolvedValue(null);
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
-    const result = await getAvatarBase64(
-      "testuser",
-      "https://avatars.githubusercontent.com/u/123",
+    await expect(
+      getAvatarBase64(
+        "testuser",
+        "https://avatars.githubusercontent.com/u/123",
+      ),
+    ).rejects.toThrow("Network error");
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("rejects on a transient GitHub CDN 5xx response", async () => {
+    mockCacheGet.mockResolvedValue(null);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("temporary failure", { status: 503 }),
     );
 
-    expect(result).toBeUndefined();
+    await expect(
+      getAvatarBase64(
+        "testuser",
+        "https://avatars.githubusercontent.com/u/123",
+      ),
+    ).rejects.toThrow(/503/);
     expect(mockCacheSet).not.toHaveBeenCalled();
   });
 

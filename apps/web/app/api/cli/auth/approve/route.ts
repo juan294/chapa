@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheMergeJson, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import {
@@ -48,7 +48,7 @@ export const POST = withErrorCapture("/api/cli/auth/approve", async (request: Ne
     return NextResponse.json({ error: "Invalid session ID" }, { status: 400 });
   }
 
-  // 3. Store approval in Redis as a read-modify-write, not a blind overwrite
+  // 3. Atomically merge approval into the Redis session.
   // (BE-H3 / SE-H1, #1078 / #1097). The poll route's device_code binding
   // (`deviceCode` / `deviceCodeConfirmed`) lives on this same session object.
   // A plain `cacheSet({ status, handle })` here would drop those fields,
@@ -58,13 +58,15 @@ export const POST = withErrorCapture("/api/cli/auth/approve", async (request: Ne
   // session exists yet (approve called before any poll), there's nothing to
   // preserve — that's the legacy path the poll route's own comments describe.
   const key = cliDeviceSessionKey(sessionId);
-  const existing = await cacheGet<CliDeviceSession>(key);
-  const merged: CliDeviceSession = {
-    ...existing,
+  const approval: Partial<CliDeviceSession> = {
     status: "approved",
     handle: session.login,
   };
-  const stored = await cacheSet(key, merged, DEVICE_SESSION_TTL);
+  const stored = await cacheMergeJson<CliDeviceSession>(
+    key,
+    approval,
+    DEVICE_SESSION_TTL,
+  );
 
   if (!stored) {
     return NextResponse.json(

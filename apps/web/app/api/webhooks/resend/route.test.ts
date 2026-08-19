@@ -12,6 +12,8 @@ const {
   mockForwardEmail,
   mockRateLimit,
   mockCacheSetNxStatus,
+  mockCacheGet,
+  mockCacheSet,
   mockCacheDel,
 } = vi.hoisted(() => ({
   mockVerifyWebhookSignature: vi.fn(),
@@ -20,6 +22,8 @@ const {
   mockRateLimit: vi.fn(),
   // BE-L2: route now uses cacheSetNxStatus (not cacheSetNx + cacheGet)
   mockCacheSetNxStatus: vi.fn(),
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
   // BE-H2: route releases the dedupe key on the 502 failure branches
   mockCacheDel: vi.fn(),
 }));
@@ -33,6 +37,8 @@ vi.mock("@/lib/email/resend", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
   cacheSetNxStatus: mockCacheSetNxStatus,
+  cacheGet: mockCacheGet,
+  cacheSet: mockCacheSet,
   cacheDel: mockCacheDel,
 }));
 
@@ -97,7 +103,9 @@ beforeEach(() => {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
   // Default: key newly acquired — first delivery
   mockCacheSetNxStatus.mockResolvedValue("acquired");
-  mockCacheDel.mockResolvedValue(undefined);
+  mockCacheGet.mockResolvedValue(null);
+  mockCacheSet.mockResolvedValue(true);
+  mockCacheDel.mockResolvedValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -223,8 +231,7 @@ describe("POST /api/webhooks/resend", () => {
 
   it("returns 200 and skips forwarding when the svix event was already processed", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
-    // BE-L2: cacheSetNxStatus returns "exists" → already processed
-    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
+    mockCacheGet.mockResolvedValueOnce(1);
 
     const req = makeRequest(emailReceivedPayload, validHeaders);
 
@@ -260,7 +267,7 @@ describe("POST /api/webhooks/resend", () => {
 
   it("BE-L2: does NOT duplicate-forward when Redis confirms the event is known (exists)", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
-    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
+    mockCacheGet.mockResolvedValueOnce(1);
 
     const req = makeRequest(emailReceivedPayload, validHeaders);
 
@@ -364,6 +371,22 @@ describe("POST /api/webhooks/resend — dedupe key release on failure (BE-H2)", 
     mockForwardEmail.mockReset();
   });
 
+  it("does not mark a retry processed when cleanup of a failed claim fails", async () => {
+    mockVerifyWebhookSignature.mockReturnValue(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(null);
+    mockCacheDel.mockResolvedValueOnce(false);
+    mockCacheSetNxStatus
+      .mockResolvedValueOnce("acquired")
+      .mockResolvedValueOnce("exists");
+
+    const first = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(first.status).toBe(502);
+
+    const retry = await POST(makeRequest(emailReceivedPayload, validHeaders));
+    expect(retry.status).toBe(503);
+    expect((await retry.json()).status).toBe("processing");
+  });
+
   it("releases the dedupe key when fetchReceivedEmail fails (502)", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
     mockFetchReceivedEmail.mockResolvedValueOnce(null);
@@ -372,7 +395,9 @@ describe("POST /api/webhooks/resend — dedupe key release on failure (BE-H2)", 
     const res = await POST(req);
 
     expect(res.status).toBe(502);
-    expect(mockCacheDel).toHaveBeenCalledWith("webhook:resend:svix:msg_123");
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123:processing",
+    );
   });
 
   it("releases the dedupe key when forwardEmail fails (502)", async () => {
@@ -384,10 +409,12 @@ describe("POST /api/webhooks/resend — dedupe key release on failure (BE-H2)", 
     const res = await POST(req);
 
     expect(res.status).toBe(502);
-    expect(mockCacheDel).toHaveBeenCalledWith("webhook:resend:svix:msg_123");
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123:processing",
+    );
   });
 
-  it("does NOT release the dedupe key on a genuine success", async () => {
+  it("marks completion before releasing the processing claim on success", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
     mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
     mockForwardEmail.mockResolvedValueOnce({ id: "fwd_123" });
@@ -396,7 +423,17 @@ describe("POST /api/webhooks/resend — dedupe key release on failure (BE-H2)", 
     const res = await POST(req);
 
     expect(res.status).toBe(200);
-    expect(mockCacheDel).not.toHaveBeenCalled();
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123",
+      1,
+      60 * 60 * 24 * 7,
+    );
+    expect(mockCacheSet.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCacheDel.mock.invocationCallOrder[0]!,
+    );
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "webhook:resend:svix:msg_123:processing",
+    );
   });
 
   // Integration-style tests below use a small in-memory fake for the Redis
@@ -406,13 +443,21 @@ describe("POST /api/webhooks/resend — dedupe key release on failure (BE-H2)", 
   // short-circuited as "already_processed".
   function useFakeDedupeStore() {
     const store = new Set<string>();
+    mockCacheGet.mockImplementation(async (key: string) =>
+      store.has(key) ? 1 : null,
+    );
     mockCacheSetNxStatus.mockImplementation(async (key: string) => {
       if (store.has(key)) return "exists";
       store.add(key);
       return "acquired";
     });
+    mockCacheSet.mockImplementation(async (key: string) => {
+      store.add(key);
+      return true;
+    });
     mockCacheDel.mockImplementation(async (key: string) => {
       store.delete(key);
+      return true;
     });
     return store;
   }

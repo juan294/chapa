@@ -98,6 +98,49 @@ export async function cacheSet<T>(
 }
 
 /**
+ * Atomically merge fields into a JSON object stored in Redis.
+ *
+ * The read, merge, and TTL refresh run in one Lua script, so concurrent
+ * callers cannot overwrite fields written by another request between a
+ * separate GET and SET. Returns false when Redis is unavailable or the
+ * update fails.
+ */
+export async function cacheMergeJson<T extends object>(
+  key: string,
+  patch: Partial<T>,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+
+  const script = `
+local raw = redis.call("GET", KEYS[1])
+local value = {}
+if raw then
+  value = cjson.decode(raw)
+end
+local patch = cjson.decode(ARGV[1])
+for field, field_value in pairs(patch) do
+  value[field] = field_value
+end
+redis.call("SET", KEYS[1], cjson.encode(value), "EX", ARGV[2])
+return 1
+`;
+
+  try {
+    await redis.eval<[string, string], number>(
+      script,
+      [key],
+      [JSON.stringify(patch), String(ttlSeconds)],
+    );
+    return true;
+  } catch (error) {
+    console.error("[cache] cacheMergeJson failed:", (error as Error).message);
+    return false;
+  }
+}
+
+/**
  * Delete a cached key.
  * Silently no-ops if Redis is unavailable.
  */

@@ -473,11 +473,8 @@ describe("GET /u/[handle]/badge.svg", () => {
       );
     });
 
-    // #1080 — `avatarResolved` used to conflate "nothing to fetch" and "a hard
-    // failure settled before the deadline" with "the deadline actually fired".
-    // Both of the first two cases will never resolve differently on a retry,
-    // so the SVG cache must still be written for them; only a genuine timeout
-    // should withhold the write (a retry might succeed there).
+    // A transient avatar failure that settles before the deadline can still
+    // heal on retry. It must not make the avatar-less SVG the 24-hour value.
     it("#1080: writes the SVG cache when the handle has no avatarUrl at all (nothing to fetch)", async () => {
       mockMaterializePublicProfile.mockResolvedValue({
         ...FAKE_MATERIALIZED,
@@ -495,17 +492,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       );
     });
 
-    it("#1080: still writes the SVG cache when the avatar fetch fails outright before the deadline (not a timeout)", async () => {
-      mockGetAvatarBase64.mockRejectedValue(new Error("404 from CDN"));
+    it("withholds the SVG cache when the avatar fetch fails transiently before the deadline", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("503 from CDN"));
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
 
-      expect(mockCacheSet).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
-        FAKE_SVG,
-        expect.any(Number),
-      );
+      expect(mockCacheSet).not.toHaveBeenCalled();
     });
 
     it("#1080: still withholds the SVG cache write when the avatar fetch genuinely times out against the deadline", async () => {

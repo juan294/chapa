@@ -195,30 +195,26 @@ async function finalizeMaterializedBadge(
   // undefined`) that gated the shared SVG cache write shut for all of them
   // except a clean success:
   //   1. succeeded — got real avatar data. Cache normally (full TTL).
-  //   2. fetch failed outright before the deadline (e.g. a hard 404) — the
-  //      real promise SETTLED (with undefined, via `.catch`), it just didn't
-  //      produce data. A retry won't resolve any differently, so this is
-  //      safe to cache normally too (full TTL) — same as case 1 for caching
-  //      purposes, distinct only in that `avatarDataUri` stays undefined.
+  //   2. definitively absent (e.g. a 404) — the real promise settled with
+  //      undefined. Cache normally because a retry is not expected to heal it.
   //   3. permanently absent — `stats.avatarUrl` was never set. PERMANENT
   //      until the next stats refetch, never a genuine in-flight race loss.
   //      Cache with a short TTL so a later good render (avatarUrl
   //      reappearing) isn't shadowed for the full 24h+jitter.
-  //   4. timed out — a real `avatarUrl` fetch lost the race against
-  //      AVATAR_RACE_DEADLINE_MS without settling. Genuinely transient — do
-  //      not cache, so the next request gets a fresh attempt instead of a
-  //      stale placeholder.
-  // `avatarFetchTimedOut` distinguishes case 4 (the deadline symbol won the
-  // race) from cases 1/2 (the real promise settled, whether or not it
-  // produced data) — collapsing it into `avatarDataUri !== undefined` would
-  // wrongly withhold the cache write for case 2 as well.
+  //   4. transient failure or timeout — do not cache, so the next request gets
+  //      a fresh attempt instead of a stale placeholder.
+  // Separate flags distinguish a definitive empty result from a transient
+  // failure and from the deadline winning the race.
   let avatarPermanentlyAbsent = false;
   let avatarFetchTimedOut = false;
+  let avatarFetchFailed = false;
   if (!options.readOnly) {
     avatarPermanentlyAbsent = !materialized.stats.avatarUrl;
     const avatarPromise = materialized.stats.avatarUrl
-      ? getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
-      : Promise.resolve(undefined);
+      ? getAvatarBase64(handle, materialized.stats.avatarUrl)
+          .then((dataUri) => ({ dataUri, failed: false }))
+          .catch(() => ({ dataUri: undefined, failed: true }))
+      : Promise.resolve({ dataUri: undefined, failed: false });
     const AVATAR_TIMEOUT = Symbol("avatar-race-timeout");
     const raceResult = await Promise.race([
       avatarPromise,
@@ -229,7 +225,8 @@ async function finalizeMaterializedBadge(
     if (raceResult === AVATAR_TIMEOUT) {
       avatarFetchTimedOut = true;
     } else {
-      avatarDataUri = raceResult;
+      avatarDataUri = raceResult.dataUri;
+      avatarFetchFailed = raceResult.failed;
     }
   }
   const verification = getPublicProfileVerification(materialized);
@@ -260,17 +257,12 @@ async function finalizeMaterializedBadge(
       await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
         ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
       });
-    } else if (!avatarFetchTimedOut) {
-      // #1080 — covers both a real success and a real fetch that failed
-      // outright before the deadline; both settle the race with a
-      // definitive (non-retriable-differently) outcome, so both are safe to
-      // cache at the normal full TTL.
+    } else if (!avatarFetchTimedOut && !avatarFetchFailed) {
+      // Covers a real success or a definitive empty result such as 404.
       await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
     }
-    // else: avatarUrl exists but its fetch lost the race against
-    // AVATAR_RACE_DEADLINE_MS (#1029, #1080) — a genuinely transient
-    // condition — do not cache; the next request gets a fresh fetch attempt
-    // instead of being stuck behind a stale avatar-less placeholder.
+    // else: the avatar fetch timed out or failed transiently. Do not cache;
+    // the next request gets a fresh attempt instead of a stale placeholder.
   }
 
   return { svg, verification, renderMs };

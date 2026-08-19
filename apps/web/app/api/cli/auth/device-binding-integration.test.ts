@@ -10,12 +10,32 @@ import { NextRequest } from "next/server";
 // approve route's actual read/write behavior is what's under test.
 // ---------------------------------------------------------------------------
 
-const { store } = vi.hoisted(() => ({ store: new Map<string, unknown>() }));
+const { store, approvedWriteGate } = vi.hoisted(() => ({
+  store: new Map<string, unknown>(),
+  approvedWriteGate: {
+    beforeWrite: null as null | (() => Promise<void>),
+    started: null as null | (() => void),
+  },
+}));
+
+async function waitBeforeApprovedWrite(value: unknown): Promise<void> {
+  const session = value as { status?: string };
+  if (session.status !== "approved" || !approvedWriteGate.beforeWrite) return;
+  approvedWriteGate.started?.();
+  await approvedWriteGate.beforeWrite();
+}
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(async (key: string) => (store.has(key) ? store.get(key) : null)),
   cacheSet: vi.fn(async (key: string, value: unknown) => {
+    await waitBeforeApprovedWrite(value);
     store.set(key, value);
+    return true;
+  }),
+  cacheMergeJson: vi.fn(async (key: string, patch: Record<string, unknown>) => {
+    await waitBeforeApprovedWrite(patch);
+    const existing = (store.get(key) as Record<string, unknown> | undefined) ?? {};
+    store.set(key, { ...existing, ...patch });
     return true;
   }),
   cacheDel: vi.fn(async (key: string) => {
@@ -64,6 +84,8 @@ function approveRequest(): NextRequest {
 
 beforeEach(() => {
   store.clear();
+  approvedWriteGate.beforeWrite = null;
+  approvedWriteGate.started = null;
   vi.clearAllMocks();
   vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
 });
@@ -111,6 +133,40 @@ describe("CLI device-code binding survives approval (#1078, #1097)", () => {
     expect(body.status).toBe("approved");
     expect(typeof body.token).toBe("string");
     expect(body.handle).toBe("octocat");
+  });
+
+  it("atomically preserves confirmation when approval and confirmation overlap", async () => {
+    const first = await pollGET(pollRequest());
+    const deviceCode: string = (await first.json()).device_code;
+
+    let releaseApprovedWrite!: () => void;
+    const approvedWriteCanFinish = new Promise<void>((resolve) => {
+      releaseApprovedWrite = resolve;
+    });
+    let markApprovedWriteStarted!: () => void;
+    const approvedWriteStarted = new Promise<void>((resolve) => {
+      markApprovedWriteStarted = resolve;
+    });
+    approvedWriteGate.beforeWrite = () => approvedWriteCanFinish;
+    approvedWriteGate.started = markApprovedWriteStarted;
+
+    const approvalPromise = approvePOST(approveRequest());
+    await approvedWriteStarted;
+
+    const confirmation = await pollGET(pollRequest(deviceCode));
+    expect(confirmation.status).toBe(200);
+
+    releaseApprovedWrite();
+    expect((await approvalPromise).status).toBe(200);
+
+    expect(store.get(`cli:device:${SESSION_ID}`)).toEqual(
+      expect.objectContaining({
+        status: "approved",
+        handle: "octocat",
+        deviceCode,
+        deviceCodeConfirmed: true,
+      }),
+    );
   });
 
   it("legacy flow (device_code offered but never confirmed) still works via sessionId only after approval", async () => {

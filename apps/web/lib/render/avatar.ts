@@ -1,6 +1,7 @@
 /**
  * Fetch a GitHub avatar URL and return it as a base64 data URI.
- * Returns undefined if the fetch fails (caller should fall back to octocat icon).
+ * Returns undefined for a definitive absence. Transient network and upstream
+ * failures reject so callers do not cache a fallback as the terminal result.
  */
 
 import { cacheGet, cacheSet } from "../cache/redis";
@@ -18,31 +19,39 @@ const AVATAR_CACHE_TTL = 21600;
 export async function fetchAvatarBase64(
   avatarUrl: string,
 ): Promise<string | undefined> {
+  let parsed: URL;
   try {
-    const parsed = new URL(avatarUrl);
-    if (!ALLOWED_AVATAR_HOSTS.has(parsed.hostname)) {
-      // Log rejected URLs for security monitoring (sanitize to prevent log injection)
-      const sanitizedUrl = avatarUrl.replace(/[\n\r]/g, "").slice(0, 200);
-      console.warn("[avatar] rejected non-GitHub URL:", sanitizedUrl);
-      return undefined;
-    }
-    const res = await fetch(avatarUrl, {
-      // 2s ceiling keeps the badge render path fast under GitHub CDN slowdowns.
-      // The badge route has maxDuration=35s but avatar is non-critical; if it
-      // misses the deadline the caller falls back to the Chapa shield icon.
-      signal: AbortSignal.timeout(2000),
-    });
-    if (!res.ok) return undefined;
-
-    const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
-    const rawType = res.headers.get("content-type")?.split(";")[0]?.trim() ?? "image/png";
-    const contentType = ALLOWED_TYPES.has(rawType) ? rawType : "image/png";
-    const buf = await res.arrayBuffer();
-    const base64 = Buffer.from(buf).toString("base64");
-    return `data:${contentType};base64,${base64}`;
+    parsed = new URL(avatarUrl);
   } catch {
     return undefined;
   }
+
+  if (!ALLOWED_AVATAR_HOSTS.has(parsed.hostname)) {
+    // Log rejected URLs for security monitoring (sanitize to prevent log injection)
+    const sanitizedUrl = avatarUrl.replace(/[\n\r]/g, "").slice(0, 200);
+    console.warn("[avatar] rejected non-GitHub URL:", sanitizedUrl);
+    return undefined;
+  }
+
+  const res = await fetch(avatarUrl, {
+    // 2s ceiling keeps the badge render path fast under GitHub CDN slowdowns.
+    // The badge route has maxDuration=35s but avatar is non-critical; if it
+    // misses the deadline the caller falls back to the Chapa shield icon.
+    signal: AbortSignal.timeout(2000),
+  });
+  if (!res.ok) {
+    if (res.status >= 500 || res.status === 408 || res.status === 429) {
+      throw new Error(`Transient avatar response: ${res.status}`);
+    }
+    return undefined;
+  }
+
+  const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+  const rawType = res.headers.get("content-type")?.split(";")[0]?.trim() ?? "image/png";
+  const contentType = ALLOWED_TYPES.has(rawType) ? rawType : "image/png";
+  const buf = await res.arrayBuffer();
+  const base64 = Buffer.from(buf).toString("base64");
+  return `data:${contentType};base64,${base64}`;
 }
 
 /**
@@ -54,7 +63,8 @@ export async function fetchAvatarBase64(
  *
  * @param handle - GitHub username (used for cache key)
  * @param avatarUrl - Full avatar URL from GitHub
- * @returns base64 data URI string or undefined if fetch fails
+ * @returns base64 data URI string, undefined for definitive absence, or a
+ * rejected promise for a transient fetch failure
  */
 export async function getAvatarBase64(
   handle: string,

@@ -8,6 +8,7 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn().mockResolvedValue(true),
+  cacheMergeJson: vi.fn().mockResolvedValue(true),
   cacheDel: vi.fn(),
   rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 120 }),
 }));
@@ -23,7 +24,13 @@ vi.mock("@/lib/http/client-ip", () => ({
 }));
 
 import { GET } from "./route";
-import { cacheGet, cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
+import {
+  cacheGet,
+  cacheSet,
+  cacheMergeJson,
+  cacheDel,
+  rateLimit,
+} from "@/lib/cache/redis";
 import { generateCliToken } from "@/lib/auth/cli-token";
 
 // ---------------------------------------------------------------------------
@@ -283,11 +290,10 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("pending");
-    // The session must be re-persisted with deviceCodeConfirmed: true so future
-    // polls without the code are rejected.
-    expect(cacheSet).toHaveBeenCalledWith(
+    // Only the latch is merged so a concurrent approval cannot be overwritten.
+    expect(cacheMergeJson).toHaveBeenCalledWith(
       `cli:device:${VALID_UUID}`,
-      expect.objectContaining({ deviceCode, deviceCodeConfirmed: true }),
+      { deviceCodeConfirmed: true },
       expect.any(Number),
     );
   });

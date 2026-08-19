@@ -4,8 +4,10 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
 // Minimal InfoTooltip stub — avoids dependency on portal/positioning logic
 vi.mock("./InfoTooltip", () => ({
-  InfoTooltip: ({ content, id }: { content: string; id: string }) => (
-    <span data-testid={`tooltip-${id}`}>{content}</span>
+  InfoTooltip: ({ content, id, className }: { content: string; id: string; className?: string }) => (
+    <span data-testid={`tooltip-${id}`} className={className}>
+      <button type="button" aria-label={`${id} explanation`}>{content}</button>
+    </span>
   ),
 }));
 
@@ -142,6 +144,17 @@ describe("BadgeOverlay — rendering", () => {
     expect(hotspots.length).toBe(11);
     for (const hotspot of hotspots) {
       expect(hotspot.getAttribute("tabindex")).toBeNull();
+    }
+  });
+
+  it("keeps each explanation button available to desktop keyboard users", () => {
+    render(<BadgeOverlay />);
+    const explanationButtons = screen.getAllByRole("button", {
+      name: / explanation$/,
+    });
+    expect(explanationButtons).toHaveLength(11);
+    for (const button of explanationButtons) {
+      expect(button.closest("span")?.className).not.toContain("md:hidden");
     }
   });
 

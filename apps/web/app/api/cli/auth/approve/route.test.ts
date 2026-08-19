@@ -12,6 +12,7 @@ vi.mock("@/lib/auth/require-session", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn(),
+  cacheMergeJson: vi.fn(),
   rateLimit: vi.fn(),
 }));
 
@@ -21,7 +22,7 @@ vi.mock("@/lib/http/client-ip", () => ({
 
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheGet, cacheMergeJson, rateLimit } from "@/lib/cache/redis";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,7 +61,7 @@ beforeEach(() => {
 
 describe("POST /api/cli/auth/approve", () => {
   it("returns 503 when Redis write fails", async () => {
-    vi.mocked(cacheSet).mockResolvedValue(false);
+    vi.mocked(cacheMergeJson).mockResolvedValue(false);
 
     const res = await POST(
       makeRequest(
@@ -75,7 +76,7 @@ describe("POST /api/cli/auth/approve", () => {
   });
 
   it("returns 200 with success when Redis write succeeds", async () => {
-    vi.mocked(cacheSet).mockResolvedValue(true);
+    vi.mocked(cacheMergeJson).mockResolvedValue(true);
 
     const res = await POST(
       makeRequest(
@@ -151,16 +152,16 @@ describe("POST /api/cli/auth/approve", () => {
   });
 
   // -------------------------------------------------------------------------
-  // BE-H3 / SE-H1 (#1078, #1097): read-modify-write, not a blind overwrite.
+  // BE-H3 / SE-H1 (#1078, #1097): atomic merge, not read-modify-write.
   // -------------------------------------------------------------------------
 
-  it("preserves deviceCode/deviceCodeConfirmed from the existing session instead of overwriting them", async () => {
+  it("merges approval fields without reading and overwriting the session", async () => {
     vi.mocked(cacheGet).mockResolvedValue({
       status: "pending",
       deviceCode: "abc123def456",
       deviceCodeConfirmed: true,
     });
-    vi.mocked(cacheSet).mockResolvedValue(true);
+    vi.mocked(cacheMergeJson).mockResolvedValue(true);
 
     await POST(
       makeRequest(
@@ -169,16 +170,12 @@ describe("POST /api/cli/auth/approve", () => {
       ),
     );
 
-    expect(cacheGet).toHaveBeenCalledWith(
-      "cli:device:1feae8e3-6bc0-47da-84aa-0e24e2510454",
-    );
-    expect(cacheSet).toHaveBeenCalledWith(
+    expect(cacheGet).not.toHaveBeenCalled();
+    expect(cacheMergeJson).toHaveBeenCalledWith(
       "cli:device:1feae8e3-6bc0-47da-84aa-0e24e2510454",
       {
         status: "approved",
         handle: "testuser",
-        deviceCode: "abc123def456",
-        deviceCodeConfirmed: true,
       },
       300,
     );
@@ -186,7 +183,7 @@ describe("POST /api/cli/auth/approve", () => {
 
   it("creates a fresh approved session when no prior session exists (legacy path)", async () => {
     vi.mocked(cacheGet).mockResolvedValue(null);
-    vi.mocked(cacheSet).mockResolvedValue(true);
+    vi.mocked(cacheMergeJson).mockResolvedValue(true);
 
     const res = await POST(
       makeRequest(
@@ -196,7 +193,7 @@ describe("POST /api/cli/auth/approve", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(cacheSet).toHaveBeenCalledWith(
+    expect(cacheMergeJson).toHaveBeenCalledWith(
       "cli:device:1feae8e3-6bc0-47da-84aa-0e24e2510454",
       { status: "approved", handle: "testuser" },
       300,
