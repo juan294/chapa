@@ -184,6 +184,7 @@ export async function deferProfileCacheWork(
     verification?: PublicVerificationCode | null;
     readOnly?: boolean;
     sendFirstBadgeNotification?: boolean;
+    verificationOnly?: boolean;
   } = {},
 ): Promise<void> {
   if (options.readOnly) return;
@@ -199,6 +200,15 @@ export async function deferProfileCacheWork(
         buildVerificationRecord(materialized, verification),
       ),
     );
+  }
+
+  // Snapshot persistence is deduplicated once per day, but the rendered
+  // verification hash can still change after a refresh or linked-platform
+  // update. Store that hash without repeating telemetry, notifications, or
+  // user metadata writes that already ran for today's snapshot.
+  if (options.verificationOnly) {
+    await Promise.allSettled(ops);
+    return;
   }
 
   ops.push(trackBadgeGenerated(handle));

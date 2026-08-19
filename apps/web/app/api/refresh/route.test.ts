@@ -15,6 +15,8 @@ const {
   mockMaterializeOrchestratedProfile,
   mockPersistOrchestratedSnapshot,
   mockGetSessionGitHubToken,
+  mockGetPublicProfileVerification,
+  mockDeferProfileCacheWork,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockCacheDel: vi.fn(),
@@ -28,6 +30,8 @@ const {
   mockMaterializeOrchestratedProfile: vi.fn(),
   mockPersistOrchestratedSnapshot: vi.fn(),
   mockGetSessionGitHubToken: vi.fn(),
+  mockGetPublicProfileVerification: vi.fn(),
+  mockDeferProfileCacheWork: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -71,6 +75,13 @@ vi.mock("@/lib/profile/orchestrated-profile", () => ({
 
 vi.mock("@/lib/auth/github-session-token", () => ({
   getSessionGitHubToken: (...args: unknown[]) => mockGetSessionGitHubToken(...args),
+}));
+
+vi.mock("@/lib/profile/public-profile", () => ({
+  getPublicProfileVerification: (...args: unknown[]) =>
+    mockGetPublicProfileVerification(...args),
+  deferProfileCacheWork: (...args: unknown[]) =>
+    mockDeferProfileCacheWork(...args),
 }));
 
 const SESSION = {
@@ -136,6 +147,11 @@ describe("POST /api/refresh", () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockGetSessionGitHubToken.mockResolvedValue("oauth-token");
+    mockGetPublicProfileVerification.mockReturnValue({
+      hash: "refreshed-hash",
+      date: "2026-04-17",
+    });
+    mockDeferProfileCacheWork.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -208,6 +224,14 @@ describe("POST /api/refresh", () => {
       "testuser",
       FAKE_MATERIALIZED,
       { mode: "replace" },
+    );
+    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      {
+        verification: { hash: "refreshed-hash", date: "2026-04-17" },
+        verificationOnly: true,
+      },
     );
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
       badgeSvg: true,

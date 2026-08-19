@@ -13,6 +13,10 @@ import {
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
+import {
+  deferProfileCacheWork,
+  getPublicProfileVerification,
+} from "@/lib/profile/public-profile";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -115,6 +119,14 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
       { status: 500 },
     );
   }
+
+  // A refresh can produce a new verification hash after today's snapshot
+  // side-effect guard has already run. Store that hash now without repeating
+  // badge telemetry, notifications, or user metadata writes.
+  await deferProfileCacheWork(handle, materialized, {
+    verification: getPublicProfileVerification(materialized),
+    verificationOnly: true,
+  });
 
   // Post-persist invalidation: clear the artifacts derived from the snapshot
   // just written. Deliberately separate from the pre-fetch call above, which
