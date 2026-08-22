@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.22.1] - 2026-08-22
+
+### Fixed
+
+- **The developer-impact badge undercounted repos once an account passed 20
+  repositories.** The GitHub GraphQL query capped the owned/collaborator repo
+  list at 20 results, silently dropping the least-recently-pushed repo (and
+  any activity it contributed) from the badge's repo count. The cap now
+  matches the query's existing 100-repo star/fork/watcher fetch.
+
+### Changed
+
+- Coverage is now reported to Portfolio on every `develop` push (previously
+  daily-only), so a repository's coverage badge doesn't go stale between
+  scheduled runs.
+
 ## [2.22.0] - 2026-08-19
 
 ### Fixed
