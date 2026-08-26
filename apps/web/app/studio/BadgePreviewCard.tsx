@@ -6,6 +6,7 @@ import type {
   BadgeConfig,
   StatsData,
   ImpactV6Result,
+  Platform,
 } from "@chapa/shared";
 import type { GlassVariant } from "@/lib/effects/cards/glass-presets";
 import { glassStyle } from "@/lib/effects/cards/glass-presets";
@@ -14,6 +15,10 @@ import { useTilt } from "@/lib/effects/interactions/use-tilt";
 import { HOLOGRAPHIC_CSS } from "@/lib/effects/interactions/holographic-css";
 import { fireSingleBurst } from "@/lib/effects/celebrations/confetti";
 import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import {
+  PreviewFooter,
+  type PreviewVerification,
+} from "./PreviewFooter";
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded effect components (code-split, client-only)
@@ -48,6 +53,7 @@ export interface BadgePreviewCardProps {
   stats: StatsData;
   impact: ImpactV6Result;
   interactive?: boolean;
+  verification?: PreviewVerification | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,10 +65,17 @@ function BadgePreviewCardInner({
   stats,
   impact,
   interactive = true,
+  verification = null,
 }: BadgePreviewCardProps) {
   // --- Tilt interaction ---
   const { ref: tiltRef, tilt, handleMouseMove, handleMouseLeave } = useTilt(15);
   const useTiltInteraction = interactive && config.interaction === "tilt-3d";
+  const linkedPlatforms: Platform[] = [
+    "github",
+    ...(stats.linkedPlatforms?.filter(
+      (platform): platform is Platform => platform !== "github",
+    ) ?? []),
+  ];
 
   // --- Confetti celebration on mount ---
   useEffect(() => {
@@ -131,6 +144,11 @@ function BadgePreviewCardInner({
         heatmapAnimation={config.heatmapAnimation}
         statsDisplay={config.statsDisplay}
         tierTreatment={config.tierTreatment}
+        showFooter={false}
+      />
+      <PreviewFooter
+        linkedPlatforms={linkedPlatforms}
+        verification={verification}
       />
     </div>
   );

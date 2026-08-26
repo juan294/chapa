@@ -58,6 +58,7 @@ export const es: Translations = {
     impactScoreValue: 'Puntuación de impacto: {score}',
     impactScoreTier: 'Puntuación de impacto {score}, nivel {tier}',
     terminalCommandInput: 'Entrada de comando de terminal',
+    connectedPlatforms: 'Plataformas conectadas',
     loading: 'Cargando',
   },
   landing: {

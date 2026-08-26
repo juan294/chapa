@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   isStudioEnabled: vi.fn(),
   getOptionalServerSessionFromHeaders: vi.fn(),
   getSessionGitHubToken: vi.fn(),
-  getStats: vi.fn(),
+  materializePublicProfile: vi.fn(),
+  getPublicProfileVerification: vi.fn(),
   loadStudioConfig: vi.fn(),
   computeImpactV6: vi.fn(),
   getServerLocale: vi.fn(),
@@ -38,8 +39,9 @@ vi.mock("@/lib/auth/github-session-token", () => ({
   getSessionGitHubToken: mocks.getSessionGitHubToken,
 }));
 
-vi.mock("@/lib/github/client", () => ({
-  getStats: mocks.getStats,
+vi.mock("@/lib/profile/public-profile", () => ({
+  materializePublicProfile: mocks.materializePublicProfile,
+  getPublicProfileVerification: mocks.getPublicProfileVerification,
 }));
 
 vi.mock("@/lib/db/studio", () => ({
@@ -70,16 +72,19 @@ vi.mock("./StudioClient", () => ({
     handle,
     stats,
     initialConfig,
+    verification,
   }: {
     handle: string;
     stats: StatsData;
     initialConfig: { theme: string };
+    verification: { hash: string; date: string } | null;
   }) => (
     <section
       data-testid="studio-client"
       data-handle={handle}
       data-commits={String(stats.commitsTotal)}
       data-config-theme={initialConfig.theme}
+      data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
     />
   ),
 }));
@@ -121,7 +126,14 @@ beforeEach(() => {
   mocks.isStudioEnabled.mockResolvedValue(true);
   mocks.getOptionalServerSessionFromHeaders.mockReturnValue(session);
   mocks.getSessionGitHubToken.mockResolvedValue("gho_token");
-  mocks.getStats.mockResolvedValue(stats);
+  mocks.materializePublicProfile.mockResolvedValue({
+    stats,
+    displayImpact: { compositeScore: 80 },
+  });
+  mocks.getPublicProfileVerification.mockReturnValue({
+    hash: "abc123",
+    date: "2026-08-26",
+  });
   mocks.loadStudioConfig.mockResolvedValue({ theme: "saved-theme" });
   mocks.computeImpactV6.mockReturnValue({ compositeScore: 80 });
   mocks.getServerLocale.mockResolvedValue("en");
@@ -171,12 +183,22 @@ describe("StudioPage render", () => {
     expect(client.getAttribute("data-handle")).toBe("octocat");
     expect(client.getAttribute("data-commits")).toBe("42");
     expect(client.getAttribute("data-config-theme")).toBe("saved-theme");
-    expect(mocks.computeImpactV6).toHaveBeenCalledWith(stats);
+    expect(client.getAttribute("data-verification")).toBe(
+      "abc123:2026-08-26",
+    );
+    expect(mocks.materializePublicProfile).toHaveBeenCalledWith("octocat", {
+      token: "gho_token",
+      readOnly: true,
+    });
+    expect(mocks.getPublicProfileVerification).toHaveBeenCalledWith(
+      expect.objectContaining({ stats }),
+    );
+    expect(mocks.computeImpactV6).not.toHaveBeenCalled();
     expect(mocks.loadStudioConfig).toHaveBeenCalledWith("octocat");
   });
 
   it("falls back to empty stats and the default config", async () => {
-    mocks.getStats.mockResolvedValue(null);
+    mocks.materializePublicProfile.mockResolvedValue(null);
     mocks.loadStudioConfig.mockResolvedValue(null);
     const { default: StudioPage } = await import("./page");
 

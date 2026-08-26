@@ -32,7 +32,7 @@ in `/embed` & `/share`; stale docs.
 
 - [x] Phase 1 — Config persistence hardening
 - [x] Phase 2 — Command-layer cleanup
-- [ ] Phase 3 — Preview parity
+- [x] Phase 3 — Preview parity
 - [ ] Phase 4 — Documentation refresh
 - [ ] Phase 5 — Production flag flip
 

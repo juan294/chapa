@@ -65,11 +65,17 @@ vi.mock("./BadgePreviewCard", () => ({
   BadgePreviewCard: ({
     config,
     interactive,
+    verification,
   }: {
     config: Record<string, unknown>;
     interactive: boolean;
+    verification?: { hash: string; date: string } | null;
   }) => (
-    <div data-testid="badge-preview" data-interactive={String(interactive)}>
+    <div
+      data-testid="badge-preview"
+      data-interactive={String(interactive)}
+      data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
+    >
       {JSON.stringify(config)}
     </div>
   ),
@@ -323,6 +329,21 @@ describe("StudioClient render", () => {
       );
       const preview = screen.getByTestId("badge-preview");
       expect(preview.getAttribute("data-interactive")).toBe("true");
+    });
+
+    it("forwards verification to BadgePreviewCard", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          verification={{ hash: "abc123", date: "2026-08-26" }}
+        />,
+      );
+
+      expect(screen.getByTestId("badge-preview").getAttribute("data-verification")).toBe(
+        "abc123:2026-08-26",
+      );
     });
   });
 

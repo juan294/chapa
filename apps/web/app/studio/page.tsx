@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
-import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
+import {
+  getPublicProfileVerification,
+  materializePublicProfile,
+} from "@/lib/profile/public-profile";
 import { loadStudioConfig } from "@/lib/db/studio";
 import { Navbar } from "@/components/Navbar";
 import { toDateString } from "@/lib/utils/date";
@@ -77,16 +80,19 @@ export default async function StudioPage() {
     redirect("/api/auth/login");
   }
 
-  // Fetch data in parallel: stats + saved config
-  const [stats, savedConfig] = await Promise.all([
-    getStats(session.login, token),
+  // Fetch data in parallel: read-only public profile + saved config
+  const [materialized, savedConfig] = await Promise.all([
+    materializePublicProfile(session.login, { token, readOnly: true }),
     loadStudioConfig(session.login) as Promise<BadgeConfig | null>,
   ]);
 
-  // Compute impact (fallback to empty stats if fetch failed)
-  const effectiveStats: StatsData = stats ?? buildEmptyStats(session);
+  // Compute fallback impact only when profile materialization failed.
+  const effectiveStats: StatsData = materialized?.stats ?? buildEmptyStats(session);
 
-  const impact = computeImpactV6(effectiveStats);
+  const impact = materialized?.displayImpact ?? computeImpactV6(effectiveStats);
+  const verification = materialized
+    ? getPublicProfileVerification(materialized)
+    : null;
   const initialConfig = savedConfig ?? DEFAULT_BADGE_CONFIG;
 
   const locale = await getServerLocale();
@@ -108,6 +114,7 @@ export default async function StudioPage() {
           stats={effectiveStats}
           impact={impact}
           handle={session.login}
+          verification={verification}
         />
       </div>
     </main>

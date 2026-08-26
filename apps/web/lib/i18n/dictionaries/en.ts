@@ -58,6 +58,7 @@ export const en: Translations = {
     impactScoreValue: 'Impact score: {score}',
     impactScoreTier: 'Impact score {score}, tier {tier}',
     terminalCommandInput: 'Terminal command input',
+    connectedPlatforms: 'Connected platforms',
     loading: 'Loading',
   },
   landing: {

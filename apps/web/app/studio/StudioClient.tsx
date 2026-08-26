@@ -7,6 +7,7 @@ import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { useIsClient } from "@/hooks/useIsClient";
 import { BadgePreviewCard } from "./BadgePreviewCard";
+import type { PreviewVerification } from "./PreviewFooter";
 import { QuickControls } from "./QuickControls";
 import { useStudioCommands } from "./useStudioCommands";
 import { TerminalOutput } from "@/components/terminal/TerminalOutput";
@@ -27,6 +28,7 @@ export interface StudioClientProps {
   stats: StatsData;
   impact: ImpactV6Result;
   handle?: string;
+  verification?: PreviewVerification | null;
 }
 
 function subscribeReducedMotion(callback: () => void) {
@@ -56,6 +58,7 @@ export function StudioClient({
   stats,
   impact,
   handle = "",
+  verification = null,
 }: StudioClientProps) {
   const { t } = useTranslation();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
@@ -267,6 +270,7 @@ export function StudioClient({
             stats={stats}
             impact={impact}
             interactive={isClient && !reducedMotion}
+            verification={verification}
           />
 
           {saving && (

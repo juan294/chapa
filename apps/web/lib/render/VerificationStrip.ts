@@ -1,6 +1,6 @@
 import { escapeXml } from "./escape";
 
-const CORAL = "#E05A47";
+export const CORAL = "#E05A47";
 
 /**
  * Render a vertical verification strip on the right edge of the badge SVG.
