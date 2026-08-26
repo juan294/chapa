@@ -11,6 +11,7 @@ import {
   CATEGORY_KEY_TO_ALIAS,
   makeLine,
   resolveCategory,
+  type CommandAction,
   type CommandDef,
 } from "@/components/terminal/command-registry";
 import { getBaseUrl } from "@/lib/env";
@@ -23,11 +24,24 @@ interface UseStudioCommandsOptions {
   saving?: boolean;
 }
 
+export type StudioCommandAction =
+  | Extract<
+      CommandAction,
+      { type: "clear" | "preset" | "save" | "reset" }
+    >
+  | {
+      type: "set";
+      category: keyof BadgeConfig;
+      value: BadgeConfig[keyof BadgeConfig];
+    };
+
+export type StudioCommandDef = CommandDef<StudioCommandAction>;
+
 export function useStudioCommands({
   config,
   handle,
   saving = false,
-}: UseStudioCommandsOptions): CommandDef[] {
+}: UseStudioCommandsOptions): StudioCommandDef[] {
   const { t } = useTranslation();
   return useMemo(() => {
     const text = (key: string) => t(key) as string;
@@ -36,7 +50,7 @@ export function useStudioCommands({
     const base = getBaseUrl();
     const profileUrl = `${base}/u/${handle}`;
     const badgeUrl = `${profileUrl}/badge.svg`;
-    const commands: CommandDef[] = [
+    const commands: StudioCommandDef[] = [
       {
         name: "/set",
         description: text("studio.commands.setDescription"),
@@ -96,7 +110,11 @@ export function useStudioCommands({
 
           return {
             lines: [makeLine("success", `${resolved} → ${value}`)],
-            action: { type: "set", category: resolved, value },
+            action: {
+              type: "set",
+              category: resolved,
+              value: value as BadgeConfig[keyof BadgeConfig],
+            },
           };
         },
       },

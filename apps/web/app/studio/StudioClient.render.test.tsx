@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
+import { useState } from "react";
 import { LanguageContext, type LanguageContextValue } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -65,6 +66,8 @@ vi.mock("@/lib/effects/defaults", () => ({
   ],
 }));
 
+const previewLifecycle = vi.hoisted(() => ({ nextInstanceId: 0 }));
+
 vi.mock("./BadgePreviewCard", () => ({
   BadgePreviewCard: ({
     config,
@@ -74,15 +77,19 @@ vi.mock("./BadgePreviewCard", () => ({
     config: Record<string, unknown>;
     interactive: boolean;
     verification?: { hash: string; date: string } | null;
-  }) => (
-    <div
-      data-testid="badge-preview"
-      data-interactive={String(interactive)}
-      data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
-    >
-      {JSON.stringify(config)}
-    </div>
-  ),
+  }) => {
+    const [instanceId] = useState(() => ++previewLifecycle.nextInstanceId);
+    return (
+      <div
+        data-testid="badge-preview"
+        data-instance-id={instanceId}
+        data-interactive={String(interactive)}
+        data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
+      >
+        {JSON.stringify(config)}
+      </div>
+    );
+  },
 }));
 
 vi.mock("./QuickControls", () => ({
@@ -374,6 +381,33 @@ describe("StudioClient render", () => {
       expect(screen.getByTestId("badge-preview").getAttribute("data-verification")).toBe(
         "abc123:2026-08-26",
       );
+    });
+
+    it("updates ordinary configuration without remounting the preview", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "set-background", type: "success", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      const initialInstanceId = screen
+        .getByTestId("badge-preview")
+        .getAttribute("data-instance-id");
+
+      fireEvent.click(screen.getByTestId("qc-command"));
+
+      const preview = screen.getByTestId("badge-preview");
+      expect(preview.textContent).toContain('"background":"aurora"');
+      expect(preview.getAttribute("data-instance-id")).toBe(initialInstanceId);
     });
   });
 
@@ -1238,7 +1272,7 @@ describe("StudioClient render", () => {
       expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("true");
     });
 
-    it("refresh-preview shortcut increments preview key", () => {
+    it("refresh-preview shortcut explicitly remounts the preview", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -1247,14 +1281,17 @@ describe("StudioClient render", () => {
         />,
       );
 
-      // The BadgePreviewCard is rendered with key={previewKey}
-      // Refreshing should cause re-render (new key)
+      const initialInstanceId = screen
+        .getByTestId("badge-preview")
+        .getAttribute("data-instance-id");
+
       act(() => {
         capturedShortcutHandler?.("refresh-preview");
       });
 
-      // Component should still render correctly
-      expect(screen.getByTestId("badge-preview")).toBeDefined();
+      expect(
+        screen.getByTestId("badge-preview").getAttribute("data-instance-id"),
+      ).not.toBe(initialInstanceId);
     });
 
     it("cycle-preset shortcut cycles to next preset", async () => {

@@ -9,7 +9,10 @@ import { useIsClient } from "@/hooks/useIsClient";
 import { BadgePreviewCard } from "./BadgePreviewCard";
 import type { PreviewVerification } from "./PreviewFooter";
 import { QuickControls } from "./QuickControls";
-import { useStudioCommands } from "./useStudioCommands";
+import {
+  useStudioCommands,
+  type StudioCommandAction,
+} from "./useStudioCommands";
 import { TerminalOutput } from "@/components/terminal/TerminalOutput";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
 import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
@@ -17,7 +20,6 @@ import {
   executeCommand,
   makeLine,
   type OutputLine,
-  type CommandAction,
 } from "@/components/terminal/command-registry";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListener";
 import { useTranslation, type LanguageContextValue } from "@/lib/i18n";
@@ -172,7 +174,6 @@ export function StudioClient({
         }
       }
       setConfig(newConfig);
-      setPreviewKey((k) => k + 1);
     },
     [config],
   );
@@ -238,16 +239,14 @@ export function StudioClient({
         setSaveState({ status: "dirty" });
       }
     }
-    setPreviewKey((k) => k + 1);
     trackEvent("effect_changed", { category: "reset", to: "default" });
   }, [config]);
 
   const handleAction = useCallback(
-    (action: CommandAction) => {
+    (action: StudioCommandAction) => {
       switch (action.type) {
         case "set": {
-          const key = action.category as keyof BadgeConfig;
-          handleConfigChange({ ...config, [key]: action.value });
+          handleConfigChange({ ...config, [action.category]: action.value });
           break;
         }
         case "preset": {
