@@ -1,9 +1,25 @@
+import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
-import { renderVerificationStrip } from "./VerificationStrip";
+import {
+  renderDemoVerificationStrip,
+  renderVerificationStrip,
+} from "./VerificationStrip";
 
 describe("renderVerificationStrip", () => {
   const hash = "abc12345";
   const date = "2025-06-15";
+
+  it("preserves the exact real and sample SVG bytes after metadata extraction", () => {
+    const digest = (svg: string) =>
+      createHash("sha256").update(svg).digest("hex");
+
+    expect(digest(renderVerificationStrip(hash, date))).toBe(
+      "15a64f009e4a3fa12445ad55fb2aa0cbb59e255bfe76bb0b284a109bdcfee52e",
+    );
+    expect(digest(renderDemoVerificationStrip())).toBe(
+      "ae01271f13fbf97599fe8ad33ab10e07004029813bec44b0dea20a1ab864b9b2",
+    );
+  });
 
   it("returns an SVG <g> element", () => {
     const svg = renderVerificationStrip(hash, date);
