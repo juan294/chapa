@@ -15,6 +15,9 @@ interface TerminalInputProps {
   history?: string[];
   prompt?: string;
   autoFocus?: boolean;
+  suggestionsVisible?: boolean;
+  suggestionsListboxId?: string;
+  activeSuggestionId?: string;
 }
 
 export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>(function TerminalInput({
@@ -23,6 +26,9 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
   history = [],
   prompt = "chapa",
   autoFocus = false,
+  suggestionsVisible = false,
+  suggestionsListboxId,
+  activeSuggestionId,
 }, ref) {
   const { t } = useTranslation();
   // `t` is a stable reference per locale (memoized in LanguageProvider), but
@@ -132,6 +138,13 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
           style={{ outline: "none" }}
           placeholder={placeholder}
           aria-label={ariaLabel}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={suggestionsVisible}
+          aria-controls={suggestionsVisible ? suggestionsListboxId : undefined}
+          aria-activedescendant={
+            suggestionsVisible ? activeSuggestionId : undefined
+          }
           autoComplete="off"
           autoCapitalize="off"
           autoCorrect="off"
@@ -141,4 +154,3 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
     </div>
   );
 });
-

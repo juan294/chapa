@@ -20,8 +20,12 @@ import {
   type CommandAction,
 } from "@/components/terminal/command-registry";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListener";
-import { useTranslation } from "@/lib/i18n";
-import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
+import { useTranslation, type LanguageContextValue } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
+import {
+  TERMINAL_COMMAND_INPUT_ID,
+  TERMINAL_COMMAND_LISTBOX_ID,
+} from "@/lib/keyboard/shortcuts";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
@@ -29,6 +33,61 @@ export interface StudioClientProps {
   impact: ImpactV6Result;
   handle?: string;
   verification?: PreviewVerification | null;
+}
+
+type SaveState =
+  | { status: "dirty" | "saving" | "saved" }
+  | { status: "error"; message: string };
+
+type Translate = LanguageContextValue["t"];
+
+function translation(t: Translate, key: string): string {
+  return t(key) as string;
+}
+
+export function parseRetryAfterSeconds(
+  value: string | null,
+  now = Date.now(),
+): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number.parseInt(trimmed, 10);
+  const retryAt = Date.parse(trimmed);
+  if (Number.isNaN(retryAt)) return null;
+  return Math.max(0, Math.ceil((retryAt - now) / 1000));
+}
+
+function getSaveErrorMessage(response: Response, t: Translate): string {
+  let key: string;
+  switch (response.status) {
+    case 400:
+      key = "studio.save.invalidError";
+      break;
+    case 401:
+    case 403:
+      key = "studio.save.authError";
+      break;
+    case 404:
+      key = "studio.save.notFoundError";
+      break;
+    case 429:
+      key = "studio.save.rateLimitError";
+      break;
+    case 503:
+      key = "studio.save.unavailableError";
+      break;
+    default:
+      return interpolate(translation(t, "studio.save.statusError"), {
+        status: String(response.status),
+      });
+  }
+
+  const base = translation(t, key);
+  const retryAfter = parseRetryAfterSeconds(response.headers.get("Retry-After"));
+  if (retryAfter === null) return base;
+  return `${base} ${interpolate(translation(t, "studio.save.retryAfter"), {
+    seconds: String(retryAfter),
+  })}`;
 }
 
 function subscribeReducedMotion(callback: () => void) {
@@ -62,12 +121,14 @@ export function StudioClient({
 }: StudioClientProps) {
   const { t } = useTranslation();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>({ status: "saved" });
   const [previewKey, setPreviewKey] = useState(0);
   const [showQuickControls, setShowQuickControls] = useState(false);
   const isClient = useIsClient();
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
+  const configRevisionRef = useRef(0);
+  const saveInFlightRef = useRef(false);
 
   // Terminal state — seed lines use t() so they follow the user's locale
   const [lines, setLines] = useState<OutputLine[]>([
@@ -77,8 +138,11 @@ export function StudioClient({
   const [history, setHistory] = useState<string[]>([]);
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [activeSuggestionId, setActiveSuggestionId] = useState<string>();
 
-  const studioCommands = useStudioCommands({ config, handle });
+  const saving = saveState.status === "saving";
+  const autocompleteExpanded = showAutocomplete && !!activeSuggestionId;
+  const studioCommands = useStudioCommands({ config, handle, saving });
 
   // Track studio_opened on mount (once)
   useEffect(() => {
@@ -90,13 +154,21 @@ export function StudioClient({
 
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
+      let changed = false;
       for (const key of Object.keys(newConfig) as (keyof BadgeConfig)[]) {
         if (newConfig[key] !== config[key]) {
+          changed = true;
           trackEvent("effect_changed", {
             category: key,
             from: config[key],
             to: newConfig[key],
           });
+        }
+      }
+      if (changed) {
+        configRevisionRef.current += 1;
+        if (!saveInFlightRef.current) {
+          setSaveState({ status: "dirty" });
         }
       }
       setConfig(newConfig);
@@ -106,29 +178,69 @@ export function StudioClient({
   );
 
   const handleSave = useCallback(async () => {
-    setSaving(true);
+    if (saveInFlightRef.current) {
+      setLines((prev) => [
+        ...prev,
+        makeLine("warning", translation(t, "studio.save.alreadySaving")),
+      ]);
+      return;
+    }
+
+    saveInFlightRef.current = true;
+    const revision = configRevisionRef.current;
+    const configToSave = config;
+    setSaveState({ status: "saving" });
     try {
       const res = await fetch("/api/studio/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify(configToSave),
       });
       if (res.ok) {
-        trackEvent("config_saved", { config });
-        setLines((prev) => [...prev, makeLine("success", "Configuration saved!")]);
+        trackEvent("config_saved", { config: configToSave });
+        const hasNewerChanges = configRevisionRef.current !== revision;
+        setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
+        setLines((prev) => [
+          ...prev,
+          makeLine(
+            hasNewerChanges ? "warning" : "success",
+            translation(
+              t,
+              hasNewerChanges
+                ? "studio.save.changedDuringSave"
+                : "studio.save.success",
+            ),
+          ),
+        ]);
       } else {
-        setLines((prev) => [...prev, makeLine("error", "Failed to save. Try again.")]);
+        const message = getSaveErrorMessage(res, t);
+        setSaveState({ status: "error", message });
+        setLines((prev) => [...prev, makeLine("error", message)]);
       }
+    } catch {
+      const message = translation(t, "studio.save.transportError");
+      setSaveState({ status: "error", message });
+      setLines((prev) => [...prev, makeLine("error", message)]);
     } finally {
-      setSaving(false);
+      saveInFlightRef.current = false;
     }
-  }, [config]);
+  }, [config, t]);
 
   const handleReset = useCallback(() => {
+    const changed = Object.keys(DEFAULT_BADGE_CONFIG).some((key) => {
+      const configKey = key as keyof BadgeConfig;
+      return config[configKey] !== DEFAULT_BADGE_CONFIG[configKey];
+    });
     setConfig({ ...DEFAULT_BADGE_CONFIG });
+    if (changed) {
+      configRevisionRef.current += 1;
+      if (!saveInFlightRef.current) {
+        setSaveState({ status: "dirty" });
+      }
+    }
     setPreviewKey((k) => k + 1);
     trackEvent("effect_changed", { category: "reset", to: "default" });
-  }, []);
+  }, [config]);
 
   const handleAction = useCallback(
     (action: CommandAction) => {
@@ -147,7 +259,7 @@ export function StudioClient({
           break;
         }
         case "save":
-          handleSave();
+          void handleSave();
           break;
         case "reset":
           handleReset();
@@ -199,11 +311,13 @@ export function StudioClient({
 
   const handleAutocompleteDismiss = useCallback(() => {
     setShowAutocomplete(false);
+    setActiveSuggestionId(undefined);
   }, []);
 
   const handleAutocompleteSelect = useCallback(
     (command: string) => {
       setShowAutocomplete(false);
+      setActiveSuggestionId(undefined);
       setPartial("");
       handleSubmit(command);
     },
@@ -212,6 +326,7 @@ export function StudioClient({
 
   const handleAutocompleteFill = useCallback((command: string) => {
     setShowAutocomplete(false);
+    setActiveSuggestionId(undefined);
     const input = document.querySelector<HTMLInputElement>(
       `#${TERMINAL_COMMAND_INPUT_ID}`,
     );
@@ -260,7 +375,7 @@ export function StudioClient({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
-      <h1 className="sr-only">Creator Studio</h1>
+      <h1 className="sr-only">{t("studio.title") as string}</h1>
       {/* Preview pane (left, sticky) */}
       <div className="flex items-start justify-center lg:items-center px-3 sm:px-4 py-4 sm:py-6 lg:px-8 lg:py-0 border-b lg:border-b-0 lg:border-r border-stroke" aria-busy={saving}>
         <div className="w-full max-w-xl sticky top-20">
@@ -273,15 +388,25 @@ export function StudioClient({
             verification={verification}
           />
 
-          {saving && (
-            <div className="mt-4 text-center text-sm text-amber animate-terminal-fade-in font-heading">
-              Saving...
-            </div>
-          )}
+          <div
+            className={`mt-4 text-center text-sm font-heading ${
+              saveState.status === "error"
+                ? "text-terminal-red"
+                : saveState.status === "saving"
+                  ? "text-amber animate-terminal-fade-in"
+                  : "text-text-secondary"
+            }`}
+            role={saveState.status === "error" ? "alert" : "status"}
+            data-save-state={saveState.status}
+          >
+            {saveState.status === "error"
+              ? saveState.message
+              : (t(`studio.save.${saveState.status}`) as string)}
+          </div>
 
           {reducedMotion && (
             <div className="mt-4 text-center text-xs text-text-secondary">
-              Reduced motion detected — animations are disabled
+              {t("studio.reducedMotion") as string}
             </div>
           )}
         </div>
@@ -295,6 +420,7 @@ export function StudioClient({
           onCommand={handleQuickCommand}
           visible={showQuickControls}
           onToggle={() => setShowQuickControls((v) => !v)}
+          saveDisabled={saving}
         />
 
         {/* Terminal output */}
@@ -309,12 +435,17 @@ export function StudioClient({
             onFill={handleAutocompleteFill}
             onDismiss={handleAutocompleteDismiss}
             visible={showAutocomplete}
+            listboxId={TERMINAL_COMMAND_LISTBOX_ID}
+            onActiveDescendantChange={setActiveSuggestionId}
           />
           <TerminalInput
             onSubmit={handleSubmit}
             onPartialChange={handlePartialChange}
             history={history}
             prompt="studio"
+            suggestionsVisible={autocompleteExpanded}
+            suggestionsListboxId={TERMINAL_COMMAND_LISTBOX_ID}
+            activeSuggestionId={activeSuggestionId}
           />
         </div>
       </div>

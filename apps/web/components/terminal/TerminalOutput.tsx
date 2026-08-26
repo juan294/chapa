@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { OutputLine } from "./command-registry";
+import { useTranslation } from "@/lib/i18n";
 
 interface TerminalOutputProps {
   lines: OutputLine[];
@@ -28,6 +29,7 @@ const TYPE_PREFIX: Record<string, string> = {
 };
 
 export function TerminalOutput({ lines }: TerminalOutputProps) {
+  const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function TerminalOutput({ lines }: TerminalOutputProps) {
     <div
       role="log"
       aria-live="polite"
-      aria-label="Terminal output"
+      aria-label={t("aria.terminalOutput") as string}
       className="flex-1 overflow-y-auto font-terminal text-sm leading-relaxed p-4 space-y-0.5"
     >
       {lines.map((line) => (

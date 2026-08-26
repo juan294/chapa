@@ -1,4 +1,5 @@
 import type { BadgeConfig } from "@chapa/shared";
+import type { LanguageContextValue } from "@/lib/i18n";
 
 /** Metadata for a single selectable option */
 export interface OptionMeta {
@@ -12,6 +13,20 @@ export interface CategoryMeta {
   key: keyof BadgeConfig;
   label: string;
   options: OptionMeta[];
+}
+
+export type StudioTranslate = LanguageContextValue["t"];
+
+function translatedOrFallback(
+  t: StudioTranslate | undefined,
+  key: string,
+  fallback: string,
+): string {
+  if (!t) return fallback;
+  const translated = t(key);
+  return typeof translated === "string" && translated !== key
+    ? translated
+    : fallback;
 }
 
 export const STUDIO_CATEGORIES: CategoryMeta[] = [
@@ -106,9 +121,37 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
 ];
 
 /** Get the display label for a specific option value */
-export function getOptionLabel(key: keyof BadgeConfig, value: string): string {
+export function getCategoryLabel(
+  category: CategoryMeta,
+  t?: StudioTranslate,
+): string {
+  return translatedOrFallback(
+    t,
+    `studio.categories.${category.key}.label`,
+    category.label,
+  );
+}
+
+export function getOptionLabel(
+  key: keyof BadgeConfig,
+  value: string,
+  t?: StudioTranslate,
+): string {
   const category = STUDIO_CATEGORIES.find((c) => c.key === key);
   if (!category) return value;
   const option = category.options.find((o) => o.value === value);
-  return option ? option.label : value;
+  if (!option) return value;
+  return translatedOrFallback(
+    t,
+    `studio.categories.${key}.options.${value}`,
+    option.label,
+  );
+}
+
+export function getPresetLabel(
+  id: string,
+  fallback: string,
+  t?: StudioTranslate,
+): string {
+  return translatedOrFallback(t, `studio.presetLabels.${id}`, fallback);
 }

@@ -16,7 +16,10 @@ import type { OutputLine } from "@/components/terminal/command-registry";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { useTranslation } from "@/lib/i18n";
 import { tObject } from "@/lib/i18n/typed-accessors";
-import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
+import {
+  TERMINAL_COMMAND_INPUT_ID,
+  TERMINAL_COMMAND_LISTBOX_ID,
+} from "@/lib/keyboard/shortcuts";
 
 const OUTPUT_TIMEOUT_MS = 5000;
 
@@ -44,8 +47,10 @@ export function GlobalCommandBar({
   const terminalRef = useRef<TerminalInputHandle>(null);
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [activeSuggestionId, setActiveSuggestionId] = useState<string>();
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autocompleteExpanded = showAutocomplete && !!activeSuggestionId;
 
   const descriptions = useMemo(() => {
     const d = tObject<Record<string, string>>(t, "commands.descriptions");
@@ -160,6 +165,8 @@ export function GlobalCommandBar({
             onFill={handleAutocompleteFill}
             onDismiss={handleAutocompleteDismiss}
             visible={showAutocomplete}
+            listboxId={TERMINAL_COMMAND_LISTBOX_ID}
+            onActiveDescendantChange={setActiveSuggestionId}
           />
           <TerminalInput
             ref={terminalRef}
@@ -167,6 +174,9 @@ export function GlobalCommandBar({
             onPartialChange={handlePartialChange}
             prompt="chapa"
             autoFocus={!!isAdmin}
+            suggestionsVisible={autocompleteExpanded}
+            suggestionsListboxId={TERMINAL_COMMAND_LISTBOX_ID}
+            activeSuggestionId={activeSuggestionId}
           />
         </div>
       </div>

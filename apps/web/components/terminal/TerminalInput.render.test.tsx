@@ -13,6 +13,40 @@ describe("TerminalInput", () => {
     expect(screen.getByLabelText("Terminal command input")).toBeDefined();
   });
 
+  it("exposes combobox ownership and the active suggestion", () => {
+    render(
+      <TerminalInput
+        onSubmit={vi.fn()}
+        suggestionsVisible
+        suggestionsListboxId="studio-suggestions"
+        activeSuggestionId="studio-suggestions-option-1"
+      />,
+    );
+
+    const input = screen.getByRole("combobox");
+    expect(input.getAttribute("aria-autocomplete")).toBe("list");
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    expect(input.getAttribute("aria-controls")).toBe("studio-suggestions");
+    expect(input.getAttribute("aria-activedescendant")).toBe(
+      "studio-suggestions-option-1",
+    );
+  });
+
+  it("does not claim listbox ownership while suggestions are closed", () => {
+    render(
+      <TerminalInput
+        onSubmit={vi.fn()}
+        suggestionsVisible={false}
+        suggestionsListboxId="studio-suggestions"
+      />,
+    );
+
+    const input = screen.getByRole("combobox");
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    expect(input.hasAttribute("aria-controls")).toBe(false);
+    expect(input.hasAttribute("aria-activedescendant")).toBe(false);
+  });
+
   it("renders default prompt", () => {
     render(<TerminalInput onSubmit={vi.fn()} />);
     expect(screen.getByText(/chapa/)).toBeDefined();

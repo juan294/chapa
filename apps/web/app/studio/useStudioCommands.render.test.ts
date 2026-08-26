@@ -3,6 +3,9 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useStudioCommands } from "./useStudioCommands";
 import type { BadgeConfig } from "@chapa/shared";
+import { createElement, type ComponentType, type ReactNode } from "react";
+import { LanguageProvider } from "@/lib/i18n";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 vi.mock("../../lib/feature-flags", () => ({
   isStudioEnabledSync: () => true,
@@ -24,8 +27,22 @@ const DEFAULT_CONFIG: BadgeConfig = {
   celebration: "none",
 };
 
-function getCommands(config = DEFAULT_CONFIG, handle = "testuser") {
-  const { result } = renderHook(() => useStudioCommands({ config, handle }));
+function getCommands(config = DEFAULT_CONFIG, handle = "testuser", locale?: "es") {
+  const wrapper = locale
+    ? ({ children }: { children: ReactNode }) =>
+        createElement(
+          LanguageProvider as unknown as ComponentType<{
+            initialLocale: "es";
+            dictionary: typeof es;
+            children?: ReactNode;
+          }>,
+          { initialLocale: "es", dictionary: es },
+          children,
+        )
+    : undefined;
+  const { result } = renderHook(() => useStudioCommands({ config, handle }), {
+    wrapper,
+  });
   return result.current;
 }
 
@@ -50,6 +67,33 @@ describe("useStudioCommands (render)", () => {
     expect(names).toContain("/share");
     expect(names).toContain("/help");
     expect(names).toContain("/clear");
+  });
+
+  it("localizes Spanish output while command syntax and values stay stable", () => {
+    const commands = getCommands(DEFAULT_CONFIG, "testuser", "es");
+    const names = commands.map((command) => command.name);
+    expect(names).toContain("/save");
+    expect(names).toContain("/set");
+
+    const setUsage = commands.find((command) => command.name === "/set")!.execute([]);
+    expect(setUsage.lines[0]!.text).toBe("Uso: /set <category> <value>");
+    expect(setUsage.lines.map((line) => line.text).join("\n")).toContain("aurora");
+
+    const status = commands.find((command) => command.name === "/status")!.execute([]);
+    const statusText = status.lines.map((line) => line.text).join("\n");
+    expect(statusText).toContain("Configuración actual:");
+    expect(statusText).toContain("Fondo");
+    expect(statusText).toContain("Oscuro sólido");
+  });
+
+  it("returns no duplicate save action while saving", () => {
+    const { result } = renderHook(() =>
+      useStudioCommands({ config: DEFAULT_CONFIG, handle: "testuser", saving: true }),
+    );
+    const save = result.current.find((command) => command.name === "/save")!;
+
+    expect(save.execute([]).action).toBeUndefined();
+    expect(save.execute([]).lines[0]!.text).toContain("already in progress");
   });
 
   describe("/set", () => {
