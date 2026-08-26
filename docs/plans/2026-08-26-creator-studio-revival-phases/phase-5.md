@@ -15,16 +15,20 @@ Steps (runner: Claude, after authorization):
    "enabled": true }` with admin credentials (same auth path the admin
    panel uses; CLI-first via curl with the admin session/token — do not
    use the dashboard).
-2. Verify within ~1 min (flag cache TTL 5 min in-process, PATCH revalidates):
-   - `GET /api/feature-flags` → `studio_enabled: true`
+2. Retry the flag read for up to about five minutes. PATCH invalidates the
+   handling instance, but another instance can retain its in-process value for
+   the full 5-minute cache TTL. An early stale flag read is not failure or rollback evidence. Continue only after `GET /api/feature-flags` returns
+   `studio_enabled: true`, then verify:
    - Unauthenticated `GET /api/studio/config` → **401** (was 404)
    - `/studio` logged out → redirect to `/api/auth/login` (not `/`)
    - Logged in (Juan): `/studio` renders; UserMenu shows the Studio link;
      `/set bg aurora`, `/save` → success line; reload → config persists
      (exercises the Phase 1 load path live)
-3. Rollback: same PATCH with `enabled: false` — restores 404/hidden state
-   immediately. Rollback-first: if anything in step 2 fails, flip back,
-   then investigate.
+3. Rollback: same PATCH with `enabled: false`. Rollback-first: if the retry
+   window expires without convergence, or a later check in step 2 fails, flip
+   back and then investigate. Do not roll back on one early stale read. The
+   disabled value can take the same cache-convergence window to appear on every
+   instance.
 
 Record the flip (date, verification results) in the release notes /
 CHANGELOG per repo convention.

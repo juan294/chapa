@@ -213,17 +213,17 @@ describe("validateReleaseDocs", () => {
 
 describe("repository release procedure", () => {
   const repositoryRoot = path.resolve(import.meta.dirname, "../..");
-  const playbook = fs.readFileSync(
-    path.join(repositoryRoot, "docs/release/release-playbook.md"),
-    "utf8",
+  const readRepositoryFile = (file: string): string =>
+    fs.readFileSync(path.join(repositoryRoot, file), "utf8");
+  const playbook = readRepositoryFile("docs/release/release-playbook.md");
+  const releaseCommand = readRepositoryFile(".claude/commands/release.md");
+  const rollbackRunbook = readRepositoryFile("docs/runbooks/rollback.md");
+  const studioFlagPlan = readRepositoryFile(
+    "docs/plans/2026-08-26-creator-studio-revival-phases/phase-5.md",
   );
-  const explore = fs.readFileSync(
-    path.join(repositoryRoot, ".claude/commands/explore-release.md"),
-    "utf8",
-  );
-  const prodplaybook = fs.readFileSync(
-    path.join(repositoryRoot, ".claude/commands/prodplaybook.md"),
-    "utf8",
+  const explore = readRepositoryFile(".claude/commands/explore-release.md");
+  const prodplaybook = readRepositoryFile(
+    ".claude/commands/prodplaybook.md",
   );
 
   it("documents exact dispatch, evidence download, and final assembly", () => {
@@ -243,6 +243,32 @@ describe("repository release procedure", () => {
     }
     expect(playbook.indexOf('rollbackReference="$baselineTag"')).toBeLessThan(
       playbook.indexOf('--rollback-reference "$rollbackReference"'),
+    );
+  });
+
+  it("binds the release baseline and rollback target to production identity", () => {
+    for (const required of [
+      'productionVersion="$(curl -fsS "$productionUrl/api/version")"',
+      'select(.environment == "production") | .commitSha',
+      'mainCommit="$(git rev-parse origin/main)"',
+      'test "$productionCommit" = "$mainCommit"',
+      'git for-each-ref --points-at "$mainCommit"',
+      'git cat-file -t "$baselineTag"',
+      '${baselineTag}^{commit}',
+    ]) {
+      expect(playbook).toContain(required);
+    }
+    expect(releaseCommand).toContain("Do not use `git describe`");
+    expect(rollbackRunbook).toContain('${approvedRollbackTag}^{commit}');
+    expect(rollbackRunbook).toContain(
+      'test "$restoredCommit" = "$approvedRollbackCommit"',
+    );
+  });
+
+  it("treats early stale Studio flag reads as cache convergence, not failure", () => {
+    expect(studioFlagPlan).toContain("up to about five minutes");
+    expect(studioFlagPlan).toContain(
+      "An early stale flag read is not failure or rollback evidence",
     );
   });
 
