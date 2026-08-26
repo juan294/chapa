@@ -3,6 +3,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { AutocompleteDropdown } from "./AutocompleteDropdown";
 import type { CommandDef } from "./command-registry";
+import { LanguageProvider } from "@/lib/i18n";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 afterEach(cleanup);
 
@@ -13,6 +15,50 @@ const COMMANDS: CommandDef[] = [
 ];
 
 describe("AutocompleteDropdown", () => {
+  it("owns stable option ids and reports the active descendant", () => {
+    const onActiveDescendantChange = vi.fn();
+    render(
+      <AutocompleteDropdown
+        commands={COMMANDS}
+        partial="/a"
+        onSelect={vi.fn()}
+        visible={true}
+        listboxId="studio-suggestions"
+        onActiveDescendantChange={onActiveDescendantChange}
+      />,
+    );
+
+    expect(screen.getByRole("listbox").id).toBe("studio-suggestions");
+    expect(screen.getAllByRole("option")[0]!.id).toBe(
+      "studio-suggestions-option-0",
+    );
+    expect(onActiveDescendantChange).toHaveBeenLastCalledWith(
+      "studio-suggestions-option-0",
+    );
+
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    expect(onActiveDescendantChange).toHaveBeenLastCalledWith(
+      "studio-suggestions-option-1",
+    );
+  });
+
+  it("localizes the listbox label", () => {
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <AutocompleteDropdown
+          commands={COMMANDS}
+          partial="/a"
+          onSelect={vi.fn()}
+          visible={true}
+        />
+      </LanguageProvider>,
+    );
+
+    expect(
+      screen.getByRole("listbox", { name: "Sugerencias de comandos" }),
+    ).toBeDefined();
+  });
+
   it("renders nothing when not visible", () => {
     const { container } = render(
       <AutocompleteDropdown

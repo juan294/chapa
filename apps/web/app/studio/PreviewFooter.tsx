@@ -33,10 +33,15 @@ export function PreviewFooter({
     linkedPlatforms.includes(platform),
   );
   const host = new URL(getBaseUrl()).host;
+  const tagline = t("studio.brandingTagline") as string;
+  const verificationLabel = t("studio.verificationLabel") as string;
+  const verificationAccessibleLabel = verification
+    ? `${verificationLabel.charAt(0)}${verificationLabel.slice(1).toLowerCase()} · ${verification.hash} · ${verification.date}`
+    : undefined;
 
   return (
     <footer className="mt-4 pt-3 border-t border-stroke/50">
-      <div className="flex items-center justify-between gap-3 text-xs text-text-secondary/60">
+      <div className="flex flex-col items-stretch gap-2 text-xs text-text-secondary/60 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
             className="flex shrink-0 items-center gap-2 rounded-full border border-amber/15 bg-amber/[0.08] px-2.5 py-1.5"
@@ -58,18 +63,29 @@ export function PreviewFooter({
             ))}
           </div>
           <span className="hidden truncate sm:inline">
-            Forged from purpose. Driven by curiosity.
+            {tagline}
           </span>
         </div>
-        <span className="shrink-0 font-heading">{host}</span>
+        <span
+          className="min-w-0 max-w-full truncate font-heading sm:shrink-0 sm:text-right"
+          aria-label={host}
+          title={host}
+        >
+          {host}
+        </span>
       </div>
 
       {verification && (
         <div
           className="mt-3 border-t pt-2 text-center font-heading text-[10px] tracking-[0.12em] opacity-60"
           style={{ color: CORAL, borderColor: `${CORAL}26` }}
+          aria-label={verificationAccessibleLabel}
         >
-          VERIFIED · {verification.hash} · {verification.date}
+          <span>{verificationLabel}</span>
+          <span aria-hidden="true"> · </span>
+          <span className="break-all">{verification.hash}</span>
+          <span aria-hidden="true"> · </span>
+          <span>{verification.date}</span>
         </div>
       )}
     </footer>

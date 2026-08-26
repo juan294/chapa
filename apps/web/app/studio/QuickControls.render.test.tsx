@@ -3,6 +3,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QuickControls } from "./QuickControls";
 import type { BadgeConfig } from "@chapa/shared";
+import { LanguageProvider } from "@/lib/i18n";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 vi.mock("@/lib/effects/defaults", () => ({
   STUDIO_PRESETS: [
@@ -36,6 +38,9 @@ describe("QuickControls", () => {
       />,
     );
     expect(screen.getByText("Quick Controls")).toBeDefined();
+    const toggle = screen.getByRole("button", { name: "Quick Controls" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-controls")).toBeTruthy();
   });
 
   it("calls onToggle when expand button clicked", () => {
@@ -210,8 +215,51 @@ describe("QuickControls", () => {
     const wrapper = bgButton.closest("button")!.nextElementSibling as HTMLElement;
     expect(wrapper.className).toContain("collapse-grid");
     expect(wrapper.getAttribute("data-expanded")).toBe("false");
+    expect(wrapper.getAttribute("aria-hidden")).toBe("true");
+    expect(wrapper.hasAttribute("inert")).toBe(true);
+    expect(bgButton.closest("button")!.getAttribute("aria-controls")).toBe(
+      wrapper.id,
+    );
 
     fireEvent.click(bgButton);
     expect(wrapper.getAttribute("data-expanded")).toBe("true");
+    expect(wrapper.getAttribute("aria-hidden")).toBe("false");
+    expect(wrapper.hasAttribute("inert")).toBe(false);
+  });
+
+  it("disables the save entry point while a save is in progress", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={true}
+        onToggle={vi.fn()}
+        saveDisabled
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "/save" }).hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("renders Spanish control copy while command identifiers stay unchanged", () => {
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <QuickControls
+          config={baseConfig}
+          onCommand={vi.fn()}
+          visible={true}
+          onToggle={vi.fn()}
+        />
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByText("Controles rápidos")).toBeDefined();
+    expect(screen.getByText("Preajustes")).toBeDefined();
+    expect(screen.getByText("Fondo")).toBeDefined();
+    fireEvent.click(screen.getByText("Fondo"));
+    expect(screen.getByText("Aurora luminosa")).toBeDefined();
+    expect(screen.getByRole("button", { name: "/save" })).toBeDefined();
   });
 });

@@ -51,8 +51,50 @@ describe("PreviewFooter", () => {
     );
 
     expect(
-      screen.getByText("VERIFIED · abc123 · 2026-08-26"),
+      screen.getByLabelText("Verified · abc123 · 2026-08-26"),
     ).toBeDefined();
+  });
+
+  it("keeps four platforms and full verification values accessible at 320px", () => {
+    const hash = "0123456789abcdef0123456789abcdef";
+    const { container } = render(
+      <div style={{ width: 320 }}>
+        <PreviewFooter
+          linkedPlatforms={["gitlab", "github", "codeberg", "bitbucket"]}
+          verification={{ hash, date: "2026-08-26" }}
+        />
+      </div>,
+    );
+
+    const layout = container.querySelector("footer > div")!;
+    expect(layout.className).toContain("flex-col");
+    expect(layout.className).toContain("sm:flex-row");
+
+    const host = screen.getByText("studio.test");
+    expect(host.className).toContain("truncate");
+    expect(host.getAttribute("aria-label")).toBe("studio.test");
+
+    const hashNode = screen.getByText(hash);
+    expect(hashNode.className).toContain("break-all");
+    expect(
+      screen.getByLabelText(`Verified · ${hash} · 2026-08-26`),
+    ).toBeDefined();
+  });
+
+  it("localizes visible branding and verification copy", () => {
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <PreviewFooter
+          linkedPlatforms={["github"]}
+          verification={{ hash: "abc123", date: "2026-08-26" }}
+        />
+      </LanguageProvider>,
+    );
+
+    expect(
+      screen.getByText("Forjada con propósito. Impulsada por la curiosidad."),
+    ).toBeDefined();
+    expect(screen.getByText("VERIFICADA")).toBeDefined();
   });
 
   it("omits the verification strip when verification is null", () => {

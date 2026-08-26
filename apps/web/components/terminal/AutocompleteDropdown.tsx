@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from "react";
 import { getMatchingCommands } from "./command-registry";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import type { CommandDef } from "./command-registry";
+import { useTranslation } from "@/lib/i18n";
 
 interface AutocompleteDropdownProps {
   commands: CommandDef[];
@@ -12,6 +13,8 @@ interface AutocompleteDropdownProps {
   onFill?: (command: string) => void;
   onDismiss?: () => void;
   visible: boolean;
+  listboxId?: string;
+  onActiveDescendantChange?: (id: string | undefined) => void;
 }
 
 export function AutocompleteDropdown({
@@ -21,9 +24,14 @@ export function AutocompleteDropdown({
   onFill,
   onDismiss,
   visible,
+  listboxId,
+  onActiveDescendantChange,
 }: AutocompleteDropdownProps) {
+  const { t } = useTranslation();
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const generatedId = useId();
+  const resolvedListboxId = listboxId ?? `${generatedId}-suggestions`;
   const { shouldRender, isAnimatingOut } = useAnimatedUnmount(visible, 150);
 
   const matching = useMemo(
@@ -89,18 +97,28 @@ export function AutocompleteDropdown({
     return () => document.removeEventListener("mousedown", handleMouseDown);
   }, [visible, matching.length, onDismiss]);
 
+  useEffect(() => {
+    const activeId =
+      visible && matching[activeIndex]
+        ? `${resolvedListboxId}-option-${activeIndex}`
+        : undefined;
+    onActiveDescendantChange?.(activeId);
+  }, [activeIndex, matching, onActiveDescendantChange, resolvedListboxId, visible]);
+
   if (!shouldRender || matching.length === 0) return null;
 
   return (
     <div
       ref={containerRef}
+      id={resolvedListboxId}
       role="listbox"
-      aria-label="Command suggestions"
+      aria-label={t("aria.commandSuggestions") as string}
       className={`absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl ${isAnimatingOut ? "animate-fade-out-up" : "animate-terminal-fade-in"}`}
     >
       {matching.map((cmd, i) => (
         <div
           key={cmd.name}
+          id={`${resolvedListboxId}-option-${i}`}
           role="option"
           tabIndex={-1}
           aria-selected={i === activeIndex}

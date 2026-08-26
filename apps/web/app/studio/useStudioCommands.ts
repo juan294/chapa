@@ -1,6 +1,11 @@
 import { useMemo } from "react";
 import type { BadgeConfig } from "@chapa/shared";
-import { STUDIO_CATEGORIES, getOptionLabel } from "./studio-options";
+import {
+  getCategoryLabel,
+  getOptionLabel,
+  getPresetLabel,
+  STUDIO_CATEGORIES,
+} from "./studio-options";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import {
   CATEGORY_KEY_TO_ALIAS,
@@ -9,24 +14,32 @@ import {
   type CommandDef,
 } from "@/components/terminal/command-registry";
 import { getBaseUrl } from "@/lib/env";
+import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 interface UseStudioCommandsOptions {
   config: BadgeConfig;
   handle: string;
+  saving?: boolean;
 }
 
 export function useStudioCommands({
   config,
   handle,
+  saving = false,
 }: UseStudioCommandsOptions): CommandDef[] {
+  const { t } = useTranslation();
   return useMemo(() => {
+    const text = (key: string) => t(key) as string;
+    const format = (key: string, values: Record<string, string>) =>
+      interpolate(text(key), values);
     const base = getBaseUrl();
     const profileUrl = `${base}/u/${handle}`;
     const badgeUrl = `${profileUrl}/badge.svg`;
     const commands: CommandDef[] = [
       {
         name: "/set",
-        description: "Set badge config field",
+        description: text("studio.commands.setDescription"),
         usage: "/set <category> <value>",
         execute: (args) => {
           if (args.length < 2) {
@@ -36,7 +49,7 @@ export function useStudioCommands({
             });
             return {
               lines: [
-                makeLine("system", "Usage: /set <category> <value>"),
+                makeLine("system", text("studio.commands.setUsage")),
                 makeLine("dim", ""),
                 ...categoryList.map((l) => makeLine("info", l)),
               ],
@@ -50,8 +63,11 @@ export function useStudioCommands({
           if (!resolved) {
             return {
               lines: [
-                makeLine("error", `Unknown category: ${catInput}`),
-                makeLine("dim", "Valid: bg, card, border, score, heatmap, interact, stats, tier, celebrate"),
+                makeLine(
+                  "error",
+                  format("studio.commands.unknownCategory", { category: catInput }),
+                ),
+                makeLine("dim", text("studio.commands.validCategories")),
               ],
             };
           }
@@ -61,8 +77,19 @@ export function useStudioCommands({
           if (category && !category.options.some((o) => o.value === value)) {
             return {
               lines: [
-                makeLine("error", `Invalid value "${value}" for ${resolved}`),
-                makeLine("dim", `Options: ${category.options.map((o) => o.value).join(", ")}`),
+                makeLine(
+                  "error",
+                  format("studio.commands.invalidValue", {
+                    value,
+                    category: resolved,
+                  }),
+                ),
+                makeLine(
+                  "dim",
+                  format("studio.commands.options", {
+                    options: category.options.map((o) => o.value).join(", "),
+                  }),
+                ),
               ],
             };
           }
@@ -75,15 +102,18 @@ export function useStudioCommands({
       },
       {
         name: "/preset",
-        description: "Apply a preset configuration",
+        description: text("studio.commands.presetDescription"),
         usage: "/preset <name>",
         execute: (args) => {
           if (args.length === 0) {
             return {
               lines: [
-                makeLine("system", "Available presets:"),
+                makeLine("system", text("studio.commands.availablePresets")),
                 ...STUDIO_PRESETS.map((p) =>
-                  makeLine("info", `  ${p.id.padEnd(14)} ${p.label}`),
+                  makeLine(
+                    "info",
+                    `  ${p.id.padEnd(14)} ${getPresetLabel(p.id, p.label, t)}`,
+                  ),
                 ),
               ],
             };
@@ -93,43 +123,61 @@ export function useStudioCommands({
           if (!preset) {
             return {
               lines: [
-                makeLine("error", `Unknown preset: ${name}`),
-                makeLine("dim", `Available: ${STUDIO_PRESETS.map((p) => p.id).join(", ")}`),
+                makeLine(
+                  "error",
+                  format("studio.commands.unknownPreset", { preset: name }),
+                ),
+                makeLine(
+                  "dim",
+                  format("studio.commands.available", {
+                    presets: STUDIO_PRESETS.map((p) => p.id).join(", "),
+                  }),
+                ),
               ],
             };
           }
           return {
-            lines: [makeLine("success", `Applied preset: ${preset.label}`)],
+            lines: [
+              makeLine(
+                "success",
+                format("studio.commands.appliedPreset", {
+                  preset: getPresetLabel(preset.id, preset.label, t),
+                }),
+              ),
+            ],
             action: { type: "preset", name },
           };
         },
       },
       {
         name: "/save",
-        description: "Save current configuration",
-        execute: () => ({
-          lines: [makeLine("system", "Saving configuration...")],
-          action: { type: "save" },
-        }),
+        description: text("studio.commands.saveDescription"),
+        execute: () =>
+          saving
+            ? { lines: [makeLine("warning", text("studio.save.alreadySaving"))] }
+            : {
+                lines: [makeLine("system", text("studio.save.saving"))],
+                action: { type: "save" },
+              },
       },
       {
         name: "/reset",
-        description: "Reset to defaults",
+        description: text("studio.commands.resetDescription"),
         execute: () => ({
-          lines: [makeLine("warning", "Configuration reset to defaults.")],
+          lines: [makeLine("warning", text("studio.commands.resetDone"))],
           action: { type: "reset" },
         }),
       },
       {
         name: "/status",
-        description: "Show current config summary",
+        description: text("studio.commands.statusDescription"),
         execute: () => ({
           lines: [
-            makeLine("system", "Current configuration:"),
+            makeLine("system", text("studio.commands.currentConfiguration")),
             ...STUDIO_CATEGORIES.map((c) =>
               makeLine(
                 "info",
-                `  ${c.label.padEnd(20)} ${getOptionLabel(c.key, config[c.key])}`,
+                `  ${getCategoryLabel(c, t).padEnd(20)} ${getOptionLabel(c.key, config[c.key], t)}`,
               ),
             ),
           ],
@@ -137,52 +185,52 @@ export function useStudioCommands({
       },
       {
         name: "/embed",
-        description: "Show embed snippets",
+        description: text("studio.commands.embedDescription"),
         execute: () => ({
           lines: [
-            makeLine("system", "Embed your badge:"),
+            makeLine("system", text("studio.commands.embedHeading")),
             makeLine("dim", ""),
-            makeLine("info", "Markdown:"),
-            makeLine("success", `![Chapa Badge](${badgeUrl})`),
+            makeLine("info", text("studio.commands.markdown")),
+            makeLine("success", `![${text("studio.commands.embedAlt")}](${badgeUrl})`),
             makeLine("dim", ""),
-            makeLine("info", "HTML:"),
-            makeLine("success", `<img src="${badgeUrl}" alt="Chapa Badge" width="600" height="315" />`),
+            makeLine("info", text("studio.commands.html")),
+            makeLine("success", `<img src="${badgeUrl}" alt="${text("studio.commands.embedAlt")}" width="600" height="315" />`),
           ],
         }),
       },
       {
         name: "/share",
-        description: "Show share links",
+        description: text("studio.commands.shareDescription"),
         execute: () => ({
           lines: [
-            makeLine("system", "Share your badge:"),
-            makeLine("info", `Direct link: ${profileUrl}`),
-            makeLine("info", `Badge SVG:   ${badgeUrl}`),
+            makeLine("system", text("studio.commands.shareHeading")),
+            makeLine("info", `${text("studio.commands.directLink")} ${profileUrl}`),
+            makeLine("info", `${text("studio.commands.badgeSvg")}   ${badgeUrl}`),
           ],
         }),
       },
       {
         name: "/help",
-        description: "List all studio commands",
+        description: text("studio.commands.helpDescription"),
         execute: () => ({
           lines: [
-            makeLine("system", "Creator Studio commands:"),
-            makeLine("info", "  /set <cat> <val>   Set effect (bg, card, border, score, heatmap, interact, stats, tier, celebrate)"),
-            makeLine("info", "  /preset <name>     Apply preset (minimal/premium/holographic/maximum)"),
-            makeLine("info", "  /save              Save configuration"),
-            makeLine("info", "  /reset             Reset to defaults"),
-            makeLine("info", "  /status            Show current config"),
-            makeLine("info", "  /embed             Show embed snippets"),
-            makeLine("info", "  /share             Show share links"),
-            makeLine("info", "  /clear             Clear output"),
+            makeLine("system", text("studio.commands.helpHeading")),
+            makeLine("info", `  /set <cat> <val>   ${text("studio.commands.helpSet")}`),
+            makeLine("info", `  /preset <name>     ${text("studio.commands.helpPreset")}`),
+            makeLine("info", `  /save              ${text("studio.commands.helpSave")}`),
+            makeLine("info", `  /reset             ${text("studio.commands.helpReset")}`),
+            makeLine("info", `  /status            ${text("studio.commands.helpStatus")}`),
+            makeLine("info", `  /embed             ${text("studio.commands.helpEmbed")}`),
+            makeLine("info", `  /share             ${text("studio.commands.helpShare")}`),
+            makeLine("info", `  /clear             ${text("studio.commands.helpClear")}`),
             makeLine("dim", ""),
-            makeLine("dim", "Tip: Click options in Quick Controls to auto-execute commands."),
+            makeLine("dim", text("studio.commands.helpTip")),
           ],
         }),
       },
       {
         name: "/clear",
-        description: "Clear output",
+        description: text("studio.commands.clearDescription"),
         execute: () => ({
           lines: [],
           action: { type: "clear" },
@@ -190,5 +238,5 @@ export function useStudioCommands({
       },
     ];
     return commands;
-  }, [config, handle]);
+  }, [config, handle, saving, t]);
 }
