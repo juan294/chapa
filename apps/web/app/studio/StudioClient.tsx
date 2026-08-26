@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
@@ -42,6 +49,9 @@ type SaveState =
   | { status: "error"; message: string };
 
 type Translate = LanguageContextValue["t"];
+
+const TERMINAL_WELCOME_LINE_ID = "studio-terminal-welcome";
+const TERMINAL_HINT_LINE_ID = "studio-terminal-hint";
 
 function translation(t: Translate, key: string): string {
   return t(key) as string;
@@ -132,11 +142,35 @@ export function StudioClient({
   const configRevisionRef = useRef(0);
   const saveInFlightRef = useRef(false);
 
-  // Terminal state — seed lines use t() so they follow the user's locale
-  const [lines, setLines] = useState<OutputLine[]>([
-    makeLine("system", t('studio.terminalWelcome') as string),
-    makeLine("dim", t('studio.terminalHint') as string),
+  // Terminal state — identify seed lines so their rendered text can follow a
+  // live locale change without replacing command history or re-adding cleared
+  // output.
+  const [lines, setLines] = useState<OutputLine[]>(() => [
+    {
+      id: TERMINAL_WELCOME_LINE_ID,
+      type: "system",
+      text: translation(t, "studio.terminalWelcome"),
+    },
+    {
+      id: TERMINAL_HINT_LINE_ID,
+      type: "dim",
+      text: translation(t, "studio.terminalHint"),
+    },
   ]);
+  const localizedLines = useMemo(() => {
+    return lines.map((line) => {
+      if (line.id === TERMINAL_WELCOME_LINE_ID) {
+        return {
+          ...line,
+          text: translation(t, "studio.terminalWelcome"),
+        };
+      }
+      if (line.id === TERMINAL_HINT_LINE_ID) {
+        return { ...line, text: translation(t, "studio.terminalHint") };
+      }
+      return line;
+    });
+  }, [lines, t]);
   const [history, setHistory] = useState<string[]>([]);
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -423,7 +457,7 @@ export function StudioClient({
         />
 
         {/* Terminal output */}
-        <TerminalOutput lines={lines} />
+        <TerminalOutput lines={localizedLines} />
 
         {/* Terminal input + autocomplete */}
         <div className="relative mt-auto">

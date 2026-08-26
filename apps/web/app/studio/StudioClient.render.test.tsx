@@ -459,25 +459,38 @@ describe("StudioClient render", () => {
       });
 
       const { rerender } = render(
-        <LanguageContext.Provider value={languageValue("en")}>
+        <LanguageContext.Provider value={languageValue("es")}>
           <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />
         </LanguageContext.Provider>,
+      );
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        "Creator Studio — personaliza la vista previa de tu Chapa",
       );
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/set bg aurora" } });
       fireEvent.keyDown(input, { key: "Enter" });
 
       rerender(
-        <LanguageContext.Provider value={languageValue("es")}>
+        <LanguageContext.Provider value={languageValue("en")}>
           <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />
         </LanguageContext.Provider>,
       );
 
+      const output = screen.getByTestId("terminal-output");
       expect(screen.getByTestId("badge-preview").textContent).toContain(
         '"background":"aurora"',
       );
-      expect(screen.getByTestId("terminal-output").textContent).toContain("4 lines");
-      expect(screen.getByText("Cambios de vista previa sin guardar")).toBeDefined();
+      expect(output.textContent).toContain("4 lines");
+      expect(output.textContent).toContain(
+        "Creator Studio — customize your badge preview",
+      );
+      expect(output.textContent).toContain(
+        "Type /help for commands or use Quick Controls.",
+      );
+      expect(output.textContent).not.toContain(
+        "Creator Studio — personaliza la vista previa de tu Chapa",
+      );
+      expect(screen.getByText("Unsaved preview changes")).toBeDefined();
     });
   });
 
