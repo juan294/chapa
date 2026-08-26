@@ -3,10 +3,10 @@
 import type { Platform } from "@chapa/shared";
 import type { PublicVerificationCode } from "@/lib/profile/public-profile";
 import {
-  PLATFORM_LOGOS,
-  PLATFORM_ORDER,
-} from "@/lib/render/BadgeBranding";
-import { CORAL } from "@/lib/render/VerificationStrip";
+  BADGE_PLATFORM_LOGOS,
+  VERIFICATION_CORAL,
+  orderBadgePlatforms,
+} from "@/lib/badge-visual-metadata";
 import { getBaseUrl } from "@/lib/env";
 import { useTranslation } from "@/lib/i18n";
 
@@ -29,9 +29,7 @@ export function PreviewFooter({
   verification,
 }: PreviewFooterProps) {
   const { t } = useTranslation();
-  const platforms = PLATFORM_ORDER.filter((platform) =>
-    linkedPlatforms.includes(platform),
-  );
+  const platforms = orderBadgePlatforms(linkedPlatforms);
   const host = new URL(getBaseUrl()).host;
   const tagline = t("studio.brandingTagline") as string;
   const verificationLabel = t("studio.verificationLabel") as string;
@@ -58,7 +56,7 @@ export function PreviewFooter({
                 role="img"
                 aria-label={PLATFORM_LABELS[platform]}
               >
-                <path d={PLATFORM_LOGOS[platform]} />
+                <path d={BADGE_PLATFORM_LOGOS[platform]} />
               </svg>
             ))}
           </div>
@@ -78,7 +76,10 @@ export function PreviewFooter({
       {verification && (
         <div
           className="mt-3 border-t pt-2 text-center font-heading text-[10px] tracking-[0.12em] opacity-60"
-          style={{ color: CORAL, borderColor: `${CORAL}26` }}
+          style={{
+            color: VERIFICATION_CORAL,
+            borderColor: `${VERIFICATION_CORAL}26`,
+          }}
           aria-label={verificationAccessibleLabel}
         >
           <span>{verificationLabel}</span>
