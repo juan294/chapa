@@ -54,7 +54,10 @@ export async function materializePublicProfile(
 }
 
 export function getPublicProfileVerification(
-  materialized: MaterializedProfile,
+  materialized: Pick<
+    MaterializedProfile,
+    "stats" | "displayImpact" | "statsComplete"
+  >,
 ): PublicVerificationCode | null {
   // #1003 — Never attest a verification record from stats that look
   // incomplete (e.g. served from an old poisoned `stats:stale` entry). This

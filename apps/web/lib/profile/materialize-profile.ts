@@ -27,14 +27,10 @@ export interface MaterializeImpactStateOptions {
   inputsChanged?: boolean;
 }
 
-export interface MaterializedImpactState {
+export interface MaterializedDisplayState {
   craftResult: CraftResult | null;
-  latestSnapshot: SnapshotScoreInput | null;
   rawImpact: ImpactV6Result;
   displayImpact: ImpactV6Result;
-  snapshot: MetricsSnapshot;
-  /** True when scoring inputs have changed since today's snapshot (#826). */
-  inputsChanged: boolean;
   /**
    * #1003 — False when the served stats look like the corrupt "0 merged PRs
    * despite real commit/issue activity" shape (e.g. served from an old
@@ -43,6 +39,13 @@ export interface MaterializedImpactState {
    * is never attested, even though it can still be displayed.
    */
   statsComplete: boolean;
+}
+
+export interface MaterializedImpactState extends MaterializedDisplayState {
+  latestSnapshot: SnapshotScoreInput | null;
+  snapshot: MetricsSnapshot;
+  /** True when scoring inputs have changed since today's snapshot (#826). */
+  inputsChanged: boolean;
 }
 
 /**
@@ -80,6 +83,48 @@ export interface MaterializedProfile extends MaterializedImpactState {
   stats: StatsData;
 }
 
+export interface MaterializedDisplayProfile extends MaterializedDisplayState {
+  stats: StatsData;
+}
+
+interface DisplayInputs {
+  stats: StatsData;
+  craftResult: CraftResult | null;
+}
+
+function materializeDisplayState(
+  stats: StatsData,
+  craftResult: CraftResult | null,
+): MaterializedDisplayState {
+  const rawImpact = computeImpactV6(stats, craftResult?.craftScore);
+  return {
+    craftResult,
+    rawImpact,
+    displayImpact: rawImpact,
+    statsComplete: statsLookComplete(stats),
+  };
+}
+
+async function loadDisplayInputs(
+  handle: string,
+  token: string | undefined,
+  readOnly: boolean | undefined,
+): Promise<DisplayInputs | null> {
+  const [statsSettled, craftSettled] = await Promise.allSettled([
+    getStats(handle, token, { readOnly }),
+    getCachedCraftScore(handle),
+  ]);
+
+  const stats = statsSettled.status === "fulfilled" ? statsSettled.value : null;
+  if (!stats) return null;
+
+  return {
+    stats,
+    craftResult:
+      craftSettled.status === "fulfilled" ? craftSettled.value : null,
+  };
+}
+
 export function materializeImpactState(
   stats: StatsData,
   options: MaterializeImpactStateOptions = {},
@@ -87,7 +132,7 @@ export function materializeImpactState(
   const craftResult = options.craftResult ?? null;
   const latestSnapshot = options.latestSnapshot ?? null;
   const inputsChanged = options.inputsChanged ?? false;
-  const rawImpact = computeImpactV6(stats, craftResult?.craftScore);
+  const displayState = materializeDisplayState(stats, craftResult);
 
   // #1001 — The live headline shown to users (badge, dashboard, verification
   // record, emails) is the FRESH score, always internally consistent with the
@@ -98,23 +143,37 @@ export function materializeImpactState(
   // as the headline next to un-smoothed dimensions, so a real dimension change
   // (e.g. Delivery dropping) showed immediately on the radar while the headline
   // lagged for days — reading as "the number doesn't match the breakdown".
-  const smoothedImpact = applyImpactScorePolicy(rawImpact, latestSnapshot, {
+  const smoothedImpact = applyImpactScorePolicy(displayState.rawImpact, latestSnapshot, {
     policy: options.policy,
     today: options.today,
     inputsChanged,
   });
-  const displayImpact = rawImpact;
 
   return {
-    craftResult,
+    ...displayState,
     latestSnapshot,
-    rawImpact,
-    displayImpact,
     // Persist the smoothed composite so the history sparkline stays smooth and
     // tomorrow's EMA has a stable prior; the headline stays fresh.
     snapshot: buildSnapshot(stats, smoothedImpact, options.today),
     inputsChanged,
-    statsComplete: statsLookComplete(stats),
+  };
+}
+
+/**
+ * Materialize the live profile fields used by owner-only display surfaces.
+ * This deliberately omits snapshot and dirty-marker reads because the fresh
+ * display impact and verification HMAC do not depend on trend state.
+ */
+export async function materializeDisplayProfile(
+  handle: string,
+  options: { token?: string } = {},
+): Promise<MaterializedDisplayProfile | null> {
+  const inputs = await loadDisplayInputs(handle, options.token, false);
+  if (!inputs) return null;
+
+  return {
+    stats: inputs.stats,
+    ...materializeDisplayState(inputs.stats, inputs.craftResult),
   };
 }
 
@@ -127,10 +186,9 @@ export async function materializeProfile(
   // dominates; on cache hit, this saves a round-trip vs the previous serial
   // shape. Cache lookup failures fail open to defaults rather than rejecting
   // the whole profile fetch.
-  const [statsSettled, craftSettled, snapshotSettled, dirtySettled] =
+  const [displayInputsSettled, snapshotSettled, dirtySettled] =
     await Promise.allSettled([
-      getStats(handle, options.token, { readOnly: options.readOnly }),
-      getCachedCraftScore(handle),
+      loadDisplayInputs(handle, options.token, options.readOnly),
       // #930 — Skip snapshot lookup when the caller wants to force-recalculate
       // from scratch. Passing Promise.resolve(null) skips the Redis/Supabase
       // read so the EMA same-day lock never sees a stale today-snapshot.
@@ -138,14 +196,14 @@ export async function materializeProfile(
       isStatsDirty(handle),
     ]);
 
-  const stats = statsSettled.status === "fulfilled" ? statsSettled.value : null;
-  if (!stats) {
+  const displayInputs =
+    displayInputsSettled.status === "fulfilled"
+      ? displayInputsSettled.value
+      : null;
+  if (!displayInputs) {
     return null;
   }
-
-  const craftResult = craftSettled.status === "fulfilled"
-    ? craftSettled.value
-    : null;
+  const { stats, craftResult } = displayInputs;
   const latestSnapshot = options.ignoreSnapshot
     ? null
     : snapshotSettled.status === "fulfilled" ? snapshotSettled.value : null;

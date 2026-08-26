@@ -3,6 +3,7 @@ import type { CraftResult } from "@chapa/shared";
 import { getTier } from "../impact/utils";
 import { makeFullStats, makeSnapshot } from "../test-helpers/fixtures";
 import {
+  materializeDisplayProfile,
   materializeImpactState,
   materializeProfile,
 } from "./materialize-profile";
@@ -252,6 +253,60 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
     const result = materializeImpactState(stats);
 
     expect(result.statsComplete).toBe(true);
+  });
+});
+
+describe("materializeDisplayProfile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("loads a live owner profile without trend-state reads", async () => {
+    const stats = makeFullStats({ handle: "testuser" });
+    const craftResult = makeCraftResult({ craftScore: 88 });
+    mockGetStats.mockResolvedValue(stats);
+    mockGetCachedCraftScore.mockResolvedValue(craftResult);
+
+    const result = await materializeDisplayProfile("testuser", {
+      token: "oauth-token",
+    });
+
+    expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token", {
+      readOnly: false,
+    });
+    expect(mockGetCachedCraftScore).toHaveBeenCalledWith("testuser");
+    expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
+    expect(mockIsStatsDirty).not.toHaveBeenCalled();
+    expect(result?.displayImpact).toBe(result?.rawImpact);
+    expect(result?.displayImpact.dimensions.craft).toBe(88);
+    expect(result?.statsComplete).toBe(true);
+    expect(result).not.toHaveProperty("snapshot");
+    expect(result).not.toHaveProperty("latestSnapshot");
+  });
+
+  it("preserves the completeness gate for poisoned stats", async () => {
+    mockGetStats.mockResolvedValue(
+      makeFullStats({
+        handle: "testuser",
+        prsMergedCount: 0,
+        commitsTotal: 15585,
+        issuesClosedCount: 0,
+      }),
+    );
+    mockGetCachedCraftScore.mockResolvedValue(null);
+
+    const result = await materializeDisplayProfile("testuser");
+
+    expect(result?.statsComplete).toBe(false);
+  });
+
+  it("returns null instead of fabricating stats when the live load fails", async () => {
+    mockGetStats.mockResolvedValue(null);
+    mockGetCachedCraftScore.mockResolvedValue(null);
+
+    const result = await materializeDisplayProfile("testuser");
+
+    expect(result).toBeNull();
   });
 });
 
