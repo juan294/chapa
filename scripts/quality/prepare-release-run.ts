@@ -23,9 +23,11 @@ const IMMUTABLE_REF = /^(?:v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?|[0-9a-f]{40})$
 const DIGEST = /^[0-9a-f]{40}$/;
 const RUN_ID = /^[0-9A-Za-z][0-9A-Za-z._-]*$/;
 
-export function validatePrepareOptions(
-  raw: Record<string, unknown>,
-): string[] {
+type RawPrepareOptions = {
+  [Key in keyof PrepareOptions]?: unknown;
+};
+
+export function validatePrepareOptions(raw: RawPrepareOptions): string[] {
   const errors: string[] = [];
   if (
     typeof raw.baselineTag !== "string" ||
