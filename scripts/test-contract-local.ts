@@ -34,8 +34,10 @@ export function parseSupabaseEnv(stdout: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const line of stdout.split("\n")) {
     const match = line.match(/^([A-Z0-9_]+)="(.*)"$/);
-    if (match) {
-      env[match[1]] = match[2];
+    const key = match?.[1];
+    const value = match?.[2];
+    if (key && value !== undefined) {
+      env[key] = value;
     }
   }
   return env;

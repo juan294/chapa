@@ -17,8 +17,10 @@ export function loadEnvLocal(): void {
     const text = readFileSync(path, "utf8");
     for (const line of text.split("\n")) {
       const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-      if (m && process.env[m[1]] === undefined) {
-        process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      const key = m?.[1];
+      const value = m?.[2];
+      if (key && value !== undefined && process.env[key] === undefined) {
+        process.env[key] = value.replace(/^["']|["']$/g, "");
       }
     }
   } catch {

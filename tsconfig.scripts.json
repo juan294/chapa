@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@chapa/shared": ["./packages/shared/src/index.ts"],
+      "@chapa/shared/*": ["./packages/shared/src/*"],
+      "@/*": ["./apps/web/*"]
+    },
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "node_modules.nosync",
+    ".worktrees",
+    "scripts/**/*.test.ts"
+  ]
+}
