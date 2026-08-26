@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useStudioCommands } from "./useStudioCommands";
+import type { StudioCommandAction } from "./useStudioCommands";
 import type { BadgeConfig } from "@chapa/shared";
 import { createElement, type ComponentType, type ReactNode } from "react";
 import { LanguageProvider } from "@/lib/i18n";
@@ -51,6 +52,24 @@ function findCommand(name: string, commands = getCommands()) {
 }
 
 describe("useStudioCommands (render)", () => {
+  it("narrows set action categories to BadgeConfig keys", () => {
+    type SetCategory = Extract<
+      StudioCommandAction,
+      { type: "set" }
+    >["category"];
+
+    expectTypeOf<SetCategory>().toEqualTypeOf<keyof BadgeConfig>();
+  });
+
+  it("narrows set action values to BadgeConfig values", () => {
+    type SetValue = Extract<
+      StudioCommandAction,
+      { type: "set" }
+    >["value"];
+
+    expectTypeOf<SetValue>().toEqualTypeOf<BadgeConfig[keyof BadgeConfig]>();
+  });
+
   it("returns an array of 9 command definitions", () => {
     const commands = getCommands();
     expect(commands).toHaveLength(9);

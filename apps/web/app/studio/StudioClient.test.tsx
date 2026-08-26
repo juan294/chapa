@@ -53,5 +53,6 @@ describe("StudioClient", () => {
     it("passes previewKey as key to BadgePreviewCard", () => {
       expect(SOURCE).toContain("key={previewKey}");
     });
+
   });
 });
