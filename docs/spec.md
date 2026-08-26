@@ -12,9 +12,9 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
    - Embed code snippets: Markdown + HTML
    - One-click "Share on X" with prefilled copy
 4) Creator Studio `/studio`:
-   - Terminal-first badge customization (9 visual categories)
+   - Terminal-first Studio preview customization (9 visual categories)
    - Live preview updates as settings change
-   - Configuration persisted via Redis
+   - Configuration persisted in Supabase (`studio_configs`, source of truth) with Redis as the hot read path (#935, migration 027)
 5) Public access:
    - Anyone can view `/u/:handle` and `/u/:handle/badge.svg`
 
@@ -33,7 +33,7 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
 - POST `/api/supplemental`
   - Upload EMU supplemental stats (CLI tool)
 - GET|PUT `/api/studio/config`
-  - Load/save Creator Studio badge customization (GET to load, PUT to save)
+  - Load/save Creator Studio preview configuration (GET to load, PUT to save)
 - GET `/api/history/:handle`
   - Score history, trend analysis, and snapshot diffs (public, rate-limited)
 - GET `/api/profile/:handle`

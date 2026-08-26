@@ -14,5 +14,17 @@ Docs-only; no code. Fixes research §5.6.
 4. Sweep: `grep -rn "persisted via Redis\|Redis (TTL" docs/` for any other
    stale persistence claims; fix in the same commit.
 
+AMENDMENT (2026-08-26, found during /implement): `docs/user-manual.md:326`
+falsely claims "Your badge at `/u/<handle>/badge.svg` will reflect the saved
+settings" — the config→SVG pipeline never existed (research §4). Approved
+replacement:
+> Persists your badge configuration server-side. The saved configuration is
+> restored when you return to Creator Studio; it does not change the public
+> SVG badge.
+5. Extend the sweep to rendering claims too: `grep -rni "reflect the saved\|
+   applies to your badge\|custom badge" docs/ README.md` — correct any other
+   statement implying saved Studio config changes the public badge or share
+   page.
+
 No emojis (standing rule). Success criteria: `pnpm run lint` (docs lint if
 configured) and a clean `git diff` review — no automated behavior to test.

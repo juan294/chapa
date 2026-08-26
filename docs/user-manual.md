@@ -1,6 +1,6 @@
 # Chapa User Manual
 
-> Terminal-first developer badge customization tool.
+> Terminal-first Studio preview customization tool.
 > Everything is a slash command. Mouse works too.
 
 ---
@@ -13,7 +13,7 @@ Most pages have a terminal input bar at the bottom. Type `/` to see available co
 
 There are three terminal contexts:
 1. **Landing page** (`chapa >`) — navigation commands
-2. **Creator Studio** (`studio >`) — badge customization commands
+2. **Creator Studio** (`studio >`) — Studio preview customization commands
 3. **Global command bar** — appears on share pages, about, terms, etc. — navigation + admin commands
 
 ---
@@ -24,7 +24,7 @@ The landing page terminal (`chapa >`) handles navigation only.
 
 | Command | What it does |
 |---------|-------------|
-| `/studio` | Open the Creator Studio |
+| `/studio` | Open the Creator Studio when `studio_enabled` is enabled (disabled by default) |
 | `/login` | Sign in with GitHub |
 | `/badge <handle>` | View someone's badge share page |
 | `/b <handle>` | Shortcut for `/badge` |
@@ -42,6 +42,8 @@ chapa > /b juan294
 
 ## Creator Studio
 
+> **Availability:** Creator Studio is gated by the `studio_enabled` feature flag, which is disabled by default.
+
 After logging in, navigate to `/studio`. The layout is two-column:
 
 - **Left:** Live badge preview (updates instantly as you change settings)
@@ -54,7 +56,7 @@ The Studio terminal prompt is `studio >`.
 | Command | What it does |
 |---------|-------------|
 | `/help` | List all studio commands |
-| `/set <category> <value>` | Change a badge effect |
+| `/set <category> <value>` | Change a Studio preview effect |
 | `/preset <name>` | Apply a full preset |
 | `/save` | Save your configuration |
 | `/reset` | Reset everything to defaults |
@@ -322,7 +324,7 @@ studio > /preset maximum
 studio > /save
 ```
 
-Persists your badge configuration server-side. Your badge at `/u/<handle>/badge.svg` will reflect the saved settings.
+Persists your badge configuration server-side. The saved configuration is restored when you return to Creator Studio; it does not change the public SVG badge.
 
 ### Check Current Settings
 
@@ -414,7 +416,7 @@ On pages that don't have a dedicated terminal (share pages, about, terms, privac
 |---------|-------------|
 | `/help` | List available commands |
 | `/home` | Go to the landing page |
-| `/studio` | Open the Creator Studio (if enabled) |
+| `/studio` | Open the Creator Studio when `studio_enabled` is enabled (disabled by default) |
 | `/login` | Sign in with GitHub |
 | `/badge <handle>` | View someone's badge share page |
 | `/b <handle>` | Shortcut for `/badge` |

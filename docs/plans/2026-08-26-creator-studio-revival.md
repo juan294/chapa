@@ -33,7 +33,7 @@ in `/embed` & `/share`; stale docs.
 - [x] Phase 1 — Config persistence hardening
 - [x] Phase 2 — Command-layer cleanup
 - [x] Phase 3 — Preview parity
-- [ ] Phase 4 — Documentation refresh
+- [x] Phase 4 — Documentation refresh
 - [ ] Phase 5 — Production flag flip
 
 Phases 2 and 4 have no file overlap with anything → `/batch` can run them in
