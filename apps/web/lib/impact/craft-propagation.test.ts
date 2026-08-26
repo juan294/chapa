@@ -28,26 +28,18 @@ import path from "node:path";
 // Each entry MUST be a relative path from the repo root (with forward slashes
 // on all OSes) AND must come with a justification in the trailing comment.
 //
-// REVIEW: as of #680 these two call sites compute impact without craft, even
-// though the user may have insights. They are documented here so the test does
-// not regress further; whether they should pass craft is being tracked
-// separately. Both are non-user-visible / non-persistent paths:
+// REVIEW: as of #680 this call site computes impact without craft, even though
+// the user may have insights. It is documented here so the test does not
+// regress further; whether it should pass craft is being tracked separately.
+// It is a non-user-visible / non-persistent path:
 //   - /api/generate: warms the badge cache and discards the result; the badge
 //     route itself reads craft from cache via materializeProfile.
-//   - /studio/page.tsx: renders a customization preview for the badge owner
-//     based on their own GitHub stats. Insights come through the cached path
-//     once the user visits /u/<handle>.
 //
 const CRAFT_OPTOUTS: ReadonlyArray<{ file: string; reason: string }> = [
   {
     file: "apps/web/app/api/generate/route.ts",
     reason:
       "Cache warm only: result is discarded; user-visible badge reads craft via materializeProfile.",
-  },
-  {
-    file: "apps/web/app/studio/page.tsx",
-    reason:
-      "Studio preview computes a same-day display from primary stats; share page is the source of truth.",
   },
 ];
 

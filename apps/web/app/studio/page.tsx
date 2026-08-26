@@ -3,52 +3,16 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
-import { computeImpactV6 } from "@/lib/impact/v6";
-import {
-  getPublicProfileVerification,
-  materializePublicProfile,
-} from "@/lib/profile/public-profile";
+import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
+import { getPublicProfileVerification } from "@/lib/profile/public-profile";
 import { loadStudioConfig } from "@/lib/db/studio";
 import { Navbar } from "@/components/Navbar";
-import { toDateString } from "@/lib/utils/date";
 import { StudioClient } from "./StudioClient";
-import type { BadgeConfig, StatsData } from "@chapa/shared";
+import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
-
-function buildEmptyStats(session: {
-  login: string;
-  name: string | null;
-  avatar_url: string;
-}): StatsData {
-  const now = Date.now();
-  return {
-    handle: session.login,
-    displayName: session.name ?? undefined,
-    avatarUrl: session.avatar_url,
-    commitsTotal: 0,
-    activeDays: 0,
-    prsMergedCount: 0,
-    prsMergedWeight: 0,
-    reviewsSubmittedCount: 0,
-    issuesClosedCount: 0,
-    linesAdded: 0,
-    linesDeleted: 0,
-    reposContributed: 0,
-    topRepoShare: 0,
-    maxCommitsIn10Min: 0,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
-    heatmapData: Array.from({ length: 366 }, (_, i) => ({
-      date: toDateString(new Date(now - (365 - i) * 86400000)),
-      count: 0,
-    })),
-    fetchedAt: new Date(now).toISOString(),
-  };
-}
 
 export const dynamic = "force-dynamic";
 
@@ -80,19 +44,17 @@ export default async function StudioPage() {
     redirect("/api/auth/login");
   }
 
-  // Fetch data in parallel: read-only public profile + saved config
+  // Fetch the live owner display projection and saved config in parallel.
   const [materialized, savedConfig] = await Promise.all([
-    materializePublicProfile(session.login, { token, readOnly: true }),
+    materializeDisplayProfile(session.login, { token }),
     loadStudioConfig(session.login) as Promise<BadgeConfig | null>,
   ]);
 
-  // Compute fallback impact only when profile materialization failed.
-  const effectiveStats: StatsData = materialized?.stats ?? buildEmptyStats(session);
+  if (!materialized) {
+    throw new Error(`Unable to load Studio profile for ${session.login}`);
+  }
 
-  const impact = materialized?.displayImpact ?? computeImpactV6(effectiveStats);
-  const verification = materialized
-    ? getPublicProfileVerification(materialized)
-    : null;
+  const verification = getPublicProfileVerification(materialized);
   const initialConfig = savedConfig ?? DEFAULT_BADGE_CONFIG;
 
   const locale = await getServerLocale();
@@ -111,8 +73,8 @@ export default async function StudioPage() {
         <KeyboardShortcutsListener />
         <StudioClient
           initialConfig={initialConfig}
-          stats={effectiveStats}
-          impact={impact}
+          stats={materialized.stats}
+          impact={materialized.displayImpact}
           handle={session.login}
           verification={verification}
         />
