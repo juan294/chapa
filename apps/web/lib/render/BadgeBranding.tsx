@@ -7,7 +7,7 @@ import {
 /**
  * Render the badge footer branding strip as SVG markup.
  *
- * Produces a pill containing platform logos (GitHub, GitLab, Bitbucket, Codeberg)
+ * Produces a pill containing platform logos (GitHub, Bitbucket, Codeberg, GitLab)
  * in canonical order, followed by the tagline and the chapa domain name.
  * Personal badges show only connected platforms; demo badges show all four.
  *

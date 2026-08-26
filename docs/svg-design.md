@@ -88,6 +88,8 @@
 - Branding isolated in `apps/web/lib/render/BadgeBranding.tsx`
 - Shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg, GitLab)
 - If disabled, layout should still look balanced (no big empty gap).
+- Platform logo paths, canonical platform ordering, and the coral verification color are owned by the client-safe `apps/web/lib/badge-visual-metadata.ts` module. The server SVG renderer and Creator Studio preview both consume this metadata so the two surfaces stay in parity without a client import from server render modules.
+- Creator Studio renders the same platform order and verification color through `apps/web/app/studio/PreviewFooter.tsx`. This is visual parity only: saving a Studio configuration does not alter the public SVG badge.
 
 ## Theme tokens (Warm Amber)
 

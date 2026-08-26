@@ -685,7 +685,7 @@ The implemented JSON manifest contains:
 {
   "schemaVersion": 1,
   "release": {
-    "baselineTag": "v2.22.0",
+    "baselineTag": "v2.22.1",
     "developCommit": "immutable commit SHA",
     "candidateTreeDigest": "Git tree digest",
     "previewUrl": "exact candidate preview URL",

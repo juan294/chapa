@@ -150,6 +150,8 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Demo badges show all 4 platform logos (GitHub, Bitbucket, Codeberg, GitLab)
 - Branding is behind a flag: `includeBranding`
 - Branding is isolated in `apps/web/lib/render/BadgeBranding.tsx`
+- Client-safe visual metadata lives in `apps/web/lib/badge-visual-metadata.ts`: platform logo paths, canonical platform order, and the verification coral token. Both the server SVG renderer and Studio preview consume it.
+- Creator Studio composes `BadgeContent` with `apps/web/app/studio/PreviewFooter.tsx` for platform, host, and optional verification parity. Studio config persistence does not change the public SVG badge or share page.
 - Avatar placeholder (when no user photo) shows the Chapa shield icon
 
 ## Caching rules
@@ -208,6 +210,8 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Score challenge: `apps/web/lib/challenge/*` — validation for `/api/challenge` score dispute submissions
 - Crypto helpers: `apps/web/lib/crypto/*` — constant-time comparison (`safe-equal.ts`) for HMAC/token verification
 - Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (interactions, borders, cards, celebrations, backgrounds, counters, heatmap animations, tier visuals) behind Creator Studio's 9 customization categories
+- Creator Studio UI: `apps/web/app/studio/*` — authenticated owner preview, controls, save state, command actions, and preview footer composition
+- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — validated Redis hot path with durable Supabase fallback; Supabase commits before Redis is refreshed
 - HTTP utilities: `apps/web/lib/http/*` — client IP extraction (`client-ip.ts`) for rate limiting
 - Keyboard shortcuts: `apps/web/lib/keyboard/*` — shortcut registry and React hook for the terminal/command-bar UI
 - Monitoring: `apps/web/lib/monitoring/*` — badge latency SLO budgets and measurement (`latency-slo.ts`) backing `/api/cron/latency-check`

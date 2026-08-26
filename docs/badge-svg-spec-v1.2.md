@@ -939,7 +939,7 @@ Uses SMIL `<animate>` elements (not CSS):
 | Avatar image vs Chapa shield fallback | `avatarDataUri` provided or not |
 | Display name vs `@handle` | `stats.displayName` truthy or not |
 | Badge branding (footer) | `includeBranding` option (default `true`) |
-| Platform logos in footer | `stats.linkedPlatforms` + `demoMode` (demo shows all 3) |
+| Platform logos in footer | `stats.linkedPlatforms` + `demoMode` (demo shows all 4) |
 | Verification strip | Both `verificationHash` and `verificationDate` provided |
 
 ---
@@ -969,6 +969,7 @@ Source files (in `apps/web/lib/render/`):
 | `heatmap.ts` | 13×7 heatmap grid cells + animation |
 | `theme.ts` | Color palette, tier colors, archetype colors, heatmap color mapping |
 | `BadgeBranding.tsx` | Footer branding: "Forged from purpose. Driven by curiosity." + dynamic platform logos |
+| `../badge-visual-metadata.ts` | Client-safe source for platform logo paths, canonical platform order, and verification coral |
 | `VerificationStrip.ts` | Right-edge verification seal |
 | `avatar.ts` | Avatar URL → base64 data URI conversion |
 | `escape.ts` | XML entity escaping for user-controlled text |

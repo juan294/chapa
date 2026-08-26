@@ -158,5 +158,6 @@ Rate-limited to 30 requests per IP per 60 seconds. CORS-open so third-party site
 | `lib/verification/store.ts` | Redis read/write for verification records |
 | `lib/verification/types.ts` | `VerificationRecord` interface |
 | `lib/render/VerificationStrip.ts` | SVG markup for the coral verification strip |
+| `lib/badge-visual-metadata.ts` | Shared `VERIFICATION_CORAL` token used by the SVG strip and Studio preview footer |
 | `app/api/verify/[hash]/route.ts` | Public verification API endpoint |
 | `app/u/[handle]/badge.svg/route.ts` | Badge route (generates hash + stores record) |

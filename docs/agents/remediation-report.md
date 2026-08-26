@@ -13,7 +13,7 @@
 - Halted (recommendation unsafe, needs human re-scope): 0
 - Tests added: 63 test cases (52 net after replacing obsolete cases)
 - Files modified: 58, including this report
-- CI status: PASSING for every exact candidate merged through PR #1159; PR #1160 is the final Wave 2 merge unit and carries this report
+- CI status: PASSING for the final merged candidate `e3a384efc8e37da2367aee2b0d0bb5f67afaf0bc`; CI, Coverage, Bundle Size Analysis, Security Scan, Secret Scanning, and Dead Code Detection all completed successfully
 
 ## Wave 1: Before launch (must-fix)
 
@@ -29,7 +29,7 @@
 | 8 | UX-H2 | Both primary control modes have broken assistive-state semantics | high | 21 shared in work unit | [#1156](https://github.com/juan294/chapa/pull/1156) | Merged |
 | 9 | UX-M1 | The new preview footer can overflow narrow mobile cards | medium | 21 shared in work unit | [#1156](https://github.com/juan294/chapa/pull/1156) | Merged |
 | 10 | AR-H1 | Root operational scripts remain outside static quality gates | high | N/A, quality-gate configuration | [#1157](https://github.com/juan294/chapa/pull/1157) | Merged |
-| 11 | DO-M1 | An ancestry-based baseline lookup selects v2.22.0 instead of production v2.22.1 | medium | 2 | [#1158](https://github.com/juan294/chapa/pull/1158) | Final Wave 1 merge unit |
+| 11 | DO-M1 | An ancestry-based baseline lookup selects v2.22.0 instead of production v2.22.1 | medium | 2 | [#1158](https://github.com/juan294/chapa/pull/1158) | Merged |
 
 ## Wave 2: After launch
 
@@ -37,7 +37,7 @@
 |---|------------|-------|----------|-------------|----|--------|
 | 1 | PE-M3 | Every configuration change remounts the complete preview | medium | 4 shared in work unit | [#1159](https://github.com/juan294/chapa/pull/1159) | Merged |
 | 2 | AR-L1 | Studio command metadata remains stringly typed across the action boundary | low | 4 shared in work unit | [#1159](https://github.com/juan294/chapa/pull/1159) | Merged |
-| 3 | AR-L2 | Client preview imports metadata from server SVG implementation modules | low | 6 | [#1160](https://github.com/juan294/chapa/pull/1160) | Final Wave 2 merge unit |
+| 3 | AR-L2 | Client preview imports metadata from server SVG implementation modules | low | 6 | [#1160](https://github.com/juan294/chapa/pull/1160) | Merged |
 
 ## Wave 3: Later / strategic (filed, not fixed)
 
@@ -47,12 +47,13 @@
 
 ## Final Verification
 
-- [x] Wave 1 implementation merged through PR #1157; PR #1158 is the final merge unit
-- [x] Wave 2 implementation completed through PRs #1159 and #1160
+- [x] Wave 1 implementation merged through PR #1158
+- [x] Wave 2 implementation merged through PRs #1159 and #1160
 - [x] Wave 3 issue filed in the backlog
 - [x] `/simplify` final reuse, quality, and efficiency passes complete for Wave 2
 - [x] Wave 2 local test, typecheck, lint, and production-build gates pass
-- [x] Wave 2 cleanup scheduled immediately after final merged-commit verification
+- [x] Final merged commit `e3a384efc8e37da2367aee2b0d0bb5f67afaf0bc` verified with all six GitHub Actions workflows passing
+- [x] Wave 2 task worktrees and merged branches cleaned up after verification
 
 ## Deferred Items
 

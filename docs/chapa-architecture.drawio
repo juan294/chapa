@@ -74,8 +74,8 @@
     <mxCell id="pubep" value="Public Endpoints&#10;/api/profile · /api/history&#10;/api/version · /u/:handle/badge.svg" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="api">
       <mxGeometry x="210" y="35" width="180" height="52" as="geometry"/>
     </mxCell>
-    <mxCell id="privep" value="Authenticated Endpoints&#10;/api/refresh, /api/generate, /api/supplemental" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
-      <mxGeometry x="420" y="35" width="200" height="45" as="geometry"/>
+    <mxCell id="privep" value="Authenticated Endpoints&#10;/api/refresh · /api/generate&#10;/api/supplemental · /api/studio/config" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="api">
+      <mxGeometry x="420" y="35" width="200" height="52" as="geometry"/>
     </mxCell>
     <mxCell id="adminep" value="Admin Endpoints&#10;/api/admin/*" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="api">
       <mxGeometry x="650" y="35" width="200" height="45" as="geometry"/>
