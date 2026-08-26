@@ -57,6 +57,13 @@ describe("resolveCategory", () => {
     expect(resolveCategory("unknown")).toBeNull();
     expect(resolveCategory("foo")).toBeNull();
   });
+
+  it.each(["constructor", "toString"])(
+    "rejects inherited object key %s",
+    (input) => {
+      expect(resolveCategory(input)).toBeNull();
+    },
+  );
 });
 
 describe("CATEGORY_KEY_TO_ALIAS", () => {

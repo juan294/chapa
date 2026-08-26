@@ -1,12 +1,13 @@
 /**
  * Supabase data access — studio_configs table.
  *
- * Durable persistence for Creator Studio badge customization configs.
+ * Durable persistence for Creator Studio preview configurations.
  * Redis remains the hot read path with a 365-day TTL; this table is the
  * source of truth so Redis eviction doesn't permanently destroy a user's
- * badge customization. See issue #935.
+ * saved Studio preview configuration. See issue #935.
  *
- * All operations fail-open (return sensible defaults when DB is unavailable).
+ * Read operations fail open when the database is unavailable. Upserts return
+ * typed failure results so callers can handle each failure explicitly.
  */
 
 import { getSupabase } from "./supabase";

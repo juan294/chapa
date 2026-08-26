@@ -67,8 +67,10 @@ export const CATEGORY_KEY_TO_ALIAS: Record<string, string> = Object.fromEntries(
 
 /** Resolve a short alias or full key to the config key */
 export function resolveCategory(input: string): string | null {
-  if (CATEGORY_ALIASES[input]) return CATEGORY_ALIASES[input];
-  if (CATEGORY_KEY_TO_ALIAS[input]) return input;
+  if (Object.hasOwn(CATEGORY_ALIASES, input)) {
+    return CATEGORY_ALIASES[input] ?? null;
+  }
+  if (Object.hasOwn(CATEGORY_KEY_TO_ALIAS, input)) return input;
   return null;
 }
 
