@@ -11,6 +11,17 @@
 
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
+import { cacheGet, cacheSet } from "../cache/redis";
+
+export const STUDIO_CONFIG_TTL = 31536000;
+
+export type StudioConfigUpsertResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "unavailable" | "constraint" | "error";
+      code?: string;
+    };
 
 interface StudioConfigRow {
   handle: string;
@@ -27,14 +38,15 @@ const REQUIRED_KEYS: readonly (keyof StudioConfigRow & string)[] = [
 /**
  * Upsert a studio config for a handle. One row per handle — the latest save
  * replaces any prior one.
- * Returns true on success, false when DB is unavailable or on error.
+ * Returns a typed result so the API can distinguish retryable storage outages,
+ * invalid persisted values, and unexpected failures.
  */
 export async function dbUpsertStudioConfig(
   handle: string,
   config: unknown,
-): Promise<boolean> {
+): Promise<StudioConfigUpsertResult> {
   const db = getSupabase();
-  if (!db) return false;
+  if (!db) return { ok: false, reason: "unavailable" };
 
   try {
     const { error } = await db
@@ -49,10 +61,40 @@ export async function dbUpsertStudioConfig(
       );
 
     if (error) throw error;
-    return true;
+    return { ok: true };
   } catch (error) {
-    console.error("[db] dbUpsertStudioConfig failed:", (error as Error).message);
-    return false;
+    const code =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code
+        : undefined;
+
+    if (code === "23505") return { ok: true };
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" &&
+            error !== null &&
+            "message" in error &&
+            typeof error.message === "string"
+          ? error.message
+          : String(error);
+
+    console.error(
+      "[db] dbUpsertStudioConfig failed:",
+      message,
+    );
+
+    if (code === "23502" || code === "22P02" || code === "22003") {
+      return { ok: false, reason: "constraint", code };
+    }
+
+    return code
+      ? { ok: false, reason: "error", code }
+      : { ok: false, reason: "error" };
   }
 }
 
@@ -80,4 +122,23 @@ export async function dbGetStudioConfig(handle: string): Promise<unknown | null>
     console.error("[db] dbGetStudioConfig failed:", (error as Error).message);
     return null;
   }
+}
+
+/** Load a studio config from Redis, falling back to its durable Supabase row. */
+export async function loadStudioConfig(login: string): Promise<unknown | null> {
+  const cacheKey = `config:${login}`;
+  const cached = await cacheGet<unknown>(cacheKey);
+  if (cached !== null) return cached;
+
+  const dbConfig = await dbGetStudioConfig(login);
+  if (dbConfig === null) return null;
+
+  void cacheSet(cacheKey, dbConfig, STUDIO_CONFIG_TTL).catch((error: unknown) => {
+    console.warn(
+      "[studio/config] Redis rehydration failed (best-effort):",
+      error instanceof Error ? error.message : String(error),
+    );
+  });
+
+  return dbConfig;
 }

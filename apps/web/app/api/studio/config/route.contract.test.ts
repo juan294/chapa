@@ -2,9 +2,12 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { describe, expect, it, vi } from "vitest";
 import { declareField, generatePayloads, runMatrix } from "@/test/contract/payload-matrix";
 import { bodyAsRecord, invokeJson } from "@/test/contract/invoke";
+import type { StudioConfigUpsertResult } from "@/lib/db/studio";
 
 const { mockDbUpsertStudioConfig, mockRequireRequestSession } = vi.hoisted(() => ({
-  mockDbUpsertStudioConfig: vi.fn(async () => true),
+  mockDbUpsertStudioConfig: vi.fn(
+    async (): Promise<StudioConfigUpsertResult> => ({ ok: true }),
+  ),
   mockRequireRequestSession: vi.fn(() => ({
     session: { login: "octocat", name: "Octocat", avatar_url: "" },
     error: null,
@@ -22,8 +25,9 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("@/lib/db/studio", () => ({
-  dbGetStudioConfig: vi.fn(async () => null),
+  STUDIO_CONFIG_TTL: 31536000,
   dbUpsertStudioConfig: mockDbUpsertStudioConfig,
+  loadStudioConfig: vi.fn(async () => null),
 }));
 
 import { PUT } from "./route";
@@ -117,7 +121,10 @@ describe("PUT /api/studio/config contract", () => {
   });
 
   it("fails closed when the durable config write fails", async () => {
-    mockDbUpsertStudioConfig.mockResolvedValueOnce(false);
+    mockDbUpsertStudioConfig.mockResolvedValueOnce({
+      ok: false,
+      reason: "error",
+    });
 
     const response = await invokeJson(PUT, {
       method: "PUT",

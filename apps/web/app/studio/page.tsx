@@ -5,7 +5,7 @@ import { isStudioEnabled } from "@/lib/feature-flags";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
-import { cacheGet } from "@/lib/cache/redis";
+import { loadStudioConfig } from "@/lib/db/studio";
 import { Navbar } from "@/components/Navbar";
 import { toDateString } from "@/lib/utils/date";
 import { StudioClient } from "./StudioClient";
@@ -80,7 +80,7 @@ export default async function StudioPage() {
   // Fetch data in parallel: stats + saved config
   const [stats, savedConfig] = await Promise.all([
     getStats(session.login, token),
-    cacheGet<BadgeConfig>(`config:${session.login}`),
+    loadStudioConfig(session.login) as Promise<BadgeConfig | null>,
   ]);
 
   // Compute impact (fallback to empty stats if fetch failed)

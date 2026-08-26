@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   getOptionalServerSessionFromHeaders: vi.fn(),
   getSessionGitHubToken: vi.fn(),
   getStats: vi.fn(),
-  cacheGet: vi.fn(),
+  loadStudioConfig: vi.fn(),
   computeImpactV6: vi.fn(),
   getServerLocale: vi.fn(),
   getServerT: vi.fn(),
@@ -42,8 +42,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats: mocks.getStats,
 }));
 
-vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mocks.cacheGet,
+vi.mock("@/lib/db/studio", () => ({
+  loadStudioConfig: mocks.loadStudioConfig,
 }));
 
 vi.mock("@/lib/impact/v6", () => ({
@@ -122,7 +122,7 @@ beforeEach(() => {
   mocks.getOptionalServerSessionFromHeaders.mockReturnValue(session);
   mocks.getSessionGitHubToken.mockResolvedValue("gho_token");
   mocks.getStats.mockResolvedValue(stats);
-  mocks.cacheGet.mockResolvedValue({ theme: "saved-theme" });
+  mocks.loadStudioConfig.mockResolvedValue({ theme: "saved-theme" });
   mocks.computeImpactV6.mockReturnValue({ compositeScore: 80 });
   mocks.getServerLocale.mockResolvedValue("en");
   mocks.getServerT.mockReturnValue(
@@ -172,11 +172,12 @@ describe("StudioPage render", () => {
     expect(client.getAttribute("data-commits")).toBe("42");
     expect(client.getAttribute("data-config-theme")).toBe("saved-theme");
     expect(mocks.computeImpactV6).toHaveBeenCalledWith(stats);
+    expect(mocks.loadStudioConfig).toHaveBeenCalledWith("octocat");
   });
 
   it("falls back to empty stats and the default config", async () => {
     mocks.getStats.mockResolvedValue(null);
-    mocks.cacheGet.mockResolvedValue(null);
+    mocks.loadStudioConfig.mockResolvedValue(null);
     const { default: StudioPage } = await import("./page");
 
     render(await StudioPage());

@@ -4,14 +4,16 @@ import {
   getSessionSecret,
   requireRequestSession,
 } from "@/lib/auth/session";
-import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheSet, rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
-import { dbGetStudioConfig, dbUpsertStudioConfig } from "@/lib/db/studio";
+import {
+  STUDIO_CONFIG_TTL,
+  dbUpsertStudioConfig,
+  loadStudioConfig,
+} from "@/lib/db/studio";
 import type { BadgeConfig } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
-
-const CONFIG_TTL = 31536000; // 365 days
 
 /**
  * GET /api/studio/config — Load the authenticated user's badge config.
@@ -35,23 +37,8 @@ export const GET = withErrorCapture("/api/studio/config", async (request: NextRe
     );
   }
 
-  const cacheKey = `config:${session.login}`;
-
-  const cached = await cacheGet<BadgeConfig>(cacheKey);
-  if (cached !== null) {
-    return NextResponse.json({ config: cached });
-  }
-
-  // Redis miss — fall back to Supabase and rehydrate Redis (best-effort)
-  const dbConfig = await dbGetStudioConfig(session.login);
-  if (dbConfig !== null) {
-    cacheSet(cacheKey, dbConfig as BadgeConfig, CONFIG_TTL).catch((err: unknown) => {
-      console.warn("[studio/config] Redis rehydration failed (best-effort):", (err as Error).message);
-    });
-    return NextResponse.json({ config: dbConfig });
-  }
-
-  return NextResponse.json({ config: null });
+  const config = await loadStudioConfig(session.login);
+  return NextResponse.json({ config });
 });
 
 /**
@@ -93,14 +80,33 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
 
   // Write to Supabase (durable) AND Redis (hot read path).
   // Supabase is the success criterion — Redis is best-effort.
-  const [, dbOk] = await Promise.all([
-    cacheSet(cacheKey, body as BadgeConfig, CONFIG_TTL).catch((err: unknown) => {
-      console.warn("[studio/config] Redis write failed (best-effort):", (err as Error).message);
-    }),
+  const [, dbResult] = await Promise.all([
+    cacheSet(cacheKey, body as BadgeConfig, STUDIO_CONFIG_TTL).catch(
+      (err: unknown) => {
+        console.warn(
+          "[studio/config] Redis write failed (best-effort):",
+          (err as Error).message,
+        );
+      },
+    ),
     dbUpsertStudioConfig(session.login, body),
   ]);
 
-  if (!dbOk) {
+  if (!dbResult.ok && dbResult.reason === "constraint") {
+    return NextResponse.json(
+      { success: false, error: "Invalid badge config" },
+      { status: 400 },
+    );
+  }
+
+  if (!dbResult.ok && dbResult.reason === "unavailable") {
+    return NextResponse.json(
+      { success: false, error: "Storage temporarily unavailable" },
+      { status: 503, headers: { "Retry-After": "30" } },
+    );
+  }
+
+  if (!dbResult.ok) {
     return NextResponse.json(
       { success: false, error: "Failed to persist studio config" },
       { status: 500 },
