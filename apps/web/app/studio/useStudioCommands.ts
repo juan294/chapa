@@ -3,10 +3,12 @@ import type { BadgeConfig } from "@chapa/shared";
 import { STUDIO_CATEGORIES, getOptionLabel } from "./studio-options";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import {
+  CATEGORY_KEY_TO_ALIAS,
   makeLine,
   resolveCategory,
   type CommandDef,
 } from "@/components/terminal/command-registry";
+import { getBaseUrl } from "@/lib/env";
 
 interface UseStudioCommandsOptions {
   config: BadgeConfig;
@@ -18,6 +20,9 @@ export function useStudioCommands({
   handle,
 }: UseStudioCommandsOptions): CommandDef[] {
   return useMemo(() => {
+    const base = getBaseUrl();
+    const profileUrl = `${base}/u/${handle}`;
+    const badgeUrl = `${profileUrl}/badge.svg`;
     const commands: CommandDef[] = [
       {
         name: "/set",
@@ -26,17 +31,7 @@ export function useStudioCommands({
         execute: (args) => {
           if (args.length < 2) {
             const categoryList = STUDIO_CATEGORIES.map((c) => {
-              const alias = Object.entries({
-                bg: "background",
-                card: "cardStyle",
-                border: "border",
-                score: "scoreEffect",
-                heatmap: "heatmapAnimation",
-                interact: "interaction",
-                stats: "statsDisplay",
-                tier: "tierTreatment",
-                celebrate: "celebration",
-              }).find(([, v]) => v === c.key)?.[0] ?? c.key;
+              const alias = CATEGORY_KEY_TO_ALIAS[c.key] ?? c.key;
               return `  ${alias.padEnd(12)} ${c.options.map((o) => o.value).join(", ")}`;
             });
             return {
@@ -148,10 +143,10 @@ export function useStudioCommands({
             makeLine("system", "Embed your badge:"),
             makeLine("dim", ""),
             makeLine("info", "Markdown:"),
-            makeLine("success", `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`),
+            makeLine("success", `![Chapa Badge](${badgeUrl})`),
             makeLine("dim", ""),
             makeLine("info", "HTML:"),
-            makeLine("success", `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge" width="600" height="315" />`),
+            makeLine("success", `<img src="${badgeUrl}" alt="Chapa Badge" width="600" height="315" />`),
           ],
         }),
       },
@@ -161,8 +156,8 @@ export function useStudioCommands({
         execute: () => ({
           lines: [
             makeLine("system", "Share your badge:"),
-            makeLine("info", `Direct link: https://chapa.thecreativetoken.com/u/${handle}`),
-            makeLine("info", `Badge SVG:   https://chapa.thecreativetoken.com/u/${handle}/badge.svg`),
+            makeLine("info", `Direct link: ${profileUrl}`),
+            makeLine("info", `Badge SVG:   ${badgeUrl}`),
           ],
         }),
       },

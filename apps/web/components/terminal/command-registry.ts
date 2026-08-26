@@ -49,7 +49,7 @@ export function makeLine(
 }
 
 /** Category short aliases for /set */
-const CATEGORY_ALIASES: Record<string, string> = {
+export const CATEGORY_ALIASES: Record<string, string> = {
   bg: "background",
   card: "cardStyle",
   border: "border",
@@ -61,10 +61,14 @@ const CATEGORY_ALIASES: Record<string, string> = {
   celebrate: "celebration",
 };
 
+export const CATEGORY_KEY_TO_ALIAS: Record<string, string> = Object.fromEntries(
+  Object.entries(CATEGORY_ALIASES).map(([alias, key]) => [key, alias]),
+);
+
 /** Resolve a short alias or full key to the config key */
 export function resolveCategory(input: string): string | null {
   if (CATEGORY_ALIASES[input]) return CATEGORY_ALIASES[input];
-  if (Object.values(CATEGORY_ALIASES).includes(input)) return input;
+  if (CATEGORY_KEY_TO_ALIAS[input]) return input;
   return null;
 }
 

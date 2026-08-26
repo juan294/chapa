@@ -31,7 +31,7 @@ in `/embed` & `/share`; stale docs.
 ## Implementation status
 
 - [x] Phase 1 — Config persistence hardening
-- [ ] Phase 2 — Command-layer cleanup
+- [x] Phase 2 — Command-layer cleanup
 - [ ] Phase 3 — Preview parity
 - [ ] Phase 4 — Documentation refresh
 - [ ] Phase 5 — Production flag flip

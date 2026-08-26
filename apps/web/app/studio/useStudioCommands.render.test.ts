@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useStudioCommands } from "./useStudioCommands";
 import type { BadgeConfig } from "@chapa/shared";
@@ -7,6 +7,10 @@ import type { BadgeConfig } from "@chapa/shared";
 vi.mock("../../lib/feature-flags", () => ({
   isStudioEnabledSync: () => true,
 }));
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const DEFAULT_CONFIG: BadgeConfig = {
   background: "solid",
@@ -165,6 +169,22 @@ describe("useStudioCommands (render)", () => {
       const text = result.lines.map((l) => l.text).join("\n");
       expect(text).toContain("myhandle");
     });
+  });
+
+  it("uses NEXT_PUBLIC_BASE_URL for embed and share output", () => {
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://studio.test");
+    const commands = getCommands(DEFAULT_CONFIG, "myhandle");
+
+    for (const name of ["/embed", "/share"]) {
+      const text = commands
+        .find((command) => command.name === name)!
+        .execute([])
+        .lines.map((line) => line.text)
+        .join("\n");
+
+      expect(text).toContain("https://studio.test");
+      expect(text).not.toContain("https://chapa.thecreativetoken.com");
+    }
   });
 
   describe("/help", () => {

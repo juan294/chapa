@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { BadgeConfig } from "@chapa/shared";
 import { STUDIO_CATEGORIES } from "./studio-options";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
+import { CATEGORY_KEY_TO_ALIAS } from "@/components/terminal/command-registry";
 
 interface QuickControlsProps {
   config: BadgeConfig;
@@ -11,18 +12,6 @@ interface QuickControlsProps {
   visible: boolean;
   onToggle: () => void;
 }
-
-const CATEGORY_ALIAS: Record<string, string> = {
-  background: "bg",
-  cardStyle: "card",
-  border: "border",
-  scoreEffect: "score",
-  heatmapAnimation: "heatmap",
-  interaction: "interact",
-  statsDisplay: "stats",
-  tierTreatment: "tier",
-  celebration: "celebrate",
-};
 
 export function QuickControls({
   config,
@@ -97,7 +86,7 @@ export function QuickControls({
           {/* Categories */}
           <div className="max-h-48 sm:max-h-64 overflow-y-auto">
             {STUDIO_CATEGORIES.map((category) => {
-              const alias = CATEGORY_ALIAS[category.key] ?? category.key;
+              const alias = CATEGORY_KEY_TO_ALIAS[category.key] ?? category.key;
               const isExpanded = expandedKey === category.key;
               const currentValue = config[category.key];
 
