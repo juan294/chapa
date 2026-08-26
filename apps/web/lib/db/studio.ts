@@ -45,6 +45,12 @@ export type StudioConfigReadResult =
   | { status: "unavailable" }
   | { status: "invalid" };
 
+type StudioConfigRevisionReadResult =
+  | { status: "found"; revision: number }
+  | { status: "not_found" }
+  | { status: "unavailable" }
+  | { status: "invalid" };
+
 interface StudioConfigRow {
   handle: string;
   config: unknown;
@@ -64,6 +70,14 @@ interface StudioConfigCacheEntry {
   version: typeof STUDIO_CONFIG_CACHE_ENTRY_VERSION;
   revision: number;
   config: BadgeConfig;
+}
+
+function isValidStudioConfigRevision(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value > 0
+  );
 }
 
 function errorMessage(error: unknown): string {
@@ -226,7 +240,7 @@ export async function dbGetStudioConfig(
       return { status: "invalid" };
     }
 
-    if (!Number.isSafeInteger(row.revision) || row.revision <= 0) {
+    if (!isValidStudioConfigRevision(row.revision)) {
       console.error(
         "[STUDIO_CONFIG_FALLBACK] Invalid persisted Studio configuration revision",
         { handle: handle.toLowerCase() },
@@ -238,6 +252,48 @@ export async function dbGetStudioConfig(
   } catch (error) {
     console.error(
       "[STUDIO_CONFIG_FALLBACK] dbGetStudioConfig failed:",
+      errorMessage(error),
+    );
+    return { status: "unavailable" };
+  }
+}
+
+/** Read only the durable revision used to validate a cached payload. */
+async function dbGetStudioConfigRevision(
+  handle: string,
+): Promise<StudioConfigRevisionReadResult> {
+  const db = getSupabase();
+  if (!db) return { status: "unavailable" };
+
+  try {
+    const { data, error } = await withTimeout(
+      Promise.resolve(
+        db
+          .from("studio_configs")
+          .select("revision")
+          .eq("handle", handle.toLowerCase())
+          .maybeSingle(),
+      ),
+      STUDIO_CONFIG_READ_TIMEOUT_MS,
+      "dbGetStudioConfigRevision",
+    );
+
+    if (error) throw error;
+    if (!data) return { status: "not_found" };
+
+    const revision = (data as { revision?: unknown }).revision;
+    if (!isValidStudioConfigRevision(revision)) {
+      console.error(
+        "[STUDIO_CONFIG_FALLBACK] Invalid persisted Studio configuration revision",
+        { handle: handle.toLowerCase() },
+      );
+      return { status: "invalid" };
+    }
+
+    return { status: "found", revision };
+  } catch (error) {
+    console.error(
+      "[STUDIO_CONFIG_FALLBACK] dbGetStudioConfigRevision failed:",
       errorMessage(error),
     );
     return { status: "unavailable" };
@@ -265,23 +321,52 @@ export async function loadStudioConfig(
     );
   }
 
-  if (isNegativeCacheEntry(cached)) return { status: "not_found" };
   if (cached !== null) {
-    if (isStudioConfigCacheEntry(cached)) {
-      return {
-        status: "found",
-        config: cached.config,
-        revision: cached.revision,
-      };
+    const positiveEntry = isStudioConfigCacheEntry(cached) ? cached : null;
+    const negativeEntry = isNegativeCacheEntry(cached);
+    if (positiveEntry || negativeEntry) {
+      const durableRevision = await dbGetStudioConfigRevision(normalizedLogin);
+      if (
+        positiveEntry &&
+        durableRevision.status === "found" &&
+        durableRevision.revision === positiveEntry.revision
+      ) {
+        return {
+          status: "found",
+          config: positiveEntry.config,
+          revision: positiveEntry.revision,
+        };
+      }
+      if (negativeEntry && durableRevision.status === "not_found") {
+        return { status: "not_found" };
+      }
+      if (
+        durableRevision.status === "unavailable" ||
+        durableRevision.status === "invalid"
+      ) {
+        return { status: durableRevision.status };
+      }
+
+      await cacheDel(cacheKey);
+      if (durableRevision.status === "not_found") {
+        void cacheSetVersioned(
+          cacheKey,
+          STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY,
+          STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.revision,
+          STUDIO_CONFIG_NEGATIVE_TTL,
+        );
+        return { status: "not_found" };
+      }
+    } else {
+      const legacy = isValidBadgeConfig(cached);
+      console[legacy ? "warn" : "error"](
+        legacy
+          ? "[STUDIO_CONFIG_FALLBACK] Migrating unversioned cached Studio configuration"
+          : "[STUDIO_CONFIG_FALLBACK] Invalid cached Studio configuration",
+        { handle: normalizedLogin },
+      );
+      await cacheDel(cacheKey);
     }
-    const legacy = isValidBadgeConfig(cached);
-    console[legacy ? "warn" : "error"](
-      legacy
-        ? "[STUDIO_CONFIG_FALLBACK] Migrating unversioned cached Studio configuration"
-        : "[STUDIO_CONFIG_FALLBACK] Invalid cached Studio configuration",
-      { handle: normalizedLogin },
-    );
-    await cacheDel(cacheKey);
   }
 
   const dbResult = await dbGetStudioConfig(normalizedLogin);

@@ -24,9 +24,9 @@ The Creator Studio revival is well tested and its security boundary is sound, bu
 
 ## 2. System Architecture Overview
 
-Chapa is a pnpm monorepo with a Next.js application under `apps/web`, shared domain types and pure logic under `packages/shared`, and operational tooling under `scripts`. `/studio` is a dynamic authenticated server page. It checks the DB-backed feature flag and session, then loads profile material and the saved Studio config in parallel. `StudioClient` owns configuration, preview, terminal, quick-control, motion, and save state. Supabase is the durable source for `studio_configs`; Redis is a one-year hot-read cache. Production deploys only from `main`, while `develop` is the integration branch.
+Chapa is a pnpm monorepo with a Next.js application under `apps/web`, shared domain types and pure logic under `packages/shared`, and operational tooling under `scripts`. `/studio` is a dynamic authenticated server page. It checks the DB-backed feature flag and session, then loads profile material and the saved Studio config in parallel. `StudioClient` owns configuration, preview, terminal, quick-control, motion, and save state. Supabase is the durable source for `studio_configs`; Redis caches the payload for one year, but each hit is accepted only after its revision matches Supabase. Production deploys only from `main`, while `develop` is the integration branch.
 
-The replacement candidate adds backward-compatible migration 035 for database-ordered Studio cache revisions. It adds no workflow, environment-variable, cron, or Vercel configuration change. Its production release must apply the migration through the normal deploy, squash `develop` into `main`, prove tree equality, verify exact production identity, and only then enable `studio_enabled` through the admin API.
+The replacement candidate adds backward-compatible migration 035 for database-ordered Studio cache revisions. It adds no workflow, environment-variable, cron, or Vercel configuration change. Migration 035 was applied and verified before the release PR; the release must still squash `develop` into `main`, prove tree equality, verify exact production identity, and only then enable `studio_enabled` through the admin API.
 
 ## 3. End-to-End Flow Analysis
 

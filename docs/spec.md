@@ -14,7 +14,7 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
 4) Creator Studio `/studio`:
    - Terminal-first Studio preview customization (9 visual categories)
    - Live preview updates as settings change
-   - Configuration persisted in Supabase (`studio_configs`, source of truth) with Redis as the hot read path (#935, migration 027); migration 035 adds database-ordered revisions for cross-instance cache consistency
+   - Configuration persisted in Supabase (`studio_configs`, source of truth) with Redis as a cached payload layer (#935, migration 027); migration 035 adds database-ordered revisions that validate cache hits and preserve cross-instance consistency
 5) Public access:
    - Anyone can view `/u/:handle` and `/u/:handle/badge.svg`
 

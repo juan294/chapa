@@ -22,8 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failures are reported truthfully.** Reads fall back to the durable Supabase
   record and repopulate Redis, writes persist to Supabase before updating the
   cache, database-issued revisions prevent an older serverless instance from
-  overwriting a newer cache entry, unknown stored shapes fall back safely, and
-  real storage failures no longer appear as successful saves.
+  overwriting a newer cache entry, every cache hit is checked against the
+  durable revision so an outage cannot revive stale data, unknown stored shapes
+  fall back safely, and real storage failures no longer appear as successful
+  saves.
 - **Studio controls now handle concurrent saves, localization, and assistive
   state correctly.** Duplicate saves are blocked, failure states stay visible,
   English and Spanish labels remain in parity, selected quick controls expose

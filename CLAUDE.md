@@ -211,7 +211,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Crypto helpers: `apps/web/lib/crypto/*` — constant-time comparison (`safe-equal.ts`) for HMAC/token verification
 - Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (interactions, borders, cards, celebrations, backgrounds, counters, heatmap animations, tier visuals) behind Creator Studio's 9 customization categories
 - Creator Studio UI: `apps/web/app/studio/*` — authenticated owner preview, controls, save state, command actions, and preview footer composition
-- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — validated Redis hot path with durable Supabase fallback; Supabase commits before Redis is refreshed, and migration 035 assigns database-ordered revisions so an older serverless instance cannot replace a newer cache entry
+- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — Redis caches validated payloads while Supabase remains authoritative; Supabase commits before Redis is refreshed, migration 035 assigns database-ordered revisions, and each cache hit checks the durable revision so an outage or older serverless instance cannot make stale data authoritative
 - HTTP utilities: `apps/web/lib/http/*` — client IP extraction (`client-ip.ts`) for rate limiting
 - Keyboard shortcuts: `apps/web/lib/keyboard/*` — shortcut registry and React hook for the terminal/command-bar UI
 - Monitoring: `apps/web/lib/monitoring/*` — badge latency SLO budgets and measurement (`latency-slo.ts`) backing `/api/cron/latency-check`
