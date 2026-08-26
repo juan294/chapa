@@ -13,12 +13,27 @@ Roll back when a production deployment causes:
 - Health endpoint (`/api/health`) returning errors
 - Any data-loss scenario
 
+## Resolve the Approved Target
+
+Before using either rollback method, read the failed release report. Resolve
+its `rollbackReference` as `approvedRollbackTag` and its previous
+evidence-approved production commit as `approvedRollbackCommit`. Do not
+recompute either from `develop` ancestry.
+Require the annotated tag to identify that exact commit:
+
+```bash
+test "$(git cat-file -t "$approvedRollbackTag")" = tag
+test "$(git rev-parse "${approvedRollbackTag}^{commit}")" = "$approvedRollbackCommit"
+```
+
+Any missing value or mismatch blocks rollback target selection.
+
 ## Rollback via Vercel Dashboard
 
 1. Open [vercel.com/dashboard](https://vercel.com/dashboard) and select the Chapa project.
 2. Navigate to **Deployments** tab.
-3. Read the failed release report and select its named previous
-   evidence-approved deployment. Do not choose merely by chronology.
+3. Select the report's named deployment for `approvedRollbackCommit`. Do not
+   choose merely by chronology.
 4. Click the three-dot menu on that deployment and select **Promote to Production**.
 5. Confirm the target identity, then obtain explicit rollback authorization.
 6. Promote it; traffic shifts immediately without a rebuild.
@@ -51,7 +66,9 @@ After promoting or reverting:
 
 ```bash
 # Verify restored deployment identity
-curl -fsS https://chapa.thecreativetoken.com/api/version
+restoredVersion="$(curl -fsS https://chapa.thecreativetoken.com/api/version)"
+restoredCommit="$(printf '%s' "$restoredVersion" | jq -er 'select(.environment == "production") | .commitSha')"
+test "$restoredCommit" = "$approvedRollbackCommit"
 
 # Check health and core dependency state
 curl https://chapa.thecreativetoken.com/api/health
@@ -63,8 +80,8 @@ curl -I 'https://chapa.thecreativetoken.com/u/octocat/badge.svg?__chapa_smoke=1'
 curl -I https://chapa.thecreativetoken.com | grep x-vercel-deployment-url
 ```
 
-Require `/api/version` to match the previous evidence-approved commit in the
-failed release report. Record the failed `runId`, failed candidate/main
+Require the equality check above to pass; a healthy response from another
+commit is not a successful rollback. Record the failed `runId`, failed candidate/main
 identities, rollback deployment URL and commit, command/operator, time, health,
 badge, header, and restored identity evidence.
 

@@ -8,19 +8,27 @@ Capability detail lives in the linked runbooks; evidence semantics live in
 
 - Release topology: `develop` to `main`, squash merge, then tag `mainCommit`.
 - Analyzer PASS is evidence, not authorization.
-- STOP separately for version choice, full diff approval, external CI/preview,
-  release PR, merge, production operations beyond the read-only probes below,
-  and tag/publication.
-- Never mutate production data, apply migrations, invoke crons, send messages,
-  change environment configuration, merge, tag, or publish without its explicit
-  authorization.
+- STOP separately for version choice, full diff approval, external CI/preview, release PR, merge, production operations beyond the read-only probes below, and tag/publication.
+- Never mutate production data, apply migrations, invoke crons, send messages, change environment configuration, merge, tag, or publish without explicit authorization.
 
 ## 1. Prepare and verify
 
 1. Read `CLAUDE.md`, this playbook, and the linked runbooks.
 2. Use an isolated clean release worktree based on current `develop`.
-3. Fetch origin; identify `baselineTag`, current version, commits, paths,
-   migrations, version-bearing files, exact remote refs, and exact-SHA CI.
+3. Fetch origin. Bind `baselineTag` to the exact deployed production `main` identity, not `develop` ancestry:
+
+   ```bash
+   productionUrl="${productionUrl:-https://chapa.thecreativetoken.com}"
+   productionVersion="$(curl -fsS "$productionUrl/api/version")"
+   productionCommit="$(printf '%s' "$productionVersion" | jq -er 'select(.environment == "production") | .commitSha')"
+   mainCommit="$(git rev-parse origin/main)"
+   test "$productionCommit" = "$mainCommit"
+   baselineTag="$(git for-each-ref --points-at "$mainCommit" --sort=-version:refname --count=1 --format='%(refname:short)' 'refs/tags/v[0-9]*')"
+   test "$(git cat-file -t "$baselineTag")" = tag
+   test "$(git rev-parse "${baselineTag}^{commit}")" = "$mainCommit"
+   ```
+
+   An empty tag or any identity mismatch blocks. Then identify the current version, commits, paths, migrations, version-bearing files, exact remote refs, and exact-SHA CI from `baselineTag..develop`.
 4. Present release type, changes, topology, known risks, and retirement review.
 5. **STOP — version choice.**
 6. Update version, changelog, and every current version reference.
@@ -51,8 +59,7 @@ Capability detail lives in the linked runbooks; evidence semantics live in
    rollbackReference="$baselineTag"
    ```
 
-3. Wait for exact-`developCommit` push CI and preview `/api/version`. Protected
-   previews require `VERCEL_AUTOMATION_BYPASS_SECRET`; missing blocks verification.
+3. Wait for exact-`developCommit` push CI and preview `/api/version`. Protected previews require `VERCEL_AUTOMATION_BYPASS_SECRET`; missing blocks verification.
 4. Prepare the run and candidate record:
 
    ```bash
@@ -68,24 +75,20 @@ Capability detail lives in the linked runbooks; evidence semantics live in
      "$runDir/release-run.json" > "$runDir/candidate.json"
    ```
 
-5. Run `/explore-release $runDir/candidate.json`, then complete applicable
-   manual arcs in `docs/runbooks/release-checklist.md`.
+5. Run `/explore-release $runDir/candidate.json`, then complete applicable manual arcs in `docs/runbooks/release-checklist.md`.
 6. Create `$runDir/pre-merge-evidence.json`:
 
    ```json
    {"exploratoryCharters":[],"manualObligations":[],"manualResult":{"scenarioId":"release.manual-arcs","environment":"preview"}}
    ```
 
-   Replace the placeholders with complete schema-valid charters, one passed
-   candidate-bound record per catalog `manualObligationIds`, and the manual
-   `ScenarioResult` with `ui` and `http` evidence.
+   Replace the placeholders with complete schema-valid charters, one passed candidate-bound record per catalog `manualObligationIds`, and the manual `ScenarioResult` with `ui` and `http` evidence.
 
 ## 3. Release PR and pre-merge evidence
 
 1. **STOP — release PR authorization.**
 2. Create or reuse the `develop` to `main` PR; never enable auto-merge yet.
-3. Wait for exact release-PR CI. Record its numeric workflow run ID and attempt.
-   A missing, skipped, or failed pending-migration result blocks.
+3. Wait for exact release-PR CI. Record its numeric workflow run ID and attempt; a missing, skipped, or failed pending-migration result blocks.
 4. **STOP — external CI/preview authorization.** This authorizes only the
    read-only release-verification dispatch and its externally billed preview
    probes.
@@ -110,10 +113,7 @@ Capability detail lives in the linked runbooks; evidence semantics live in
      --dir "$runDir/pre-merge"
    ```
 
-6. Confirm the workflow did run the pre-merge analyzer and its decision is PASS.
-   Missing/failed/skipped requirements,
-   identity defects, missing oracles, cleanup defects, incomplete charters,
-   skipped high-risk areas, and untriaged findings block.
+6. Confirm the workflow did run the pre-merge analyzer and its decision is PASS. Missing/failed/skipped requirements, identity defects, missing oracles, cleanup defects, incomplete charters, skipped high-risk areas, and untriaged findings block.
 7. **STOP — merge authorization.**
 
 ## 4. Promote and assemble final evidence
