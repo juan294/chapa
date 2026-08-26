@@ -12,6 +12,7 @@
  * `input[aria-label="Terminal command input"]` selector did.
  */
 export const TERMINAL_COMMAND_INPUT_ID = "terminal-command-input";
+export const TERMINAL_COMMAND_LISTBOX_ID = "terminal-command-suggestions";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                              */

@@ -15,10 +15,14 @@ Also read:
 
 ## Inputs and orientation
 
-Detect the current version from `apps/web/package.json`, find the latest release
-tag, and compute changes from that immutable baseline to current `develop`.
-Search both the bare and `v`-prefixed current version across the repository so
-all manifests, badges, documentation, and lockfile references are included.
+Detect the current version from `apps/web/package.json`. Resolve the release
+baseline from the exact production identity as specified by the playbook:
+production `/api/version` must report `production`, its commit must equal
+`origin/main`, and the annotated release tag must dereference to that commit.
+Do not use `git describe` or `develop` ancestry to select the baseline. Compute
+changes from that immutable tag to current `develop`. Search both the bare and
+`v`-prefixed current version across the repository so all manifests, badges,
+documentation, and lockfile references are included.
 
 Present:
 

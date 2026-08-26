@@ -510,9 +510,23 @@ describe("BadgeContent — render-based", () => {
   });
 
   describe("footer", () => {
-    it("shows the domain URL", () => {
+    it("shows the legacy footer by default", () => {
       render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
+      expect(screen.getByText("Powered by GitHub")).toBeDefined();
       expect(screen.getByText("chapa.thecreativetoken.com")).toBeDefined();
+    });
+
+    it("omits the legacy footer when showFooter is false", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact()}
+          showFooter={false}
+        />,
+      );
+
+      expect(screen.queryByText("Powered by GitHub")).toBeNull();
+      expect(screen.queryByText("chapa.thecreativetoken.com")).toBeNull();
     });
   });
 

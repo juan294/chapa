@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
+import { useState } from "react";
+import { LanguageContext, type LanguageContextValue } from "@/lib/i18n";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
+import { resolveTranslation } from "@/lib/i18n/resolve";
 
 // ---------- Browser API mocks ----------
 
@@ -61,18 +66,30 @@ vi.mock("@/lib/effects/defaults", () => ({
   ],
 }));
 
+const previewLifecycle = vi.hoisted(() => ({ nextInstanceId: 0 }));
+
 vi.mock("./BadgePreviewCard", () => ({
   BadgePreviewCard: ({
     config,
     interactive,
+    verification,
   }: {
     config: Record<string, unknown>;
     interactive: boolean;
-  }) => (
-    <div data-testid="badge-preview" data-interactive={String(interactive)}>
-      {JSON.stringify(config)}
-    </div>
-  ),
+    verification?: { hash: string; date: string } | null;
+  }) => {
+    const [instanceId] = useState(() => ++previewLifecycle.nextInstanceId);
+    return (
+      <div
+        data-testid="badge-preview"
+        data-instance-id={instanceId}
+        data-interactive={String(interactive)}
+        data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
+      >
+        {JSON.stringify(config)}
+      </div>
+    );
+  },
 }));
 
 vi.mock("./QuickControls", () => ({
@@ -80,10 +97,12 @@ vi.mock("./QuickControls", () => ({
     onCommand,
     visible,
     onToggle,
+    saveDisabled,
   }: {
     onCommand: (cmd: string) => void;
     visible: boolean;
     onToggle: () => void;
+    saveDisabled?: boolean;
   }) => (
     <div data-testid="quick-controls" data-visible={String(visible)}>
       <button data-testid="qc-toggle" onClick={onToggle}>
@@ -94,6 +113,13 @@ vi.mock("./QuickControls", () => ({
         onClick={() => onCommand("/set background gradient")}
       >
         Run Command
+      </button>
+      <button
+        data-testid="qc-save"
+        disabled={saveDisabled}
+        onClick={() => onCommand("/save")}
+      >
+        /save
       </button>
     </div>
   ),
@@ -107,9 +133,12 @@ vi.mock("./useStudioCommands", () => ({
 }));
 
 vi.mock("@/components/terminal/TerminalOutput", () => ({
-  TerminalOutput: ({ lines }: { lines: unknown[] }) => (
+  TerminalOutput: ({ lines }: { lines: Array<{ id: string; text: string }> }) => (
     <div data-testid="terminal-output" role="log">
       {lines.length} lines
+      {lines.map((line) => (
+        <span key={line.id}>{line.text}</span>
+      ))}
     </div>
   ),
 }));
@@ -196,7 +225,7 @@ vi.mock("@/components/KeyboardShortcutsListener", () => ({
   }),
 }));
 
-import { StudioClient } from "./StudioClient";
+import { parseRetryAfterSeconds, StudioClient } from "./StudioClient";
 import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 
 // ---------- Test fixtures ----------
@@ -250,6 +279,20 @@ const impact: ImpactV6Result = {
   tier: "Solid",
   computedAt: new Date().toISOString(),
 };
+
+function languageValue(
+  locale: "en" | "es",
+): LanguageContextValue {
+  const dictionary = locale === "es" ? es : en;
+  return {
+    locale,
+    setLocale: async () => {},
+    t: (key) =>
+      resolveTranslation(key, dictionary) as ReturnType<
+        LanguageContextValue["t"]
+      >,
+  };
+}
 
 // ---------- Tests ----------
 
@@ -324,6 +367,48 @@ describe("StudioClient render", () => {
       const preview = screen.getByTestId("badge-preview");
       expect(preview.getAttribute("data-interactive")).toBe("true");
     });
+
+    it("forwards verification to BadgePreviewCard", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          verification={{ hash: "abc123", date: "2026-08-26" }}
+        />,
+      );
+
+      expect(screen.getByTestId("badge-preview").getAttribute("data-verification")).toBe(
+        "abc123:2026-08-26",
+      );
+    });
+
+    it("updates ordinary configuration without remounting the preview", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "set-background", type: "success", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      const initialInstanceId = screen
+        .getByTestId("badge-preview")
+        .getAttribute("data-instance-id");
+
+      fireEvent.click(screen.getByTestId("qc-command"));
+
+      const preview = screen.getByTestId("badge-preview");
+      expect(preview.textContent).toContain('"background":"aurora"');
+      expect(preview.getAttribute("data-instance-id")).toBe(initialInstanceId);
+    });
   });
 
   describe("terminal pane", () => {
@@ -362,6 +447,50 @@ describe("StudioClient render", () => {
       );
       const qc = screen.getByTestId("quick-controls");
       expect(qc).toBeDefined();
+    });
+
+    it("preserves config and terminal history when the locale changes", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "locale-set", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      const { rerender } = render(
+        <LanguageContext.Provider value={languageValue("es")}>
+          <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />
+        </LanguageContext.Provider>,
+      );
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        "Creator Studio — personaliza la vista previa de tu Chapa",
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      rerender(
+        <LanguageContext.Provider value={languageValue("en")}>
+          <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />
+        </LanguageContext.Provider>,
+      );
+
+      const output = screen.getByTestId("terminal-output");
+      expect(screen.getByTestId("badge-preview").textContent).toContain(
+        '"background":"aurora"',
+      );
+      expect(output.textContent).toContain("4 lines");
+      expect(output.textContent).toContain(
+        "Creator Studio — customize your badge preview",
+      );
+      expect(output.textContent).toContain(
+        "Type /help for commands or use Quick Controls.",
+      );
+      expect(output.textContent).not.toContain(
+        "Creator Studio — personaliza la vista previa de tu Chapa",
+      );
+      expect(screen.getByText("Unsaved preview changes")).toBeDefined();
     });
   });
 
@@ -468,15 +597,61 @@ describe("StudioClient render", () => {
   });
 
   describe("save functionality", () => {
+    it("parses numeric and HTTP-date Retry-After values", () => {
+      const now = Date.parse("2026-08-26T10:00:00Z");
+      expect(parseRetryAfterSeconds("90", now)).toBe(90);
+      expect(
+        parseRetryAfterSeconds("Wed, 26 Aug 2026 10:01:30 GMT", now),
+      ).toBe(90);
+      expect(parseRetryAfterSeconds("not-a-delay", now)).toBeNull();
+    });
+
+    it("moves from saved to dirty when the config changes", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "dirty-1", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      expect(screen.getByText("Preview saved")).toBeDefined();
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(await screen.findByText("Unsaved preview changes")).toBeDefined();
+    });
+
+    it("does not mark an unchanged value dirty", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "same-1", type: "system", text: "Unchanged" }],
+        action: { type: "set", category: "background", value: "solid" },
+      });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg solid" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(screen.getByText("Preview saved")).toBeDefined();
+      expect(screen.queryByText("Unsaved preview changes")).toBeNull();
+    });
+
     it("shows saving indicator during save", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockImplementation(
-          () =>
-            new Promise((resolve) =>
-              setTimeout(() => resolve(new Response("{}", { status: 200 })), 100),
-            ),
-        );
+      let resolveSave!: (response: Response) => void;
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
+        () => new Promise<Response>((resolve) => { resolveSave = resolve; }),
+      );
 
       const { executeCommand } = await import(
         "@/components/terminal/command-registry"
@@ -499,12 +674,16 @@ describe("StudioClient render", () => {
       fireEvent.keyDown(input, { key: "Enter" });
 
       await waitFor(() => {
-        expect(screen.getByText("Saving...")).toBeDefined();
+        expect(screen.getAllByText("Saving...")).toHaveLength(2);
       });
 
       const previewPane = screen.getByTestId("badge-preview").closest("[aria-busy]");
       expect(previewPane?.getAttribute("aria-busy")).toBe("true");
 
+      resolveSave(new Response("{}", { status: 200 }));
+      await waitFor(() => {
+        expect(previewPane?.getAttribute("aria-busy")).toBe("false");
+      });
       fetchSpy.mockRestore();
     });
 
@@ -591,6 +770,175 @@ describe("StudioClient render", () => {
       });
 
       fetchSpy.mockRestore();
+    });
+
+    it("reports a rejected transport and keeps the config unsaved", async () => {
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"));
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "save-network", type: "system", text: "Saving" }],
+        action: { type: "save" },
+      });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      fireEvent.click(screen.getByTestId("qc-save"));
+
+      expect(
+        await screen.findAllByText(
+          "Could not reach the server. Your changes are still unsaved. Try again.",
+        ),
+      ).toHaveLength(2);
+      expect(
+        screen.getByTestId("badge-preview").textContent,
+      ).toContain('"background":"solid"');
+    });
+
+    it("maps status and Retry-After into recoverable feedback", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("", {
+          status: 429,
+          headers: { "Retry-After": "90" },
+        }),
+      );
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "save-rate", type: "system", text: "Saving" }],
+        action: { type: "save" },
+      });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      fireEvent.click(screen.getByTestId("qc-save"));
+
+      expect(
+        await screen.findAllByText(
+          "Too many save attempts. Your changes are still unsaved. Try again in 90 seconds.",
+        ),
+      ).toHaveLength(2);
+    });
+
+    it.each([
+      [400, "This configuration is invalid. Change an option or reset it, then try again."],
+      [401, "Your session expired. Sign in again, then try again."],
+      [404, "Creator Studio is unavailable. Your changes are still unsaved."],
+      [503, "Storage is temporarily unavailable. Your changes are still unsaved."],
+      [500, "Could not save (server status 500). Your changes are still unsaved. Try again."],
+    ])("maps a %i response to status-specific feedback", async (status, message) => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("", { status }),
+      );
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: `save-${status}`, type: "system", text: "Saving" }],
+        action: { type: "save" },
+      });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      fireEvent.click(screen.getByTestId("qc-save"));
+
+      expect((await screen.findByRole("alert")).textContent).toBe(message);
+    });
+
+    it("prevents overlapping saves from the button", async () => {
+      let resolveSave!: (response: Response) => void;
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
+        () => new Promise<Response>((resolve) => { resolveSave = resolve; }),
+      );
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "save-single", type: "system", text: "Saving" }],
+        action: { type: "save" },
+      });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const save = screen.getByTestId("qc-save");
+      fireEvent.click(save);
+      fireEvent.click(save);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(save.hasAttribute("disabled")).toBe(true);
+      resolveSave(new Response("{}", { status: 200 }));
+      await screen.findByText(
+        "Preview configuration saved. Your public badge and share page are unchanged.",
+      );
+    });
+
+    it("prevents overlapping saves from repeated /save commands", async () => {
+      let resolveSave!: (response: Response) => void;
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
+        () => new Promise<Response>((resolve) => { resolveSave = resolve; }),
+      );
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      let line = 0;
+      vi.mocked(executeCommand).mockImplementation(() => ({
+        lines: [{ id: `save-command-${++line}`, type: "system", text: "Saving" }],
+        action: { type: "save" },
+      }));
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/save" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("A save is already in progress.")).toBeDefined();
+      resolveSave(new Response("{}", { status: 200 }));
+      await screen.findByText(
+        "Preview configuration saved. Your public badge and share page are unchanged.",
+      );
+    });
+
+    it("does not mark newer edits saved when an older request finishes", async () => {
+      let resolveSave!: (response: Response) => void;
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        () => new Promise<Response>((resolve) => { resolveSave = resolve; }),
+      );
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "save-old", type: "system", text: "Saving" }],
+        action: { type: "save" },
+      });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      fireEvent.click(screen.getByTestId("qc-save"));
+
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "set-new", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      resolveSave(new Response("{}", { status: 200 }));
+      expect(await screen.findByText("Unsaved preview changes")).toBeDefined();
+      expect(screen.getByTestId("badge-preview").textContent).toContain(
+        '"background":"aurora"',
+      );
     });
   });
 
@@ -941,7 +1289,7 @@ describe("StudioClient render", () => {
       expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("true");
     });
 
-    it("refresh-preview shortcut increments preview key", () => {
+    it("refresh-preview shortcut explicitly remounts the preview", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -950,14 +1298,17 @@ describe("StudioClient render", () => {
         />,
       );
 
-      // The BadgePreviewCard is rendered with key={previewKey}
-      // Refreshing should cause re-render (new key)
+      const initialInstanceId = screen
+        .getByTestId("badge-preview")
+        .getAttribute("data-instance-id");
+
       act(() => {
         capturedShortcutHandler?.("refresh-preview");
       });
 
-      // Component should still render correctly
-      expect(screen.getByTestId("badge-preview")).toBeDefined();
+      expect(
+        screen.getByTestId("badge-preview").getAttribute("data-instance-id"),
+      ).not.toBe(initialInstanceId);
     });
 
     it("cycle-preset shortcut cycles to next preset", async () => {

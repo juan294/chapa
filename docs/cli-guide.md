@@ -78,7 +78,7 @@ npx chapa-cli --help
 You should see:
 
 ```
-chapa-cli v0.2.4
+chapa-cli v0.5.0
 
 Merge GitHub EMU (Enterprise Managed User) contributions into your Chapa badge.
 
@@ -382,8 +382,8 @@ If you cannot install Node.js system-wide, options:
 
 1. **nvm (Node Version Manager)** — Installs Node.js in your home directory, no admin rights needed:
    ```bash
-   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
-   nvm install 18
+   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.7/install.sh | bash
+   nvm install 20
    ```
 
 2. **Portable Node.js** — Download the binary from [nodejs.org](https://nodejs.org/en/download/) and extract it to a directory you have write access to. Add the `bin/` directory to your `PATH`.

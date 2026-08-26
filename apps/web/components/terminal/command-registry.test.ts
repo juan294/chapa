@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 import {
+  CATEGORY_KEY_TO_ALIAS,
   parseCommand,
   executeCommand,
   createNavigationCommands,
@@ -54,6 +56,21 @@ describe("resolveCategory", () => {
   it("returns null for unknown categories", () => {
     expect(resolveCategory("unknown")).toBeNull();
     expect(resolveCategory("foo")).toBeNull();
+  });
+
+  it.each(["constructor", "toString"])(
+    "rejects inherited object key %s",
+    (input) => {
+      expect(resolveCategory(input)).toBeNull();
+    },
+  );
+});
+
+describe("CATEGORY_KEY_TO_ALIAS", () => {
+  it("covers exactly the BadgeConfig keys", () => {
+    expect(Object.keys(CATEGORY_KEY_TO_ALIAS).sort()).toEqual(
+      Object.keys(BADGE_CONFIG_OPTIONS).sort(),
+    );
   });
 });
 

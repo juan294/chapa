@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { TerminalOutput } from "./TerminalOutput";
 import type { OutputLine } from "./command-registry";
+import { LanguageProvider } from "@/lib/i18n";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 // jsdom doesn't implement scrollIntoView
 beforeEach(() => {
@@ -36,6 +38,15 @@ describe("TerminalOutput", () => {
     render(<TerminalOutput lines={[]} />);
     const log = screen.getByLabelText("Terminal output");
     expect(log).toBeDefined();
+  });
+
+  it("localizes its accessible label", () => {
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <TerminalOutput lines={[]} />
+      </LanguageProvider>,
+    );
+    expect(screen.getByRole("log", { name: "Salida de terminal" })).toBeDefined();
   });
 
   it("renders output lines with correct text", () => {

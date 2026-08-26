@@ -1,7 +1,7 @@
 # Chapa Demo Script (2–3 minutes)
 
 ## Demo goal
-Show that Chapa turns GitHub, Bitbucket, and Codeberg activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact v6 Profile** (4–5 dimensions + archetype + tier) that updates automatically and is easy to customize and share.
+Show that Chapa turns GitHub, Bitbucket, and Codeberg activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact v6 Profile** (4–5 dimensions + archetype + tier) that updates automatically and is easy to share, plus a separate Creator Studio design playground with a live preview.
 
 ## 10-second opener (hook)
 "Developers already have GitHub graphs—but they're not embeddable, not beautiful, and they don't tell an impact story. Chapa generates a live badge you can embed anywhere, with a multi-dimensional Impact Profile that discourages gaming."
@@ -12,7 +12,7 @@ Show that Chapa turns GitHub, Bitbucket, and Codeberg activity into a **beautifu
 - Impact v6 = 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional Craft + archetype + tier
 - Radar chart visualization (diamond or pentagon when Craft is present)
 - Multi-platform support (GitHub + Bitbucket + Codeberg)
-- Creator Studio for badge visual customization
+- Creator Studio design playground with a live preview
 - Verified mode via GitHub OAuth
 - Cacheable + fast for real-world usage
 
@@ -45,14 +45,16 @@ Say:
 "The breakdown shows each dimension score individually — hover any element for an explanation. The four dimensions give granular insight beyond a single number, and tooltips make everything self-explanatory."
 
 ### 4) Creator Studio (30s)
+This beat is available only when the `studio_enabled` feature flag is enabled; the flag is disabled by default.
+
 - Navigate to `/studio`
 - Show the terminal-first interface
 - Type `/set bg aurora` → live preview updates
 - Type `/preset premium` → full preset applied
-- Type `/save` → configuration persists
+- Type `/save` → the Studio configuration is restored when you return
 
 Say:
-"The Creator Studio lets you customize your badge with 9 visual categories—backgrounds, card styles, score effects, heatmap animations, and more. Everything is a terminal command, but mouse controls are there too."
+"The Creator Studio is a design playground with 9 visual categories: backgrounds, card styles, score effects, heatmap animations, and more. Everything is a terminal command, but mouse controls are there too. Saved Studio settings do not change the public SVG badge or share page."
 
 ### 5) Embed it anywhere (35s)
 - Copy Markdown embed snippet
@@ -93,7 +95,7 @@ Badge footer shows "Forged from purpose. Driven by curiosity." with dynamic plat
 - [ ] Landing page with CTA
 - [ ] OAuth success
 - [ ] Share page with badge + breakdown (radar chart, archetype, dimensions, tooltips)
-- [ ] Creator Studio — live badge customization
+- [ ] Creator Studio — live preview customization
 - [ ] Copy embed snippet
 - [ ] README embed rendering
 - [ ] Share-on-X click

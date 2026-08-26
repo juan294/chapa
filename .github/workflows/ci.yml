@@ -223,6 +223,10 @@ jobs:
             exit "$STATUS"
           fi
 
+      - name: Enforce operational script coverage
+        if: needs.develop_push_source.outputs.validated_by_pr != 'true'
+        run: pnpm run test:coverage:scripts
+
       - name: Report coverage to portfolio
         if: needs.develop_push_source.outputs.validated_by_pr != 'true' && success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         continue-on-error: true

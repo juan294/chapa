@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-08-26
+
+### Added
+
+- **Creator Studio now previews the signed-in owner's real badge data.** The
+  flag-gated `/studio` route materializes the same profile inputs used by the
+  public surfaces, and its footer now matches badge platform ordering,
+  verification styling, and the configured deployment host.
+
+### Fixed
+
+- **Saved Studio configurations now survive Redis eviction and storage
+  failures are reported truthfully.** Reads fall back to the durable Supabase
+  record and repopulate Redis, writes persist to Supabase before updating the
+  cache, database-issued revisions prevent an older serverless instance from
+  overwriting a newer cache entry, every cache hit is checked against the
+  durable revision so an outage cannot revive stale data, unknown stored shapes
+  fall back safely, and real storage failures no longer appear as successful
+  saves.
+- **Studio controls now handle concurrent saves, localization, and assistive
+  state correctly.** Duplicate saves are blocked, failure states stay visible,
+  English and Spanish labels remain in parity, selected quick controls expose
+  their state, save copy now identifies the preview-only boundary, and narrow
+  preview footers no longer overflow.
+
+### Changed
+
+- Studio preview updates preserve component state instead of remounting the
+  complete preview, command actions use typed option metadata, and shared
+  client-safe badge visual metadata now owns platform ordering, logo paths, and
+  the verification color.
+- Operational TypeScript scripts now run through dedicated typecheck, lint,
+  and coverage gates. Release preparation now derives its baseline from the
+  verified production identity instead of Git ancestry.
+
 ## [2.22.1] - 2026-08-22
 
 ### Fixed
@@ -1071,7 +1106,9 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.22.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.23.0...HEAD
+[2.23.0]: https://github.com/juan294/chapa/compare/v2.22.1...v2.23.0
+[2.22.1]: https://github.com/juan294/chapa/compare/v2.22.0...v2.22.1
 [2.22.0]: https://github.com/juan294/chapa/compare/v2.21.0...v2.22.0
 [2.21.0]: https://github.com/juan294/chapa/compare/v2.20.0...v2.21.0
 [2.20.0]: https://github.com/juan294/chapa/compare/v2.19.1...v2.20.0

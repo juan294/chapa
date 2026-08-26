@@ -1,15 +1,15 @@
 # Badge Design v1 Spec — React Component (Creator Studio)
 
-> **Scope**: This spec covers the **React component** (`BadgeContent.tsx`) used in the Creator Studio preview — NOT the embeddable SVG badge.
+> **Scope**: This spec covers the **React preview composition** (`BadgeContent.tsx`, `BadgePreviewCard.tsx`, and `PreviewFooter.tsx`) used in Creator Studio. It does **not** cover the embeddable SVG badge.
 > For the **embeddable SVG badge** served at `/u/:handle/badge.svg`, see [`badge-svg-spec-v1.2.md`](./badge-svg-spec-v1.2.md).
 >
-> Implemented in `apps/web/components/badge/BadgeContent.tsx`.
+> Implemented in `apps/web/components/badge/BadgeContent.tsx` and `apps/web/app/studio/`.
 
 ## Overview
 
 The badge is a dark card (`bg-card #111118`) with `rounded-2xl p-6` padding. Default aspect ratio is unconstrained (content-driven), but the embeddable SVG renders at 1200×630.
 
-The layout has five vertical sections: **Header**, **Body** (two columns), **Dimension Cards** (4-col grid), **Footer**, and conditional **Tier Sparkles**.
+The layout has five vertical sections: **Header**, **Body** (two columns), **Dimension Cards** (4-col grid), **Footer**, and conditional **Tier Sparkles**. `BadgePreviewCard` renders `BadgeContent` with `showFooter={false}`, then adds `PreviewFooter` so Studio can match the public badge's platform and verification metadata without duplicating the legacy content footer.
 
 ---
 
@@ -139,13 +139,20 @@ Values support animated counters via `useAnimatedCounter(value, 2000, easing, is
 
 ## 4. Footer
 
-Layout: `mt-4 pt-3 border-t border-stroke/50 flex items-center justify-between`.
+### Creator Studio preview footer
 
-| Element | Classes | Details |
-|---------|---------|---------|
-| Platform logos | `w-3.5 h-3.5` fill SVG | Dynamic: GitHub always shown, plus Bitbucket/Codeberg if linked. |
-| "Forged from purpose. Driven by curiosity." | `text-xs text-text-secondary/60` with `flex items-center gap-2` | Adjacent to platform logos. |
-| Domain text | `text-xs text-text-secondary/60 font-heading` | `chapa.thecreativetoken.com`. |
+`BadgePreviewCard` suppresses the built-in footer with `showFooter={false}` and renders `PreviewFooter` after the badge content. The responsive layout uses `flex-col` on narrow cards and `sm:flex-row` when space allows.
+
+| Element | Classes / source | Details |
+|---------|------------------|---------|
+| Platform logo pill | `h-3.5 w-3.5` logos in a rounded pill | GitHub is always present. Connected platforms follow canonical order: GitHub, Bitbucket, Codeberg, GitLab. Logo paths and ordering come from `apps/web/lib/badge-visual-metadata.ts`. |
+| "Forged from purpose. Driven by curiosity." | Localized `studio.brandingTagline`; hidden on the narrowest cards | Adjacent to the logo pill. |
+| Host text | `truncate font-heading` | Derived from `getBaseUrl()` so preview branding follows the active deployment host. |
+| Verification row | Coral text below a divider | Shown only when a public verification hash and date exist. The color comes from `VERIFICATION_CORAL` in `badge-visual-metadata.ts`. |
+
+### Built-in `BadgeContent` footer
+
+`BadgeContent` keeps a small legacy footer for callers that do not provide a composed footer. It is enabled by default through `showFooter?: boolean` and contains GitHub attribution plus the Chapa production domain. Studio does not render this path.
 
 ---
 

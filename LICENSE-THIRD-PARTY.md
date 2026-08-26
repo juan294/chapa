@@ -19,7 +19,7 @@ documented here for transparency.
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `@img/sharp-libvips-darwin-arm64` | 1.2.4 | Native `libvips` binary bundled behind `sharp` on darwin-arm64 installs |
+| `@img/sharp-libvips-darwin-arm64` | 1.3.2 | Native `libvips` binary bundled behind `sharp` on darwin-arm64 installs |
 
 ## Why MPL-2.0 is Accepted
 

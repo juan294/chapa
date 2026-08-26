@@ -56,11 +56,11 @@ export function isValidEmuHandle(handle: string): boolean {
  * @param value - The candidate object to validate
  * @returns `true` if the object matches the expected BadgeConfig schema exactly
  */
-import { BADGE_CONFIG_OPTIONS } from "@chapa/shared";
+import { BADGE_CONFIG_OPTIONS, type BadgeConfig } from "@chapa/shared";
 
 const BADGE_CONFIG_KEYS = Object.keys(BADGE_CONFIG_OPTIONS) as (keyof typeof BADGE_CONFIG_OPTIONS)[];
 
-export function isValidBadgeConfig(value: unknown): boolean {
+export function isValidBadgeConfig(value: unknown): value is BadgeConfig {
   if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
   const obj = value as Record<string, unknown>;
 

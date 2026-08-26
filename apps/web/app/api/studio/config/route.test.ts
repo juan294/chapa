@@ -10,21 +10,19 @@ const {
   mockGetOptionalRequestSession,
   mockGetSessionSecret,
   mockRequireRequestSession,
-  mockCacheGet,
-  mockCacheSet,
+  mockRefreshStudioConfigCache,
   mockRateLimit,
   mockDbUpsertStudioConfig,
-  mockDbGetStudioConfig,
+  mockLoadStudioConfig,
 } =
   vi.hoisted(() => ({
     mockGetOptionalRequestSession: vi.fn(),
     mockGetSessionSecret: vi.fn(),
     mockRequireRequestSession: vi.fn(),
-    mockCacheGet: vi.fn(),
-    mockCacheSet: vi.fn(),
+    mockRefreshStudioConfigCache: vi.fn(),
     mockRateLimit: vi.fn(),
     mockDbUpsertStudioConfig: vi.fn(),
-    mockDbGetStudioConfig: vi.fn(),
+    mockLoadStudioConfig: vi.fn(),
   }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -34,14 +32,13 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mockCacheGet,
-  cacheSet: mockCacheSet,
   rateLimit: mockRateLimit,
 }));
 
 vi.mock("@/lib/db/studio", () => ({
   dbUpsertStudioConfig: mockDbUpsertStudioConfig,
-  dbGetStudioConfig: mockDbGetStudioConfig,
+  loadStudioConfig: mockLoadStudioConfig,
+  refreshStudioConfigCache: mockRefreshStudioConfigCache,
 }));
 
 // Re-export real validation functions through the mock to avoid alias resolution issues
@@ -98,9 +95,8 @@ describe("GET /api/studio/config", () => {
     vi.clearAllMocks();
     vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
     mockGetSessionSecret.mockReturnValue("test-secret-32-characters-valid-ok");
-    mockCacheGet.mockResolvedValue(null);
-    mockCacheSet.mockResolvedValue(undefined);
-    mockDbGetStudioConfig.mockResolvedValue(null);
+    mockRefreshStudioConfigCache.mockResolvedValue(undefined);
+    mockLoadStudioConfig.mockResolvedValue({ status: "not_found" });
   });
 
   it("returns 401 when no session", async () => {
@@ -118,41 +114,52 @@ describe("GET /api/studio/config", () => {
     expect(await res.json()).toEqual({ config: null });
   });
 
-  it("returns saved config from Redis on cache hit", async () => {
+  it("returns the config from the shared load helper", async () => {
     mockGetOptionalRequestSession.mockReturnValue(SESSION);
     const savedConfig = { ...DEFAULT_BADGE_CONFIG, background: "aurora" };
-    mockCacheGet.mockResolvedValue(savedConfig);
+    mockLoadStudioConfig.mockResolvedValue({
+      status: "found",
+      config: savedConfig,
+    });
 
     const res = await GET(makeGetRequest("session=abc"));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.config).toEqual(savedConfig);
-    expect(mockCacheGet).toHaveBeenCalledWith("config:juan294");
-    expect(mockDbGetStudioConfig).not.toHaveBeenCalled();
+    expect(mockLoadStudioConfig).toHaveBeenCalledWith("juan294");
   });
 
-  it("falls back to Supabase on Redis miss and rehydrates Redis (BE-H1)", async () => {
+  it("returns { config: null } when the shared load helper misses", async () => {
     mockGetOptionalRequestSession.mockReturnValue(SESSION);
-    mockCacheGet.mockResolvedValue(null);
-    const dbConfig = { ...DEFAULT_BADGE_CONFIG, background: "galaxy" as const };
-    mockDbGetStudioConfig.mockResolvedValue(dbConfig);
-
-    const res = await GET(makeGetRequest("session=abc"));
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.config).toEqual(dbConfig);
-    expect(mockDbGetStudioConfig).toHaveBeenCalledWith("juan294");
-    expect(mockCacheSet).toHaveBeenCalledWith("config:juan294", dbConfig, 31536000);
-  });
-
-  it("returns { config: null } when both Redis and Supabase have no config", async () => {
-    mockGetOptionalRequestSession.mockReturnValue(SESSION);
-    mockCacheGet.mockResolvedValue(null);
-    mockDbGetStudioConfig.mockResolvedValue(null);
 
     const res = await GET(makeGetRequest("session=abc"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ config: null });
+  });
+
+  it("returns 503 when the durable config store is unavailable", async () => {
+    mockGetOptionalRequestSession.mockReturnValue(SESSION);
+    mockLoadStudioConfig.mockResolvedValue({ status: "unavailable" });
+
+    const res = await GET(makeGetRequest("session=abc"));
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("30");
+    expect(await res.json()).toEqual({
+      error: "Storage temporarily unavailable",
+    });
+  });
+
+  it("returns 500 when the persisted config is malformed", async () => {
+    mockGetOptionalRequestSession.mockReturnValue(SESSION);
+    mockLoadStudioConfig.mockResolvedValue({ status: "invalid" });
+
+    const res = await GET(makeGetRequest("session=abc"));
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: "Invalid persisted studio config",
+    });
   });
 });
 
@@ -161,8 +168,8 @@ describe("PUT /api/studio/config", () => {
     vi.clearAllMocks();
     mockRequireRequestSession.mockReturnValue({ session: SESSION });
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
-    mockDbUpsertStudioConfig.mockResolvedValue(true);
-    mockCacheSet.mockResolvedValue(undefined);
+    mockDbUpsertStudioConfig.mockResolvedValue({ ok: true });
+    mockRefreshStudioConfigCache.mockResolvedValue(undefined);
   });
 
   it("returns 401 when no session", async () => {
@@ -202,13 +209,13 @@ describe("PUT /api/studio/config", () => {
     expect(res.status).toBe(429);
   });
 
-  it("saves valid config to Redis with 365-day TTL", async () => {
+  it("refreshes Redis from durable state after a valid save", async () => {
     const config = { ...DEFAULT_BADGE_CONFIG, background: "aurora" as const };
     const res = await PUT(makePutRequest(config, "session=abc"));
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
-    expect(mockCacheSet).toHaveBeenCalledWith("config:juan294", config, 31536000);
+    expect(mockRefreshStudioConfigCache).toHaveBeenCalledWith("juan294");
   });
 
   it("persists config to Supabase alongside Redis (BE-H1)", async () => {
@@ -219,21 +226,122 @@ describe("PUT /api/studio/config", () => {
     expect(mockDbUpsertStudioConfig).toHaveBeenCalledWith("juan294", config);
   });
 
-  it("returns 500 when Supabase write fails (DB is success criterion)", async () => {
-    mockDbUpsertStudioConfig.mockResolvedValue(false);
+  it("refreshes Redis only after the durable write succeeds", async () => {
+    const operations: string[] = [];
+    mockDbUpsertStudioConfig.mockImplementation(async () => {
+      operations.push("durable");
+      return { ok: true };
+    });
+    mockRefreshStudioConfigCache.mockImplementation(async () => {
+      operations.push("cache");
+    });
+
+    const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
+
+    expect(res.status).toBe(200);
+    expect(operations).toEqual(["durable", "cache"]);
+  });
+
+  it("serializes concurrent saves for one handle so the last request wins everywhere", async () => {
+    const operations: string[] = [];
+    let releaseFirstWrite!: () => void;
+    const firstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    mockDbUpsertStudioConfig.mockImplementation(
+      async (_handle: string, value: { background: string }) => {
+        operations.push(`durable:${value.background}`);
+        if (value.background === "aurora") await firstWrite;
+        return { ok: true };
+      },
+    );
+    mockRefreshStudioConfigCache.mockImplementation(async () => {
+      operations.push("cache:refresh");
+    });
+    const firstConfig = {
+      ...DEFAULT_BADGE_CONFIG,
+      background: "aurora" as const,
+    };
+    const secondConfig = {
+      ...DEFAULT_BADGE_CONFIG,
+      background: "particles" as const,
+    };
+
+    const firstResponse = PUT(makePutRequest(firstConfig, "session=abc"));
+    await vi.waitFor(() => {
+      expect(operations).toEqual(["durable:aurora"]);
+    });
+    const secondResponse = PUT(makePutRequest(secondConfig, "session=abc"));
+    await vi.waitFor(() => {
+      expect(mockRateLimit).toHaveBeenCalledTimes(2);
+    });
+    expect(mockDbUpsertStudioConfig).toHaveBeenCalledTimes(1);
+    releaseFirstWrite();
+
+    expect((await firstResponse).status).toBe(200);
+    expect((await secondResponse).status).toBe(200);
+    expect(operations).toEqual([
+      "durable:aurora",
+      "cache:refresh",
+      "durable:particles",
+      "cache:refresh",
+    ]);
+  });
+
+  it("returns 400 when Supabase rejects the config with a constraint error", async () => {
+    mockDbUpsertStudioConfig.mockResolvedValue({
+      ok: false,
+      reason: "constraint",
+      code: "23502",
+    });
 
     const config = { ...DEFAULT_BADGE_CONFIG, background: "aurora" as const };
     const res = await PUT(makePutRequest(config, "session=abc"));
 
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.success).toBe(false);
-    expect(json.error).toMatch(/persist studio config/i);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Invalid badge config",
+    });
+    expect(mockRefreshStudioConfigCache).not.toHaveBeenCalled();
   });
 
-  it("returns 200 when Redis write fails but Supabase succeeds (Redis best-effort)", async () => {
-    mockCacheSet.mockRejectedValue(new Error("Redis down"));
-    mockDbUpsertStudioConfig.mockResolvedValue(true);
+  it("returns 503 with Retry-After when Supabase is unavailable", async () => {
+    mockDbUpsertStudioConfig.mockResolvedValue({
+      ok: false,
+      reason: "unavailable",
+    });
+
+    const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("30");
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Storage temporarily unavailable",
+    });
+    expect(mockRefreshStudioConfigCache).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when Supabase fails unexpectedly", async () => {
+    mockDbUpsertStudioConfig.mockResolvedValue({
+      ok: false,
+      reason: "error",
+      code: "XX000",
+    });
+
+    const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Failed to persist studio config",
+    });
+    expect(mockRefreshStudioConfigCache).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 when the best-effort cache publisher completes", async () => {
+    mockDbUpsertStudioConfig.mockResolvedValue({ ok: true });
 
     const config = { ...DEFAULT_BADGE_CONFIG, background: "aurora" as const };
     const res = await PUT(makePutRequest(config, "session=abc"));
@@ -241,6 +349,7 @@ describe("PUT /api/studio/config", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
     expect(mockDbUpsertStudioConfig).toHaveBeenCalledTimes(1);
+    expect(mockRefreshStudioConfigCache).toHaveBeenCalledTimes(1);
   });
 
   it("rate limits by user login", async () => {

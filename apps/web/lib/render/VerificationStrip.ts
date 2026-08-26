@@ -1,6 +1,5 @@
+import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 import { escapeXml } from "./escape";
-
-const CORAL = "#E05A47";
 
 /**
  * Render a vertical verification strip on the right edge of the badge SVG.
@@ -21,10 +20,10 @@ export function renderVerificationStrip(hash: string, date: string): string {
 
   return `<g aria-label="Verification seal">
   <!-- Separator line -->
-  <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${CORAL}" stroke-width="1" opacity="0.15"/>
+  <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${VERIFICATION_CORAL}" stroke-width="1" opacity="0.15"/>
   <!-- Vertical text (bottom-to-top), clickable link to verification page -->
   <a href="${verifyUrl}" target="_blank">
-    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${CORAL}" opacity="0.50" text-anchor="middle" letter-spacing="2" style="cursor:pointer">VERIFIED \u00B7 ${safeHash} \u00B7 ${safeDate}</text>
+    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${VERIFICATION_CORAL}" opacity="0.50" text-anchor="middle" letter-spacing="2" style="cursor:pointer">VERIFIED \u00B7 ${safeHash} \u00B7 ${safeDate}</text>
   </a>
 </g>`;
 }
@@ -40,7 +39,7 @@ export function renderDemoVerificationStrip(): string {
   const textY = 315;
 
   return `<g aria-label="Sample badge indicator">
-  <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${CORAL}" stroke-width="1" opacity="0.15"/>
-  <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${CORAL}" opacity="0.50" text-anchor="middle" letter-spacing="2">SAMPLE \u00B7 NOT A REAL BADGE \u00B7 FOR ILLUSTRATION ONLY</text>
+  <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${VERIFICATION_CORAL}" stroke-width="1" opacity="0.15"/>
+  <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${VERIFICATION_CORAL}" opacity="0.50" text-anchor="middle" letter-spacing="2">SAMPLE \u00B7 NOT A REAL BADGE \u00B7 FOR ILLUSTRATION ONLY</text>
 </g>`;
 }

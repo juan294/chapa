@@ -1,7 +1,21 @@
+import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import { renderBadgeBranding } from "./BadgeBranding";
 
 describe("renderBadgeBranding", () => {
+  it("preserves the exact SVG bytes after metadata extraction", () => {
+    const svg = renderBadgeBranding(60, 585, 1140, [
+      "gitlab",
+      "github",
+      "github",
+      "bitbucket",
+    ]);
+
+    expect(createHash("sha256").update(svg).digest("hex")).toBe(
+      "d9645a9ee80a0b96264f2e1159ada863086e88fb4276b22b346bffa64389c904",
+    );
+  });
+
   it("returns SVG markup with branding text (opacity contrast tspans)", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
     expect(svg).toContain("Forged from ");

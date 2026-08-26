@@ -70,6 +70,7 @@ vi.mock("@/components/badge/BadgeContent", () => ({
     heatmapAnimation,
     statsDisplay,
     tierTreatment,
+    showFooter,
   }: {
     stats: { handle: string };
     impact: { compositeScore: number };
@@ -77,6 +78,7 @@ vi.mock("@/components/badge/BadgeContent", () => ({
     heatmapAnimation: string;
     statsDisplay: string;
     tierTreatment: string;
+    showFooter: boolean;
   }) => (
     <div
       data-testid="badge-content"
@@ -86,9 +88,26 @@ vi.mock("@/components/badge/BadgeContent", () => ({
       data-heatmap-animation={heatmapAnimation}
       data-stats-display={statsDisplay}
       data-tier-treatment={tierTreatment}
+      data-show-footer={String(showFooter)}
     />
   ),
   getBadgeContentCSS: vi.fn(() => ["/* badge-content-css */"]),
+}));
+
+vi.mock("./PreviewFooter", () => ({
+  PreviewFooter: ({
+    linkedPlatforms,
+    verification,
+  }: {
+    linkedPlatforms: string[];
+    verification: { hash: string; date: string } | null;
+  }) => (
+    <div
+      data-testid="preview-footer"
+      data-platforms={linkedPlatforms.join(",")}
+      data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
+    />
+  ),
 }));
 
 import { BadgePreviewCard } from "./BadgePreviewCard";
@@ -188,6 +207,27 @@ describe("BadgePreviewCard render", () => {
       expect(content.getAttribute("data-heatmap-animation")).toBe("fade-in");
       expect(content.getAttribute("data-stats-display")).toBe("static");
       expect(content.getAttribute("data-tier-treatment")).toBe("standard");
+      expect(content.getAttribute("data-show-footer")).toBe("false");
+    });
+
+    it("renders PreviewFooter inside the card with linked platforms and verification", () => {
+      const verification = { hash: "abc123", date: "2026-08-26" };
+      render(
+        <BadgePreviewCard
+          config={defaultConfig}
+          stats={{ ...stats, linkedPlatforms: ["gitlab", "bitbucket"] }}
+          impact={impact}
+          verification={verification}
+        />,
+      );
+
+      const card = screen.getByTestId("badge-card");
+      const footer = screen.getByTestId("preview-footer");
+      expect(card.contains(footer)).toBe(true);
+      expect(footer.getAttribute("data-platforms")).toBe("github,gitlab,bitbucket");
+      expect(footer.getAttribute("data-verification")).toBe(
+        "abc123:2026-08-26",
+      );
     });
 
     it("tracks card style via data attribute", () => {

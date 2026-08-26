@@ -47,7 +47,7 @@ Public profile page with full score breakdown, interactive radar chart, dimensio
 
 ### Creator Studio (`/studio`)
 
-Terminal-first badge customization UI with 9 visual effect categories, live preview, and config persistence. Requires GitHub login.
+Terminal-first Studio design playground with 9 visual effect categories, live preview, and saved Studio configuration. Requires GitHub login. Saved Studio settings do not change the public SVG badge or share page.
 
 ### CLI Tool (`chapa-cli`)
 

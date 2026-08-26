@@ -9,9 +9,9 @@ const mocks = vi.hoisted(() => ({
   isStudioEnabled: vi.fn(),
   getOptionalServerSessionFromHeaders: vi.fn(),
   getSessionGitHubToken: vi.fn(),
-  getStats: vi.fn(),
-  cacheGet: vi.fn(),
-  computeImpactV6: vi.fn(),
+  materializeDisplayProfile: vi.fn(),
+  getPublicProfileVerification: vi.fn(),
+  loadStudioConfig: vi.fn(),
   getServerLocale: vi.fn(),
   getServerT: vi.fn(),
 }));
@@ -38,16 +38,16 @@ vi.mock("@/lib/auth/github-session-token", () => ({
   getSessionGitHubToken: mocks.getSessionGitHubToken,
 }));
 
-vi.mock("@/lib/github/client", () => ({
-  getStats: mocks.getStats,
+vi.mock("@/lib/profile/materialize-profile", () => ({
+  materializeDisplayProfile: mocks.materializeDisplayProfile,
 }));
 
-vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mocks.cacheGet,
+vi.mock("@/lib/profile/public-profile", () => ({
+  getPublicProfileVerification: mocks.getPublicProfileVerification,
 }));
 
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mocks.computeImpactV6,
+vi.mock("@/lib/db/studio", () => ({
+  loadStudioConfig: mocks.loadStudioConfig,
 }));
 
 vi.mock("@/lib/i18n/server", () => ({
@@ -70,16 +70,20 @@ vi.mock("./StudioClient", () => ({
     handle,
     stats,
     initialConfig,
+    verification,
   }: {
     handle: string;
     stats: StatsData;
-    initialConfig: { theme: string };
+    initialConfig: { theme?: string; background?: string };
+    verification: { hash: string; date: string } | null;
   }) => (
     <section
       data-testid="studio-client"
       data-handle={handle}
       data-commits={String(stats.commitsTotal)}
-      data-config-theme={initialConfig.theme}
+      data-config-theme={initialConfig.theme ?? "none"}
+      data-config-background={initialConfig.background ?? "none"}
+      data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
     />
   ),
 }));
@@ -114,6 +118,7 @@ const stats = {
 
 beforeEach(() => {
   cleanup();
+  vi.clearAllMocks();
   mocks.headers.mockResolvedValue(new Headers());
   mocks.redirect.mockImplementation((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -121,9 +126,19 @@ beforeEach(() => {
   mocks.isStudioEnabled.mockResolvedValue(true);
   mocks.getOptionalServerSessionFromHeaders.mockReturnValue(session);
   mocks.getSessionGitHubToken.mockResolvedValue("gho_token");
-  mocks.getStats.mockResolvedValue(stats);
-  mocks.cacheGet.mockResolvedValue({ theme: "saved-theme" });
-  mocks.computeImpactV6.mockReturnValue({ compositeScore: 80 });
+  mocks.materializeDisplayProfile.mockResolvedValue({
+    stats,
+    displayImpact: { compositeScore: 80 },
+    statsComplete: true,
+  });
+  mocks.getPublicProfileVerification.mockReturnValue({
+    hash: "abc123",
+    date: "2026-08-26",
+  });
+  mocks.loadStudioConfig.mockResolvedValue({
+    status: "found",
+    config: { theme: "saved-theme" },
+  });
   mocks.getServerLocale.mockResolvedValue("en");
   mocks.getServerT.mockReturnValue(
     (key: string) =>
@@ -171,28 +186,38 @@ describe("StudioPage render", () => {
     expect(client.getAttribute("data-handle")).toBe("octocat");
     expect(client.getAttribute("data-commits")).toBe("42");
     expect(client.getAttribute("data-config-theme")).toBe("saved-theme");
-    expect(mocks.computeImpactV6).toHaveBeenCalledWith(stats);
+    expect(client.getAttribute("data-verification")).toBe(
+      "abc123:2026-08-26",
+    );
+    expect(mocks.materializeDisplayProfile).toHaveBeenCalledWith("octocat", {
+      token: "gho_token",
+    });
+    expect(mocks.getPublicProfileVerification).toHaveBeenCalledWith(
+      expect.objectContaining({ stats }),
+    );
+    expect(mocks.loadStudioConfig).toHaveBeenCalledWith("octocat");
   });
 
-  it("falls back to empty stats and the default config", async () => {
-    mocks.getStats.mockResolvedValue(null);
-    mocks.cacheGet.mockResolvedValue(null);
+  it("fails instead of rendering fabricated zero metrics when profile loading fails", async () => {
+    mocks.materializeDisplayProfile.mockResolvedValue(null);
+    mocks.loadStudioConfig.mockResolvedValue({ status: "not_found" });
+    const { default: StudioPage } = await import("./page");
+
+    await expect(StudioPage()).rejects.toThrow(
+      "Unable to load Studio profile for octocat",
+    );
+    expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
+  });
+
+  it("fails open to the default config when persisted storage is unavailable", async () => {
+    mocks.loadStudioConfig.mockResolvedValue({ status: "unavailable" });
     const { default: StudioPage } = await import("./page");
 
     render(await StudioPage());
 
-    const client = screen.getByTestId("studio-client");
-    expect(client.getAttribute("data-commits")).toBe("0");
-    expect(mocks.computeImpactV6).toHaveBeenCalledWith(
-      expect.objectContaining({
-        handle: "octocat",
-        displayName: "Octo Cat",
-        commitsTotal: 0,
-        heatmapData: expect.arrayContaining([
-          expect.objectContaining({ count: 0 }),
-        ]),
-      }),
-    );
+    expect(
+      screen.getByTestId("studio-client").getAttribute("data-config-background"),
+    ).toBe("solid");
   });
 
   it("is configured as a force-dynamic route", async () => {

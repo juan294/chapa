@@ -15,9 +15,11 @@ export interface OutputLine {
   text: string;
 }
 
-export interface CommandResult {
+export interface CommandResult<
+  TAction extends CommandAction = CommandAction,
+> {
   lines: OutputLine[];
-  action?: CommandAction;
+  action?: TAction;
 }
 
 export type CommandAction =
@@ -29,12 +31,14 @@ export type CommandAction =
   | { type: "reset" }
   | { type: "custom"; event: string; detail?: Record<string, unknown> };
 
-export interface CommandDef {
+export interface CommandDef<
+  TAction extends CommandAction = CommandAction,
+> {
   name: string;
   aliases?: string[];
   description: string;
   usage?: string;
-  execute: (args: string[]) => CommandResult;
+  execute: (args: string[]) => CommandResult<TAction>;
 }
 
 export type CommandDescriptions = Partial<Record<string, string>>;
@@ -49,7 +53,7 @@ export function makeLine(
 }
 
 /** Category short aliases for /set */
-const CATEGORY_ALIASES: Record<string, string> = {
+export const CATEGORY_ALIASES = {
   bg: "background",
   card: "cardStyle",
   border: "border",
@@ -59,13 +63,29 @@ const CATEGORY_ALIASES: Record<string, string> = {
   stats: "statsDisplay",
   tier: "tierTreatment",
   celebrate: "celebration",
-};
+} as const satisfies Readonly<Record<string, string>>;
+
+type CategoryAlias = keyof typeof CATEGORY_ALIASES;
+export type CategoryKey = (typeof CATEGORY_ALIASES)[CategoryAlias];
+
+export const CATEGORY_KEY_TO_ALIAS = Object.fromEntries(
+  Object.entries(CATEGORY_ALIASES).map(([alias, key]) => [key, alias]),
+) as Record<CategoryKey, CategoryAlias>;
+
+function resolveCategoryFromAliases<TCategory extends string>(
+  input: string,
+  aliases: Readonly<Record<string, TCategory>>,
+): TCategory | null {
+  if (Object.hasOwn(aliases, input)) {
+    return aliases[input] ?? null;
+  }
+
+  return Object.values(aliases).find((category) => category === input) ?? null;
+}
 
 /** Resolve a short alias or full key to the config key */
-export function resolveCategory(input: string): string | null {
-  if (CATEGORY_ALIASES[input]) return CATEGORY_ALIASES[input];
-  if (Object.values(CATEGORY_ALIASES).includes(input)) return input;
-  return null;
+export function resolveCategory(input: string): CategoryKey | null {
+  return resolveCategoryFromAliases(input, CATEGORY_ALIASES);
 }
 
 /** Sort field aliases for /sort command (alias → SortField) */
@@ -393,10 +413,10 @@ export function parseCommand(input: string): { name: string; args: string[] } | 
   return { name, args };
 }
 
-export function executeCommand(
+export function executeCommand<TAction extends CommandAction = CommandAction>(
   input: string,
-  commands: CommandDef[],
-): CommandResult {
+  commands: CommandDef<TAction>[],
+): CommandResult<TAction> {
   const parsed = parseCommand(input);
 
   if (!parsed) {
@@ -420,10 +440,12 @@ export function executeCommand(
   return cmd.execute(parsed.args);
 }
 
-export function getMatchingCommands(
+export function getMatchingCommands<
+  TAction extends CommandAction = CommandAction,
+>(
   partial: string,
-  commands: CommandDef[],
-): CommandDef[] {
+  commands: CommandDef<TAction>[],
+): CommandDef<TAction>[] {
   const lower = partial.toLowerCase();
   if (!lower.startsWith("/")) return [];
 

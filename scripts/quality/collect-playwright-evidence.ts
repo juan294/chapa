@@ -130,7 +130,7 @@ export function collectPlaywrightEvidence(
 
     const match = spec.title?.match(/@release-required\s+([a-z0-9.-]+)/i);
     if (!match) continue;
-    const scenarioId = match[1];
+    const scenarioId = match[1]!;
     if (!catalogById.has(scenarioId)) {
       throw new Error(`unknown Playwright scenario ${scenarioId}`);
     }

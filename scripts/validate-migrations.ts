@@ -52,10 +52,11 @@ function main(): void {
       continue;
     }
 
-    const num = parseInt(match[1], 10);
+    const prefix = match[1]!;
+    const num = parseInt(prefix, 10);
     if (seenNumbers.has(num)) {
       errors.push(
-        `  DUPLICATE PREFIX: "${filename}" has the same number (${match[1]}) as "${seenNumbers.get(num)}"`
+        `  DUPLICATE PREFIX: "${filename}" has the same number (${prefix}) as "${seenNumbers.get(num)}"`
       );
       continue;
     }
