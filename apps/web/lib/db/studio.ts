@@ -12,9 +12,18 @@
 
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
-import { cacheGet, cacheSet } from "../cache/redis";
+import { cacheDel, cacheGet, cacheSet } from "../cache/redis";
+import { withTimeout } from "../async/with-timeout";
+import { isValidBadgeConfig } from "../validation";
+import type { BadgeConfig } from "@chapa/shared";
 
 export const STUDIO_CONFIG_TTL = 31536000;
+export const STUDIO_CONFIG_NEGATIVE_TTL = 60;
+export const STUDIO_CONFIG_READ_TIMEOUT_MS = 2_000;
+export const STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY = {
+  kind: "studio-config-not-found",
+  version: 1,
+} as const;
 
 export type StudioConfigUpsertResult =
   | { ok: true }
@@ -23,6 +32,12 @@ export type StudioConfigUpsertResult =
       reason: "unavailable" | "constraint" | "error";
       code?: string;
     };
+
+export type StudioConfigReadResult =
+  | { status: "found"; config: BadgeConfig }
+  | { status: "not_found" }
+  | { status: "unavailable" }
+  | { status: "invalid" };
 
 interface StudioConfigRow {
   handle: string;
@@ -35,6 +50,75 @@ const REQUIRED_KEYS: readonly (keyof StudioConfigRow & string)[] = [
   "config",
   "updated_at",
 ];
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function isNegativeCacheEntry(
+  value: unknown,
+): value is typeof STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const entry = value as Record<string, unknown>;
+  return (
+    entry.kind === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.kind &&
+    entry.version === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.version
+  );
+}
+
+async function setCacheBestEffort(
+  cacheKey: string,
+  value: unknown,
+  ttl: number,
+  operation: string,
+): Promise<boolean> {
+  try {
+    const stored = await cacheSet(cacheKey, value, ttl);
+    if (!stored) {
+      console.warn(
+        `[studio/config] Redis ${operation} failed (best-effort):`,
+        "cacheSet returned false",
+      );
+    }
+    return stored;
+  } catch (error) {
+    console.warn(
+      `[studio/config] Redis ${operation} failed (best-effort):`,
+      errorMessage(error),
+    );
+    return false;
+  }
+}
+
+/** Publish a committed Studio config to Redis without changing API success. */
+export async function cacheStudioConfig(
+  login: string,
+  config: BadgeConfig,
+): Promise<void> {
+  const cacheKey = `config:${login.toLowerCase()}`;
+  const stored = await setCacheBestEffort(
+    cacheKey,
+    config,
+    STUDIO_CONFIG_TTL,
+    "write",
+  );
+  if (!stored) {
+    // A failed publication must not leave an older year-long value
+    // authoritative after Redis recovers.
+    await cacheDel(cacheKey);
+  }
+}
 
 /**
  * Upsert a studio config for a handle. One row per handle — the latest save
@@ -74,19 +158,9 @@ export async function dbUpsertStudioConfig(
 
     if (code === "23505") return { ok: true };
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : typeof error === "object" &&
-            error !== null &&
-            "message" in error &&
-            typeof error.message === "string"
-          ? error.message
-          : String(error);
-
     console.error(
       "[db] dbUpsertStudioConfig failed:",
-      message,
+      errorMessage(error),
     );
 
     if (code === "23502" || code === "22P02" || code === "22003") {
@@ -100,46 +174,101 @@ export async function dbUpsertStudioConfig(
 }
 
 /**
- * Fetch the persisted studio config for a handle. Returns null on miss or
- * when Supabase is unavailable.
+ * Fetch and validate the persisted Studio config while preserving distinct
+ * miss, unavailable, and invalid outcomes.
  */
-export async function dbGetStudioConfig(handle: string): Promise<unknown | null> {
+export async function dbGetStudioConfig(
+  handle: string,
+): Promise<StudioConfigReadResult> {
   const db = getSupabase();
-  if (!db) return null;
+  if (!db) return { status: "unavailable" };
 
   try {
-    const { data, error } = await db
-      .from("studio_configs")
-      .select("handle, config, updated_at")
-      .eq("handle", handle.toLowerCase())
-      .maybeSingle();
+    const { data, error } = await withTimeout(
+      Promise.resolve(
+        db
+          .from("studio_configs")
+          .select("handle, config, updated_at")
+          .eq("handle", handle.toLowerCase())
+          .maybeSingle(),
+      ),
+      STUDIO_CONFIG_READ_TIMEOUT_MS,
+      "dbGetStudioConfig",
+    );
 
     if (error) throw error;
-    if (!data) return null;
+    if (!data) return { status: "not_found" };
 
     const row = parseRow<StudioConfigRow>(data, REQUIRED_KEYS, "studio_configs");
-    return row ? row.config : null;
+    if (!row || !isValidBadgeConfig(row.config)) {
+      console.error(
+        "[STUDIO_CONFIG_FALLBACK] Invalid persisted Studio configuration",
+        { handle: handle.toLowerCase() },
+      );
+      return { status: "invalid" };
+    }
+
+    return { status: "found", config: row.config };
   } catch (error) {
-    console.error("[db] dbGetStudioConfig failed:", (error as Error).message);
-    return null;
+    console.error(
+      "[STUDIO_CONFIG_FALLBACK] dbGetStudioConfig failed:",
+      errorMessage(error),
+    );
+    return { status: "unavailable" };
   }
 }
 
-/** Load a studio config from Redis, falling back to its durable Supabase row. */
-export async function loadStudioConfig(login: string): Promise<unknown | null> {
-  const cacheKey = `config:${login}`;
-  const cached = await cacheGet<unknown>(cacheKey);
-  if (cached !== null) return cached;
+/** Load and validate a Studio config from Redis, then durable Supabase storage. */
+export async function loadStudioConfig(
+  login: string,
+): Promise<StudioConfigReadResult> {
+  const normalizedLogin = login.toLowerCase();
+  const cacheKey = `config:${normalizedLogin}`;
+  let cached: unknown = null;
 
-  const dbConfig = await dbGetStudioConfig(login);
-  if (dbConfig === null) return null;
-
-  void cacheSet(cacheKey, dbConfig, STUDIO_CONFIG_TTL).catch((error: unknown) => {
-    console.warn(
-      "[studio/config] Redis rehydration failed (best-effort):",
-      error instanceof Error ? error.message : String(error),
+  try {
+    cached = await withTimeout(
+      cacheGet<unknown>(cacheKey),
+      STUDIO_CONFIG_READ_TIMEOUT_MS,
+      "loadStudioConfig cache read",
     );
-  });
+  } catch (error) {
+    console.error(
+      "[STUDIO_CONFIG_FALLBACK] Studio config cache read failed:",
+      errorMessage(error),
+    );
+  }
 
-  return dbConfig;
+  if (isNegativeCacheEntry(cached)) return { status: "not_found" };
+  if (cached !== null) {
+    if (isValidBadgeConfig(cached)) {
+      return { status: "found", config: cached };
+    }
+    console.error(
+      "[STUDIO_CONFIG_FALLBACK] Invalid cached Studio configuration",
+      { handle: normalizedLogin },
+    );
+    await cacheDel(cacheKey);
+  }
+
+  const dbResult = await dbGetStudioConfig(normalizedLogin);
+  if (dbResult.status === "not_found") {
+    void setCacheBestEffort(
+      cacheKey,
+      STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY,
+      STUDIO_CONFIG_NEGATIVE_TTL,
+      "negative-cache write",
+    );
+    return dbResult;
+  }
+  if (dbResult.status !== "found") return dbResult;
+
+  void setCacheBestEffort(
+    cacheKey,
+    dbResult.config,
+    STUDIO_CONFIG_TTL,
+    "rehydration",
+  );
+
+  return dbResult;
 }

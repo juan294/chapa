@@ -74,14 +74,15 @@ vi.mock("./StudioClient", () => ({
   }: {
     handle: string;
     stats: StatsData;
-    initialConfig: { theme: string };
+    initialConfig: { theme?: string; background?: string };
     verification: { hash: string; date: string } | null;
   }) => (
     <section
       data-testid="studio-client"
       data-handle={handle}
       data-commits={String(stats.commitsTotal)}
-      data-config-theme={initialConfig.theme}
+      data-config-theme={initialConfig.theme ?? "none"}
+      data-config-background={initialConfig.background ?? "none"}
       data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
     />
   ),
@@ -134,7 +135,10 @@ beforeEach(() => {
     hash: "abc123",
     date: "2026-08-26",
   });
-  mocks.loadStudioConfig.mockResolvedValue({ theme: "saved-theme" });
+  mocks.loadStudioConfig.mockResolvedValue({
+    status: "found",
+    config: { theme: "saved-theme" },
+  });
   mocks.getServerLocale.mockResolvedValue("en");
   mocks.getServerT.mockReturnValue(
     (key: string) =>
@@ -196,13 +200,24 @@ describe("StudioPage render", () => {
 
   it("fails instead of rendering fabricated zero metrics when profile loading fails", async () => {
     mocks.materializeDisplayProfile.mockResolvedValue(null);
-    mocks.loadStudioConfig.mockResolvedValue(null);
+    mocks.loadStudioConfig.mockResolvedValue({ status: "not_found" });
     const { default: StudioPage } = await import("./page");
 
     await expect(StudioPage()).rejects.toThrow(
       "Unable to load Studio profile for octocat",
     );
     expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
+  });
+
+  it("fails open to the default config when persisted storage is unavailable", async () => {
+    mocks.loadStudioConfig.mockResolvedValue({ status: "unavailable" });
+    const { default: StudioPage } = await import("./page");
+
+    render(await StudioPage());
+
+    expect(
+      screen.getByTestId("studio-client").getAttribute("data-config-background"),
+    ).toBe("solid");
   });
 
   it("is configured as a force-dynamic route", async () => {

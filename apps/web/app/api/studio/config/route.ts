@@ -4,16 +4,39 @@ import {
   getSessionSecret,
   requireRequestSession,
 } from "@/lib/auth/session";
-import { cacheSet, rateLimit } from "@/lib/cache/redis";
+import { rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import {
-  STUDIO_CONFIG_TTL,
+  cacheStudioConfig,
   dbUpsertStudioConfig,
   loadStudioConfig,
 } from "@/lib/db/studio";
-import type { BadgeConfig } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+
+const studioConfigWriteTails = new Map<string, Promise<void>>();
+
+async function serializeStudioConfigWrite<T>(
+  login: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const key = login.toLowerCase();
+  const previous = studioConfigWriteTails.get(key) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  const tail = current.then(
+    () => undefined,
+    () => undefined,
+  );
+  studioConfigWriteTails.set(key, tail);
+
+  try {
+    return await current;
+  } finally {
+    if (studioConfigWriteTails.get(key) === tail) {
+      studioConfigWriteTails.delete(key);
+    }
+  }
+}
 
 /**
  * GET /api/studio/config — Load the authenticated user's badge config.
@@ -38,7 +61,22 @@ export const GET = withErrorCapture("/api/studio/config", async (request: NextRe
   }
 
   const config = await loadStudioConfig(session.login);
-  return NextResponse.json({ config });
+  if (config.status === "found") {
+    return NextResponse.json({ config: config.config });
+  }
+  if (config.status === "not_found") {
+    return NextResponse.json({ config: null });
+  }
+  if (config.status === "unavailable") {
+    return NextResponse.json(
+      { error: "Storage temporarily unavailable" },
+      { status: 503, headers: { "Retry-After": "30" } },
+    );
+  }
+  return NextResponse.json(
+    { error: "Invalid persisted studio config" },
+    { status: 500 },
+  );
 });
 
 /**
@@ -76,21 +114,20 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
     );
   }
 
-  const cacheKey = `config:${session.login}`;
+  const normalizedLogin = session.login.toLowerCase();
+  const dbResult = await serializeStudioConfigWrite(
+    normalizedLogin,
+    async () => {
+      // Commit durable state before publishing it to the hot cache. A rejected
+      // Supabase write must never make an uncommitted config visible in Redis.
+      const result = await dbUpsertStudioConfig(normalizedLogin, body);
+      if (!result.ok) return result;
 
-  // Write to Supabase (durable) AND Redis (hot read path).
-  // Supabase is the success criterion — Redis is best-effort.
-  const [, dbResult] = await Promise.all([
-    cacheSet(cacheKey, body as BadgeConfig, STUDIO_CONFIG_TTL).catch(
-      (err: unknown) => {
-        console.warn(
-          "[studio/config] Redis write failed (best-effort):",
-          (err as Error).message,
-        );
-      },
-    ),
-    dbUpsertStudioConfig(session.login, body),
-  ]);
+      await cacheStudioConfig(normalizedLogin, body);
+
+      return result;
+    },
+  );
 
   if (!dbResult.ok && dbResult.reason === "constraint") {
     return NextResponse.json(
