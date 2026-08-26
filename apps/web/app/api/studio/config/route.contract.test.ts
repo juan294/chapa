@@ -14,6 +14,10 @@ const { mockDbUpsertStudioConfig, mockRequireRequestSession } = vi.hoisted(() =>
   })),
 }));
 
+vi.mock("@/lib/cache/redis", () => ({
+  rateLimit: vi.fn(async () => ({ allowed: true, current: 1, limit: 30 })),
+}));
+
 vi.mock("@/lib/auth/session", () => ({
   getOptionalRequestSession: vi.fn(() => ({
     login: "octocat",
@@ -25,9 +29,9 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("@/lib/db/studio", () => ({
-  STUDIO_CONFIG_TTL: 31536000,
+  cacheStudioConfig: vi.fn(async () => undefined),
   dbUpsertStudioConfig: mockDbUpsertStudioConfig,
-  loadStudioConfig: vi.fn(async () => null),
+  loadStudioConfig: vi.fn(async () => ({ status: "not_found" })),
 }));
 
 import { PUT } from "./route";

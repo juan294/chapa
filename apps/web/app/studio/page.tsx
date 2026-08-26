@@ -8,7 +8,6 @@ import { getPublicProfileVerification } from "@/lib/profile/public-profile";
 import { loadStudioConfig } from "@/lib/db/studio";
 import { Navbar } from "@/components/Navbar";
 import { StudioClient } from "./StudioClient";
-import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
@@ -45,9 +44,9 @@ export default async function StudioPage() {
   }
 
   // Fetch the live owner display projection and saved config in parallel.
-  const [materialized, savedConfig] = await Promise.all([
+  const [materialized, savedConfigResult] = await Promise.all([
     materializeDisplayProfile(session.login, { token }),
-    loadStudioConfig(session.login) as Promise<BadgeConfig | null>,
+    loadStudioConfig(session.login),
   ]);
 
   if (!materialized) {
@@ -55,7 +54,9 @@ export default async function StudioPage() {
   }
 
   const verification = getPublicProfileVerification(materialized);
-  const initialConfig = savedConfig ?? DEFAULT_BADGE_CONFIG;
+  const initialConfig = savedConfigResult.status === "found"
+    ? savedConfigResult.config
+    : DEFAULT_BADGE_CONFIG;
 
   const locale = await getServerLocale();
   const t = getServerT(locale);
