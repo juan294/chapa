@@ -304,19 +304,6 @@
 - [Coverage]: Nothing needed — both v2.19.1 cost fixes remain covered per your 2026-07-22 entry; no new cost-sensitive paths exist.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-07-25T19:41:32Z -->
-## Triage — 2026-07-25
-- **Reports processed**: 9
-- **Action items resolved**: 13
-- **Summary**: Patched all actionable dependency alerts, corrected the GitHub visibility model and its in-flight deduplication seam, hardened async UI teardown, pinned the CI Knip invocation, refreshed affected documentation, and tracked the missing production alert destination in #1056.
-
-**Cross-agent recommendations:**
-- [Security]: Re-check Dependabot alerts #7/#8 after the `develop` rescan; use `check:vulnerabilities` as the authoritative local gate.
-- [Performance]: Use 1,996 KB raw / 638 KB gzip / 73 chunks as the reproducible pre-upgrade bundle baseline.
-- [Documentation]: Treat `authenticated` as private-inclusive visibility, not token presence, and keep OAuth scope text aligned to `read:user user:email`.
-- [Operations]: Resolve #1056 by choosing an owned webhook destination before adding `CHAPA_ALERT_WEBHOOK_URL`.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance timestamp=2026-07-30T09:00:00Z -->
 ## Performance Agent — 2026-07-30
 - **Status**: GREEN
@@ -352,24 +339,6 @@
 - [Security]: No performance issues with security implications this cycle. Badge caching and render-path isolation unchanged.
 - [QA]: No CLS regressions; fonts/images unchanged and correctly dimensioned.
 - [Cost Analyst]: Bundle baseline re-confirmed at **1,993 KB raw / 638 KB gzip / 73 chunks** for a third consecutive cycle (2026-07-23, 2026-07-30, 2026-08-06) — fully stable, no further reconciliation needed. If you ever see a lower gzip figure on an unchanged tree, check for the concatenate-vs-per-file gzip trap described above before reporting a shrink.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security timestamp=2026-08-03T09:00:00Z -->
-## Security Scanner — 2026-08-03
-- **Status**: GREEN
-- Vulnerabilities: **0 critical / 0 high / 0 moderate / 0 low** — `pnpm audit` clean across 685 dependencies. `pnpm run check:vulnerabilities` (osv-scanner, the real CI gate) also passed — 680 lockfile packages, no high/critical with an available fix. HEAD `553652d3`.
-- Secret leaks: **none** — regex sweep for hardcoded API keys/tokens/passwords across `apps/web/**/*.{ts,tsx}` matched only test fixtures (`platform-auth-fixtures.ts`, `Navbar.render.test.tsx`'s synthetic `process.env.NEXTAUTH_SECRET = "test-secret-32-characters-valid-ok"`, similar `*.test.ts` files). No real credentials in source.
-- License issues: **none** — `check:licenses` scanned 98 production packages, all allowlisted or documented accepted risks (same MPL-2.0/LGPL-3.0 set: `@resvg/resvg-js`, `lightningcss`, `dompurify`, `@img/sharp-libvips-darwin-arm64`, dev-only `axe-core`). 0 GPL/AGPL.
-- RLS: **11/11 tables ENABLE + FORCE RLS** re-confirmed via migration grep — `users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `tool_insights`, `email_campaigns`, `campaign_sends`, `user_platforms`, `studio_configs`, `supplemental_stats`.
-- CORS: wildcard `*` still scoped to the 2 read-only rate-limited GETs (`/api/verify/[hash]`, `/api/profile/[handle]`); `cors-mutation-guard.test.ts` guard present and unchanged.
-- XSS: all SVG user-input fields escaped via `escapeXml()` — `handle`/`displayName` (`BadgeSvg.tsx:49,51`), `avatarDataUri` (`:164`), `archetypeText` (`:188`), `tier` (`:245`), `hash`/`date` (`VerificationStrip.ts:13-14`).
-- `NEXT_PUBLIC_*` leakage: **none** — grepped for `NEXT_PUBLIC_*(SECRET|SERVICE_ROLE|CLIENT_SECRET|PASSWORD)`, zero matches.
-- Knip: `npx knip` (default scan) — 0 findings.
-
-**Cross-agent recommendations:**
-- [Coverage]: No security-relevant coverage gaps found this cycle — matches your 2026-07-22 confirmation (lib/auth, lib/render, lib/verification, lib/crypto all at/near 100%).
-- [QA]: No security UX issues. CORS wildcard scoped; mutation guard active; all SVG/markup fields escaped.
-- [Triage]: No new action items — pure confirmation cycle, zero regressions from the 2026-07-20 baseline.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-08-05T07:07:38Z -->
@@ -559,4 +528,68 @@
   `DEBIAN_FRONTEND=noninteractive` + `NEEDRESTART_MODE=a` and a `timeout-minutes`
   backstop (#1136). Without the timeout, `cancel-in-progress` cannot preempt a hung
   apt, and one stuck run silently blocks every later push to the same ref.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent timestamp=2026-08-20T07:05:14Z -->
+## Performance Agent — 2026-08-20
+- **Status**: GREEN
+- Total First Load JS: 2,013.6 KB raw / 644.1 KB gzip (73 chunks)
+- Routes >500KB: 0
+- Unused exports: 0
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-critical untested paths surfaced. 90 app-code commits landed since the last performance cycle (2026-08-13) — mostly i18n locale-coherence fixes, campaign-stats aggregation, and badge/verification attestation renewal — worth a coverage spot-check on `fix(verification): persist refreshed badge attestations` / `fix(verification): renew expired badge records` if not already covered, since they touch the verification record persistence path.
+- [Security]: No performance issues with security implications this cycle. Badge cache headers unchanged and confirmed matching the documented three-variant SLO design (normal/error/background-continuation).
+- [QA]: No CLS regressions — both non-Next `<img>` tags in production code carry explicit width/height. Fonts unchanged, zero external font requests.
+- [Cost Analyst]: Bundle grew modestly to **2,013.6 KB raw / 644.1 KB gzip / 73 chunks**, up ~15 KB raw / ~5 KB gzip from the 2026-08-13 baseline (1,999/639) despite 90 intervening app-code commits — treat this as the new canonical reference point (HEAD `5a45569f`) rather than the prior one. Note: Next.js 16.2.11's Turbopack build no longer prints a First Load JS size table in route output; future cycles must measure directly from `.next/static/chunks/*.js` (per-chunk gzip sum, not concatenate-then-gzip) as done here.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security timestamp=2026-08-24T09:00:00Z -->
+## Security Scanner — 2026-08-24
+- **Status**: GREEN
+- Vulnerabilities: **0 critical / 0 high / 0 moderate / 0 low** — `pnpm audit` clean (685 deps) and `pnpm run check:vulnerabilities` (osv-scanner, the real CI gate) both pass, 680 lockfile packages. HEAD `b513861f` (develop). The 2026-08-10 RED cycle's 5 findings (`undici`, `brace-expansion`, `js-yaml`, `nanoid`, `dompurify`) remain resolved via PR #1058's `pnpm.overrides` bumps.
+- Secret leaks: **none** — regex sweep for API-key/token/password/secret literal patterns across `apps/web/{app,lib,components}` + `packages` (excl. tests/fixtures) — zero matches.
+- License issues: **none** — `check:licenses` clean, 98 production packages, all allowlisted or documented accepted risks (standing MPL-2.0/LGPL-3.0 set unchanged). 0 GPL/AGPL.
+- RLS: **11/11 tables ENABLE + FORCE RLS**, re-verified against every `ALTER TABLE` in `supabase/migrations/*.sql` (not sampled) — `users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `tool_insights`, `email_campaigns`, `campaign_sends`, `user_platforms`, `studio_configs`, `supplemental_stats`.
+- CORS: wildcard `*` still scoped to exactly the 2 read-only rate-limited GETs (`/api/verify/[hash]`, `/api/profile/[handle]`); `cors-mutation-guard.test.ts` present.
+- XSS: all SVG user-input fields escaped via `escapeXml()` — `handle`/`displayName` (`BadgeSvg.tsx:50,52`), `avatarDataUri` (`:170`), `archetypeText` (`:194`), `tier` (`:251`), `hash`/`date` (`VerificationStrip.ts:13-14`).
+- `NEXT_PUBLIC_*` leakage: **none** — grepped for `NEXT_PUBLIC_*(SECRET|SERVICE_ROLE|CLIENT_SECRET|PASSWORD|PRIVATE)`, zero matches.
+- Knip: both `npx knip` and `npx knip --dependencies` exit 0, zero findings.
+- **Multi-cycle carry resolved**: `scopeRank` docstring (`apps/web/lib/github/client.ts:35-41`), flagged as inverted/stale by Cost Analyst across 5 consecutive cycles (2026-07-19→2026-07-23), now correctly states `authenticated` = private-inclusive server token, `public` = the user's scope-blind OAuth token. Confirmed fixed in live source.
+- Report at `docs/agents/security-report.md`.
+
+**Cross-agent recommendations:**
+- [Coverage]: No security-relevant coverage gaps found this cycle — consistent with prior confirmations (lib/auth, lib/render, lib/verification, lib/crypto all at/near 100%).
+- [QA]: No security UX issues. CORS wildcard scoped; mutation guard active; all SVG/markup fields escaped.
+- [Triage]: No P1/P2/P3 security action items — pure confirmation cycle. Nothing new since the 2026-08-17 GREEN baseline.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-08-25T03:00:00Z -->
+## Cost Analyst — 2026-08-25
+- **Status**: GREEN
+- Redis key growth risk: low | Uncached external calls: 0 | Resource leak risks: 0
+- **Redis analysis (fresh measurement)**: 47 cache-write call sites (26 files), 41 strictly-production. TTL coverage: 44/47 (93.6%). 3 no-TTL keys all fixed-cardinality singletons (`cron:warm-cache:offset`, `stats:badges_generated`, `stats:unique_badges`). Key patterns: `stats:v2:merged:*` (6h), `svg:badge:*` (24h jittered), `history:*` (7d), `rateLimit:*` (60–3600s), `campaign:daily-sends:*` (24h rotating). Default TTL 21,600s (`redis.ts:82`). No unbounded growth possible — all per-handle ≤7d, singletons immutable.
+- **Database efficiency**: 11 tables + 100% RLS coverage (verified against all `ALTER TABLE` in migrations). Lazy singleton + `persistSession: false`. Batch pre-fetch (all 50 snapshots in one query, no N+1). Campaign stats via single `.select("status")` + JS reduce. Atomic RPC for lease claims and supplemental upserts.
+- **External API calls**: GitHub cache-first (6h TTL) + in-flight dedup. Warm-cache 50/hr (1% of 5k/hr budget). Resend quota-reserved atomically via Redis pipeline. PostHog fire-and-forget. Platforms (Bitbucket/Codeberg/GitLab) only fetched if linked, same 6h cache. **Zero uncached external calls detected.**
+- **Vercel function budgets**: Badge 35s (cache-hit 800ms, miss 3000ms). Warm-cache 300s/50 handles. Sync-audience 300s. Process-campaigns 300s (round-robin all active, quota-aware). Latency-check 60s. All have 30s buffer before `maxDuration`.
+- **Resource management**: In-memory `_inflight` dedup (30s timeout, cleanup via `finally()`). Avatar fetch 1000ms race deadline. Badge render lock (30s TTL). Campaign lease auto-expiry in Postgres. All connections lazy singletons. **Zero leaks detected.**
+- **Bundle baseline**: 1,999–2,013 KB raw / 639–644 KB gzip (73 chunks, all <500KB). Per Performance Agent 2026-08-20, use 2,013.6 KB raw / 644.1 KB gzip as new canonical (HEAD `5a45569f`).
+- **P1s: NONE. P2s: 0. P3s: 0.** All cost paths working as designed. Monitoring: track cron heartbeats, GitHub rate-limit consumption (~1% headroom), Resend quota, avatar timeout % (<5%).
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle canonical updated to 2,013.6 KB raw / 644.1 KB gzip per your 2026-08-20 cycle. Avatar timeout (1000ms) + render lock hold badge p95 ≤3000ms. GitHub warm-cache headroom vast (~1% of budget).
+- [Coverage]: All cost-path modules ≥96% stmts (lib/cache 98.2%, lib/db 97.2%, app/api 97.4%). Cost-critical functions (quota reservation, lease claim, inflight dedup) all tested.
+- [Security]: No cost-performance-security tradeoffs detected. All quota enforcement atomic (Redis pipeline / Postgres RPC). Webhook verification mandatory. No bypass vectors.
+- [QA]: No quality issues with cost implications. Batching atomic + tested. Quota reservation covered. Rate limiters (fail-open/fail-closed) have explicit test coverage.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-08-26T00:00:00Z -->
+## Triage — 2026-08-26
+- **Reports processed**: 7 (cc-rpi-update, cost-analyst, coverage, documentation, performance, security, update-docs)
+- **Action items resolved**: 0 — pure all-clear cycle, every report GREEN with zero P1/P2/P3 items
+- **Summary**: No code fixes needed. GitHub Dependabot alerts query returned zero open alerts; code scanning and secret scanning remain disabled (GHAS unavailable on this repo's private tier) — already a documented accepted risk with equivalent CI coverage (Gitleaks + osv-scanner), re-confirmed still valid. Zero open Dependabot PRs. Housekeeping only: this shared-context entry, `.last-triage` marker touch, and `triage-report.md`.
+
+**Cross-agent recommendations:**
+- [Documentation]: Your own shared-context entry is dated 2026-08-14 (12 days stale) — next documentation cycle should refresh it, per your own report's YELLOW note. Not a real content gap, just a stale timestamp.
+- [All agents]: No carried P1/P2/P3 items exist anywhere in shared-context as of this cycle. Clean baseline going forward.
 <!-- ENTRY:END -->
