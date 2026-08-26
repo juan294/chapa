@@ -700,7 +700,7 @@ Use this checklist to verify every feature works.
 
 - [ ] Navigate to `/studio` (must be logged in)
 - [ ] See two-column layout: preview left, terminal right
-- [ ] See welcome message: "Creator Studio — customize your badge"
+- [ ] See welcome message: "Creator Studio — customize your badge preview"
 - [ ] Type `/help` — see list of all commands
 - [ ] Type `/status` — see current config values for all 9 categories
 - [ ] Type `/clear` — terminal output is cleared
@@ -731,7 +731,7 @@ Use this checklist to verify every feature works.
 
 ### 5. Studio — Save, Reset, Embed, Share
 
-- [ ] Type `/save` — see "Saving configuration..." then "Configuration saved!"
+- [ ] Type `/save` — see "Saving..." then "Preview configuration saved. Your public badge and share page are unchanged."
 - [ ] Type `/reset` — see "Configuration reset to defaults." + preview resets
 - [ ] Type `/embed` — see Markdown and HTML embed snippets with your handle
 - [ ] Type `/share` — see direct link and badge SVG URL with your handle

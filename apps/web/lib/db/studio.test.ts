@@ -4,10 +4,10 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 const mockUpsert = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
-const { mockCacheDel, mockCacheGet, mockCacheSet } = vi.hoisted(() => ({
+const { mockCacheDel, mockCacheGet, mockCacheSetVersioned } = vi.hoisted(() => ({
   mockCacheDel: vi.fn(),
   mockCacheGet: vi.fn(),
-  mockCacheSet: vi.fn(),
+  mockCacheSetVersioned: vi.fn(),
 }));
 let terminalResolve: { data: unknown; error: unknown };
 let terminalNeverResolves = false;
@@ -41,7 +41,7 @@ vi.mock("./supabase", () => ({
 vi.mock("../cache/redis", () => ({
   cacheDel: mockCacheDel,
   cacheGet: mockCacheGet,
-  cacheSet: mockCacheSet,
+  cacheSetVersioned: mockCacheSetVersioned,
 }));
 
 import { getSupabase } from "./supabase";
@@ -54,6 +54,7 @@ import {
   dbGetStudioConfig,
   dbUpsertStudioConfig,
   loadStudioConfig,
+  refreshStudioConfigCache,
 } from "./studio";
 
 const config = { ...DEFAULT_BADGE_CONFIG, background: "aurora" as const };
@@ -63,7 +64,7 @@ beforeEach(() => {
   terminalResolve = { data: null, error: null };
   terminalNeverResolves = false;
   mockCacheGet.mockResolvedValue(null);
-  mockCacheSet.mockResolvedValue(true);
+  mockCacheSetVersioned.mockResolvedValue("stored");
   mockCacheDel.mockResolvedValue(undefined);
 });
 
@@ -164,23 +165,29 @@ describe("dbUpsertStudioConfig", () => {
 
 describe("cacheStudioConfig", () => {
   it("publishes a committed config under the normalized handle", async () => {
-    await cacheStudioConfig("Juan294", config);
+    await cacheStudioConfig("Juan294", config, 42);
 
-    expect(mockCacheSet).toHaveBeenCalledWith(
+    expect(mockCacheSetVersioned).toHaveBeenCalledWith(
       "config:juan294",
-      config,
+      {
+        kind: "studio-config",
+        version: 1,
+        revision: 42,
+        config,
+      },
+      42,
       STUDIO_CONFIG_TTL,
     );
   });
 
   it("logs a false Redis result without rejecting the committed save", async () => {
-    mockCacheSet.mockResolvedValue(false);
+    mockCacheSetVersioned.mockResolvedValue("failed");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    await expect(cacheStudioConfig("juan294", config)).resolves.toBeUndefined();
+    await expect(cacheStudioConfig("juan294", config, 42)).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalledWith(
       "[studio/config] Redis write failed (best-effort):",
-      "cacheSet returned false",
+      "cacheSetVersioned returned failed",
     );
     expect(mockCacheDel).toHaveBeenCalledWith("config:juan294");
   });
@@ -189,13 +196,13 @@ describe("cacheStudioConfig", () => {
 describe("dbGetStudioConfig", () => {
   it("returns the config on hit", async () => {
     terminalResolve = {
-      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z" },
+      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z", revision: 42 },
       error: null,
     };
 
     const result = await dbGetStudioConfig("juan294");
 
-    expect(result).toEqual({ status: "found", config });
+    expect(result).toEqual({ status: "found", config, revision: 42 });
   });
 
   it("queries by lowercased handle", async () => {
@@ -233,6 +240,7 @@ describe("dbGetStudioConfig", () => {
         handle: "juan294",
         config: { ...config, background: "not-a-background" },
         updated_at: "2026-06-25T00:00:00Z",
+        revision: 42,
       },
       error: null,
     };
@@ -253,11 +261,17 @@ describe("dbGetStudioConfig", () => {
 
 describe("loadStudioConfig", () => {
   it("returns a Redis cache hit without querying Supabase", async () => {
-    mockCacheGet.mockResolvedValue(config);
+    mockCacheGet.mockResolvedValue({
+      kind: "studio-config",
+      version: 1,
+      revision: 42,
+      config,
+    });
 
     await expect(loadStudioConfig("juan294")).resolves.toEqual({
       status: "found",
       config,
+      revision: 42,
     });
 
     expect(mockCacheGet).toHaveBeenCalledWith("config:juan294");
@@ -266,18 +280,25 @@ describe("loadStudioConfig", () => {
 
   it("falls back to Supabase and rehydrates Redis after a cache miss", async () => {
     terminalResolve = {
-      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z" },
+      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z", revision: 42 },
       error: null,
     };
 
     await expect(loadStudioConfig("juan294")).resolves.toEqual({
       status: "found",
       config,
+      revision: 42,
     });
 
-    expect(mockCacheSet).toHaveBeenCalledWith(
+    expect(mockCacheSetVersioned).toHaveBeenCalledWith(
       "config:juan294",
-      config,
+      {
+        kind: "studio-config",
+        version: 1,
+        revision: 42,
+        config,
+      },
+      42,
       STUDIO_CONFIG_TTL,
     );
   });
@@ -287,9 +308,10 @@ describe("loadStudioConfig", () => {
       status: "not_found",
     });
 
-    expect(mockCacheSet).toHaveBeenCalledWith(
+    expect(mockCacheSetVersioned).toHaveBeenCalledWith(
       "config:nobody",
       STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY,
+      0,
       STUDIO_CONFIG_NEGATIVE_TTL,
     );
   });
@@ -304,22 +326,53 @@ describe("loadStudioConfig", () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
-  it("rejects malformed cached data and repairs it from Supabase", async () => {
-    mockCacheGet.mockResolvedValue({ ...config, background: "invalid" });
+  it("repairs a legacy negative-cache entry without a revision", async () => {
+    mockCacheGet.mockResolvedValue({
+      kind: "studio-config-not-found",
+      version: 1,
+    });
     terminalResolve = {
-      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z" },
+      data: {
+        handle: "juan294",
+        config,
+        updated_at: "2026-06-25T00:00:00Z",
+        revision: 42,
+      },
       error: null,
     };
 
     await expect(loadStudioConfig("juan294")).resolves.toEqual({
       status: "found",
       config,
+      revision: 42,
+    });
+    expect(mockCacheDel).toHaveBeenCalledWith("config:juan294");
+    expect(mockFrom).toHaveBeenCalledWith("studio_configs");
+  });
+
+  it("rejects malformed cached data and repairs it from Supabase", async () => {
+    mockCacheGet.mockResolvedValue({ ...config, background: "invalid" });
+    terminalResolve = {
+      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z", revision: 42 },
+      error: null,
+    };
+
+    await expect(loadStudioConfig("juan294")).resolves.toEqual({
+      status: "found",
+      config,
+      revision: 42,
     });
     expect(mockFrom).toHaveBeenCalledWith("studio_configs");
     expect(mockCacheDel).toHaveBeenCalledWith("config:juan294");
-    expect(mockCacheSet).toHaveBeenCalledWith(
+    expect(mockCacheSetVersioned).toHaveBeenCalledWith(
       "config:juan294",
-      config,
+      {
+        kind: "studio-config",
+        version: 1,
+        revision: 42,
+        config,
+      },
+      42,
       STUDIO_CONFIG_TTL,
     );
   });
@@ -337,39 +390,87 @@ describe("loadStudioConfig", () => {
 
   it("swallows a best-effort Redis rehydration rejection", async () => {
     terminalResolve = {
-      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z" },
+      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z", revision: 42 },
       error: null,
     };
-    mockCacheSet.mockRejectedValue(new Error("Redis down"));
+    mockCacheSetVersioned.mockResolvedValue("failed");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await expect(loadStudioConfig("juan294")).resolves.toEqual({
       status: "found",
       config,
+      revision: 42,
     });
-    expect(warn).toHaveBeenCalledWith(
-      "[studio/config] Redis rehydration failed (best-effort):",
-      "Redis down",
-    );
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(
+        "[studio/config] Redis write failed (best-effort):",
+        "cacheSetVersioned returned failed",
+      );
+    });
   });
 
   it("logs when Redis returns false while rehydrating a durable config", async () => {
     terminalResolve = {
-      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z" },
+      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z", revision: 42 },
       error: null,
     };
-    mockCacheSet.mockResolvedValue(false);
+    mockCacheSetVersioned.mockResolvedValue("failed");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await expect(loadStudioConfig("juan294")).resolves.toEqual({
       status: "found",
       config,
+      revision: 42,
     });
     await vi.waitFor(() => {
       expect(warn).toHaveBeenCalledWith(
-        "[studio/config] Redis rehydration failed (best-effort):",
-        "cacheSet returned false",
+        "[studio/config] Redis write failed (best-effort):",
+        "cacheSetVersioned returned failed",
       );
     });
+  });
+
+  it("repairs an unversioned legacy cache entry from Supabase", async () => {
+    mockCacheGet.mockResolvedValue(config);
+    terminalResolve = {
+      data: { handle: "juan294", config, updated_at: "2026-06-25T00:00:00Z", revision: 42 },
+      error: null,
+    };
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await expect(loadStudioConfig("juan294")).resolves.toEqual({
+      status: "found",
+      config,
+      revision: 42,
+    });
+    expect(mockCacheDel).toHaveBeenCalledWith("config:juan294");
+  });
+});
+
+describe("refreshStudioConfigCache", () => {
+  it("publishes the current durable revision instead of the request body", async () => {
+    const latest = { ...config, background: "particles" as const };
+    terminalResolve = {
+      data: { handle: "juan294", config: latest, updated_at: "2026-06-25T00:00:01Z", revision: 43 },
+      error: null,
+    };
+
+    await refreshStudioConfigCache("Juan294");
+
+    expect(mockCacheSetVersioned).toHaveBeenCalledWith(
+      "config:juan294",
+      { kind: "studio-config", version: 1, revision: 43, config: latest },
+      43,
+      STUDIO_CONFIG_TTL,
+    );
+  });
+
+  it("removes an older cache value when durable readback is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    await refreshStudioConfigCache("Juan294");
+
+    expect(mockCacheSetVersioned).not.toHaveBeenCalled();
+    expect(mockCacheDel).toHaveBeenCalledWith("config:juan294");
   });
 });

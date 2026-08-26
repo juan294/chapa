@@ -8,9 +8,9 @@ import { rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import {
-  cacheStudioConfig,
   dbUpsertStudioConfig,
   loadStudioConfig,
+  refreshStudioConfigCache,
 } from "@/lib/db/studio";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
@@ -123,7 +123,7 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
       const result = await dbUpsertStudioConfig(normalizedLogin, body);
       if (!result.ok) return result;
 
-      await cacheStudioConfig(normalizedLogin, body);
+      await refreshStudioConfigCache(normalizedLogin);
 
       return result;
     },

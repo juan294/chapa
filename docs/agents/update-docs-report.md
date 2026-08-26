@@ -29,7 +29,8 @@ Creator Studio revival and the Wave 2 remediation merges through PR #1160.
   link definition is restored.
 - `CLAUDE.md` now identifies the Studio UI, config API and storage ownership,
   shared client-safe badge metadata, and the boundary between saved Studio
-  configuration and the unchanged public badge and share page.
+  configuration and the unchanged public badge and share page. It also records
+  the database-ordered cache revisions introduced by migration 035.
 - `docs/chapa-architecture.drawio` now includes `/api/studio/config` among the
   authenticated endpoints. `docs/chapa-architecture.drawio.png` was regenerated
   from that source and checked visually.

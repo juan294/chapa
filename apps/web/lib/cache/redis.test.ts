@@ -48,6 +48,7 @@ vi.mock("@upstash/redis", () => ({
 import {
   cacheGet,
   cacheSet,
+  cacheSetVersioned,
   cacheMergeJson,
   cacheDel,
   rateLimit,
@@ -178,6 +179,39 @@ describe("cacheSet", () => {
 
     expect(result).toBe(false);
     expect(mockSet).not.toHaveBeenCalled();
+  });
+});
+
+describe("cacheSetVersioned", () => {
+  it("atomically stores an entry when no newer revision exists", async () => {
+    mockEval.mockResolvedValueOnce(1);
+    const entry = { kind: "studio-config", revision: 42, config: { background: "aurora" } };
+
+    await expect(cacheSetVersioned("config:juan294", entry, 42, 3600)).resolves.toBe("stored");
+
+    expect(mockEval).toHaveBeenCalledOnce();
+    const [script, keys, args] = mockEval.mock.calls[0]!;
+    expect(script).toContain('redis.call("GET", KEYS[1])');
+    expect(script).toContain("current.revision");
+    expect(script).toContain('redis.call("SET", KEYS[1]');
+    expect(keys).toEqual(["config:juan294"]);
+    expect(args).toEqual([JSON.stringify(entry), "42", "3600"]);
+  });
+
+  it("reports stale when Redis keeps a newer revision", async () => {
+    mockEval.mockResolvedValueOnce(0);
+
+    await expect(
+      cacheSetVersioned("config:juan294", { revision: 41 }, 41, 3600),
+    ).resolves.toBe("stale");
+  });
+
+  it("fails open when the atomic versioned write fails", async () => {
+    mockEval.mockRejectedValueOnce(new Error("Connection refused"));
+
+    await expect(
+      cacheSetVersioned("config:juan294", { revision: 42 }, 42, 3600),
+    ).resolves.toBe("failed");
   });
 });
 

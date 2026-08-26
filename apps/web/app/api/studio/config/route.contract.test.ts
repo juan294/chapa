@@ -29,9 +29,9 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("@/lib/db/studio", () => ({
-  cacheStudioConfig: vi.fn(async () => undefined),
   dbUpsertStudioConfig: mockDbUpsertStudioConfig,
   loadStudioConfig: vi.fn(async () => ({ status: "not_found" })),
+  refreshStudioConfigCache: vi.fn(async () => undefined),
 }));
 
 import { PUT } from "./route";

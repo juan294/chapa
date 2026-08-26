@@ -21,12 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Saved Studio configurations now survive Redis eviction and storage
   failures are reported truthfully.** Reads fall back to the durable Supabase
   record and repopulate Redis, writes persist to Supabase before updating the
-  cache, unknown stored shapes fall back safely, and real storage failures no
-  longer appear as successful saves.
+  cache, database-issued revisions prevent an older serverless instance from
+  overwriting a newer cache entry, unknown stored shapes fall back safely, and
+  real storage failures no longer appear as successful saves.
 - **Studio controls now handle concurrent saves, localization, and assistive
   state correctly.** Duplicate saves are blocked, failure states stay visible,
   English and Spanish labels remain in parity, selected quick controls expose
-  their state, and narrow preview footers no longer overflow.
+  their state, save copy now identifies the preview-only boundary, and narrow
+  preview footers no longer overflow.
 
 ### Changed
 

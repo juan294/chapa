@@ -23,10 +23,27 @@ describe("Studio config durable boundary (contract)", () => {
     await expect(dbUpsertStudioConfig(HANDLE, config)).resolves.toEqual({
       ok: true,
     });
-    await expect(dbGetStudioConfig(HANDLE)).resolves.toEqual({
+    const firstRead = await dbGetStudioConfig(HANDLE);
+    expect(firstRead).toEqual({
       status: "found",
       config,
+      revision: expect.any(Number),
     });
+
+    const updated = { ...config, background: "particles" as const };
+    await expect(dbUpsertStudioConfig(HANDLE, updated)).resolves.toEqual({
+      ok: true,
+    });
+    const secondRead = await dbGetStudioConfig(HANDLE);
+    expect(secondRead).toEqual({
+      status: "found",
+      config: updated,
+      revision: expect.any(Number),
+    });
+    if (firstRead.status !== "found" || secondRead.status !== "found") {
+      throw new Error("Expected both Studio config reads to succeed");
+    }
+    expect(secondRead.revision).toBeGreaterThan(firstRead.revision);
   });
 
   it("reports malformed persisted JSON instead of returning it to callers", async () => {

@@ -1,7 +1,7 @@
 # Chapa — Dev Impact Badge
 
 ## One-liner
-Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v6 Profile** (4–5 dimensions + archetype + confidence) from GitHub activity and optional AI tool insights, with a Creator Studio for badge customization, a share page, and one-click sharing.
+Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v6 Profile** (4–5 dimensions + archetype + confidence) from GitHub activity and optional AI tool insights, with a Creator Studio for badge preview customization, a share page, and one-click sharing.
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
@@ -11,7 +11,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
      - Note: "Quality Champion" is the display name; internal code/routes use "guardian" (e.g., `/archetypes/guardian`, `--color-archetype-guardian`)
    - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
 
-3. Serve **Creator Studio**: `/studio` (badge customization with 9 visual categories).
+3. Serve **Creator Studio**: `/studio` (badge preview customization with 9 visual categories).
 4. Serve **embeddable SVG badge**: `/u/:handle/badge.svg`
 5. Serve **share page**: `/u/:handle`
 6. Badge **verification** via HMAC-SHA256 hash (proves badge data hasn't been tampered with).
@@ -34,7 +34,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ### Pages
 - GET `/` Landing + GitHub login (terminal-first UI)
-- GET `/studio` Creator Studio (badge customization, requires auth)
+- GET `/studio` Creator Studio (badge preview customization, requires auth)
 - GET `/admin` Admin dashboard (requires auth + admin handle, see `ADMIN_HANDLES`)
 - GET `/u/:handle` Share page (badge preview, breakdown, embed snippet, share CTA)
 - GET `/u/:handle/badge.svg` Embeddable badge SVG (cacheable)
@@ -87,7 +87,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ### Authenticated API
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
-- GET|PUT `/api/studio/config` Load/save badge customization config
+- GET|PUT `/api/studio/config` Load/save Studio preview configuration
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
 - POST `/api/generate` Generate badge for authenticated user
 - POST `/api/recalculate` Recalculate impact scores
@@ -211,7 +211,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Crypto helpers: `apps/web/lib/crypto/*` — constant-time comparison (`safe-equal.ts`) for HMAC/token verification
 - Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (interactions, borders, cards, celebrations, backgrounds, counters, heatmap animations, tier visuals) behind Creator Studio's 9 customization categories
 - Creator Studio UI: `apps/web/app/studio/*` — authenticated owner preview, controls, save state, command actions, and preview footer composition
-- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — validated Redis hot path with durable Supabase fallback; Supabase commits before Redis is refreshed
+- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — validated Redis hot path with durable Supabase fallback; Supabase commits before Redis is refreshed, and migration 035 assigns database-ordered revisions so an older serverless instance cannot replace a newer cache entry
 - HTTP utilities: `apps/web/lib/http/*` — client IP extraction (`client-ip.ts`) for rate limiting
 - Keyboard shortcuts: `apps/web/lib/keyboard/*` — shortcut registry and React hook for the terminal/command-bar UI
 - Monitoring: `apps/web/lib/monitoring/*` — badge latency SLO budgets and measurement (`latency-slo.ts`) backing `/api/cron/latency-check`
@@ -228,7 +228,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
 - Repo contains `docs/impact-v6.md` (current spec truth), `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
-- Creator Studio at `/studio` allows badge visual customization (9 categories).
+- Creator Studio at `/studio` allows badge preview customization (9 visual categories); saved settings do not alter the public badge or share page.
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
 - Lifetime metric snapshots are recorded automatically (cron, badge route, refresh).

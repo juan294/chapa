@@ -477,7 +477,7 @@ describe("StudioClient render", () => {
         '"background":"aurora"',
       );
       expect(screen.getByTestId("terminal-output").textContent).toContain("4 lines");
-      expect(screen.getByText("Cambios sin guardar")).toBeDefined();
+      expect(screen.getByText("Cambios de vista previa sin guardar")).toBeDefined();
     });
   });
 
@@ -605,13 +605,13 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      expect(screen.getByText("Saved")).toBeDefined();
+      expect(screen.getByText("Preview saved")).toBeDefined();
 
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/set bg aurora" } });
       fireEvent.keyDown(input, { key: "Enter" });
 
-      expect(await screen.findByText("Unsaved changes")).toBeDefined();
+      expect(await screen.findByText("Unsaved preview changes")).toBeDefined();
     });
 
     it("does not mark an unchanged value dirty", async () => {
@@ -630,8 +630,8 @@ describe("StudioClient render", () => {
       fireEvent.change(input, { target: { value: "/set bg solid" } });
       fireEvent.keyDown(input, { key: "Enter" });
 
-      expect(screen.getByText("Saved")).toBeDefined();
-      expect(screen.queryByText("Unsaved changes")).toBeNull();
+      expect(screen.getByText("Preview saved")).toBeDefined();
+      expect(screen.queryByText("Unsaved preview changes")).toBeNull();
     });
 
     it("shows saving indicator during save", async () => {
@@ -860,7 +860,9 @@ describe("StudioClient render", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(save.hasAttribute("disabled")).toBe(true);
       resolveSave(new Response("{}", { status: 200 }));
-      await screen.findByText("Configuration saved.");
+      await screen.findByText(
+        "Preview configuration saved. Your public badge and share page are unchanged.",
+      );
     });
 
     it("prevents overlapping saves from repeated /save commands", async () => {
@@ -888,7 +890,9 @@ describe("StudioClient render", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(screen.getByText("A save is already in progress.")).toBeDefined();
       resolveSave(new Response("{}", { status: 200 }));
-      await screen.findByText("Configuration saved.");
+      await screen.findByText(
+        "Preview configuration saved. Your public badge and share page are unchanged.",
+      );
     });
 
     it("does not mark newer edits saved when an older request finishes", async () => {
@@ -918,7 +922,7 @@ describe("StudioClient render", () => {
       fireEvent.keyDown(input, { key: "Enter" });
 
       resolveSave(new Response("{}", { status: 200 }));
-      expect(await screen.findByText("Unsaved changes")).toBeDefined();
+      expect(await screen.findByText("Unsaved preview changes")).toBeDefined();
       expect(screen.getByTestId("badge-preview").textContent).toContain(
         '"background":"aurora"',
       );

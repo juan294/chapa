@@ -12,7 +12,11 @@
 
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
-import { cacheDel, cacheGet, cacheSet } from "../cache/redis";
+import {
+  cacheDel,
+  cacheGet,
+  cacheSetVersioned,
+} from "../cache/redis";
 import { withTimeout } from "../async/with-timeout";
 import { isValidBadgeConfig } from "../validation";
 import type { BadgeConfig } from "@chapa/shared";
@@ -23,7 +27,9 @@ export const STUDIO_CONFIG_READ_TIMEOUT_MS = 2_000;
 export const STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY = {
   kind: "studio-config-not-found",
   version: 1,
+  revision: 0,
 } as const;
+export const STUDIO_CONFIG_CACHE_ENTRY_VERSION = 1;
 
 export type StudioConfigUpsertResult =
   | { ok: true }
@@ -34,7 +40,7 @@ export type StudioConfigUpsertResult =
     };
 
 export type StudioConfigReadResult =
-  | { status: "found"; config: BadgeConfig }
+  | { status: "found"; config: BadgeConfig; revision: number }
   | { status: "not_found" }
   | { status: "unavailable" }
   | { status: "invalid" };
@@ -43,13 +49,22 @@ interface StudioConfigRow {
   handle: string;
   config: unknown;
   updated_at: string;
+  revision: number;
 }
 
 const REQUIRED_KEYS: readonly (keyof StudioConfigRow & string)[] = [
   "handle",
   "config",
   "updated_at",
+  "revision",
 ];
+
+interface StudioConfigCacheEntry {
+  kind: "studio-config";
+  version: typeof STUDIO_CONFIG_CACHE_ENTRY_VERSION;
+  revision: number;
+  config: BadgeConfig;
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -73,47 +88,50 @@ function isNegativeCacheEntry(
   const entry = value as Record<string, unknown>;
   return (
     entry.kind === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.kind &&
-    entry.version === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.version
+    entry.version === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.version &&
+    entry.revision === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.revision
   );
 }
 
-async function setCacheBestEffort(
-  cacheKey: string,
-  value: unknown,
-  ttl: number,
-  operation: string,
-): Promise<boolean> {
-  try {
-    const stored = await cacheSet(cacheKey, value, ttl);
-    if (!stored) {
-      console.warn(
-        `[studio/config] Redis ${operation} failed (best-effort):`,
-        "cacheSet returned false",
-      );
-    }
-    return stored;
-  } catch (error) {
-    console.warn(
-      `[studio/config] Redis ${operation} failed (best-effort):`,
-      errorMessage(error),
-    );
+function isStudioConfigCacheEntry(value: unknown): value is StudioConfigCacheEntry {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
+  const entry = value as Record<string, unknown>;
+  return (
+    entry.kind === "studio-config" &&
+    entry.version === STUDIO_CONFIG_CACHE_ENTRY_VERSION &&
+    typeof entry.revision === "number" &&
+    Number.isSafeInteger(entry.revision) &&
+    entry.revision > 0 &&
+    isValidBadgeConfig(entry.config)
+  );
 }
 
 /** Publish a committed Studio config to Redis without changing API success. */
 export async function cacheStudioConfig(
   login: string,
   config: BadgeConfig,
+  revision: number,
 ): Promise<void> {
   const cacheKey = `config:${login.toLowerCase()}`;
-  const stored = await setCacheBestEffort(
-    cacheKey,
+  const entry: StudioConfigCacheEntry = {
+    kind: "studio-config",
+    version: STUDIO_CONFIG_CACHE_ENTRY_VERSION,
+    revision,
     config,
+  };
+  const stored = await cacheSetVersioned(
+    cacheKey,
+    entry,
+    revision,
     STUDIO_CONFIG_TTL,
-    "write",
   );
-  if (!stored) {
+  if (stored === "failed") {
+    console.warn(
+      "[studio/config] Redis write failed (best-effort):",
+      "cacheSetVersioned returned failed",
+    );
     // A failed publication must not leave an older year-long value
     // authoritative after Redis recovers.
     await cacheDel(cacheKey);
@@ -188,7 +206,7 @@ export async function dbGetStudioConfig(
       Promise.resolve(
         db
           .from("studio_configs")
-          .select("handle, config, updated_at")
+          .select("handle, config, updated_at, revision")
           .eq("handle", handle.toLowerCase())
           .maybeSingle(),
       ),
@@ -208,7 +226,15 @@ export async function dbGetStudioConfig(
       return { status: "invalid" };
     }
 
-    return { status: "found", config: row.config };
+    if (!Number.isSafeInteger(row.revision) || row.revision <= 0) {
+      console.error(
+        "[STUDIO_CONFIG_FALLBACK] Invalid persisted Studio configuration revision",
+        { handle: handle.toLowerCase() },
+      );
+      return { status: "invalid" };
+    }
+
+    return { status: "found", config: row.config, revision: row.revision };
   } catch (error) {
     console.error(
       "[STUDIO_CONFIG_FALLBACK] dbGetStudioConfig failed:",
@@ -241,11 +267,18 @@ export async function loadStudioConfig(
 
   if (isNegativeCacheEntry(cached)) return { status: "not_found" };
   if (cached !== null) {
-    if (isValidBadgeConfig(cached)) {
-      return { status: "found", config: cached };
+    if (isStudioConfigCacheEntry(cached)) {
+      return {
+        status: "found",
+        config: cached.config,
+        revision: cached.revision,
+      };
     }
-    console.error(
-      "[STUDIO_CONFIG_FALLBACK] Invalid cached Studio configuration",
+    const legacy = isValidBadgeConfig(cached);
+    console[legacy ? "warn" : "error"](
+      legacy
+        ? "[STUDIO_CONFIG_FALLBACK] Migrating unversioned cached Studio configuration"
+        : "[STUDIO_CONFIG_FALLBACK] Invalid cached Studio configuration",
       { handle: normalizedLogin },
     );
     await cacheDel(cacheKey);
@@ -253,22 +286,31 @@ export async function loadStudioConfig(
 
   const dbResult = await dbGetStudioConfig(normalizedLogin);
   if (dbResult.status === "not_found") {
-    void setCacheBestEffort(
+    void cacheSetVersioned(
       cacheKey,
       STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY,
+      STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.revision,
       STUDIO_CONFIG_NEGATIVE_TTL,
-      "negative-cache write",
     );
     return dbResult;
   }
   if (dbResult.status !== "found") return dbResult;
 
-  void setCacheBestEffort(
-    cacheKey,
-    dbResult.config,
-    STUDIO_CONFIG_TTL,
-    "rehydration",
-  );
+  void cacheStudioConfig(normalizedLogin, dbResult.config, dbResult.revision);
 
   return dbResult;
+}
+
+/** Refresh Redis from the current durable row after a successful upsert. */
+export async function refreshStudioConfigCache(login: string): Promise<void> {
+  const normalizedLogin = login.toLowerCase();
+  const result = await dbGetStudioConfig(normalizedLogin);
+  if (result.status === "found") {
+    await cacheStudioConfig(normalizedLogin, result.config, result.revision);
+    return;
+  }
+
+  // A durable save already succeeded. If its readback is temporarily
+  // unavailable, remove any older cache value and let the next GET retry.
+  await cacheDel(`config:${normalizedLogin}`);
 }

@@ -26,7 +26,7 @@ The Creator Studio revival is well tested and its security boundary is sound, bu
 
 Chapa is a pnpm monorepo with a Next.js application under `apps/web`, shared domain types and pure logic under `packages/shared`, and operational tooling under `scripts`. `/studio` is a dynamic authenticated server page. It checks the DB-backed feature flag and session, then loads profile material and the saved Studio config in parallel. `StudioClient` owns configuration, preview, terminal, quick-control, motion, and save state. Supabase is the durable source for `studio_configs`; Redis is a one-year hot-read cache. Production deploys only from `main`, while `develop` is the integration branch.
 
-The candidate adds no migrations, workflows, environment variables, crons, or Vercel configuration. Its production release must squash `develop` into `main`, prove tree equality, verify exact production identity, and only then enable `studio_enabled` through the admin API.
+The replacement candidate adds backward-compatible migration 035 for database-ordered Studio cache revisions. It adds no workflow, environment-variable, cron, or Vercel configuration change. Its production release must apply the migration through the normal deploy, squash `develop` into `main`, prove tree equality, verify exact production identity, and only then enable `studio_enabled` through the admin API.
 
 ## 3. End-to-End Flow Analysis
 
@@ -140,7 +140,7 @@ Studio loads profile and config data in parallel, then renders a client preview 
 
 ### Domain Model
 
-`develop` is the integration branch and protected `main` drives Vercel production. Releases use a squash PR, exact tree comparison, production identity verification, read-only production probes, and tag-last publication. This candidate changes no migration or infrastructure surface.
+`develop` is the integration branch and protected `main` drives Vercel production. Releases use a squash PR, exact tree comparison, production identity verification, read-only production probes, and tag-last publication. The replacement candidate adds only the backward-compatible Studio revision migration; it changes no hosting or vendor infrastructure surface.
 
 #### DO-M1 An ancestry-based baseline lookup selects v2.22.0 instead of production v2.22.1
 - **Severity:** medium
