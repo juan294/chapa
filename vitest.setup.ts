@@ -8,6 +8,31 @@
  * is provided, which prevents JSDOM from injecting its own implementation.
  */
 import { beforeAll, afterAll, vi } from "vitest";
+import { __setFallbackDictionary } from "@/lib/i18n/fallback-dictionary";
+import { en } from "@/lib/i18n/dictionaries/en";
+
+// #1164 (FE-H1/PE-H1) — `useTranslation()`'s no-provider fallback used to
+// resolve against a dictionary statically imported IN APPLICATION CODE,
+// which pulled the English dictionary into every client bundle regardless of
+// locale (it was referenced from the prerendered Spanish page too). The
+// fallback exists only for tests that render a component outside
+// LanguageProvider without asserting real translated copy — no production
+// path renders outside the provider (docs/accepted-risks.md) — so the
+// dictionary is injected here, at test setup, instead. This keeps ~463
+// existing component tests (across ~49 files) that rely on that fallback
+// resolving real English strings passing unchanged, while removing the
+// static import from the shipped client bundle.
+//
+// Imported from `lib/i18n/fallback-dictionary.ts` specifically — NOT from
+// `lib/i18n/use-translation.ts` — because that module imports `provider.tsx`,
+// which imports `./set-locale-action`. A global setup file's imports run
+// before a test file's own `vi.mock('./set-locale-action', ...)` is hoisted,
+// so importing through `use-translation.ts` here registered the REAL
+// `set-locale-action` module first and silently broke that mock everywhere
+// it's used (`provider.test.tsx`'s `setLocaleAction` assertions saw zero
+// calls). `fallback-dictionary.ts` has no path to `provider.tsx`, so it
+// can't collide with any test file's mocks.
+__setFallbackDictionary(en);
 
 const SUPPRESSED_PREFIXES = [
   "[cache]",

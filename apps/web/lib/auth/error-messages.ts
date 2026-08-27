@@ -9,13 +9,16 @@
  * Message text lives in the i18n dictionary (`oauthErrors.*`, #1109) so it
  * renders in the visitor's locale. This module stays a pure, dependency-free
  * code→dictKey lookup; callers resolve the key through their own translator
- * (`useTranslation()`'s `t`, or `getServerT`). The default `t` — matching
- * `useTranslation()`'s no-provider fallback — resolves against the English
- * dictionary, so existing callers that don't pass a translator keep working
- * unchanged.
+ * (`useTranslation()`'s `t`, or `getServerT`).
+ *
+ * #1164 (FE-H1/PE-H1): `t` has no default translator. It previously defaulted
+ * to a `defaultT` that statically imported the English dictionary, which
+ * pulled that dictionary into every client bundle reachable from this
+ * module's callers regardless of locale — but every real call site
+ * (`app/u/[handle]/page.tsx`, `app/LandingUrlEffects.tsx`) already passes its
+ * own translator, so the default was dead in the client path. Callers must
+ * now always pass `t`.
  */
-import { en } from "@/lib/i18n/dictionaries/en";
-import { resolveTranslation } from "@/lib/i18n/resolve";
 import { interpolate } from "@/lib/i18n/interpolate";
 
 export const OAUTH_ERROR_CODES = [
@@ -42,10 +45,6 @@ const ERROR_MESSAGE_KEYS: Record<OAuthErrorCode, string> = {
 };
 
 const FALLBACK_KEY = "oauthErrors.fallback";
-
-function defaultT(key: string): string {
-  return resolveTranslation(key, en) as string;
-}
 
 /**
  * Platform identifiers used by the linked-account OAuth flows
@@ -111,12 +110,11 @@ function getPlatformOAuthErrorMessage(
  * Returns `null` when the input is falsy (undefined, null, empty string),
  * meaning there is no error to display.
  *
- * @param t Optional translator, e.g. `useTranslation().t`. Defaults to the
- *   English dictionary when omitted.
+ * @param t Translator, e.g. `useTranslation().t` or `getServerT(locale)`.
  */
 export function getOAuthErrorMessage(
   code: string | null | undefined,
-  t: (key: string) => string = defaultT,
+  t: (key: string) => string,
 ): string | null {
   if (!code) return null;
 

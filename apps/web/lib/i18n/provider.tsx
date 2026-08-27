@@ -17,7 +17,21 @@ import {
 } from './types';
 import { resolveTranslation } from './resolve';
 import { setLocaleAction } from './set-locale-action';
-import { en } from './dictionaries/en';
+
+// #1164 (FE-H1/PE-H1) — this module used to statically `import { en } from
+// './dictionaries/en'` as the fallback SOURCE below, which pulled the ~90KB
+// English dictionary into every client bundle that reaches this 'use client'
+// module regardless of locale (measured: it was referenced 17 times from the
+// prerendered SPANISH page's <script src> list, while the Spanish dictionary
+// chunk was referenced 0 times anywhere). `dictionary` is only ever omitted
+// in two situations: (1) the #1071 pass-through case, where this fallback is
+// never reached (LanguageProviderInner isn't mounted), and (2) tests that
+// render a bare LanguageProvider. Neither needs a real dictionary, so an
+// empty object is the correct fallback SOURCE — `resolveTranslation` already
+// degrades a missing/malformed dictionary to the raw key rather than
+// crashing (see resolve.ts), so this preserves "never crash, never render
+// undefined" without shipping any dictionary bytes.
+const EMPTY_DICTIONARY: Translations = {};
 
 export interface LanguageContextValue {
   locale: Locale;
@@ -82,8 +96,10 @@ export function canonicalLocaleHref({
  * client-side — restoring a returning non-default-locale user's language.
  *
  * When `dictionary` is omitted (e.g. unit tests that render with only
- * `initialLocale`), the provider falls back to the statically-bundled English
- * dictionary, keeping the test-facing API identical.
+ * `initialLocale`), the provider falls back to an empty dictionary (#1164):
+ * `t()` then resolves every key to itself rather than crashing or rendering
+ * `undefined`. Production always supplies `dictionary` except through the
+ * #1071 pass-through below, which never reaches this fallback at all.
  *
  * #1071 — `/u/[handle]` and `/verify/[hash]` are dynamic routes that resolve
  * their own per-request locale and each nest a SECOND `LanguageProvider`
@@ -141,7 +157,10 @@ export function LanguageProvider({
     return <>{children}</>;
   }
   return (
-    <LanguageProviderInner initialLocale={initialLocale} dictionary={dictionary}>
+    <LanguageProviderInner
+      initialLocale={initialLocale}
+      dictionary={dictionary ?? EMPTY_DICTIONARY}
+    >
       {children}
     </LanguageProviderInner>
   );
@@ -154,12 +173,10 @@ function LanguageProviderInner({
 }: {
   children: ReactNode;
   initialLocale: Locale;
-  dictionary?: Translations;
+  dictionary: Translations;
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
-  const [activeDictionary, setActiveDictionary] = useState<Translations>(
-    dictionary ?? en
-  );
+  const [activeDictionary, setActiveDictionary] = useState<Translations>(dictionary);
 
   // Load a locale's dictionary client-side. The active locale's dictionary is
   // already supplied via the RSC payload, so this only fetches the OTHER locale
