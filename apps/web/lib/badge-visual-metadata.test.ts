@@ -60,3 +60,138 @@ describe("badge visual metadata", () => {
     expect(source).not.toMatch(/from ["']@\/lib\/render\//);
   });
 });
+
+/**
+ * #1183 (UX-M10, second half) — Wave 2 decision record.
+ *
+ * Wave 1 (#1168) gave the badge exactly one verified color (VERIFICATION_CORAL).
+ * This wave evaluated carrying that coral onto the light/dark-capable
+ * `/verify/:hash` page for continuity, and decided AGAINST it, keeping the
+ * existing teal (`--color-complement`) tokens there instead. Two independent
+ * reasons, both measured below:
+ *
+ * 1. Contrast: coral clears AA against the badge's own fixed dark background,
+ *    but on a light background it only clears the *large/bold-text* AA floor
+ *    (3:1), not the normal-text floor (4.5:1) the verify page's body copy
+ *    (hash, handle, dimension labels) would need.
+ * 2. Colorblind-safe separation from the error/red semantic: coral and
+ *    `--color-terminal-red` sit ~7 degrees apart in hue, and the lightness
+ *    gap between them narrows on light theme (the site's default theme) to
+ *    the point of being hard to distinguish — an unacceptable risk on a page
+ *    whose entire job is to assert "verified" without being mistaken for
+ *    "error".
+ *
+ * These two guard tests keep that decision honest: if VERIFICATION_CORAL's
+ * value or the badge's fixed background ever change, the contrast numbers
+ * this decision relied on are re-derived and checked against the documented
+ * thresholds (see docs/design-system.md's "Verification-related UI" section)
+ * rather than silently going stale; and the badge-only usage boundary
+ * (coral never leaking into the site's teal-branded verification UI) is
+ * enforced structurally.
+ */
+describe("verification color decision (#1183)", () => {
+  function hexToRgb(hex: string): [number, number, number] {
+    const clean = hex.replace("#", "");
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16),
+    ];
+  }
+
+  function relativeLuminance([r, g, b]: [number, number, number]): number {
+    const channel = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    return (
+      0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+    );
+  }
+
+  function contrastRatio(hexA: string, hexB: string): number {
+    const lumA = relativeLuminance(hexToRgb(hexA));
+    const lumB = relativeLuminance(hexToRgb(hexB));
+    const lighter = Math.max(lumA, lumB);
+    const darker = Math.min(lumA, lumB);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  function hueDegrees(hex: string): number {
+    const [r0, g0, b0] = hexToRgb(hex);
+    const r = r0 / 255;
+    const g = g0 / 255;
+    const b = b0 / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+    if (delta === 0) return 0;
+    let h: number;
+    if (max === r) h = ((g - b) / delta) % 6;
+    else if (max === g) h = (b - r) / delta + 2;
+    else h = (r - g) / delta + 4;
+    h *= 60;
+    return h < 0 ? h + 360 : h;
+  }
+
+  // Badge's own fixed dark canvas (never themed — see BadgeSvg.tsx).
+  const BADGE_DARK_BG = "#0C0D14";
+  // Site light theme backgrounds (--color-bg / --color-card).
+  const SITE_LIGHT_BG = "#FFFFFF";
+  const SITE_LIGHT_CARD = "#F9FAFB";
+  // Site terminal-red per theme.
+  const TERMINAL_RED_LIGHT = "#DC2626";
+  const TERMINAL_RED_DARK = "#F87171";
+
+  it("clears AA against the badge's own fixed dark background", () => {
+    const ratio = contrastRatio(VERIFICATION_CORAL, BADGE_DARK_BG);
+    // ~5.3:1 — comfortably AA (>= 4.5) for any text size on the badge itself.
+    expect(ratio).toBeGreaterThanOrEqual(5.0);
+    expect(ratio).toBeLessThan(5.6);
+  });
+
+  it("only clears large/bold-text AA on a light background, not normal text", () => {
+    const ratioBg = contrastRatio(VERIFICATION_CORAL, SITE_LIGHT_BG);
+    const ratioCard = contrastRatio(VERIFICATION_CORAL, SITE_LIGHT_CARD);
+    // ~3.7:1 — above the 3:1 large/bold-text AA floor...
+    expect(ratioBg).toBeGreaterThanOrEqual(3.0);
+    expect(ratioCard).toBeGreaterThanOrEqual(3.0);
+    // ...but below the 4.5:1 normal-text AA floor the verify page's body
+    // copy (hash, handle, dimension values) would need if coral were used
+    // as a general text color there.
+    expect(ratioBg).toBeLessThan(4.5);
+    expect(ratioCard).toBeLessThan(4.5);
+  });
+
+  it("sits close enough to terminal-red in hue that light-theme separation is unsafe", () => {
+    const coralHue = hueDegrees(VERIFICATION_CORAL);
+    const redLightHue = hueDegrees(TERMINAL_RED_LIGHT);
+    const redDarkHue = hueDegrees(TERMINAL_RED_DARK);
+
+    // ~7.5 degrees apart in both themes — a colorblind viewer (especially
+    // protanopia/deuteranopia, which collapse the red-orange range) cannot
+    // rely on hue alone to tell "verified" from "error".
+    expect(Math.abs(coralHue - redLightHue)).toBeLessThan(10);
+    expect(Math.abs(coralHue - redDarkHue)).toBeLessThan(10);
+  });
+
+  it("keeps coral scoped to the badge — the site's verification UI stays on teal", () => {
+    const verifyPageSource = readFileSync(
+      resolve(__dirname, "../app/verify/[hash]/page.tsx"),
+      "utf8",
+    );
+    const statusCalloutSource = readFileSync(
+      resolve(__dirname, "../components/StatusCallout.tsx"),
+      "utf8",
+    );
+
+    for (const source of [verifyPageSource, statusCalloutSource]) {
+      expect(source).not.toMatch(/VERIFICATION_CORAL/);
+      expect(source).not.toMatch(/#E05A47/i);
+    }
+
+    // The site's verification affordances stay on the documented teal tokens.
+    expect(statusCalloutSource).toContain("border-complement/30");
+    expect(statusCalloutSource).toContain("text-complement");
+  });
+});
