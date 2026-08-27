@@ -438,6 +438,7 @@ GITHUB_TOKEN=              # GitHub personal access token (optional — fallback
 
 CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, disabled by default)
+NEXT_PUBLIC_STUDIO_DEMO_ENABLED= # Set to "true" to enable Studio's anonymous demo mode at /studio?demo=1 (optional, disabled by default)
 NEXT_PUBLIC_EXPERIMENTS_ENABLED= # Set to "true" to enable /experiments pages (optional, disabled by default)
 
 NEXT_PUBLIC_INSIGHTS_ENABLED=  # Set to "true" to enable AI Insights integration (optional, disabled by default)
@@ -454,6 +455,8 @@ GITLAB_CLIENT_ID=                # GitLab OAuth app client ID (optional — GitL
 GITLAB_CLIENT_SECRET=            # GitLab OAuth app secret (optional — server-side only)
 NEXT_PUBLIC_GITLAB_ENABLED=      # Set to "true" to enable GitLab link/unlink in User Menu (optional, disabled by default)
 
+NEXT_PUBLIC_WEBMCP_ENABLED=      # Set to "true" to register Chapa's WebMCP tools into a visitor's document.modelContext (optional, disabled by default)
+
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
 ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)
 ALLOW_AGENT_RUN=               # Set to "true" to allow /api/admin/agents/run endpoint (optional, disabled by default)
@@ -466,6 +469,8 @@ ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer i
 ```
 
 > **Intentionally omitted:** `CI`, `NODE_ENV`, and `VERCEL_*` are standard Node/Vercel build vars and do not need to be configured manually. `TESTPLATFORM_CLIENT_ID` / `TESTPLATFORM_CLIENT_SECRET` are test-only mocks — not real credentials and not needed in any deployed environment.
+
+> **Not a kill switch:** the `NEXT_PUBLIC_*_ENABLED` feature flags above are DB-backed (`apps/web/lib/feature-flags.ts`) — the env var is consulted only as a fallback when the DB flag row is absent or its 500ms lookup times out. During a Supabase outage the env var becomes authoritative for that flag (the opposite of a kill switch), but whenever the DB is reachable, the DB row wins regardless of the env var's value.
 
 `/api/version` reads Vercel commit/environment identity through
 `apps/web/lib/env.ts`; route and test code must not introduce direct

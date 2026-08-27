@@ -10,7 +10,7 @@
  * that corruption for the handles you name.
  *
  * For each handle it:
- *   1. Reads `stats:v2:merged:<handle>` and `stats:stale:<handle>` from Redis
+ *   1. Reads `stats:v2:merged:<handle>` and `stats:stale:v2:<handle>` from Redis
  *      and checks each against `isPoisonedStats()`.
  *   2. Reads `metrics_snapshots` rows where `prs_merged_count = 0` AND
  *      `commits_total > SNAPSHOT_COMMITS_THRESHOLD` for the handle.
