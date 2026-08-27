@@ -69,9 +69,15 @@ describe("SharePage — non-renderable architecture checks", () => {
       expect(SOURCE).toMatch(/\bheaders\(\)/);
     });
 
-    it("uses NavbarClient (unaffected by the dynamic-rendering change)", () => {
-      expect(SOURCE).toContain("NavbarClient");
-      expect(SOURCE).not.toMatch(/from ["']@\/components\/Navbar["']/);
+    // #1165 (FE-H2) — the route is confirmed dynamic (not ISR, see the two
+    // tests above), so it can use the server Navbar variant (session sourced
+    // via headers(), rendered synchronously, no client round trip) instead
+    // of the client NavbarClient variant reserved for ISR pages. Using
+    // NavbarClient here forced three downstream client components to
+    // re-derive ownership via a redundant `/api/auth/session` fetch.
+    it("uses the server Navbar variant, not the client NavbarClient variant", () => {
+      expect(SOURCE).toMatch(/from ["']@\/components\/Navbar["']/);
+      expect(SOURCE).not.toContain("NavbarClient");
     });
   });
 

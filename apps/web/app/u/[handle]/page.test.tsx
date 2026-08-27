@@ -143,8 +143,8 @@ vi.mock("@/components/ErrorBanner", () => ({
 vi.mock("@/components/CommandBarHint", () => ({
   CommandBarHint: () => null,
 }));
-vi.mock("@/components/NavbarClient", () => ({
-  NavbarClient: () => "<nav />",
+vi.mock("@/components/Navbar", () => ({
+  Navbar: () => "<nav />",
 }));
 vi.mock("@/components/SharePageShortcuts", () => ({
   SharePageShortcuts: () => null,
@@ -162,6 +162,10 @@ vi.mock("@/components/BadgeSkeleton", () => ({
 import SharePage, { SharePageContent, generateMetadata } from "./page";
 import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { SharePageShortcuts } from "@/components/SharePageShortcuts";
+import { BadgeToolbar } from "@/components/BadgeToolbar";
+import { Navbar } from "@/components/Navbar";
+import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 
 /**
  * Recursively walk a rendered React element tree (as returned by an async
@@ -799,6 +803,130 @@ describe("SharePage /u/[handle]", () => {
       expect(ownerEl).not.toBeNull();
       expect(ownerEl!.props.trend).toBeNull();
       expect(ownerEl!.props.diff).toBeNull();
+    });
+  });
+
+  // #1165 (FE-H2) — the route is dynamic (not ISR, see the page.test.ts
+  // source-text assertions), so it must use the server Navbar variant and
+  // thread the already-resolved isOwner down as a prop to the client
+  // components that used to re-derive it over a network round trip to
+  // /api/auth/session. isOwner stays a DISPLAY gate only — the redaction
+  // tests above are the actual security boundary and must be unaffected.
+  describe("server Navbar + isOwner prop threading (#1165 / FE-H2)", () => {
+    it("renders the server Navbar, not NavbarClient", async () => {
+      const result = await renderPage("testuser");
+
+      const navbarEl = findElement(result, (el) => el.type === Navbar);
+      expect(navbarEl).not.toBeNull();
+    });
+
+    it("threads isOwner=true to SharePageOwnerContentLazy, SharePageShortcuts, and BadgeToolbar when the session matches the handle", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+
+      const result = await renderPage("testuser");
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const toolbarEl = findElement(result, (el) => el.type === BadgeToolbar);
+
+      expect(ownerEl!.props.isOwner).toBe(true);
+      expect(shortcutsEl!.props.isOwner).toBe(true);
+      expect(toolbarEl!.props.isOwner).toBe(true);
+    });
+
+    it("threads isOwner=false when there is no session (anonymous visitor)", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      const result = await renderPage("testuser");
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const toolbarEl = findElement(result, (el) => el.type === BadgeToolbar);
+
+      expect(ownerEl!.props.isOwner).toBe(false);
+      expect(shortcutsEl!.props.isOwner).toBe(false);
+      expect(toolbarEl!.props.isOwner).toBe(false);
+    });
+
+    it("threads isOwner=false when a different user's session is present", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "someone-else" });
+
+      const result = await renderPage("testuser");
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      expect(ownerEl!.props.isOwner).toBe(false);
+    });
+  });
+
+  // #1165 (FE-M1) — an early <html lang> assignment must be emitted for the
+  // page's own resolved locale (query > cookie > Accept-Language > default),
+  // matching the pattern already used on the landing page and /verify pages.
+  describe("DocumentLocaleScript (#1165 / FE-M1)", () => {
+    it("emits an early document-language assignment for the resolved locale", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      const scriptEl = findElement(result, (el) => el.type === DocumentLocaleScript);
+      expect(scriptEl).not.toBeNull();
+      expect(scriptEl!.props.locale).toBe("en");
+    });
+
+    it("resolves the same locale as the LanguageProvider body (no disagreement)", async () => {
+      mockGetServerLocale.mockResolvedValue("es");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
+
+      const scriptEl = findElement(result, (el) => el.type === DocumentLocaleScript);
+      expect(scriptEl!.props.locale).toBe("es");
+    });
+  });
+
+  // #1165 (UX-M5) — the "e" keyboard shortcut and the visible Markdown Copy
+  // button must produce byte-identical clipboard content: a single,
+  // localized, handle-bearing string built once, server-side, and threaded
+  // to both consumers.
+  describe("canonical embed markdown (#1165 / UX-M5)", () => {
+    it("passes a handle-bearing, non-hardcoded-English embed markdown to SharePageShortcuts", async () => {
+      const result = await renderPage("testuser");
+
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const embedMarkdown = shortcutsEl!.props.embedMarkdown as string;
+      expect(embedMarkdown).toContain("testuser");
+      expect(embedMarkdown).toContain("testuser/badge.svg");
+      // Regression guard: this used to be the hardcoded literal "Chapa Badge"
+      // with no handle in the alt text at all.
+      expect(embedMarkdown).not.toBe(
+        "![Chapa Badge](https://chapa.thecreativetoken.com/u/testuser/badge.svg)",
+      );
+    });
+
+    it("passes the IDENTICAL embed markdown string to both SharePageShortcuts and SharePageOwnerContentLazy", async () => {
+      const result = await renderPage("testuser");
+
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+
+      expect(ownerEl!.props.embedMarkdown).toBe(shortcutsEl!.props.embedMarkdown);
+    });
+
+    it("localizes the embed markdown alt text to the resolved locale", async () => {
+      const esResult = await SharePageContent({ handle: "testuser", locale: "es" });
+      const enResult = await SharePageContent({ handle: "testuser", locale: "en" });
+
+      const esShortcuts = findElement(esResult, (el) => el.type === SharePageShortcuts);
+      const enShortcuts = findElement(enResult, (el) => el.type === SharePageShortcuts);
+
+      // Spanish dict: shareOwner.badgeAltOf = 'Chapa de'
+      expect(esShortcuts!.props.embedMarkdown).toContain("![Chapa de testuser](");
+      // English dict: shareOwner.badgeAltOf = 'Chapa Badge of'
+      expect(enShortcuts!.props.embedMarkdown).toContain("![Chapa Badge of testuser](");
     });
   });
 });

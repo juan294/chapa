@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/types";
+import { SUPPORTED_LOCALES, DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
+import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 
 /**
  * Generates both supported locale variants at build time for every page
@@ -22,15 +23,44 @@ export function generateStaticParams(): { locale: Locale }[] {
 export const dynamicParams = false;
 
 /**
- * Pure pass-through — this segment exists only to host `generateStaticParams`
- * for the locale-segmented content-page rewrite. The real HTML shell
- * (<html>, <body>, ThemeProvider, LanguageProvider, feature flags) stays in
- * the root `app/layout.tsx`, unchanged.
+ * Hosts `generateStaticParams` for the locale-segmented content-page
+ * rewrite, plus (#1165 / FE-M1) an early `<html lang>` assignment for the
+ * route's own resolved locale. The real HTML shell (<html>, <body>,
+ * ThemeProvider, LanguageProvider, feature flags) stays in the root
+ * `app/layout.tsx`, unchanged and still statically rendered at
+ * DEFAULT_LOCALE ('es') — so a genuine `/en/*` request would otherwise ship
+ * English body copy inside `<html lang="es">` in the served HTML. Only the
+ * landing page (`/[locale]/page.tsx`) and the two `/verify` pages emitted
+ * this before; hoisting it here covers all 9 migrated content pages
+ * (`/about`, `/privacy`, `/terms`, `/archetypes/*`, etc.) in one edit.
+ *
+ * `params` is awaited here just like `generateMetadata`/the page components
+ * under this segment already do (e.g. `app/[locale]/about/page.tsx`) — since
+ * `generateStaticParams` above pre-renders both locale values at build time
+ * and `dynamicParams = false` rejects any other value at request time, this
+ * does NOT introduce a request-time read or opt these pages out of
+ * `force-static` (verified via the production build's prerender output).
+ *
+ * Next's generated `LayoutProps<"/[locale]">` types `params.locale` as a
+ * bare `string` (unlike the page-level `PageProps` types under this same
+ * segment, which the sibling `page.tsx` files narrow to `Locale` directly) —
+ * so this narrows it explicitly via `isSupportedLocale` rather than casting.
+ * The `DEFAULT_LOCALE` fallback branch is unreachable in practice: only
+ * `proxy.ts` ever routes here, and only with 'es' or 'en'.
  */
-export default function LocaleSegmentLayout({
+export default async function LocaleSegmentLayout({
   children,
+  params,
 }: {
   children: ReactNode;
+  params: Promise<{ locale: string }>;
 }) {
-  return <>{children}</>;
+  const { locale: rawLocale } = await params;
+  const locale: Locale = isSupportedLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
+  return (
+    <>
+      <DocumentLocaleScript locale={locale} />
+      {children}
+    </>
+  );
 }

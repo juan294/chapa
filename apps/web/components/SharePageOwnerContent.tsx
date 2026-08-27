@@ -95,6 +95,19 @@ interface SharePageOwnerContentProps {
   craftResult?: CraftResult | null;
   trend?: TrendSummary | null;
   diff?: ClientSnapshotDiff | null;
+  // #1165 (FE-H2) — server-resolved display gate, threaded down from
+  // `/u/[handle]`'s dynamic (non-ISR) render so this doesn't need to
+  // re-derive ownership over a network round trip to `/api/auth/session`.
+  // Optional so any other/future caller keeps working via the useSession()
+  // fallback below.
+  isOwner?: boolean;
+  // #1165 (UX-M5) — canonical, localized, handle-bearing Markdown embed
+  // string built ONCE server-side (SharePageContent in page.tsx) so the "e"
+  // keyboard shortcut (SharePageShortcuts) and this Markdown Copy button
+  // always produce byte-identical clipboard content. Optional for backward
+  // compatibility with direct callers/tests that don't pass it — falls back
+  // to a locally-built equivalent using the same formula.
+  embedMarkdown?: string;
 }
 
 export function SharePageOwnerContent({
@@ -104,20 +117,25 @@ export function SharePageOwnerContent({
   craftResult = null,
   trend = null,
   diff = null,
+  isOwner: isOwnerProp,
+  embedMarkdown: embedMarkdownProp,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
-  const isOwner = !loading && session?.login === handle;
-  const isVisitor = !loading && !isOwner;
+  const isOwner = isOwnerProp ?? (!loading && session?.login === handle);
+  const isVisitor = isOwnerProp !== undefined ? !isOwnerProp : !loading && !isOwner;
 
   // Warm cache with OAuth data when owner visits (once per session)
   useOwnerCacheWarm(handle, isOwner);
 
   const badgeUrl = `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`;
-  const badgeAlt = t('shareOwner.badgeAlt') as string;
   const badgeAltOf = t('shareOwner.badgeAltOf') as string;
-  const embedMarkdown = `![${badgeAlt}](${badgeUrl})`;
-  const embedHtml = `<img src="${badgeUrl}" alt="${badgeAltOf} ${handle}" width="600" height="315" />`;
+  // The HTML embed's alt form (`${badgeAltOf} ${handle}`) is the canonical
+  // one — the Markdown embed used to build its own, non-handle-bearing alt
+  // text independently (#1165 / UX-M5). Both now share this formula.
+  const embedAltText = `${badgeAltOf} ${handle}`;
+  const embedMarkdown = embedMarkdownProp ?? `![${embedAltText}](${badgeUrl})`;
+  const embedHtml = `<img src="${badgeUrl}" alt="${embedAltText}" width="600" height="315" />`;
 
   return (
     <>
@@ -181,7 +199,7 @@ export function SharePageOwnerContent({
           </div>
           <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <p className="text-text-primary/80 whitespace-nowrap">
-              <span className="text-amber">{`![${badgeAlt}](`}</span>
+              <span className="text-amber">{`![${embedAltText}](`}</span>
               <span className="text-text-secondary">
                 {badgeUrl}
               </span>
@@ -209,7 +227,7 @@ export function SharePageOwnerContent({
               <span className="text-text-secondary">{"src="}</span>
               <span className="text-amber/70">{`"${badgeUrl}"`}</span>
               <span className="text-text-secondary">{" alt="}</span>
-              <span className="text-amber/70">{`"${badgeAltOf} ${handle}"`}</span>
+              <span className="text-amber/70">{`"${embedAltText}"`}</span>
               <span className="text-text-secondary">{" width="}</span>
               <span className="text-amber/70">{'"600"'}</span>
               <span className="text-text-secondary">{" height="}</span>

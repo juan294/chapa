@@ -108,4 +108,66 @@ describe("CopyButton", () => {
 
     expect(screen.getByText("Copied!")).toBeDefined();
   });
+
+  // ─── Failure state (#1165 / UX-M4) ─────────────────────────────────────
+  // Previously there was NO catch at all here — a rejected clipboard write
+  // was an unhandled promise rejection and the button visibly did nothing.
+
+  it("does not throw when the clipboard write rejects", async () => {
+    mockWriteText.mockRejectedValue(new Error("Clipboard blocked"));
+    render(<CopyButton text="some text" />);
+    const button = screen.getByRole("button", { name: "Copy embed snippet" });
+
+    await expect(
+      act(async () => {
+        fireEvent.click(button);
+      }),
+    ).resolves.not.toThrow();
+  });
+
+  it("surfaces a visible failure state in the aria-live region when the clipboard write rejects", async () => {
+    mockWriteText.mockRejectedValue(new Error("Clipboard blocked"));
+    render(<CopyButton text="some text" />);
+    const button = screen.getByRole("button", { name: "Copy embed snippet" });
+
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(screen.queryByText("Copy")).toBeNull();
+    expect(screen.queryByText("Copied!")).toBeNull();
+    expect(screen.getByText("Failed")).toBeDefined();
+  });
+
+  it("does not track embed_copied when the clipboard write rejects", async () => {
+    const { trackEvent } = await import("@/lib/analytics/posthog");
+    vi.mocked(trackEvent).mockClear();
+    mockWriteText.mockRejectedValue(new Error("Clipboard blocked"));
+    render(<CopyButton text="some text" />);
+    const button = screen.getByRole("button", { name: "Copy embed snippet" });
+
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(trackEvent).not.toHaveBeenCalled();
+  });
+
+  it("reverts the failure state back to 'Copy' after the reset delay", async () => {
+    mockWriteText.mockRejectedValue(new Error("Clipboard blocked"));
+    render(<CopyButton text="some text" />);
+    const button = screen.getByRole("button", { name: "Copy embed snippet" });
+
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(screen.getByText("Failed")).toBeDefined();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(screen.getByText("Copy")).toBeDefined();
+    expect(screen.queryByText("Failed")).toBeNull();
+  });
 });
