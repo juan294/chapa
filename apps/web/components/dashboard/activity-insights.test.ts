@@ -195,4 +195,58 @@ describe("computeActivityInsights", () => {
       expect(computeActivityInsights([]).busiestDayIndex).toBe(-1);
     });
   });
+
+  // FE-M2 (#1173): ActivityHeatmap is server-rendered (next/dynamic default
+  // ssr:true) but the trailing-zero-count-"today" trim below deliberately
+  // uses the *local* device clock ("to match GitHub's date format") — correct
+  // on the client, but wrong on the server, which runs in UTC. A viewer whose
+  // local date differs from UTC could see the server and the first client
+  // render disagree on "today" and therefore on currentStreak — a React 19
+  // hydration text mismatch. The fix gates the trim behind an explicit option
+  // (set from useIsClient() at the call site in ActivityHeatmap.tsx) rather
+  // than ever substituting a server-computed UTC date, which would just move
+  // the same boundary bug to a different clock.
+  describe("trimTodayIfZero option", () => {
+    it("defaults to true, preserving the existing 'today isn't over yet' behavior", () => {
+      const data: HeatmapDay[] = [
+        { date: relativeDateStr(-2), count: 5 },
+        { date: relativeDateStr(-1), count: 3 },
+        { date: relativeDateStr(0), count: 0 },
+      ];
+      expect(computeActivityInsights(data).currentStreak).toBe(2);
+    });
+
+    it("when false, does not trim a zero-count trailing 'today' entry — safe for a server pass with no reliable local clock", () => {
+      const data: HeatmapDay[] = [
+        { date: relativeDateStr(-2), count: 5 },
+        { date: relativeDateStr(-1), count: 3 },
+        { date: relativeDateStr(0), count: 0 },
+      ];
+      expect(
+        computeActivityInsights(data, { trimTodayIfZero: false })
+          .currentStreak,
+      ).toBe(0);
+    });
+
+    it("is a pure function: identical (data, options) input always produces identical output", () => {
+      const data = makeDays("2025-03-01", [1, 2, 0, 4, 5]);
+      const first = computeActivityInsights(data, { trimTodayIfZero: false });
+      const second = computeActivityInsights(data, {
+        trimTodayIfZero: false,
+      });
+      expect(first).toEqual(second);
+    });
+
+    it("agrees between a server pass (trimTodayIfZero=false) and a hydrated client pass (trimTodayIfZero=true) whenever today already has activity — the trim branch never engages, so gating it introduces no other discrepancy", () => {
+      const data: HeatmapDay[] = [
+        { date: relativeDateStr(-1), count: 3 },
+        { date: relativeDateStr(0), count: 7 },
+      ];
+      const server = computeActivityInsights(data, {
+        trimTodayIfZero: false,
+      });
+      const client = computeActivityInsights(data, { trimTodayIfZero: true });
+      expect(server).toEqual(client);
+    });
+  });
 });

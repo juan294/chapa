@@ -1022,6 +1022,7 @@ export const en: Translations = {
     terminalWelcome: 'Creator Studio — customize your badge preview',
     terminalHint: 'Type /help for commands or use Quick Controls.',
     title: 'Creator Studio',
+    subtitle: 'Preview and customize your badge — changes here never affect your public badge or share page.',
     quickControls: 'Quick Controls',
     presetsHeading: 'Presets',
     reducedMotion: 'Reduced motion detected — animations are disabled',

@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { render, screen, cleanup } from "@testing-library/react";
 import type { StatsData, ImpactV6Result, ImpactTier } from "@chapa/shared";
-import { getBadgeContentCSS } from "./BadgeContent";
+import { getBadgeContentCSS, getRadarAxes, radarPoint } from "./BadgeContent";
 
 // ---------------------------------------------------------------------------
 // Mock heavy dependencies to allow render-based tests in jsdom
@@ -154,11 +154,21 @@ function makeImpact(overrides?: Partial<ImpactV6Result>): ImpactV6Result {
   };
 }
 
+// Uses the component's own exported axis definitions (getRadarAxes/radarPoint)
+// rather than re-deriving the diamond-only formula, so pentagon layouts (with
+// craft present) are covered too and there's a single source of truth for the
+// angle math instead of two formulas that could silently drift apart.
 function expectedDataPolygonPoints(dimensions: ImpactV6Result["dimensions"]): string {
   const cx = 70;
   const cy = 70;
   const r = 55;
-  return `${cx},${cy - (dimensions.delivery / 100) * r} ${cx + (dimensions.quality / 100) * r},${cy} ${cx},${cy + (dimensions.consistency / 100) * r} ${cx - (dimensions.breadth / 100) * r},${cy}`;
+  return getRadarAxes(dimensions)
+    .map(({ key, angle }) => {
+      const val = (dimensions[key] ?? 0) / 100;
+      const [x, y] = radarPoint(cx, cy, angle, val * r);
+      return `${x},${y}`;
+    })
+    .join(" ");
 }
 
 describe("BadgeContent — render-based", () => {
@@ -485,9 +495,81 @@ describe("BadgeContent — render-based", () => {
       expect(screen.getByText("Developer Profile")).toBeDefined();
     });
 
-    it("renders the abbreviated 'Consist' radar axis label", () => {
-      render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
-      expect(screen.getByText("Consist")).toBeDefined();
+    // UX-M2 (#1173): the shipped SVG badge (apps/web/lib/render/RadarChart.ts)
+    // renders the full word "Consistency", never the truncated "Consist".
+    // Scoped to the radar's own <svg> since "Consistency" also legitimately
+    // appears as a dimension-card label elsewhere in this component.
+    it("renders the full 'Consistency' radar axis label, not the truncated 'Consist'", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const svg = container.querySelector('svg[viewBox="0 0 140 140"]');
+      const labels = Array.from(svg!.querySelectorAll("text")).map(
+        (el) => el.textContent,
+      );
+      expect(labels).toContain("Consistency");
+      expect(labels).not.toContain("Consist");
+    });
+
+    // UX-M2 (#1173): RadarChart.ts renders a 5-axis pentagon (72° spacing)
+    // when impact.dimensions.craft is present, and a 4-axis diamond (90°
+    // spacing) otherwise. The Studio preview must match, or a Craft user
+    // sees a four-sided preview of a five-sided public badge.
+    it("renders a 5-axis pentagon (with a Craft label) when impact.dimensions.craft is present", () => {
+      const dimensions = {
+        delivery: 60,
+        quality: 70,
+        consistency: 80,
+        breadth: 50,
+        craft: 65,
+      };
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ dimensions })} />,
+      );
+      const svg = container.querySelector('svg[viewBox="0 0 140 140"]');
+      const labels = Array.from(svg!.querySelectorAll("text")).map(
+        (el) => el.textContent,
+      );
+      expect(labels).toEqual(["Delivery", "Quality", "Consistency", "Breadth", "Craft"]);
+
+      const dataPolygon = svg!.querySelector('polygon[fill="var(--color-purple-tint)"]');
+      const points = dataPolygon!.getAttribute("points")!.trim().split(" ");
+      expect(points).toHaveLength(5);
+      expect(dataPolygon!.getAttribute("points")).toBe(
+        expectedDataPolygonPoints(dimensions),
+      );
+    });
+
+    it("falls back to a 4-axis diamond (no Craft label) when craft is absent", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const svg = container.querySelector('svg[viewBox="0 0 140 140"]');
+      const labels = Array.from(svg!.querySelectorAll("text")).map(
+        (el) => el.textContent,
+      );
+      expect(labels).toEqual(["Delivery", "Quality", "Consistency", "Breadth"]);
+    });
+
+    it("renders 5 guide ring polygons' vertices and axis lines matching the pentagon axis count when craft is present", () => {
+      const dimensions = {
+        delivery: 60,
+        quality: 70,
+        consistency: 80,
+        breadth: 50,
+        craft: 65,
+      };
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ dimensions })} />,
+      );
+      const svg = container.querySelector('svg[viewBox="0 0 140 140"]');
+      // Still 4 concentric guide rings (one per ring level) — only the
+      // vertex count per ring changes with the axis count.
+      const guideRings = svg!.querySelectorAll('polygon[fill="none"]');
+      expect(guideRings.length).toBe(4);
+      expect(guideRings[0]!.getAttribute("points")!.trim().split(" ")).toHaveLength(5);
+      // One axis line per axis (5 for the pentagon).
+      expect(svg!.querySelectorAll("line").length).toBe(5);
     });
   });
 

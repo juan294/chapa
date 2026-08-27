@@ -43,6 +43,23 @@ describe("QuickControls", () => {
     expect(toggle.getAttribute("aria-controls")).toBeTruthy();
   });
 
+  // UX-M1 (#1173): the toggle was the only pointer affordance for Studio's 9
+  // customization categories, styled at ~2.3:1 contrast (text-terminal-dim).
+  // Promoted to the standard secondary-text token.
+  it("uses text-text-secondary (not the low-contrast text-terminal-dim) for the toggle label", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={false}
+        onToggle={vi.fn()}
+      />,
+    );
+    const toggle = screen.getByRole("button", { name: "Quick Controls" });
+    expect(toggle.className).toContain("text-text-secondary");
+    expect(toggle.className).not.toContain("text-terminal-dim");
+  });
+
   it("calls onToggle when expand button clicked", () => {
     const toggle = vi.fn();
     render(

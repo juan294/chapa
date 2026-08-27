@@ -8,6 +8,7 @@ import {
   type ActivitySummary,
 } from "./activity-insights";
 import { seededRandom } from "@/lib/utils/prng";
+import { useIsClient } from "@/hooks/useIsClient";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -201,9 +202,15 @@ export function ActivityHeatmap({
   dimensions,
 }: ActivityHeatmapProps) {
   const { t, locale } = useTranslation();
+  // FE-M2 (#1173): this component is server-rendered by default (next/dynamic
+  // ssr:true upstream), but the streak calculation's "is today over yet?"
+  // check deliberately uses the viewer's local clock. The server runs UTC, so
+  // gate the trim behind hydration rather than ever computing it from a
+  // server-side date — see the option's doc comment in activity-insights.ts.
+  const isClient = useIsClient();
   const insights = useMemo(
-    () => computeActivityInsights(heatmapData),
-    [heatmapData]
+    () => computeActivityInsights(heatmapData, { trimTodayIfZero: isClient }),
+    [heatmapData, isClient]
   );
   const enriched = useMemo(
     () => enrichDays(heatmapData, dimensions),

@@ -1022,6 +1022,7 @@ export const es: Translations = {
     terminalWelcome: 'Creator Studio — personaliza la vista previa de tu Chapa',
     terminalHint: 'Escribe /help para ver los comandos o usa los Controles Rápidos.',
     title: 'Creator Studio',
+    subtitle: 'Previsualiza y personaliza tu Chapa — los cambios aquí nunca afectan a tu Chapa pública ni a tu página compartida.',
     quickControls: 'Controles rápidos',
     presetsHeading: 'Preajustes',
     reducedMotion: 'Se ha detectado movimiento reducido — las animaciones están desactivadas',
