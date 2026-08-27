@@ -74,7 +74,7 @@ describe("admin error.tsx render", () => {
     render(<AdminErrorPage error={new Error("admin boundary boom")} reset={vi.fn()} />);
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe("/api/telemetry");
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({

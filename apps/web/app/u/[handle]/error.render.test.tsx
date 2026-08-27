@@ -72,7 +72,7 @@ describe("u/[handle] error.tsx render", () => {
     render(<SharePageError error={new Error("share page boundary boom")} reset={vi.fn()} />);
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe("/api/telemetry");
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({
