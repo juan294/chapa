@@ -33,6 +33,7 @@ For this submission, all work through 2026-08-24 is prior work. The badge, scori
 Submission-period work started after that cutoff:
 
 - The Creator Studio revival and hardening landed on 2026-08-26 and was released as [v2.23.0](https://github.com/juan294/chapa/releases/tag/v2.23.0).
+- The pre-launch audit remediation — 73 findings across two waves, including both launch-blockers — landed on 2026-08-27 and was released as [v2.24.0](https://github.com/juan294/chapa/releases/tag/v2.24.0).
 - The WebMCP layer runs from [3156fcaa](https://github.com/juan294/chapa/commit/3156fcaab716c0712044b9a6b59233ff28767043) through [699f94b0](https://github.com/juan294/chapa/commit/699f94b000a6fb561f9001c3a54b2b509e6efe5d). The local receipt is `git log --oneline 3156fcaa^..699f94b0`:
 
 ```text

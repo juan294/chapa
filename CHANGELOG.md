@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.24.0] - 2026-08-27
+
+Pre-launch audit remediation: 73 findings resolved across two waves, plus the
+WebMCP tool surface and Studio demo mode. Both launch-blockers from the audit
+are fixed.
+
+### Breaking
+
+- **CLI tokens now expire after 10 days instead of 90.** Every existing CLI
+  token is invalidated on its next use — run `chapa login` again to
+  re-authorize. This bounds the blast radius of a phished device-authorization
+  approval, which previously granted three months of unrevocable write access
+  to another user's scoring inputs.
+
+### Added
+
+- **WebMCP tool surface.** The share, verify and Studio pages register
+  read-only tools on `document.modelContext` so a visitor's browser AI agent
+  can query a profile, compare handles, verify a badge, and explain a
+  dimension. Gated by the `webmcp_enabled` feature flag; all tools carrying
+  third-party data are annotated as untrusted content.
+- **Creator Studio demo mode** — anonymous preview access behind the
+  `studio_demo_enabled` flag.
+- **Badge localization.** `/u/:handle/badge.svg?lang=es|en` renders the badge
+  in either locale. `resolveBadgeLocale` derives the strings and the cache key
+  together so rendered content and cache slot can never diverge.
+- **Site-wide footer.** Privacy and Terms are now reachable from every page,
+  not just the landing page, and inner pages carry real-route navigation.
+- **Operational alerts deliver by email.** When no webhook is configured,
+  `captureOperationalAlert` falls back to the existing Resend integration.
+  Nine P1/P2 signals previously went nowhere in production.
+- Route error boundaries now report to telemetry, once per error identity.
+- New design tokens: `--color-complement-dark`, `--color-complement-text`,
+  `--color-complement-text-hover`.
+
+### Fixed
+
+- **Scoring: multi-platform users were misclassified.** Chained `mergeStats`
+  calls accumulated `primaryReviewsSubmittedCount`, so for anyone with two or
+  more linked sources non-GitHub reviews drove the solo-vs-collaborative
+  classification that gates the Quality dimension and Quality Champion
+  archetype. Both that field and `hasSupplementalData` are now
+  order-independent.
+- **Cache: a scope-blinded fetch could overwrite private-inclusive data** via
+  the rejection path, collapsing the Delivery dimension for up to six hours.
+- **Rate limiter: a lost `EXPIRE` locked a key out permanently.** `INCR` and
+  `EXPIRE` are now one atomic Lua script that self-heals a TTL-less key.
+  Affected fail-closed routes including `/api/refresh`, which is keyed per
+  handle.
+- **Accessibility:** hero CTAs, navigation labels and verification text failed
+  WCAG AA contrast; tooltip and footer touch targets were as small as 14px;
+  the activity timeline exposed ~90 tab stops inside a `role="img"`; the badge
+  animated indefinitely with no `prefers-reduced-motion` guard.
+- **Archetype guide pages rendered two empty sections** — the essay copy that
+  belonged under them was stranded above, on 7 archetypes across both locales.
+- Telemetry's `client_error` branch bypassed all three rate limits, and
+  `captureServerEvent` forwarded client strings to analytics unsanitized.
+- Campaign sends were capped at one 50-recipient batch per run, and a missing
+  Resend key marked an entire batch permanently failed instead of releasing
+  the lease.
+- Badge verification strip was illegible at embed scale and inert in `<img>`
+  embeds; the verified marker used three different colours across one badge.
+- Feature-flag caching made content-page ISR revalidate nondeterministic
+  between build workers.
+- The English dictionary shipped in every page's client bundle (~30 KB gzip),
+  including for Spanish visitors.
+- The share page discarded a server-resolved session and re-fetched it from
+  the client; nine locale-aware routes served the wrong `<html lang>`.
+- Studio previewed a four-axis radar for a five-axis badge, had no
+  unsaved-changes guard, and hid its only GUI behind a near-invisible toggle.
+
+### Changed
+
+- Badge cache-miss p95 budget reconciled from 3000ms to 4100ms to match the
+  route's actual bounded deadline stack, after moving the SVG cache write off
+  the response path.
+- The badge SVG cache key now includes locale.
+- Studio config reads come from Supabase directly; the Redis mirror is gone.
+- `warm-cache` skips re-rendering a badge whose cache entry is already
+  populated, and bounds avatar resolution explicitly.
+
+### Removed
+
+- `webmcp-spike` debug route, `cacheSetVersioned`, the orphaned Studio config
+  cache write, and the unread `COMING_SOON` environment variable.
+
 ## [2.23.0] - 2026-08-26
 
 ### Added
