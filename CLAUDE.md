@@ -390,7 +390,7 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 
 ```bash
 # Before committing
-pnpm run test           # Run all tests
+pnpm run test           # Unit + script suites (contract tests: pnpm run test:contract:local)
 pnpm run typecheck      # Check types
 pnpm run lint           # Check linting
 

@@ -90,31 +90,65 @@ dashboard** (last N runs of each cron path + status), and a **health dashboard**
 ## Relationship to existing alerting
 
 Log drains are for **retention and forensics**; they are **not** the real-time
-alert path. The app already does active alerting independently:
+alert path. The app already does active alerting independently via
+`captureOperationalAlert()` (`apps/web/lib/analytics/server-errors.ts`), which
+sends **P1/P2 alerts** for `health_degraded`, `badge_5xx`,
+`oauth_callback_failure`, `cron_failure`, `warm_cache_high_failure_rate`,
+`warm_cache_ceiling_approached`, and `badge_latency_slo_breach` (#974, raised
+by the daily `latency-check` cron when the badge route's p95 latency budget is
+exceeded or the probe fails). Alert payloads are JSON with secrets scrubbed.
 
-- `CHAPA_ALERT_WEBHOOK_URL` (documented in `CLAUDE.md` and
-  `docs/runbooks/incident-response.md`) receives **P1/P2 alerts** for
-  `health_degraded`, `badge_5xx`, `oauth_callback_failure`, `cron_failure`,
-  `warm_cache_high_failure_rate`, `warm_cache_ceiling_approached`, and
-  `badge_latency_slo_breach` (#974, raised by the daily `latency-check` cron
-  when the badge route's p95 latency budget is exceeded or the probe fails).
-  Alert payloads are JSON with secrets scrubbed.
-- **Cron heartbeats**: `warm-cache`, `sync-audience`, `process-campaigns`, and
-  `latency-check` each write a `cron:lastrun:<name>` key to Redis on
-  completion (#1018 added `latency-check` to this set — it previously had no
-  heartbeat and was invisible to health monitoring). `/api/health` checks each
-  key's staleness against a grace window and reports `degraded` (with a
-  `health_degraded` alert) if a cron hasn't run recently — this is how a
-  silently-broken cron (e.g. a Vercel scheduling misconfiguration) gets
-  caught even though the cron itself never returns a 5xx.
+**Delivery channel (updated by Wave 1 / #1162 / DO-B1):** if
+`CHAPA_ALERT_WEBHOOK_URL` is configured, alerts POST to that webhook. In
+production the webhook is unset, so delivery falls back to **email via the
+existing Resend integration** (`sendAlertEmail`, `apps/web/lib/email/alerts.ts`)
+rather than a Discord/Slack webhook. Both `CLAUDE.md` and
+`docs/runbooks/incident-response.md` still describe the webhook as the primary
+path — check which channel is actually configured before assuming pages will
+arrive as webhook pushes.
 
-So the two layers are complementary:
+Not all of these signals fire the same way:
 
-- **`CHAPA_ALERT_WEBHOOK_URL`** → push, real-time, "wake me up now."
+- `badge_5xx`, `oauth_callback_failure`, `cron_failure`, the `warm_cache_*`
+  signals, and `badge_latency_slo_breach` are raised **on the request path**
+  (a real request hit the route and got a 5xx, or the `latency-check` cron ran
+  its synthetic probe) — for these, the alert channel above is genuinely
+  push/real-time: something happened and the alert fires immediately as a side
+  effect of that happening.
+- `health_degraded` is different: it is only ever raised from inside the
+  `/api/health` GET handler itself (`apps/web/app/api/health/route.ts`), so it
+  is **PULL-evaluated** — it only fires when something calls `/api/health`.
+  There is no background timer independently checking health. **Cron
+  heartbeats** (`warm-cache`, `sync-audience`, `process-campaigns`, and
+  `latency-check`, each writing a `cron:lastrun:<name>` key to Redis on
+  completion — #1018 added `latency-check` to this set) are likewise only
+  checked for staleness, and only surfaced as `health_degraded`, when
+  `/api/health` is polled.
+- The only automated poller of `/api/health` in production today is
+  `.github/workflows/nightly-prod-probe.yml`, scheduled `0 5 * * *` — **once
+  daily**. So a cron that silently stops running, or a dependency that goes
+  degraded, can sit undetected for up to ~24 hours before the next scheduled
+  probe evaluates `/api/health` and raises `health_degraded`. An incident
+  responder should not assume `health_degraded` pages them the moment
+  something degrades — it pages them the next time the nightly probe (or any
+  other manual/ad-hoc hit to `/api/health`, e.g. from the dashboard or a
+  manual `curl`) happens to run.
+
+So the two layers are complementary, with one caveat baked into the alert
+layer itself:
+
+- **Alert channel (webhook or, currently, email)** → push/real-time for
+  request-path signals; **pull, once-daily** for `health_degraded` and cron
+  heartbeat staleness specifically.
 - **Axiom log drain** → pull, durable, "let me investigate what happened."
 
-Configure both. The webhook tells you something broke; the log drain lets you find
-out why after the fact.
+Configuring the alert channel and the log drain does not by itself make
+`health_degraded` real-time — that would require a more frequent poller of
+`/api/health`, which is intentionally out of scope here (see
+`docs/accepted-risks.md`'s project-scale policy). The log drain lets you find
+out why something broke after the fact; the alert channel tells you a
+request-path problem happened immediately, and tells you about health/cron
+degradation on whatever cadence something is polling `/api/health`.
 
 ## Release evidence correlation
 
