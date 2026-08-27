@@ -101,6 +101,27 @@ describe("QuickControls", () => {
     expect(onCommand).toHaveBeenCalledWith("/preset minimal");
   });
 
+  // UX-L1 (#1187): the current-value indicator next to each category label
+  // was `text-[10px]` — below the design-system's documented 11px type-scale
+  // floor, and compounded by the low-contrast `text-terminal-dim` color.
+  // Unlike the uppercase tracking-wide section headings in this file (which
+  // are intentionally left at 10px as hierarchy micro-labels), this is
+  // ordinary content text the user needs to read, so it's raised to the
+  // standard text-xs (12px) step already used by its sibling label span.
+  it("renders the category current-value indicator at text-xs, not a sub-11px arbitrary size", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={true}
+        onToggle={vi.fn()}
+      />,
+    );
+    const valueSpan = screen.getByText("solid");
+    expect(valueSpan.className).toContain("text-xs");
+    expect(valueSpan.className).not.toContain("text-[10px]");
+  });
+
   it("renders category labels", () => {
     render(
       <QuickControls
