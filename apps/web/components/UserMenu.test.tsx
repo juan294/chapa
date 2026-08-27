@@ -25,6 +25,7 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => false),
+  isWebmcpEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
   // Platform flags default to enabled so existing status-fetch tests behave as
   // before; the gating test (#885) overrides these to false.
@@ -1554,6 +1555,138 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// Insights success toast — dictionary-resolved, both locales (#1170 / FE-M4)
+//
+// Regression guard: the success toast used to be built from raw template
+// literals (`Craft: ${craftScore} ${craftTier}`, `Score updated to
+// ${newScore}`) that never went through t(), so a Spanish-locale user (the
+// default locale) got an English-only confirmation. `craftTier` is also a
+// raw enum value from the API — an unrecognized tier must fall back to the
+// raw string rather than rendering a bare translation-key path.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — insights success toast is dictionary-resolved (#1170)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let reloadSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    reloadSpy = vi.fn() as unknown as ReturnType<typeof vi.spyOn>;
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { ...window.location, reload: reloadSpy },
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+    vi.useRealTimers();
+    localStorage.clear();
+  });
+
+  async function uploadAndGetToast() {
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("toast").getAttribute("data-type")).toBe("success");
+    });
+    return {
+      message: screen.getByTestId("toast").textContent ?? "",
+      detail: screen.getByTestId("toast-detail")?.textContent ?? "",
+    };
+  }
+
+  it("renders the recognized craft tier through the dictionary in English", async () => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "Expert" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ adjustedComposite: 85, craftScore: 72, craftTier: "Expert" }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<UserMenu {...baseProps} />);
+
+    const { message, detail } = await uploadAndGetToast();
+    expect(message).toContain("Craft: 72 Expert");
+    expect(detail).toContain("Score updated to 85");
+  });
+
+  it("renders the recognized craft tier through the dictionary in Spanish (default locale)", async () => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "Expert" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ adjustedComposite: 85, craftScore: 72, craftTier: "Expert" }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { LanguageProvider } = await import("@/lib/i18n");
+    const { es } = await import("@/lib/i18n/dictionaries/es");
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <UserMenu {...baseProps} />
+      </LanguageProvider>,
+    );
+
+    const { message, detail } = await uploadAndGetToast();
+    // "Oficio" is the established Spanish translation for the Craft
+    // dimension/tier name (see badgeOverlayLabels.craft / dominantDimension).
+    expect(message).toContain("Oficio: 72 Experto");
+    expect(detail).toContain("actualizada a 85");
+  });
+
+  it("falls back to the raw tier string when the API returns a tier not in the dictionary", async () => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 40, tier: "FutureTier" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ adjustedComposite: 50, craftScore: 40, craftTier: "FutureTier" }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<UserMenu {...baseProps} />);
+
+    const { message } = await uploadAndGetToast();
+    // Must show the raw value, never a bare key path like "userMenu.craftTierFutureTier".
+    expect(message).toContain("Craft: 40 FutureTier");
+    expect(message).not.toMatch(/userMenu\./);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // Insights loading toast duration (runtime)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1637,6 +1770,19 @@ describe("UserMenu — semantic HTML for menu items (runtime, #578)", () => {
     const btn = screen.getByText("Import Claude Code Insights").closest("button");
     expect(btn).not.toBeNull();
     expect(btn?.getAttribute("role")).toBe("menuitem");
+  });
+
+  it("insights file input is a sibling of the button, not nested inside it (#1184 FE-L1)", () => {
+    // HTML forbids interactive content (an <input>) inside a <button>, and
+    // HTMLElement.click() bubbles a synthetic click back into an ancestor's
+    // onClick handler. The input must live outside the button element.
+    render(<UserMenu {...baseProps} />);
+
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    const input = document.querySelector('input[type="file"]');
+    expect(btn).not.toBeNull();
+    expect(input).not.toBeNull();
+    expect(btn?.contains(input)).toBe(false);
   });
 });
 

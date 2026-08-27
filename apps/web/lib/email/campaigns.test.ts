@@ -305,6 +305,53 @@ describe("processCampaignBatch", () => {
     );
   });
 
+  // BE-M2 regression: quotaKey is computed once when the batch is reserved,
+  // but the old refundDailyQuota() re-derived `toDateString(new Date())`
+  // itself. Resend's batch.send() is timeout-wrapped and can take long
+  // enough that a batch reserved just before UTC midnight refunds just
+  // after it — crediting the WRONG day's counter (tomorrow's), which can
+  // drive it negative and silently raise the effective daily cap above
+  // DAILY_SEND_LIMIT. The refund must credit the same key it charged.
+  it("BE-M2: refunds the day the quota was reserved on, even if the batch crosses UTC midnight", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T23:59:59.900Z"));
+
+      vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+      vi.mocked(dbClaimPendingSends).mockResolvedValue([
+        { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "processing", sentAt: null, error: null },
+      ]);
+      mockBatchSend.mockImplementation(async () => {
+        // Simulate the provider call taking long enough to cross midnight
+        // UTC before it resolves.
+        vi.setSystemTime(new Date("2026-01-02T00:00:05.000Z"));
+        return {
+          data: null,
+          error: { message: "Rate limited", statusCode: 429, name: "rate_limit" },
+        };
+      });
+      vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 0, processing: 1, failed: 0 });
+      vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+
+      await processCampaignBatch("campaign-1");
+
+      // Must credit 2026-01-01 (the day the quota was reserved), never
+      // 2026-01-02 (the day the provider call happened to finish on).
+      expect(cacheIncr).toHaveBeenCalledWith(
+        "campaign:daily-sends:2026-01-01",
+        -1,
+        86400,
+      );
+      expect(cacheIncr).not.toHaveBeenCalledWith(
+        "campaign:daily-sends:2026-01-02",
+        expect.anything(),
+        expect.anything(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("surfaces a sent acknowledgement write failure without marking the send failed", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends).mockResolvedValue([
@@ -569,21 +616,51 @@ describe("processCampaignBatch", () => {
     expect(result.remaining).toBe(43);
   });
 
-  it("does not call incrementDailyQuota when Resend client is null", async () => {
+  // BE-M6: a missing/blank RESEND_API_KEY is a transient config problem, not
+  // a permanent per-recipient failure. Marking claimed rows "failed" via
+  // dbMarkSendsFailed is a TERMINAL status nothing ever retries
+  // (claim_campaign_sends only selects expired-processing or pending), so a
+  // config outage used to silently drop recipients forever. Resend was never
+  // called, so releasing the lease is exactly as safe as the oversized-group
+  // release path (#1085) — it lets the same rows be reclaimed (with their
+  // group_token intact) once the config is fixed.
+  it("releases the claimed lease instead of permanently failing sends when Resend client is null (BE-M6)", async () => {
     vi.mocked(getResend).mockReturnValue(null);
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends).mockResolvedValue([
       { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "a@e.com", status: "processing", sentAt: null, error: null },
     ]);
-    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 0, processing: 0, failed: 1 });
+    vi.mocked(dbReleaseCampaignSendLease).mockResolvedValue(true);
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 1, processing: 0, failed: 0 });
 
     const result = await processCampaignBatch("campaign-1");
 
-    expect(result.failed).toBe(1);
-    expect(result.sent).toBe(0);
-    // cacheIncr should NOT be called since Resend was unavailable
+    expect(result).toEqual({ sent: 0, failed: 0, remaining: 1 });
+    expect(dbReleaseCampaignSendLease).toHaveBeenCalledWith(
+      expect.any(String),
+      1,
+    );
+    // cacheIncr should NOT be called since Resend was unavailable and quota
+    // was never reserved for this attempt.
     expect(cacheIncr).not.toHaveBeenCalled();
-    expect(dbMarkSendsFailed).toHaveBeenCalledWith(["s-1"], "Resend unavailable", expect.any(String));
+    expect(dbMarkSendsFailed).not.toHaveBeenCalled();
+    // The campaign isn't finalized — it still has pending work, exactly like
+    // the oversized-group release path.
+    expect(dbUpdateCampaign).not.toHaveBeenCalled();
+  });
+
+  it("throws when releasing the lease fails after Resend client is null (BE-M6)", async () => {
+    vi.mocked(getResend).mockReturnValue(null);
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbClaimPendingSends).mockResolvedValue([
+      { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "a@e.com", status: "processing", sentAt: null, error: null },
+    ]);
+    vi.mocked(dbReleaseCampaignSendLease).mockResolvedValue(false);
+
+    await expect(processCampaignBatch("campaign-1")).rejects.toThrow(
+      "Failed to release campaign lease after Resend unavailable",
+    );
+    expect(dbMarkSendsFailed).not.toHaveBeenCalled();
   });
 
   it("handles dbGetCampaignStats failure gracefully after sending", async () => {

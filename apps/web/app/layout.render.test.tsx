@@ -23,9 +23,13 @@ vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
     flags,
   }: {
     children: React.ReactNode;
-    flags: { studioEnabled: boolean };
+    flags: { studioEnabled: boolean; webmcpEnabled: boolean };
   }) => (
-    <div data-testid="feature-flags" data-studio={String(flags.studioEnabled)}>
+    <div
+      data-testid="feature-flags"
+      data-studio={String(flags.studioEnabled)}
+      data-webmcp={String(flags.webmcpEnabled)}
+    >
       {children}
     </div>
   ),
@@ -46,6 +50,7 @@ vi.mock("@/lib/feature-flags-sync", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   isStudioEnabled: () => Promise.resolve(mockIsStudioEnabledSync()),
+  isWebmcpEnabled: () => Promise.resolve(true),
   isInsightsEnabled: () => Promise.resolve(false),
   isBitbucketEnabled: () => Promise.resolve(false),
   isCodebergEnabled: () => Promise.resolve(false),
@@ -107,6 +112,9 @@ describe("RootLayout render", () => {
     expect(screen.getByTestId("theme-provider")).toBeTruthy();
     expect(
       screen.getByTestId("feature-flags").getAttribute("data-studio"),
+    ).toBe("true");
+    expect(
+      screen.getByTestId("feature-flags").getAttribute("data-webmcp"),
     ).toBe("true");
     expect(screen.getByText("Child route")).toBeTruthy();
     expect(screen.getByTestId("instrumentation")).toBeTruthy();

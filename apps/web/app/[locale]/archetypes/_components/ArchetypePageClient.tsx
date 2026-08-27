@@ -1,5 +1,6 @@
 import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { SiteFooter } from "@/components/SiteFooter";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import Link from "next/link";
 
@@ -32,6 +33,8 @@ export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
   const ns = `archetypes.${archetypeKey}`;
 
   const essay = tArray<string>(t, `${ns}.essay`);
+  const practiceEssay = tArray<string>(t, `${ns}.practiceEssay`);
+  const radarEssay = tArray<string>(t, `${ns}.radarEssay`);
   const keySignals = tArray<{ tier: string; description: string }>(t, `${ns}.keySignals`);
   const accentClass = ACCENT_CLASS[archetypeKey];
 
@@ -52,7 +55,10 @@ export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
   return (
     <div className="min-h-screen bg-bg text-text-primary">
       <NavbarClient />
-      <main id="main-content" className="mx-auto max-w-3xl px-6 pt-32 pb-16">
+      {/* pb-24 (was pb-16, #1167 / UX-B1) — GlobalCommandBarLazy is
+          fixed bottom-0; the smaller reservation left the footer added
+          below occluded behind it. */}
+      <main id="main-content" className="mx-auto max-w-3xl px-6 pt-32 pb-24">
         <article className="animate-fade-in-up">
           <div className="flex items-center gap-2 mb-6 font-heading text-sm">
             <span className="text-terminal-dim select-none">$</span>
@@ -111,10 +117,12 @@ export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 {t(`${ns}.sectionPractice`) as string}
               </h2>
+              {practiceEssay.map((p, i) => <p key={i}>{p}</p>)}
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 {t(`${ns}.sectionRadar`) as string}
               </h2>
+              {radarEssay.map((p, i) => <p key={i}>{p}</p>)}
             </div>
             <div className="pt-4 flex flex-wrap items-center justify-between gap-4">
               <Link href="/#features" className="font-heading text-sm text-amber hover:text-amber-light transition-colors">
@@ -127,6 +135,12 @@ export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
           </div>
         </article>
       </main>
+      {/* pb-16 spacer (#1167 / UX-B1) — reserves room below the footer so
+          scrolling to the true bottom of the page clears GlobalCommandBarLazy
+          (fixed bottom-0) instead of it occluding the footer's last line. */}
+      <div className="pb-16">
+        <SiteFooter t={t} showCta />
+      </div>
       <GlobalCommandBarLazy />
     </div>
   );

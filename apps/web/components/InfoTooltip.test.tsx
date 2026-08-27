@@ -612,6 +612,59 @@ describe("InfoTooltip", () => {
     });
   });
 
+  describe("touch target (#1167 / UX-H6)", () => {
+    it("keeps the trigger's own LAYOUT box at 16px (w-4 h-4) — portal positioning derives from this element's getBoundingClientRect", () => {
+      render(<InfoTooltip content="Test tooltip" id="tt-hitbox-layout" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      const classes = button.className.split(/\s+/);
+      expect(classes).toContain("w-4");
+      expect(classes).toContain("h-4");
+    });
+
+    it("grows the hit area via an invisible pseudo-element overlay, not by resizing the button itself", () => {
+      render(<InfoTooltip content="Test tooltip" id="tt-hitbox-pseudo" />);
+      const button = screen.getByRole("button", { name: "More information" });
+      // `relative` is required for the `before:absolute` hit-slop overlay to
+      // anchor to the button's own box rather than a farther positioned
+      // ancestor.
+      expect(button.className).toContain("relative");
+      expect(button.className).toMatch(/before:absolute/);
+      // 16px visual box + 14px inset on every side = 44px hit target,
+      // meeting the WCAG 2.5.5 / mobile touch-target minimum, without
+      // changing the box getBoundingClientRect() measures.
+      expect(button.className).toMatch(/before:-inset-3\.5|before:-inset-\[14px\]/);
+    });
+
+    it("does not change the size passed to getBoundingClientRect (auto-flip threshold / centering unaffected)", () => {
+      // Regression guard for the exact bug UX-H6 warns about: if the hit-area
+      // fix were done by resizing the button (e.g. min-h-[44px]) instead of a
+      // pseudo-element overlay, this mock would need to report 44x44 and the
+      // rect.top < 120 flip / horizontal centering math would silently shift.
+      render(<InfoTooltip content="Flip test" id="tt-hitbox-rect" />);
+      const button = screen.getByRole("button", { name: "More information" });
+
+      const rectSpy = vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        top: 200,
+        right: 116,
+        bottom: 216,
+        width: 16,
+        height: 16,
+        x: 100,
+        y: 200,
+        toJSON: () => {},
+      });
+
+      fireEvent.click(button);
+
+      // The button was measured as 16x16 (asserted above stays true post-fix)
+      // and the tooltip centers on that box: x = left + width/2 = 108.
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.style.left).toBe("108px");
+      rectSpy.mockRestore();
+    });
+  });
+
   describe("className prop", () => {
     it("applies custom className to wrapper span", () => {
       const { container } = render(

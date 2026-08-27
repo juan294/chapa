@@ -1,40 +1,61 @@
 # Triage Report
-> Generated on 2026-08-26 | 7 reports processed | 0 action items | 0 Dependabot PRs
+> Generated on 2026-08-27 | 5 reports processed | 0 code action items | 0 Dependabot PRs
 
 ## Agent Failures
-None — all agents ran successfully (`find logs/ -name "*.error.log" -mtime -1` returned empty).
+| Agent | Error | Log File |
+|-------|-------|----------|
+None — all agents ran successfully; no `.error.log` files modified in the last 24h.
 
 ## Reports Reviewed
-| # | Report | Agent | Status | Action Items |
-|---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi Update | GREEN | 0 — already in sync with cc-rpi v1.28.2 |
-| 2 | cost-analyst-report.md | Cost Analyst | GREEN | 0 |
-| 3 | coverage-report.md | Coverage | GREEN | 0 |
-| 4 | documentation-report.md | Documentation | GREEN | 0 |
-| 5 | performance-report.md | Performance | GREEN | 0 |
-| 6 | security-report.md | Security | GREEN | 0 |
-| 7 | update-docs-report.md | Update Docs | GREEN | 0 — historical record of already-applied doc updates |
+| # | Report | Status | Action Items |
+|---|--------|--------|---------------|
+| 1 | `pre-launch-report.md` (generated 08-27 10:54, HEAD `e72a4e3a`, verdict NOT READY) | Already fully remediated | 0 remaining — see below |
+| 2 | `remediation-report.md` (was stale) | Regenerated | 1 (report rewrite) |
+| 3 | `performance-report.md` | GREEN | 0 (its 1 P3 is now moot) |
+| 4 | `update-docs-report.md` | GREEN | 0 (covers docs through v2.23.0 accurately) |
+| 5 | `qa-report.md` | GREEN | 0 |
 
 ## Overall Status: GREEN
 
+The pre-launch audit's verdict (NOT READY, ~77 findings, 2 launch blockers, 14 "Before
+launch" highs) was accurate **at generation time**. Between generation (10:54) and this
+triage, an independent `/remediate` cycle (peer session `chapa-42`) fixed and merged 28
+issues (#1162–#1189) to `develop`, bringing HEAD to `8ee9d1dc` with all 6 required CI
+workflows green. The remaining 7 findings (AR-S1, AR-S2, BE-S1, FE-S1, FE-L7, AR-L3, PE-L4)
+are strategic and correctly filed as issues #1191–#1197 without fix agents, per the Wave 3
+policy. Verified via two independent methods (direct `git log`/`gh issue list` audit, and a
+separate fork that read the full 1415-line report) — both agree on full coverage, no gaps.
+
 ## Action Items Completed
-None this cycle — no report surfaced an open finding.
+| # | Item | Source Report | Tests Added | Status |
+|---|------|----------------|-------------|--------|
+| 1 | Regenerated `docs/agents/remediation-report.md` to document the actual 28-issue remediation wave (was only documenting the smaller 08-26 cycle) | `pre-launch-report.md` cross-check | N/A (docs only) | Done |
+| 2 | Confirmed `performance-report.md`'s only P3 (add `/webmcp-spike` to CLAUDE.md route table) is moot — route deleted in #1186 | `performance-report.md` | N/A | Verified, no action needed |
+| 3 | Appended triage entry to `shared-context.md`, pruned 2 oldest triage entries to stay within the 3-per-agent-type cap | Rule (shared-context maintenance) | N/A | Done |
 
 ## GitHub Security & Quality Alerts
 | # | Type | Severity | Tool/Package | Rule/Advisory | Location | Status | Notes |
-|---|------|----------|--------------|---------------|----------|--------|-------|
-| 1 | Code scanning (CodeQL) | — | — | — | repo-wide | GREEN (disabled) | GHAS not licensed for private repos on this tier (403). Already a documented accepted risk (`docs/accepted-risks.md:204-208`) — equivalent coverage via CI Gitleaks + osv-scanner. Re-confirmed still valid. |
-| 2 | Secret scanning | — | — | — | repo-wide | GREEN (disabled) | Same GHAS limitation (404). Same accepted-risk entry. |
-| 3 | Dependabot security alerts | — | — | — | repo-wide | GREEN | Query succeeded — zero open alerts. |
+|---|------|----------|--------------|----------------|----------|--------|-------|
+| — | Code scanning | — | GHAS | — | repo-wide | Disabled (403) | Pre-existing accepted risk, this repo tier — unchanged |
+| — | Secret scanning | — | GHAS | — | repo-wide | Disabled (404) | Pre-existing accepted risk, this repo tier — unchanged |
+| — | Dependabot | — | — | — | — | 0 open alerts | Clean |
 
 ## Dependabot PRs
-None — no open Dependabot PRs (`gh pr list --author "app/dependabot"` → empty).
+| # | PR | Update Type | Disposition | Notes |
+|---|----|--------------|-------------|-------|
+None — no open Dependabot PRs.
 
 ## Verification
-- [x] All tests passing (per coverage-report.md: 7814/7814)
-- [x] Typecheck clean (per performance-report.md: 0 errors)
-- [x] Lint clean (per cost/performance reports: knip 0 findings, no lint issues raised)
-- [x] CI green on `develop` (no code changes this cycle — nothing to break)
+- [x] All tests passing (nothing app-code changed this cycle; last known-good run: 8009/487 files per pre-launch audit, reconfirmed GREEN by every subsequent report)
+- [x] Typecheck clean
+- [x] Lint clean
+- [x] CI green on current `develop` HEAD `8ee9d1dc` (all 6 required workflows: CI, Coverage, Bundle Size Analysis, Security Scan, Secret Scanning, Dead Code Detection)
 
 ## Carried Items
-None. Prior carried item (`scopeRank` docstring, flagged by Cost Analyst across 5 cycles 2026-07-19→2026-07-23) is now confirmed resolved by both Security (08-24) and Cost Analyst (08-25) reports.
+- `CHANGELOG.md`'s `[Unreleased]` section is empty despite 28 merged fixes since `v2.23.0` —
+  flagged for the next `/update-docs` cycle, not fixed here (out of triage scope).
+- Wave 3 strategic issues #1191–#1197 (plus older carried #1153) remain open pending human
+  architectural judgment — not a triage action item, tracked per policy.
+- A peer session (`chapa-42`) has a live worktree at `.claude/worktrees/agent-aaf7b8858af18882b`
+  (branch `docs/post-remediation`, identical to `develop` HEAD) that appears to still be
+  running — left untouched as active work, not a stale worktree needing cleanup.

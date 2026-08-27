@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { StatusCallout } from "@/components/StatusCallout";
 import { useTranslation } from "@/lib/i18n";
+import { useErrorBoundaryReport } from "@/lib/analytics/use-error-boundary-report";
 
 export default function AdminErrorPage({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useErrorBoundaryReport(error, "admin-error");
   const { t } = useTranslation();
 
   return (
@@ -16,22 +20,23 @@ export default function AdminErrorPage({
       id="main-content"
       className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center"
     >
-      <h1 className="font-heading text-4xl font-bold text-amber">
-        {t('errors.admin.title') as string}
-      </h1>
-      <p className="mt-4 text-sm text-text-secondary">
-        {t('errors.admin.description') as string}
-      </p>
+      <StatusCallout
+        variant="error"
+        title={t('errors.admin.title') as string}
+        titleAs="h1"
+        description={t('errors.admin.description') as string}
+        className="w-full max-w-xl text-left"
+      />
       <div className="mt-8 flex items-center gap-4">
         <button
           onClick={reset}
-          className="rounded-lg border border-amber/20 bg-amber/10 px-6 py-2.5 text-sm font-medium text-amber transition-colors hover:bg-amber/20"
+          className="rounded-lg border border-terminal-red/30 bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/20"
         >
           {t('common.tryAgain') as string}
         </button>
         <Link
           href="/"
-          className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary"
+          className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-terminal-red/30 hover:text-text-primary"
         >
           {t('common.goHome') as string}
         </Link>

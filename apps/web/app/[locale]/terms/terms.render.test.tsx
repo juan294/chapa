@@ -32,6 +32,12 @@ vi.mock("@/lib/i18n/server", () => ({
       "legal.terms.metadataDescription":
         "Terms of Service for Chapa. Understand the rules and guidelines for using the developer impact badge platform.",
       "legal.terms.metadataOgTitle": "Terms of Service — Chapa",
+      "landing.footer.tagline": "Built for developers, by developers.",
+      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.about": "About",
+      "landing.footer.scoring": "Scoring",
+      "landing.footer.terms": "Terms",
+      "landing.footer.privacy": "Privacy",
     };
     return (dict[key] ?? key) as unknown as string;
   }),
@@ -75,9 +81,20 @@ describe("TermsPage", () => {
     expect(screen.getByText("1. Acceptance of Terms")).toBeDefined();
   });
 
+  // #1167 (UX-B1, launch blocker) — the footer now links back to Privacy
+  // too, via the shared SiteFooter component.
+  it("renders a Privacy link via the site-wide footer", async () => {
+    render(await TermsPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
+  });
+
   it("renders contact email link on last section", async () => {
     render(await TermsPage({ params: Promise.resolve({ locale: "en" }) }));
-    const link = screen.getByRole("link");
+    // #1167 — the page now also renders the site-wide footer's links
+    // (About/Scoring/Terms/Privacy/platform icons), so this must be scoped
+    // to the mailto link specifically rather than assuming it's the only
+    // link on the page.
+    const link = screen.getByRole("link", { name: "support@chapa.thecreativetoken.com" });
     expect(link.getAttribute("href")).toBe(
       "mailto:support@chapa.thecreativetoken.com"
     );

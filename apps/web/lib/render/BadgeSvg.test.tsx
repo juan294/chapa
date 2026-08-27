@@ -745,4 +745,223 @@ describe("renderBadgeSvg", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Reduced motion (#1168 UX-M6)
+  // ---------------------------------------------------------------------------
+
+  describe("prefers-reduced-motion guard", () => {
+    it("contains a prefers-reduced-motion media block disabling the infinite pulse-glow", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)/);
+      // The media block must target the pulse-glow animation and turn it off.
+      const mediaMatch = svg.match(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\}\s*\}/);
+      expect(mediaMatch).not.toBeNull();
+      expect(mediaMatch![0]).toContain("animation: none");
+    });
+
+    it("does not disable the finite ring-draw reveal in the reduced-motion block", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const mediaMatch = svg.match(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\}\s*\}/);
+      expect(mediaMatch).not.toBeNull();
+      expect(mediaMatch![0]).not.toContain("ring-draw");
+      // ring-draw's own keyframe + inline animation reference must still exist untouched.
+      expect(svg).toContain("@keyframes ring-draw");
+      expect(svg).toContain("animation: ring-draw 1.2s ease-out 0.5s both");
+    });
+
+    it("still includes the pulse-glow keyframe and applies it to the score (unchanged when motion is not reduced)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("@keyframes pulse-glow");
+      expect(svg).toMatch(/pulse-glow 3s ease-in-out infinite/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Accessible name (#1168 UX-L5) — gated to the route-served (disableAnimation)
+  // variant so it doesn't collide with the share page's aria-labelledby wrapper
+  // or the portal-tooltip convention on inline-embedded badges.
+  // ---------------------------------------------------------------------------
+
+  describe("accessible name (role/title/desc)", () => {
+    it("adds role=img, <title>, and <desc> when disableAnimation is true (route-served variant)", () => {
+      const svg = renderBadgeSvg(makeStats({ handle: "octocat" }), makeImpact(), {
+        disableAnimation: true,
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toMatch(/<svg[^>]*>\s*<title>/);
+      expect(svg).toContain("<desc>");
+      expect(svg).toContain("octocat");
+    });
+
+    it("does NOT add role=img/<title>/<desc> for the inline in-DOM variant (default)", () => {
+      // Inline embeds (share page, demo badges) already have an external
+      // aria-labelledby / BadgeOverlay tooltip convention — a native <title>
+      // tooltip here would collide with it, and role=img here would be
+      // redundant with the wrapping role=img div.
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).not.toContain('role="img"');
+      expect(svg).not.toContain("<title>");
+      expect(svg).not.toContain("<desc>");
+    });
+
+    it("escapes user-controlled text in the accessible name (XSS)", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ handle: "user<script>alert(1)</script>" }),
+        makeImpact(),
+        { disableAnimation: true },
+      );
+      expect(svg).not.toContain("<script>");
+      expect(svg).toContain("&lt;script&gt;");
+    });
+
+    it("<title> content mentions the score and archetype", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ handle: "octocat" }),
+        makeImpact({ adjustedComposite: 74, archetype: "Builder", tier: "High" }),
+        { disableAnimation: true },
+      );
+      const titleMatch = svg.match(/<title>([\s\S]*?)<\/title>/);
+      expect(titleMatch).not.toBeNull();
+      expect(titleMatch![1]).toContain("74");
+      expect(titleMatch![1]).toContain("Builder");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Verified signal color (#1168 UX-M10) — single coral signal, not purple+coral
+  // ---------------------------------------------------------------------------
+
+  describe("verified signal uses a single coral color, not purple + coral", () => {
+    it("renders the verified shield in coral (#E05A47), not the purple brand accent", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
+      const shieldIdx = svg.indexOf("M12 1L3 5v6");
+      expect(shieldIdx).toBeGreaterThan(-1);
+      const shieldTagStart = svg.lastIndexOf("<path", shieldIdx);
+      const shieldTagEnd = svg.indexOf("/>", shieldIdx);
+      const shieldTag = svg.slice(shieldTagStart, shieldTagEnd);
+      expect(shieldTag).toContain('fill="#E05A47"');
+      expect(shieldTag).not.toContain('fill="#8B5CF6"');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Locale-aware strings (#1181 UX-H3) — renderBadgeSvg stays a pure,
+  // deterministic function. Locale resolution (getServerT, ?lang=) happens at
+  // the call site (badge.svg route); resolved strings are passed in via the
+  // `strings` option. Omitting `strings` entirely must reproduce the exact
+  // current English output (backward compatible with every existing caller:
+  // share page, og-image route, warm-cache cron, demo/archetype pages).
+  // ---------------------------------------------------------------------------
+
+  describe("locale-aware strings (#1181)", () => {
+    it("defaults to English metrics/tier/radar/verification text when no strings option is given", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "High" }), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
+      expect(svg).toContain("Verified metrics");
+      expect(svg).toContain(">High<");
+      expect(svg).toContain(">Delivery<");
+      expect(svg).toContain(">Quality<");
+      expect(svg).toContain(">Consistency<");
+      expect(svg).toContain(">Breadth<");
+    });
+
+    it("uses translated metrics label (public) when strings option is provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        strings: { metricsPublic: "Métricas públicas" },
+      });
+      expect(svg).toContain("Métricas públicas");
+      expect(svg).not.toContain("Public metrics");
+    });
+
+    it("uses translated metrics label (verified) when strings option is provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+        strings: { metricsVerified: "Métricas verificadas" },
+      });
+      expect(svg).toContain("Métricas verificadas");
+      expect(svg).not.toContain("Verified metrics");
+    });
+
+    it("uses translated metrics label (simulated/demo) when strings option is provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        demoMode: true,
+        strings: { metricsSimulated: "Métricas simuladas" },
+      });
+      expect(svg).toContain("Métricas simuladas");
+      expect(svg).not.toContain("Simulated metrics");
+    });
+
+    it("uses a translated tier label when provided, without altering the raw archetype", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ archetype: "Builder", tier: "Solid" }),
+        { strings: { tierLabel: "Sólido" } },
+      );
+      expect(svg).toContain(">Sólido<");
+      expect(svg).not.toContain(">Solid<");
+      // Archetype names are deliberately untranslated brand terms.
+      expect(svg).toContain("Builder");
+    });
+
+    it("uses translated radar dimension labels when provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        strings: {
+          radarLabels: {
+            delivery: "Entrega",
+            quality: "Calidad",
+            consistency: "Constancia",
+            breadth: "Alcance",
+            craft: "Oficio",
+          },
+        },
+      });
+      expect(svg).toContain(">Entrega<");
+      expect(svg).toContain(">Calidad<");
+      expect(svg).toContain(">Constancia<");
+      expect(svg).toContain(">Alcance<");
+      expect(svg).not.toContain(">Delivery<");
+    });
+
+    it("uses translated radar empty-state text when provided", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 } }),
+        { strings: { radarNoData: "aún sin datos" } },
+      );
+      expect(svg).toContain(">aún sin datos<");
+      expect(svg).not.toContain(">no data yet<");
+    });
+
+    it("uses a translated verified strip label when provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+        strings: { verifiedLabel: "VERIFICADO" },
+      });
+      expect(svg).toContain("VERIFICADO");
+    });
+
+    it("uses a translated sample disclosure when provided (demo mode)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        demoMode: true,
+        strings: { sampleDisclosure: "MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN" },
+      });
+      expect(svg).toContain("MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN");
+    });
+
+    it("still escapes the translated tier label (XSS boundary preserved)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        strings: { tierLabel: '"onload="alert(1)' },
+      });
+      expect(svg).not.toContain('"onload=');
+      expect(svg).toContain("&quot;onload=");
+    });
+  });
+
 });

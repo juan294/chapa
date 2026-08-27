@@ -69,9 +69,15 @@ describe("SharePage — non-renderable architecture checks", () => {
       expect(SOURCE).toMatch(/\bheaders\(\)/);
     });
 
-    it("uses NavbarClient (unaffected by the dynamic-rendering change)", () => {
-      expect(SOURCE).toContain("NavbarClient");
-      expect(SOURCE).not.toMatch(/from ["']@\/components\/Navbar["']/);
+    // #1165 (FE-H2) — the route is confirmed dynamic (not ISR, see the two
+    // tests above), so it can use the server Navbar variant (session sourced
+    // via headers(), rendered synchronously, no client round trip) instead
+    // of the client NavbarClient variant reserved for ISR pages. Using
+    // NavbarClient here forced three downstream client components to
+    // re-derive ownership via a redundant `/api/auth/session` fetch.
+    it("uses the server Navbar variant, not the client NavbarClient variant", () => {
+      expect(SOURCE).toMatch(/from ["']@\/components\/Navbar["']/);
+      expect(SOURCE).not.toContain("NavbarClient");
     });
   });
 
@@ -88,6 +94,21 @@ describe("SharePage — non-renderable architecture checks", () => {
 
     it("extracts data-dependent content into SharePageContent", () => {
       expect(SOURCE).toContain("SharePageContent");
+    });
+  });
+
+  // #1167 (UX-B1, launch blocker) — CommandBarHint mounts GlobalCommandBarLazy
+  // (fixed bottom-0) once summoned via the "/" shortcut. A bottom spacer
+  // between SiteFooter and the end of the page keeps that from occluding the
+  // footer's last line — same pattern as the [locale] content pages'
+  // pb-16/pb-24 spacer (see footer-command-bar-spacing.test.ts).
+  describe("SiteFooter bottom spacer (#1167 / UX-B1)", () => {
+    it("wraps SiteFooter in a bottom-padding spacer", () => {
+      expect(SOURCE).toContain("<SiteFooter");
+      const footerIndex = SOURCE.indexOf("<SiteFooter");
+      const windowStart = Math.max(0, footerIndex - 200);
+      const region = SOURCE.slice(windowStart, footerIndex);
+      expect(region).toMatch(/pb-16|pb-24|h-16|h-24/);
     });
   });
 });

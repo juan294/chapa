@@ -15,16 +15,42 @@ candidate tree, deployed commit, and rollback identity throughout this runbook.
 
 ## Detection
 
-Production should have `CHAPA_ALERT_WEBHOOK_URL` configured to an operator-owned webhook endpoint. The app sends active alerts for these launch-critical signals:
+The app sends active operational alerts for these launch-critical signals via
+`captureOperationalAlert()` (`apps/web/lib/analytics/server-errors.ts`):
 
-| Signal | Threshold | Severity | Recipient |
-|--------|-----------|----------|-----------|
-| `health_degraded` | Every `/api/health` response with status `degraded` / HTTP 503 | P1 | `CHAPA_ALERT_WEBHOOK_URL` |
-| `badge_5xx` | Every captured 5xx from `/u/:handle/badge.svg` | P1 | `CHAPA_ALERT_WEBHOOK_URL` |
-| `oauth_callback_failure` | Every captured 5xx from `/api/auth/callback` | P1 | `CHAPA_ALERT_WEBHOOK_URL` |
-| `cron_failure` | Every captured 5xx from `/api/cron/*` | P2 | `CHAPA_ALERT_WEBHOOK_URL` |
+| Signal | Threshold | Severity |
+|--------|-----------|----------|
+| `health_degraded` | Every `/api/health` response with status `degraded` / HTTP 503 | P1 |
+| `badge_5xx` | Every captured 5xx from `/u/:handle/badge.svg` | P1 |
+| `oauth_callback_failure` | Every captured 5xx from `/api/auth/callback` | P1 |
+| `cron_failure` | Every captured 5xx from `/api/cron/*` | P2 |
+| `warm_cache_high_failure_rate` / `warm_cache_ceiling_approached` | Warm-cache cron thresholds | P2 |
+| `badge_latency_slo_breach` | Daily `latency-check` cron p95 budget breach or probe failure | P2 |
 
-If `CHAPA_ALERT_WEBHOOK_URL` is unset, detection falls back to:
+**Delivery channel (#1162 / DO-B1):** if `CHAPA_ALERT_WEBHOOK_URL` is
+configured, alerts POST to that webhook. There is deliberately no Discord or
+Slack integration anywhere in this project. In production the webhook is
+unset, so every signal above is delivered instead as **email via the existing
+Resend integration** (`sendAlertEmail`, `apps/web/lib/email/alerts.ts`) to
+`SUPPORT_FORWARD_EMAIL`. Check which channel is actually configured
+(`CHAPA_ALERT_WEBHOOK_URL` first, then `RESEND_API_KEY` +
+`SUPPORT_FORWARD_EMAIL`) before assuming an alert will land as a webhook push.
+
+`health_degraded` is **pull-evaluated**, not push: it is only ever raised
+from inside the `/api/health` GET handler
+(`apps/web/app/api/health/route.ts`), so it reaches the alert channel only
+when something polls that endpoint. The only automated poller in production
+is the nightly `.github/workflows/nightly-prod-probe.yml` probe — once
+daily — so a degraded dependency or a stalled cron heartbeat can sit
+undetected for up to ~24 hours before it is surfaced. `badge_5xx`,
+`oauth_callback_failure`, `cron_failure`, the `warm_cache_*` signals, and
+`badge_latency_slo_breach` are genuinely push: each fires immediately as a
+side effect of the triggering request or cron run. See
+`docs/runbooks/observability.md` for the full detection-layer breakdown.
+
+If neither the webhook nor email delivery is configured (email requires both
+`RESEND_API_KEY` and `SUPPORT_FORWARD_EMAIL`), alerts are silently dropped
+and detection falls back to:
 - Manual monitoring of `/api/health` — returns `status` plus `dependencies.redis`, `dependencies.supabase`, and `dependencies.github`
 - Vercel deployment failure notifications
 - GitHub CI failure on `develop`

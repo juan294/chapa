@@ -6,9 +6,52 @@ vi.mock("@/lib/verification/store", () => ({
   getVerificationRecord: vi.fn(),
 }));
 
+const featureFlagMocks = vi.hoisted(() => ({
+  isWebmcpEnabled: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("@/lib/feature-flags", () => ({
+  isWebmcpEnabled: featureFlagMocks.isWebmcpEnabled,
+}));
+
+vi.mock("./VerifyPageWebMcpTools", () => ({
+  VerifyPageWebMcpTools: ({
+    hash,
+    record,
+  }: {
+    hash: string;
+    record: { handle: string };
+  }) => (
+    <span
+      data-testid="verify-page-webmcp-tools"
+      data-hash={hash}
+      data-handle={record.handle}
+    />
+  ),
+}));
+
 vi.mock("@/components/Navbar", () => ({
-  Navbar: ({ locale }: { locale?: string }) => (
-    <nav data-testid="navbar" data-locale={locale}>Navbar</nav>
+  Navbar: ({
+    locale,
+    navLinks,
+  }: {
+    locale?: string;
+    navLinks?: Array<{ label: string; href: string }>;
+  }) => (
+    <nav data-testid="navbar" data-locale={locale}>
+      Navbar
+      {navLinks?.map((l) => (
+        <a key={l.href} href={l.href} data-testid={`navbar-link-${l.href}`}>
+          {l.label}
+        </a>
+      ))}
+    </nav>
+  ),
+}));
+
+vi.mock("@/components/SiteFooter", () => ({
+  SiteFooter: ({ t }: { t: (key: string) => unknown }) => (
+    <footer data-testid="site-footer">{t("landing.footer.privacy") as string}</footer>
   ),
 }));
 
@@ -77,6 +120,7 @@ import VerifyPage, { generateMetadata } from "./page";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  featureFlagMocks.isWebmcpEnabled.mockResolvedValue(true);
 });
 
 const MOCK_RECORD = {
@@ -206,6 +250,7 @@ describe("VerifyPage", () => {
         screen.getByText("No verification record found for this hash."),
       ).toBeDefined();
       expect(screen.getByText("a1b2c3d4")).toBeDefined();
+      expect(screen.queryByTestId("verify-page-webmcp-tools")).toBeNull();
     });
 
     it("wraps a supported 32-character hash on narrow viewports", async () => {
@@ -239,6 +284,25 @@ describe("VerifyPage", () => {
       expect(screen.getByText("Badge verified")).toBeDefined();
       expect(screen.getByText("@testuser")).toBeDefined();
       expect(screen.getByText("Test User")).toBeDefined();
+      const webMcpHost = screen.getByTestId("verify-page-webmcp-tools");
+      expect(webMcpHost.getAttribute("data-hash")).toBe(
+        "a1b2c3d4e5f6a7b8",
+      );
+      expect(webMcpHost.getAttribute("data-handle")).toBe("testuser");
+    });
+
+    it("omits the WebMCP host when the server kill-switch is off", async () => {
+      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
+      featureFlagMocks.isWebmcpEnabled.mockResolvedValue(false);
+
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      expect(screen.queryByTestId("verify-page-webmcp-tools")).toBeNull();
+      expect(screen.getByText("Badge verified")).toBeDefined();
     });
 
     it("displays impact score and tier", async () => {
@@ -340,6 +404,48 @@ describe("VerifyPage", () => {
 
       // English: verifyDetail.name = 'Name'
       expect(screen.queryByText("Name")).toBeNull();
+    });
+  });
+
+  // #1167 (UX-B1, launch blocker) — /verify/[hash] had no footer at all, so
+  // a visitor landing here (e.g. scanning a QR code on a badge) had no way
+  // to reach Privacy or Terms.
+  describe("SiteFooter + real-route nav links (#1167 / UX-B1)", () => {
+    it("renders SiteFooter on the invalid-hash branch", async () => {
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "not-valid!" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      // English: landing.footer.privacy = 'Privacy'
+      expect(screen.getByTestId("site-footer").textContent).toBe("Privacy");
+    });
+
+    it("renders SiteFooter on the valid-hash-with-record branch", async () => {
+      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
+
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      expect(screen.getByTestId("site-footer").textContent).toBe("Privacy");
+    });
+
+    it("gives the Navbar real-route inner nav links, not landing hash anchors", async () => {
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "not-valid!" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      expect(screen.getByTestId("navbar-link-/about").textContent).toBe("About");
+      expect(screen.getByTestId("navbar-link-/about/scoring").textContent).toBe(
+        "Scoring",
+      );
+      expect(screen.getByTestId("navbar-link-/verify").textContent).toBe("Verify");
     });
   });
 });

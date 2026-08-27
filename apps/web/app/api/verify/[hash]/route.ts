@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getBaseUrl } from "@/lib/env";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { toPublicVerificationRecord } from "@/lib/verification/types";
 
 // Legacy pre-v2 payload hashes remain valid through this 90-day deprecation window.
 export const LEGACY_PRE_V2_DEADLINE = "2026-07-19";
@@ -49,7 +50,7 @@ export const GET = withErrorCapture("/api/verify/[hash]", async (
     {
       status: "verified",
       hash,
-      data: record,
+      data: toPublicVerificationRecord(record),
       verifyUrl: `${baseUrl}/verify/${hash}`,
       badgeUrl: `${baseUrl}/u/${record.handle}/badge.svg`,
     },

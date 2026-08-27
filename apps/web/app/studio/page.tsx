@@ -1,21 +1,35 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { isStudioEnabled } from "@/lib/feature-flags";
+import {
+  isStudioDemoEnabled,
+  isStudioEnabled,
+} from "@/lib/feature-flags";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { getPublicProfileVerification } from "@/lib/profile/public-profile";
 import { loadStudioConfig } from "@/lib/db/studio";
 import { Navbar } from "@/components/Navbar";
-import { StudioClient } from "./StudioClient";
+import { StudioClient, type StudioClientProps } from "./StudioClient";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata(): Promise<Metadata> {
+interface StudioPageProps {
+  searchParams?: Promise<{ demo?: string | string[] }>;
+}
+
+export async function generateMetadata(
+  { searchParams }: StudioPageProps = {},
+): Promise<Metadata> {
+  const params = searchParams ? await searchParams : {};
+  const isDemo = params.demo === "1"
+    && await isStudioEnabled()
+    && await isStudioDemoEnabled();
   const locale = await getServerLocale();
   const t = getServerT(locale);
   return {
@@ -24,13 +38,54 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: {
       canonical: "/studio",
     },
+    ...(isDemo ? { robots: { index: false, follow: false } } : {}),
   };
 }
 
-export default async function StudioPage() {
+async function renderStudio(clientProps: StudioClientProps) {
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
+  const handle = clientProps.handle ?? clientProps.stats.handle;
+
+  return (
+    <main id="main-content" className="min-h-screen bg-bg">
+      <Navbar
+        navLinks={[
+          { label: t('studio.navLinkStudio') as string, href: "/studio" },
+          { label: t('studio.navLinkYourBadge') as string, href: `/u/${handle}` },
+        ]}
+      />
+
+      <div className="pt-[57px]">
+        <KeyboardShortcutsListener />
+        <StudioClient
+          key={clientProps.demo ? "demo" : "live"}
+          {...clientProps}
+        />
+      </div>
+    </main>
+  );
+}
+
+export default async function StudioPage(
+  { searchParams }: StudioPageProps = {},
+) {
   // Feature flag gate — redirect when studio is disabled
   if (!(await isStudioEnabled())) {
     redirect("/");
+  }
+
+  const params = searchParams ? await searchParams : {};
+  if (params.demo === "1" && await isStudioDemoEnabled()) {
+    return renderStudio({
+      initialConfig: DEFAULT_BADGE_CONFIG,
+      stats: DEMO_STATS,
+      impact: DEMO_IMPACT,
+      craftResult: null,
+      handle: DEMO_STATS.handle,
+      verification: null,
+      demo: true,
+    });
   }
 
   const session = getOptionalServerSessionFromHeaders(await headers());
@@ -58,28 +113,12 @@ export default async function StudioPage() {
     ? savedConfigResult.config
     : DEFAULT_BADGE_CONFIG;
 
-  const locale = await getServerLocale();
-  const t = getServerT(locale);
-
-  return (
-    <main id="main-content" className="min-h-screen bg-bg">
-      <Navbar
-        navLinks={[
-          { label: t('studio.navLinkStudio') as string, href: "/studio" },
-          { label: t('studio.navLinkYourBadge') as string, href: `/u/${session.login}` },
-        ]}
-      />
-
-      <div className="pt-[57px]">
-        <KeyboardShortcutsListener />
-        <StudioClient
-          initialConfig={initialConfig}
-          stats={materialized.stats}
-          impact={materialized.displayImpact}
-          handle={session.login}
-          verification={verification}
-        />
-      </div>
-    </main>
-  );
+  return renderStudio({
+    initialConfig,
+    stats: materialized.stats,
+    impact: materialized.displayImpact,
+    craftResult: materialized.craftResult,
+    handle: session.login,
+    verification,
+  });
 }

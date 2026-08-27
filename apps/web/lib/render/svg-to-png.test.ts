@@ -76,6 +76,59 @@ describe("stripSvgAnimations", () => {
     expect(result).toContain("<svg>");
   });
 
+  // #1168 UX-M6 (critical note) — the original regex
+  // (/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/) only consumes exactly 2 levels
+  // of nested braces. A @keyframes block with 2+ percentage/from-to rules (the
+  // real badge's pulse-glow has "0%, 100% {...}" AND "50% {...}") closes its
+  // own outer brace UNCONSUMED, leaving a stray "}" right before whatever
+  // follows — here, the new prefers-reduced-motion @media block added for
+  // #1168. Verified against real (non-mocked) resvg rendering: the stray
+  // brace doesn't visibly break rasterization, but it's a latent parsing
+  // fragility this test closes.
+  it("fully consumes a @keyframes block with 2+ inner rules, leaving no stray closing brace", () => {
+    const css = [
+      "@keyframes pulse-glow {",
+      "  0%, 100% { opacity: 0.7; }",
+      "  50% { opacity: 1; }",
+      "}",
+      "@media (prefers-reduced-motion: reduce) {",
+      "  .badge-score-pulse { animation: none; }",
+      "}",
+    ].join("\n");
+    const svg = `<svg><style>${css}</style></svg>`;
+    const result = stripSvgAnimations(svg);
+    expect(result).not.toContain("@keyframes");
+    // No stray "}" sitting between the stripped keyframes and the @media block.
+    expect(result).not.toMatch(/\}\s*@media/);
+    // The @media block itself must survive fully intact and brace-balanced.
+    expect(result).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(result).toContain(".badge-score-pulse");
+    const openBraces = (result.match(/\{/g) ?? []).length;
+    const closeBraces = (result.match(/\}/g) ?? []).length;
+    expect(openBraces).toBe(closeBraces);
+  });
+
+  it("fully consumes multiple consecutive @keyframes blocks with no stray braces between them", () => {
+    const css = [
+      "@keyframes pulse-glow {",
+      "  0%, 100% { opacity: 0.7; }",
+      "  50% { opacity: 1; }",
+      "}",
+      "@keyframes ring-draw {",
+      "  from { stroke-dashoffset: 289.03; }",
+      "  to   { stroke-dashoffset: 75.15; }",
+      "}",
+      ".other-rule { color: red; }",
+    ].join("\n");
+    const svg = `<svg><style>${css}</style></svg>`;
+    const result = stripSvgAnimations(svg);
+    expect(result).not.toContain("@keyframes");
+    expect(result).toContain(".other-rule { color: red; }");
+    const openBraces = (result.match(/\{/g) ?? []).length;
+    const closeBraces = (result.match(/\}/g) ?? []).length;
+    expect(openBraces).toBe(closeBraces);
+  });
+
   it("removes CSS animation properties from style attributes", () => {
     const svg = `<svg><rect style="animation: fade 1s ease-in"/></svg>`;
     const result = stripSvgAnimations(svg);

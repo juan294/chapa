@@ -6,10 +6,9 @@
  */
 
 import type { VerificationRecord } from "@/lib/verification/types";
+import { VERIFICATION_RECORD_TTL_MS } from "@/lib/verification/constants";
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
-
-const VERIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Row ↔ Type mapping
@@ -108,7 +107,7 @@ export async function dbStoreVerification(
   const db = getSupabase();
   if (!db) return;
 
-  const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
+  const expiresAt = new Date(Date.now() + VERIFICATION_RECORD_TTL_MS).toISOString();
 
   try {
     const { error } = await db.from("verification_records").upsert(

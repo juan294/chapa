@@ -68,6 +68,34 @@ vi.mock("@/lib/effects/defaults", () => ({
 
 const previewLifecycle = vi.hoisted(() => ({ nextInstanceId: 0 }));
 
+interface StudioWebMcpOptionsCapture {
+  craftResult?: unknown;
+  enabled: boolean;
+  getCurrentConfig: () => Record<string, unknown>;
+  runCommand: (input: string) => unknown;
+  proposeSave: () => void;
+}
+
+const studioWebMcpMocks = vi.hoisted(() => ({
+  options: null as StudioWebMcpOptionsCapture | null,
+  useModelContextTools: vi.fn(),
+}));
+
+vi.mock("./useStudioWebMcpTools", () => ({
+  useStudioWebMcpTools: (options: StudioWebMcpOptionsCapture) => {
+    studioWebMcpMocks.options = options;
+    return [];
+  },
+}));
+
+vi.mock("@/lib/webmcp/use-model-context-tools", () => ({
+  useModelContextTools: studioWebMcpMocks.useModelContextTools,
+}));
+
+vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
+  useClientFeatureFlags: () => ({ webmcpEnabled: true }),
+}));
+
 vi.mock("./BadgePreviewCard", () => ({
   BadgePreviewCard: ({
     config,
@@ -98,11 +126,16 @@ vi.mock("./QuickControls", () => ({
     visible,
     onToggle,
     saveDisabled,
+    agentSaveProposal,
   }: {
     onCommand: (cmd: string) => void;
     visible: boolean;
     onToggle: () => void;
     saveDisabled?: boolean;
+    agentSaveProposal?: {
+      onConfirm: () => void;
+      onDismiss: () => void;
+    };
   }) => (
     <div data-testid="quick-controls" data-visible={String(visible)}>
       <button data-testid="qc-toggle" onClick={onToggle}>
@@ -121,6 +154,17 @@ vi.mock("./QuickControls", () => ({
       >
         /save
       </button>
+      {agentSaveProposal && (
+        <div>
+          <span>An agent wants to save this preview configuration.</span>
+          <button data-testid="agent-save-confirm" onClick={agentSaveProposal.onConfirm}>
+            Confirm save
+          </button>
+          <button data-testid="agent-save-dismiss" onClick={agentSaveProposal.onDismiss}>
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
   ),
 }));
@@ -226,7 +270,12 @@ vi.mock("@/components/KeyboardShortcutsListener", () => ({
 }));
 
 import { parseRetryAfterSeconds, StudioClient } from "./StudioClient";
-import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
+import type {
+  BadgeConfig,
+  CraftResult,
+  StatsData,
+  ImpactV6Result,
+} from "@chapa/shared";
 
 // ---------- Test fixtures ----------
 
@@ -280,6 +329,15 @@ const impact: ImpactV6Result = {
   computedAt: new Date().toISOString(),
 };
 
+const craftResult: CraftResult = {
+  tool: "claude-code",
+  dimensions: { proficiency: 91, effectiveness: 72, sophistication: 83 },
+  craftScore: 82,
+  tier: "Expert",
+  reportPeriod: { start: "2026-08-01", end: "2026-08-27" },
+  computedAt: "2026-08-27T00:00:00.000Z",
+};
+
 function languageValue(
   locale: "en" | "es",
 ): LanguageContextValue {
@@ -299,6 +357,7 @@ function languageValue(
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.localStorage.clear();
 });
 
 describe("StudioClient render", () => {
@@ -312,7 +371,7 @@ describe("StudioClient render", () => {
           handle="testuser"
         />,
       );
-      expect(screen.getByText("Creator Studio")).toBeDefined();
+      expect(screen.getAllByText("Creator Studio").length).toBeGreaterThanOrEqual(1);
     });
 
     it("renders sr-only h1 heading", () => {
@@ -326,6 +385,39 @@ describe("StudioClient render", () => {
       const heading = screen.getByRole("heading", { level: 1 });
       expect(heading.textContent).toBe("Creator Studio");
       expect(heading.className).toContain("sr-only");
+    });
+
+    // UX-M1 (#1173): the only accessible name for the page was an sr-only h1
+    // — nothing on screen visibly named the tool. Alongside the sr-only h1
+    // (kept for landmark/AT purposes), add a visible title + one-line
+    // subhead so a sighted visitor immediately sees what the page is.
+    it("renders a visible title and subhead alongside the sr-only h1", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(screen.getByTestId("studio-visible-title").textContent).toBe(
+        "Creator Studio",
+      );
+      expect(
+        screen.getByTestId("studio-visible-subtitle").textContent,
+      ).not.toBe("");
+    });
+
+    it("forwards materialized Craft data to the Studio WebMCP tools", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          craftResult={craftResult}
+        />,
+      );
+
+      expect(studioWebMcpMocks.options?.craftResult).toBe(craftResult);
     });
   });
 
@@ -343,6 +435,29 @@ describe("StudioClient render", () => {
   });
 
   describe("preview pane", () => {
+    it("shows a persistent demo marker only in demo mode", () => {
+      const { rerender } = render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+
+      expect(screen.getByTestId("studio-demo-marker").textContent).toBe("DEMO");
+
+      rerender(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      expect(screen.queryByTestId("studio-demo-marker")).toBeNull();
+    });
+
     it("renders BadgePreviewCard with config", () => {
       render(
         <StudioClient
@@ -495,6 +610,66 @@ describe("StudioClient render", () => {
   });
 
   describe("terminal input interactions", () => {
+    it("composes back-to-back WebMCP mutations from the latest config", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockImplementation((input: string) => ({
+        lines: [],
+        action: input.includes("background")
+          ? { type: "set", category: "background", value: "aurora" }
+          : { type: "set", category: "border", value: "glow" },
+      }));
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      act(() => {
+        studioWebMcpMocks.options?.runCommand("/set background aurora");
+        studioWebMcpMocks.options?.runCommand("/set border glow");
+      });
+
+      expect(studioWebMcpMocks.options?.getCurrentConfig()).toMatchObject({
+        background: "aurora",
+        border: "glow",
+      });
+      expect(screen.getByTestId("badge-preview").textContent).toContain(
+        '"background":"aurora"',
+      );
+      expect(screen.getByTestId("badge-preview").textContent).toContain(
+        '"border":"glow"',
+      );
+    });
+
+    it("returns the same command result that it renders for WebMCP callers", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      const commandResult = {
+        lines: [{ id: "agent-command", type: "success" as const, text: "Applied" }],
+      };
+      vi.mocked(executeCommand).mockReturnValue(commandResult);
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      let returned: unknown;
+      act(() => {
+        returned = studioWebMcpMocks.options?.runCommand("/status");
+      });
+
+      expect(returned).toBe(commandResult);
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        "Applied",
+      );
+      expect(studioWebMcpMocks.useModelContextTools).toHaveBeenCalledWith(
+        [],
+        true,
+      );
+    });
+
     it("shows autocomplete when typing / prefix", () => {
       render(
         <StudioClient
@@ -550,7 +725,10 @@ describe("StudioClient render", () => {
   });
 
   describe("quick controls", () => {
-    it("quick controls are hidden by default", () => {
+    // UX-M1 (#1173): the only pointer affordance for Studio's 9 customization
+    // categories was the Quick Controls panel, and it started collapsed —
+    // easy to miss entirely. It now defaults to expanded.
+    it("quick controls are shown by default", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -559,7 +737,7 @@ describe("StudioClient render", () => {
         />,
       );
       const qc = screen.getByTestId("quick-controls");
-      expect(qc.getAttribute("data-visible")).toBe("false");
+      expect(qc.getAttribute("data-visible")).toBe("true");
     });
 
     it("clicking toggle shows/hides quick controls", () => {
@@ -574,7 +752,36 @@ describe("StudioClient render", () => {
       fireEvent.click(toggle);
 
       const qc = screen.getByTestId("quick-controls");
-      expect(qc.getAttribute("data-visible")).toBe("true");
+      expect(qc.getAttribute("data-visible")).toBe("false");
+    });
+
+    it("persists a user's collapse choice in localStorage and restores it on the next mount", () => {
+      const { unmount } = render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "true",
+      );
+      fireEvent.click(screen.getByTestId("qc-toggle"));
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "false",
+      );
+      unmount();
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "false",
+      );
     });
 
     it("quick command triggers handleSubmit", async () => {
@@ -597,6 +804,82 @@ describe("StudioClient render", () => {
   });
 
   describe("save functionality", () => {
+    it("keeps a confirmed agent save local in demo mode", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+
+      act(() => studioWebMcpMocks.options?.proposeSave());
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId("agent-save-confirm"));
+
+      expect(
+        await screen.findByText("(demo) configuration not persisted"),
+      ).toBeDefined();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("agent-save-confirm")).toBeNull();
+      expect(trackEvent).toHaveBeenCalledWith("config_saved", {
+        config: defaultConfig,
+        demo: true,
+      });
+    });
+
+    it("arms an on-page gate and does not save until the user confirms", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("{}", { status: 200 }));
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      act(() => studioWebMcpMocks.options?.proposeSave());
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "true",
+      );
+      expect(
+        screen.getByText("Agent proposed saving — confirm below."),
+      ).toBeDefined();
+      expect(
+        screen.getByText("An agent wants to save this preview configuration."),
+      ).toBeDefined();
+
+      fireEvent.click(screen.getByTestId("agent-save-confirm"));
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledWith(
+          "/api/studio/config",
+          expect.objectContaining({ method: "PUT" }),
+        );
+      });
+      expect(screen.queryByTestId("agent-save-confirm")).toBeNull();
+    });
+
+    it("dismisses an agent save proposal without persisting", () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      act(() => studioWebMcpMocks.options?.proposeSave());
+      fireEvent.click(screen.getByTestId("agent-save-dismiss"));
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("agent-save-dismiss")).toBeNull();
+      expect(
+        screen.getByText("Agent save proposal dismissed."),
+      ).toBeDefined();
+    });
+
     it("parses numeric and HTTP-date Retry-After values", () => {
       const now = Date.parse("2026-08-26T10:00:00Z");
       expect(parseRetryAfterSeconds("90", now)).toBe(90);
@@ -1208,6 +1491,36 @@ describe("StudioClient render", () => {
 
       expect(trackEvent).toHaveBeenCalledWith("studio_opened");
     });
+
+    it("marks demo telemetry without changing normal event properties", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "demo-change", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+      expect(trackEvent).toHaveBeenCalledWith("studio_opened", { demo: true });
+
+      fireEvent.click(screen.getByTestId("qc-command"));
+
+      expect(trackEvent).toHaveBeenCalledWith("effect_changed", {
+        category: "background",
+        from: "solid",
+        to: "aurora",
+        demo: true,
+      });
+    });
   });
 
   describe("autocomplete fill", () => {
@@ -1279,14 +1592,14 @@ describe("StudioClient render", () => {
         />,
       );
 
-      // Initially hidden
-      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("false");
+      // Shown by default (UX-M1, #1173)
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("true");
 
       act(() => {
         capturedShortcutHandler?.("toggle-quick-controls");
       });
 
-      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("true");
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("false");
     });
 
     it("refresh-preview shortcut explicitly remounts the preview", () => {
@@ -1344,7 +1657,7 @@ describe("StudioClient render", () => {
           impact={impact}
         />,
       );
-      expect(screen.getByText("Creator Studio")).toBeDefined();
+      expect(screen.getAllByText("Creator Studio").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -1393,6 +1706,105 @@ describe("StudioClient render", () => {
       expect(screen.queryByText(/Reduced motion detected/)).toBeNull();
       const preview = screen.getByTestId("badge-preview");
       expect(preview.getAttribute("data-interactive")).toBe("true");
+    });
+  });
+
+  // FE-M3 (#1173): nothing previously consumed saveState "dirty" to prevent
+  // data loss — a user who tweaked several categories and then navigated (or
+  // closed the tab) lost everything silently. The guard must register only
+  // while dirty (register/unregister on the status transition, not on mount)
+  // and must NEVER fire in demo mode — demo never persists by design, so a
+  // spurious "leave site?" prompt on every judge-demo exit would itself be a
+  // regression.
+  describe("beforeunload guard", () => {
+    function dispatchBeforeUnload(): Event {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event;
+    }
+
+    it("does not warn on unload in the initial 'saved' state", () => {
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("warns on unload once a change makes saveState dirty", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "dirty-1", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Unsaved preview changes");
+
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("stops warning once the dirty change is saved", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("{}", { status: 200 }),
+      );
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand)
+        .mockReturnValueOnce({
+          lines: [],
+          action: { type: "set", category: "background", value: "aurora" },
+        })
+        .mockReturnValueOnce({ lines: [], action: { type: "save" } });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Unsaved preview changes");
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+      fireEvent.change(input, { target: { value: "/save" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Preview saved");
+
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("never warns in demo mode, even while dirty — demo never persists by design", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Unsaved preview changes");
+
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(false);
     });
   });
 });

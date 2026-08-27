@@ -7,11 +7,7 @@ import {
 import { rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
-import {
-  dbUpsertStudioConfig,
-  loadStudioConfig,
-  refreshStudioConfigCache,
-} from "@/lib/db/studio";
+import { dbUpsertStudioConfig, loadStudioConfig } from "@/lib/db/studio";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 const studioConfigWriteTails = new Map<string, Promise<void>>();
@@ -41,7 +37,7 @@ async function serializeStudioConfigWrite<T>(
 /**
  * GET /api/studio/config — Load the authenticated user's badge config.
  * Returns { config: BadgeConfig | null }.
- * Read path: Redis first; on miss, fall back to Supabase and rehydrate Redis.
+ * Read path: Supabase directly — no Redis involvement (#1186/BE-L1).
  */
 export const GET = withErrorCapture("/api/studio/config", async (request: NextRequest) => {
   if (!(await isStudioEnabled())) {
@@ -82,7 +78,8 @@ export const GET = withErrorCapture("/api/studio/config", async (request: NextRe
 /**
  * PUT /api/studio/config — Save the authenticated user's badge config.
  * Auth required. Rate limited: 30 requests/hour per user.
- * Write path: Supabase is the success criterion; Redis is best-effort.
+ * Write path: Supabase only — no Redis mirror (removed, nothing read it back
+ * once the read path stopped consulting Redis; see `apps/web/lib/db/studio.ts`).
  */
 export const PUT = withErrorCapture("/api/studio/config", async (request: NextRequest) => {
   if (!(await isStudioEnabled())) {
@@ -115,18 +112,8 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
   }
 
   const normalizedLogin = session.login.toLowerCase();
-  const dbResult = await serializeStudioConfigWrite(
-    normalizedLogin,
-    async () => {
-      // Commit durable state before publishing it to the hot cache. A rejected
-      // Supabase write must never make an uncommitted config visible in Redis.
-      const result = await dbUpsertStudioConfig(normalizedLogin, body);
-      if (!result.ok) return result;
-
-      await refreshStudioConfigCache(normalizedLogin);
-
-      return result;
-    },
+  const dbResult = await serializeStudioConfigWrite(normalizedLogin, () =>
+    dbUpsertStudioConfig(normalizedLogin, body),
   );
 
   if (!dbResult.ok && dbResult.reason === "constraint") {

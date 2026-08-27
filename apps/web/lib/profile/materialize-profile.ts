@@ -160,15 +160,23 @@ export function materializeImpactState(
 }
 
 /**
- * Materialize the live profile fields used by owner-only display surfaces.
- * This deliberately omits snapshot and dirty-marker reads because the fresh
- * display impact and verification HMAC do not depend on trend state.
+ * Materialize the live display-only profile fields: fresh `displayImpact`
+ * (and the verification HMAC it feeds) never depend on trend state, so this
+ * deliberately omits the snapshot and dirty-marker reads `materializeProfile`
+ * performs (#1001 — the headline is always the fresh `rawImpact`, never the
+ * EMA-smoothed value those reads exist for).
+ *
+ * `readOnly` defaults to `false` (the original owner-studio call shape,
+ * where a live GitHub fetch on a cold key is desired) but must be threaded
+ * through as `true` for a public, unauthenticated caller (#1180 PE-L2) —
+ * otherwise a cold-key read-only caller could trigger a live GitHub fetch,
+ * which #1083 specifically forbids for that class of caller.
  */
 export async function materializeDisplayProfile(
   handle: string,
-  options: { token?: string } = {},
+  options: { token?: string; readOnly?: boolean } = {},
 ): Promise<MaterializedDisplayProfile | null> {
-  const inputs = await loadDisplayInputs(handle, options.token, false);
+  const inputs = await loadDisplayInputs(handle, options.token, options.readOnly ?? false);
   if (!inputs) return null;
 
   return {

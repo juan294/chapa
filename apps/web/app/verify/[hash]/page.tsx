@@ -1,7 +1,13 @@
 import { getVerificationRecord } from "@/lib/verification/store";
+import {
+  toPublicVerificationRecord,
+  type VerificationRecord,
+} from "@/lib/verification/types";
 import { Navbar } from "@/components/Navbar";
+import { SiteFooter } from "@/components/SiteFooter";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { tArray } from "@/lib/i18n/typed-accessors";
 import {
   DEFAULT_LOCALE,
   LangSync,
@@ -13,8 +19,10 @@ import {
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { isWebmcpEnabled } from "@/lib/feature-flags";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { VerifyPageWebMcpTools } from "./VerifyPageWebMcpTools";
 
 const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
@@ -53,11 +61,15 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   const lang = queryLocale(rawLang);
   const locale = await getServerLocale(lang);
   const t = getServerT(locale);
+  // #1167 (UX-B1) — real routes (/about, /about/scoring, /verify), NOT the
+  // landing page's `landing.navLinks` hash anchors, which are meaningless
+  // off that page.
+  const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
 
   if (!HASH_PATTERN.test(hash)) {
     return (
-      <VerifyLocaleBoundary locale={locale} queryLang={lang}>
-        <Navbar locale={locale} />
+      <VerifyLocaleBoundary locale={locale} queryLang={lang} t={t}>
+        <Navbar locale={locale} navLinks={innerNavLinks} />
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
           <InvalidHashCard hash={hash} t={t} />
         </main>
@@ -65,14 +77,25 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
     );
   }
 
-  const record = await getVerificationRecord(hash);
+  const [record, webmcpEnabled] = await Promise.all([
+    getVerificationRecord(hash),
+    isWebmcpEnabled(),
+  ]);
 
   return (
-    <VerifyLocaleBoundary locale={locale} queryLang={lang}>
-      <Navbar locale={locale} />
+    <VerifyLocaleBoundary locale={locale} queryLang={lang} t={t}>
+      <Navbar locale={locale} navLinks={innerNavLinks} />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
-          <VerifiedCard hash={hash} record={record} t={t} />
+          <>
+            {webmcpEnabled && (
+              <VerifyPageWebMcpTools
+                hash={hash}
+                record={toPublicVerificationRecord(record)}
+              />
+            )}
+            <VerifiedCard hash={hash} record={record} t={t} />
+          </>
         ) : (
           <NotFoundCard hash={hash} t={t} />
         )}
@@ -85,10 +108,12 @@ function VerifyLocaleBoundary({
   children,
   locale,
   queryLang,
+  t,
 }: {
   children: React.ReactNode;
   locale: Locale;
   queryLang?: string;
+  t: TFunc;
 }) {
   return (
     <>
@@ -102,7 +127,12 @@ function VerifyLocaleBoundary({
       >
         <LangSync />
         <LocaleSync queryLang={queryLang} />
-        <div className="min-h-screen bg-bg text-text-primary">{children}</div>
+        <div className="min-h-screen bg-bg text-text-primary">
+          {children}
+          {/* #1167 (UX-B1) — no fixed-bottom command bar exists on this page,
+              so no bottom spacer is needed before the footer. */}
+          <SiteFooter t={t} />
+        </div>
       </LanguageProvider>
     </>
   );
@@ -116,25 +146,7 @@ function VerifiedCard({
   t,
 }: {
   hash: string;
-  record: {
-    handle: string;
-    displayName?: string;
-    adjustedComposite: number;
-    confidence: number;
-    tier: string;
-    archetype: string;
-    dimensions: {
-      delivery: number;
-      quality: number;
-      consistency: number;
-      breadth: number;
-    };
-    commitsTotal: number;
-    prsMergedCount: number;
-    reviewsSubmittedCount: number;
-    generatedAt: string;
-    profileType: string;
-  };
+  record: VerificationRecord;
   t: TFunc;
 }) {
   return (
@@ -147,7 +159,7 @@ function VerifiedCard({
       {/* Hash display */}
       <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.verificationCode') as string}</p>
-        <p className="break-all font-heading text-lg tracking-widest text-complement">
+        <p className="break-all font-heading text-lg tracking-widest text-complement-text">
           {hash}
         </p>
       </div>
@@ -158,7 +170,7 @@ function VerifiedCard({
           <span className="text-sm text-text-secondary">{t('verifyDetail.developer') as string}</span>
           <Link
             href={`/u/${record.handle}`}
-            className="font-heading text-sm text-complement hover:text-complement-light"
+            className="font-heading text-sm text-complement-text hover:text-complement-text-hover"
           >
             @{record.handle}
           </Link>
@@ -249,7 +261,7 @@ function VerifiedCard({
         </p>
         <Link
           href={`/u/${record.handle}/badge.svg`}
-          className="text-xs text-complement hover:text-complement-light"
+          className="text-xs text-complement-text hover:text-complement-text-hover"
         >
           {t('verifyDetail.viewBadge') as string}
         </Link>

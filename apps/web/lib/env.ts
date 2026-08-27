@@ -267,6 +267,16 @@ export function getStudioEnabledEnv(): string | undefined {
   return clean(process.env.NEXT_PUBLIC_STUDIO_ENABLED);
 }
 
+/** Raw `NEXT_PUBLIC_STUDIO_DEMO_ENABLED` value — `"true"` when Studio demo mode is on. */
+export function getStudioDemoEnabledEnv(): string | undefined {
+  return clean(process.env.NEXT_PUBLIC_STUDIO_DEMO_ENABLED);
+}
+
+/** Raw `NEXT_PUBLIC_WEBMCP_ENABLED` value — `"true"` when WebMCP registration is on. */
+export function getWebmcpEnabledEnv(): string | undefined {
+  return clean(process.env.NEXT_PUBLIC_WEBMCP_ENABLED);
+}
+
 // ---------------------------------------------------------------------------
 // Runtime
 // ---------------------------------------------------------------------------

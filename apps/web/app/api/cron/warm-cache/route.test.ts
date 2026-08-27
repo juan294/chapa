@@ -12,6 +12,7 @@ const {
   mockDbCleanExpiredMergeOperations,
   mockCacheGet,
   mockCacheSet,
+  mockCacheSetNxStatus,
   mockCompareSnapshots,
   mockIsSignificantChange,
   mockNotifyScoreBump,
@@ -25,6 +26,7 @@ const {
   mockGetPublicProfileVerification,
   mockBuildBadgeSvgCacheKey,
   mockWriteBadgeSvgCache,
+  mockReadBadgeSvgCache,
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
@@ -35,6 +37,7 @@ const {
   mockDbCleanExpiredMergeOperations: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockCacheSetNxStatus: vi.fn(),
   mockCompareSnapshots: vi.fn(),
   mockIsSignificantChange: vi.fn(),
   mockNotifyScoreBump: vi.fn(),
@@ -48,6 +51,7 @@ const {
   mockGetPublicProfileVerification: vi.fn(),
   mockBuildBadgeSvgCacheKey: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
+  mockReadBadgeSvgCache: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cron", () => ({
@@ -76,6 +80,7 @@ vi.mock("@/lib/db/telemetry", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
 }));
 
 vi.mock("@/lib/history/diff", () => ({
@@ -114,6 +119,7 @@ vi.mock("@/lib/render/badge-svg-cache", () => ({
   AVATAR_ABSENT_CACHE_TTL_SECONDS: 900,
   buildBadgeSvgCacheKey: (...args: unknown[]) => mockBuildBadgeSvgCacheKey(...args),
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+  readBadgeSvgCache: (...args: unknown[]) => mockReadBadgeSvgCache(...args),
 }));
 
 vi.mock("@/lib/analytics/server-errors", () => ({
@@ -179,6 +185,10 @@ describe("GET /api/cron/warm-cache", () => {
     mockDbCleanExpiredMergeOperations.mockResolvedValue(0);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    // Day-guard for the ceiling alert (#1162 / BE-L5) defaults to "acquired"
+    // (first run of the day) so existing ceiling-alert tests, which don't
+    // exercise the guard directly, keep firing exactly as before.
+    mockCacheSetNxStatus.mockResolvedValue("acquired");
     mockCompareSnapshots.mockReturnValue({ adjustedComposite: 5, tier: null, archetype: null });
     mockIsSignificantChange.mockReturnValue({ significant: false });
     mockNotifyScoreBump.mockResolvedValue(undefined);
@@ -197,6 +207,9 @@ describe("GET /api/cron/warm-cache", () => {
       (handle: string, date: string) => `badge:v1:${handle}:warm-amber-v3:${date}`,
     );
     mockWriteBadgeSvgCache.mockResolvedValue(true);
+    // Default: no pre-existing badge SVG cache entry for today's key, so the
+    // existing render/write assertions below keep passing unchanged.
+    mockReadBadgeSvgCache.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -726,6 +739,171 @@ describe("GET /api/cron/warm-cache", () => {
     });
   });
 
+  // #1181 (UX-H3) regression — this route used to build the SVG cache key
+  // (buildBadgeSvgCacheKey, no locale arg → defaults to DEFAULT_LOCALE, 'es')
+  // and the rendered content (renderBadgeSvg, no `strings` → defaults to
+  // English) from two INDEPENDENT defaults. Both wrote an English-rendered
+  // badge into the Spanish-keyed cache slot — content and key silently
+  // disagreed, and since the hourly cron pre-warms every handle, this won in
+  // practice for essentially all real (default-locale) traffic. Fixed via
+  // the shared `resolveBadgeLocale` helper, which derives strings AND the
+  // cache key from the same locale value (DEFAULT_LOCALE — the cron has no
+  // request/cookie context to resolve a different one).
+  describe("badge content and cache key never diverge by locale (#1181 regression)", () => {
+    it("renders Spanish (DEFAULT_LOCALE) content for the badge SVG cache warm", async () => {
+      await GET(makeRequest());
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Métricas verificadas",
+            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            radarLabels: expect.objectContaining({ delivery: "Entrega" }),
+          }),
+        }),
+      );
+    });
+
+    it("builds the cache key for the SAME locale ('es') the content was rendered in", async () => {
+      await GET(makeRequest());
+
+      expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
+        "alice",
+        expect.any(String),
+        "es",
+      );
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          strings: expect.objectContaining({ metricsVerified: "Métricas verificadas" }),
+        }),
+      );
+    });
+  });
+
+  // #1177 (PE-M2): the cron previously re-rendered and re-wrote the badge SVG
+  // cache on every hourly run even when the stats TTL (6h) guarantees the SVG
+  // is byte-identical to what's already cached — ~83% redundant renders and
+  // Redis writes. warmHandle now reads today's cache key first and skips the
+  // avatar resolve + render + write entirely when it's already populated.
+  //
+  // Critical invariant verified before landing this: a mid-day score change
+  // (EMU supplemental upload via /api/supplemental, a platform connect via
+  // lib/auth/platform-oauth.ts, or /api/recalculate) already deletes the
+  // exact same date-scoped badge SVG key through invalidateProfileReadModels
+  // / invalidatePlatformReadModels — so the skip below only ever short-
+  // circuits a genuinely-unchanged render, never a stale one.
+  describe("read-before-write skip (#1177 / PE-M2)", () => {
+    it("skips the avatar resolve, render, and cache write when today's badge SVG cache key is already populated", async () => {
+      mockReadBadgeSvgCache.mockResolvedValue("<svg>already cached</svg>");
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
+
+    it("still renders and writes the badge SVG when today's cache key is empty — the first request after UTC rollover must still get a warm cache", async () => {
+      // The date-scoped key means a new UTC day naturally produces a cache
+      // miss (null) even though yesterday's key still holds a value — the
+      // route never reads yesterday's key, only buildBadgeSvgCacheKey(handle,
+      // today), so this is the realistic rollover case (#1089 already solved
+      // the underlying gap; this test guards that the #1177 skip doesn't
+      // reintroduce it).
+      mockReadBadgeSvgCache.mockResolvedValue(null);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledTimes(2);
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledTimes(2);
+    });
+
+    it("checks the cache under the same date-scoped key writeBadgeSvgCache would use", async () => {
+      await GET(makeRequest());
+
+      expect(mockReadBadgeSvgCache).toHaveBeenCalledWith(
+        expect.stringContaining("alice"),
+      );
+      // #1181 — the cron has no request/cookie context, so it always warms
+      // the DEFAULT_LOCALE ('es') slot; the locale is now an explicit third
+      // argument (via the shared resolveBadgeLocale helper) rather than left
+      // to buildBadgeSvgCacheKey's own default.
+      expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
+        "alice",
+        expect.any(String),
+        "es",
+      );
+    });
+
+    it("does not let a badge SVG cache-read failure skip the warm (falls through to render/write)", async () => {
+      mockReadBadgeSvgCache.mockRejectedValue(new Error("redis read boom"));
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(body.failed).toBe(0);
+    });
+  });
+
+  // #1177 (PE-L3): resolveBadgeAvatar was called with no options.deadlineMs,
+  // so a slow avatar CDN could add up to the ~2000ms internal fetch-abort
+  // bound per handle across BATCH_SIZE-concurrent handles, eating into the
+  // 270s time budget that governs rotation coverage. An explicit deadline
+  // (looser than the user-facing request paths' 1000ms/250ms since cron
+  // latency isn't user-facing) bounds this per-handle cost independently of
+  // that internal abort.
+  describe("avatar resolve deadline (#1177 / PE-L3)", () => {
+    it("does not block the run past the explicit warm-cache avatar deadline when the avatar fetch stalls", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const responsePromise = GET(makeRequest());
+
+        // 1500ms is comfortably below the 2000ms internal getAvatarBase64
+        // abort this test bypasses by mocking it out — if warmHandle relied
+        // on that internal bound alone (no explicit deadlineMs), advancing
+        // only 1500ms would never settle this promise.
+        await vi.advanceTimersByTimeAsync(1500);
+        const res = await responsePromise;
+        const body = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(body.warmed).toBe(2);
+        // Timeout maps to the "skip" avatar cache policy — no SVG published
+        // for this handle this run, consistent with the request-path gates.
+        expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("still writes the badge SVG cache when the avatar resolves comfortably within the deadline", async () => {
+      mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc");
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledTimes(2);
+    });
+  });
+
   // DO-M5: PostHog cron_warm_cache_complete event
   it("emits a cron_warm_cache_complete PostHog event with warmed, failed, and durationMs", async () => {
     const res = await GET(makeRequest());
@@ -1008,6 +1186,57 @@ describe("GET /api/cron/warm-cache", () => {
           }),
         }),
       );
+    });
+
+    // #1162 / BE-L5: post-#1010 the cron runs hourly, so an unconditional fire
+    // here means 24 identical emails/day once delivery actually works. A
+    // once-per-day SETNX guard (same pattern as persistProfileSnapshot's
+    // dedup key in lib/profile/public-profile.ts) caps it to one alert/day.
+    it("does not re-emit the ceiling alert on a later run the same day (guard already acquired)", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheSetNxStatus.mockResolvedValue("exists");
+
+      await GET(makeRequest());
+
+      const ceilingAlerts = (mockCaptureOperationalAlert.mock.calls as Array<[{ signal: string }]>).filter(
+        ([opts]) => opts.signal === "warm_cache_ceiling_approached",
+      );
+      expect(ceilingAlerts).toHaveLength(0);
+    });
+
+    it("uses a once-per-day SETNX key with a 24h TTL to guard the ceiling alert", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+
+      await GET(makeRequest());
+
+      expect(mockCacheSetNxStatus).toHaveBeenCalledWith(
+        expect.stringMatching(/^warm-cache:ceiling-alerted:\d{4}-\d{2}-\d{2}$/),
+        86400,
+      );
+    });
+
+    it("still emits the ceiling alert when the day-guard is unavailable (Redis down) — fails open", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheSetNxStatus.mockResolvedValue("unavailable");
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: "warm_cache_ceiling_approached" }),
+      );
+    });
+
+    it("does not consult the day-guard at all when below the ceiling (guard cost only paid when it matters)", async () => {
+      // Default: 2 users (alice, bob) — well below the ceiling
+      await GET(makeRequest());
+
+      expect(mockCacheSetNxStatus).not.toHaveBeenCalled();
     });
   });
 

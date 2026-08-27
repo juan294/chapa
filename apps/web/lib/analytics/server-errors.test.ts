@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+const { mockSendAlertEmail } = vi.hoisted(() => ({
+  mockSendAlertEmail: vi.fn(),
+}));
+
+// The email fallback transport (#1162 / DO-B1) is exercised by its own
+// dedicated test file (alerts.test.ts) — here it's mocked so
+// captureOperationalAlert tests only assert *whether* and *with what
+// payload* it's invoked, not its internal Resend plumbing.
+vi.mock("@/lib/email/alerts", () => ({
+  sendAlertEmail: mockSendAlertEmail,
+}));
+
 // Mock fetch globally so no real HTTP calls are made
 const mockFetch = vi.fn();
 
@@ -377,6 +389,8 @@ describe("captureOperationalAlert", () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     globalThis.fetch = mockFetch as unknown as typeof fetch;
+    mockSendAlertEmail.mockReset();
+    mockSendAlertEmail.mockResolvedValue(true);
 
     vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://alerts.example.com/chapa");
   });
@@ -418,8 +432,8 @@ describe("captureOperationalAlert", () => {
     expect(JSON.stringify(body)).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz1234567890");
   });
 
-  it("does not send when the alert webhook is not configured", async () => {
-    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", undefined);
+  it("does not fall back to email when the webhook is configured and delivery succeeds", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
 
     const { captureOperationalAlert } = await import("./server-errors");
 
@@ -429,7 +443,72 @@ describe("captureOperationalAlert", () => {
       summary: "Health check is degraded",
     });
 
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockSendAlertEmail).not.toHaveBeenCalled();
+  });
+
+  // #1162 / DO-B1: CHAPA_ALERT_WEBHOOK_URL is unset in production, so every
+  // P1/P2 signal previously short-circuited here with no second delivery
+  // path. No Discord/Slack — fall back to the already-configured Resend
+  // client (SUPPORT_FORWARD_EMAIL) instead of adding a new dependency.
+  it("falls back to email delivery when no webhook URL is configured", async () => {
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", undefined);
+
+    const { captureOperationalAlert } = await import("./server-errors");
+
+    await captureOperationalAlert({
+      signal: "health_degraded",
+      severity: "P1",
+      summary: "Health check is degraded",
+      route: "/api/health",
+      properties: {
+        token: "ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+        dependencies: { redis: "error" },
+      },
+    });
+
+    // No webhook configured — never POSTs.
     expect(mockFetch).not.toHaveBeenCalled();
+
+    // Falls back to email with the same sanitized, structured payload the
+    // webhook path would have sent.
+    expect(mockSendAlertEmail).toHaveBeenCalledTimes(1);
+    const [emailPayload] = mockSendAlertEmail.mock.calls[0] as [Record<string, unknown>];
+    expect(emailPayload.source).toBe("chapa");
+    expect(emailPayload.signal).toBe("health_degraded");
+    expect(emailPayload.severity).toBe("P1");
+    expect(emailPayload.route).toBe("/api/health");
+    expect(JSON.stringify(emailPayload)).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz1234567890");
+  });
+
+  it("never throws when the email fallback rejects — alert delivery stays fire-and-forget", async () => {
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", undefined);
+    mockSendAlertEmail.mockRejectedValue(new Error("Resend down"));
+
+    const { captureOperationalAlert } = await import("./server-errors");
+
+    await expect(
+      captureOperationalAlert({
+        signal: "health_degraded",
+        severity: "P1",
+        summary: "Health check is degraded",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("never throws when the email fallback resolves false (send failed)", async () => {
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", undefined);
+    mockSendAlertEmail.mockResolvedValue(false);
+
+    const { captureOperationalAlert } = await import("./server-errors");
+
+    await expect(
+      captureOperationalAlert({
+        signal: "health_degraded",
+        severity: "P1",
+        summary: "Health check is degraded",
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -504,6 +583,25 @@ describe("captureServerEvent", () => {
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  // #1162 / BE-M4: captureServerEvent previously forwarded properties as-is,
+  // unlike captureServerError which sanitizes message/stack. A caller passing
+  // raw request/error context through captureServerEvent could leak a token.
+  it("sanitizes sensitive values out of event properties, matching captureServerError", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerEvent } = await import("./server-errors");
+
+    await captureServerEvent("client_error", {
+      message: "auth failed with token=ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+      nested: { authorization: "Bearer sk-abcdefghijklmnopqrstuvwx" },
+    });
+
+    const body = getCallBody();
+    expect(JSON.stringify(body)).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz1234567890");
+    expect(JSON.stringify(body)).not.toContain("sk-abcdefghijklmnopqrstuvwx");
+    expect(JSON.stringify(body)).toContain("[REDACTED]");
   });
 });
 

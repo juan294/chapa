@@ -27,7 +27,22 @@ interface NavLinkItem {
  * these ISR pages (#1025 / FE-L2).
  */
 
-export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
+export function NavbarClient({
+  navLinks,
+  translationKey = 'landing.navLinks',
+}: {
+  navLinks?: NavLinkItem[];
+  /**
+   * Dictionary key to re-derive nav links from on every render (#1167 /
+   * UX-B1). Defaults to `landing.navLinks` — the landing page's own
+   * hash-anchor links (`#features`, etc.), which only make sense scrolled
+   * within that page. Inner pages (share page, verify pages) pass
+   * `"nav.innerLinks"` (real routes: `/about`, `/about/scoring`, `/verify`)
+   * here so they don't inherit the landing page's meaningless-off-page
+   * anchors.
+   */
+  translationKey?: string;
+}) {
   const { session, loading } = useSession();
   const { t } = useTranslation();
 
@@ -37,10 +52,10 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
   // and a last-resort fallback if t() returns an empty array.
   const resolvedNavLinks = useMemo<NavLinkItem[] | undefined>(() => {
     if (!navLinks || navLinks.length === 0) return undefined;
-    const localeLinks = tArray<NavLinkItem>(t, 'landing.navLinks');
+    const localeLinks = tArray<NavLinkItem>(t, translationKey);
     if (localeLinks.length > 0) return localeLinks;
     return navLinks;
-  }, [navLinks, t]);
+  }, [navLinks, t, translationKey]);
 
   return (
     <NavbarShell

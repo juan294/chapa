@@ -392,6 +392,100 @@ describe("getStats", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // #1179 (PE-M4) — fold the baseline read into the existing Promise.all
+  // The baseline (`stats:stale:v2:*`) read had no data dependency on `primary`
+  // or `overlays` — the guards only consume it after `primary` exists — yet it
+  // sat in front of the two slowest network legs (GitHub GraphQL + overlays).
+  // ---------------------------------------------------------------------------
+  describe("baseline read runs concurrently with fetch + overlays (#1179 / PE-M4)", () => {
+    it("kicks off fetchStats before the baseline cacheGet resolves, not strictly after it", async () => {
+      mockCacheGet.mockResolvedValueOnce(null); // stats:v2:merged (primary miss)
+
+      let resolveBaseline!: (value: StatsData | null) => void;
+      mockCacheGet.mockImplementationOnce(
+        () =>
+          new Promise<StatsData | null>((resolve) => {
+            resolveBaseline = resolve;
+          }),
+      ); // stats:stale (baseline) — held pending
+      mockCacheGet.mockResolvedValueOnce(null); // supplemental miss
+
+      mockFetchStatsData.mockResolvedValue(makeStats());
+
+      const resultPromise = getStats("test-user");
+
+      // Flush pending microtasks (everything that can run without the
+      // baseline read settling) without resolving it.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // fetchStats must already have been invoked even though the baseline
+      // read is still pending — proof the baseline read no longer gates the
+      // GitHub fetch behind a serialized round-trip.
+      expect(mockFetchStatsData).toHaveBeenCalled();
+
+      resolveBaseline(null);
+      const result = await resultPromise;
+      expect(result).not.toBeNull();
+    });
+
+    it("still rejects a degraded fetch once the concurrently-read baseline settles (integrity invariant survives)", async () => {
+      // Critical invariant (#1004/#1060): folding the baseline read into
+      // Promise.all must not change what the degraded-fetch guard sees, nor
+      // let a slow baseline resolve to a stale/null value by the time the
+      // guard runs. `primary` (0 merged PRs) must still be judged against the
+      // REAL baseline (41 merged PRs) once both promises have settled.
+      const lastGood = makeStats({ prsMergedCount: 41, prsMergedWeight: 120, commitsTotal: 14000 });
+      const degraded = makeStats({
+        prsMergedCount: 0,
+        prsMergedWeight: 0,
+        commitsTotal: 15533,
+        issuesClosedCount: 5096,
+      });
+
+      mockCacheGet.mockResolvedValueOnce(null); // stats:v2:merged (primary miss)
+
+      let resolveBaseline!: (value: StatsData | null) => void;
+      mockCacheGet.mockImplementationOnce(
+        () =>
+          new Promise<StatsData | null>((resolve) => {
+            resolveBaseline = resolve;
+          }),
+      ); // stats:stale (baseline) — resolves late, after fetchStats
+      mockCacheGet.mockResolvedValueOnce(null); // supplemental miss
+
+      mockFetchStatsData.mockResolvedValue(degraded);
+
+      const resultPromise = getStats("test-user");
+
+      // Let fetchStats settle first, proving the guard still waits for the
+      // baseline rather than running against a premature `undefined`/`null`.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      resolveBaseline(lastGood);
+
+      await resultPromise;
+
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "github_degraded_pr_fetch",
+        expect.objectContaining({
+          handle: "test-user",
+          freshPrsMergedCount: 0,
+          stalePrsMergedCount: 41,
+        }),
+      );
+      // Rejected fetch must not overwrite the protected baseline.
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:stale:v2:test-user",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // #1004 phase 2 — scope-aware, non-downgrading cache writes
   // A lower-scope (public) fetch must never overwrite a higher-scope
   // (authenticated) entry already cached for this handle.
@@ -623,6 +717,77 @@ describe("getStats", () => {
       expect(mockCacheSet).toHaveBeenCalledWith(
         "stats:stale:v2:test-user",
         expect.objectContaining({ fetchScope: "public" }),
+        expect.any(Number),
+      );
+    });
+
+    // #1163 (BE-H2): the rejected-fetch branch reads `existingComposed` at
+    // :522 to detect a concurrent better-scoped write (the documented inflight
+    // race between separate public/authenticated dedup keys — :91-99), but
+    // wrote the composed value to `cacheKey` unconditionally whenever a
+    // baseline existed, regardless of whether `existingComposed` outranked
+    // the value it was about to write. That silently downgraded the shared
+    // cache — the exact #1002/#1050 signature, reintroduced via the
+    // rejection path.
+    it("#1163: a rejected fetch's baseline fallback does not overwrite a better-scoped existingComposed entry (race)", async () => {
+      // The baseline is only public-scoped and lower-value than the entry a
+      // concurrent authenticated fetch already landed at cacheKey.
+      const publicBaseline = makeStats({
+        fetchScope: "public",
+        prsMergedCount: 50,
+        commitsTotal: 100,
+      });
+      const raceWinnerAuthenticated = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 900,
+      });
+      // Not a degraded-fetch collapse (same scope as baseline, comparable
+      // magnitude) — this fetch is rejected purely by the scope-rank check
+      // against the racing authenticated entry.
+      const publicFetch = makeStats({ prsMergedCount: 55, commitsTotal: 100 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // getStats(): cacheKey miss -> triggers fetch
+        .mockResolvedValueOnce(publicBaseline) // staleKey hit -> public baseline
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(raceWinnerAuthenticated); // re-read cacheKey: race winner landed
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "public" }),
+        expect.any(Number),
+      );
+    });
+
+    it("#1163: still refreshes cacheKey TTL on a rejected fetch when existingComposed is not better-scoped than the fallback", async () => {
+      // Anti-thrash requirement: the write must still happen (refreshing the
+      // 6h TTL so a sustained scope-blinded caller doesn't refetch on every
+      // request) whenever existingComposed is present but NOT better-scoped
+      // than the value about to be written.
+      const authenticatedBaseline = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 904,
+        commitsTotal: 500,
+      });
+      const stalePublicExisting = makeStats({ fetchScope: "public", prsMergedCount: 3 });
+      const publicFetch = makeStats({ prsMergedCount: 3, commitsTotal: 500 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // cacheKey miss
+        .mockResolvedValueOnce(authenticatedBaseline) // staleKey hit -> authenticated
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(stalePublicExisting); // re-read cacheKey: existing entry, but NOT better-scoped than the fallback
+
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "authenticated", prsMergedCount: 904 }),
         expect.any(Number),
       );
     });

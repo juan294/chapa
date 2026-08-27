@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
@@ -24,7 +24,18 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-afterEach(cleanup);
+const mockFetch = vi.fn();
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("u/[handle] error.tsx render", () => {
   it("renders the share-page-specific error heading and description", async () => {
@@ -54,5 +65,21 @@ describe("u/[handle] error.tsx render", () => {
     const { container } = render(<SharePageError error={new Error("boom")} reset={vi.fn()} />);
     expect(container.querySelector(".text-terminal-red")).not.toBeNull();
     expect(container.innerHTML).not.toContain("amber");
+  });
+
+  it("reports the error to /api/telemetry with the share-page-error source", async () => {
+    const { default: SharePageError } = await import("./error");
+    render(<SharePageError error={new Error("share page boundary boom")} reset={vi.fn()} />);
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0]!;
+    expect(url).toBe("/api/telemetry");
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({
+      event: "client_error",
+      category: "route_error",
+      source: "share-page-error",
+      message: "share page boundary boom",
+    });
   });
 });

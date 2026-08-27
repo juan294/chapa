@@ -131,8 +131,15 @@ describe("process-campaigns cron", () => {
       makeCampaign("c-1", "Campaign One"),
       makeCampaign("c-2", "Campaign Two"),
     ]);
+    let c1Calls = 0;
     vi.mocked(processCampaignBatch).mockImplementation(async (campaignId: string) => {
-      if (campaignId === "c-1") return { sent: 5, failed: 0, remaining: 3 };
+      if (campaignId === "c-1") {
+        c1Calls += 1;
+        // First batch leaves work behind; second batch drains it.
+        return c1Calls === 1
+          ? { sent: 5, failed: 0, remaining: 3 }
+          : { sent: 3, failed: 0, remaining: 0 };
+      }
       return { sent: 4, failed: 0, remaining: 0 };
     });
 
@@ -140,12 +147,16 @@ describe("process-campaigns cron", () => {
     const body = await res.json();
 
     expect(body.status).toBe("ok");
-    expect(processCampaignBatch).toHaveBeenCalledTimes(2);
+    // c-1 still has remaining work after its first batch, but it must not
+    // monopolize the run (BE-M5/#1176 critical constraint): c-2 gets its
+    // turn in the same pass before c-1 is revisited for its second batch.
+    expect(processCampaignBatch).toHaveBeenCalledTimes(3);
     expect(processCampaignBatch).toHaveBeenNthCalledWith(1, "c-1");
     expect(processCampaignBatch).toHaveBeenNthCalledWith(2, "c-2");
+    expect(processCampaignBatch).toHaveBeenNthCalledWith(3, "c-1");
     expect(body.processed).toBe(2);
     expect(body.campaigns).toEqual([
-      { campaignId: "c-1", campaignName: "Campaign One", sent: 5, failed: 0, remaining: 3 },
+      { campaignId: "c-1", campaignName: "Campaign One", sent: 8, failed: 0, remaining: 0 },
       { campaignId: "c-2", campaignName: "Campaign Two", sent: 4, failed: 0, remaining: 0 },
     ]);
     expect(cacheSet).toHaveBeenCalledWith(
@@ -153,6 +164,109 @@ describe("process-campaigns cron", () => {
       expect.any(Number),
       172800,
     );
+  });
+
+  // BE-M5 (#1176): a run used to call processCampaignBatch exactly ONCE per
+  // campaign, claiming at most BATCH_SIZE (50) rows and returning — wasting
+  // most of the day's quota when a campaign has a large backlog. The cron
+  // must keep giving a campaign additional batches across passes (sharing
+  // turns fairly with other active campaigns) until its backlog drains or
+  // the shared daily quota runs out.
+  it("gives a campaign multiple batches across passes in one run until its backlog drains (BE-M5)", async () => {
+    vi.mocked(dbGetCampaigns).mockResolvedValue([
+      makeCampaign("c-1", "Campaign One"),
+      makeCampaign("c-2", "Campaign Two"),
+    ]);
+    let c1Calls = 0;
+    vi.mocked(processCampaignBatch).mockImplementation(async (campaignId: string) => {
+      if (campaignId === "c-1") {
+        c1Calls += 1;
+        // Simulate a 1000-recipient backlog needing several batches.
+        return c1Calls < 3
+          ? { sent: 50, failed: 0, remaining: 900 - (c1Calls - 1) * 50 }
+          : { sent: 30, failed: 0, remaining: 0 };
+      }
+      return { sent: 4, failed: 0, remaining: 0 };
+    });
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.status).toBe("ok");
+    // c-1: 3 batches (50 + 50 + 30 = 130 sent), c-2: 1 batch (4 sent).
+    expect(processCampaignBatch).toHaveBeenCalledTimes(4);
+    expect(body.campaigns).toEqual([
+      { campaignId: "c-1", campaignName: "Campaign One", sent: 130, failed: 0, remaining: 0 },
+      { campaignId: "c-2", campaignName: "Campaign Two", sent: 4, failed: 0, remaining: 0 },
+    ]);
+    expect(body.deferred).toBeUndefined();
+  });
+
+  // BE-M6 interaction: if a batch attempt makes no forward progress (e.g. a
+  // permanently misconfigured Resend client, or an oversized recovered lease
+  // group that never fits the remaining quota), looping "while remaining >
+  // 0" would busy-spin that one campaign for the entire TIME_BUDGET_MS,
+  // hammering the DB for no benefit and starving every other active
+  // campaign. A stalled campaign must get exactly one attempt per run and
+  // then yield, while other campaigns keep progressing.
+  it("stops retrying a campaign that makes no forward progress instead of busy-spinning the run", async () => {
+    vi.mocked(dbGetCampaigns).mockResolvedValue([
+      makeCampaign("c-1", "Campaign One"),
+      makeCampaign("c-2", "Campaign Two"),
+    ]);
+    vi.mocked(processCampaignBatch).mockImplementation(async (campaignId: string) => {
+      // c-1 never makes progress (e.g. Resend permanently unavailable):
+      // sent=0, failed=0, but remaining stays positive forever.
+      if (campaignId === "c-1") return { sent: 0, failed: 0, remaining: 5 };
+      return { sent: 4, failed: 0, remaining: 0 };
+    });
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.status).toBe("ok");
+    // c-1 attempted exactly once despite never reaching remaining 0 or -1.
+    expect(processCampaignBatch).toHaveBeenCalledTimes(2);
+    expect(processCampaignBatch).toHaveBeenNthCalledWith(1, "c-1");
+    expect(processCampaignBatch).toHaveBeenNthCalledWith(2, "c-2");
+    expect(body.campaigns).toEqual([
+      { campaignId: "c-1", campaignName: "Campaign One", sent: 0, failed: 0, remaining: 5 },
+      { campaignId: "c-2", campaignName: "Campaign Two", sent: 4, failed: 0, remaining: 0 },
+    ]);
+    expect(body.deferred).toBeUndefined();
+  });
+
+  it("stops issuing new batches once the per-invocation time budget is exhausted, deferring the rest as time_budget", async () => {
+    vi.useFakeTimers();
+    try {
+      const start = new Date("2026-01-01T00:00:00.000Z");
+      vi.setSystemTime(start);
+      vi.mocked(dbGetCampaigns).mockResolvedValue([
+        makeCampaign("c-1", "Campaign One"),
+        makeCampaign("c-2", "Campaign Two"),
+      ]);
+      vi.mocked(processCampaignBatch).mockImplementation(async () => {
+        // Simulate a slow batch call that eats past the 270s time budget
+        // (maxDuration=300s minus the 30s buffer).
+        vi.setSystemTime(new Date(start.getTime() + 271_000));
+        return { sent: 5, failed: 0, remaining: 3 };
+      });
+
+      const res = await GET(makeRequest("test-secret"));
+      const body = await res.json();
+
+      expect(body.status).toBe("ok");
+      expect(processCampaignBatch).toHaveBeenCalledTimes(1);
+      expect(processCampaignBatch).toHaveBeenCalledWith("c-1");
+      expect(body.campaigns).toEqual([
+        { campaignId: "c-1", campaignName: "Campaign One", sent: 5, failed: 0, remaining: 3 },
+      ]);
+      expect(body.deferred).toEqual([
+        { campaignId: "c-2", campaignName: "Campaign Two", reason: "time_budget" },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops iterating and defers remaining campaigns once the shared daily quota is exhausted", async () => {

@@ -11,6 +11,7 @@ import type {
 import {
   buildScoreExplanation,
   type DimensionExplanation,
+  getDimensionFormulaKey,
   type SignalKey,
 } from "@/lib/dashboard/score-explanation";
 import { useTranslation } from "@/lib/i18n";
@@ -53,16 +54,6 @@ function formatPenalty(penalty: number): string {
 
 function formatPercent(value: number): number {
   return Math.round(Math.max(0, Math.min(1, value)) * 100);
-}
-
-function formulaKeyForDimension(dimension: DimensionExplanation): string {
-  if (dimension.key === "quality") {
-    return dimension.countsTowardComposite
-      ? "scoreExplanation.dimensions.qualityCollaborativeFormula"
-      : "scoreExplanation.dimensions.qualitySoloFormula";
-  }
-
-  return `scoreExplanation.dimensions.${dimension.key}Formula`;
 }
 
 export function ScoreExplanationPanel({
@@ -173,7 +164,7 @@ export function ScoreExplanationPanel({
                   key={dimension.key}
                   dimension={dimension}
                   label={t(`dimensions.${dimension.key}.label`) as string}
-                  formula={t(formulaKeyForDimension(dimension)) as string}
+                  formula={t(getDimensionFormulaKey(dimension)) as string}
                   notCountedLabel={t("scoreExplanation.dimensions.notCounted") as string}
                   t={t}
                 />

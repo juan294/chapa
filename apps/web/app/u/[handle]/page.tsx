@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { isValidHandle } from "@/lib/validation";
-import { NavbarClient } from "@/components/NavbarClient";
+import { Navbar } from "@/components/Navbar";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
@@ -12,9 +12,9 @@ import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
-  buildBadgeSvgCacheKey,
   readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
@@ -36,16 +36,22 @@ import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
+import { isWebmcpEnabled } from "@/lib/feature-flags";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { redactSnapshotDiffForVisitor } from "@/lib/history/diff";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LanguageProvider, LocaleSync } from "@/lib/i18n";
+import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import type { Locale } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { tArray } from "@/lib/i18n/typed-accessors";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageH2 } from "./SharePageH2";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
+import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -129,30 +135,40 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   }
 
   return (
-    <LanguageProvider
-      initialLocale={locale}
-      // #1071 — the root layout's LanguageProvider already serializes the
-      // DEFAULT_LOCALE dictionary into the RSC payload. When this page's
-      // per-request locale matches it, omit the prop entirely so it isn't
-      // serialized a second time — LanguageProvider reuses that ancestor's
-      // context instead. Only a genuine mismatch (e.g. `?lang=` override)
-      // needs its own dictionary supplied here.
-      dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
-    >
-      {/* Establish query ownership in the hydrated shell. The streamed client
-          subtree then starts with the same dictionary as its server markup. */}
-      <LocaleSync queryLang={queryLang} />
-      {errorMessage && <ErrorBanner message={errorMessage} />}
-      <main id="main-content" className="min-h-screen bg-bg">
-        <Suspense fallback={<BadgeSkeleton />}>
-          <SharePageContent handle={handle} readOnly={readOnly} />
-        </Suspense>
-        {/* Progressive disclosure (#783): the terminal command bar is demoted to a
-            subtle, opt-in hint so the badge value stays legible to non-developer
-            visitors. The "/" shortcut and full command bar remain available. */}
-        <CommandBarHint />
-      </main>
-    </LanguageProvider>
+    <>
+      {/* #1165 (FE-M1) — this route is dynamic (not ISR, see below), so the
+          resolved-per-request locale is known here already. The root layout
+          always renders `<html lang="es">` statically (#861), so a genuine
+          English request (cookie/header/`?lang=en`) would otherwise ship
+          English body copy inside `<html lang="es">` in the served HTML.
+          Mirrors the landing page's / `/verify` pages' own use of this
+          component (see docs there for the LangSync interplay). */}
+      <DocumentLocaleScript locale={locale} />
+      <LanguageProvider
+        initialLocale={locale}
+        // #1071 — the root layout's LanguageProvider already serializes the
+        // DEFAULT_LOCALE dictionary into the RSC payload. When this page's
+        // per-request locale matches it, omit the prop entirely so it isn't
+        // serialized a second time — LanguageProvider reuses that ancestor's
+        // context instead. Only a genuine mismatch (e.g. `?lang=` override)
+        // needs its own dictionary supplied here.
+        dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
+      >
+        {/* Establish query ownership in the hydrated shell. The streamed client
+            subtree then starts with the same dictionary as its server markup. */}
+        <LocaleSync queryLang={queryLang} />
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+        <main id="main-content" className="min-h-screen bg-bg">
+          <Suspense fallback={<BadgeSkeleton />}>
+            <SharePageContent handle={handle} readOnly={readOnly} locale={locale} />
+          </Suspense>
+          {/* Progressive disclosure (#783): the terminal command bar is demoted to a
+              subtle, opt-in hint so the badge value stays legible to non-developer
+              visitors. The "/" shortcut and full command bar remain available. */}
+          <CommandBarHint />
+        </main>
+      </LanguageProvider>
+    </>
   );
 }
 
@@ -161,9 +177,11 @@ export default async function SharePage({ params, searchParams }: SharePageProps
 export async function SharePageContent({
   handle,
   readOnly = false,
+  locale = DEFAULT_LOCALE,
 }: {
   handle: string;
   readOnly?: boolean;
+  locale?: Locale;
 }) {
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
@@ -182,12 +200,36 @@ export async function SharePageContent({
   // guard so a future regression in that contract still can't fail the
   // whole share page render — a 500 here would be a bug (CLAUDE.md).
   //
-  // Session resolution has no data dependency on the other two, so all
-  // three run concurrently rather than awaiting headers() up front.
-  const [session, materialized, trendData] = await Promise.all([
+  // Session and flag resolution have no data dependency on the profile or
+  // trend fetches, so all four run concurrently.
+  //
+  // #1180 (PE-L1) — the shared SVG cache read (#720 below) depends on
+  // nothing in this wave: only `handle` and today's date, both known here
+  // already. It used to run as a strictly later `await` step after this
+  // Promise.all resolved, serializing a Redis round-trip behind the whole
+  // wave for no reason. `today`/`svgCacheKey` are computed HERE (not after
+  // the wave) and reused verbatim by the later `writeBadgeSvgCache` call
+  // below — computing the date once and reusing it (rather than recomputing
+  // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
+  // race where a request could read one day's key and write another.
+  const today = toDateString(new Date());
+  // #1181 (UX-H3 follow-up) — the cache key and the rendered content below
+  // MUST come from the same resolved locale, never independent defaults.
+  // `resolveBadgeLocale` (not `buildBadgeSvgCacheKey` directly) is the only
+  // sanctioned way to derive either here: it bundles both under one call
+  // bound to this page's own resolved `locale` prop, so the key can no
+  // longer silently disagree with the content written into it (the bug
+  // this fixed — content defaulted to English while the key defaulted to
+  // DEFAULT_LOCALE/Spanish, so the majority Spanish-locale traffic was
+  // served an English badge).
+  const badgeLocale = resolveBadgeLocale(locale);
+  const svgCacheKey = badgeLocale.cacheKey(handle, today);
+  const [session, materialized, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
     materializePublicProfile(handle, { readOnly }),
     getTrendData(handle).catch(() => ({ trend: null, diff: null })),
+    isWebmcpEnabled(),
+    readBadgeSvgCache(svgCacheKey),
   ]);
   const isOwner = session?.login === handle;
   const stats = materialized?.stats ?? null;
@@ -202,13 +244,10 @@ export async function SharePageContent({
     ? getPublicProfileVerification(materialized)
     : null;
 
-  // #720 — try the shared SVG cache first. The /u/[handle]/badge.svg route
-  // writes here after every successful render, so on warm caches the share
-  // page can skip avatar fetch + render entirely.
-  const today = toDateString(new Date());
-  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
-  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
-
+  // #720 — try the shared SVG cache first (read kicked off above, alongside
+  // the rest of the wave). The /u/[handle]/badge.svg route writes here after
+  // every successful render, so on warm caches the share page can skip
+  // avatar fetch + render entirely.
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
   let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
@@ -232,6 +271,9 @@ export async function SharePageContent({
       avatarDataUri,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
+      // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
+      // so content and key are always for the same locale.
+      strings: badgeLocale.stringsFor(impact.tier),
     });
     renderedFresh = true;
   }
@@ -294,11 +336,25 @@ export async function SharePageContent({
   const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
   const badgeSrcParams = new URLSearchParams({
     v: badgeCacheBuster,
+    lang: locale,
     ...(readOnly ? { [READ_ONLY_SMOKE_PARAM]: "1" } : {}),
   });
   const badgeImageSrc = `/u/${encodeURIComponent(handle)}/badge.svg?${badgeSrcParams.toString()}`;
 
-  const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
+  // #1165 (UX-M5) — built ONCE here, server-side, so the "e" keyboard
+  // shortcut (SharePageShortcuts) and the visible Markdown Copy button
+  // (SharePageOwnerContent) always produce byte-identical, localized,
+  // handle-bearing clipboard content — this used to be an independent,
+  // hardcoded-English, non-handle-bearing literal. The alt text form
+  // matches the HTML embed's own (`${badgeAltOf} ${handle}`).
+  const t = getServerT(locale);
+  // #1167 (UX-B1) — real routes (/about, /about/scoring, /verify) for the
+  // server Navbar's center nav, NOT the landing page's `landing.navLinks`
+  // hash anchors (`#features`, etc.), which are meaningless off that page.
+  const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
+  const embedBadgeUrl = `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`;
+  const embedAltText = `${t('shareOwner.badgeAltOf') as string} ${handle}`;
+  const embedMarkdown = `![${embedAltText}](${embedBadgeUrl})`;
 
   const displayLabel = stats?.displayName ?? handle;
 
@@ -333,8 +389,19 @@ export async function SharePageContent({
       <SharePageShortcuts
         embedMarkdown={embedMarkdown}
         handle={handle}
-
+        isOwner={isOwner}
       />
+      {webmcpEnabled && stats && impactForClient && (
+        <SharePageWebMcpTools
+          handle={handle}
+          impact={impactForClient}
+          stats={stats}
+          verification={verification}
+          trend={trendData.trend}
+          diff={diffForClient}
+          craftResult={craftResult}
+        />
+      )}
       {/* SAFETY: renderJsonLd escapes <, >, & to prevent </script> injection. */}
       <script
         type="application/ld+json"
@@ -343,7 +410,12 @@ export async function SharePageContent({
         }}
       />
 
-      <NavbarClient />
+      {/* #1165 (FE-H2) — this route is dynamic (not ISR), so it uses the
+          server Navbar variant (session sourced via headers(), rendered
+          synchronously) instead of the client variant's round trip to
+          /api/auth/session. `locale` is already resolved above; passing it
+          avoids Navbar re-deriving it a second time. */}
+      <Navbar locale={locale} navLinks={innerNavLinks} />
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
@@ -385,10 +457,13 @@ export async function SharePageContent({
         <div className="relative z-30 flex justify-end mb-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:250ms]">
           <BadgeToolbar
             handle={handle}
+            isOwner={isOwner}
           />
         </div>
 
-        {/* ── Owner/Visitor Content (client-side session check) ── */}
+        {/* ── Owner/Visitor Content (isOwner resolved server-side above; see
+             the redaction boundary comment near impactForClient — this prop
+             stays a DISPLAY gate only) ── */}
         <SharePageOwnerContentLazy
           handle={handle}
           stats={stats}
@@ -396,7 +471,19 @@ export async function SharePageContent({
           craftResult={craftResult}
           trend={trendData.trend}
           diff={diffForClient}
+          isOwner={isOwner}
+          embedMarkdown={embedMarkdown}
         />
+      </div>
+
+      {/* pb-16 spacer (#1167 / UX-B1) — CommandBarHint (rendered by the
+          SharePage default export, a sibling of this Suspense boundary)
+          mounts GlobalCommandBarLazy (fixed bottom-0) once summoned via the
+          "/" shortcut. This reserves room below the footer so scrolling to
+          the true bottom of the page clears it instead of it occluding the
+          footer's last line — same pattern as the [locale] content pages. */}
+      <div className="pb-16">
+        <SiteFooter t={t} />
       </div>
     </>
   );

@@ -6,13 +6,7 @@ import { tArray, tObject } from "@/lib/i18n/typed-accessors";
 import { LandingUrlEffects } from "./LandingUrlEffects";
 import { LandingTerminal } from "./LandingTerminal";
 import { LoginCtaButton } from "@/components/LoginCtaButton";
-import { ClaudeCodeStar } from "@/components/ClaudeCodeStar";
-import {
-  GitHubIcon,
-  BitbucketIcon,
-  CodebergIcon,
-  GitlabIcon,
-} from "@/components/icons";
+import { SiteFooter } from "@/components/SiteFooter";
 
 type TFunction = (key: string) => unknown;
 
@@ -92,7 +86,6 @@ export function LandingContent({
   const enterprise = tObject<Record<string, string>>(t, 'landing.enterprise');
   const stats = tArray<{ value: string; label: string }>(t, 'landing.stats');
   const finalCta = tObject<Record<string, string>>(t, 'landing.finalCta');
-  const footer = tObject<Record<string, string>>(t, 'landing.footer');
 
   return (
     <div className="bg-bg min-h-screen text-text-primary">
@@ -131,7 +124,7 @@ export function LandingContent({
                 />
                 <Link
                   href="/verify"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement-dark pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:shadow-xl hover:shadow-complement/25"
                 >
                   <ShieldCheckIcon className="w-4 h-4" />
                   {heroVerifyCta}
@@ -173,7 +166,7 @@ export function LandingContent({
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
-                  <span className="ml-2 text-xs text-terminal-dim font-heading">
+                  <span className="ml-2 text-xs text-text-secondary font-heading">
                     {embed.windowLabel}
                   </span>
                   <div className="ml-auto">
@@ -181,7 +174,7 @@ export function LandingContent({
                   </div>
                 </div>
                 <div className="p-4 font-heading text-sm leading-relaxed">
-                  <p className="text-terminal-dim">
+                  <p className="text-text-secondary">
                     <span className="text-amber/50">{"<!-- "}</span>
                     {embed.comment}
                     <span className="text-amber/50">{" -->"}</span>
@@ -314,7 +307,7 @@ export function LandingContent({
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
-                  <span className="ml-2 text-xs text-terminal-dim font-heading">
+                  <span className="ml-2 text-xs text-text-secondary font-heading">
                     terminal
                   </span>
                 </div>
@@ -420,52 +413,7 @@ export function LandingContent({
       </main>
 
       {/* ── Footer ─────────────────────────────────────────── */}
-      <footer className="border-t border-stroke py-8">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <span className="font-heading text-sm tracking-tight text-text-primary">
-                Chapa<span className="text-amber">_</span>
-              </span>
-              <span className="text-xs text-text-secondary">
-                {footer.tagline}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 text-text-secondary">
-              <span className="text-xs">{footer.poweredBy}</span>
-              <div className="flex items-center gap-2.5">
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber transition-colors">
-                  <GitHubIcon className="w-3.5 h-3.5" />
-                </a>
-                <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" aria-label="Bitbucket" title="Bitbucket" className="hover:text-amber transition-colors">
-                  <BitbucketIcon className="w-3.5 h-3.5" />
-                </a>
-                <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="hover:text-amber transition-colors">
-                  <CodebergIcon className="w-3.5 h-3.5" />
-                </a>
-                <a href="https://gitlab.com" target="_blank" rel="noopener noreferrer" aria-label="GitLab" title="GitLab" className="hover:text-amber transition-colors">
-                  <GitlabIcon className="w-3.5 h-3.5" />
-                </a>
-                <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber transition-colors">
-                  <ClaudeCodeStar />
-                </a>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 text-xs text-text-secondary">
-              <Link href="/about" className="hover:text-amber transition-colors">{footer.about}</Link>
-              <Link href="/about/scoring" className="hover:text-amber transition-colors">{footer.scoring}</Link>
-              <Link href="/terms" className="hover:text-amber transition-colors">{footer.terms}</Link>
-              <Link href="/privacy" className="hover:text-amber transition-colors">{footer.privacy}</Link>
-            </div>
-          </div>
-
-          <div suppressHydrationWarning className="mt-6 text-center text-xs text-terminal-dim">
-            &copy; {new Date().getFullYear()} Chapa
-          </div>
-        </div>
-      </footer>
+      <SiteFooter t={t} />
     </div>
   );
 }

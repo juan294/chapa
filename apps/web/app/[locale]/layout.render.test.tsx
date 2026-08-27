@@ -18,13 +18,41 @@ describe("dynamicParams", () => {
 });
 
 describe("LocaleSegmentLayout", () => {
-  it("renders its children unchanged, as a pure pass-through", () => {
-    render(
-      <LocaleSegmentLayout>
-        <div data-testid="child">content</div>
-      </LocaleSegmentLayout>,
-    );
+  it("renders its children unchanged", async () => {
+    const jsx = await LocaleSegmentLayout({
+      params: Promise.resolve({ locale: "en" }),
+      children: <div data-testid="child">content</div>,
+    });
+    render(jsx);
     expect(screen.getByTestId("child")).toBeDefined();
     expect(screen.getByText("content")).toBeDefined();
+  });
+
+  // #1165 (FE-M1) — hoisted here so all 9 migrated content pages emit an
+  // early <html lang> assignment in one edit, instead of each page needing
+  // to render DocumentLocaleScript itself (previously only the landing page
+  // and the two /verify pages did, out of ~12 locale-aware routes).
+  it("emits an early document-language assignment for the route's own locale (en)", async () => {
+    const jsx = await LocaleSegmentLayout({
+      params: Promise.resolve({ locale: "en" }),
+      children: <div data-testid="child">content</div>,
+    });
+    const { container } = render(jsx);
+    const script = container.querySelector(
+      'script[data-chapa-document-locale="en"]',
+    );
+    expect(script?.textContent).toBe('document.documentElement.lang="en";');
+  });
+
+  it("emits the Spanish document-language assignment for the es route", async () => {
+    const jsx = await LocaleSegmentLayout({
+      params: Promise.resolve({ locale: "es" }),
+      children: <div data-testid="child">content</div>,
+    });
+    const { container } = render(jsx);
+    const script = container.querySelector(
+      'script[data-chapa-document-locale="es"]',
+    );
+    expect(script?.textContent).toBe('document.documentElement.lang="es";');
   });
 });

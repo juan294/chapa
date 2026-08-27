@@ -7,6 +7,7 @@ import type {
   StatsData,
   ImpactV6Result,
   ImpactTier,
+  DimensionScores,
 } from "@chapa/shared";
 import type { ScoreEffect } from "@/lib/effects/text/ScoreEffectText";
 import { ScoreEffectText, SCORE_EFFECT_CSS } from "@/lib/effects/text/ScoreEffectText";
@@ -48,6 +49,81 @@ const TIER_SYMBOLS: Record<ImpactTier, string> = {
 function hasEnhancedTier(tier: ImpactTier): boolean {
   return tier === "High" || tier === "Elite";
 }
+
+// ---------------------------------------------------------------------------
+// Radar axes — UX-M2 (#1173)
+// ---------------------------------------------------------------------------
+
+export interface RadarAxis {
+  key: keyof DimensionScores;
+  label: string;
+  angle: number;
+}
+
+/** Locale-resolved dimension labels, keyed the same as `DimensionScores`. */
+export type DimensionLabels = Record<keyof DimensionScores, string>;
+
+const DEFAULT_DIMENSION_LABELS: DimensionLabels = {
+  delivery: "Delivery",
+  quality: "Quality",
+  consistency: "Consistency",
+  breadth: "Breadth",
+  craft: "Craft",
+};
+
+/**
+ * Radar axis layout: a 5-axis pentagon (72° spacing) when Craft is present,
+ * a 4-axis diamond (90° spacing) otherwise — full label strings only, never
+ * truncated.
+ *
+ * This intentionally mirrors apps/web/lib/render/RadarChart.ts's axis/label
+ * layout (the shipped SVG badge's source of truth for the acceptance
+ * criterion "pentagon when Craft is present, diamond fallback") so the
+ * Studio preview never shows a shape or label the public badge doesn't. It's
+ * duplicated rather than imported because RadarChart.ts renders a markup
+ * *string* for the server SVG pipeline and lives in apps/web/lib/render/**,
+ * which this component's ownership boundary doesn't include — see the
+ * angle/label values there if the two ever need to be reconciled into one
+ * shared module.
+ *
+ * @param labels - Locale-resolved dimension labels (#1181 UX-H3). Defaults to
+ *   English so existing non-translated callers are unaffected.
+ */
+export function getRadarAxes(
+  dimensions: DimensionScores,
+  labels: DimensionLabels = DEFAULT_DIMENSION_LABELS,
+): RadarAxis[] {
+  const hasCraft = dimensions.craft != null;
+  return hasCraft
+    ? [
+        { key: "delivery", label: labels.delivery, angle: -Math.PI / 2 },
+        { key: "quality", label: labels.quality, angle: -Math.PI / 2 + (2 * Math.PI) / 5 },
+        { key: "consistency", label: labels.consistency, angle: -Math.PI / 2 + (4 * Math.PI) / 5 },
+        { key: "breadth", label: labels.breadth, angle: -Math.PI / 2 + (6 * Math.PI) / 5 },
+        { key: "craft", label: labels.craft, angle: -Math.PI / 2 + (8 * Math.PI) / 5 },
+      ]
+    : [
+        { key: "delivery", label: labels.delivery, angle: -Math.PI / 2 },
+        { key: "quality", label: labels.quality, angle: 0 },
+        { key: "consistency", label: labels.consistency, angle: Math.PI / 2 },
+        { key: "breadth", label: labels.breadth, angle: Math.PI },
+      ];
+}
+
+/** Cartesian point at `dist` from `(cx, cy)` along `angle` (radians). */
+export function radarPoint(
+  cx: number,
+  cy: number,
+  angle: number,
+  dist: number,
+): [number, number] {
+  return [cx + dist * Math.cos(angle), cy + dist * Math.sin(angle)];
+}
+
+const RADAR_CENTER = 70;
+const RADAR_RADIUS = 55;
+const RADAR_LABEL_OFFSET = 20;
+const RADAR_RING_LEVELS = [0.25, 0.5, 0.75, 1];
 
 /**
  * Returns an array of CSS strings needed for the active config options.
@@ -114,6 +190,16 @@ export function BadgeContent({
 }: BadgeContentProps) {
   const { t } = useTranslation();
   const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: stats.handle });
+  // #1181 (UX-H3) — reused for both the radar axis labels and the dimension
+  // stat cards below, so the two stay consistent with each other and with
+  // the shipped SVG badge's own `dimensions.*.label` translations.
+  const dimensionLabels: DimensionLabels = {
+    delivery: t('dimensions.delivery.label') as string,
+    quality: t('dimensions.quality.label') as string,
+    consistency: t('dimensions.consistency.label') as string,
+    breadth: t('dimensions.breadth.label') as string,
+    craft: t('dimensions.craft.label') as string,
+  };
   const statsRef = useRef<HTMLDivElement>(null);
   const statsInView = useInView(statsRef);
   void statsInView;
@@ -170,41 +256,104 @@ export function BadgeContent({
             Developer Profile
           </div>
 
-          {/* Radar chart */}
+          {/* Radar chart — pentagon (5 axes) when Craft is present, diamond
+              (4 axes) otherwise; see getRadarAxes() above. Labels render as
+              SVG <text> (not absolutely-positioned HTML) so the full word
+              "Consistency" is placed the same way RadarChart.ts computes it
+              for the shipped badge, without a fixed-width slot to overflow. */}
           <div className="flex justify-center my-3">
             <div className="relative w-[140px] h-[140px]">
               <svg viewBox="0 0 140 140" className="absolute inset-0 w-full h-full" aria-hidden="true">
-                {/* Guide rings */}
-                {[0.25, 0.5, 0.75, 1].map((scale) => (
-                  <polygon
-                    key={scale}
-                    points={`70,${70 - 55 * scale} ${70 + 55 * scale},70 70,${70 + 55 * scale} ${70 - 55 * scale},70`}
-                    fill="none"
-                    stroke="var(--color-stroke)"
-                    strokeWidth="1"
-                  />
-                ))}
-                {/* Axes */}
-                <line x1="70" y1="15" x2="70" y2="125" stroke="var(--color-stroke)" strokeWidth="1" />
-                <line x1="15" y1="70" x2="125" y2="70" stroke="var(--color-stroke)" strokeWidth="1" />
-                {/* Data polygon */}
-                <polygon
-                  points={`70,${70 - (impact.dimensions.delivery / 100) * 55} ${70 + (impact.dimensions.quality / 100) * 55},70 70,${70 + (impact.dimensions.consistency / 100) * 55} ${70 - (impact.dimensions.breadth / 100) * 55},70`}
-                  fill="var(--color-purple-tint)"
-                  stroke={WARM_AMBER.accent}
-                  strokeWidth="1.5"
-                />
-                {/* Vertex dots */}
-                <circle cx="70" cy={70 - (impact.dimensions.delivery / 100) * 55} r="3" fill={WARM_AMBER.accent} />
-                <circle cx={70 + (impact.dimensions.quality / 100) * 55} cy="70" r="3" fill={WARM_AMBER.accent} />
-                <circle cx="70" cy={70 + (impact.dimensions.consistency / 100) * 55} r="3" fill={WARM_AMBER.accent} />
-                <circle cx={70 - (impact.dimensions.breadth / 100) * 55} cy="70" r="3" fill={WARM_AMBER.accent} />
+                {(() => {
+                  const axes = getRadarAxes(impact.dimensions, dimensionLabels);
+                  const cx = RADAR_CENTER;
+                  const cy = RADAR_CENTER;
+                  const radius = RADAR_RADIUS;
+                  return (
+                    <>
+                      {/* Guide rings */}
+                      {RADAR_RING_LEVELS.map((level) => {
+                        const points = axes
+                          .map((a) => radarPoint(cx, cy, a.angle, radius * level))
+                          .map(([x, y]) => `${x},${y}`)
+                          .join(" ");
+                        return (
+                          <polygon
+                            key={level}
+                            points={points}
+                            fill="none"
+                            stroke="var(--color-stroke)"
+                            strokeWidth="1"
+                          />
+                        );
+                      })}
+                      {/* Axis lines */}
+                      {axes.map((a) => {
+                        const [x2, y2] = radarPoint(cx, cy, a.angle, radius);
+                        return (
+                          <line
+                            key={a.key}
+                            x1={cx}
+                            y1={cy}
+                            x2={x2}
+                            y2={y2}
+                            stroke="var(--color-stroke)"
+                            strokeWidth="1"
+                          />
+                        );
+                      })}
+                      {/* Data polygon */}
+                      <polygon
+                        points={axes
+                          .map((a) => {
+                            const val = (impact.dimensions[a.key] ?? 0) / 100;
+                            const [x, y] = radarPoint(cx, cy, a.angle, val * radius);
+                            return `${x},${y}`;
+                          })
+                          .join(" ")}
+                        fill="var(--color-purple-tint)"
+                        stroke={WARM_AMBER.accent}
+                        strokeWidth="1.5"
+                      />
+                      {/* Vertex dots */}
+                      {axes.map((a) => {
+                        const val = (impact.dimensions[a.key] ?? 0) / 100;
+                        const [x, y] = radarPoint(cx, cy, a.angle, val * radius);
+                        return <circle key={a.key} cx={x} cy={y} r="3" fill={WARM_AMBER.accent} />;
+                      })}
+                      {/* Axis labels */}
+                      {axes.map((a) => {
+                        const [x, y] = radarPoint(cx, cy, a.angle, radius + RADAR_LABEL_OFFSET);
+                        const cosA = Math.cos(a.angle);
+                        const sinA = Math.sin(a.angle);
+                        let anchor: "start" | "middle" | "end" = "middle";
+                        let dx = 0;
+                        if (cosA > 0.3) {
+                          anchor = "start";
+                          dx = 4;
+                        } else if (cosA < -0.3) {
+                          anchor = "end";
+                          dx = -4;
+                        }
+                        const dy = sinA < -0.3 ? -4 : sinA > 0.3 ? 14 : 4;
+                        return (
+                          <text
+                            key={a.key}
+                            x={x + dx}
+                            y={y + dy}
+                            fontSize="10"
+                            fill="var(--color-text-secondary)"
+                            textAnchor={anchor}
+                            className="font-body"
+                          >
+                            {a.label}
+                          </text>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
               </svg>
-              {/* Axis labels */}
-              <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[9px] text-text-secondary">Delivery</span>
-              <span className="absolute top-1/2 -right-2 -translate-y-1/2 text-[9px] text-text-secondary">Quality</span>
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-text-secondary">Consist</span>
-              <span className="absolute top-1/2 -left-3 -translate-y-1/2 text-[9px] text-text-secondary">Breadth</span>
             </div>
           </div>
 
@@ -242,22 +391,22 @@ export function BadgeContent({
       <div className="mt-5 grid grid-cols-4 gap-3">
         <AnimatedStatCard
           value={impact.dimensions.delivery}
-          label="Delivery"
+          label={dimensionLabels.delivery}
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard
           value={impact.dimensions.quality}
-          label="Quality"
+          label={dimensionLabels.quality}
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard
           value={impact.dimensions.consistency}
-          label="Consistency"
+          label={dimensionLabels.consistency}
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard
           value={impact.dimensions.breadth}
-          label="Breadth"
+          label={dimensionLabels.breadth}
           statsDisplay={statsDisplay}
         />
       </div>

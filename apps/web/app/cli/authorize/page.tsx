@@ -7,6 +7,8 @@ import {
 import { getBaseUrl } from "@/lib/env";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { LocaleSync } from "@/lib/i18n";
+import { cacheGet } from "@/lib/cache/redis";
+import { cliDeviceContextKey, type CliDeviceContext } from "@/lib/auth/cli-token";
 import { AuthorizeClient } from "./AuthorizeClient";
 import type { Metadata } from "next";
 
@@ -64,10 +66,23 @@ export default async function CliAuthorizePage({ searchParams }: Props) {
     redirect(`/api/auth/login?redirect=${encodeURIComponent(returnUrl)}`);
   }
 
+  // SE-H1 interim mitigation (#1174): surface the initiating device's IP and
+  // user-agent (captured by the poll route at session creation) so a user
+  // approving a request they did not themselves initiate has a visible
+  // signal. Best-effort read — null (session predates this change, expired,
+  // or Redis unavailable) just means the page shows no device details.
+  const deviceContext = await cacheGet<CliDeviceContext>(
+    cliDeviceContextKey(sessionId),
+  );
+
   return (
     <>
       <LocaleSync queryLang={params.lang} />
-      <AuthorizeClient sessionId={sessionId} handle={session.login} />
+      <AuthorizeClient
+        sessionId={sessionId}
+        handle={session.login}
+        deviceContext={deviceContext}
+      />
     </>
   );
 }

@@ -36,6 +36,12 @@ vi.mock("@/lib/i18n/server", () => ({
       "legal.privacy.metadataDescription":
         "Privacy Policy for Chapa. Learn how we handle your developer data, session storage, and analytics.",
       "legal.privacy.metadataOgTitle": "Privacy Policy — Chapa",
+      "landing.footer.tagline": "Built for developers, by developers.",
+      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.about": "About",
+      "landing.footer.scoring": "Scoring",
+      "landing.footer.terms": "Terms",
+      "landing.footer.privacy": "Privacy",
     };
     return (dict[key] ?? key) as unknown as string;
   }),
@@ -81,9 +87,19 @@ describe("PrivacyPage", () => {
     expect(screen.getByText("1. Information We Collect")).toBeDefined();
   });
 
+  // #1167 (UX-B1, launch blocker) — the footer now links back to Terms too,
+  // via the shared SiteFooter component.
+  it("renders a Terms link via the site-wide footer", async () => {
+    render(await PrivacyPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
+  });
+
   it("renders contact email link on last section", async () => {
     render(await PrivacyPage({ params: Promise.resolve({ locale: "en" }) }));
-    const link = screen.getByRole("link");
+    // #1167 — the page now also renders the site-wide footer's links, so
+    // this must be scoped to the mailto link specifically rather than
+    // assuming it's the only link on the page.
+    const link = screen.getByRole("link", { name: "support@chapa.thecreativetoken.com" });
     expect(link.getAttribute("href")).toBe(
       "mailto:support@chapa.thecreativetoken.com"
     );

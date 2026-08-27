@@ -14,13 +14,34 @@
  *
  * Budgets:
  * - cache-hit  (warm SVG served straight from Redis): p95 ≤ 800ms
- * - cache-miss (materialize profile + render SVG):    p95 ≤ 3000ms
+ * - cache-miss (materialize profile + render SVG):    p95 ≤ 4100ms
+ *
+ * cache-miss reconciliation (#1166 / PE-H2): the winner path's bounded
+ * worst case is the sum of every deadline it can block on before the
+ * response is built — primary SVG cache read (500ms,
+ * `CACHE_DEADLINE_MS` in `lib/render/badge-svg-cache.ts`) + rate limit
+ * (150ms, `BADGE_RATE_LIMIT_DEADLINE_MS` below) + render-lock acquire
+ * (250ms, `BADGE_CACHE_DEADLINE_MS` below) + the bounded materialize
+ * deadline (2200ms, `BADGE_MATERIALIZE_DEADLINE_MS` below, only entered
+ * when a stale SVG exists to fall back on) + the avatar race (1000ms,
+ * `AVATAR_RACE_DEADLINE_MS` below) = 4100ms. This previously also
+ * included a 6th, synchronous 500ms SVG cache **write** before the
+ * response was built — nothing in the response depends on that write, so
+ * it now runs in the route's `after()` block instead (foreground path
+ * only; the background cache-warm continuation still awaits it inline,
+ * since it has no response to race). 3000ms was never achievable against
+ * the pre-fix 4600ms bound; 4100ms is the true bound of what remains. A
+ * brand-new handle with no stale SVG to fall back on skips the
+ * materialize deadline (an unbounded await is preferable to starving a
+ * legitimate cold GitHub fetch) and is not covered by this budget — an
+ * accepted, pre-existing exception (#1086), not something this budget
+ * claims to bound.
  */
 export const BADGE_LATENCY_SLO_MS = {
   /** p95 budget for a warm cache-hit response served from Redis. */
   cacheHit: 800,
   /** p95 budget for a cold cache-miss (materialize + render) response. */
-  cacheMiss: 3000,
+  cacheMiss: 4100,
 } as const;
 
 export interface BadgeLatencySample {

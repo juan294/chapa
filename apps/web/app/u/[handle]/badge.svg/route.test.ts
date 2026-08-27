@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { CACHE_VERSION } from "@/lib/cache/version";
-import { BADGE_RENDER_VARIANT } from "@/lib/render/badge-svg-cache";
+import {
+  BADGE_RENDER_VARIANT,
+  buildBadgeSvgCacheKey,
+  buildBadgeSvgRenderLockKey,
+} from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
 
 const {
   mockMaterializePublicProfile,
@@ -218,15 +223,19 @@ describe("GET /u/[handle]/badge.svg", () => {
     const res = await GET(req, ctx);
 
     expect(res.status).toBe(200);
+    // #1181 — the route now always threads a resolved `strings` bundle
+    // through; see the "locale (#1181)" describe block below for coverage
+    // of its exact shape. This test only cares about the pre-existing
+    // avatar/verification/disableAnimation contract.
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
       FAKE_MATERIALIZED.displayImpact,
-      {
+      expect.objectContaining({
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2026-04-17",
         disableAnimation: true,
-      },
+      }),
     );
   });
 
@@ -270,6 +279,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
     await GET(req, ctx);
+    await flushAfterCallbacks();
 
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
@@ -465,6 +475,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockCacheSet).toHaveBeenCalledWith(
         expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
@@ -478,6 +489,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockCacheSet).toHaveBeenCalledWith(
         expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
@@ -497,6 +509,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockGetAvatarBase64).not.toHaveBeenCalled();
       expect(mockCacheSet).toHaveBeenCalledWith(
@@ -553,6 +566,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(res.status).toBe(200);
       // No avatarUrl to fetch — getAvatarBase64 must never be called.
@@ -574,6 +588,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       const ttl = mockCacheSet.mock.calls[0]![2] as number;
       expect(ttl).toBeLessThan(86400);
@@ -603,6 +618,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockCacheSet).not.toHaveBeenCalled();
     });
@@ -648,6 +664,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       // TTL is base 24h + per-handle jitter of 0-2h (PE-S1)
       expect(mockCacheSet).toHaveBeenCalledWith(
@@ -829,6 +846,102 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
   });
 
+  // #1166 (PE-H2) — the cache-miss winner path previously awaited the shared
+  // SVG cache write synchronously before the response was built, adding up to
+  // 500ms to the response-blocking critical path for zero benefit (nothing in
+  // the response depends on the write succeeding). The write must move to the
+  // route's existing after() block, exactly like the durable side effects
+  // already do (#1013) — but ONLY on the foreground winner path. The
+  // background continuation (`warmBadgeCacheInBackground`, covered further
+  // below) has no response to race and must keep awaiting it inline.
+  describe("SVG cache write deferred to after() on the foreground path (#1166 / PE-H2)", () => {
+    it("does not write the shared SVG cache before the response is returned", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      // Not called on the synchronous path — only after() has scheduled it.
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("schedules the SVG cache write inside after(), not on the synchronous path", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).not.toHaveBeenCalled();
+      expect(mockAfter).toHaveBeenCalledWith(expect.any(Function));
+
+      await flushAfterCallbacks();
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+    });
+
+    it("still writes the cache and runs durable side effects exactly once each", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+      await flushAfterCallbacks();
+
+      expect(mockCacheSet).toHaveBeenCalledTimes(1);
+      expect(mockPersistProfileSnapshot).toHaveBeenCalledTimes(1);
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledTimes(1);
+    });
+
+    // `writeBadgeSvgCache` itself fails open (`withCacheFallback` catches and
+    // returns `false` — the SVG cache is deliberately best-effort, unlike the
+    // durable Supabase snapshot write). A rejected underlying `cacheSet` call
+    // must therefore never surface as a thrown error out of the deferred
+    // after() write, and must not prevent the durable side effects that run
+    // alongside it in the same after() registration.
+    it("a failed deferred cache write does not affect the already-returned response or block durable side effects", async () => {
+      mockCacheSet.mockRejectedValue(new Error("redis write failed"));
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(FAKE_SVG);
+
+      await flushAfterCallbacks();
+
+      expect(mockCaptureServerError).not.toHaveBeenCalled();
+      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED,
+        { readOnly: false },
+      );
+    });
+  });
+
+  // #1166 (BE-M1) — `readOnly` (the public `__chapa_smoke=1` probe) must never
+  // change the shared Redis SVG cache key or the render-lock key: both are
+  // consumed by the share page too, and a smoke probe taking its own
+  // independent render-lock would double GitHub fetches at date rollover.
+  // Only the in-memory `inflightBadgeRenders` coalescing map (same-instance
+  // dedup only) may distinguish readOnly from normal requests.
+  describe("readOnly does not fork the shared cache/lock keys (#1166 / BE-M1)", () => {
+    it("uses the exact shared cache key and render-lock key for a readOnly (smoke) request", async () => {
+      const today = toDateString(new Date());
+      const [req, ctx] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?__chapa_smoke=1",
+      );
+      await GET(req, ctx);
+
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        buildBadgeSvgCacheKey("testuser", today),
+      );
+      expect(mockCacheSetNx).toHaveBeenCalledWith(
+        buildBadgeSvgRenderLockKey("testuser", today),
+        30,
+      );
+    });
+  });
+
   // #1086 (PE-H1) — nothing bounded the SUM of the cache-miss path's steps;
   // materializePublicProfile alone could take up to the 30s inflight cap, on
   // top of the route's own cache/lock/avatar ceilings. The route now races
@@ -896,6 +1009,48 @@ describe("GET /u/[handle]/badge.svg", () => {
           { readOnly: false },
         );
         expect(mockDeferProfileCacheWork).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // #1166 (PE-H2) — `warmBadgeCacheInBackground` is the ONE caller that must
+    // keep AWAITING the SVG cache write: it runs entirely inside after(), has
+    // no response to race, and cache warming is its whole purpose. Unlike the
+    // foreground winner path (deferred above), its write must complete before
+    // its durable side effects run — not merely be scheduled.
+    it("warmBadgeCacheInBackground awaits the SVG cache write before running durable side effects", async () => {
+      vi.useFakeTimers();
+      try {
+        const order: string[] = [];
+        mockCacheSet.mockImplementation(async () => {
+          order.push("cacheSet-start");
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          order.push("cacheSet-end");
+          return true;
+        });
+        mockPersistProfileSnapshot.mockImplementation(async () => {
+          order.push("persist");
+          return true;
+        });
+
+        mockCacheGet
+          .mockResolvedValueOnce(null) // today's SVG cache: miss
+          .mockResolvedValueOnce(STALE_SVG); // yesterday's stale SVG: hit
+        const { resolve } = deferredMaterialize();
+
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(2300);
+        await responsePromise;
+
+        resolve(FAKE_MATERIALIZED);
+        const flushPromise = flushAfterCallbacks();
+        await vi.advanceTimersByTimeAsync(50);
+        await flushPromise;
+
+        expect(order).toEqual(["cacheSet-start", "cacheSet-end", "persist"]);
       } finally {
         vi.useRealTimers();
       }
@@ -1033,6 +1188,173 @@ describe("GET /u/[handle]/badge.svg", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Locale (#1181 UX-H3) — `renderBadgeSvg` stays pure; the route resolves a
+  // `?lang=` query param (falling back to DEFAULT_LOCALE) via the real
+  // `getServerT`/dictionaries (no mocking — this exercises the real wiring)
+  // and threads the resolved strings + locale into the render call and the
+  // shared SVG cache key.
+  // ---------------------------------------------------------------------------
+
+  describe("locale (#1181)", () => {
+    it("resolves badge strings from the default locale (es) when no ?lang= is given", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Métricas verificadas",
+            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            radarLabels: expect.objectContaining({
+              delivery: "Entrega",
+              quality: "Calidad",
+              consistency: "Constancia",
+              breadth: "Alcance",
+            }),
+            radarNoData: "aún sin datos",
+            verifiedLabel: "VERIFICADO",
+          }),
+        }),
+      );
+    });
+
+    it("resolves badge strings from ?lang=en", async () => {
+      const [req, ctx] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      await GET(req, ctx);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Verified metrics",
+            tierLabel: "Solid",
+            radarLabels: expect.objectContaining({
+              delivery: "Delivery",
+              quality: "Quality",
+              consistency: "Consistency",
+              breadth: "Breadth",
+            }),
+            radarNoData: "no data yet",
+            verifiedLabel: "VERIFIED",
+          }),
+        }),
+      );
+    });
+
+    it("falls back to the default locale (es) for an unsupported ?lang= value", async () => {
+      const [req, ctx] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=fr",
+      );
+      await GET(req, ctx);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({ metricsVerified: "Métricas verificadas" }),
+        }),
+      );
+    });
+
+    it("includes the locale in the shared SVG cache key so es/en never collide", async () => {
+      const today = toDateString(new Date());
+
+      const [reqEs, ctxEs] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(reqEs, ctxEs);
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        buildBadgeSvgCacheKey("testuser", today, "es"),
+      );
+
+      vi.clearAllMocks();
+      mockIsValidHandle.mockReturnValue(true);
+      mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
+      mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
+      mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+      mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+      mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+      mockCacheGet.mockResolvedValue(null);
+      mockCacheSetNx.mockResolvedValue(true);
+
+      const [reqEn, ctxEn] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      await GET(reqEn, ctxEn);
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        buildBadgeSvgCacheKey("testuser", today, "en"),
+      );
+    });
+
+    it("still produces the exact pre-#1181 key format for the default locale (es) — buildBadgeSvgCacheKey's own 2-arg default", async () => {
+      // buildBadgeSvgCacheKey/buildBadgeSvgRenderLockKey default their locale
+      // param to DEFAULT_LOCALE (es), so out-of-scope callers that still pass
+      // only (handle, date) — the share page, warm-cache cron, platform-oauth
+      // invalidation, post-write-invalidation — land on the exact same slot
+      // the route uses for an unqualified (no ?lang=) request.
+      const today = toDateString(new Date());
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheGet).toHaveBeenCalledWith(buildBadgeSvgCacheKey("testuser", today));
+    });
+
+    it("localizes the invalid-handle fallback SVG", async () => {
+      mockIsValidHandle.mockReturnValue(false);
+
+      const [reqEs, ctxEs] = makeRequest("bad!!handle");
+      const resEs = await GET(reqEs, ctxEs);
+      expect(await resEs.text()).toContain("Usuario de GitHub no válido.");
+
+      const [reqEn, ctxEn] = makeRequest("bad!!handle", {}, "?lang=en");
+      const resEn = await GET(reqEn, ctxEn);
+      expect(await resEn.text()).toContain("Invalid GitHub handle.");
+    });
+
+    it("localizes the 'could not load data' fallback SVG when materialize returns null", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+
+      const [reqEs, ctxEs] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const resEs = await GET(reqEs, ctxEs);
+      expect(await resEs.text()).toContain("No se pudieron cargar los datos.");
+
+      const [reqEn, ctxEn] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      const resEn = await GET(reqEn, ctxEn);
+      expect(await resEn.text()).toContain("Could not load data.");
+    });
+
+    it("localizes the catch-all error fallback SVG", async () => {
+      mockMaterializePublicProfile.mockRejectedValue(new Error("boom"));
+
+      const [reqEs, ctxEs] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const resEs = await GET(reqEs, ctxEs);
+      expect(resEs.status).toBe(500);
+      expect(await resEs.text()).toContain("Algo salió mal.");
+
+      const [reqEn, ctxEn] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      const resEn = await GET(reqEn, ctxEn);
+      expect(await resEn.text()).toContain("Something went wrong.");
     });
   });
 });

@@ -67,7 +67,7 @@ curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/rate_limit
 **Response:**
 1. If GitHub is fully down: all cached badges continue serving from Redis (TTL 24h). No action needed for cached users. New badge generation will fail gracefully with a "try later" message — this is the designed behavior.
 2. If rate-limited (unauthenticated): ensure users are authenticated via GitHub OAuth to get their own 5000 req/hr allocation.
-3. If the fallback `GITHUB_TOKEN` is rate-limited: it's a shared token — authenticated users have independent limits. Consider generating a new PAT with higher rate limits.
+3. If the fallback `GITHUB_TOKEN` is rate-limited: it's a shared token — authenticated users have independent limits. If generating a replacement PAT, it must carry `repo` scope — check `/api/health`'s `insufficient_scope` status, which is the authority on whether the current token still has it.
 4. Check `GITHUB_TOKEN` in Vercel env vars is set and not expired (PATs can have expiry dates).
 
 **Cache is the primary protection.** The hourly warm-cache cron (`/api/cron/warm-cache`; #1010 — was daily) keeps priority handles fresh. Handles in `WARM_CACHE_PRIORITY_HANDLES` are always refreshed first.

@@ -4,6 +4,8 @@ import { render, screen, act, cleanup, waitFor } from '@testing-library/react';
 import { useContext, useEffect } from 'react';
 import { LanguageContext, LanguageProvider, type LanguageContextValue } from './provider';
 import { es } from './dictionaries/es';
+import { en } from './dictionaries/en';
+import { resolveTranslation } from './resolve';
 import type { Translations } from './types';
 
 vi.mock('./set-locale-action', () => ({
@@ -284,16 +286,23 @@ describe('LanguageProvider', () => {
       );
     });
 
-    it('falls back to the bundled English dictionary when no dictionary prop is given', () => {
+    // #1164 (FE-H1/PE-H1) — the provider used to fall back to the
+    // statically-imported English dictionary when no `dictionary` prop was
+    // given, which pulled the English dictionary into every client bundle
+    // (even on the prerendered Spanish page — it appeared 17 times in
+    // `es.html`'s <script src> list). Production always supplies the
+    // dictionary; this test-only path must degrade to the raw key — no
+    // crash, no `undefined` — without importing any dictionary.
+    it('falls back to the raw key (not a bundled dictionary) when no dictionary prop is given', () => {
       // This is the test-only path; production always supplies the dictionary.
       render(
         <LanguageProvider initialLocale="es">
           <TranslateConsumer />
         </LanguageProvider>
       );
-      expect(screen.getByTestId('title').textContent).toBe(
-        'Chapa — Developer Impact, Decoded'
-      );
+      const text = screen.getByTestId('title').textContent;
+      expect(text).toBe('meta.defaultTitle');
+      expect(text).not.toBe('undefined');
     });
 
     it('uses whatever dictionary is passed regardless of locale label', () => {
@@ -304,6 +313,43 @@ describe('LanguageProvider', () => {
         </LanguageProvider>
       );
       expect(screen.getByTestId('title').textContent).toBe('Custom Title');
+    });
+  });
+
+  // #1164 (FE-H1/PE-H1) — the fix removes provider.tsx's static `import { en }`
+  // fallback entirely. The runtime locale-switch mechanism (`loadDictionary`'s
+  // `await import('./dictionaries/es')` / `await import('./dictionaries/en')`)
+  // was never the cause of the bug and must keep resolving REAL translated
+  // strings, not just flip a locale label, after this change.
+  describe('cookie-driven locale switch resolves real translations (#1164 guard)', () => {
+    function TranslateConsumer() {
+      const ctx = useContext(LanguageContext);
+      if (!ctx) return <div data-testid="no-ctx">no context</div>;
+      return <span data-testid="title">{ctx.t('meta.defaultTitle') as string}</span>;
+    }
+
+    it('resolves the real English dictionary via the dynamic import after a persisted cookie switches away from the initial locale', async () => {
+      document.cookie = 'chapa-locale=en; path=/';
+
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <TranslateConsumer />
+        </LanguageProvider>
+      );
+
+      // Initial (SSR-matching) render is still Spanish, from the `dictionary` prop.
+      expect(screen.getByTestId('title').textContent).toBe(
+        'Chapa — Impacto de desarrollador, decodificado'
+      );
+
+      // The mount effect reads the cookie and awaits the dynamic import of
+      // the real English dictionary — confirming the switch resolves actual
+      // translated copy, not just a locale label.
+      await waitFor(() =>
+        expect(screen.getByTestId('title').textContent).toBe(
+          resolveTranslation('meta.defaultTitle', en),
+        )
+      );
     });
   });
 
@@ -363,10 +409,10 @@ describe('LanguageProvider', () => {
         </LanguageProvider>
       );
 
-      // Without ancestor reuse this would fall back to the bundled English
-      // dictionary (see the "falls back to bundled English" test above),
-      // silently regressing #1020's flash fix by disagreeing with the SSR'd
-      // Spanish markup one React commit after hydration.
+      // Without ancestor reuse this would fall back to the raw-key fallback
+      // (see the "falls back to the raw key" test above), silently
+      // regressing #1020's flash fix by disagreeing with the SSR'd Spanish
+      // markup one React commit after hydration.
       expect(screen.getByTestId('title').textContent).toBe(
         'Chapa — Impacto de desarrollador, decodificado'
       );

@@ -72,6 +72,29 @@ interface UserMenuProps {
   isAdmin?: boolean;
 }
 
+// Maps the raw `CraftTier` enum value returned by /api/insights and
+// /api/recalculate (see packages/shared's `CraftTier`) to its dictionary key.
+// Kept separate from any single tier's translated string so an unrecognized
+// value (e.g. a tier added server-side before the dictionary catches up)
+// falls back to the raw string instead of resolving to `undefined` or a bare
+// key path (#1170 / FE-M4).
+const CRAFT_TIER_DICTIONARY_KEYS: Record<string, string> = {
+  Novice: 'userMenu.craftTierNovice',
+  Practitioner: 'userMenu.craftTierPractitioner',
+  Expert: 'userMenu.craftTierExpert',
+  Master: 'userMenu.craftTierMaster',
+};
+
+/** Resolves a raw craft tier value to its translated display name, falling
+ * back to the raw value when the tier isn't in the dictionary. */
+function resolveCraftTierLabel(t: (key: string) => unknown, tier: string | undefined | null): string {
+  if (!tier) return '';
+  const dictKey = CRAFT_TIER_DICTIONARY_KEYS[tier];
+  if (!dictKey) return tier;
+  const label = t(dictKey);
+  return typeof label === 'string' ? label : tier;
+}
+
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
   const {
@@ -203,8 +226,13 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         const newScore = recalcData.adjustedComposite;
 
         setToast({
-          message: `Craft: ${craftScore} ${craftTier}`,
-          detail: `Score updated to ${newScore}`,
+          message: interpolate(t('userMenu.insightsCraftResult') as string, {
+            craftScore: String(craftScore),
+            craftTier: resolveCraftTierLabel(t, craftTier),
+          }),
+          detail: interpolate(t('userMenu.insightsScoreUpdated') as string, {
+            score: String(newScore),
+          }),
           type: "success",
         });
       } else {
@@ -212,7 +240,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         const craftTier = uploadData.craftScore?.tier;
         setToast({
           message: craftScore
-            ? `Craft: ${craftScore} ${craftTier}`
+            ? interpolate(t('userMenu.insightsCraftResult') as string, {
+                craftScore: String(craftScore),
+                craftTier: resolveCraftTierLabel(t, craftTier),
+              })
             : t('userMenu.insightsImported') as string,
           detail: t('userMenu.insightsImportedDetail') as string,
           type: "success",
@@ -482,29 +513,38 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               </Link>
             )}
             {insightsEnabled && (
-              <button
-                type="button"
-                role="menuitem"
-                disabled={insightsCooldownActive}
-                title={insightsTooltip}
-                onClick={() => insightsFileRef.current?.click()}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${insightsCooldownActive ? "cursor-not-allowed opacity-50 text-text-secondary" : "text-text-primary hover:bg-amber/[0.06]"}`}
-              >
-                <svg
-                  className="h-4 w-4 text-text-secondary"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+              <>
+                {/* #1184 (FE-L1) — the file input must be a sibling, not a
+                    descendant of this <button>: HTML forbids interactive
+                    content nested inside <button>, and HTMLElement.click()
+                    (called below) bubbles a synthetic click back up into the
+                    button's own onClick, bounded only by the spec's "click in
+                    progress" flag. Ref, handler, and sr-only visibility are
+                    unchanged — only the nesting moved. */}
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={insightsCooldownActive}
+                  title={insightsTooltip}
+                  onClick={() => insightsFileRef.current?.click()}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${insightsCooldownActive ? "cursor-not-allowed opacity-50 text-text-secondary" : "text-text-primary hover:bg-amber/[0.06]"}`}
                 >
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                {t('userMenu.importInsights') as string}
+                  <svg
+                    className="h-4 w-4 text-text-secondary"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  {t('userMenu.importInsights') as string}
+                </button>
                 <input
                   ref={insightsFileRef}
                   type="file"
@@ -513,7 +553,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   className="sr-only"
                   aria-label={t('aria.selectInsightsReport') as string}
                 />
-              </button>
+              </>
             )}
             {bbStatus && (
               bbStatus.linked ? (

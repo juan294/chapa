@@ -7,7 +7,12 @@ import {
   rateLimit,
 } from "@/lib/cache/redis";
 import { getNextauthSecret } from "@/lib/env";
-import { generateCliToken } from "@/lib/auth/cli-token";
+import {
+  generateCliToken,
+  cliDeviceContextKey,
+  sanitizeDeviceContextField,
+  type CliDeviceContext,
+} from "@/lib/auth/cli-token";
 import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import {
@@ -120,6 +125,23 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
         { status: 503 },
       );
     }
+
+    // SE-H1 interim mitigation (#1174): capture the IP/user-agent of the
+    // device that initiated this session, so /cli/authorize can show the
+    // approving user a visible signal for whether the request matches the
+    // device/browser they expect. Best-effort: this is a UX/awareness aid,
+    // not part of the auth flow's correctness, so a write failure here must
+    // not block (or 503) the primary session response above.
+    const deviceContext: CliDeviceContext = {
+      ip: sanitizeDeviceContextField(ip),
+      userAgent: sanitizeDeviceContextField(request.headers.get("user-agent")),
+    };
+    await cacheSet(
+      cliDeviceContextKey(sessionId),
+      deviceContext,
+      CLI_DEVICE_SESSION_TTL_SECONDS,
+    );
+
     return NextResponse.json({ status: "pending", device_code: newDeviceCode });
   }
 

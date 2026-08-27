@@ -231,6 +231,114 @@ describe("SharePageOwnerContent — render", () => {
     );
   });
 
+  // #1165 (UX-M5) — the Markdown embed alt text must match the HTML embed's
+  // handle-bearing alt form (`${badgeAltOf} ${handle}`), and both the "e"
+  // keyboard shortcut (SharePageShortcuts) and this Markdown Copy button
+  // must produce byte-identical clipboard content — achieved by building it
+  // once, server-side, and threading it down as the `embedMarkdown` prop.
+  describe("embed alt text (#1165 / UX-M5)", () => {
+    it("uses the handle-bearing alt form for the default (no prop) Markdown snippet, matching the HTML snippet", () => {
+      render(
+        <SharePageOwnerContent
+          handle="testuser"
+          stats={MOCK_STATS}
+          impact={MOCK_IMPACT}
+        />,
+      );
+
+      const copyButtons = screen.getAllByTestId("copy-button");
+      // English: shareOwner.badgeAltOf = 'Chapa Badge of'
+      expect(copyButtons[0]!.getAttribute("data-text")).toContain(
+        "![Chapa Badge of testuser](",
+      );
+      expect(copyButtons[1]!.getAttribute("data-text")).toContain(
+        'alt="Chapa Badge of testuser"',
+      );
+    });
+
+    it("uses the server-provided embedMarkdown prop verbatim for the Markdown Copy button when supplied", () => {
+      const canonicalMarkdown =
+        "![Chapa Badge of testuser](https://chapa.thecreativetoken.com/u/testuser/badge.svg)";
+
+      render(
+        <SharePageOwnerContent
+          handle="testuser"
+          stats={MOCK_STATS}
+          impact={MOCK_IMPACT}
+          embedMarkdown={canonicalMarkdown}
+        />,
+      );
+
+      const copyButtons = screen.getAllByTestId("copy-button");
+      expect(copyButtons[0]!.getAttribute("data-text")).toBe(canonicalMarkdown);
+    });
+  });
+
+  // #1165 (FE-H2) — server-resolved isOwner prop is authoritative over the
+  // client useSession() fallback when provided, avoiding a round trip to
+  // /api/auth/session on the dynamic (non-ISR) share page.
+  describe("isOwner prop (#1165 / FE-H2)", () => {
+    it("shows owner content when isOwner prop is true, even if session mismatches", () => {
+      mockUseSession.mockReturnValue({
+        session: { login: "someone-else", name: null, avatar_url: "" },
+        loading: false,
+        invalidate: vi.fn(),
+      });
+
+      render(
+        <SharePageOwnerContent
+          handle="testuser"
+          stats={MOCK_STATS}
+          impact={MOCK_IMPACT}
+          isOwner={true}
+        />,
+      );
+
+      // English: shareOwner.impactBreakdown = 'Impact breakdown' (owner-only heading)
+      expect(screen.getByText("Impact breakdown")).toBeTruthy();
+      // Visitor CTA must NOT render for the owner.
+      expect(
+        screen.queryByText("Want to see what your developer impact looks like?"),
+      ).toBeNull();
+    });
+
+    it("shows visitor content when isOwner prop is false, even if session matches", () => {
+      mockUseSession.mockReturnValue({
+        session: { login: "testuser", name: null, avatar_url: "" },
+        loading: false,
+        invalidate: vi.fn(),
+      });
+
+      render(
+        <SharePageOwnerContent
+          handle="testuser"
+          stats={MOCK_STATS}
+          impact={MOCK_IMPACT}
+          isOwner={false}
+        />,
+      );
+
+      expect(
+        screen.getByText("Want to see what your developer impact looks like?"),
+      ).toBeTruthy();
+    });
+
+    it("does not wait on session loading when isOwner prop is provided", () => {
+      mockUseSession.mockReturnValue({ session: null, loading: true, invalidate: vi.fn() });
+
+      render(
+        <SharePageOwnerContent
+          handle="testuser"
+          stats={MOCK_STATS}
+          impact={MOCK_IMPACT}
+          isOwner={true}
+        />,
+      );
+
+      expect(screen.getByText("Impact breakdown")).toBeTruthy();
+    });
+  });
+
   it("shows fallback message when impact data is missing", () => {
     mockUseSession.mockReturnValue({
       session: { login: "testuser", name: null, avatar_url: "" },

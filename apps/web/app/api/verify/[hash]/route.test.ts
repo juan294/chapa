@@ -148,7 +148,7 @@ describe("GET /api/verify/[hash]", () => {
       expect(body.status).toBe("not_found");
     });
 
-    it("returns 200 with full record when found", async () => {
+    it("returns 200 with the public record when found", async () => {
       mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
       const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
       const res = await GET(req, ctx);
@@ -156,7 +156,13 @@ describe("GET /api/verify/[hash]", () => {
       const body = await res.json();
       expect(body.status).toBe("verified");
       expect(body.hash).toBe("abc12345");
-      expect(body.data).toEqual(FAKE_RECORD);
+      expect(body.data).toEqual(
+        expect.objectContaining({
+          handle: FAKE_RECORD.handle,
+          adjustedComposite: FAKE_RECORD.adjustedComposite,
+        }),
+      );
+      expect(body.data).not.toHaveProperty("confidence");
     });
 
     it("includes verifyUrl and badgeUrl in response", async () => {

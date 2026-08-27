@@ -15,6 +15,7 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { getRequestId } from "@/lib/log";
 import { getChapaAlertWebhookUrl, getPosthogKey, getPosthogHost } from "@/lib/env";
+import { sendAlertEmail } from "@/lib/email/alerts";
 
 /** Patterns that match sensitive values in error messages and stack traces. */
 const SENSITIVE_PATTERNS = [
@@ -122,7 +123,6 @@ export async function captureOperationalAlert(
 ): Promise<void> {
   try {
     const webhookUrl = getChapaAlertWebhookUrl();
-    if (!webhookUrl) return;
 
     const payload = {
       source: "chapa",
@@ -131,15 +131,25 @@ export async function captureOperationalAlert(
       severity: options.severity,
       summary: sanitize(options.summary),
       ...(options.route && { route: options.route }),
-      properties: sanitizeUnknown(options.properties ?? {}),
+      properties: sanitizeUnknown(options.properties ?? {}) as Record<string, unknown>,
     };
 
-    await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000),
-    });
+    if (webhookUrl) {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(5000),
+      });
+      return;
+    }
+
+    // #1162 / DO-B1: no Discord/Slack — CHAPA_ALERT_WEBHOOK_URL is unset in
+    // production, so fall back to email via the existing Resend client
+    // rather than dropping the alert. sendAlertEmail never throws on its
+    // own, but this call still sits inside the outer try/catch below so a
+    // future change to that contract can't take down the request path.
+    await sendAlertEmail(payload);
   } catch {
     // Never let alert delivery affect the request path.
   }
@@ -168,7 +178,11 @@ export async function captureServerEvent(
       api_key: apiKey,
       event,
       distinct_id: "chapa-server",
-      properties: properties ?? {},
+      // #1162 / BE-M4: sanitize like captureServerError does — a caller can
+      // pass raw request/error context through here (e.g. the telemetry
+      // route forwards client-reported error messages), and this event has
+      // no other redaction boundary before it leaves the process.
+      properties: sanitizeUnknown(properties ?? {}) as Record<string, unknown>,
     };
 
     await fetch(`${host}/capture/`, {

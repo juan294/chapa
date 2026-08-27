@@ -308,6 +308,34 @@ describe("materializeDisplayProfile", () => {
 
     expect(result).toBeNull();
   });
+
+  // #1180 (PE-L2) — `/api/profile/[handle]` calls `getCachedLatestSnapshot`
+  // itself, then separately needed just the fresh `displayImpact` headline
+  // (#1062). Routing that lookup through `materializeProfile` (via
+  // `materializePublicProfile`) performed a SECOND, identical
+  // `getCachedLatestSnapshot` read whose result (`latestSnapshot`) only ever
+  // feeds the persisted trend `snapshot` — never `displayImpact`, which is
+  // always the fresh `rawImpact` (#1001). `materializeDisplayProfile` already
+  // skips that lookup entirely (see the "no trend-state reads" test above);
+  // it only needed a `readOnly` passthrough to be safe for a public,
+  // unauthenticated, CORS-enabled endpoint (#1083 — never a live GitHub
+  // fetch on a cold key from a read-only caller).
+  it("passes readOnly through to getStats for a public read-only caller (#1180 PE-L2)", async () => {
+    const stats = makeFullStats({ handle: "testuser" });
+    mockGetStats.mockResolvedValue(stats);
+    mockGetCachedCraftScore.mockResolvedValue(null);
+
+    const result = await materializeDisplayProfile("testuser", {
+      readOnly: true,
+    });
+
+    expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined, {
+      readOnly: true,
+    });
+    expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
+    expect(mockIsStatsDirty).not.toHaveBeenCalled();
+    expect(result?.displayImpact).toBe(result?.rawImpact);
+  });
 });
 
 describe("materializeProfile", () => {

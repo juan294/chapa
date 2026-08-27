@@ -11,6 +11,7 @@ import {
   isGitlabEnabled,
   isInsightsEnabled,
   isStudioEnabled,
+  isWebmcpEnabled,
 } from "@/lib/feature-flags";
 import { renderJsonLd } from "@/lib/jsonld";
 import { LanguageProvider, LangSync } from "@/lib/i18n";
@@ -86,12 +87,14 @@ export default async function RootLayout({
   // force request-time cookies()/headers() or per-request dynamic rendering.
   const [
     studioEnabled,
+    webmcpEnabled,
     insightsEnabled,
     bitbucketEnabled,
     codebergEnabled,
     gitlabEnabled,
   ] = await Promise.all([
     isStudioEnabled(),
+    isWebmcpEnabled(),
     isInsightsEnabled(),
     isBitbucketEnabled(),
     isCodebergEnabled(),
@@ -99,6 +102,7 @@ export default async function RootLayout({
   ]);
   const clientFeatureFlags = {
     studioEnabled,
+    webmcpEnabled,
     insightsEnabled,
     bitbucketEnabled,
     codebergEnabled,

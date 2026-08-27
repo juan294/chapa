@@ -7,6 +7,7 @@
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/types";
 
 /**
  * #1014 — this deadline was previously 250ms, which under Redis tail latency
@@ -65,12 +66,30 @@ export function handleCacheJitterSeconds(handle: string): number {
   return hash % (CACHE_TTL_JITTER_MAX_SECONDS + 1);
 }
 
-export function buildBadgeSvgCacheKey(handle: string, date: string): string {
-  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${date}`;
+/**
+ * @param locale - #1181 (UX-H3) — an es-rendered and en-rendered badge for the
+ *   same handle/day must never share a cache slot. Defaults to DEFAULT_LOCALE
+ *   ('es') so callers outside this issue's ownership that still pass only
+ *   (handle, date) — the share page, warm-cache cron, platform-oauth
+ *   invalidation, post-write-invalidation — keep compiling and land on the
+ *   same slot the badge.svg route uses for an unqualified (no `?lang=`)
+ *   request. Adding this segment doubles cache cardinality and invalidates
+ *   every previously-warm key (expected, see #1181).
+ */
+export function buildBadgeSvgCacheKey(
+  handle: string,
+  date: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${date}:${locale}`;
 }
 
-export function buildBadgeSvgRenderLockKey(handle: string, date: string): string {
-  return buildBadgeSvgCacheKey(handle, date).replace(/^badge:/, "badge-lock:");
+export function buildBadgeSvgRenderLockKey(
+  handle: string,
+  date: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return buildBadgeSvgCacheKey(handle, date, locale).replace(/^badge:/, "badge-lock:");
 }
 
 async function withCacheFallback<T>(

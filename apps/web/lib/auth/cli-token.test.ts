@@ -1,8 +1,19 @@
 import { createHmac } from "node:crypto";
 import { describe, it, expect } from "vitest";
-import { generateCliToken, verifyCliToken, isCliToken } from "./cli-token";
+import {
+  generateCliToken,
+  verifyCliToken,
+  isCliToken,
+  cliDeviceContextKey,
+  sanitizeDeviceContextField,
+} from "./cli-token";
 
 const SECRET = "test-secret-for-cli-tokens";
+
+function decodePayload(token: string): { iat: number; exp: number } {
+  const [encoded] = token.split(".");
+  return JSON.parse(Buffer.from(encoded!, "base64url").toString("utf8"));
+}
 
 describe("generateCliToken", () => {
   it("returns a string with a dot separator", () => {
@@ -21,6 +32,24 @@ describe("generateCliToken", () => {
     const t1 = generateCliToken("alice", "secret-a");
     const t2 = generateCliToken("alice", "secret-b");
     expect(t1).not.toBe(t2);
+  });
+
+  // ---------------------------------------------------------------------
+  // SE-H1 interim mitigation (#1174): shortened token lifetime.
+  // A token obtained via a phished /cli/authorize approval link previously
+  // carried a 90-day, unrevocable grant. This bounds it to 10 days.
+  // ---------------------------------------------------------------------
+  it("issues a token with a 10-day lifetime, not the old 90-day one", () => {
+    const token = generateCliToken("juan294", SECRET);
+    const { iat, exp } = decodePayload(token);
+    const lifetimeMs = exp - iat;
+    const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
+    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+
+    expect(lifetimeMs).toBe(tenDaysMs);
+    expect(lifetimeMs).not.toBe(ninetyDaysMs);
+    expect(lifetimeMs).toBeLessThanOrEqual(14 * 24 * 60 * 60 * 1000);
+    expect(lifetimeMs).toBeGreaterThanOrEqual(7 * 24 * 60 * 60 * 1000);
   });
 });
 
@@ -123,5 +152,44 @@ describe("isCliToken", () => {
 
   it("returns false when signature contains invalid chars (space)", () => {
     expect(isCliToken("abc.de f")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SE-H1 interim mitigation (#1174): device-context capture helpers, used to
+// surface the initiating device's IP/user-agent on /cli/authorize.
+// ---------------------------------------------------------------------------
+
+describe("cliDeviceContextKey", () => {
+  it("builds a namespaced Redis key from the session id", () => {
+    expect(cliDeviceContextKey("abc-123")).toBe("cli:device-context:abc-123");
+  });
+
+  it("uses a distinct namespace from the device session key", () => {
+    expect(cliDeviceContextKey("abc-123")).not.toBe("cli:device:abc-123");
+  });
+});
+
+describe("sanitizeDeviceContextField", () => {
+  it("returns the trimmed value unchanged when short", () => {
+    expect(sanitizeDeviceContextField("  1.2.3.4  ")).toBe("1.2.3.4");
+  });
+
+  it("returns 'unknown' for null", () => {
+    expect(sanitizeDeviceContextField(null)).toBe("unknown");
+  });
+
+  it("returns 'unknown' for undefined", () => {
+    expect(sanitizeDeviceContextField(undefined)).toBe("unknown");
+  });
+
+  it("returns 'unknown' for an empty/whitespace-only string", () => {
+    expect(sanitizeDeviceContextField("   ")).toBe("unknown");
+  });
+
+  it("caps an attacker-influenceable user-agent value at 200 chars", () => {
+    const huge = "A".repeat(10_000);
+    const result = sanitizeDeviceContextField(huge);
+    expect(result.length).toBe(200);
   });
 });

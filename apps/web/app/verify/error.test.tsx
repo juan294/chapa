@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { LanguageProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -10,7 +10,18 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
 
-afterEach(cleanup);
+const mockFetch = vi.fn();
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("verify error.tsx — render", () => {
   const makeError = () => new Error("test") as Error & { digest?: string };
@@ -74,20 +85,43 @@ describe("verify error.tsx — render", () => {
     );
   });
 
-  it("uses complement (teal) tokens, not amber, for verification-related error UI", () => {
-    // Design system rule: verification-related UI must use text-complement /
-    // bg-complement tokens, never amber/purple (docs/design-system.md).
-    render(
+  it("uses terminal-red tokens for the error state, not teal or amber (#1169 — an error is an error, not a trust signal)", () => {
+    // Design system rule: error banners/alerts must use terminal-red tokens,
+    // never amber/purple. The verify page's teal (complement) tokens are
+    // reserved for verification TRUST signals (verified badge, verify CTA) —
+    // not for its error boundary, which is an error state like any other.
+    const { container } = render(
       <LanguageProvider initialLocale="en" dictionary={en}>
         <VerifyError error={makeError()} reset={vi.fn()} />
       </LanguageProvider>,
     );
+    expect(screen.getByRole("alert")).toBeDefined();
     const heading = screen.getByText("Something went wrong");
     const retryButton = screen.getByText("Try again");
-    expect(heading.className).toContain("text-complement");
-    expect(retryButton.className).toContain("text-complement");
-    expect(retryButton.className).toContain("bg-complement/10");
-    expect(heading.className).not.toContain("text-amber");
-    expect(retryButton.className).not.toContain("bg-amber");
+    expect(heading.className).toContain("text-terminal-red");
+    expect(retryButton.className).toContain("text-terminal-red");
+    expect(retryButton.className).toContain("bg-terminal-red/10");
+    expect(container.innerHTML).not.toContain("text-complement");
+    expect(container.innerHTML).not.toContain("amber");
+  });
+
+  it("reports the error to /api/telemetry with the verify-error source", async () => {
+    const error = new Error("verify boundary boom") as Error & { digest?: string };
+    render(
+      <LanguageProvider initialLocale="en" dictionary={en}>
+        <VerifyError error={error} reset={vi.fn()} />
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0]!;
+    expect(url).toBe("/api/telemetry");
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({
+      event: "client_error",
+      category: "route_error",
+      source: "verify-error",
+      message: "verify boundary boom",
+    });
   });
 });

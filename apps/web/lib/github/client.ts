@@ -444,19 +444,28 @@ async function _fetchAndCache(
   // change is meant to protect.
   const baselineKey = `stats:stale:v2:${lowerHandle}`;
 
-  // Read the baseline before the fetch, so it is available if the fetch fails.
-  const baseline = await cacheGet<StatsData>(baselineKey);
-
+  // #1179 (PE-M4) — the baseline read has zero data dependency on `primary` or
+  // `overlays` (the guards below only ever consume it AFTER `primary` exists),
+  // yet it used to be awaited alone in front of the two slowest network legs.
+  // Folding it into the same `Promise.all` removes that serialized round-trip
+  // without changing what the guards see: `cacheGet` never rejects (it catches
+  // internally and resolves `null`), so this is a plain `Promise.all` — not
+  // `allSettled` with a null fallback, which would silently disable the
+  // degraded-fetch guard by handing it a spurious `null` baseline on any
+  // transient rejection.
+  //
   // #1087 (PE-H2) — `_loadOverlays` has zero data dependency on `primary`, so
   // the two most expensive network legs on this path (GitHub GraphQL and the
   // linked-platform fetches) run concurrently rather than back-to-back. This
   // is safe for the integrity contract precisely because every guard below
   // (`isDegradedPrFetch`, the scope-rank comparison) closes over `primary` and
   // `baseline` only — never `overlays` — and `_compose` still runs strictly
-  // after both legs have settled, onto whichever GitHub-derived value the
+  // after all three legs have settled, onto whichever GitHub-derived value the
   // guards select. Overlay data is never visible to the guards, regardless of
-  // how quickly or slowly it resolves relative to the GitHub fetch.
-  const [primary, overlays] = await Promise.all([
+  // how quickly or slowly it resolves relative to the GitHub fetch or the
+  // baseline read.
+  const [baseline, primary, overlays] = await Promise.all([
+    cacheGet<StatsData>(baselineKey),
     fetchStats(handle, token),
     _loadOverlays(handle, lowerHandle, false),
   ]);
@@ -535,10 +544,26 @@ async function _fetchAndCache(
   const base = accepted ? primary : (baseline ?? primary);
   const composed = _compose(base, overlays);
 
+  // #1163 (BE-H2) — on the rejected branch, `base` (the baseline fallback)
+  // can itself be lower-scoped than whatever is already sitting at cacheKey
+  // (`existingComposed`): the documented inflight race between separate
+  // public/authenticated dedup keys (:91-99 above), or a prior partial
+  // failure that left cacheKey and baselineKey at different scopes. Writing
+  // `composed` (built from `base`) in that case would silently downgrade
+  // cacheKey — the #1002/#1050 signature, reintroduced via the rejection
+  // path. Skip the write ONLY in that specific case: every other rejected
+  // write still needs to happen to refresh the 6h TTL and avoid a refetch
+  // hot-loop (an untagged/absent existingComposed ranks weakest, per
+  // scopeRank, so it never blocks this write).
+  const rejectedDowngrade =
+    rejected &&
+    existingComposed != null &&
+    scopeRank(existingComposed.fetchScope) > scopeRank(base.fetchScope);
+
   // A rejected fetch with no baseline to fall back on has nothing better to
   // offer the shared cache, so it writes nothing rather than persisting a
   // downgrade — the caller still receives its own composed data below.
-  if (accepted || baseline != null) {
+  if ((accepted || baseline != null) && !rejectedDowngrade) {
     await cacheSet(cacheKey, composed, CACHE_TTL);
   }
 

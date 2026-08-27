@@ -8,9 +8,17 @@ afterEach(cleanup);
 // Mock next-themes
 const mockSetTheme = vi.fn();
 let mockTheme = "light";
+// resolvedTheme defaults to mockTheme unless a test overrides it explicitly —
+// this lets most existing tests (which only set mockTheme) keep working
+// unchanged while the system-preference tests below diverge the two.
+let mockResolvedTheme: string | undefined;
 
 vi.mock("next-themes", () => ({
-  useTheme: () => ({ theme: mockTheme, setTheme: mockSetTheme }),
+  useTheme: () => ({
+    theme: mockTheme,
+    setTheme: mockSetTheme,
+    resolvedTheme: mockResolvedTheme ?? mockTheme,
+  }),
 }));
 
 // Mock the shared useIsClient hook — controllable per-test so we can exercise
@@ -26,6 +34,7 @@ vi.mock("@/hooks/useIsClient", () => ({
 describe("ThemeToggle", () => {
   beforeEach(() => {
     mockTheme = "light";
+    mockResolvedTheme = undefined;
     mockSetTheme.mockClear();
     isClientState.current = true;
   });
@@ -115,6 +124,38 @@ describe("ThemeToggle — icon transition (Phase 6)", () => {
     // In dark mode the two flip.
     expect(firstIcon!.className).toContain("opacity-100 scale-100");
     expect(secondIcon!.className).toContain("opacity-0 scale-75");
+  });
+});
+
+describe("ThemeToggle — resolvedTheme under system preference (UX-M7, #1173)", () => {
+  // ThemeProvider now enables next-themes' `enableSystem`, so `theme` can be
+  // the literal string "system" rather than "light"/"dark". Deriving state
+  // from `theme === "dark"` would then always read as light-mode (wrong icon,
+  // wrong aria-label) for every system-preference user. The toggle must
+  // derive its visual/aria state from `resolvedTheme`, which next-themes
+  // always resolves to the concrete "light" or "dark".
+  it("shows the dark-mode icon/label when theme is 'system' and the OS prefers dark (resolvedTheme='dark')", () => {
+    mockTheme = "system";
+    mockResolvedTheme = "dark";
+    render(<ThemeToggle />);
+    const button = screen.getByRole("button");
+    expect(button.getAttribute("aria-label")).toBe("Switch to light theme");
+  });
+
+  it("shows the light-mode icon/label when theme is 'system' and the OS has no preference (resolvedTheme='light')", () => {
+    mockTheme = "system";
+    mockResolvedTheme = "light";
+    render(<ThemeToggle />);
+    const button = screen.getByRole("button");
+    expect(button.getAttribute("aria-label")).toBe("Switch to dark theme");
+  });
+
+  it("clicking while theme is 'system' toggles based on resolvedTheme, not the literal 'system' string", () => {
+    mockTheme = "system";
+    mockResolvedTheme = "dark";
+    render(<ThemeToggle />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockSetTheme).toHaveBeenCalledWith("light");
   });
 });
 

@@ -283,6 +283,59 @@ describe("mergeStats", () => {
       expect(merged.reviewsSubmittedCount).toBe(15);
       expect(merged.primaryReviewsSubmittedCount).toBe(10);
     });
+
+    // #1163 (BE-H1): `_compose` (client.ts) chains mergeStats up to 4x in
+    // sequence (bitbucket -> codeberg -> gitlab -> supplemental), each time
+    // passing the previous result as `primary`. Before the fix, line 53 read
+    // `primary.reviewsSubmittedCount` — which after the first chained call IS
+    // the running SUM, not the original GitHub-only count — so the field
+    // accumulated non-GitHub reviews with every additional overlay.
+    // `detectProfileType` (impact/v6.ts) reads exactly this field to gate
+    // solo/collaborative classification, so a corrupted value here reaches
+    // persisted snapshots and the HMAC verification record.
+    describe("chained-overlay invariant (#1163)", () => {
+      const githubDerivedReviews = 12;
+
+      function chain(overlayReviewCounts: number[]): number | undefined {
+        const githubDerived = makeStats({ reviewsSubmittedCount: githubDerivedReviews });
+        let stats = githubDerived;
+        overlayReviewCounts.forEach((reviewsSubmittedCount, i) => {
+          const isLast = i === overlayReviewCounts.length - 1;
+          stats = mergeStats(
+            stats,
+            makeStats({ reviewsSubmittedCount }),
+            // Mirrors _compose: platform overlays (bitbucket/codeberg/gitlab)
+            // pass markAsSupplemental: false; only the last (EMU) overlay
+            // uses the default.
+            isLast ? undefined : { markAsSupplemental: false },
+          );
+        });
+        return stats.primaryReviewsSubmittedCount;
+      }
+
+      it("equals the GitHub-derived review count after two chained overlays", () => {
+        expect(chain([3, 5])).toBe(githubDerivedReviews);
+      });
+
+      it("equals the GitHub-derived review count after three chained overlays", () => {
+        expect(chain([3, 5, 7])).toBe(githubDerivedReviews);
+      });
+
+      it("equals the GitHub-derived review count after four chained overlays (bitbucket, codeberg, gitlab, supplemental)", () => {
+        expect(chain([1, 2, 3, 4])).toBe(githubDerivedReviews);
+      });
+
+      it("remains undefined for an overlay-free fetch (never calls mergeStats)", () => {
+        // Critical: v6.ts's detectProfileType does
+        // `stats.primaryReviewsSubmittedCount ?? stats.reviewsSubmittedCount`,
+        // and treats `reviews === 0` as an unconditional "solo" signal. A raw,
+        // un-merged GitHub fetch must never carry a defined (let alone `0`)
+        // value here, or detectProfileType would use it instead of falling
+        // through to reviewsSubmittedCount.
+        const githubDerived = makeStats({ reviewsSubmittedCount: 0 });
+        expect(githubDerived.primaryReviewsSubmittedCount).toBeUndefined();
+      });
+    });
   });
 
   describe("hasSupplementalData flag", () => {
@@ -303,6 +356,45 @@ describe("mergeStats", () => {
         markAsSupplemental: true,
       });
       expect(merged.hasSupplementalData).toBe(true);
+    });
+
+    // #1163 (BE-H1 mirror bug): the flag was last-write-wins across a chain,
+    // so it only came out correct because `_compose` happens to apply the
+    // EMU/supplemental overlay LAST. Any reordering (or a future overlay
+    // added after supplemental) would silently drop the flag back to false.
+    // The fix must make it order-independent: true once ANY merge in the
+    // chain was a real (non-platform) supplemental merge, regardless of
+    // position.
+    describe("chained-overlay order independence (#1163)", () => {
+      it("stays true when a platform overlay is merged AFTER the supplemental merge", () => {
+        const githubDerived = makeStats();
+        let stats = mergeStats(githubDerived, makeStats(), {
+          markAsSupplemental: true,
+        }); // supplemental merged first
+        stats = mergeStats(stats, makeStats(), { markAsSupplemental: false }); // bitbucket merged after
+        stats = mergeStats(stats, makeStats(), { markAsSupplemental: false }); // codeberg merged after
+
+        expect(stats.hasSupplementalData).toBe(true);
+      });
+
+      it("stays true across the documented order (platforms then supplemental)", () => {
+        const githubDerived = makeStats();
+        let stats = mergeStats(githubDerived, makeStats(), { markAsSupplemental: false }); // bitbucket
+        stats = mergeStats(stats, makeStats(), { markAsSupplemental: false }); // codeberg
+        stats = mergeStats(stats, makeStats(), { markAsSupplemental: false }); // gitlab
+        stats = mergeStats(stats, makeStats()); // supplemental (default true)
+
+        expect(stats.hasSupplementalData).toBe(true);
+      });
+
+      it("stays false when only platform overlays are chained (no supplemental anywhere)", () => {
+        const githubDerived = makeStats();
+        let stats = mergeStats(githubDerived, makeStats(), { markAsSupplemental: false });
+        stats = mergeStats(stats, makeStats(), { markAsSupplemental: false });
+        stats = mergeStats(stats, makeStats(), { markAsSupplemental: false });
+
+        expect(stats.hasSupplementalData).toBe(false);
+      });
     });
   });
 

@@ -5,7 +5,7 @@ import { useIsClient } from "@/hooks/useIsClient";
 import { useTranslation } from "@/lib/i18n";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const hydrated = useIsClient();
   const { t } = useTranslation();
 
@@ -13,7 +13,12 @@ export function ThemeToggle() {
     return <div className="h-11 w-11" aria-hidden="true" />;
   }
 
-  const isDark = theme === "dark";
+  // ThemeProvider enables next-themes' `enableSystem`, so `theme` can be the
+  // literal string "system" rather than "light"/"dark". `resolvedTheme` is
+  // always the concrete value next-themes actually applied (falling back to
+  // light when the OS reports no preference), so it — not `theme` — is what
+  // determines the icon/label shown here.
+  const isDark = resolvedTheme === "dark";
 
   return (
     <button

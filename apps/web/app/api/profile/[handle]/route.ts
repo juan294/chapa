@@ -3,7 +3,7 @@ import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
-import { materializePublicProfile } from "@/lib/profile/public-profile";
+import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
@@ -25,12 +25,22 @@ const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
  *
  * Failure here is non-fatal by design — the endpoint predates these fields and
  * must keep serving the snapshot half if the fresh score cannot be computed.
+ *
+ * #1180 (PE-L2) — uses `materializeDisplayProfile`, not
+ * `materializePublicProfile`. The caller above already read
+ * `getCachedLatestSnapshot(handle)` once for the snapshot half of this
+ * response; `materializePublicProfile` (via `materializeProfile`) would
+ * perform a SECOND, identical `getCachedLatestSnapshot` read whose result
+ * only ever feeds the EMA-smoothed *persisted* snapshot (#1001) — never
+ * `displayImpact`, which is always the fresh score and therefore genuinely
+ * snapshot-independent. `materializeDisplayProfile` skips that lookup (and
+ * the dirty-marker lookup) entirely rather than deduplicating it.
  */
 async function getDisplayHeadline(
   handle: string,
 ): Promise<{ displayScore: number | null; displayTier: string | null }> {
   try {
-    const materialized = await materializePublicProfile(handle, {
+    const materialized = await materializeDisplayProfile(handle, {
       readOnly: true,
     });
     if (!materialized) return { displayScore: null, displayTier: null };

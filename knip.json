@@ -10,9 +10,7 @@
     ".": {
       "entry": ["scripts/**/*.ts"],
       "ignoreDependencies": [
-        "next",
-        "@upstash/redis",
-        "@supabase/supabase-js"
+        "next"
       ]
     },
     "apps/web": {

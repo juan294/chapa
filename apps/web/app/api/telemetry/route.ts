@@ -18,27 +18,13 @@ export const POST = withErrorCapture("/api/telemetry", async (request: NextReque
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (isClientErrorTelemetryPayload(body)) {
-    void captureServerEvent(body.event, {
-      category: body.category,
-      message: body.message.slice(0, 500),
-      ...(body.stack && { stack: body.stack.slice(0, 1000) }),
-      ...(body.digest && { digest: body.digest.slice(0, 128) }),
-      ...(body.path && { path: body.path.slice(0, 300) }),
-      source: body.source,
-    });
-    return NextResponse.json({ ok: true });
-  }
-
-  // 2. Validate payload structure
-  if (!isValidTelemetryPayload(body)) {
-    return NextResponse.json({ error: "Invalid telemetry payload" }, { status: 400 });
-  }
-
-  const payload = body as Omit<TelemetryPayload, "verified">;
-
-  // 3a. IP-based floor rate limit: 60 requests per IP per 60 seconds.
+  // 2a. IP-based floor rate limit: 60 requests per IP per 60 seconds.
   // This prevents an attacker from rotating targetHandle to bypass per-handle limits.
+  // Applied before the client-error branch below too (#1162 / SE-M1, BE-M4):
+  // a client_error/client_api_error payload carries no targetHandle, so it can
+  // never be metered by the per-handle check further down — without this IP
+  // floor in front of it, an unauthenticated caller gets unmetered PostHog
+  // writes just by sending that shape instead of a validated payload.
   const clientIp = getClientIp(request);
   const ipRl = await rateLimit(`ratelimit:telemetry-ip:${clientIp}`, 60, 60);
   if (!ipRl.allowed) {
@@ -48,7 +34,7 @@ export const POST = withErrorCapture("/api/telemetry", async (request: NextReque
     );
   }
 
-  // 3b. IP/day ceiling: 600 requests per IP per 24 hours.
+  // 2b. IP/day ceiling: 600 requests per IP per 24 hours.
   // This keeps the route open for CLI use while bounding sustained abuse from a single source.
   const ipDailyRl = await rateLimit(`ratelimit:telemetry-ip-day:${clientIp}`, 600, 86400);
   if (!ipDailyRl.allowed) {
@@ -57,6 +43,25 @@ export const POST = withErrorCapture("/api/telemetry", async (request: NextReque
       { status: 429, headers: { "Retry-After": "3600" } },
     );
   }
+
+  if (isClientErrorTelemetryPayload(body)) {
+    void captureServerEvent(body.event, {
+      category: body.category.slice(0, 128),
+      message: body.message.slice(0, 500),
+      ...(body.stack && { stack: body.stack.slice(0, 1000) }),
+      ...(body.digest && { digest: body.digest.slice(0, 128) }),
+      ...(body.path && { path: body.path.slice(0, 300) }),
+      source: body.source,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // 3. Validate payload structure
+  if (!isValidTelemetryPayload(body)) {
+    return NextResponse.json({ error: "Invalid telemetry payload" }, { status: 400 });
+  }
+
+  const payload = body as Omit<TelemetryPayload, "verified">;
 
   // 3c. Per-handle rate limit: 10 requests per targetHandle per 60 seconds.
   // targetHandle has already been validated as a safe GitHub handle by isValidTelemetryPayload.

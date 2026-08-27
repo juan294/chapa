@@ -8,6 +8,7 @@ import {
   type ActivitySummary,
 } from "./activity-insights";
 import { seededRandom } from "@/lib/utils/prng";
+import { useIsClient } from "@/hooks/useIsClient";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -201,9 +202,15 @@ export function ActivityHeatmap({
   dimensions,
 }: ActivityHeatmapProps) {
   const { t, locale } = useTranslation();
+  // FE-M2 (#1173): this component is server-rendered by default (next/dynamic
+  // ssr:true upstream), but the streak calculation's "is today over yet?"
+  // check deliberately uses the viewer's local clock. The server runs UTC, so
+  // gate the trim behind hydration rather than ever computing it from a
+  // server-side date — see the option's doc comment in activity-insights.ts.
+  const isClient = useIsClient();
   const insights = useMemo(
-    () => computeActivityInsights(heatmapData),
-    [heatmapData]
+    () => computeActivityInsights(heatmapData, { trimTodayIfZero: isClient }),
+    [heatmapData, isClient]
   );
   const enriched = useMemo(
     () => enrichDays(heatmapData, dimensions),
@@ -597,40 +604,6 @@ function DotTimeline({
     [locale]
   );
 
-  const handleDotFocus = useCallback(
-    (day: EnrichedDay, e: React.FocusEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      setTooltip({
-        title: formatLocalizedDate(day.date, locale),
-        count: day.count,
-        dimensionWeights: day.dimensionWeights,
-        dominant: day.dominant,
-        screenX: rect.left + rect.width / 2,
-        screenY: rect.top,
-        cellBottom: rect.bottom,
-      });
-    },
-    [locale]
-  );
-
-  const handleDotKeyDown = useCallback(
-    (day: EnrichedDay, e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === "Enter" || e.key === " ") {
-        const rect = e.currentTarget.getBoundingClientRect();
-        setTooltip({
-          title: formatLocalizedDate(day.date, locale),
-          count: day.count,
-          dimensionWeights: day.dimensionWeights,
-          dominant: day.dominant,
-          screenX: rect.left + rect.width / 2,
-          screenY: rect.top,
-          cellBottom: rect.bottom,
-        });
-      }
-    },
-    [locale]
-  );
-
   const handleLeave = useCallback(() => setTooltip(null), []);
 
   const timelineLabel = interpolate(
@@ -644,80 +617,105 @@ function DotTimeline({
   );
 
   return (
-    <div role="img" aria-label={timelineLabel}>
-      {/* Day-of-week column headers */}
-      <div className="flex items-center gap-2 mb-1">
-        <span className="w-12 shrink-0" />
-        <div className="flex items-center gap-1 flex-1">
-          {DOW_HEADER_KEYS.map((key, i) => (
-            <span
-              key={i}
-              className="flex-1 text-center text-[7px] text-text-secondary font-body"
-            >
-              {text(t, key)}
-            </span>
+    <>
+      <div role="img" aria-label={timelineLabel}>
+        {/* Day-of-week column headers */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-14 shrink-0" />
+          <div className="flex items-center gap-1 flex-1">
+            {DOW_HEADER_KEYS.map((key, i) => (
+              <span
+                key={i}
+                className="flex-1 text-center text-[10px] text-text-secondary font-body"
+              >
+                {text(t, key)}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Week rows */}
+        <div className="space-y-2">
+          {weeks.map((week, wi) => (
+            <div key={wi} className="flex items-center gap-2">
+              <span className="text-[10px] text-text-secondary font-body w-14 shrink-0 text-right">
+                {week.label}
+              </span>
+              <div className="flex items-center gap-1 flex-1">
+                {week.days.map((day, di) => {
+                  const size = day.count > 0
+                    ? 8 + (day.count / maxCount) * 24
+                    : 6;
+                  const isPeak = day.date === peakDate && day.count > 0;
+                  return (
+                    <div key={di} className="flex flex-col items-center gap-0.5 flex-1">
+                      <div
+                        aria-hidden="true"
+                        className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
+                        style={{
+                          width: size,
+                          height: size,
+                          backgroundColor: day.count > 0
+                            ? DIMENSION_COLORS[day.dominant]
+                            : "var(--color-purple-tint)",
+                          opacity: day.count > 0
+                            ? 0.3 + (day.count / maxCount) * 0.7
+                            : 1,
+                          border: day.count === 0
+                            ? "1px solid var(--color-stroke)"
+                            : "none",
+                          boxShadow: isPeak
+                            ? "0 0 0 2px var(--color-amber)"
+                            : undefined,
+                        }}
+                        onMouseEnter={(e) => handleDotEnter(day, e)}
+                        onMouseLeave={handleLeave}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Week rows */}
-      <div className="space-y-2">
-        {weeks.map((week, wi) => (
-          <div key={wi} className="flex items-center gap-2">
-            <span className="text-[9px] text-text-secondary font-body w-12 shrink-0 text-right">
-              {week.label}
-            </span>
-            <div className="flex items-center gap-1 flex-1">
-              {week.days.map((day, di) => {
-                const size = day.count > 0
-                  ? 8 + (day.count / maxCount) * 24
-                  : 6;
-                const isPeak = day.date === peakDate && day.count > 0;
-                return (
-                  <div key={di} className="flex flex-col items-center gap-0.5 flex-1">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-label={interpolate(
-                        text(
-                          t,
-                          day.count === 1
-                            ? "dashboard.activity.contributionOne"
-                            : "dashboard.activity.contributionMany",
-                        ),
-                        { count: String(day.count) },
-                      ) + ` — ${formatLocalizedDate(day.date, locale)}`}
-                      className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
-                      style={{
-                        width: size,
-                        height: size,
-                        backgroundColor: day.count > 0
-                          ? DIMENSION_COLORS[day.dominant]
-                          : "var(--color-purple-tint)",
-                        opacity: day.count > 0
-                          ? 0.3 + (day.count / maxCount) * 0.7
-                          : 1,
-                        border: day.count === 0
-                          ? "1px solid var(--color-stroke)"
-                          : "none",
-                        boxShadow: isPeak
-                          ? "0 0 0 2px var(--color-amber)"
-                          : undefined,
-                      }}
-                      onMouseEnter={(e) => handleDotEnter(day, e)}
-                      onMouseLeave={handleLeave}
-                      onFocus={(e) => handleDotFocus(day, e)}
-                      onBlur={handleLeave}
-                      onKeyDown={(e) => handleDotKeyDown(day, e)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/*
+        #1182 / UX-M9: `role="img"` above collapses its subtree for
+        assistive tech (only the wrapper's own aria-label is announced),
+        and the day dots are now non-focusable decoration (mouse-hover-only
+        tooltip trigger). This sibling table keeps every day's date and
+        contribution count available to screen readers — it must live
+        outside the role="img" subtree, or it would be collapsed exactly
+        like the dots it's meant to expose data for. Visually hidden via
+        `sr-only`; the same info a sighted mouse user gets from the hover
+        tooltip.
+      */}
+      <table className="sr-only">
+        <caption>{timelineLabel}</caption>
+        <tbody>
+          {weeks.flatMap((week) =>
+            week.days.map((day) => (
+              <tr key={day.date}>
+                <th scope="row">{formatLocalizedDate(day.date, locale)}</th>
+                <td>
+                  {interpolate(
+                    text(
+                      t,
+                      day.count === 1
+                        ? "dashboard.activity.contributionOne"
+                        : "dashboard.activity.contributionMany",
+                    ),
+                    { count: String(day.count) },
+                  )}
+                </td>
+              </tr>
+            )),
+          )}
+        </tbody>
+      </table>
+
       {tooltip && <ChartTooltip tip={tooltip} />}
-    </div>
+    </>
   );
 }

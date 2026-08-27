@@ -17,13 +17,22 @@ interface CliTokenPayload {
   exp: number;
 }
 
-const TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+// SE-H1 interim mitigation (#1174): shortened from 90 days to 10 days.
+// A token obtained via a phished /cli/authorize approval link (the gap
+// tracked by #1174; the full device-code-on-approve binding is deferred to
+// Wave 3) previously carried a 90-day, unrevocable grant. 10 days keeps
+// normal CLI usage friction-free (most users re-authorize far more often
+// than that in practice) while bounding the blast radius of any single
+// leaked/phished token to a much shorter window. Regression note: this
+// invalidates any CLI token issued before this change on its next use — the
+// holder must re-run `chapa login`. That is intended.
+const TOKEN_EXPIRY_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
 
 /**
  * Generate an HMAC-signed CLI authentication token for a user.
  *
- * The token embeds the user's handle, a creation timestamp, and a 90-day
- * expiry. Format: `base64url(payload).base64url(hmac_sha256(payload, secret))`.
+ * The token embeds the user's handle, a creation timestamp, and a 10-day
+ * expiry (#1174). Format: `base64url(payload).base64url(hmac_sha256(payload, secret))`.
  * This allows CLI authentication without requiring a GitHub PAT.
  *
  * @param handle - The GitHub handle to embed in the token payload
@@ -96,4 +105,46 @@ export function isCliToken(token: string): boolean {
   const [payload, sig] = parts;
   if (!payload || !sig) return false;
   return BASE64URL_RE.test(payload) && BASE64URL_RE.test(sig);
+}
+
+/**
+ * CLI device-authorization context (SE-H1 interim mitigation, #1174).
+ *
+ * Captures the IP and user-agent of the device that INITIATED a CLI device
+ * authorization session — i.e. the first `/api/cli/auth/poll` call that
+ * creates the session. Surfaced on the `/cli/authorize` approval page so a
+ * user approving a request has a visible signal for whether it matches the
+ * device/browser they expect. This is a UX/awareness signal against a
+ * phished approval link, not a binding enforcement mechanism — the full
+ * device-code-on-approve binding is deferred to Wave 3 (blocked on the
+ * external CLI shipping a user code first).
+ */
+export interface CliDeviceContext {
+  ip: string;
+  userAgent: string;
+}
+
+/** Caps a device-context field's stored/rendered length. */
+const CLI_DEVICE_CONTEXT_FIELD_MAX_LEN = 200;
+
+/** Redis key for the device context captured at CLI device-session creation. */
+export function cliDeviceContextKey(sessionId: string): string {
+  return `cli:device-context:${sessionId}`;
+}
+
+/**
+ * Bound and default a device-context field pulled from a request header.
+ *
+ * The user-agent header in particular is attacker-influenceable free text
+ * sent by whichever client makes the first poll — cap its length so a
+ * hostile value can't bloat Redis storage or the rendered approval page.
+ * React escapes it as plain text on render, so no HTML/script injection is
+ * possible even from an adversarial value.
+ */
+export function sanitizeDeviceContextField(
+  value: string | null | undefined,
+): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "unknown";
+  return trimmed.slice(0, CLI_DEVICE_CONTEXT_FIELD_MAX_LEN);
 }

@@ -82,3 +82,75 @@ describe("AuthorizeClient", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// SE-H1 interim mitigation (#1174): surface the initiating device context
+// (IP + user-agent captured at poll-time) so a user approving a request they
+// did not themselves initiate has a visible signal.
+// ---------------------------------------------------------------------------
+
+describe("AuthorizeClient — device context (#1174)", () => {
+  const defaultProps = {
+    sessionId: "test-session-123",
+    handle: "juandev",
+  };
+
+  it("renders the IP and user-agent when device context is provided", () => {
+    render(
+      <AuthorizeClient
+        {...defaultProps}
+        deviceContext={{ ip: "203.0.113.5", userAgent: "curl/8.0" }}
+      />,
+    );
+
+    const box = screen.getByTestId("cli-device-context");
+    expect(box.textContent).toContain("203.0.113.5");
+    expect(box.textContent).toContain("curl/8.0");
+  });
+
+  it("shows an unavailable message when device context is null", () => {
+    render(<AuthorizeClient {...defaultProps} deviceContext={null} />);
+
+    const box = screen.getByTestId("cli-device-context");
+    expect(box.textContent).not.toContain("undefined");
+    // No IP/UA fields rendered — falls back to the unavailable copy key.
+    expect(screen.queryByText("203.0.113.5")).toBeNull();
+  });
+
+  it("shows an unavailable message when device context prop is omitted entirely", () => {
+    render(<AuthorizeClient {...defaultProps} />);
+    expect(screen.getByTestId("cli-device-context")).toBeDefined();
+  });
+
+  it("renders a hostile user-agent value as inert text, not markup (XSS guard)", () => {
+    const hostileUa = "<img src=x onerror=alert(1)>";
+    const { container } = render(
+      <AuthorizeClient
+        {...defaultProps}
+        deviceContext={{ ip: "1.2.3.4", userAgent: hostileUa }}
+      />,
+    );
+
+    // React must render this as a text node, never parsed as an <img> element.
+    expect(container.querySelector("img")).toBeNull();
+    const box = screen.getByTestId("cli-device-context");
+    expect(box.textContent).toContain(hostileUa);
+  });
+
+  it("does not show the device context box after approval", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 200 }),
+    );
+    render(
+      <AuthorizeClient
+        {...defaultProps}
+        deviceContext={{ ip: "1.2.3.4", userAgent: "ua" }}
+      />,
+    );
+    fireEvent.click(screen.getByText("Authorize CLI"));
+    await waitFor(() => {
+      expect(screen.getByText(/authorized/i)).toBeDefined();
+    });
+    expect(screen.queryByTestId("cli-device-context")).toBeNull();
+  });
+});

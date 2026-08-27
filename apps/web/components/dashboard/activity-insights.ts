@@ -28,7 +28,32 @@ export type ActivitySummary =
     }
   | { kind: "peak-day"; date: string; count: number };
 
-export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
+export interface ComputeActivityInsightsOptions {
+  /**
+   * When true (default), a trailing zero-count entry for "today" is dropped
+   * from the current-streak walk — the day isn't over yet, so an
+   * as-yet-empty today shouldn't read as a broken streak. "Today" is derived
+   * from the local device clock, deliberately matching GitHub's own
+   * per-viewer date format.
+   *
+   * ActivityHeatmap is server-rendered (#1173/FE-M2): the server's clock is
+   * UTC, not the viewer's zone, so evaluating this trim during SSR can
+   * disagree with the viewer's own browser and produce a React hydration
+   * text mismatch near a UTC day boundary. Callers should pass `false` for a
+   * pass that isn't guaranteed to run on the viewer's own clock (e.g. an
+   * initial/server render gated by `useIsClient()`) and let a later
+   * client-only pass use the default `true` — never substitute a
+   * server-computed UTC date here instead, as that just relocates the same
+   * boundary bug to a different clock.
+   */
+  trimTodayIfZero?: boolean;
+}
+
+export function computeActivityInsights(
+  data: HeatmapDay[],
+  options: ComputeActivityInsightsOptions = {},
+): ActivityInsights {
+  const { trimTodayIfZero = true } = options;
   if (data.length === 0) {
     return {
       currentStreak: 0,
@@ -47,7 +72,7 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
   // If the last entry is today with zero activity, skip it — the day isn't over yet.
   let startIdx = data.length - 1;
   const lastEntry = data[startIdx];
-  if (lastEntry && lastEntry.count === 0) {
+  if (trimTodayIfZero && lastEntry && lastEntry.count === 0) {
     // Use local calendar date (not UTC) to match GitHub's date format
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;

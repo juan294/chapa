@@ -21,6 +21,11 @@ interface Props {
   craftResult?: CraftResult | null;
   trend?: TrendSummary | null;
   diff?: ClientSnapshotDiff | null;
+  // #1165 (FE-H2/UX-M5) — mechanically threaded through to
+  // SharePageOwnerContent; see that component for details. This wrapper has
+  // no logic of its own beyond the next/dynamic lazy split.
+  isOwner?: boolean;
+  embedMarkdown?: string;
 }
 
 export function SharePageOwnerContentLazy(props: Props) {

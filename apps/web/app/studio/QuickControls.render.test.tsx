@@ -43,6 +43,23 @@ describe("QuickControls", () => {
     expect(toggle.getAttribute("aria-controls")).toBeTruthy();
   });
 
+  // UX-M1 (#1173): the toggle was the only pointer affordance for Studio's 9
+  // customization categories, styled at ~2.3:1 contrast (text-terminal-dim).
+  // Promoted to the standard secondary-text token.
+  it("uses text-text-secondary (not the low-contrast text-terminal-dim) for the toggle label", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={false}
+        onToggle={vi.fn()}
+      />,
+    );
+    const toggle = screen.getByRole("button", { name: "Quick Controls" });
+    expect(toggle.className).toContain("text-text-secondary");
+    expect(toggle.className).not.toContain("text-terminal-dim");
+  });
+
   it("calls onToggle when expand button clicked", () => {
     const toggle = vi.fn();
     render(
@@ -82,6 +99,27 @@ describe("QuickControls", () => {
     );
     fireEvent.click(screen.getByText("Minimal"));
     expect(onCommand).toHaveBeenCalledWith("/preset minimal");
+  });
+
+  // UX-L1 (#1187): the current-value indicator next to each category label
+  // was `text-[10px]` — below the design-system's documented 11px type-scale
+  // floor, and compounded by the low-contrast `text-terminal-dim` color.
+  // Unlike the uppercase tracking-wide section headings in this file (which
+  // are intentionally left at 10px as hierarchy micro-labels), this is
+  // ordinary content text the user needs to read, so it's raised to the
+  // standard text-xs (12px) step already used by its sibling label span.
+  it("renders the category current-value indicator at text-xs, not a sub-11px arbitrary size", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={true}
+        onToggle={vi.fn()}
+      />,
+    );
+    const valueSpan = screen.getByText("solid");
+    expect(valueSpan.className).toContain("text-xs");
+    expect(valueSpan.className).not.toContain("text-[10px]");
   });
 
   it("renders category labels", () => {
@@ -241,6 +279,31 @@ describe("QuickControls", () => {
     expect(
       screen.getByRole("button", { name: "/save" }).hasAttribute("disabled"),
     ).toBe(true);
+  });
+
+  it("renders and dispatches the human confirmation gate for an agent save", () => {
+    const onConfirmAgentSave = vi.fn();
+    const onDismissAgentSave = vi.fn();
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={true}
+        onToggle={vi.fn()}
+        agentSaveProposal={{
+          onConfirm: onConfirmAgentSave,
+          onDismiss: onDismissAgentSave,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("An agent wants to save this preview configuration."),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(onConfirmAgentSave).toHaveBeenCalledOnce();
+    expect(onDismissAgentSave).toHaveBeenCalledOnce();
   });
 
   it("renders Spanish control copy while command identifiers stay unchanged", () => {

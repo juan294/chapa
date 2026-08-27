@@ -134,8 +134,13 @@ export async function persistProfileSnapshot(
   // Only the explicit duplicate case should skip work; Redis outages must fail open.
   // #826 — When inputs have legitimately changed mid-day (supplemental upload),
   // bypass the guard so today's snapshot can be replaced with the fresh score.
+  // BE-L2 (#1186) — GitHub handles are case-insensitive; every other
+  // handle-derived cache key lowercases first (dbReplaceSnapshot,
+  // buildSnapshotKey, buildBadgeSvgCacheKey). Without this, `/u/JuanX` and
+  // `/u/juanx` each claimed an independent day guard and re-ran the
+  // deferred sequence once per casing variant per day.
   const today = new Date().toISOString().slice(0, 10);
-  const guardKey = `sideeffects:done:${handle}:${today}`;
+  const guardKey = `sideeffects:done:${handle.toLowerCase()}:${today}`;
   const guardStatus = await cacheSetNxStatus(guardKey, 86400);
   if (guardStatus === "exists" && !materialized.inputsChanged) return false;
 

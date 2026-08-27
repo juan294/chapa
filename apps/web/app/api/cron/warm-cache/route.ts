@@ -11,7 +11,7 @@ import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheGet, cacheSet, cacheSetNxStatus } from "@/lib/cache/redis";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
@@ -26,9 +26,11 @@ import {
   resolveBadgeAvatar,
 } from "@/lib/render/avatar-outcome";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeLocale } from "@/lib/render/badge-locale";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
-  buildBadgeSvgCacheKey,
+  readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
@@ -67,6 +69,20 @@ const MAX_HANDLES = 50;
 
 /** Number of handles to process concurrently per batch. */
 const BATCH_SIZE = 5;
+
+/**
+ * #1177 (PE-L3) — explicit deadline for the opportunistic badge-avatar
+ * resolve inside warmHandle. Without this, resolveBadgeAvatar's only bound
+ * was getAvatarBase64's own internal 2000ms fetch-abort, so a slow avatar
+ * CDN could add up to that per handle across BATCH_SIZE-concurrent handles,
+ * eating into the 270s time budget that governs rotation coverage. Looser
+ * than the user-facing request paths (badge route: 1000ms, share page:
+ * 250ms) since cron latency is not user-facing — just needs to comfortably
+ * clear observed avatar-cache-hit latency so a genuine hit isn't
+ * misclassified as a timeout (which maps to the "skip" cache policy and
+ * withholds that handle's SVG publish for the run — see warmHandle below).
+ */
+const WARM_CACHE_AVATAR_DEADLINE_MS = 1500;
 
 /**
  * Leave a buffer before `maxDuration` so there's time left to finish the
@@ -301,15 +317,28 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   // rather than assuming the old daily-cadence blast radius. (Full fix — tiered
   // freshness by popularity, or decoupling snapshot recording from warm rotation
   // entirely — is tracked as a follow-up infra task.)
+  // #1162 / BE-L5: once-per-day SETNX guard. This alert fires whenever the
+  // active-user population is at/above the ceiling, which post-#1010 is true
+  // on every hourly run for a population that doesn't shrink — an
+  // unconditional fire means 24 identical emails/day once alert delivery
+  // actually works (see captureOperationalAlert's email fallback). Only the
+  // "exists" outcome (already alerted today) suppresses; a Redis outage
+  // ("unavailable") fails open exactly like persistProfileSnapshot's dedup
+  // guard in lib/profile/public-profile.ts — better to over-alert than to
+  // silently swallow a real ceiling breach because Redis is down.
   if (allHandles.length >= MAX_HANDLES) {
-    const rotationHours = Math.ceil(allHandles.length / MAX_HANDLES);
-    void captureOperationalAlert({
-      signal: "warm_cache_ceiling_approached",
-      severity: "P2",
-      summary: `warm-cache ceiling: ${allHandles.length} active users vs ${MAX_HANDLES}/run (hourly) — full rotation takes ~${rotationHours}h`,
-      route: "/api/cron/warm-cache",
-      properties: { totalUsers: allHandles.length, ceiling: MAX_HANDLES, rotationHours },
-    });
+    const today = new Date().toISOString().slice(0, 10);
+    const guardStatus = await cacheSetNxStatus(`warm-cache:ceiling-alerted:${today}`, 86400);
+    if (guardStatus !== "exists") {
+      const rotationHours = Math.ceil(allHandles.length / MAX_HANDLES);
+      void captureOperationalAlert({
+        signal: "warm_cache_ceiling_approached",
+        severity: "P2",
+        summary: `warm-cache ceiling: ${allHandles.length} active users vs ${MAX_HANDLES}/run (hourly) — full rotation takes ~${rotationHours}h`,
+        route: "/api/cron/warm-cache",
+        properties: { totalUsers: allHandles.length, ceiling: MAX_HANDLES, rotationHours },
+      });
+    }
   }
 
   // Clean expired verification records from Supabase (fire-and-forget safe)
@@ -415,33 +444,67 @@ async function warmHandle(
     // must not publish a placeholder, while definitive absence is safe to
     // cache and a missing URL gets only the short placeholder TTL.
     // The avatar fetch is awaited (not fire-and-forget as before) since its
-    // result now feeds the render; its own internal fetch abort bounds this.
+    // result now feeds the render; an explicit deadline bounds it (#1177 /
+    // PE-L3, see WARM_CACHE_AVATAR_DEADLINE_MS above).
+    //
+    // #1177 (PE-M2 follow-up): the stats TTL (6h) means the rendered SVG is
+    // byte-identical to what's already cached for any re-run inside that
+    // window — hourly cadence over 50 handles made ~83% of these renders and
+    // Redis writes redundant. Read today's cache key first and skip the
+    // avatar resolve + render + write entirely when it's already populated.
+    // Safe because the date-scoped key already produces a genuine miss on
+    // the first run of a new UTC day (the #1089 case this route exists to
+    // solve), AND because every mid-day score-changing write path
+    // (invalidateProfileReadModels in lib/profile/post-write-invalidation.ts
+    // for /api/supplemental, /api/recalculate, /api/refresh, /api/insights,
+    // /api/admin/bulk-recalculate; invalidatePlatformReadModels in
+    // lib/auth/platform-oauth.ts for platform connect/disconnect) already
+    // deletes this exact key — verified before landing this skip.
     try {
-      const avatarOutcome = await resolveBadgeAvatar(
-        handle,
-        materialized.stats.avatarUrl,
-      );
-      const avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
-      const avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
-      const verification = getPublicProfileVerification(materialized);
+      const today = toDateString(new Date());
+      // #1181 (UX-H3 follow-up) — this cron has no request/cookie context to
+      // resolve a per-visitor locale from, so it only ever warms the
+      // DEFAULT_LOCALE ('es') badge — the locale most real traffic reads
+      // (badge.svg defaults to it when no `?lang=` is given). The cache key
+      // and the rendered content below MUST come from the same resolved
+      // locale, never independent defaults: `resolveBadgeLocale` (not
+      // `buildBadgeSvgCacheKey` directly) is the only sanctioned way to
+      // derive either here. This is exactly the bug #1181 found — this
+      // route previously rendered English content via `renderBadgeSvg`'s own
+      // default while writing it under `buildBadgeSvgCacheKey`'s separately
+      // defaulted key, so the hourly pre-warm published an English badge
+      // into the Spanish-keyed slot for every handle.
+      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE);
+      const svgCacheKey = badgeLocale.cacheKey(handle, today);
+      const existingSvg = await readBadgeSvgCache(svgCacheKey);
 
-      if (avatarCachePolicy !== "skip" && verification) {
-        const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
-          avatarDataUri,
-          verificationHash: verification.hash,
-          verificationDate: verification.date,
-          // Mirrors the request path — this SVG is served to <img> embeds,
-          // where SMIL <animate> never runs.
-          disableAnimation: true,
-        });
-        const today = toDateString(new Date());
-        const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
-        if (avatarCachePolicy === "short") {
-          await writeBadgeSvgCache(svgCacheKey, svg, handle, {
-            ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+      if (existingSvg === null) {
+        const avatarOutcome = await resolveBadgeAvatar(
+          handle,
+          materialized.stats.avatarUrl,
+          { deadlineMs: WARM_CACHE_AVATAR_DEADLINE_MS },
+        );
+        const avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
+        const avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
+        const verification = getPublicProfileVerification(materialized);
+
+        if (avatarCachePolicy !== "skip" && verification) {
+          const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+            avatarDataUri,
+            verificationHash: verification.hash,
+            verificationDate: verification.date,
+            // Mirrors the request path — this SVG is served to <img> embeds,
+            // where SMIL <animate> never runs.
+            disableAnimation: true,
+            strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
           });
-        } else {
-          await writeBadgeSvgCache(svgCacheKey, svg, handle);
+          if (avatarCachePolicy === "short") {
+            await writeBadgeSvgCache(svgCacheKey, svg, handle, {
+              ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+            });
+          } else {
+            await writeBadgeSvgCache(svgCacheKey, svg, handle);
+          }
         }
       }
     } catch {

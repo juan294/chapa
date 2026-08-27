@@ -11,14 +11,14 @@ const {
   mockDbGetToolInsights,
   mockGetClientIp,
   mockIsValidHandle,
-  mockMaterializePublicProfile,
+  mockMaterializeDisplayProfile,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetCachedLatestSnapshot: vi.fn(),
   mockDbGetToolInsights: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockIsValidHandle: vi.fn(),
-  mockMaterializePublicProfile: vi.fn(),
+  mockMaterializeDisplayProfile: vi.fn(),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -41,8 +41,11 @@ vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
 }));
 
-vi.mock("@/lib/profile/public-profile", () => ({
-  materializePublicProfile: mockMaterializePublicProfile,
+// #1180 (PE-L2) — route.ts calls materializeDisplayProfile directly (not
+// materializePublicProfile/materializeProfile), which never re-reads the
+// snapshot the route already fetched via getCachedLatestSnapshot above.
+vi.mock("@/lib/profile/materialize-profile", () => ({
+  materializeDisplayProfile: mockMaterializeDisplayProfile,
 }));
 
 // ---------------------------------------------------------------------------
@@ -130,7 +133,7 @@ beforeEach(() => {
   mockGetCachedLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
   mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
   mockGetClientIp.mockReturnValue("127.0.0.1");
-  mockMaterializePublicProfile.mockResolvedValue(MOCK_MATERIALIZED);
+  mockMaterializeDisplayProfile.mockResolvedValue(MOCK_MATERIALIZED);
 });
 
 // ---------------------------------------------------------------------------
@@ -419,13 +422,13 @@ describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () =>
   it("materializes read-only so a public GET never triggers a cache write", async () => {
     await GET(makeRequest("juan294"), makeParams("juan294"));
 
-    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("juan294", {
+    expect(mockMaterializeDisplayProfile).toHaveBeenCalledWith("juan294", {
       readOnly: true,
     });
   });
 
   it("returns null display fields when the profile cannot be materialized", async () => {
-    mockMaterializePublicProfile.mockResolvedValue(null);
+    mockMaterializeDisplayProfile.mockResolvedValue(null);
 
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
     const body = await resp.json();
@@ -441,7 +444,7 @@ describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () =>
     // A 500 on legal user input is always a bug — this endpoint worked before
     // the display fields existed and must keep working if they cannot be
     // computed.
-    mockMaterializePublicProfile.mockRejectedValue(new Error("redis down"));
+    mockMaterializeDisplayProfile.mockRejectedValue(new Error("redis down"));
 
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
     const body = await resp.json();
@@ -458,6 +461,20 @@ describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () =>
     const resp = await GET(makeRequest("nobody"), makeParams("nobody"));
 
     expect(resp.status).toBe(404);
-    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    expect(mockMaterializeDisplayProfile).not.toHaveBeenCalled();
+  });
+
+  // #1180 (PE-L2) — the route already read the snapshot once above for the
+  // 404 check and the snapshot half of the response body. Materializing the
+  // display headline via `materializeDisplayProfile` (rather than
+  // `materializePublicProfile` -> `materializeProfile`) must not perform a
+  // second, identical `getCachedLatestSnapshot` read for the same request —
+  // that second read's result never affects `displayImpact` in the first
+  // place (#1001), so deduplicating it is unnecessary; it should simply not
+  // happen.
+  it("reads the snapshot cache exactly once per request, not twice", async () => {
+    await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(mockGetCachedLatestSnapshot).toHaveBeenCalledTimes(1);
   });
 });

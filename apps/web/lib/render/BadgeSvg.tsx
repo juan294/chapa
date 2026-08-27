@@ -3,9 +3,32 @@ import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderBadgeBranding } from "./BadgeBranding";
-import { renderRadarChart } from "./RadarChart";
+import { renderRadarChart, type RadarChartLabels } from "./RadarChart";
 import { escapeXml } from "./escape";
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
+import { VERIFICATION_CORAL } from "../badge-visual-metadata";
+
+/**
+ * Locale-resolved strings for the ~10 literals rendered directly onto the
+ * badge SVG (#1181 UX-H3). All fields optional and independently defaulted
+ * to their current English text — `renderBadgeSvg` stays a pure, synchronous
+ * function: the caller (the badge.svg route) resolves these via `getServerT`
+ * and passes plain strings in. Existing callers that omit `strings` entirely
+ * (share page, og-image route, warm-cache cron, demo/archetype pages) keep
+ * producing byte-identical English output.
+ */
+export interface BadgeI18nStrings {
+  metricsSimulated?: string;
+  metricsVerified?: string;
+  metricsPublic?: string;
+  /** Pre-resolved translated label for `impact.tier` (e.g. "Sólido" for "Solid"). */
+  tierLabel?: string;
+  radarLabels?: Partial<Omit<RadarChartLabels, "noData">>;
+  radarNoData?: string;
+  verifiedLabel?: string;
+  sampleDisclosure?: string;
+}
+
 interface BadgeOptions {
   includeBranding?: boolean;
   avatarDataUri?: string;
@@ -22,6 +45,8 @@ interface BadgeOptions {
    * interactive in-DOM previews where animation runs. (#760)
    */
   disableAnimation?: boolean;
+  /** Locale-resolved badge strings (#1181). Omit for English (default). */
+  strings?: BadgeI18nStrings;
 }
 
 /**
@@ -44,7 +69,7 @@ export function renderBadgeSvg(
   impact: ImpactV6Result,
   options: BadgeOptions = {},
 ): string {
-  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false } = options;
+  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {} } = options;
   const hasVerification = Boolean(verificationHash && verificationDate);
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
@@ -107,10 +132,23 @@ export function renderBadgeSvg(
   const radarCX = profileColX + profileColW / 2;
   const radarCY = 275;
   const radarR = 85;
-  const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR);
+  const radarLabels: RadarChartLabels = {
+    delivery: strings.radarLabels?.delivery ?? "Delivery",
+    quality: strings.radarLabels?.quality ?? "Quality",
+    consistency: strings.radarLabels?.consistency ?? "Consistency",
+    breadth: strings.radarLabels?.breadth ?? "Breadth",
+    craft: strings.radarLabels?.craft ?? "Craft",
+    noData: strings.radarNoData ?? "no data yet",
+  };
+  const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR, radarLabels);
 
   // ── Hero score ring (right column, below radar) ───────────
   const scoreStr = String(impact.adjustedComposite);
+  // #1181 — pre-resolved translated tier label; falls back to the raw tier
+  // value (English) for callers that don't pass `strings.tierLabel`. Always
+  // escaped below since `impact.tier`/a caller-supplied string both flow
+  // into SVG text content.
+  const tierLabel = strings.tierLabel ?? impact.tier;
   const ringCY = 460;
   const ringR = 46;
   const ringCircumference = 2 * Math.PI * ringR; // ≈289.03
@@ -131,17 +169,31 @@ export function renderBadgeSvg(
 
   // Verification strip (right edge)
   const verificationSvg = demoMode
-    ? renderDemoVerificationStrip()
+    ? renderDemoVerificationStrip(strings.sampleDisclosure)
     : verificationHash && verificationDate
-      ? renderVerificationStrip(verificationHash, verificationDate)
+      ? renderVerificationStrip(verificationHash, verificationDate, strings.verifiedLabel)
       : "";
   const metricsLabel = demoMode
-    ? "Simulated metrics"
+    ? strings.metricsSimulated ?? "Simulated metrics"
     : hasVerification
-      ? "Verified metrics"
-      : "Public metrics";
+      ? strings.metricsVerified ?? "Verified metrics"
+      : strings.metricsPublic ?? "Public metrics";
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  // ── Accessible name (#1168 UX-L5) ─────────────────────────
+  // Gated to the route-served variant (disableAnimation === true — the
+  // badge.svg route, og-image rasterization, and warm-cache priming) so it
+  // never collides with the share page's own `aria-labelledby` wrapper
+  // around the inline-embedded SVG, or with the portal-tooltip convention
+  // (BadgeOverlay) used over the demo badges on the landing/archetype pages
+  // — both of those are inline (disableAnimation left false/unset).
+  const accessibleTitle = `${headerName} — Chapa Impact score ${scoreStr}, ${escapeXml(archetypeText)} archetype`;
+  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(impact.tier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.`;
+  const a11yAttrs = disableAnimation ? ' role="img"' : "";
+  const a11yMarkup = disableAnimation
+    ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"${a11yAttrs}>${a11yMarkup}
   <defs>
     <style>
       @keyframes pulse-glow {
@@ -151,6 +203,19 @@ export function renderBadgeSvg(
       @keyframes ring-draw {
         from { stroke-dashoffset: ${ringCircumference.toFixed(2)}; }
         to   { stroke-dashoffset: ${ringOffset.toFixed(2)}; }
+      }
+      .badge-score-pulse {
+        animation: pulse-glow 3s ease-in-out infinite;
+      }
+      /* #1168 UX-M6 — pulse-glow runs infinitely on other people's READMEs
+         forever; ring-draw is a one-shot reveal (1.2s, "both" fill) and is
+         intentionally left untouched. This rule must come AFTER the base
+         .badge-score-pulse rule above so equal-specificity cascade order
+         (not !important) is what wins under reduced motion. */
+      @media (prefers-reduced-motion: reduce) {
+        .badge-score-pulse {
+          animation: none;
+        }
       }
     </style>
   </defs>
@@ -176,7 +241,7 @@ export function renderBadgeSvg(
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
   <!-- Verified icon (shield + checkmark) appears only with a real seal. -->
   ${hasVerification ? `<g transform="translate(${PAD + 72}, ${headerY + 6})" opacity="0.4">
-    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${t.accent}" transform="scale(0.7)"/>
+    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${VERIFICATION_CORAL}" transform="scale(0.7)"/>
   </g>` : ""}
   <text x="${PAD + 72 + (hasVerification ? 20 : 0)}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">${metricsLabel}</text>
 
@@ -246,9 +311,9 @@ export function renderBadgeSvg(
   <!-- Ring arc (foreground, tier-colored, animates from 0 to score) -->
   <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})" style="animation: ring-draw 1.2s ease-out 0.5s both"/>
   <!-- Score number (centered inside ring) -->
-  <text x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" dominant-baseline="central" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
+  <text class="badge-score-pulse" x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" dominant-baseline="central">${scoreStr}</text>
   <!-- Tier label (always visible below ring) -->
-  <text x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${escapeXml(impact.tier)}</text>
+  <text x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${escapeXml(tierLabel)}</text>
 
   <!-- ─── Footer ─────────────────────────────────────────── -->
   <!-- Divider line -->

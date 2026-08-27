@@ -8,8 +8,12 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react";
-import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
-import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
+import type {
+  BadgeConfig,
+  CraftResult,
+  StatsData,
+  ImpactV6Result,
+} from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { useIsClient } from "@/hooks/useIsClient";
@@ -26,8 +30,10 @@ import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown
 import {
   executeCommand,
   makeLine,
+  type CommandResult,
   type OutputLine,
 } from "@/components/terminal/command-registry";
+import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListener";
 import { useTranslation, type LanguageContextValue } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -35,13 +41,18 @@ import {
   TERMINAL_COMMAND_INPUT_ID,
   TERMINAL_COMMAND_LISTBOX_ID,
 } from "@/lib/keyboard/shortcuts";
+import { useModelContextTools } from "@/lib/webmcp/use-model-context-tools";
+import { useStudioWebMcpTools } from "./useStudioWebMcpTools";
+import { getStudioCommandConfig } from "./studio-command-config";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: StatsData;
   impact: ImpactV6Result;
+  craftResult?: CraftResult | null;
   handle?: string;
   verification?: PreviewVerification | null;
+  demo?: boolean;
 }
 
 type SaveState =
@@ -52,6 +63,10 @@ type Translate = LanguageContextValue["t"];
 
 const TERMINAL_WELCOME_LINE_ID = "studio-terminal-welcome";
 const TERMINAL_HINT_LINE_ID = "studio-terminal-hint";
+
+// UX-M1 (#1173): Quick Controls now defaults to expanded (see showQuickControls
+// below) but a user's explicit collapse choice is still respected across visits.
+const QUICK_CONTROLS_STORAGE_KEY = "chapa:studio:quickControlsVisible";
 
 function translation(t: Translate, key: string): string {
   return t(key) as string;
@@ -128,19 +143,66 @@ export function StudioClient({
   initialConfig,
   stats,
   impact,
+  craftResult = null,
   handle = "",
   verification = null,
+  demo = false,
 }: StudioClientProps) {
   const { t } = useTranslation();
+  const { webmcpEnabled } = useClientFeatureFlags();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
+  const configRef = useRef(config);
   const [saveState, setSaveState] = useState<SaveState>({ status: "saved" });
+  const [pendingAgentSave, setPendingAgentSave] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
-  const [showQuickControls, setShowQuickControls] = useState(false);
+  // UX-M1 (#1173): defaults to expanded — Quick Controls was the only
+  // pointer affordance for the 9 customization categories, and starting
+  // collapsed behind a low-contrast toggle meant it was easy to miss
+  // entirely. Starting `true` here matches the server-rendered value too
+  // (no localStorage on the server), so there's no hydration mismatch; the
+  // effect below only ever narrows it to a previously-chosen `false`.
+  const [showQuickControls, setShowQuickControlsState] = useState(true);
+  const setShowQuickControls = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      setShowQuickControlsState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next;
+        try {
+          window.localStorage.setItem(QUICK_CONTROLS_STORAGE_KEY, String(value));
+        } catch {
+          // localStorage unavailable (private browsing, etc.) — visibility
+          // still works for this session, it just won't persist.
+        }
+        return value;
+      });
+    },
+    [],
+  );
+  // Hydrate a previously-chosen collapse state after mount only — reading
+  // localStorage during the initial render would disagree with the
+  // server-rendered `true` default and trigger a hydration mismatch. This is
+  // the intended client-only hydration of a browser-derived value (same
+  // pattern as UserMenu.tsx's insights-cooldown read, #892); the lint rule
+  // below is a false positive for that case.
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(QUICK_CONTROLS_STORAGE_KEY);
+      if (stored === "true" || stored === "false") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setShowQuickControlsState(stored === "true");
+      }
+    } catch {
+      // localStorage unavailable — keep the default.
+    }
+  }, []);
   const isClient = useIsClient();
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
   const configRevisionRef = useRef(0);
   const saveInFlightRef = useRef(false);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   // Terminal state — identify seed lines so their rendered text can follow a
   // live locale change without replacing command history or re-adding cleared
@@ -179,24 +241,53 @@ export function StudioClient({
   const saving = saveState.status === "saving";
   const autocompleteExpanded = showAutocomplete && !!activeSuggestionId;
   const studioCommands = useStudioCommands({ config, handle, saving });
+  const trackStudioEvent = useCallback(
+    (event: string, properties?: Record<string, unknown>) => {
+      if (demo) {
+        trackEvent(event, { ...properties, demo: true });
+      } else if (properties) {
+        trackEvent(event, properties);
+      } else {
+        trackEvent(event);
+      }
+    },
+    [demo],
+  );
 
   // Track studio_opened on mount (once)
   useEffect(() => {
     if (!hasTrackedOpen.current) {
-      trackEvent("studio_opened");
+      trackStudioEvent("studio_opened");
       hasTrackedOpen.current = true;
     }
-  }, []);
+  }, [trackStudioEvent]);
+
+  // FE-M3 (#1173): warn before an unsaved-changes loss. Registered/removed on
+  // the saveState.status transition (not just on mount) so the listener only
+  // exists while there's actually something to lose. Demo mode never
+  // persists by design (see handleSave above) — the guard must not fire
+  // there, or the judge-demo flow gets a spurious "leave site?" prompt on
+  // every exit even though there was never anything to save.
+  useEffect(() => {
+    if (demo || saveState.status !== "dirty") return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [demo, saveState.status]);
 
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
+      const currentConfig = configRef.current;
       let changed = false;
       for (const key of Object.keys(newConfig) as (keyof BadgeConfig)[]) {
-        if (newConfig[key] !== config[key]) {
+        if (newConfig[key] !== currentConfig[key]) {
           changed = true;
-          trackEvent("effect_changed", {
+          trackStudioEvent("effect_changed", {
             category: key,
-            from: config[key],
+            from: currentConfig[key],
             to: newConfig[key],
           });
         }
@@ -207,9 +298,10 @@ export function StudioClient({
           setSaveState({ status: "dirty" });
         }
       }
+      configRef.current = newConfig;
       setConfig(newConfig);
     },
-    [config],
+    [trackStudioEvent],
   );
 
   const handleSave = useCallback(async () => {
@@ -223,16 +315,29 @@ export function StudioClient({
 
     saveInFlightRef.current = true;
     const revision = configRevisionRef.current;
-    const configToSave = config;
+    const configToSave = configRef.current;
     setSaveState({ status: "saving" });
     try {
+      if (demo) {
+        trackStudioEvent("config_saved", { config: configToSave });
+        setSaveState({ status: "saved" });
+        setLines((prev) => [
+          ...prev,
+          makeLine(
+            "success",
+            translation(t, "studio.save.demoNotPersisted"),
+          ),
+        ]);
+        return;
+      }
+
       const res = await fetch("/api/studio/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configToSave),
       });
       if (res.ok) {
-        trackEvent("config_saved", { config: configToSave });
+        trackStudioEvent("config_saved", { config: configToSave });
         const hasNewerChanges = configRevisionRef.current !== revision;
         setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
         setLines((prev) => [
@@ -259,39 +364,48 @@ export function StudioClient({
     } finally {
       saveInFlightRef.current = false;
     }
-  }, [config, t]);
+  }, [demo, t, trackStudioEvent]);
 
   const handleReset = useCallback(() => {
-    const changed = Object.keys(DEFAULT_BADGE_CONFIG).some((key) => {
+    const currentConfig = configRef.current;
+    const resetConfig = getStudioCommandConfig(currentConfig, { type: "reset" });
+    if (!resetConfig) return;
+    const changed = Object.keys(resetConfig).some((key) => {
       const configKey = key as keyof BadgeConfig;
-      return config[configKey] !== DEFAULT_BADGE_CONFIG[configKey];
+      return currentConfig[configKey] !== resetConfig[configKey];
     });
-    setConfig({ ...DEFAULT_BADGE_CONFIG });
+    configRef.current = resetConfig;
+    setConfig(resetConfig);
     if (changed) {
       configRevisionRef.current += 1;
       if (!saveInFlightRef.current) {
         setSaveState({ status: "dirty" });
       }
     }
-    trackEvent("effect_changed", { category: "reset", to: "default" });
-  }, [config]);
+    trackStudioEvent("effect_changed", {
+      category: "reset",
+      to: "default",
+    });
+  }, [trackStudioEvent]);
 
   const handleAction = useCallback(
     (action: StudioCommandAction) => {
       switch (action.type) {
         case "set": {
-          handleConfigChange({ ...config, [action.category]: action.value });
+          const nextConfig = getStudioCommandConfig(configRef.current, action);
+          if (nextConfig) handleConfigChange(nextConfig);
           break;
         }
         case "preset": {
-          const preset = STUDIO_PRESETS.find((p) => p.id === action.name);
-          if (preset) {
-            trackEvent("preset_selected", { preset: preset.id });
-            handleConfigChange(preset.config);
+          const nextConfig = getStudioCommandConfig(configRef.current, action);
+          if (nextConfig) {
+            trackStudioEvent("preset_selected", { preset: action.name });
+            handleConfigChange(nextConfig);
           }
           break;
         }
         case "save":
+          setPendingAgentSave(false);
           void handleSave();
           break;
         case "reset":
@@ -304,11 +418,11 @@ export function StudioClient({
           break;
       }
     },
-    [config, handleConfigChange, handleSave, handleReset],
+    [handleConfigChange, handleSave, handleReset, trackStudioEvent],
   );
 
   const handleSubmit = useCallback(
-    (input: string) => {
+    (input: string): CommandResult<StudioCommandAction> => {
       const inputLine = makeLine("input", input);
       setHistory((h) => [...h, input]);
       setShowAutocomplete(false);
@@ -318,7 +432,7 @@ export function StudioClient({
 
       if (result.action?.type === "clear") {
         setLines([]);
-        return;
+        return result;
       }
 
       setLines((prev) => [...prev, inputLine, ...result.lines]);
@@ -326,9 +440,46 @@ export function StudioClient({
       if (result.action) {
         handleAction(result.action);
       }
+      return result;
     },
     [studioCommands, handleAction],
   );
+
+  const handleAgentSaveProposal = useCallback(() => {
+    setPendingAgentSave(true);
+    setShowQuickControls(true);
+    setLines((prev) => [
+      ...prev,
+      makeLine("system", translation(t, "studio.agentSave.proposed")),
+    ]);
+  }, [t, setShowQuickControls]);
+
+  const handleAgentSaveConfirm = useCallback(() => {
+    setPendingAgentSave(false);
+    void handleSave();
+  }, [handleSave]);
+
+  const handleAgentSaveDismiss = useCallback(() => {
+    setPendingAgentSave(false);
+    setLines((prev) => [
+      ...prev,
+      makeLine("info", translation(t, "studio.agentSave.dismissed")),
+    ]);
+  }, [t]);
+
+  const studioWebMcpTools = useStudioWebMcpTools({
+    config,
+    enabled: webmcpEnabled,
+    stats,
+    impact,
+    craftResult,
+    handle,
+    saveStatus: saveState.status,
+    runCommand: handleSubmit,
+    proposeSave: handleAgentSaveProposal,
+    getCurrentConfig: () => configRef.current,
+  });
+  useModelContextTools(studioWebMcpTools, webmcpEnabled);
 
   const handleQuickCommand = useCallback(
     (cmd: string) => {
@@ -392,7 +543,7 @@ export function StudioClient({
           );
           const nextIdx = (currentIdx + 1) % STUDIO_PRESETS.length;
           const preset = STUDIO_PRESETS[nextIdx]!;
-          trackEvent("preset_selected", { preset: preset.id });
+          trackStudioEvent("preset_selected", { preset: preset.id });
           handleConfigChange(preset.config);
           break;
         }
@@ -404,7 +555,13 @@ export function StudioClient({
           break;
       }
     });
-  }, [registerPageShortcuts, config.background, handleConfigChange]);
+  }, [
+    registerPageShortcuts,
+    config.background,
+    handleConfigChange,
+    trackStudioEvent,
+    setShowQuickControls,
+  ]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
@@ -412,6 +569,14 @@ export function StudioClient({
       {/* Preview pane (left, sticky) */}
       <div className="flex items-start justify-center lg:items-center px-3 sm:px-4 py-4 sm:py-6 lg:px-8 lg:py-0 border-b lg:border-b-0 lg:border-r border-stroke" aria-busy={saving}>
         <div className="w-full max-w-xl sticky top-20">
+          {demo && (
+            <div
+              className="mb-3 text-center font-heading text-xs font-bold tracking-[0.2em] text-amber"
+              data-testid="studio-demo-marker"
+            >
+              {t("studio.demoMarker") as string}
+            </div>
+          )}
           <BadgePreviewCard
             key={previewKey}
             config={config}
@@ -447,6 +612,27 @@ export function StudioClient({
 
       {/* Terminal pane (right) */}
       <div className="flex flex-col min-h-[50vh] lg:h-[calc(100vh-3.5rem)] bg-bg">
+        {/* Visible title + subhead (UX-M1, #1173) — the page's only prior
+            accessible name was the sr-only <h1> above, so nothing on screen
+            named the tool. The title text duplicates that h1 and is hidden
+            from assistive tech to avoid a double announcement; the subhead
+            is new descriptive copy and stays in the normal a11y tree. */}
+        <div className="flex flex-col gap-0.5 border-b border-stroke px-3 py-2.5">
+          <span
+            aria-hidden="true"
+            data-testid="studio-visible-title"
+            className="font-heading text-sm font-semibold tracking-tight text-text-primary"
+          >
+            {t("studio.title") as string}
+          </span>
+          <span
+            data-testid="studio-visible-subtitle"
+            className="text-xs text-text-secondary"
+          >
+            {t("studio.subtitle") as string}
+          </span>
+        </div>
+
         {/* Quick Controls toggle */}
         <QuickControls
           config={config}
@@ -454,6 +640,14 @@ export function StudioClient({
           visible={showQuickControls}
           onToggle={() => setShowQuickControls((v) => !v)}
           saveDisabled={saving}
+          agentSaveProposal={
+            pendingAgentSave
+              ? {
+                  onConfirm: handleAgentSaveConfirm,
+                  onDismiss: handleAgentSaveDismiss,
+                }
+              : undefined
+          }
         />
 
         {/* Terminal output */}

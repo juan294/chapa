@@ -156,7 +156,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 6h primary, 7-day stale-fallback tier)
-- Cache SVG output per user/day + theme (TTL 24h + per-handle jitter of 0–2h to spread UTC-midnight recompute spikes)
+- Cache SVG output per user/day + theme + locale (TTL 24h + per-handle jitter of 0–2h to spread UTC-midnight recompute spikes)
 - **Lifetime metrics**: `MetricsSnapshot` records stored in Supabase `metrics_snapshots` table — permanent history. Max 1 snapshot per user per day (UNIQUE constraint on handle+date). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
 - **Supplemental EMU stats**: durably stored in Supabase `supplemental_stats` table (one row per `target_handle`). Redis (`supplemental:<handle>`, 24h TTL) is the hot read path; on miss, `getStats()` falls back to Supabase and rehydrates Redis via fire-and-forget. A missed CLI upload day no longer drops EMU data from scores. Supplemental is composed onto GitHub-derived stats *after* the integrity guards run, and is deliberately excluded from the `stats:stale:v2:` baseline (#1060) — so a scope-rejected fetch re-composes the current supplemental instead of discarding it.
 - **Same-day refresh signal**: a CLI supplemental upload sets `stats:dirty:<handle>` in Redis (1h TTL). `materializeProfile` reads the marker and threads `inputsChanged` so `applyImpactScorePolicy` bypasses the same-day EMA lock; `runPublicProfileSideEffects` then routes today's snapshot through `dbReplaceSnapshot` (UPSERT) and clears the marker. Since #1001 the **displayed headline is always the fresh score**, so this bypass now governs only the persisted trend snapshot (whether today's snapshot absorbs the new inputs same-day) — not what the user sees. Default behavior (no dirty marker) preserves the existing feedback-loop protection for the snapshot.
@@ -182,7 +182,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - **Rate-limit fail-open (with fail-closed exceptions)**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) allows all requests when Redis is unavailable (fail-open) on public reads — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement, and GitHub's own API limits + CDN caching provide secondary protection. Auth-critical and write routes use `rateLimitStrict` (fail-closed) instead: `/api/auth/session`, `/api/refresh`, and — since #1027 — all platform OAuth connect/callback/disconnect routes (Bitbucket/Codeberg/GitLab), which also share GitHub's single-use replay-consume nonce via a per-platform `chapa_<provider>_oauth_state_store` cookie. See `redis.ts` for the full fail-open rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`
-- **Badge latency SLO (#974)**: the badge route (`/u/:handle/badge.svg`) has a defined p95 latency budget — **800ms cache-hit**, **3000ms cache-miss** — enforced in `apps/web/lib/monitoring/latency-slo.ts`. Every badge response carries a `Server-Timing` header (`cache;desc="hit"` on warm hits, `cache;desc="cache-timeout"` when a Redis read exceeds its deadline (#1014), `materialize` + `render` breakdown on cold misses; always a `total`) so per-request latency is inspectable. The `/api/cron/latency-check` daily synthetic monitor times the live endpoint, writes its own heartbeat (monitored by `/api/health`, #1018), and raises a P2 `badge_latency_slo_breach` operational alert via `CHAPA_ALERT_WEBHOOK_URL` when the budget is exceeded (or the probe fails). Against this budget: the SVG cache-read deadline is 500ms (#1014, was 250ms — too tight, misclassified genuine hits as misses under Redis tail latency), the render-lock loser's poll budget is ~950ms (#1029, was ~2000ms), the avatar fetch is capped at 1000ms and skips the shared cache write on timeout (#1029/PE-L1), and the durable snapshot persist runs in `after()` rather than blocking the response (#1013). **Materialize deadline + background continuation (#1086)**: on a cold miss where a stale (yesterday's) SVG already exists, the foreground request races the materialize call against a 2200ms `BADGE_MATERIALIZE_DEADLINE_MS` deadline — on timeout it serves the stale SVG with a short-TTL `s-maxage=60` header instead of blocking further, while the original materialize call keeps running via `warmBadgeCacheInBackground` so the next request is warm. `finalizeMaterializedBadge`/`runBadgeSideEffects` are shared between the foreground and background paths so side effects (snapshot persist, cache writes) run exactly once either way. Avatar cache writes now track four outcomes instead of one boolean — success, real-fetch-failed, **permanently absent** (no `avatarUrl` at all, cached for a short `AVATAR_ABSENT_CACHE_TTL_SECONDS` window), and race-timeout (never cached) — so a handle with no avatar (e.g. a README embed) still gets cache population instead of forcing a full materialize+render on every request (#1080/#1088).
+- **Badge latency SLO (#974)**: the badge route (`/u/:handle/badge.svg`) has a defined p95 latency budget — **800ms cache-hit**, **4100ms cache-miss** — enforced in `apps/web/lib/monitoring/latency-slo.ts`. Every badge response carries a `Server-Timing` header (`cache;desc="hit"` on warm hits, `cache;desc="cache-timeout"` when a Redis read exceeds its deadline (#1014), `materialize` + `render` breakdown on cold misses; always a `total`) so per-request latency is inspectable. The `/api/cron/latency-check` daily synthetic monitor times the live endpoint, writes its own heartbeat (monitored by `/api/health`, #1018), and raises a P2 `badge_latency_slo_breach` operational alert via `CHAPA_ALERT_WEBHOOK_URL` when the budget is exceeded (or the probe fails). Against this budget: the SVG cache-read deadline is 500ms (#1014, was 250ms — too tight, misclassified genuine hits as misses under Redis tail latency), the render-lock loser's poll budget is ~950ms (#1029, was ~2000ms), the avatar fetch is capped at 1000ms and skips the shared cache write on timeout (#1029/PE-L1), and the durable snapshot persist runs in `after()` rather than blocking the response (#1013). **Materialize deadline + background continuation (#1086)**: on a cold miss where a stale (yesterday's) SVG already exists, the foreground request races the materialize call against a 2200ms `BADGE_MATERIALIZE_DEADLINE_MS` deadline — on timeout it serves the stale SVG with a short-TTL `s-maxage=60` header instead of blocking further, while the original materialize call keeps running via `warmBadgeCacheInBackground` so the next request is warm. `finalizeMaterializedBadge`/`runBadgeSideEffects` are shared between the foreground and background paths so side effects (snapshot persist, cache writes) run exactly once either way. Avatar cache writes now track four outcomes instead of one boolean — success, real-fetch-failed, **permanently absent** (no `avatarUrl` at all, cached for a short `AVATAR_ABSENT_CACHE_TTL_SECONDS` window), and race-timeout (never cached) — so a handle with no avatar (e.g. a README embed) still gets cache population instead of forcing a full materialize+render on every request (#1080/#1088).
 
 ## Code ownership areas
 - OAuth: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
@@ -211,7 +211,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Crypto helpers: `apps/web/lib/crypto/*` — constant-time comparison (`safe-equal.ts`) for HMAC/token verification
 - Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (interactions, borders, cards, celebrations, backgrounds, counters, heatmap animations, tier visuals) behind Creator Studio's 9 customization categories
 - Creator Studio UI: `apps/web/app/studio/*` — authenticated owner preview, controls, save state, command actions, and preview footer composition
-- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — Redis caches validated payloads while Supabase remains authoritative; Supabase commits before Redis is refreshed, migration 035 assigns database-ordered revisions, and each cache hit checks the durable revision so an outage or older serverless instance cannot make stale data authoritative
+- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — Supabase is the only store; both GET and PUT read/write it directly with no Redis involvement (#1186/BE-L1 removed the Redis read because every cache hit still required a second, independent Supabase revision check to trust it; a later remediation removed the now-orphaned Redis write too, since nothing read that mirror back once the read path stopped consulting it). Migration 035's `revision` column and `set_studio_config_revision` trigger remain — `dbGetStudioConfig` still validates and returns a monotonically-increasing `revision` per row — but nothing outside this module consumes it today.
 - HTTP utilities: `apps/web/lib/http/*` — client IP extraction (`client-ip.ts`) for rate limiting
 - Keyboard shortcuts: `apps/web/lib/keyboard/*` — shortcut registry and React hook for the terminal/command-bar UI
 - Monitoring: `apps/web/lib/monitoring/*` — badge latency SLO budgets and measurement (`latency-slo.ts`) backing `/api/cron/latency-check`
@@ -390,7 +390,7 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 
 ```bash
 # Before committing
-pnpm run test           # Run all tests
+pnpm run test           # Unit + script suites (contract tests: pnpm run test:contract:local)
 pnpm run typecheck      # Check types
 pnpm run lint           # Check linting
 
@@ -428,7 +428,7 @@ SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBL
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
-CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1 operational alerts (Discord/Slack/custom — optional; triggers on health_degraded, badge_5xx, oauth_callback_failure, cron_failure, warm_cache_high_failure_rate, warm_cache_ceiling_approached)
+CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1/P2 operational alerts (optional, custom endpoint only — no Discord/Slack integration exists or is planned; triggers on health_degraded, badge_5xx, oauth_callback_failure, cron_failure, warm_cache_high_failure_rate, warm_cache_ceiling_approached, badge_latency_slo_breach). When unset (the current production default), the same signals deliver via email instead (Resend, to SUPPORT_FORWARD_EMAIL) — see docs/runbooks/incident-response.md.
 
 RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
 RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)
@@ -438,6 +438,7 @@ GITHUB_TOKEN=              # GitHub personal access token (optional — fallback
 
 CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, disabled by default)
+NEXT_PUBLIC_STUDIO_DEMO_ENABLED= # Set to "true" to enable Studio's anonymous demo mode at /studio?demo=1 (optional, disabled by default)
 NEXT_PUBLIC_EXPERIMENTS_ENABLED= # Set to "true" to enable /experiments pages (optional, disabled by default)
 
 NEXT_PUBLIC_INSIGHTS_ENABLED=  # Set to "true" to enable AI Insights integration (optional, disabled by default)
@@ -454,6 +455,8 @@ GITLAB_CLIENT_ID=                # GitLab OAuth app client ID (optional — GitL
 GITLAB_CLIENT_SECRET=            # GitLab OAuth app secret (optional — server-side only)
 NEXT_PUBLIC_GITLAB_ENABLED=      # Set to "true" to enable GitLab link/unlink in User Menu (optional, disabled by default)
 
+NEXT_PUBLIC_WEBMCP_ENABLED=      # Set to "true" to register Chapa's WebMCP tools into a visitor's document.modelContext (optional, disabled by default)
+
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
 ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)
 ALLOW_AGENT_RUN=               # Set to "true" to allow /api/admin/agents/run endpoint (optional, disabled by default)
@@ -466,6 +469,8 @@ ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer i
 ```
 
 > **Intentionally omitted:** `CI`, `NODE_ENV`, and `VERCEL_*` are standard Node/Vercel build vars and do not need to be configured manually. `TESTPLATFORM_CLIENT_ID` / `TESTPLATFORM_CLIENT_SECRET` are test-only mocks — not real credentials and not needed in any deployed environment.
+
+> **Not a kill switch:** the `NEXT_PUBLIC_*_ENABLED` feature flags above are DB-backed (`apps/web/lib/feature-flags.ts`) — the env var is consulted only as a fallback when the DB flag row is absent or its 500ms lookup times out. During a Supabase outage the env var becomes authoritative for that flag (the opposite of a kill switch), but whenever the DB is reachable, the DB row wins regardless of the env var's value.
 
 `/api/version` reads Vercel commit/environment identity through
 `apps/web/lib/env.ts`; route and test code must not introduce direct

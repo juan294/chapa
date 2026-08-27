@@ -63,6 +63,50 @@ export function getFontBuffers(): Buffer[] | undefined {
 }
 
 /**
+ * Remove every `@keyframes name { ... }` block from a CSS string, correctly
+ * consuming ANY number of nested `{ ... }` rule blocks inside it.
+ *
+ * #1168 UX-M6 (critical note): the previous implementation used a fixed
+ * 2-brace-deep regex (`/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/`), which only
+ * matches a @keyframes block with exactly ONE inner rule. The real badge's
+ * `pulse-glow` keyframes has TWO inner rules ("0%, 100% {...}" and "50%
+ * {...}"), so the old regex stopped after the first one and left the
+ * @keyframes block's own outer closing brace unconsumed — a stray "}" bleeding
+ * into whatever CSS followed (here, the new `prefers-reduced-motion` @media
+ * block). Verified this didn't visibly corrupt rasterization via real resvg
+ * output, but it's fragile: a brace-depth counter handles it exactly instead.
+ */
+function stripKeyframesBlocks(css: string): string {
+  const KEYFRAMES = "@keyframes";
+  let result = "";
+  let i = 0;
+  for (;;) {
+    const start = css.indexOf(KEYFRAMES, i);
+    if (start === -1) {
+      result += css.slice(i);
+      break;
+    }
+    result += css.slice(i, start);
+    const braceStart = css.indexOf("{", start);
+    if (braceStart === -1) {
+      // Malformed (no opening brace) — leave the rest untouched rather than
+      // risk eating unrelated CSS.
+      result += css.slice(start);
+      break;
+    }
+    let depth = 1;
+    let j = braceStart + 1;
+    while (j < css.length && depth > 0) {
+      if (css[j] === "{") depth++;
+      else if (css[j] === "}") depth--;
+      j++;
+    }
+    i = j; // Resume right after the matching outer closing brace.
+  }
+  return result;
+}
+
+/**
  * Strip all animations from an SVG string so it renders as a static image.
  *
  * Removes:
@@ -73,8 +117,8 @@ export function getFontBuffers(): Buffer[] | undefined {
  */
 export function stripSvgAnimations(svg: string): string {
   let result = svg;
-  // CSS @keyframes blocks
-  result = result.replace(/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/g, "");
+  // CSS @keyframes blocks (brace-depth aware — see stripKeyframesBlocks)
+  result = stripKeyframesBlocks(result);
   // CSS animation properties in style attributes
   result = result.replace(/animation[^;"]*/g, "");
   // SMIL <animate> elements (self-closing and with content)

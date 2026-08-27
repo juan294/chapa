@@ -757,7 +757,7 @@ export function CampaignsDashboard() {
 
         {/* Engagement info banner */}
         {c.type === "engagement" && (
-          <div className="rounded-lg border border-complement/20 bg-complement/5 px-4 py-2 text-sm text-complement">
+          <div className="rounded-lg border border-complement/20 bg-complement/5 px-4 py-2 text-sm text-complement-text">
             This template is sent automatically when a user&apos;s score increases by 10+ points. Enable delivery in the Engagement tab.
           </div>
         )}
@@ -913,7 +913,7 @@ export function CampaignsDashboard() {
                   <td className="px-4 py-3 text-text-primary">
                     {c.name}
                     {c.type === "engagement" && (
-                      <span className="ml-2 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-complement/10 text-complement font-heading">
+                      <span className="ml-2 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-complement/10 text-complement-text font-heading">
                         engagement
                       </span>
                     )}

@@ -4,7 +4,7 @@
 // this page since it renders outside the normal component tree.
 "use client";
 
-import { useEffect } from "react";
+import { useErrorBoundaryReport } from "@/lib/analytics/use-error-boundary-report";
 
 export default function GlobalError({
   error,
@@ -13,21 +13,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    void fetch("/api/telemetry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event: "client_error",
-        category: "global_error",
-        message: error.message,
-        stack: error.stack,
-        digest: error.digest,
-        path: typeof window === "undefined" ? undefined : window.location.pathname,
-        source: "global-error",
-      }),
-    }).catch(() => undefined);
-  }, [error]);
+  useErrorBoundaryReport(error, "global-error", "global_error");
 
   return (
     // DEFAULT_LOCALE ('es') — this page can't reach the i18n provider (see note above),
@@ -45,7 +31,7 @@ export default function GlobalError({
           .global-error-subtext { color: #6B7280; }
           @media (prefers-color-scheme: dark) {
             .global-error-body { background-color: #0A0A0F; color: #E2E4E9; }
-            .global-error-subtext { color: #6B6F7B; }
+            .global-error-subtext { color: #8B8FA0; }
           }
         `}</style>
       </head>
@@ -123,7 +109,7 @@ export default function GlobalError({
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#6B6F7B",
+                color: "#8B8FA0",
                 textDecoration: "none",
                 cursor: "pointer",
               }}

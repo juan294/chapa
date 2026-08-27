@@ -105,6 +105,70 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     expect(svg).toContain(">Breadth<");
   });
 
+  // ---------------------------------------------------------------------------
+  // Locale-aware labels (#1181 UX-H3) — renderRadarChart stays pure/sync;
+  // resolved label strings are passed in by the caller, never resolved here.
+  // ---------------------------------------------------------------------------
+
+  describe("locale-aware labels (#1181)", () => {
+    it("defaults to English labels and 'no data yet' when no labels option is given (backward compatible)", () => {
+      const svg = renderRadarChart(makeDimensions(), 200, 200, 100);
+      expect(svg).toContain(">Delivery<");
+      expect(svg).toContain(">Quality<");
+      expect(svg).toContain(">Consistency<");
+      expect(svg).toContain(">Breadth<");
+      const empty = renderRadarChart(makeDimensions({ delivery: 0, quality: 0, consistency: 0, breadth: 0 }), 200, 200, 100);
+      expect(empty).toContain(">no data yet<");
+    });
+
+    it("uses translated axis labels and empty-state text when a labels option is provided", () => {
+      const svg = renderRadarChart(makeDimensions(), 200, 200, 100, {
+        delivery: "Entrega",
+        quality: "Calidad",
+        consistency: "Constancia",
+        breadth: "Alcance",
+        craft: "Oficio",
+        noData: "aún sin datos",
+      });
+      expect(svg).toContain(">Entrega<");
+      expect(svg).toContain(">Calidad<");
+      expect(svg).toContain(">Constancia<");
+      expect(svg).toContain(">Alcance<");
+      expect(svg).not.toContain(">Delivery<");
+      expect(svg).not.toContain(">Quality<");
+
+      const empty = renderRadarChart(makeDimensions({ delivery: 0, quality: 0, consistency: 0, breadth: 0 }), 200, 200, 100, {
+        delivery: "Entrega",
+        quality: "Calidad",
+        consistency: "Constancia",
+        breadth: "Alcance",
+        craft: "Oficio",
+        noData: "aún sin datos",
+      });
+      expect(empty).toContain(">aún sin datos<");
+      expect(empty).not.toContain(">no data yet<");
+    });
+
+    it("uses the translated Craft label in pentagon mode", () => {
+      const svg = renderRadarChart(
+        { delivery: 50, quality: 50, consistency: 50, breadth: 50, craft: 50 },
+        200,
+        200,
+        100,
+        {
+          delivery: "Entrega",
+          quality: "Calidad",
+          consistency: "Constancia",
+          breadth: "Alcance",
+          craft: "Oficio",
+          noData: "aún sin datos",
+        },
+      );
+      expect(svg).toContain(">Oficio<");
+      expect(svg).not.toContain(">Craft<");
+    });
+  });
+
   it("delivery axis points straight up (no rotation)", () => {
     const cx = 200, cy = 200, r = 100;
     const svg = renderRadarChart(makeDimensions({ delivery: 100 }), cx, cy, r);

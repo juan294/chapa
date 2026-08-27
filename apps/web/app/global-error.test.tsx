@@ -29,5 +29,13 @@ describe("GlobalError", () => {
         }),
       );
     });
+
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
+    expect(body).toMatchObject({
+      event: "client_error",
+      category: "global_error",
+      source: "global-error",
+      digest: "digest-1",
+    });
   });
 });

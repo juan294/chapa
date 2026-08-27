@@ -17,6 +17,7 @@ const {
   mockGetOptionalServerSessionFromHeaders,
   mockWriteBadgeSvgCache,
   mockCaptureServerError,
+  mockCacheGet,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -34,6 +35,7 @@ const {
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockCacheGet: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -61,6 +63,10 @@ vi.mock("@/lib/auth/session", () => ({
 
 vi.mock("@/lib/history/get-trend-data", () => ({
   getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
+}));
+
+vi.mock("@/lib/feature-flags", () => ({
+  isWebmcpEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 // #1091 — the after()-deferred snapshot write must escalate a genuine
@@ -91,6 +97,18 @@ vi.mock("@/lib/render/badge-svg-cache", async (importOriginal) => {
   return {
     ...actual,
     writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+  };
+});
+
+// #1180 (PE-L1) — readBadgeSvgCache (kept real above) calls through to this
+// module's cacheGet. Mocked here (rather than left to the real no-credentials
+// no-op) so tests can control exactly when the read resolves and assert it is
+// kicked off concurrently with materialize/trend/flags, not strictly after.
+vi.mock("@/lib/cache/redis", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/cache/redis")>();
+  return {
+    ...actual,
+    cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   };
 });
 
@@ -139,14 +157,17 @@ vi.mock("@/components/ErrorBanner", () => ({
 vi.mock("@/components/CommandBarHint", () => ({
   CommandBarHint: () => null,
 }));
-vi.mock("@/components/NavbarClient", () => ({
-  NavbarClient: () => "<nav />",
+vi.mock("@/components/Navbar", () => ({
+  Navbar: () => "<nav />",
 }));
 vi.mock("@/components/SharePageShortcuts", () => ({
   SharePageShortcuts: () => null,
 }));
 vi.mock("@/components/BadgeToolbar", () => ({
   BadgeToolbar: () => "<div>toolbar</div>",
+}));
+vi.mock("@/components/SiteFooter", () => ({
+  SiteFooter: () => "<footer>site-footer</footer>",
 }));
 vi.mock("@/components/SharePageOwnerContent", () => ({
   SharePageOwnerContent: () => "<div>owner-content</div>",
@@ -158,6 +179,11 @@ vi.mock("@/components/BadgeSkeleton", () => ({
 import SharePage, { SharePageContent, generateMetadata } from "./page";
 import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { SharePageShortcuts } from "@/components/SharePageShortcuts";
+import { BadgeToolbar } from "@/components/BadgeToolbar";
+import { Navbar } from "@/components/Navbar";
+import { SiteFooter } from "@/components/SiteFooter";
+import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 
 /**
  * Recursively walk a rendered React element tree (as returned by an async
@@ -235,6 +261,7 @@ describe("SharePage /u/[handle]", () => {
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockWriteBadgeSvgCache.mockResolvedValue(true);
+    mockCacheGet.mockResolvedValue(null);
     mockGetServerLocale.mockResolvedValue("en");
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
     mockHeaders.mockResolvedValue({ get: () => null });
@@ -498,14 +525,18 @@ describe("SharePage /u/[handle]", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: false,
     });
+    // #1181 — the call now always also carries a locale-resolved `strings`
+    // bundle; see the "badge content and cache key never diverge by locale"
+    // describe block below for that coverage. This test only cares about
+    // the pre-existing avatar/verification contract.
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
       FAKE_MATERIALIZED.displayImpact,
-      {
+      expect.objectContaining({
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2026-04-17",
-      },
+      }),
     );
   });
 
@@ -580,6 +611,119 @@ describe("SharePage /u/[handle]", () => {
       expect(mockCaptureServerError).toHaveBeenCalledWith(
         expect.objectContaining({ error: writeError }),
       );
+    });
+  });
+
+  // #1180 (PE-L1) — the shared badge SVG cache read depends on nothing in
+  // the session/materialize/trend/flags wave (only `handle` and today's
+  // date, both known at entry). It must be kicked off concurrently with
+  // that wave, not strictly after it resolves.
+  describe("SVG cache read parallelized with materialize/trend/flags (#1180 PE-L1)", () => {
+    it("starts the badge SVG cache read without waiting for materializePublicProfile to resolve", async () => {
+      let resolveMaterialize!: (value: typeof FAKE_MATERIALIZED) => void;
+      mockMaterializePublicProfile.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveMaterialize = resolve;
+          }),
+      );
+
+      const contentPromise = SharePageContent({ handle: "testuser" });
+
+      // Flush pending microtasks WITHOUT resolving materializePublicProfile.
+      // If the cache read were still gated behind `await Promise.all([...])`
+      // (the pre-fix ordering), it could not have been invoked yet because
+      // that Promise.all can't settle until materialize does.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockCacheGet).toHaveBeenCalled();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+
+      resolveMaterialize(FAKE_MATERIALIZED);
+      await contentPromise;
+    });
+
+    it("still uses the resolved cached SVG (or falls through to a fresh render) once both settle", async () => {
+      mockCacheGet.mockResolvedValue(FAKE_SVG);
+
+      await renderPage();
+
+      // A cache hit means no fresh render/avatar work was needed.
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+    });
+
+    it("computes one `today` value reused for both the cache read key and the later cache write key", async () => {
+      await renderPage();
+
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      const writeKey = mockWriteBadgeSvgCache.mock.calls[0]![0] as string;
+      expect(writeKey).toBe(readKey);
+    });
+  });
+
+  // #1181 (UX-H3) regression — SharePageContent used to build the SVG cache
+  // key (buildBadgeSvgCacheKey, no locale arg → defaults to DEFAULT_LOCALE,
+  // 'es') and the rendered content (renderBadgeSvg, no `strings` → defaults
+  // to English) from two INDEPENDENT defaults instead of the page's own
+  // resolved `locale` prop. Both wrote an English-rendered badge into the
+  // Spanish-keyed cache slot — content and key silently disagreed, and since
+  // the default locale is the majority of real traffic, this defeated the
+  // whole feature. Fixed via the shared `resolveBadgeLocale` helper, which
+  // derives strings AND the cache key from the same locale value.
+  describe("badge content and cache key never diverge by locale (#1181 regression)", () => {
+    it("renders Spanish content into the :es-keyed cache slot for the default (es) locale", async () => {
+      await SharePageContent({ handle: "testuser", locale: "es" });
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Métricas verificadas",
+            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            radarLabels: expect.objectContaining({ delivery: "Entrega" }),
+          }),
+        }),
+      );
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      expect(readKey.endsWith(":es")).toBe(true);
+    });
+
+    it("renders English content into the :en-keyed cache slot for locale=en", async () => {
+      await SharePageContent({ handle: "testuser", locale: "en" });
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Verified metrics",
+            tierLabel: "Solid",
+            radarLabels: expect.objectContaining({ delivery: "Delivery" }),
+          }),
+        }),
+      );
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      expect(readKey.endsWith(":en")).toBe(true);
+    });
+
+    it("writes a fresh render to the exact same locale-tagged key it read from, for a non-default locale", async () => {
+      await SharePageContent({ handle: "testuser", locale: "en" });
+
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      const writeKey = mockWriteBadgeSvgCache.mock.calls[0]![0] as string;
+      expect(writeKey).toBe(readKey);
+      expect(writeKey.endsWith(":en")).toBe(true);
     });
   });
 
@@ -795,6 +939,161 @@ describe("SharePage /u/[handle]", () => {
       expect(ownerEl).not.toBeNull();
       expect(ownerEl!.props.trend).toBeNull();
       expect(ownerEl!.props.diff).toBeNull();
+    });
+  });
+
+  // #1165 (FE-H2) — the route is dynamic (not ISR, see the page.test.ts
+  // source-text assertions), so it must use the server Navbar variant and
+  // thread the already-resolved isOwner down as a prop to the client
+  // components that used to re-derive it over a network round trip to
+  // /api/auth/session. isOwner stays a DISPLAY gate only — the redaction
+  // tests above are the actual security boundary and must be unaffected.
+  describe("server Navbar + isOwner prop threading (#1165 / FE-H2)", () => {
+    it("renders the server Navbar, not NavbarClient", async () => {
+      const result = await renderPage("testuser");
+
+      const navbarEl = findElement(result, (el) => el.type === Navbar);
+      expect(navbarEl).not.toBeNull();
+    });
+
+    it("threads isOwner=true to SharePageOwnerContentLazy, SharePageShortcuts, and BadgeToolbar when the session matches the handle", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+
+      const result = await renderPage("testuser");
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const toolbarEl = findElement(result, (el) => el.type === BadgeToolbar);
+
+      expect(ownerEl!.props.isOwner).toBe(true);
+      expect(shortcutsEl!.props.isOwner).toBe(true);
+      expect(toolbarEl!.props.isOwner).toBe(true);
+    });
+
+    it("threads isOwner=false when there is no session (anonymous visitor)", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      const result = await renderPage("testuser");
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const toolbarEl = findElement(result, (el) => el.type === BadgeToolbar);
+
+      expect(ownerEl!.props.isOwner).toBe(false);
+      expect(shortcutsEl!.props.isOwner).toBe(false);
+      expect(toolbarEl!.props.isOwner).toBe(false);
+    });
+
+    it("threads isOwner=false when a different user's session is present", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "someone-else" });
+
+      const result = await renderPage("testuser");
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      expect(ownerEl!.props.isOwner).toBe(false);
+    });
+  });
+
+  // #1167 (UX-B1, launch blocker) — the share page is the single most
+  // important surface in the finding's exact reproduction: a visitor
+  // arrives from a README badge, signs in, generates their own badge, and
+  // never sees a link to Privacy or Terms anywhere in that flow. Landing
+  // and the 7 [locale] content pages already got SiteFooter in a prior
+  // remediation unit; this closes the gap on /u/[handle] itself.
+  describe("SiteFooter + real-route nav links (#1167 / UX-B1)", () => {
+    it("renders SiteFooter with the resolved locale-aware t function", async () => {
+      const result = await renderPage("testuser");
+
+      const footerEl = findElement(result, (el) => el.type === SiteFooter);
+      expect(footerEl).not.toBeNull();
+      expect(typeof footerEl!.props.t).toBe("function");
+      // renderPage() calls SharePageContent without an explicit `locale`, so
+      // it falls back to DEFAULT_LOCALE — mocked to "es" in this file.
+      const t = footerEl!.props.t as (key: string) => unknown;
+      expect(t("landing.footer.privacy")).toBe("Privacidad");
+    });
+
+    it("passes real-route inner nav links to the server Navbar, not the landing page's hash anchors", async () => {
+      const result = await renderPage("testuser");
+
+      const navbarEl = findElement(result, (el) => el.type === Navbar);
+      expect(navbarEl!.props.navLinks).toEqual([
+        { label: "Acerca de", href: "/about" },
+        { label: "Puntuación", href: "/about/scoring" },
+        { label: "Verificar", href: "/verify" },
+      ]);
+    });
+  });
+
+  // #1165 (FE-M1) — an early <html lang> assignment must be emitted for the
+  // page's own resolved locale (query > cookie > Accept-Language > default),
+  // matching the pattern already used on the landing page and /verify pages.
+  describe("DocumentLocaleScript (#1165 / FE-M1)", () => {
+    it("emits an early document-language assignment for the resolved locale", async () => {
+      mockGetServerLocale.mockResolvedValue("en");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({ lang: "en" }),
+      });
+
+      const scriptEl = findElement(result, (el) => el.type === DocumentLocaleScript);
+      expect(scriptEl).not.toBeNull();
+      expect(scriptEl!.props.locale).toBe("en");
+    });
+
+    it("resolves the same locale as the LanguageProvider body (no disagreement)", async () => {
+      mockGetServerLocale.mockResolvedValue("es");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
+
+      const scriptEl = findElement(result, (el) => el.type === DocumentLocaleScript);
+      expect(scriptEl!.props.locale).toBe("es");
+    });
+  });
+
+  // #1165 (UX-M5) — the "e" keyboard shortcut and the visible Markdown Copy
+  // button must produce byte-identical clipboard content: a single,
+  // localized, handle-bearing string built once, server-side, and threaded
+  // to both consumers.
+  describe("canonical embed markdown (#1165 / UX-M5)", () => {
+    it("passes a handle-bearing, non-hardcoded-English embed markdown to SharePageShortcuts", async () => {
+      const result = await renderPage("testuser");
+
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const embedMarkdown = shortcutsEl!.props.embedMarkdown as string;
+      expect(embedMarkdown).toContain("testuser");
+      expect(embedMarkdown).toContain("testuser/badge.svg");
+      // Regression guard: this used to be the hardcoded literal "Chapa Badge"
+      // with no handle in the alt text at all.
+      expect(embedMarkdown).not.toBe(
+        "![Chapa Badge](https://chapa.thecreativetoken.com/u/testuser/badge.svg)",
+      );
+    });
+
+    it("passes the IDENTICAL embed markdown string to both SharePageShortcuts and SharePageOwnerContentLazy", async () => {
+      const result = await renderPage("testuser");
+
+      const shortcutsEl = findElement(result, (el) => el.type === SharePageShortcuts);
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+
+      expect(ownerEl!.props.embedMarkdown).toBe(shortcutsEl!.props.embedMarkdown);
+    });
+
+    it("localizes the embed markdown alt text to the resolved locale", async () => {
+      const esResult = await SharePageContent({ handle: "testuser", locale: "es" });
+      const enResult = await SharePageContent({ handle: "testuser", locale: "en" });
+
+      const esShortcuts = findElement(esResult, (el) => el.type === SharePageShortcuts);
+      const enShortcuts = findElement(enResult, (el) => el.type === SharePageShortcuts);
+
+      // Spanish dict: shareOwner.badgeAltOf = 'Chapa de'
+      expect(esShortcuts!.props.embedMarkdown).toContain("![Chapa de testuser](");
+      // English dict: shareOwner.badgeAltOf = 'Chapa Badge of'
+      expect(enShortcuts!.props.embedMarkdown).toContain("![Chapa Badge of testuser](");
     });
   });
 });

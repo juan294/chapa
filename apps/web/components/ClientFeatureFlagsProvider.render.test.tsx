@@ -8,6 +8,7 @@ import {
 
 vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => true),
+  isWebmcpEnabledSync: vi.fn(() => true),
   isInsightsEnabledSync: vi.fn(() => false),
   isBitbucketEnabledSync: vi.fn(() => false),
   isCodebergEnabledSync: vi.fn(() => false),
@@ -15,10 +16,12 @@ vi.mock("@/lib/feature-flags-sync", () => ({
 }));
 
 function FlagProbe() {
-  const { studioEnabled, bitbucketEnabled } = useClientFeatureFlags();
+  const { studioEnabled, webmcpEnabled, bitbucketEnabled } =
+    useClientFeatureFlags();
   return (
     <div>
       {studioEnabled ? "studio-on" : "studio-off"}
+      {webmcpEnabled ? " webmcp-on" : " webmcp-off"}
       {bitbucketEnabled ? " bitbucket-on" : " bitbucket-off"}
     </div>
   );
@@ -30,6 +33,7 @@ describe("ClientFeatureFlagsProvider", () => {
       <ClientFeatureFlagsProvider
         flags={{
           studioEnabled: false,
+          webmcpEnabled: false,
           insightsEnabled: false,
           bitbucketEnabled: true,
           codebergEnabled: false,
@@ -41,6 +45,7 @@ describe("ClientFeatureFlagsProvider", () => {
     );
 
     expect(screen.getByText(/studio-off/)).toBeTruthy();
+    expect(screen.getByText(/webmcp-off/)).toBeTruthy();
     expect(screen.getByText(/bitbucket-on/)).toBeTruthy();
   });
 
@@ -48,5 +53,6 @@ describe("ClientFeatureFlagsProvider", () => {
     render(<FlagProbe />);
 
     expect(screen.getByText(/studio-on/)).toBeTruthy();
+    expect(screen.getByText(/webmcp-on/)).toBeTruthy();
   });
 });

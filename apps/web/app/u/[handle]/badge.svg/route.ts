@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
+import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   getBadgeAvatarCachePolicy,
   getBadgeAvatarDataUri,
@@ -105,15 +108,41 @@ const CACHE_HEADERS = {
   "X-Frame-Options": "ALLOWALL",
 };
 
-function fallbackSvg(handle: string, message: string): string {
+// #1181 (UX-H3) — the badge is a public, cacheable, credential-less image
+// endpoint (README <img> embeds carry no cookies), so locale is resolved
+// purely from a `?lang=` query param rather than the cookie/Accept-Language
+// chain `getServerLocale` uses for cookie-bearing page requests. No stored
+// per-handle locale preference exists yet (would need a DB column — out of
+// scope for this issue; see the PR/issue notes for the follow-up). Kept
+// synchronous and side-effect-free so it can be called before any other work.
+//
+// Named distinctly from the imported `resolveBadgeLocale` (badge-locale.ts):
+// this one extracts a `Locale` from a raw `NextRequest`; that one turns an
+// already-resolved `Locale` into locale-consistent strings + cache keys. Any
+// call site that needs BOTH content and a cache key for the SAME locale must
+// go through `resolveBadgeLocale`, never resolve each independently (#1181
+// follow-up — that mismatch is exactly the bug fixed in the share page and
+// warm-cache cron).
+function resolveLocaleFromRequest(request: NextRequest): Locale {
+  const lang = request.nextUrl.searchParams.get("lang");
+  return isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
+}
+
+function fallbackSvg(handle: string, message: string, tagline: string): string {
   const safe = escapeXml(handle);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <rect width="1200" height="630" rx="16" fill="#0C0D14" stroke="rgba(139,92,246,0.12)" stroke-width="2"/>
   <text x="60" y="80" font-family="'JetBrains Mono', monospace" font-size="42" font-weight="700" fill="#8B5CF6">CHAPA</text>
-  <text x="60" y="120" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" fill="#9AA4B2">Developer Impact Badge</text>
+  <text x="60" y="120" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" fill="#9AA4B2">${escapeXml(tagline)}</text>
   <text x="60" y="340" font-family="'JetBrains Mono', monospace" font-size="28" fill="#E6EDF3">@${safe}</text>
   <text x="60" y="400" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2">${escapeXml(message)}</text>
 </svg>`;
+}
+
+/** Localized fallback SVG — resolves both the message and tagline for `locale`. */
+function localizedFallbackSvg(handle: string, locale: Locale, messageKey: string): string {
+  const t = getServerT(locale);
+  return fallbackSvg(handle, t(messageKey) as string, t("badge.tagline") as string);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -184,14 +213,68 @@ function createDeferred<T>(): {
  * background continuation below, so a deadline-fallback response's eventual
  * real render warms the cache identically to a non-degraded request.
  */
+/**
+ * #1166 (PE-H2) — the shared SVG cache write itself, extracted so it can be
+ * awaited inline (the background/warm path, which has no response to race)
+ * or deferred into the route's after() block (the foreground winner path,
+ * where nothing in the response depends on it). `readOnly` is re-checked
+ * here (not just inferred from `avatarCachePolicy` staying "skip") so the
+ * "never cache a readOnly/smoke render" invariant holds explicitly regardless
+ * of which caller invokes this.
+ */
+async function persistFinalizedBadgeCache(
+  handle: string,
+  svg: string,
+  options: {
+    readOnly: boolean;
+    svgCacheKey: string;
+    verification: PublicVerificationCode | null;
+    avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
+  },
+): Promise<void> {
+  if (options.readOnly || !options.verification) return;
+
+  if (options.avatarCachePolicy === "short") {
+    // #1088 — short-TTL placeholder write: populates the cache (so a
+    // README embed with real traffic stops forcing a full
+    // materialize+render on every request) without shadowing a later good
+    // render — e.g. avatarUrl reappearing on a subsequent stats refetch —
+    // for anywhere near the 24h+jitter a normal write gets. The shared
+    // outcome policy distinguishes this from transient failure and timeout.
+    await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
+      ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+    });
+  } else if (options.avatarCachePolicy === "standard") {
+    // Covers a real success or a definitive empty result such as 404.
+    await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+  }
+  // else: the avatar fetch timed out or failed transiently. Do not cache;
+  // the next request gets a fresh attempt instead of a stale placeholder.
+}
+
 async function finalizeMaterializedBadge(
   handle: string,
   materialized: MaterializedProfile,
-  options: { readOnly: boolean; svgCacheKey: string },
+  options: {
+    readOnly: boolean;
+    svgCacheKey: string;
+    /** #1181 — resolved once by the caller; used to build the `strings` bundle passed to `renderBadgeSvg`. */
+    locale: Locale;
+    /**
+     * #1166 (PE-H2) — when true, skip the inline cache write below entirely;
+     * the caller (the route's foreground winner path) will perform it inside
+     * after() instead, since the write blocked the response for up to 500ms
+     * with nothing in the response depending on its result. Must stay false
+     * (the default) for `warmBadgeCacheInBackground` — that call has no
+     * response to race, and cache warming is its entire purpose.
+     */
+    deferCacheWrite?: boolean;
+  },
 ): Promise<{
   svg: string;
   verification: PublicVerificationCode | null;
   renderMs: number;
+  avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
 }> {
   // #1080/#1088 — the avatar step has distinct outcomes, previously
   // conflated into one `avatarResolved` boolean (`avatarDataUri !==
@@ -229,32 +312,28 @@ async function finalizeMaterializedBadge(
     // This SVG is always served to <img> embeds (README badges), where SMIL
     // <animate> never runs — animated heatmap cells would stay invisible. (#760)
     disableAnimation: true,
+    // #1181 — resolved strings for `options.locale` via the shared
+    // resolveBadgeLocale helper (never built ad hoc here); `renderBadgeSvg`
+    // itself stays pure/sync and never resolves locale on its own.
+    strings: resolveBadgeLocale(options.locale).stringsFor(materialized.displayImpact.tier),
   });
   const renderMs = Date.now() - renderStart;
 
   // A missing verification record can be temporary when the first public
   // fetch is incomplete. Do not make that unverified render the terminal
   // 24-hour cache value; a later complete fetch must be able to heal it.
-  if (!options.readOnly && verification) {
-    if (avatarCachePolicy === "short") {
-      // #1088 — short-TTL placeholder write: populates the cache (so a
-      // README embed with real traffic stops forcing a full
-      // materialize+render on every request) without shadowing a later good
-      // render — e.g. avatarUrl reappearing on a subsequent stats refetch —
-      // for anywhere near the 24h+jitter a normal write gets. The shared
-      // outcome policy distinguishes this from transient failure and timeout.
-      await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
-        ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
-      });
-    } else if (avatarCachePolicy === "standard") {
-      // Covers a real success or a definitive empty result such as 404.
-      await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
-    }
-    // else: the avatar fetch timed out or failed transiently. Do not cache;
-    // the next request gets a fresh attempt instead of a stale placeholder.
+  // #1166 — when deferred, the caller performs this write itself inside
+  // after() instead (foreground winner path only).
+  if (!options.deferCacheWrite) {
+    await persistFinalizedBadgeCache(handle, svg, {
+      readOnly: options.readOnly,
+      svgCacheKey: options.svgCacheKey,
+      verification,
+      avatarCachePolicy,
+    });
   }
 
-  return { svg, verification, renderMs };
+  return { svg, verification, renderMs, avatarCachePolicy };
 }
 
 /**
@@ -303,11 +382,16 @@ async function runBadgeSideEffects(
 async function warmBadgeCacheInBackground(
   handle: string,
   materializePromise: Promise<MaterializedProfile | null>,
-  options: { readOnly: boolean; svgCacheKey: string },
+  options: { readOnly: boolean; svgCacheKey: string; locale: Locale },
 ): Promise<void> {
   try {
     const materialized = await materializePromise;
     if (!materialized) return;
+    // #1166 (PE-H2) — `options` never sets `deferCacheWrite`, so this AWAITS
+    // the SVG cache write inline (the default). This call has no response to
+    // race — cache warming is its entire purpose — so the write must not be
+    // deferred to a second after() the way the foreground winner path defers
+    // its own write.
     const { verification } = await finalizeMaterializedBadge(handle, materialized, options);
     await runBadgeSideEffects(handle, materialized, { readOnly: options.readOnly, verification });
   } catch (err) {
@@ -349,10 +433,13 @@ export async function GET(
 ) {
   const startedAt = Date.now();
   const { handle } = await params;
+  // #1181 — resolved once, up front: synchronous and side-effect-free, so
+  // resolving it before handle validation costs nothing.
+  const locale = resolveLocaleFromRequest(request);
 
   // Validate handle before any cache/rate-limit work
   if (!isValidHandle(handle)) {
-    const svg = fallbackSvg(handle, "Invalid GitHub handle.");
+    const svg = localizedFallbackSvg(handle, locale, "badge.invalidHandle");
     return badgeSvgResponse(
       svg,
       { "Content-Type": "image/svg+xml" },
@@ -366,7 +453,13 @@ export async function GET(
   // overhead (#882 — rate limit moved to cache-MISS branch only).
   const readOnly = request.nextUrl.searchParams.get(READ_ONLY_SMOKE_PARAM) === "1";
   const today = toDateString(new Date());
-  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  // #1181 — locale is part of the shared SVG cache key so an es- and
+  // en-rendered badge for the same handle/day never collide. Doubles cache
+  // cardinality and invalidates every previously-warm key on deploy — a
+  // one-off wave of cache-miss (materialize + render) responses against the
+  // 4100ms `cacheMiss` SLO budget (`BADGE_LATENCY_SLO_MS.cacheMiss` in
+  // lib/monitoring/latency-slo.ts) until the new es/en keys re-warm.
+  const svgCacheKey = buildBadgeSvgCacheKey(handle, today, locale);
   const cacheReadStart = Date.now();
   const primaryCacheRead = await readBadgeSvgCacheWithStatus(svgCacheKey);
   if (primaryCacheRead.svg) {
@@ -396,7 +489,17 @@ export async function GET(
     });
   }
 
-  const inflightSvg = inflightBadgeRenders.get(svgCacheKey);
+  // #1166 (BE-M1) — `readOnly` (the public `__chapa_smoke=1` probe) must be
+  // part of the IN-MEMORY coalescing key ONLY. A readOnly render skips the
+  // avatar entirely and can be a fallback/degraded SVG on a cold handle —
+  // handing it to a concurrent real visitor (or vice versa) would be wrong.
+  // This must NOT touch `svgCacheKey` (the shared Redis SVG slot the share
+  // page also reads) or `renderLockKey` (derived from it below) — those stay
+  // identical for readOnly and normal requests, or a smoke probe would take
+  // an independent lock and double GitHub fetches at date rollover.
+  const coalesceKey = readOnly ? `${svgCacheKey}:ro` : svgCacheKey;
+
+  const inflightSvg = inflightBadgeRenders.get(coalesceKey);
   if (inflightSvg) {
     const shared = await inflightSvg;
     return badgeSvgResponse(
@@ -409,9 +512,9 @@ export async function GET(
   }
 
   const deferred = createDeferred<BadgeRenderResult>();
-  inflightBadgeRenders.set(svgCacheKey, deferred.promise);
+  inflightBadgeRenders.set(coalesceKey, deferred.promise);
 
-  const renderLockKey = buildBadgeSvgRenderLockKey(handle, today);
+  const renderLockKey = buildBadgeSvgRenderLockKey(handle, today, locale);
   let gotRenderLock = false;
 
   // Try to get an auth token from session (better rate limits)
@@ -421,7 +524,7 @@ export async function GET(
   try {
     gotRenderLock = await acquireBadgeRenderLock(renderLockKey);
     const yesterday = toDateString(new Date(Date.now() - 86_400_000));
-    const staleCacheKey = buildBadgeSvgCacheKey(handle, yesterday);
+    const staleCacheKey = buildBadgeSvgCacheKey(handle, yesterday, locale);
     // #1086 (PE-H1) — kicked off (not awaited) below, alongside materialize,
     // rather than awaited up front: this Redis read is independent of
     // materialize, so starting it in parallel keeps it off materialize's own
@@ -515,7 +618,7 @@ export async function GET(
         // for this handle is warm, instead of abandoning it. This mirrors the
         // foreground success path's own after()-deferred side effects.
         after(() =>
-          warmBadgeCacheInBackground(handle, materializePromise, { readOnly, svgCacheKey }),
+          warmBadgeCacheInBackground(handle, materializePromise, { readOnly, svgCacheKey, locale }),
         );
 
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
@@ -534,7 +637,7 @@ export async function GET(
     const materializeMs = Date.now() - materializeStart;
     if (!materialized) {
       const fallbackResult = {
-        svg: fallbackSvg(handle, "Could not load data — try again later."),
+        svg: localizedFallbackSvg(handle, locale, "badge.loadError"),
         headers: {
           "Content-Type": "image/svg+xml",
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
@@ -550,26 +653,35 @@ export async function GET(
     // Re-bind to a `const` now that `materialized` is known non-null — `let`
     // narrowing does not persist into the `after()` closure below.
     const profile = materialized;
-    const { svg, verification, renderMs } = await finalizeMaterializedBadge(
+    const { svg, verification, renderMs, avatarCachePolicy } = await finalizeMaterializedBadge(
       handle,
       profile,
-      { readOnly, svgCacheKey },
+      // #1166 (PE-H2) — the SVG cache write blocked the response for up to
+      // 500ms (its own deadline) with nothing in the response depending on
+      // it. Defer it into after(), same as the durable side effects below.
+      { readOnly, svgCacheKey, locale, deferCacheWrite: true },
     );
 
     // #1013 — persistProfileSnapshot is a durable Supabase write with nothing
     // in the response depending on its result; it must not block (or, on
     // failure, retroactively invalidate) an otherwise-successful render. Both
-    // it and the already-deferred cache work now run in after().
+    // it, the already-deferred cache work, and (#1166) the shared SVG cache
+    // write now run in after().
     after(() => {
-      return runBadgeSideEffects(handle, profile, { readOnly, verification }).catch(
-        (err) => {
+      return persistFinalizedBadgeCache(handle, svg, {
+        readOnly,
+        svgCacheKey,
+        verification,
+        avatarCachePolicy,
+      })
+        .then(() => runBadgeSideEffects(handle, profile, { readOnly, verification }))
+        .catch((err) => {
           fireAndForget(() => captureServerError({
             route: `/u/${handle}/badge.svg`,
             statusCode: 500,
             error: err,
           }));
-        },
-      );
+        });
     });
 
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
@@ -581,7 +693,7 @@ export async function GET(
     ]);
   } catch (err) {
     const fallbackResult = {
-      svg: fallbackSvg(handle, "Something went wrong — try again later."),
+      svg: localizedFallbackSvg(handle, locale, "badge.renderError"),
       status: 500,
       headers: { "Content-Type": "image/svg+xml" },
     } satisfies BadgeRenderResult;
@@ -601,7 +713,7 @@ export async function GET(
       fallbackResult.status,
     );
   } finally {
-    inflightBadgeRenders.delete(svgCacheKey);
+    inflightBadgeRenders.delete(coalesceKey);
     if (gotRenderLock) {
       fireAndForget(() => cacheDel(renderLockKey), () => undefined);
     }

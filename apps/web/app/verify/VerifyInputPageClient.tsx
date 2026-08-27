@@ -3,18 +3,25 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { NavbarClient } from "@/components/NavbarClient";
+import { SiteFooter } from "@/components/SiteFooter";
 import { LocaleSync, useTranslation } from "@/lib/i18n";
+import { tArray } from "@/lib/i18n/typed-accessors";
 import { VerifyForm } from "./VerifyForm";
 
 export function VerifyInputPageClient() {
   const { t } = useTranslation();
+  // #1167 (UX-B1) — real routes (/about, /about/scoring, /verify), not the
+  // landing page's `landing.navLinks` hash anchors, which are meaningless
+  // off that page. `translationKey` tells NavbarClient which dictionary key
+  // to re-derive locale-aware labels from.
+  const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">
       <Suspense fallback={null}>
         <VerifyQueryLocale />
       </Suspense>
-      <NavbarClient />
+      <NavbarClient navLinks={innerNavLinks} translationKey="nav.innerLinks" />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         <div className="animate-fade-in-up">
           {/* Terminal command line */}
@@ -27,7 +34,7 @@ export function VerifyInputPageClient() {
             <div>
               <h1 className="font-heading text-2xl tracking-tight">
                 {t('verify.headingBefore') as string}{" "}
-                <span className="text-complement">
+                <span className="text-complement-text">
                   {t('verify.headingHighlight') as string}
                 </span>
               </h1>
@@ -40,6 +47,9 @@ export function VerifyInputPageClient() {
           </div>
         </div>
       </main>
+      {/* #1167 (UX-B1) — no fixed-bottom command bar exists on this page
+          (unlike the share page's CommandBarHint), so no spacer is needed. */}
+      <SiteFooter t={t} />
     </div>
   );
 }
