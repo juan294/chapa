@@ -6,11 +6,18 @@ import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { useSession } from "@/hooks/useSession";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useTranslation } from "@/lib/i18n";
 import { Toast } from "@/components/Toast";
 
 interface BadgeToolbarProps {
   handle: string;
+  // #1165 (FE-H2) — server-resolved display gate, threaded down from
+  // `/u/[handle]`'s dynamic (non-ISR) render so this doesn't need to
+  // re-derive ownership over a network round trip to `/api/auth/session`.
+  // Optional so any other/future caller keeps working via the useSession()
+  // fallback below.
+  isOwner?: boolean;
 }
 
 /** Remove CSS animations and SMIL animate elements for static PNG export. */
@@ -26,11 +33,12 @@ export function stripBadgeAnimations(svgText: string): string {
 
 export function BadgeToolbar({
   handle,
+  isOwner: isOwnerProp,
 }: BadgeToolbarProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const { session } = useSession();
-  const isOwner = session?.login === handle;
+  const isOwner = isOwnerProp ?? session?.login === handle;
   const [refreshStatus, setRefreshStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -75,7 +83,7 @@ export function BadgeToolbar({
     }
   }
 
-  const [copied, setCopied] = useState(false);
+  const { status: copyLinkStatus, copy: copyLinkText } = useCopyToClipboard();
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading">("idle");
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
@@ -87,16 +95,14 @@ export function BadgeToolbar({
   const blueskyUrl = `https://bsky.app/intent/compose?text=${tweetText}`;
 
   const handleCopyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
+    const ok = await copyLinkText(shareUrl);
+    if (ok) {
       trackEvent("share_clicked", { platform: "copy_link" });
       setShareOpen(false);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } else {
       setErrorToast(t('badgeToolbar.failed') as string);
     }
-  }, [shareUrl, setShareOpen, t]);
+  }, [shareUrl, copyLinkText, setShareOpen, t]);
 
   const handleDownload = useCallback(async () => {
     setDownloadStatus("loading");
@@ -301,7 +307,7 @@ export function BadgeToolbar({
               role="menuitem"
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors w-full"
             >
-              {copied ? t('badgeToolbar.copied') as string : t('badgeToolbar.copyLink') as string}
+              {copyLinkStatus === "copied" ? t('badgeToolbar.copied') as string : t('badgeToolbar.copyLink') as string}
               <svg
                 className="w-3.5 h-3.5"
                 viewBox="0 0 24 24"
@@ -312,7 +318,7 @@ export function BadgeToolbar({
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                {copied ? (
+                {copyLinkStatus === "copied" ? (
                   <path d="M20 6L9 17l-5-5" />
                 ) : (
                   <>

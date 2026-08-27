@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { isValidHandle } from "@/lib/validation";
-import { NavbarClient } from "@/components/NavbarClient";
+import { Navbar } from "@/components/Navbar";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
@@ -42,6 +42,8 @@ import { getTrendData } from "@/lib/history/get-trend-data";
 import { redactSnapshotDiffForVisitor } from "@/lib/history/diff";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LanguageProvider, LocaleSync } from "@/lib/i18n";
+import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import type { Locale } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -131,30 +133,40 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   }
 
   return (
-    <LanguageProvider
-      initialLocale={locale}
-      // #1071 — the root layout's LanguageProvider already serializes the
-      // DEFAULT_LOCALE dictionary into the RSC payload. When this page's
-      // per-request locale matches it, omit the prop entirely so it isn't
-      // serialized a second time — LanguageProvider reuses that ancestor's
-      // context instead. Only a genuine mismatch (e.g. `?lang=` override)
-      // needs its own dictionary supplied here.
-      dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
-    >
-      {/* Establish query ownership in the hydrated shell. The streamed client
-          subtree then starts with the same dictionary as its server markup. */}
-      <LocaleSync queryLang={queryLang} />
-      {errorMessage && <ErrorBanner message={errorMessage} />}
-      <main id="main-content" className="min-h-screen bg-bg">
-        <Suspense fallback={<BadgeSkeleton />}>
-          <SharePageContent handle={handle} readOnly={readOnly} />
-        </Suspense>
-        {/* Progressive disclosure (#783): the terminal command bar is demoted to a
-            subtle, opt-in hint so the badge value stays legible to non-developer
-            visitors. The "/" shortcut and full command bar remain available. */}
-        <CommandBarHint />
-      </main>
-    </LanguageProvider>
+    <>
+      {/* #1165 (FE-M1) — this route is dynamic (not ISR, see below), so the
+          resolved-per-request locale is known here already. The root layout
+          always renders `<html lang="es">` statically (#861), so a genuine
+          English request (cookie/header/`?lang=en`) would otherwise ship
+          English body copy inside `<html lang="es">` in the served HTML.
+          Mirrors the landing page's / `/verify` pages' own use of this
+          component (see docs there for the LangSync interplay). */}
+      <DocumentLocaleScript locale={locale} />
+      <LanguageProvider
+        initialLocale={locale}
+        // #1071 — the root layout's LanguageProvider already serializes the
+        // DEFAULT_LOCALE dictionary into the RSC payload. When this page's
+        // per-request locale matches it, omit the prop entirely so it isn't
+        // serialized a second time — LanguageProvider reuses that ancestor's
+        // context instead. Only a genuine mismatch (e.g. `?lang=` override)
+        // needs its own dictionary supplied here.
+        dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
+      >
+        {/* Establish query ownership in the hydrated shell. The streamed client
+            subtree then starts with the same dictionary as its server markup. */}
+        <LocaleSync queryLang={queryLang} />
+        {errorMessage && <ErrorBanner message={errorMessage} />}
+        <main id="main-content" className="min-h-screen bg-bg">
+          <Suspense fallback={<BadgeSkeleton />}>
+            <SharePageContent handle={handle} readOnly={readOnly} locale={locale} />
+          </Suspense>
+          {/* Progressive disclosure (#783): the terminal command bar is demoted to a
+              subtle, opt-in hint so the badge value stays legible to non-developer
+              visitors. The "/" shortcut and full command bar remain available. */}
+          <CommandBarHint />
+        </main>
+      </LanguageProvider>
+    </>
   );
 }
 
@@ -163,9 +175,11 @@ export default async function SharePage({ params, searchParams }: SharePageProps
 export async function SharePageContent({
   handle,
   readOnly = false,
+  locale = DEFAULT_LOCALE,
 }: {
   handle: string;
   readOnly?: boolean;
+  locale?: Locale;
 }) {
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
@@ -301,7 +315,16 @@ export async function SharePageContent({
   });
   const badgeImageSrc = `/u/${encodeURIComponent(handle)}/badge.svg?${badgeSrcParams.toString()}`;
 
-  const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
+  // #1165 (UX-M5) — built ONCE here, server-side, so the "e" keyboard
+  // shortcut (SharePageShortcuts) and the visible Markdown Copy button
+  // (SharePageOwnerContent) always produce byte-identical, localized,
+  // handle-bearing clipboard content — this used to be an independent,
+  // hardcoded-English, non-handle-bearing literal. The alt text form
+  // matches the HTML embed's own (`${badgeAltOf} ${handle}`).
+  const t = getServerT(locale);
+  const embedBadgeUrl = `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`;
+  const embedAltText = `${t('shareOwner.badgeAltOf') as string} ${handle}`;
+  const embedMarkdown = `![${embedAltText}](${embedBadgeUrl})`;
 
   const displayLabel = stats?.displayName ?? handle;
 
@@ -336,6 +359,7 @@ export async function SharePageContent({
       <SharePageShortcuts
         embedMarkdown={embedMarkdown}
         handle={handle}
+        isOwner={isOwner}
       />
       {webmcpEnabled && stats && impactForClient && (
         <SharePageWebMcpTools
@@ -356,7 +380,12 @@ export async function SharePageContent({
         }}
       />
 
-      <NavbarClient />
+      {/* #1165 (FE-H2) — this route is dynamic (not ISR), so it uses the
+          server Navbar variant (session sourced via headers(), rendered
+          synchronously) instead of the client variant's round trip to
+          /api/auth/session. `locale` is already resolved above; passing it
+          avoids Navbar re-deriving it a second time. */}
+      <Navbar locale={locale} />
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
@@ -398,10 +427,13 @@ export async function SharePageContent({
         <div className="relative z-30 flex justify-end mb-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:250ms]">
           <BadgeToolbar
             handle={handle}
+            isOwner={isOwner}
           />
         </div>
 
-        {/* ── Owner/Visitor Content (client-side session check) ── */}
+        {/* ── Owner/Visitor Content (isOwner resolved server-side above; see
+             the redaction boundary comment near impactForClient — this prop
+             stays a DISPLAY gate only) ── */}
         <SharePageOwnerContentLazy
           handle={handle}
           stats={stats}
@@ -409,6 +441,8 @@ export async function SharePageContent({
           craftResult={craftResult}
           trend={trendData.trend}
           diff={diffForClient}
+          isOwner={isOwner}
+          embedMarkdown={embedMarkdown}
         />
       </div>
     </>

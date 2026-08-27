@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, screen } from "@testing-library/react";
 import { SharePageShortcuts } from "./SharePageShortcuts";
 import type { SessionUser } from "@/hooks/useSession";
 
@@ -84,7 +84,7 @@ describe("SharePageShortcuts", () => {
       );
     });
 
-    it("silently catches clipboard API failures", async () => {
+    it("does not throw when the clipboard write rejects", async () => {
       const clipboardError = new Error("Clipboard blocked");
       const mockWriteText = vi.fn().mockRejectedValue(clipboardError);
       Object.assign(navigator, { clipboard: { writeText: mockWriteText } });
@@ -103,6 +103,28 @@ describe("SharePageShortcuts", () => {
       await vi.waitFor(() => {
         expect(mockWriteText).toHaveBeenCalled();
       });
+    });
+
+    // #1165 (UX-M4) — this used to swallow the rejection with NO feedback
+    // either way. A rejected clipboard write must now surface a visible
+    // failure state instead of silently doing nothing.
+    it("surfaces a visible failure state when the clipboard write rejects", async () => {
+      const clipboardError = new Error("Clipboard blocked");
+      const mockWriteText = vi.fn().mockRejectedValue(clipboardError);
+      Object.assign(navigator, { clipboard: { writeText: mockWriteText } });
+
+      render(
+        <SharePageShortcuts
+          embedMarkdown="![badge](url)"
+          handle="testuser"
+        />,
+      );
+
+      const handler = getHandler();
+      handler("copy-embed");
+
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toContain("Failed");
     });
   });
 
@@ -276,6 +298,56 @@ describe("SharePageShortcuts", () => {
       await vi.waitFor(() => {
         expect(globalThis.fetch).toHaveBeenCalled();
       });
+    });
+
+    // #1165 (FE-H2) — server-resolved isOwner prop is authoritative over the
+    // client useSession() fallback when provided.
+    it("refreshes when isOwner prop is true, even if session mismatches", () => {
+      mockSessionAs("someone-else");
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("ok"));
+
+      render(
+        <SharePageShortcuts
+          embedMarkdown="![badge](url)"
+          handle="testuser"
+          isOwner={true}
+        />,
+      );
+
+      const handler = getHandler();
+      handler("refresh-badge");
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/refresh?handle=testuser",
+        { method: "POST" },
+      );
+    });
+
+    it("does not refresh when isOwner prop is false, even if session matches", () => {
+      mockSessionAs("testuser");
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("ok"));
+
+      render(
+        <SharePageShortcuts
+          embedMarkdown="![badge](url)"
+          handle="testuser"
+          isOwner={false}
+        />,
+      );
+
+      const handler = getHandler();
+      handler("refresh-badge");
+
+      const refreshCalls = fetchSpy.mock.calls.filter(
+        (call: unknown[]) =>
+          typeof call[0] === "string" &&
+          (call[0] as string).includes("/api/refresh"),
+      );
+      expect(refreshCalls).toHaveLength(0);
     });
   });
 

@@ -116,6 +116,21 @@ describe("BadgeToolbar render", () => {
         expect(screen.queryByLabelText("Refresh badge data")).toBeNull();
       });
     });
+
+    // #1165 (FE-H2) — server-resolved isOwner prop is authoritative over the
+    // client useSession() fallback when provided, avoiding a round trip to
+    // /api/auth/session on the dynamic (non-ISR) share page.
+    it("shows Refresh button when isOwner prop is true, even if session mismatches", () => {
+      mockSessionAs("someone-else");
+      render(<BadgeToolbar handle="testuser" isOwner={true} />);
+      expect(screen.getByLabelText("Refresh badge data")).toBeDefined();
+    });
+
+    it("hides Refresh button when isOwner prop is false, even if session matches", () => {
+      mockSessionAs("testuser");
+      render(<BadgeToolbar handle="testuser" isOwner={false} />);
+      expect(screen.queryByLabelText("Refresh badge data")).toBeNull();
+    });
   });
 
   /** Mock session via useSession and fetch for refresh endpoint. */

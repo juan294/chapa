@@ -127,8 +127,8 @@ vi.mock("@/lib/history/get-trend-data", () => ({
 vi.mock("@/components/CommandBarHint", () => ({
   CommandBarHint: () => null,
 }));
-vi.mock("@/components/NavbarClient", () => ({
-  NavbarClient: () => null,
+vi.mock("@/components/Navbar", () => ({
+  Navbar: () => null,
 }));
 vi.mock("@/components/SharePageShortcuts", () => ({
   SharePageShortcuts: () => null,
