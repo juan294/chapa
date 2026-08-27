@@ -16,7 +16,7 @@ import {
   createExplainDimensionTool,
   isWebMcpRecord,
   WEBMCP_EMPTY_INPUT_SCHEMA,
-  WEBMCP_READ_ONLY_ANNOTATIONS,
+  WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
 } from "@/lib/webmcp/shared-tools";
 import {
   useModelContextTools,
@@ -105,7 +105,7 @@ export function SharePageWebMcpTools({
       name: "get_impact_profile",
       description: "Return the public impact profile shown in the current page render.",
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
-      annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: () => JSON.stringify({
         handle,
         impact,
@@ -125,7 +125,7 @@ export function SharePageWebMcpTools({
       name: "get_impact_history",
       description: "Return the public impact snapshots and trend for this profile.",
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
-      annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: async (_inputs, { signal }) => {
         const response = await fetch(
           `/api/history/${encodeURIComponent(handle)}?include=snapshots,trend`,
@@ -149,7 +149,7 @@ export function SharePageWebMcpTools({
       name: "verify_badge",
       description: "Check the live verification record for the badge on this profile.",
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
-      annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: async (_inputs, { signal }) => {
         if (!verification) {
           return "This profile has no verification record yet.";
@@ -169,9 +169,14 @@ export function SharePageWebMcpTools({
         }
         const body = await readJson(response);
         if (!body) return "Badge verification returned an unreadable response.";
+        const publicRecord = isWebMcpRecord(body.data)
+          ? Object.fromEntries(
+              Object.entries(body.data).filter(([key]) => key !== "confidence"),
+            )
+          : body.data;
         return JSON.stringify({
           status: body.status,
-          record: body.data,
+          record: publicRecord,
           verifyUrl: body.verifyUrl,
         });
       },
@@ -188,7 +193,7 @@ export function SharePageWebMcpTools({
       name: "compare_profiles",
       description: "Compare this impact profile with another public GitHub handle.",
       inputSchema: COMPARE_PROFILES_INPUT_SCHEMA,
-      annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: async (inputs, { signal }) => {
         const otherHandle = isWebMcpRecord(inputs) && typeof inputs.other_handle === "string"
           ? inputs.other_handle.trim()

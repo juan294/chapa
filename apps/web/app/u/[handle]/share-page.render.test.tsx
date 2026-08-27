@@ -25,6 +25,7 @@ const {
   mockHeaders,
   mockGetOptionalServerSessionFromHeaders,
   mockSharePageWebMcpToolsComponent,
+  mockIsWebmcpEnabled,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -43,6 +44,7 @@ const {
   mockHeaders: vi.fn(),
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
   mockSharePageWebMcpToolsComponent: vi.fn(),
+  mockIsWebmcpEnabled: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -52,6 +54,10 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/auth/session", () => ({
   getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
     mockGetOptionalServerSessionFromHeaders(...args),
+}));
+
+vi.mock("@/lib/feature-flags", () => ({
+  isWebmcpEnabled: (...args: unknown[]) => mockIsWebmcpEnabled(...args),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -245,6 +251,7 @@ const FAKE_MATERIALIZED = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockIsValidHandle.mockReturnValue(true);
+  mockIsWebmcpEnabled.mockResolvedValue(true);
   mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
   mockGetPublicProfileVerification.mockReturnValue({
     hash: "abc12345",
@@ -399,6 +406,16 @@ describe("Phase 4d — Share page i18n", () => {
       expect(host?.props.impact).not.toHaveProperty("confidence");
       expect(host?.props.diff).not.toHaveProperty("confidence");
       expect(host?.props.diff).not.toHaveProperty("penaltyChanges");
+    });
+
+    it("omits the public WebMCP host when the server kill-switch is off", async () => {
+      mockIsWebmcpEnabled.mockResolvedValue(false);
+
+      const result = await SharePageContent({ handle: "testuser" });
+
+      expect(
+        findElementByType(result, mockSharePageWebMcpToolsComponent),
+      ).toBeNull();
     });
 
     it("renders sr-only h1 with handle interpolated", async () => {

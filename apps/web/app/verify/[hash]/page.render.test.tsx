@@ -6,6 +6,14 @@ vi.mock("@/lib/verification/store", () => ({
   getVerificationRecord: vi.fn(),
 }));
 
+const featureFlagMocks = vi.hoisted(() => ({
+  isWebmcpEnabled: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("@/lib/feature-flags", () => ({
+  isWebmcpEnabled: featureFlagMocks.isWebmcpEnabled,
+}));
+
 vi.mock("./VerifyPageWebMcpTools", () => ({
   VerifyPageWebMcpTools: ({
     hash,
@@ -93,6 +101,7 @@ import VerifyPage, { generateMetadata } from "./page";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  featureFlagMocks.isWebmcpEnabled.mockResolvedValue(true);
 });
 
 const MOCK_RECORD = {
@@ -261,6 +270,20 @@ describe("VerifyPage", () => {
         "a1b2c3d4e5f6a7b8",
       );
       expect(webMcpHost.getAttribute("data-handle")).toBe("testuser");
+    });
+
+    it("omits the WebMCP host when the server kill-switch is off", async () => {
+      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
+      featureFlagMocks.isWebmcpEnabled.mockResolvedValue(false);
+
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      expect(screen.queryByTestId("verify-page-webmcp-tools")).toBeNull();
+      expect(screen.getByText("Badge verified")).toBeDefined();
     });
 
     it("displays impact score and tier", async () => {

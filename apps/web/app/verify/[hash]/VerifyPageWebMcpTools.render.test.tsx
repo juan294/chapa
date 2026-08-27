@@ -82,7 +82,7 @@ describe("VerifyPageWebMcpTools", () => {
           properties: {},
           additionalProperties: false,
         },
-        annotations: { readOnlyHint: true },
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
       },
       {
         name: "explain_verification",
@@ -115,7 +115,14 @@ describe("VerifyPageWebMcpTools", () => {
     );
     if (!tool) throw new Error("Missing get_verification_record tool");
 
-    expect(JSON.parse(await execute(tool))).toEqual({ hash, record });
+    expect(JSON.parse(await execute(tool))).toEqual({
+      hash,
+      record: expect.not.objectContaining({ confidence: expect.anything() }),
+    });
+    expect(tool.annotations).toEqual({
+      readOnlyHint: true,
+      untrustedContentHint: true,
+    });
   });
 
   it("explains HMAC-SHA256 guarantees and explicit limits", async () => {

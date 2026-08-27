@@ -131,7 +131,32 @@ describe("useModelContextTools", () => {
     expect(registered.options.signal.aborted).toBe(true);
   });
 
-  it("aborts and re-registers when the tools identity changes", () => {
+  it("keeps registrations stable when only execute implementations change", async () => {
+    const registerTool = vi.fn().mockResolvedValue(undefined);
+    installModelContext(registerTool);
+    const firstExecute = vi.fn().mockResolvedValue("first");
+    const secondExecute = vi.fn().mockResolvedValue("second");
+    const firstTools = [{ ...makeTool(), execute: firstExecute }];
+    const secondTools = [{ ...makeTool(), execute: secondExecute }];
+
+    const { rerender } = renderHook(
+      ({ tools }) => useModelContextTools(tools, true),
+      { initialProps: { tools: firstTools } },
+    );
+    const registration = readRegisterCall(registerTool);
+
+    rerender({ tools: secondTools });
+
+    expect(registration.options.signal.aborted).toBe(false);
+    expect(registerTool).toHaveBeenCalledOnce();
+    await expect(
+      registration.tool.execute({}, { signal: new AbortController().signal }),
+    ).resolves.toBe("second");
+    expect(firstExecute).not.toHaveBeenCalled();
+    expect(secondExecute).toHaveBeenCalledOnce();
+  });
+
+  it("aborts and re-registers when the tool catalog changes", () => {
     const registerTool = vi.fn().mockResolvedValue(undefined);
     installModelContext(registerTool);
     const firstTools = [makeTool("first_tool")];

@@ -32,6 +32,11 @@ export const WEBMCP_READ_ONLY_ANNOTATIONS = {
   readOnlyHint: true,
 } as const;
 
+export const WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS = {
+  readOnlyHint: true,
+  untrustedContentHint: true,
+} as const;
+
 export const EXPLAIN_DIMENSION_INPUT_SCHEMA = {
   type: "object",
   properties: {

@@ -63,6 +63,10 @@ vi.mock("@/lib/history/get-trend-data", () => ({
   getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
 }));
 
+vi.mock("@/lib/feature-flags", () => ({
+  isWebmcpEnabled: vi.fn().mockResolvedValue(true),
+}));
+
 // #1091 — the after()-deferred snapshot write must escalate a genuine
 // failure via captureServerError, mirroring the badge route's #1013 pattern.
 vi.mock("@/lib/analytics/server-errors", () => ({

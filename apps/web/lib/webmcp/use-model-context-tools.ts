@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { messageFromReason } from "@/lib/analytics/error-message";
 import { trackEvent } from "@/lib/analytics/posthog";
 
@@ -33,13 +33,16 @@ function captureToolEvent(event: string, properties: Record<string, unknown>): v
   }
 }
 
-function instrumentTool(tool: WebMcpTool): WebMcpTool {
+function instrumentTool(
+  tool: WebMcpTool,
+  resolveCurrentTool: () => WebMcpTool,
+): WebMcpTool {
   return {
     ...tool,
     async execute(inputs, context) {
       captureToolEvent("webmcp_tool_called", { tool: tool.name });
       try {
-        return await tool.execute(inputs, context);
+        return await resolveCurrentTool().execute(inputs, context);
       } catch (error) {
         captureToolEvent("client_error", {
           source: "webmcp_tool_execute",
@@ -57,6 +60,21 @@ function warnRegistrationFailure(toolName: string, error: unknown): void {
 }
 
 export function useModelContextTools(tools: WebMcpTool[], enabled: boolean): void {
+  const currentToolsRef = useRef(new Map<string, WebMcpTool>());
+  const catalogSignature = JSON.stringify(
+    tools.map((tool) => ({
+      name: tool.name,
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
+    })),
+  );
+
+  useEffect(() => {
+    currentToolsRef.current = new Map(tools.map((tool) => [tool.name, tool]));
+  }, [tools]);
+
   useEffect(() => {
     if (!enabled || typeof document === "undefined" || !("modelContext" in document)) {
       return;
@@ -68,10 +86,13 @@ export function useModelContextTools(tools: WebMcpTool[], enabled: boolean): voi
     }
 
     const controller = new AbortController();
-    for (const tool of tools) {
+    for (const tool of currentToolsRef.current.values()) {
       try {
         void Promise.resolve(
-          modelContext.registerTool(instrumentTool(tool), {
+          modelContext.registerTool(instrumentTool(
+            tool,
+            () => currentToolsRef.current.get(tool.name) ?? tool,
+          ), {
             signal: controller.signal,
           }),
         ).catch((error: unknown) => {
@@ -85,5 +106,5 @@ export function useModelContextTools(tools: WebMcpTool[], enabled: boolean): voi
     }
 
     return () => controller.abort();
-  }, [tools, enabled]);
+  }, [catalogSignature, enabled]);
 }

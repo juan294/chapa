@@ -70,6 +70,8 @@ const previewLifecycle = vi.hoisted(() => ({ nextInstanceId: 0 }));
 
 interface StudioWebMcpOptionsCapture {
   craftResult?: unknown;
+  enabled: boolean;
+  getCurrentConfig: () => Record<string, unknown>;
   runCommand: (input: string) => unknown;
   proposeSave: () => void;
 }
@@ -587,6 +589,38 @@ describe("StudioClient render", () => {
   });
 
   describe("terminal input interactions", () => {
+    it("composes back-to-back WebMCP mutations from the latest config", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockImplementation((input: string) => ({
+        lines: [],
+        action: input.includes("background")
+          ? { type: "set", category: "background", value: "aurora" }
+          : { type: "set", category: "border", value: "glow" },
+      }));
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      act(() => {
+        studioWebMcpMocks.options?.runCommand("/set background aurora");
+        studioWebMcpMocks.options?.runCommand("/set border glow");
+      });
+
+      expect(studioWebMcpMocks.options?.getCurrentConfig()).toMatchObject({
+        background: "aurora",
+        border: "glow",
+      });
+      expect(screen.getByTestId("badge-preview").textContent).toContain(
+        '"background":"aurora"',
+      );
+      expect(screen.getByTestId("badge-preview").textContent).toContain(
+        '"border":"glow"',
+      );
+    });
+
     it("returns the same command result that it renders for WebMCP callers", async () => {
       const { executeCommand } = await import(
         "@/components/terminal/command-registry"

@@ -1,5 +1,8 @@
 import { getVerificationRecord } from "@/lib/verification/store";
-import type { VerificationRecord } from "@/lib/verification/types";
+import {
+  toPublicVerificationRecord,
+  type VerificationRecord,
+} from "@/lib/verification/types";
 import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
@@ -14,6 +17,7 @@ import {
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { isWebmcpEnabled } from "@/lib/feature-flags";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { VerifyPageWebMcpTools } from "./VerifyPageWebMcpTools";
@@ -67,7 +71,10 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
     );
   }
 
-  const record = await getVerificationRecord(hash);
+  const [record, webmcpEnabled] = await Promise.all([
+    getVerificationRecord(hash),
+    isWebmcpEnabled(),
+  ]);
 
   return (
     <VerifyLocaleBoundary locale={locale} queryLang={lang}>
@@ -75,7 +82,12 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
           <>
-            <VerifyPageWebMcpTools hash={hash} record={record} />
+            {webmcpEnabled && (
+              <VerifyPageWebMcpTools
+                hash={hash}
+                record={toPublicVerificationRecord(record)}
+              />
+            )}
             <VerifiedCard hash={hash} record={record} t={t} />
           </>
         ) : (

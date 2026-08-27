@@ -86,6 +86,7 @@ function setup(overrides?: {
   impact?: ImpactV6Result;
   craftResult?: CraftResult | null;
   saveStatus?: "dirty" | "saving" | "saved" | "error";
+  enabled?: boolean;
 }) {
   const runCommand = makeRunCommand();
   const proposeSave = vi.fn();
@@ -98,6 +99,7 @@ function setup(overrides?: {
       impact,
       craftResult: overrides?.craftResult ?? null,
       handle: "dev user",
+      enabled: overrides?.enabled ?? true,
       saveStatus: overrides?.saveStatus ?? "dirty",
       runCommand,
       proposeSave,
@@ -141,6 +143,7 @@ describe("useStudioWebMcpTools", () => {
       stats: DEMO_STATS,
       impact: DEMO_IMPACT,
       handle: "developer",
+      enabled: true,
       saveStatus: "saved" as const,
       runCommand: makeRunCommand(),
       proposeSave: vi.fn(),
@@ -159,6 +162,12 @@ describe("useStudioWebMcpTools", () => {
 
     rerender();
     expect(result.current).toBe(first);
+  });
+
+  it("does not build the catalog while the WebMCP kill-switch is off", () => {
+    const { tools } = setup({ enabled: false });
+
+    expect(tools).toEqual([]);
   });
 
   it("publishes the exact planned input schemas", () => {

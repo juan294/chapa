@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
 import { getChapaVerificationSecret, getVercelEnv } from "@/lib/env";
+import { CURRENT_VERIFICATION_HASH_HEX_LENGTH } from "./constants";
 
 const PAYLOAD_VERSION = "v2";
 
@@ -40,7 +41,10 @@ export function buildPayload(
  * Compute a truncated HMAC-SHA256 hash (32 hex chars / 128 bits) from a payload string.
  */
 export function computeHash(payload: string, secret: string): string {
-  return createHmac("sha256", secret).update(payload).digest("hex").slice(0, 32);
+  return createHmac("sha256", secret)
+    .update(payload)
+    .digest("hex")
+    .slice(0, CURRENT_VERIFICATION_HASH_HEX_LENGTH);
 }
 
 /**

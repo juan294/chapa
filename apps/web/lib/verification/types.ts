@@ -17,3 +17,13 @@ export interface VerificationRecord {
   generatedAt: string; // YYYY-MM-DD
   profileType: string;
 }
+
+export type PublicVerificationRecord = Omit<VerificationRecord, "confidence">;
+
+export function toPublicVerificationRecord(
+  record: PublicVerificationRecord & Partial<Pick<VerificationRecord, "confidence">>,
+): PublicVerificationRecord {
+  const publicRecord = { ...record };
+  delete publicRecord.confidence;
+  return publicRecord;
+}

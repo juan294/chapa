@@ -36,6 +36,7 @@ import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
+import { isWebmcpEnabled } from "@/lib/feature-flags";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { redactSnapshotDiffForVisitor } from "@/lib/history/diff";
@@ -183,12 +184,13 @@ export async function SharePageContent({
   // guard so a future regression in that contract still can't fail the
   // whole share page render — a 500 here would be a bug (CLAUDE.md).
   //
-  // Session resolution has no data dependency on the other two, so all
-  // three run concurrently rather than awaiting headers() up front.
-  const [session, materialized, trendData] = await Promise.all([
+  // Session and flag resolution have no data dependency on the profile or
+  // trend fetches, so all four run concurrently.
+  const [session, materialized, trendData, webmcpEnabled] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
     materializePublicProfile(handle, { readOnly }),
     getTrendData(handle).catch(() => ({ trend: null, diff: null })),
+    isWebmcpEnabled(),
   ]);
   const isOwner = session?.login === handle;
   const stats = materialized?.stats ?? null;
@@ -335,7 +337,7 @@ export async function SharePageContent({
         embedMarkdown={embedMarkdown}
         handle={handle}
       />
-      {stats && impactForClient && (
+      {webmcpEnabled && stats && impactForClient && (
         <SharePageWebMcpTools
           handle={handle}
           impact={impactForClient}

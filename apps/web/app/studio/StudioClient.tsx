@@ -147,6 +147,7 @@ export function StudioClient({
   const { t } = useTranslation();
   const { webmcpEnabled } = useClientFeatureFlags();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
+  const configRef = useRef(config);
   const [saveState, setSaveState] = useState<SaveState>({ status: "saved" });
   const [pendingAgentSave, setPendingAgentSave] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
@@ -156,6 +157,10 @@ export function StudioClient({
   const hasTrackedOpen = useRef(false);
   const configRevisionRef = useRef(0);
   const saveInFlightRef = useRef(false);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   // Terminal state — identify seed lines so their rendered text can follow a
   // live locale change without replacing command history or re-adding cleared
@@ -217,13 +222,14 @@ export function StudioClient({
 
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
+      const currentConfig = configRef.current;
       let changed = false;
       for (const key of Object.keys(newConfig) as (keyof BadgeConfig)[]) {
-        if (newConfig[key] !== config[key]) {
+        if (newConfig[key] !== currentConfig[key]) {
           changed = true;
           trackStudioEvent("effect_changed", {
             category: key,
-            from: config[key],
+            from: currentConfig[key],
             to: newConfig[key],
           });
         }
@@ -234,9 +240,10 @@ export function StudioClient({
           setSaveState({ status: "dirty" });
         }
       }
+      configRef.current = newConfig;
       setConfig(newConfig);
     },
-    [config, trackStudioEvent],
+    [trackStudioEvent],
   );
 
   const handleSave = useCallback(async () => {
@@ -250,7 +257,7 @@ export function StudioClient({
 
     saveInFlightRef.current = true;
     const revision = configRevisionRef.current;
-    const configToSave = config;
+    const configToSave = configRef.current;
     setSaveState({ status: "saving" });
     try {
       if (demo) {
@@ -299,15 +306,17 @@ export function StudioClient({
     } finally {
       saveInFlightRef.current = false;
     }
-  }, [config, demo, t, trackStudioEvent]);
+  }, [demo, t, trackStudioEvent]);
 
   const handleReset = useCallback(() => {
-    const resetConfig = getStudioCommandConfig(config, { type: "reset" });
+    const currentConfig = configRef.current;
+    const resetConfig = getStudioCommandConfig(currentConfig, { type: "reset" });
     if (!resetConfig) return;
     const changed = Object.keys(resetConfig).some((key) => {
       const configKey = key as keyof BadgeConfig;
-      return config[configKey] !== resetConfig[configKey];
+      return currentConfig[configKey] !== resetConfig[configKey];
     });
+    configRef.current = resetConfig;
     setConfig(resetConfig);
     if (changed) {
       configRevisionRef.current += 1;
@@ -319,18 +328,18 @@ export function StudioClient({
       category: "reset",
       to: "default",
     });
-  }, [config, trackStudioEvent]);
+  }, [trackStudioEvent]);
 
   const handleAction = useCallback(
     (action: StudioCommandAction) => {
       switch (action.type) {
         case "set": {
-          const nextConfig = getStudioCommandConfig(config, action);
+          const nextConfig = getStudioCommandConfig(configRef.current, action);
           if (nextConfig) handleConfigChange(nextConfig);
           break;
         }
         case "preset": {
-          const nextConfig = getStudioCommandConfig(config, action);
+          const nextConfig = getStudioCommandConfig(configRef.current, action);
           if (nextConfig) {
             trackStudioEvent("preset_selected", { preset: action.name });
             handleConfigChange(nextConfig);
@@ -351,7 +360,7 @@ export function StudioClient({
           break;
       }
     },
-    [config, handleConfigChange, handleSave, handleReset, trackStudioEvent],
+    [handleConfigChange, handleSave, handleReset, trackStudioEvent],
   );
 
   const handleSubmit = useCallback(
@@ -402,6 +411,7 @@ export function StudioClient({
 
   const studioWebMcpTools = useStudioWebMcpTools({
     config,
+    enabled: webmcpEnabled,
     stats,
     impact,
     craftResult,
@@ -409,6 +419,7 @@ export function StudioClient({
     saveStatus: saveState.status,
     runCommand: handleSubmit,
     proposeSave: handleAgentSaveProposal,
+    getCurrentConfig: () => configRef.current,
   });
   useModelContextTools(studioWebMcpTools, webmcpEnabled);
 

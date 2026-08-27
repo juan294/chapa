@@ -42,6 +42,7 @@ export type StudioSaveStatus = "dirty" | "saving" | "saved" | "error";
 
 export interface UseStudioWebMcpToolsOptions {
   config: BadgeConfig;
+  enabled: boolean;
   stats: StatsData;
   impact: ImpactV6Result;
   craftResult?: CraftResult | null;
@@ -49,6 +50,7 @@ export interface UseStudioWebMcpToolsOptions {
   saveStatus: StudioSaveStatus;
   runCommand: (input: string) => CommandResult<StudioCommandAction>;
   proposeSave: () => void;
+  getCurrentConfig?: () => BadgeConfig;
 }
 
 const APPLY_STYLE_INPUT_SCHEMA = {
@@ -108,8 +110,7 @@ function serializeCommandResult(
 ): string {
   const terminalLines = result.lines.map((line) => line.text).join("\n");
   const snapshot = JSON.stringify({
-    config:
-      getStudioCommandConfig(currentConfig, result.action) ?? currentConfig,
+    config: currentConfig,
   });
   return terminalLines ? `${terminalLines}\n${snapshot}` : snapshot;
 }
@@ -136,6 +137,7 @@ function parseDimensionOverrides(
 
 export function useStudioWebMcpTools({
   config,
+  enabled,
   stats,
   impact,
   craftResult = null,
@@ -143,10 +145,12 @@ export function useStudioWebMcpTools({
   saveStatus,
   runCommand,
   proposeSave,
+  getCurrentConfig,
 }: UseStudioWebMcpToolsOptions): WebMcpTool[] {
   const { t } = useTranslation();
 
   return useMemo<WebMcpTool[]>(() => {
+    if (!enabled) return [];
     const readOnly = WEBMCP_READ_ONLY_ANNOTATIONS;
 
     return [
@@ -172,7 +176,7 @@ export function useStudioWebMcpTools({
               label: getPresetLabel(preset.id, preset.label, t),
               config: preset.config,
             })),
-            currentConfig: config,
+            currentConfig: getCurrentConfig?.() ?? config,
           }),
       },
       {
@@ -190,9 +194,12 @@ export function useStudioWebMcpTools({
               "category and value must be single non-empty tokens",
             );
           }
+          const result = runCommand(`/set ${inputs.category} ${inputs.value}`);
           return serializeCommandResult(
-            runCommand(`/set ${inputs.category} ${inputs.value}`),
-            config,
+            result,
+            getCurrentConfig?.() ??
+              getStudioCommandConfig(config, result.action) ??
+              config,
           );
         },
       },
@@ -208,7 +215,13 @@ export function useStudioWebMcpTools({
           ) {
             return invalidInput("apply_preset", "name must be a known preset");
           }
-          return serializeCommandResult(runCommand(`/preset ${name}`), config);
+          const result = runCommand(`/preset ${name}`);
+          return serializeCommandResult(
+            result,
+            getCurrentConfig?.() ??
+              getStudioCommandConfig(config, result.action) ??
+              config,
+          );
         },
       },
       {
@@ -218,7 +231,7 @@ export function useStudioWebMcpTools({
         annotations: readOnly,
         execute: () =>
           JSON.stringify({
-            config,
+            config: getCurrentConfig?.() ?? config,
             badgeSvgUrl: `${getBaseUrl()}/u/${encodeURIComponent(handle)}/badge.svg`,
             saveStatus,
           }),
@@ -227,7 +240,15 @@ export function useStudioWebMcpTools({
         name: "reset_badge_config",
         description: "Reset Creator Studio through the visible terminal.",
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
-        execute: () => serializeCommandResult(runCommand("/reset"), config),
+        execute: () => {
+          const result = runCommand("/reset");
+          return serializeCommandResult(
+            result,
+            getCurrentConfig?.() ??
+              getStudioCommandConfig(config, result.action) ??
+              config,
+          );
+        },
       },
       {
         name: "save_badge_config",
@@ -284,6 +305,7 @@ export function useStudioWebMcpTools({
     ];
   }, [
     config,
+    enabled,
     stats,
     impact,
     craftResult,
@@ -291,6 +313,7 @@ export function useStudioWebMcpTools({
     saveStatus,
     runCommand,
     proposeSave,
+    getCurrentConfig,
     t,
   ]);
 }

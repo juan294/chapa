@@ -2,6 +2,8 @@
 
 Chapa exposes 16 browser-native WebMCP page/tool registrations across 15 distinct names; `explain_dimension` is shared by Studio and public profiles. They let an agent work on the same page state that a person can see. Studio mutations use the existing command system. Public profile and verification tools are read-only.
 
+Public tools that can return GitHub-controlled names or fetched public content also set `untrustedContentHint: true`. Verification records are projected to their public shape and never expose the internal confidence value.
+
 Runtime status in this document is based on the 2026-08-27 preview-only `chapa_hello` spike. Flagged Google Chrome 151 passed native registration, discovery, and execution for that hello-world tool. The completed catalog still needs final production verification after release and flag enablement. The ChatGPT in-app browser was not available in that Codex session, so it remains untested. This is not evidence of a ChatGPT compatibility failure.
 
 ## Input schema shorthand
@@ -96,12 +98,12 @@ document.modelContext.registerTool(tool, {
 controller.abort();
 ```
 
-The complete tool array is memoized. A tool identity change causes the effect to abort the previous registrations and register the current tools. Registration failures and missing or malformed browser support do not break the page. Tool calls emit `webmcp_tool_called`; execution failures emit a bounded `client_error` event and still reject to the caller.
+The complete tool array is memoized. A catalog-definition change causes the effect to abort the previous registrations and register the current tools. State-only changes keep registrations stable while calls resolve the latest execute implementation. Registration failures and missing or malformed browser support do not break the page. Tool calls emit `webmcp_tool_called`; execution failures emit a bounded `client_error` event and still reject to the caller.
 
 Three feature flags control exposure:
 
 - `studio_enabled` controls Creator Studio itself.
-- `webmcp_enabled` is the remote WebMCP kill switch. When it is false, hosts register no tools.
+- `webmcp_enabled` is the remote WebMCP kill switch. When it is false, Studio builds no catalog and public pages omit the client hosts.
 - `studio_demo_enabled` controls anonymous access to `/studio?demo=1`. It does not bypass `studio_enabled`.
 
 Browsers without `document.modelContext` get the normal Chapa interface with no WebMCP tools. No polyfill is shipped because the native flagged runtime passed and a polyfill would add dependency and CSP surface without solving a demonstrated failure.

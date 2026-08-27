@@ -126,6 +126,12 @@ describe("SharePageWebMcpTools", () => {
     expect(tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(
       true,
     );
+    expect(tools.find((tool) => tool.name === "get_impact_profile")?.annotations).toMatchObject({
+      untrustedContentHint: true,
+    });
+    expect(tools.find((tool) => tool.name === "verify_badge")?.annotations).toMatchObject({
+      untrustedContentHint: true,
+    });
     expect(mocks.createExplainDimensionTool).toHaveBeenCalledOnce();
   });
 
@@ -208,7 +214,7 @@ describe("SharePageWebMcpTools", () => {
   });
 
   it("returns the live verification status, record, and verify URL", async () => {
-    const record = { handle: "developer", adjustedComposite: 82 };
+    const record = { handle: "developer", adjustedComposite: 82, confidence: 85 };
     respondWith({
       status: "verified",
       data: record,
@@ -220,7 +226,7 @@ describe("SharePageWebMcpTools", () => {
 
     expect(JSON.parse(output)).toEqual({
       status: "verified",
-      record,
+      record: { handle: "developer", adjustedComposite: 82 },
       verifyUrl: "https://chapa.test/verify/abc12345",
     });
     expect(fetch).toHaveBeenCalledWith("/api/verify/abc12345", { signal });

@@ -95,6 +95,10 @@ vi.mock("@/lib/history/get-trend-data", () => ({
   getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
 }));
 
+vi.mock("@/lib/feature-flags", () => ({
+  isWebmcpEnabled: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@/lib/utils/date", () => ({
   toDateString: () => "2026-05-03",
 }));
