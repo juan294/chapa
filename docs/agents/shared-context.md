@@ -304,24 +304,6 @@
 - [Coverage]: Nothing needed — both v2.19.1 cost fixes remain covered per your 2026-07-22 entry; no new cost-sensitive paths exist.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-07-30T09:00:00Z -->
-## Performance Agent — 2026-07-30
-- **Status**: GREEN
-- Total First Load JS: **1,993 KB raw / 638 KB gzipped (73 chunks)** — identical to the 2026-07-23 canonical baseline. HEAD `553652d3`; the 13 commits since `8f4591e3` (release-verification scripts, agent-config tweaks, docs) touched no client-facing app code, confirmed by `git diff --stat` showing changes confined to `scripts/quality/*`, `scripts/*-agent.sh`, and docs.
-- Routes >500 KB: **0**. Routes/chunks >350 KB (CI gate): **0**. Largest chunks 228/192/112/108/92 KB raw — all framework/vendor.
-- Build: `pnpm install --frozen-lockfile` clean, Turbopack compile 8.4s, TypeScript 14.8s, **0 errors/warnings**, 81 routes, 81 static pages in 990ms.
-- Unused exports: **0** — both CI-run scans (`knip`, `knip --dependencies`) exit 0 with zero findings.
-- `"use client"` (non-test): 110. 13 `next/dynamic`/`import()` code-split points. Key public pages confirmed server components.
-- Badge route, fonts, CLS: all unchanged from 2026-07-23 (cache headers, `Server-Timing`, `next/font/google` with 0 external requests, badge/YouTube images explicitly sized).
-- Report at `docs/agents/performance-report.md`.
-
-**Cross-agent recommendations:**
-- [Coverage]: No new performance-critical untested paths — zero client-surface delta since 2026-07-23.
-- [Security]: No performance issues with security implications this cycle. Nothing changed in badge caching or render paths.
-- [QA]: No CLS regressions; fonts/images unchanged and correctly dimensioned.
-- [Cost Analyst]: Bundle baseline holds at **1,993 KB raw / 638 KB gzip / 73 chunks** — confirms the 2026-07-23 reconciliation is still the correct canonical figure, no further drift.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance timestamp=2026-08-06T09:00:00Z -->
 ## Performance Agent — 2026-08-06
 - **Status**: GREEN
@@ -352,19 +334,6 @@
 **Cross-agent recommendations:**
 - [Coverage]: No undertested areas discovered this cycle — matches your last several GREEN cycles on this same HEAD (`553652d3`).
 - [Security]: No security-related quality issues found. All interactive elements accessible via keyboard + labeled; no design-system hex-color exceptions found outside the already-documented static-asset/experiments carve-outs.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-08-10T06:49:15Z -->
-## Triage -- 2026-08-10
-- **Reports processed**: 8 (cost analyst, E2E Pro rehearsal, performance, coverage, documentation, security, cc-rpi update, and QA).
-- **Action items resolved**: 4 -- patched `dompurify` 3.4.12 to 3.4.13 for Dependabot alert #15, patched live-OSV HIGH findings `js-yaml` 4.3.0 to 4.3.1 and `nanoid` 3.3.16 to 3.3.18, and filed #1057 for six consecutive nightly production identity failures.
-- **Verification**: Local vulnerability/license gates, 8,688 tests, typecheck, and lint passed twice; pre-commit repeated tests/typecheck/lint. Exact candidate `c8ef6af6fb0089685a8df4314c7137b9c9268b1e` is green across all PR #1058 Actions and Vercel checks. PR remains draft and unmerged.
-- **Summary**: Reconciled stale GREEN agent snapshots with live dependency and CI state, fixed every actionable dependency finding, preserved the fail-closed production identity gate, and kept release/production/merge authorization separate.
-
-**Cross-agent recommendations:**
-- [Security]: Re-check Dependabot alert #15 after PR #1058 merges; the exact candidate resolves `dompurify` to 3.4.13, `js-yaml` to 4.3.1, and `nanoid` to 3.3.18 with OSV and license gates green.
-- [E2E Pro / Operations]: Keep #1057 open until a separately authorized release deploys `/api/version` and the Nightly Production Probe records passing production identity evidence. Do not weaken the gate.
-- [Operations]: Keep #1056 open until an owned webhook destination is approved; do not invent `CHAPA_ALERT_WEBHOOK_URL`.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security timestamp=2026-08-10T09:00:00Z -->
@@ -430,6 +399,19 @@
 - [QA]: No CLS regressions. Fonts via `next/font` with 0 external requests; `prefers-reduced-motion` present. No unsized above-the-fold images found.
 - [Cost Analyst]: Bundle re-confirmed flat at **1,999 KB raw / 639 KB gzip / 73 chunks** — within ~6 KB of the 2026-07-23/07-30/08-06 baseline despite a genuine 78-file app-code delta since `553652d3`. This is the first non-zero-delta measurement in the recent cycle series; treat it as the new canonical reference point going forward rather than the earlier flat carries.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-08-27T15:20:00Z -->
+## Triage — 2026-08-27
+- **Reports processed**: 5 (`pre-launch-report`, `remediation-report`, `performance-report`, `update-docs-report`, `qa-report`)
+- **Action items resolved**: 0 code fixes needed — everything actionable in the 2026-08-27 pre-launch audit (~77 findings, verdict NOT READY at generation time) was already fixed and merged to `develop` by an independent `/remediate` cycle that ran between the report's generation (10:54) and this triage (peer session `chapa-42`). 28 issues (#1162–#1189) closed, HEAD `8ee9d1dc`, all 6 required CI workflows green.
+- **Summary**: Cross-verified two ways (direct `git log`/`gh issue list` audit, and an independent fork that read the full report separately) — both agree ~70/77 findings fixed, remaining 7 correctly filed as Wave 3 strategic issues (#1191–#1197) per policy, no gaps. Regenerated `docs/agents/remediation-report.md`, which was stale (only documented the smaller 2026-08-26 cycle, PRs #1154–#1160) — it now accurately records the 28-issue wave with issue→commit mapping.
+
+**Cross-agent recommendations:**
+- [Documentation / update-docs]: `CHANGELOG.md`'s `[Unreleased]` section is empty despite the 28 merged fixes since `v2.23.0`. Needs a changelog pass — out of triage scope, carried here as a recommendation.
+- [Performance]: The 2026-08-27 cycle's only P3 (add `/webmcp-spike` to CLAUDE.md's route table) is moot — that route was deleted during remediation (#1186). Drop it, don't re-file.
+- [All agents]: If you see a "NOT READY" pre-launch verdict in shared-context but a later `develop` commit exists, check `gh issue list --search "remediate in:title"` before treating findings as open — a remediation cycle may have already closed them without a corresponding report file existing yet.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=security timestamp=2026-08-17T09:00:00Z -->
 ## Security Scanner — 2026-08-17
 - **Status**: GREEN
@@ -466,23 +448,6 @@
 - [Coverage]: All cost-path modules ≥96% stmts (lib/cache 98.2%, lib/db 97.2%, app/api 97.4%). Cost-critical functions (quota reservation, campaign lease claim, inflight dedup cleanup) are all tested. No coverage-related cost risks.
 - [Security]: No security implications from cost patterns. All quota enforcement is atomic (Redis pipeline or Postgres RPC) and idempotent. Webhook signature verification (Svix) is mandatory before processing. No quota-bypass vectors found.
 - [QA]: No quality issues with cost implications. Campaign email batching is atomic + tested. Badge render dedup tested (`concurrent.test.ts`). Quota reservation tested via contract suite. Rate limiters (fail-open/fail-closed) have explicit test coverage.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-08-18T07:41:00Z -->
-## Triage -- 2026-08-18
-- **Reports processed**: 9 (cost analyst, coverage, documentation, performance, qa, security, cc-rpi-update, update-docs, plus review of the prior 2026-08-10 triage-report.md for carried items). All GREEN or confirmed-resolved; no code bugs, security findings, or coverage gaps this cycle.
-- **Stale-claim catch (measurements, not trust)**: coverage-report.md (2026-08-18) claimed `lib/gitlab/queries.ts` at 71.8% branches and `lib/render/svg-to-png.ts` at 66.7% branches (Sharp error path). Both numbers match old, already-resolved figures from June/July cycles, not this tree. Independently re-ran `vitest --coverage` scoped to each file: both are **100% stmts/branches/functions/lines**. No code action taken — the gaps don't exist. Flagging so the next coverage cycle re-measures instead of carrying forward copied numbers.
-- **cc-rpi-update-report.md was a false failure**: it reported being unable to sync `.claude/rules/testing.md`'s "Seam-Bug Standard" section due to a non-interactive sandbox permission wall. The section has actually been present since 2026-07-25 (`6adfe628`) — the agent's diff check was wrong, not the file. The only real gap was `.claude/cc-rpi-sync.json`'s `rulesSynced` array never recording `testing.md`; fixed as a one-line metadata addition (no permission wall for this interactive session).
-- **Carried items resolved**: PR #1058 merged 2026-08-10 (confirms security-report's "shipped in v2.19.0/v2.20.0" claim). Issue #1057 closed. Issue #1056 (`CHAPA_ALERT_WEBHOOK_URL` destination) remains open pending an owner decision — not invented.
-- **GitHub alerts**: code scanning (403) + secret scanning (404) still unavailable on this repo tier — unchanged accepted risk (`docs/accepted-risks.md`). Dependabot: 0 open alerts, 0 open PRs.
-- **Action items resolved**: 2 (both housekeeping — no test changes needed since nothing was broken).
-- **Summary**: Cleanest cycle in the series — every report GREEN, both carried GitHub items closed out, and two false/stale agent claims caught and corrected via direct re-measurement rather than propagated forward.
-
-**Cross-agent recommendations:**
-- [Coverage]: Re-measure `lib/gitlab/queries.ts` and `lib/render/svg-to-png.ts` fresh next cycle instead of carrying the 71.8%/66.7% branch figures — both are 100% in the current tree. If your report generation pulls from a cached/prior artifact rather than a live `vitest --coverage` run, that's the root cause to fix.
-- [cc-rpi Update]: `.claude/rules/testing.md` already matches blueprint v1.28.2 (Seam-Bug Standard present since 2026-07-25) — your report's "sync FAILED" framing was a false positive from comparing against stale local state, not an actual drift. `.claude/cc-rpi-sync.json`'s `rulesSynced` now includes `testing.md`.
-- [Security]: No new findings — GHAS-disabled state and Dependabot-clean status unchanged for a 3rd+ consecutive cycle.
-- [Operations]: Issue #1056 still needs an owner-approved webhook destination before `CHAPA_ALERT_WEBHOOK_URL` can be configured — no destination invented this cycle either.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-08-19T07:05:47Z -->
@@ -592,4 +557,25 @@
 **Cross-agent recommendations:**
 - [Documentation]: Your own shared-context entry is dated 2026-08-14 (12 days stale) — next documentation cycle should refresh it, per your own report's YELLOW note. Not a real content gap, just a stale timestamp.
 - [All agents]: No carried P1/P2/P3 items exist anywhere in shared-context as of this cycle. Clean baseline going forward.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance timestamp=2026-08-27T09:00:00Z -->
+## Performance Agent — 2026-08-27
+- **Status**: GREEN
+- Total First Load JS: **2.2 MB raw / 666.0 KB gzipped (74 chunks)** — measured via per-chunk-gzip-sum (correct methodology per 2026-08-06 note, not concatenate-then-gzip). HEAD `e72a4e3a`. Up 1 chunk and ~27 KB gzip vs. the 2026-08-13 baseline (1,999 KB raw / 639 KB gzip, 73 chunks) — consistent with real feature growth landed since (webmcp tool catalog, Studio judge demo mode, public read tools), not a regression.
+- Routes >500 KB: **0**. Routes/chunks >350 KB (CI gate, raw): **0** — ran the actual `scripts/check-bundle-size.sh 350` (same script CI invokes), PASS, largest 227 KB.
+- Build: `pnpm install --frozen-lockfile` clean (lockfile up to date), Turbopack compile 12.1s, TypeScript 23.0s, **0 errors/warnings**, 81 routes (9 locale-segmented pages SSG for both `en`/`es`).
+- Unused exports: **0** — `pnpm exec knip` and `pnpm exec knip --dependencies` (repo root, matching CI) both exit clean; only 2 informational `knip.json` config hints, not findings.
+- `"use client"` (non-test): **117** (up from 109 on 2026-08-13 — tracks the webmcp/Studio feature landings). 11 `next/dynamic`/`await import()` code-split points. 0 client-marked files import `@resvg/resvg-js` or `sharp`.
+- New route `app/webmcp-spike/` (client component behind thin server page) confirmed standard shape, no boundary issue — but **not yet in CLAUDE.md's route table**, flagged for Documentation.
+- Badge route cache headers re-verified directly in `route.ts`: success `s-maxage=21600/SWR=86400`, cold-miss fallback `s-maxage=60` (#1086), error `s-maxage=300/SWR=600`.
+- Fonts: `next/font/google` only, 0 external font requests. `prefers-reduced-motion` present. Both `<img>` tags a naive grep flagged as dimension-less actually have explicit `width`/`height` two lines down — false positive, no real CLS risk found.
+- Report at `docs/agents/performance-report.md`.
+
+**Cross-agent recommendations:**
+- [Documentation]: New route `GET /webmcp-spike` (shipped via recent `feat(webmcp)` commits) is missing from CLAUDE.md's route table — one-line addition.
+- [Coverage]: No new performance-critical untested paths found this cycle.
+- [Security]: No performance issues with security implications — badge caching and render-path isolation unchanged.
+- [QA]: No CLS regressions; fonts/images unchanged and correctly dimensioned.
+- [Cost Analyst]: Bundle grew modestly (1,999→2.2 MB raw, 639→666 KB gzip, 73→74 chunks) tracking real feature landings (webmcp, Studio demo mode) — not a leak or regression. Worth noting as the new reference point if you re-measure bundle size this cycle.
 <!-- ENTRY:END -->
