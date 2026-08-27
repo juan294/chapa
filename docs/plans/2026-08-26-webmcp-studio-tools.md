@@ -48,6 +48,15 @@ Test tooling: Model Context Tool Inspector extension. Feature-detect with
 | 4 | Public read tools on `/u/[handle]` + `/verify/[hash]` | 1 | [batch-eligible] with 2+3 chain |
 | 5 | Submission assets: README split, video script, checklist, publication runbook | content-complete after 2-4 | [batch-eligible] docs part; publication + submission are MANUAL, Juan-gated |
 
+## Implementation status
+
+- [x] Phase 0 — runtime spike passed in flagged Chrome 151
+- [ ] Phase 1 — WebMCP infrastructure and feature flags
+- [ ] Phase 2 — Studio tools and human-gated save
+- [ ] Phase 3 — judge demo mode
+- [ ] Phase 4 — public read tools
+- [ ] Phase 5 — submission assets
+
 ## Success criteria
 
 Automated: chapa gates — `pnpm run typecheck && pnpm run lint && pnpm run

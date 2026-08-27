@@ -1,25 +1,20 @@
 # WebMCP runtime spike
 
-Date: 2026-08-26 CEST (artifact path follows the planned 2026-08-27 workday).
+Date: 2026-08-27 CEST.
 Plan: `2026-08-26-webmcp-studio-tools.md`, Phase 0.
 
 ## Gate result
 
-**BLOCKED — do not start Phase 1.** Neither required judging client called the
-preview tool in this run. This activates Phase 0's hard stop until one client
-executes `chapa_hello` successfully.
-
-This is not evidence that Chapa is incompatible with WebMCP. Chrome reached the
-preview with the native API disabled, and the ChatGPT in-app Browser runtime was
-not available in this Codex session. The native enabled-runtime test therefore
-remains incomplete.
+**PASS — proceed to Phase 1.** Flagged Chrome 151 registered, discovered, and
+executed `chapa_hello` on the preview. The visible result was
+`Hello from Chapa Creator Studio`. This satisfies Phase 0's one-client rule.
 
 ## Exact candidate and preview
 
-- Commit: `3156fcaa` (`feat(webmcp): add runtime spike`).
+- Commit: `b338942d` (`test(webmcp): add main-world execution probe`).
 - Local tree at deploy: clean committed spike source.
-- Vercel deployment: `dpl_7vugbqSNj9zSWNLbitxmQJHF5aXb`.
-- Preview: `https://chapa-m1wo5d7s2-thecreativetoken.vercel.app`.
+- Vercel deployment: `dpl_Fy6fh23RPUwbdY8zfS7CHijpZnjp`.
+- Preview: `https://chapa-54z2w6awa-thecreativetoken.vercel.app`.
 - Spike route: `/webmcp-spike`.
 - Vercel status: Ready; target `preview`.
 - `/api/version`: HTTP 200 through authenticated Vercel CLI access and
@@ -53,15 +48,15 @@ Production returns `notFound()` for the spike route, and the route is
 
 - Runtime: Google Chrome `151.0.7922.174`.
 - Preview access: PASS. The page rendered with its expected title and content.
-- Native API discovery: FAIL (setup incomplete). The page reported
-  `WebMCP is not available in this browser`, and
-  `"modelContext" in document` evaluated to `false`.
-- The Chrome testing flag is not active in this browser. Browser automation is
-  not permitted to open `chrome://flags`, so this run could not enable
-  `chrome://flags/#enable-webmcp-testing` or relaunch Chrome.
-- Model Context Tool Inspector execution: not run because the provider API was
-  absent. Installing a browser extension also requires an action-time user
-  confirmation.
+- `chrome://flags/#enable-webmcp-testing`: enabled by Juan; Chrome relaunched.
+- Native registration: PASS. The page reported `WebMCP tool registered`.
+- Native discovery: PASS. `getTools()` returned `chapa_hello`.
+- Native execution: PASS. `executeTool()` returned
+  `Hello from Chapa Creator Studio`, displayed in the page's live output.
+- Model Context Tool Inspector installation was authorized, but the Chrome Web
+  Store blocks scripted control. The equivalent Chrome testing interfaces were
+  exercised from a preview-only main-world probe instead; see the plan deviation
+  note.
 
 ### ChatGPT in-app browser
 
@@ -78,15 +73,13 @@ It also does not send `Origin-Agent-Cluster: ?0`.
 Chrome's current WebMCP documentation says WebMCP is available only to
 origin-isolated documents and is disabled when `document.domain` is enabled,
 for example by `Origin-Agent-Cluster: ?0`. The current response does not opt out,
-so there is no evidence that Chapa needs an explicit
-`Origin-Agent-Cluster: ?1` header. Do not add it unless the enabled-runtime test
-shows an isolation error.
+and native registration and execution passed. Chapa does not need an explicit
+`Origin-Agent-Cluster: ?1` header for the tested preview runtime.
 
 The official Chrome Origin Trials registry lists WebMCP as active for Chrome
-149 through 156, ending 2026-11-17. Therefore an origin-trial token is required
-for unflagged Chrome 151 visitors. A token was not registered in this run because
-registration creates an outward-facing persistent origin enrollment and the
-local testing flag must be tried first.
+149 through 156, ending 2026-11-17. An origin-trial token is required for
+unflagged Chrome 151 visitors, but it was not needed for the flagged judging
+client preview test. Production enrollment remains a separately gated action.
 
 Sources:
 
@@ -97,17 +90,14 @@ Sources:
 
 ## Polyfill decision
 
-**NO-GO for a polyfill at this point.** The native API has not failed in an
-enabled runtime; it was absent because the required flag or origin-trial token
-was not active. Adding `@mcp-b/global` now would hide the setup boundary and
-would not prove that either judging client discovers page tools. Reconsider only
-after a flagged Chrome run or an origin-trial run reaches the page and native
-registration still fails for a verified compatibility reason.
+**NO-GO for a polyfill.** The native API passed registration, discovery, and
+execution in flagged Chrome 151. Adding `@mcp-b/global` would add dependency and
+CSP surface without solving a demonstrated compatibility problem.
 
 ## Automated evidence
 
-- Focused Phase 0 tests: 2 files, 9 tests passed.
-- Pre-commit full suite: 481 files, 7,907 tests passed.
+- Focused Phase 0 tests: 2 files, 13 tests passed.
+- Pre-commit full suite: 481 files, 7,911 tests passed.
 - Typecheck: passed.
 - Lint: passed.
 - Plan-compliance review: approved for preview deployment.
@@ -115,14 +105,10 @@ registration still fails for a verified compatibility reason.
   with malformed-context, synchronous-failure, stale-completion, and production
   `notFound()` tests.
 
-## Required unblock
+## Phase 0 decision
 
-1. In Chrome, enable `chrome://flags/#enable-webmcp-testing` and relaunch.
-2. Reopen the preview route. The page must report `WebMCP tool registered`.
-3. Execute `chapa_hello` with the Model Context Tool Inspector or the browser's
-   native `getTools()` / `executeTool()` test surface and record the greeting.
-4. If the in-app Browser becomes available, repeat discovery and execution there.
-
-If Chrome executes the tool, Phase 0 passes under the plan's one-client rule and
-the demo video must use Chrome. If Chrome still fails and the in-app Browser is
-still unavailable, keep the hard stop and escalate to the Summon fallback.
+Proceed with Chapa. Use flagged Chrome for implementation previews and the demo
+video unless the ChatGPT in-app browser becomes available later. Do not add an
+OAC header or polyfill. Register an origin-trial token only as an explicit
+production-readiness action if the final judge instructions must work without
+the Chrome testing flag.
