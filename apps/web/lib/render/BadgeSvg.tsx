@@ -6,6 +6,7 @@ import { renderBadgeBranding } from "./BadgeBranding";
 import { renderRadarChart } from "./RadarChart";
 import { escapeXml } from "./escape";
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
+import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 interface BadgeOptions {
   includeBranding?: boolean;
   avatarDataUri?: string;
@@ -141,7 +142,21 @@ export function renderBadgeSvg(
       ? "Verified metrics"
       : "Public metrics";
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  // ── Accessible name (#1168 UX-L5) ─────────────────────────
+  // Gated to the route-served variant (disableAnimation === true — the
+  // badge.svg route, og-image rasterization, and warm-cache priming) so it
+  // never collides with the share page's own `aria-labelledby` wrapper
+  // around the inline-embedded SVG, or with the portal-tooltip convention
+  // (BadgeOverlay) used over the demo badges on the landing/archetype pages
+  // — both of those are inline (disableAnimation left false/unset).
+  const accessibleTitle = `${headerName} — Chapa Impact score ${scoreStr}, ${escapeXml(archetypeText)} archetype`;
+  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(impact.tier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.`;
+  const a11yAttrs = disableAnimation ? ' role="img"' : "";
+  const a11yMarkup = disableAnimation
+    ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"${a11yAttrs}>${a11yMarkup}
   <defs>
     <style>
       @keyframes pulse-glow {
@@ -151,6 +166,19 @@ export function renderBadgeSvg(
       @keyframes ring-draw {
         from { stroke-dashoffset: ${ringCircumference.toFixed(2)}; }
         to   { stroke-dashoffset: ${ringOffset.toFixed(2)}; }
+      }
+      .badge-score-pulse {
+        animation: pulse-glow 3s ease-in-out infinite;
+      }
+      /* #1168 UX-M6 — pulse-glow runs infinitely on other people's READMEs
+         forever; ring-draw is a one-shot reveal (1.2s, "both" fill) and is
+         intentionally left untouched. This rule must come AFTER the base
+         .badge-score-pulse rule above so equal-specificity cascade order
+         (not !important) is what wins under reduced motion. */
+      @media (prefers-reduced-motion: reduce) {
+        .badge-score-pulse {
+          animation: none;
+        }
       }
     </style>
   </defs>
@@ -176,7 +204,7 @@ export function renderBadgeSvg(
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
   <!-- Verified icon (shield + checkmark) appears only with a real seal. -->
   ${hasVerification ? `<g transform="translate(${PAD + 72}, ${headerY + 6})" opacity="0.4">
-    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${t.accent}" transform="scale(0.7)"/>
+    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${VERIFICATION_CORAL}" transform="scale(0.7)"/>
   </g>` : ""}
   <text x="${PAD + 72 + (hasVerification ? 20 : 0)}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">${metricsLabel}</text>
 
@@ -246,7 +274,7 @@ export function renderBadgeSvg(
   <!-- Ring arc (foreground, tier-colored, animates from 0 to score) -->
   <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})" style="animation: ring-draw 1.2s ease-out 0.5s both"/>
   <!-- Score number (centered inside ring) -->
-  <text x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" dominant-baseline="central" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
+  <text class="badge-score-pulse" x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" dominant-baseline="central">${scoreStr}</text>
   <!-- Tier label (always visible below ring) -->
   <text x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${escapeXml(impact.tier)}</text>
 

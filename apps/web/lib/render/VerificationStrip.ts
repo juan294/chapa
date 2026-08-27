@@ -21,9 +21,13 @@ export function renderVerificationStrip(hash: string, date: string): string {
   return `<g aria-label="Verification seal">
   <!-- Separator line -->
   <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${VERIFICATION_CORAL}" stroke-width="1" opacity="0.15"/>
-  <!-- Vertical text (bottom-to-top), clickable link to verification page -->
+  <!-- Vertical text (bottom-to-top), clickable link to verification page.
+       #1168 UX-H4: 14px/0.9 opacity (was 11px/0.50, ~2.1:1 contrast) \u2014 GitHub
+       scales README images ~830/1200, so the un-scaled size must stay legible
+       after that shrink. The <a> wrapper is inert in an <img> embed but is a
+       working affordance on the share page's inline-SVG path \u2014 never remove it. -->
   <a href="${verifyUrl}" target="_blank">
-    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${VERIFICATION_CORAL}" opacity="0.50" text-anchor="middle" letter-spacing="2" style="cursor:pointer">VERIFIED \u00B7 ${safeHash} \u00B7 ${safeDate}</text>
+    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="0.9" text-anchor="middle" letter-spacing="2" style="cursor:pointer">VERIFIED \u00B7 ${safeHash} \u00B7 ${safeDate}</text>
   </a>
 </g>`;
 }
@@ -40,6 +44,7 @@ export function renderDemoVerificationStrip(): string {
 
   return `<g aria-label="Sample badge indicator">
   <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${VERIFICATION_CORAL}" stroke-width="1" opacity="0.15"/>
-  <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${VERIFICATION_CORAL}" opacity="0.50" text-anchor="middle" letter-spacing="2">SAMPLE \u00B7 NOT A REAL BADGE \u00B7 FOR ILLUSTRATION ONLY</text>
+  <!-- #1168 UX-H4: same legibility fix as the real strip (14px/0.9 opacity). -->
+  <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="0.9" text-anchor="middle" letter-spacing="2">SAMPLE \u00B7 NOT A REAL BADGE \u00B7 FOR ILLUSTRATION ONLY</text>
 </g>`;
 }
