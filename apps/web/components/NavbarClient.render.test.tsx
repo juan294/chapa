@@ -192,4 +192,44 @@ describe("NavbarClient", () => {
     render(<NavbarClient />);
     expect(screen.queryByTestId("nav-link-#features")).toBeNull();
   });
+
+  // #1167 (UX-B1) — inner pages (share page, verify pages) need real routes
+  // in the center nav, not the landing page's hash anchors. Without an
+  // explicit `translationKey`, NavbarClient always re-derives its links from
+  // `landing.navLinks` (see the "Nav links locale awareness" tests above),
+  // which makes it impossible for any other page to show a different link
+  // set. `translationKey` lets a caller point at a different dictionary key.
+  describe("custom translationKey (#1167 / UX-B1)", () => {
+    it("resolves nav links from the given translationKey instead of landing.navLinks", async () => {
+      const { en } = await import("@/lib/i18n/dictionaries/en");
+      const fallbackLinks = [{ label: "ignored", href: "/ignored" }];
+      render(
+        <LanguageProvider initialLocale="en" dictionary={en}>
+          <NavbarClient navLinks={fallbackLinks} translationKey="nav.innerLinks" />
+        </LanguageProvider>
+      );
+      expect(screen.getByTestId("nav-link-/about").textContent).toBe("About");
+      expect(screen.getByTestId("nav-link-/about/scoring").textContent).toBe("Scoring");
+      expect(screen.getByTestId("nav-link-/verify").textContent).toBe("Verify");
+      expect(screen.queryByTestId("nav-link-#features")).toBeNull();
+    });
+
+    it("uses the Spanish dictionary's translationKey entries under a Spanish LanguageProvider", async () => {
+      const { es } = await import("@/lib/i18n/dictionaries/es");
+      const fallbackLinks = [{ label: "ignored", href: "/ignored" }];
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <NavbarClient navLinks={fallbackLinks} translationKey="nav.innerLinks" />
+        </LanguageProvider>
+      );
+      expect(screen.getByTestId("nav-link-/about").textContent).toBe("Acerca de");
+      expect(screen.getByTestId("nav-link-/verify").textContent).toBe("Verificar");
+    });
+
+    it("still defaults to landing.navLinks when translationKey is omitted", () => {
+      const anyLinks = [{ label: "ignored", href: "#features" }];
+      render(<NavbarClient navLinks={anyLinks} />);
+      expect(screen.getByTestId("nav-link-#features")).toBeDefined();
+    });
+  });
 });

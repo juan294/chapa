@@ -47,6 +47,8 @@ import type { Locale } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { tArray } from "@/lib/i18n/typed-accessors";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageH2 } from "./SharePageH2";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
@@ -322,6 +324,10 @@ export async function SharePageContent({
   // hardcoded-English, non-handle-bearing literal. The alt text form
   // matches the HTML embed's own (`${badgeAltOf} ${handle}`).
   const t = getServerT(locale);
+  // #1167 (UX-B1) — real routes (/about, /about/scoring, /verify) for the
+  // server Navbar's center nav, NOT the landing page's `landing.navLinks`
+  // hash anchors (`#features`, etc.), which are meaningless off that page.
+  const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
   const embedBadgeUrl = `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`;
   const embedAltText = `${t('shareOwner.badgeAltOf') as string} ${handle}`;
   const embedMarkdown = `![${embedAltText}](${embedBadgeUrl})`;
@@ -385,7 +391,7 @@ export async function SharePageContent({
           synchronously) instead of the client variant's round trip to
           /api/auth/session. `locale` is already resolved above; passing it
           avoids Navbar re-deriving it a second time. */}
-      <Navbar locale={locale} />
+      <Navbar locale={locale} navLinks={innerNavLinks} />
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
@@ -444,6 +450,16 @@ export async function SharePageContent({
           isOwner={isOwner}
           embedMarkdown={embedMarkdown}
         />
+      </div>
+
+      {/* pb-16 spacer (#1167 / UX-B1) — CommandBarHint (rendered by the
+          SharePage default export, a sibling of this Suspense boundary)
+          mounts GlobalCommandBarLazy (fixed bottom-0) once summoned via the
+          "/" shortcut. This reserves room below the footer so scrolling to
+          the true bottom of the page clears it instead of it occluding the
+          footer's last line — same pattern as the [locale] content pages. */}
+      <div className="pb-16">
+        <SiteFooter t={t} />
       </div>
     </>
   );

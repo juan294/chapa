@@ -4,8 +4,10 @@ import {
   type VerificationRecord,
 } from "@/lib/verification/types";
 import { Navbar } from "@/components/Navbar";
+import { SiteFooter } from "@/components/SiteFooter";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { tArray } from "@/lib/i18n/typed-accessors";
 import {
   DEFAULT_LOCALE,
   LangSync,
@@ -59,11 +61,15 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   const lang = queryLocale(rawLang);
   const locale = await getServerLocale(lang);
   const t = getServerT(locale);
+  // #1167 (UX-B1) — real routes (/about, /about/scoring, /verify), NOT the
+  // landing page's `landing.navLinks` hash anchors, which are meaningless
+  // off that page.
+  const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
 
   if (!HASH_PATTERN.test(hash)) {
     return (
-      <VerifyLocaleBoundary locale={locale} queryLang={lang}>
-        <Navbar locale={locale} />
+      <VerifyLocaleBoundary locale={locale} queryLang={lang} t={t}>
+        <Navbar locale={locale} navLinks={innerNavLinks} />
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
           <InvalidHashCard hash={hash} t={t} />
         </main>
@@ -77,8 +83,8 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   ]);
 
   return (
-    <VerifyLocaleBoundary locale={locale} queryLang={lang}>
-      <Navbar locale={locale} />
+    <VerifyLocaleBoundary locale={locale} queryLang={lang} t={t}>
+      <Navbar locale={locale} navLinks={innerNavLinks} />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
           <>
@@ -102,10 +108,12 @@ function VerifyLocaleBoundary({
   children,
   locale,
   queryLang,
+  t,
 }: {
   children: React.ReactNode;
   locale: Locale;
   queryLang?: string;
+  t: TFunc;
 }) {
   return (
     <>
@@ -119,7 +127,12 @@ function VerifyLocaleBoundary({
       >
         <LangSync />
         <LocaleSync queryLang={queryLang} />
-        <div className="min-h-screen bg-bg text-text-primary">{children}</div>
+        <div className="min-h-screen bg-bg text-text-primary">
+          {children}
+          {/* #1167 (UX-B1) — no fixed-bottom command bar exists on this page,
+              so no bottom spacer is needed before the footer. */}
+          <SiteFooter t={t} />
+        </div>
       </LanguageProvider>
     </>
   );

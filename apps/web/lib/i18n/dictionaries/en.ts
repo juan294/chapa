@@ -16,6 +16,19 @@ export const en: Translations = {
     orConnector: 'or',
     skipToMainContent: 'Skip to main content',
   },
+  nav: {
+    // #1167 (UX-B1) — real-route center-nav links for pages that are NOT
+    // the landing page. `landing.navLinks` below is hash-anchor navigation
+    // (`#features`, etc.) that only makes sense scrolled within the landing
+    // page itself; passing those hrefs to the share page or verify pages
+    // would 404-scroll on load. This key is consumed via NavbarClient's
+    // `translationKey` prop / passed directly to the server Navbar.
+    innerLinks: [
+      { label: 'About', href: '/about' },
+      { label: 'Scoring', href: '/about/scoring' },
+      { label: 'Verify', href: '/verify' },
+    ],
+  },
   aria: {
     mainNavigation: 'Main navigation',
     mobileNavigation: 'Mobile navigation',

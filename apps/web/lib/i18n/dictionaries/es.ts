@@ -16,6 +16,13 @@ export const es: Translations = {
     orConnector: 'o',
     skipToMainContent: 'Saltar al contenido principal',
   },
+  nav: {
+    innerLinks: [
+      { label: 'Acerca de', href: '/about' },
+      { label: 'Puntuación', href: '/about/scoring' },
+      { label: 'Verificar', href: '/verify' },
+    ],
+  },
   aria: {
     mainNavigation: 'Navegación principal',
     mobileNavigation: 'Navegación móvil',

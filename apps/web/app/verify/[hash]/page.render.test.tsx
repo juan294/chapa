@@ -31,8 +31,27 @@ vi.mock("./VerifyPageWebMcpTools", () => ({
 }));
 
 vi.mock("@/components/Navbar", () => ({
-  Navbar: ({ locale }: { locale?: string }) => (
-    <nav data-testid="navbar" data-locale={locale}>Navbar</nav>
+  Navbar: ({
+    locale,
+    navLinks,
+  }: {
+    locale?: string;
+    navLinks?: Array<{ label: string; href: string }>;
+  }) => (
+    <nav data-testid="navbar" data-locale={locale}>
+      Navbar
+      {navLinks?.map((l) => (
+        <a key={l.href} href={l.href} data-testid={`navbar-link-${l.href}`}>
+          {l.label}
+        </a>
+      ))}
+    </nav>
+  ),
+}));
+
+vi.mock("@/components/SiteFooter", () => ({
+  SiteFooter: ({ t }: { t: (key: string) => unknown }) => (
+    <footer data-testid="site-footer">{t("landing.footer.privacy") as string}</footer>
   ),
 }));
 
@@ -385,6 +404,48 @@ describe("VerifyPage", () => {
 
       // English: verifyDetail.name = 'Name'
       expect(screen.queryByText("Name")).toBeNull();
+    });
+  });
+
+  // #1167 (UX-B1, launch blocker) — /verify/[hash] had no footer at all, so
+  // a visitor landing here (e.g. scanning a QR code on a badge) had no way
+  // to reach Privacy or Terms.
+  describe("SiteFooter + real-route nav links (#1167 / UX-B1)", () => {
+    it("renders SiteFooter on the invalid-hash branch", async () => {
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "not-valid!" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      // English: landing.footer.privacy = 'Privacy'
+      expect(screen.getByTestId("site-footer").textContent).toBe("Privacy");
+    });
+
+    it("renders SiteFooter on the valid-hash-with-record branch", async () => {
+      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
+
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      expect(screen.getByTestId("site-footer").textContent).toBe("Privacy");
+    });
+
+    it("gives the Navbar real-route inner nav links, not landing hash anchors", async () => {
+      const jsx = await VerifyPage({
+        params: Promise.resolve({ hash: "not-valid!" }),
+        searchParams: Promise.resolve({}),
+      });
+      render(jsx);
+
+      expect(screen.getByTestId("navbar-link-/about").textContent).toBe("About");
+      expect(screen.getByTestId("navbar-link-/about/scoring").textContent).toBe(
+        "Scoring",
+      );
+      expect(screen.getByTestId("navbar-link-/verify").textContent).toBe("Verify");
     });
   });
 });

@@ -96,4 +96,19 @@ describe("SharePage — non-renderable architecture checks", () => {
       expect(SOURCE).toContain("SharePageContent");
     });
   });
+
+  // #1167 (UX-B1, launch blocker) — CommandBarHint mounts GlobalCommandBarLazy
+  // (fixed bottom-0) once summoned via the "/" shortcut. A bottom spacer
+  // between SiteFooter and the end of the page keeps that from occluding the
+  // footer's last line — same pattern as the [locale] content pages'
+  // pb-16/pb-24 spacer (see footer-command-bar-spacing.test.ts).
+  describe("SiteFooter bottom spacer (#1167 / UX-B1)", () => {
+    it("wraps SiteFooter in a bottom-padding spacer", () => {
+      expect(SOURCE).toContain("<SiteFooter");
+      const footerIndex = SOURCE.indexOf("<SiteFooter");
+      const windowStart = Math.max(0, footerIndex - 200);
+      const region = SOURCE.slice(windowStart, footerIndex);
+      expect(region).toMatch(/pb-16|pb-24|h-16|h-24/);
+    });
+  });
 });

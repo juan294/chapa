@@ -152,6 +152,9 @@ vi.mock("@/components/SharePageShortcuts", () => ({
 vi.mock("@/components/BadgeToolbar", () => ({
   BadgeToolbar: () => "<div>toolbar</div>",
 }));
+vi.mock("@/components/SiteFooter", () => ({
+  SiteFooter: () => "<footer>site-footer</footer>",
+}));
 vi.mock("@/components/SharePageOwnerContent", () => ({
   SharePageOwnerContent: () => "<div>owner-content</div>",
 }));
@@ -165,6 +168,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { Navbar } from "@/components/Navbar";
+import { SiteFooter } from "@/components/SiteFooter";
 import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 
 /**
@@ -855,6 +859,37 @@ describe("SharePage /u/[handle]", () => {
 
       const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
       expect(ownerEl!.props.isOwner).toBe(false);
+    });
+  });
+
+  // #1167 (UX-B1, launch blocker) — the share page is the single most
+  // important surface in the finding's exact reproduction: a visitor
+  // arrives from a README badge, signs in, generates their own badge, and
+  // never sees a link to Privacy or Terms anywhere in that flow. Landing
+  // and the 7 [locale] content pages already got SiteFooter in a prior
+  // remediation unit; this closes the gap on /u/[handle] itself.
+  describe("SiteFooter + real-route nav links (#1167 / UX-B1)", () => {
+    it("renders SiteFooter with the resolved locale-aware t function", async () => {
+      const result = await renderPage("testuser");
+
+      const footerEl = findElement(result, (el) => el.type === SiteFooter);
+      expect(footerEl).not.toBeNull();
+      expect(typeof footerEl!.props.t).toBe("function");
+      // renderPage() calls SharePageContent without an explicit `locale`, so
+      // it falls back to DEFAULT_LOCALE — mocked to "es" in this file.
+      const t = footerEl!.props.t as (key: string) => unknown;
+      expect(t("landing.footer.privacy")).toBe("Privacidad");
+    });
+
+    it("passes real-route inner nav links to the server Navbar, not the landing page's hash anchors", async () => {
+      const result = await renderPage("testuser");
+
+      const navbarEl = findElement(result, (el) => el.type === Navbar);
+      expect(navbarEl!.props.navLinks).toEqual([
+        { label: "Acerca de", href: "/about" },
+        { label: "Puntuación", href: "/about/scoring" },
+        { label: "Verificar", href: "/verify" },
+      ]);
     });
   });
 
