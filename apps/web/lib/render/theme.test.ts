@@ -61,6 +61,45 @@ describe("getTierColor", () => {
   });
 });
 
+describe("theme.ts brand-alignment invariant comment (#1168 UX-L2)", () => {
+  const themeSource = readFileSync(new URL("./theme.ts", import.meta.url), "utf8");
+
+  it("scopes the alignment invariant to accent + archetype colors only, not bg/card/text", () => {
+    // The comment previously claimed ALL "shared brand and archetype colors"
+    // must stay aligned with globals.css, but bg/card/textPrimary/
+    // textSecondary intentionally diverge (see next test) — only accent and
+    // the 7 archetype colors are actually kept in lockstep (enforced above).
+    // The comment must name that narrower scope explicitly.
+    expect(themeSource).toMatch(/accent/i);
+    expect(themeSource).toMatch(/archetype/i);
+    expect(themeSource).not.toMatch(
+      /shared brand and archetype colors must stay\s+\/\/\s*aligned/,
+    );
+  });
+
+  it("bg/card/textPrimary/textSecondary intentionally diverge from globals.css dark tokens", () => {
+    // Documents the actual (intentional) divergence: correcting the drifted
+    // WARM_AMBER.bg. // comment. Correcting the comment over changing values
+    // (#1168 UX-L2) — changing these hex values would alter every cached
+    // badge SVG and every already-embedded README image for a ~2-RGB-step
+    // difference that's imperceptible in practice.
+    expect(globalsCss).toContain("--color-bg: #0A0A0F;");
+    expect(globalsCss).toContain("--color-card: #111118;");
+    expect(globalsCss).toContain("--color-text-primary: #E2E4E9;");
+    expect(globalsCss).toContain("--color-text-secondary: #8B8FA0;");
+
+    expect(WARM_AMBER.bg).toBe("#0C0D14");
+    expect(WARM_AMBER.card).toBe("#13141E");
+    expect(WARM_AMBER.textPrimary).toBe("#E6EDF3");
+    expect(WARM_AMBER.textSecondary).toBe("#9AA4B2");
+
+    expect(WARM_AMBER.bg).not.toBe("#0A0A0F");
+    expect(WARM_AMBER.card).not.toBe("#111118");
+    expect(WARM_AMBER.textPrimary).not.toBe("#E2E4E9");
+    expect(WARM_AMBER.textSecondary).not.toBe("#8B8FA0");
+  });
+});
+
 describe("getArchetypeColor", () => {
   it("keeps archetype colors aligned with globals.css tokens", () => {
     expect(globalsCss).toContain("--color-archetype-builder: #8B5CF6;");

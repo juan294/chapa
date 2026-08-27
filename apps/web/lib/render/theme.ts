@@ -11,8 +11,17 @@ interface BadgeTheme {
 }
 
 // Badge SVG renders on the server before app CSS is applied, so the palette
-// is duplicated here. Invariant: shared brand and archetype colors must stay
-// aligned with apps/web/styles/globals.css.
+// is duplicated here. Invariant (narrower than it sounds): only the brand
+// `accent`/`accentLight` and the 7 `archetypes` colors below must stay
+// aligned with apps/web/styles/globals.css — enforced by theme.test.ts.
+// `bg`/`card`/`textStrong`/`textMuted` (used to build WARM_AMBER.bg/card/
+// textPrimary/textSecondary below) are an intentionally SEPARATE, slightly
+// cooler palette tuned for the badge's fixed-dark canvas; they do not match
+// --color-bg/--color-card/--color-text-primary/--color-text-secondary, and
+// that is by design, not drift. Prefer correcting this comment over changing
+// those values — a value change alters every cached badge SVG and every
+// already-embedded README image for a ~2-RGB-step difference that's
+// imperceptible in practice (#1168 UX-L2).
 const BADGE_BRAND_COLORS = {
   accent: "#8B5CF6",
   accentLight: "#A78BFA",

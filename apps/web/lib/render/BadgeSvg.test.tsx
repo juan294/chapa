@@ -745,4 +745,106 @@ describe("renderBadgeSvg", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Reduced motion (#1168 UX-M6)
+  // ---------------------------------------------------------------------------
+
+  describe("prefers-reduced-motion guard", () => {
+    it("contains a prefers-reduced-motion media block disabling the infinite pulse-glow", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)/);
+      // The media block must target the pulse-glow animation and turn it off.
+      const mediaMatch = svg.match(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\}\s*\}/);
+      expect(mediaMatch).not.toBeNull();
+      expect(mediaMatch![0]).toContain("animation: none");
+    });
+
+    it("does not disable the finite ring-draw reveal in the reduced-motion block", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const mediaMatch = svg.match(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\}\s*\}/);
+      expect(mediaMatch).not.toBeNull();
+      expect(mediaMatch![0]).not.toContain("ring-draw");
+      // ring-draw's own keyframe + inline animation reference must still exist untouched.
+      expect(svg).toContain("@keyframes ring-draw");
+      expect(svg).toContain("animation: ring-draw 1.2s ease-out 0.5s both");
+    });
+
+    it("still includes the pulse-glow keyframe and applies it to the score (unchanged when motion is not reduced)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("@keyframes pulse-glow");
+      expect(svg).toMatch(/pulse-glow 3s ease-in-out infinite/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Accessible name (#1168 UX-L5) — gated to the route-served (disableAnimation)
+  // variant so it doesn't collide with the share page's aria-labelledby wrapper
+  // or the portal-tooltip convention on inline-embedded badges.
+  // ---------------------------------------------------------------------------
+
+  describe("accessible name (role/title/desc)", () => {
+    it("adds role=img, <title>, and <desc> when disableAnimation is true (route-served variant)", () => {
+      const svg = renderBadgeSvg(makeStats({ handle: "octocat" }), makeImpact(), {
+        disableAnimation: true,
+      });
+      expect(svg).toContain('role="img"');
+      expect(svg).toMatch(/<svg[^>]*>\s*<title>/);
+      expect(svg).toContain("<desc>");
+      expect(svg).toContain("octocat");
+    });
+
+    it("does NOT add role=img/<title>/<desc> for the inline in-DOM variant (default)", () => {
+      // Inline embeds (share page, demo badges) already have an external
+      // aria-labelledby / BadgeOverlay tooltip convention — a native <title>
+      // tooltip here would collide with it, and role=img here would be
+      // redundant with the wrapping role=img div.
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).not.toContain('role="img"');
+      expect(svg).not.toContain("<title>");
+      expect(svg).not.toContain("<desc>");
+    });
+
+    it("escapes user-controlled text in the accessible name (XSS)", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ handle: "user<script>alert(1)</script>" }),
+        makeImpact(),
+        { disableAnimation: true },
+      );
+      expect(svg).not.toContain("<script>");
+      expect(svg).toContain("&lt;script&gt;");
+    });
+
+    it("<title> content mentions the score and archetype", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ handle: "octocat" }),
+        makeImpact({ adjustedComposite: 74, archetype: "Builder", tier: "High" }),
+        { disableAnimation: true },
+      );
+      const titleMatch = svg.match(/<title>([\s\S]*?)<\/title>/);
+      expect(titleMatch).not.toBeNull();
+      expect(titleMatch![1]).toContain("74");
+      expect(titleMatch![1]).toContain("Builder");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Verified signal color (#1168 UX-M10) — single coral signal, not purple+coral
+  // ---------------------------------------------------------------------------
+
+  describe("verified signal uses a single coral color, not purple + coral", () => {
+    it("renders the verified shield in coral (#E05A47), not the purple brand accent", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
+      const shieldIdx = svg.indexOf("M12 1L3 5v6");
+      expect(shieldIdx).toBeGreaterThan(-1);
+      const shieldTagStart = svg.lastIndexOf("<path", shieldIdx);
+      const shieldTagEnd = svg.indexOf("/>", shieldIdx);
+      const shieldTag = svg.slice(shieldTagStart, shieldTagEnd);
+      expect(shieldTag).toContain('fill="#E05A47"');
+      expect(shieldTag).not.toContain('fill="#8B5CF6"');
+    });
+  });
+
 });
