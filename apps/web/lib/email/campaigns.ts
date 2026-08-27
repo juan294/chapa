@@ -79,13 +79,32 @@ export function buildEmailContent(
 export async function getDailyQuota(): Promise<number> {
   const key = `${DAILY_QUOTA_KEY}:${toDateString(new Date())}`;
   const count = await cacheGet<number>(key);
-  return count ?? 0;
+  // Clamp reads at zero: a refund can never legitimately leave this negative
+  // (see refundDailyQuota below), but reading defensively means a would-be
+  // negative counter can never inflate `available` above DAILY_SEND_LIMIT.
+  return Math.max(0, count ?? 0);
 }
 
-async function refundDailyQuota(count: number): Promise<void> {
+/**
+ * Refund previously-reserved quota.
+ *
+ * **BE-M2 fix**: `key` must be the SAME `quotaKey` the caller reserved
+ * against (computed once, before the batch send), not re-derived from
+ * `new Date()` at refund time. `resend.batch.send()` is timeout-wrapped and
+ * the stats/acknowledge calls add latency, so a batch that starts just
+ * before UTC midnight can refund just after it — re-deriving the date would
+ * credit tomorrow's counter for a charge made against today's, driving
+ * tomorrow's count negative and silently raising the effective daily cap.
+ * Threading the key through means the refund always lands on the same
+ * bucket it charged, even across a UTC-midnight crossing. This does mean a
+ * refund that happens more than 86400s after the reservation (i.e. after
+ * `key` has already expired) recreates that now-stale key — a harmless,
+ * short-lived resurrection since `getDailyQuota()` only ever reads today's
+ * key and nothing else looks at it.
+ */
+async function refundDailyQuota(key: string, count: number): Promise<void> {
   if (count <= 0) return;
 
-  const key = `${DAILY_QUOTA_KEY}:${toDateString(new Date())}`;
   await cacheIncr(key, -count, 86400);
 }
 
@@ -319,7 +338,7 @@ export async function processCampaignBatch(
       // before the timeout/rate-limit response reached us. Keep the complete
       // group under its lease so expiry recovery replays identical membership
       // and therefore the same provider idempotency key.
-      await refundDailyQuota(claimed.length);
+      await refundDailyQuota(quotaKey, claimed.length);
       const stats = await dbGetCampaignStats(campaignId);
       await dbUpdateCampaign(campaignId, {
         sentCount: stats.sent,
@@ -329,7 +348,7 @@ export async function processCampaignBatch(
     } else {
       const acknowledged = await dbMarkSendsFailed(sendIds, message, leaseToken);
       if (!acknowledged) {
-        await refundDailyQuota(claimed.length);
+        await refundDailyQuota(quotaKey, claimed.length);
         throw new Error("Failed to acknowledge failed campaign emails");
       }
       batchFailed = claimed.length;
@@ -358,7 +377,7 @@ export async function processCampaignBatch(
       leaseToken,
     );
     if (!acknowledged) {
-      await refundDailyQuota(claimed.length);
+      await refundDailyQuota(quotaKey, claimed.length);
       throw new Error("Failed to acknowledge campaign email batch");
     }
 
@@ -369,7 +388,7 @@ export async function processCampaignBatch(
   }
 
   if (batchFailed > 0) {
-    await refundDailyQuota(batchFailed);
+    await refundDailyQuota(quotaKey, batchFailed);
   }
 
   // Single stats query at the end

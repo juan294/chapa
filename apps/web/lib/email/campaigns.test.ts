@@ -305,6 +305,53 @@ describe("processCampaignBatch", () => {
     );
   });
 
+  // BE-M2 regression: quotaKey is computed once when the batch is reserved,
+  // but the old refundDailyQuota() re-derived `toDateString(new Date())`
+  // itself. Resend's batch.send() is timeout-wrapped and can take long
+  // enough that a batch reserved just before UTC midnight refunds just
+  // after it — crediting the WRONG day's counter (tomorrow's), which can
+  // drive it negative and silently raise the effective daily cap above
+  // DAILY_SEND_LIMIT. The refund must credit the same key it charged.
+  it("BE-M2: refunds the day the quota was reserved on, even if the batch crosses UTC midnight", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T23:59:59.900Z"));
+
+      vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+      vi.mocked(dbClaimPendingSends).mockResolvedValue([
+        { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "processing", sentAt: null, error: null },
+      ]);
+      mockBatchSend.mockImplementation(async () => {
+        // Simulate the provider call taking long enough to cross midnight
+        // UTC before it resolves.
+        vi.setSystemTime(new Date("2026-01-02T00:00:05.000Z"));
+        return {
+          data: null,
+          error: { message: "Rate limited", statusCode: 429, name: "rate_limit" },
+        };
+      });
+      vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 0, processing: 1, failed: 0 });
+      vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+
+      await processCampaignBatch("campaign-1");
+
+      // Must credit 2026-01-01 (the day the quota was reserved), never
+      // 2026-01-02 (the day the provider call happened to finish on).
+      expect(cacheIncr).toHaveBeenCalledWith(
+        "campaign:daily-sends:2026-01-01",
+        -1,
+        86400,
+      );
+      expect(cacheIncr).not.toHaveBeenCalledWith(
+        "campaign:daily-sends:2026-01-02",
+        expect.anything(),
+        expect.anything(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("surfaces a sent acknowledgement write failure without marking the send failed", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends).mockResolvedValue([
