@@ -716,6 +716,11 @@ export const es: Translations = {
     errorGeneric: 'No se pudo autorizar. Por favor, inténtalo de nuevo.',
     errorBoundaryHeading: 'Error de autorización',
     errorBoundaryBody: 'Algo salió mal durante la autorización del CLI. Por favor, inténtalo de nuevo.',
+    deviceContextHeading: 'Dispositivo que solicita la autorización',
+    deviceContextIpLabel: 'Dirección IP',
+    deviceContextUserAgentLabel: 'Navegador / cliente',
+    deviceContextUnavailable: 'No se registró información del dispositivo para esta solicitud.',
+    deviceContextWarning: 'Autorizar esto le otorga acceso de escritura a tu puntuación de Chapa. Autorízalo solo si acabas de ejecutar este comando tú mismo, en tu propia terminal.',
   },
   comingSoon: {
     metadataTitle: 'Próximamente',

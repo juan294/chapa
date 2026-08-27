@@ -716,6 +716,11 @@ export const en: Translations = {
     errorGeneric: 'Failed to authorize. Please try again.',
     errorBoundaryHeading: 'Authorization error',
     errorBoundaryBody: 'Something went wrong during CLI authorization. Please try again.',
+    deviceContextHeading: 'Device requesting authorization',
+    deviceContextIpLabel: 'IP address',
+    deviceContextUserAgentLabel: 'Browser / client',
+    deviceContextUnavailable: 'No device information was recorded for this request.',
+    deviceContextWarning: 'Approving this grants write access to your Chapa score. Only approve if you just ran this command yourself, in your own terminal.',
   },
   comingSoon: {
     metadataTitle: 'Coming soon',
