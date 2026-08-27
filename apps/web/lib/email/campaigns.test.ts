@@ -616,21 +616,51 @@ describe("processCampaignBatch", () => {
     expect(result.remaining).toBe(43);
   });
 
-  it("does not call incrementDailyQuota when Resend client is null", async () => {
+  // BE-M6: a missing/blank RESEND_API_KEY is a transient config problem, not
+  // a permanent per-recipient failure. Marking claimed rows "failed" via
+  // dbMarkSendsFailed is a TERMINAL status nothing ever retries
+  // (claim_campaign_sends only selects expired-processing or pending), so a
+  // config outage used to silently drop recipients forever. Resend was never
+  // called, so releasing the lease is exactly as safe as the oversized-group
+  // release path (#1085) — it lets the same rows be reclaimed (with their
+  // group_token intact) once the config is fixed.
+  it("releases the claimed lease instead of permanently failing sends when Resend client is null (BE-M6)", async () => {
     vi.mocked(getResend).mockReturnValue(null);
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbClaimPendingSends).mockResolvedValue([
       { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "a@e.com", status: "processing", sentAt: null, error: null },
     ]);
-    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 0, processing: 0, failed: 1 });
+    vi.mocked(dbReleaseCampaignSendLease).mockResolvedValue(true);
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 0, pending: 1, processing: 0, failed: 0 });
 
     const result = await processCampaignBatch("campaign-1");
 
-    expect(result.failed).toBe(1);
-    expect(result.sent).toBe(0);
-    // cacheIncr should NOT be called since Resend was unavailable
+    expect(result).toEqual({ sent: 0, failed: 0, remaining: 1 });
+    expect(dbReleaseCampaignSendLease).toHaveBeenCalledWith(
+      expect.any(String),
+      1,
+    );
+    // cacheIncr should NOT be called since Resend was unavailable and quota
+    // was never reserved for this attempt.
     expect(cacheIncr).not.toHaveBeenCalled();
-    expect(dbMarkSendsFailed).toHaveBeenCalledWith(["s-1"], "Resend unavailable", expect.any(String));
+    expect(dbMarkSendsFailed).not.toHaveBeenCalled();
+    // The campaign isn't finalized — it still has pending work, exactly like
+    // the oversized-group release path.
+    expect(dbUpdateCampaign).not.toHaveBeenCalled();
+  });
+
+  it("throws when releasing the lease fails after Resend client is null (BE-M6)", async () => {
+    vi.mocked(getResend).mockReturnValue(null);
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbClaimPendingSends).mockResolvedValue([
+      { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "a@e.com", status: "processing", sentAt: null, error: null },
+    ]);
+    vi.mocked(dbReleaseCampaignSendLease).mockResolvedValue(false);
+
+    await expect(processCampaignBatch("campaign-1")).rejects.toThrow(
+      "Failed to release campaign lease after Resend unavailable",
+    );
+    expect(dbMarkSendsFailed).not.toHaveBeenCalled();
   });
 
   it("handles dbGetCampaignStats failure gracefully after sending", async () => {

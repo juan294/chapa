@@ -45,54 +45,85 @@ export const GET = withErrorCapture("/api/cron/process-campaigns", async (reques
     });
   }
 
-  // Round-robin across ALL active campaigns in this run — a single run
-  // used to process only active[0], starving any second concurrently-
-  // "sending" campaign across successive daily runs (#1035).
+  // Round-robin across ALL active campaigns in this run, giving each one
+  // batch per pass and repeating passes until every campaign's backlog
+  // drains or the run runs out of quota/time (#1176/BE-M5). A single run
+  // used to call processCampaignBatch() exactly ONCE per campaign — that
+  // claims at most BATCH_SIZE (50) rows and returns, wasting most of the
+  // day's quota whenever a campaign's backlog exceeds one batch. Passing
+  // over the list repeatedly (instead of draining one campaign fully before
+  // moving to the next) preserves the #1035 fairness property: a campaign
+  // with a huge backlog can't monopolize the day's quota ahead of a second
+  // concurrently-"sending" campaign.
   //
   // Quota safety: processCampaignBatch() re-reads the shared Redis daily
   // send counter (campaign:daily-sends:<date>) and reserves capacity
   // atomically via cacheReserveQuota() before every batch. That state is
   // persisted in Redis, not held in this function's memory, so quota
   // consumed by campaign N is immediately visible to campaign N+1 in the
-  // very same run — no in-process counter needs to be threaded through to
-  // keep campaign 2 from exceeding the daily cap.
+  // very same run (or the very next pass) — no in-process counter needs to
+  // be threaded through to keep one campaign from exceeding the daily cap.
   const startedAt = Date.now();
-  const campaigns: CampaignBatchOutcome[] = [];
-  const deferred: DeferredCampaign[] = [];
+  const outcomes = new Map<string, CampaignBatchOutcome>();
+  // Campaigns excluded from further passes this run: either finished
+  // (remaining === 0) or stalled (see below). The `while` condition below
+  // re-checks this every pass so a campaign only gets as many turns as it
+  // can actually use.
+  const excluded = new Set<string>();
+  let quotaExhausted = false;
 
-  for (let i = 0; i < active.length; i++) {
-    const campaign = active[i]!;
+  outerLoop: while (active.some((c) => !excluded.has(c.id))) {
+    for (const campaign of active) {
+      if (excluded.has(campaign.id)) continue;
 
-    if (Date.now() - startedAt >= TIME_BUDGET_MS) {
-      deferred.push({
+      if (Date.now() - startedAt >= TIME_BUDGET_MS) {
+        break outerLoop;
+      }
+
+      const result = await processCampaignBatch(campaign.id);
+      const prior = outcomes.get(campaign.id);
+      outcomes.set(campaign.id, {
         campaignId: campaign.id,
         campaignName: campaign.name,
-        reason: "time_budget",
+        sent: (prior?.sent ?? 0) + result.sent,
+        failed: (prior?.failed ?? 0) + result.failed,
+        remaining: result.remaining,
       });
-      continue;
-    }
 
-    const result = await processCampaignBatch(campaign.id);
-    campaigns.push({
+      // remaining === -1 is processCampaignBatch's signal that the shared
+      // daily send quota is exhausted for today. Stop the entire run — any
+      // other campaign would just no-op against the same exhausted counter
+      // — and defer everything not yet attempted to the next run.
+      if (result.remaining === -1) {
+        quotaExhausted = true;
+        break outerLoop;
+      }
+
+      // Exclude the campaign from further passes once it's finished
+      // (remaining === 0), or once an attempt makes no forward progress at
+      // all (sent === 0 && failed === 0 with remaining still positive — e.g.
+      // an oversized recovered lease group that doesn't fit the remaining
+      // quota, or a permanently misconfigured Resend client, see BE-M6).
+      // Looping "while remaining > 0" without this guard would busy-spin a
+      // stalled campaign for the rest of TIME_BUDGET_MS, hammering the DB
+      // for no benefit and starving every other active campaign in this
+      // run. A stalled campaign still gets exactly one attempt per run and
+      // is picked back up on the next cron invocation.
+      if (result.remaining === 0 || (result.sent === 0 && result.failed === 0)) {
+        excluded.add(campaign.id);
+      }
+    }
+  }
+
+  const campaigns = Array.from(outcomes.values());
+  const deferred: DeferredCampaign[] = [];
+  for (const campaign of active) {
+    if (outcomes.has(campaign.id)) continue;
+    deferred.push({
       campaignId: campaign.id,
       campaignName: campaign.name,
-      ...result,
+      reason: quotaExhausted ? "quota_exhausted" : "time_budget",
     });
-
-    // remaining === -1 is processCampaignBatch's signal that the shared
-    // daily send quota is exhausted for today. Stop iterating — any later
-    // campaign would just no-op against the same exhausted counter — and
-    // defer the rest to the next run instead of burning time on them.
-    if (result.remaining === -1) {
-      for (let j = i + 1; j < active.length; j++) {
-        deferred.push({
-          campaignId: active[j]!.id,
-          campaignName: active[j]!.name,
-          reason: "quota_exhausted",
-        });
-      }
-      break;
-    }
   }
 
   await cacheSet(HEARTBEAT_KEY, Date.now(), HEARTBEAT_TTL_SECONDS);

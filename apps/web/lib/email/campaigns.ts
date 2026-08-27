@@ -258,22 +258,25 @@ export async function processCampaignBatch(
 
   const resend = getResend();
   if (!resend) {
-    const acknowledged = await dbMarkSendsFailed(
-      claimed.map((s) => s.id),
-      "Resend unavailable",
+    // BE-M6: a missing/blank RESEND_API_KEY is a transient config problem,
+    // not a permanent per-recipient failure. dbMarkSendsFailed writes a
+    // TERMINAL status nothing ever retries (claim_campaign_sends only
+    // selects expired-processing or pending rows), so marking these rows
+    // "failed" here would silently drop recipients forever the moment the
+    // env var goes missing or blank. Resend was never called, so releasing
+    // the claimed lease is exactly as safe as the oversized-group release
+    // path above (#1085) — it preserves group_token so a later claim
+    // recovers identical membership instead of splitting it, keeping
+    // provider idempotency intact once the config is fixed.
+    const released = await dbReleaseCampaignSendLease(
       leaseToken,
+      claimed.length,
     );
-    if (!acknowledged) throw new Error("Failed to acknowledge failed campaign emails");
+    if (!released) {
+      throw new Error("Failed to release campaign lease after Resend unavailable");
+    }
     const stats = await dbGetCampaignStats(campaignId);
-    await dbUpdateCampaign(campaignId, {
-      sentCount: stats.sent,
-      failedCount: stats.failed,
-    });
-    return {
-      sent: 0,
-      failed: claimed.length,
-      remaining: getRemainingSends(stats),
-    };
+    return { sent: 0, failed: 0, remaining: getRemainingSends(stats) };
   }
 
   // Build emails using shared content helper
