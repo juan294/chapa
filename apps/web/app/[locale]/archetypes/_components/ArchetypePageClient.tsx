@@ -32,6 +32,8 @@ export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
   const ns = `archetypes.${archetypeKey}`;
 
   const essay = tArray<string>(t, `${ns}.essay`);
+  const practiceEssay = tArray<string>(t, `${ns}.practiceEssay`);
+  const radarEssay = tArray<string>(t, `${ns}.radarEssay`);
   const keySignals = tArray<{ tier: string; description: string }>(t, `${ns}.keySignals`);
   const accentClass = ACCENT_CLASS[archetypeKey];
 
@@ -111,10 +113,12 @@ export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 {t(`${ns}.sectionPractice`) as string}
               </h2>
+              {practiceEssay.map((p, i) => <p key={i}>{p}</p>)}
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 {t(`${ns}.sectionRadar`) as string}
               </h2>
+              {radarEssay.map((p, i) => <p key={i}>{p}</p>)}
             </div>
             <div className="pt-4 flex flex-wrap items-center justify-between gap-4">
               <Link href="/#features" className="font-heading text-sm text-amber hover:text-amber-light transition-colors">
