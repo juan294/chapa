@@ -44,6 +44,15 @@ html[lang="en"] [data-document-locale="es"] {
      strokes; never for fills, tints, or borders (those keep --color-complement
      / --color-complement-light / --color-complement-dark unchanged). */
   --color-complement-text: #0B835C;
+  /* #1189 follow-up — a hover state must be a legitimate text color that
+     clears AA in its own theme, not --color-complement-light (a translucent
+     BACKGROUND tint that renders near-invisible as text: pale mint on white
+     in light theme, 15%-alpha green in dark theme). --color-complement-text
+     is already the lightest same-hue/saturation shade that clears 4.5:1 on
+     light surfaces, so a light-theme hover can only move DARKER (still
+     4.5:1+, with room to spare); dark theme has headroom to move LIGHTER
+     instead (brighten-on-hover), re-declared in [data-theme="dark"] below. */
+  --color-complement-text-hover: #085E41;
 
   --color-terminal-green: #16A34A;
   --color-terminal-red: #DC2626;
@@ -105,6 +114,7 @@ html[lang="en"] [data-document-locale="es"] {
   --color-purple-tint: #F5F3FF;
   --color-complement-light: #D1FAE5;
   --color-complement-text: #0B835C;
+  --color-complement-text-hover: #085E41;
 
   --color-terminal-green: #16A34A;
   --color-terminal-red: #DC2626;
@@ -161,6 +171,11 @@ html[lang="en"] [data-document-locale="es"] {
      default) so the token is genuinely theme-aware like every other
      per-theme color in this block. */
   --color-complement-text: #10B981;
+  /* #1189 follow-up — dark theme has contrast headroom to move LIGHTER on
+     hover (brighten), the opposite direction from light theme's DARKER
+     hover above — both directions increase contrast against their own
+     background, which is what makes hover a legible, visible change. */
+  --color-complement-text-hover: #14EBA4;
 
   --color-terminal-green: #4ADE80;
   --color-terminal-red: #F87171;
