@@ -30,6 +30,11 @@ html[lang="en"] [data-document-locale="es"] {
   --color-purple-tint: #F5F3FF;
   --color-complement: #10B981;
   --color-complement-light: #D1FAE5;
+  /* #1167 (UX-H1) — white text on bg-complement (#10B981) measures 2.54:1,
+     below the 4.5:1 AA floor (verify CTA). This darker teal measures
+     ~5.49:1. Same value in both themes, mirroring --color-complement
+     itself (defined once here, not redefined per-theme below). */
+  --color-complement-dark: #047857;
 
   --color-terminal-green: #16A34A;
   --color-terminal-red: #DC2626;
@@ -473,6 +478,20 @@ html {
 .terminal-input-bare:focus-visible {
   outline: none !important;
   outline-offset: 0 !important;
+}
+
+/* ── Navigation active-link state (#1167 / UX-M3) ────────── */
+/* NavLink.tsx and MobileNav.tsx both already emit aria-current="page" for
+   the current route, but nothing consumed it. Scoped to <nav> (desktop,
+   NavbarShell) and [role="navigation"] (MobileNav's panel — a <div>, not a
+   <nav> element) so both pick this up without editing either component.
+   Uses text-text-primary + font-weight, not amber, so the active label
+   stays visually distinct from the amber/50 "/" prefix already inside
+   every nav link. */
+nav [aria-current="page"],
+[role="navigation"] [aria-current="page"] {
+  color: var(--color-text-primary);
+  font-weight: 600;
 }
 
 /* ── Reduced motion ─────────────────────────────────────── */

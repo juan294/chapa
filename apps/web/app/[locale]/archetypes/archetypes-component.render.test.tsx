@@ -173,6 +173,15 @@ vi.mock("@/lib/i18n/server", () => ({
       "archetypes.emerging.sectionRadar": "The Emerging radar shape",
       "archetypes.emerging.backLink": "Back to features",
       "archetypes.emerging.methodologyLink": "Full scoring methodology",
+      "landing.footer.tagline": "Built for developers, by developers.",
+      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.about": "About",
+      "landing.footer.scoring": "Scoring",
+      "landing.footer.terms": "Terms",
+      "landing.footer.privacy": "Privacy",
+      "landing.finalCta.prompt": "Ready to see your impact?",
+      "landing.finalCta.button": "Get your badge",
+      "landing.finalCta.buttonPending": "Connecting…",
     };
     return mocks[key] ?? key;
   }),
@@ -195,6 +204,17 @@ describe("Archetype pages — component render (i18n)", () => {
     await renderServerComponent(ArchetypePage, { archetypeKey: "builder", locale: "en" });
     expect(screen.getByText("Builder")).toBeDefined();
     expect(screen.getByTestId("navbar")).toBeDefined();
+  });
+
+  // #1167 (UX-B1, launch blocker) — 14 archetype SEO pages (7 archetypes x
+  // 2 locales) previously dead-ended with no footer, no Privacy/Terms
+  // links, and no signup CTA.
+  it("renders Privacy/Terms links and a signup CTA in the footer", async () => {
+    const { ArchetypePage } = await import("./_components/ArchetypePage");
+    await renderServerComponent(ArchetypePage, { archetypeKey: "builder", locale: "en" });
+    expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
+    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
+    expect(screen.getByText("Ready to see your impact?")).toBeDefined();
   });
 
   it("renders GuardianPage with Quality Champion heading", async () => {

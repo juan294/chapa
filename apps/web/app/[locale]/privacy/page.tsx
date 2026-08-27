@@ -1,5 +1,6 @@
 import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { SiteFooter } from "@/components/SiteFooter";
 import { getServerT } from "@/lib/i18n/server";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import type { Locale } from "@/lib/i18n/types";
@@ -73,6 +74,12 @@ export default async function PrivacyPage({
           </div>
         </div>
       </main>
+      {/* pb-16 spacer (#1167 / UX-B1) — reserves room below the footer so
+          scrolling to the true bottom of the page clears GlobalCommandBarLazy
+          (fixed bottom-0) instead of it occluding the footer's last line. */}
+      <div className="pb-16">
+        <SiteFooter t={t} />
+      </div>
       <GlobalCommandBarLazy />
     </div>
   );

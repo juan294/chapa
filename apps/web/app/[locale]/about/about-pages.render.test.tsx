@@ -226,6 +226,15 @@ vi.mock("@/lib/i18n/server", () => ({
       "errors.general.description": "An unexpected error occurred.",
       "common.tryAgain": "Try again",
       "common.goHome": "Go home",
+      "landing.footer.tagline": "Built for developers, by developers.",
+      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.about": "About",
+      "landing.footer.scoring": "Scoring",
+      "landing.footer.terms": "Terms",
+      "landing.footer.privacy": "Privacy",
+      "landing.finalCta.prompt": "Ready to see your impact?",
+      "landing.finalCta.button": "Get your badge",
+      "landing.finalCta.buttonPending": "Connecting…",
     };
     return map[key] ?? key;
   }),
@@ -262,6 +271,23 @@ describe("AboutPage render (en)", () => {
     const { default: AboutPage } = await import("./page");
     render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
     expect(document.getElementById("main-content")).not.toBeNull();
+  });
+
+  // #1167 (UX-B1, launch blocker) — /about previously dead-ended with no
+  // footer at all, so Privacy/Terms were unreachable from this page.
+  it("renders Privacy and Terms links via the site-wide footer", async () => {
+    const { default: AboutPage } = await import("./page");
+    render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
+    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
+  });
+
+  // #1167 (UX-B1) — 14 archetype/about SEO pages previously dead-ended with
+  // no signup CTA.
+  it("renders a compact signup CTA in the footer", async () => {
+    const { default: AboutPage } = await import("./page");
+    render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(screen.getByText("Ready to see your impact?")).toBeDefined();
   });
 
   it("links the archetype names and scoring/verification labels to their real pages", async () => {
@@ -420,6 +446,8 @@ describe("ScoringPage render (en)", () => {
         "about.scoring.sectionCaps": "Signal caps",
         "about.scoring.sectionDimensions": "The core dimensions",
         "about.scoring.ctaHeading": "Help us improve this",
+        "landing.footer.privacy": "Privacy",
+        "landing.footer.terms": "Terms",
       };
       return strMap[key] ?? (key.split('.').pop() ?? key);
     });
@@ -427,6 +455,23 @@ describe("ScoringPage render (en)", () => {
     render(await ScoringPage({ params: Promise.resolve({ locale: "en" }) }));
     expect(screen.getByTestId("navbar")).toBeDefined();
     expect(screen.getByText("Scoring Methodology")).toBeDefined();
+  });
+
+  // #1167 (UX-B1, launch blocker) — /about/scoring previously dead-ended
+  // with no footer at all.
+  it("renders Privacy and Terms links via the site-wide footer", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
+    vi.mocked(getServerT).mockReturnValue((key: string) => {
+      const strMap: Record<string, string> = {
+        "landing.footer.privacy": "Privacy",
+        "landing.footer.terms": "Terms",
+      };
+      return strMap[key] ?? (key.split('.').pop() ?? key);
+    });
+    const { default: ScoringPage } = await import("./scoring/page");
+    render(await ScoringPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
+    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
   });
 });
 
@@ -496,6 +541,8 @@ describe("VerificationPage render (en)", () => {
         "about.verification.sectionLimits": "What it does not guarantee",
         "about.verification.sectionHowTo": "How to verify a badge",
         "about.verification.sectionDesign": "Design decisions",
+        "landing.footer.privacy": "Privacy",
+        "landing.footer.terms": "Terms",
       };
       return map[key] ?? (key.split('.').pop() ?? key);
     });
@@ -504,6 +551,23 @@ describe("VerificationPage render (en)", () => {
     expect(screen.getByTestId("navbar")).toBeDefined();
     expect(screen.getByText("Badge Verification")).toBeDefined();
     expect(screen.getByText("Why verification exists")).toBeDefined();
+  });
+
+  // #1167 (UX-B1, launch blocker) — /about/verification previously
+  // dead-ended with no footer at all.
+  it("renders Privacy and Terms links via the site-wide footer", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
+    vi.mocked(getServerT).mockReturnValue((key: string) => {
+      const map: Record<string, string> = {
+        "landing.footer.privacy": "Privacy",
+        "landing.footer.terms": "Terms",
+      };
+      return map[key] ?? (key.split('.').pop() ?? key);
+    });
+    const { default: VerificationPage } = await import("./verification/page");
+    render(await VerificationPage({ params: Promise.resolve({ locale: "en" }) }));
+    expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
+    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
   });
 });
 

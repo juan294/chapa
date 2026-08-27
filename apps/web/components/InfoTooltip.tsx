@@ -160,7 +160,14 @@ export function InfoTooltip({
         }}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
-        className="inline-flex items-center justify-center w-4 h-4 text-text-secondary hover:text-amber focus-visible:text-amber transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-full"
+        // #1167 (UX-H6) — 44x44 minimum touch target via an invisible
+        // ::before overlay (`relative` + `before:absolute before:-inset-3.5`),
+        // NOT by resizing the button itself. buttonRef.current.getBoundingClientRect()
+        // above drives the tooltip's position/centering and the rect.top < 120
+        // auto-flip threshold, so the button's own LAYOUT box must stay
+        // exactly 16x16 (w-4 h-4) — a pseudo-element doesn't affect its
+        // host's box model or size, so this grows only the hit area.
+        className="relative inline-flex items-center justify-center w-4 h-4 text-text-secondary hover:text-amber focus-visible:text-amber transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-full before:absolute before:-inset-3.5 before:content-['']"
       >
         <svg
           width="16"

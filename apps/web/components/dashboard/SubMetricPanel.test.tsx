@@ -197,6 +197,25 @@ describe("SubMetricPanel", () => {
   });
 
   // ----------------------------------------------------------------
+  // 8b. Close button meets the 44x44 touch-target minimum (#1167 / UX-H6)
+  // ----------------------------------------------------------------
+  it("close button meets the 44x44 minimum touch target", () => {
+    render(
+      <SubMetricPanel
+        dimension="delivery"
+        stats={mockStats}
+        isOpen={true}
+        onClose={() => {}}
+      />
+    );
+
+    const closeButton = screen.getByLabelText("Close breakdown panel");
+    const classes = closeButton.className.split(/\s+/);
+    expect(classes).toContain("min-h-[44px]");
+    expect(classes).toContain("min-w-[44px]");
+  });
+
+  // ----------------------------------------------------------------
   // 9. Escape key fires onClose
   // ----------------------------------------------------------------
   it("Escape key fires onClose", () => {

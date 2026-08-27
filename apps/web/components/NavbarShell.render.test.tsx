@@ -108,6 +108,18 @@ describe("NavbarShell render", () => {
       expect(screen.getByTestId("mobile-link-/studio").textContent).toBe("Studio");
       expect(screen.getByTestId("mobile-link-/about").textContent).toBe("About");
     });
+
+    // #1167 / UX-H1 — text-terminal-dim on bg measures 2.29:1 (dark) /
+    // 2.54:1 (light), below the 4.5:1 AA floor, across 46 sites including
+    // nav labels. text-text-secondary measures 6.15:1 / 4.83:1.
+    // terminal-dim stays reserved for genuinely decorative glyphs ($, >, |).
+    it("desktop nav-link labels use text-text-secondary, not text-terminal-dim (#1167 / UX-H1)", () => {
+      render(<NavbarShell navLinks={navLinks} session={null} isAdmin={false} t={t} />);
+      const studioLink = screen.getByTestId("nav-link-/studio");
+      const wrapper = studioLink.parentElement;
+      expect(wrapper?.className).toContain("text-text-secondary");
+      expect(wrapper?.className).not.toContain("text-terminal-dim");
+    });
   });
 
   describe("authentication slot", () => {

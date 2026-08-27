@@ -72,7 +72,11 @@ export function SubMetricPanel({
           type="button"
           aria-label={t('aria.closeBreakdown') as string}
           onClick={onClose}
-          className="rounded-full p-1 text-text-secondary transition-colors hover:text-text-primary"
+          // #1167 (UX-H6) — 44x44 minimum touch target (was 24x24). No
+          // portal/getBoundingClientRect positioning depends on this
+          // button's box (unlike InfoTooltip), so resizing it directly is
+          // safe here.
+          className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full text-text-secondary transition-colors hover:text-text-primary"
         >
           <svg
             width="16"
