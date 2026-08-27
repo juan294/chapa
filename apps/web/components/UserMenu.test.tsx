@@ -1771,6 +1771,19 @@ describe("UserMenu — semantic HTML for menu items (runtime, #578)", () => {
     expect(btn).not.toBeNull();
     expect(btn?.getAttribute("role")).toBe("menuitem");
   });
+
+  it("insights file input is a sibling of the button, not nested inside it (#1184 FE-L1)", () => {
+    // HTML forbids interactive content (an <input>) inside a <button>, and
+    // HTMLElement.click() bubbles a synthetic click back into an ancestor's
+    // onClick handler. The input must live outside the button element.
+    render(<UserMenu {...baseProps} />);
+
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    const input = document.querySelector('input[type="file"]');
+    expect(btn).not.toBeNull();
+    expect(input).not.toBeNull();
+    expect(btn?.contains(input)).toBe(false);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════

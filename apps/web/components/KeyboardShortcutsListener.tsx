@@ -17,6 +17,7 @@ import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
 import { type ShortcutScope, TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { createModuleStore } from "@/hooks/createModuleStore";
+import { fetchSession } from "@/hooks/useSession";
 import dynamic from "next/dynamic";
 
 const ShortcutCheatSheet = dynamic(
@@ -150,18 +151,18 @@ export function KeyboardShortcutsListener() {
           router.push("/");
           return;
         case "go-profile": {
-          // Lazy-fetch session to get handle
-          fetch("/api/auth/session")
-            .then((r) => r.json())
-            .then((data) => {
-              const login = data?.user?.login;
-              if (login) {
-                router.push(`/u/${login}`);
-              }
-            })
-            .catch(() => {
-              // Silently fail — no profile navigation
-            });
+          // #1184 (FE-L6) — reuse useSession's shared, deduplicated
+          // fetchSession() instead of a bespoke fetch: this shares the
+          // module-level cache with every mounted useSession() consumer and
+          // its client_api_error instrumentation, so a 429 from the
+          // fail-closed rate limiter is observable instead of silently
+          // doing nothing. fetchSession() never rejects — failures resolve
+          // to null.
+          fetchSession().then((user) => {
+            if (user?.login) {
+              router.push(`/u/${user.login}`);
+            }
+          });
           return;
         }
         case "go-studio":

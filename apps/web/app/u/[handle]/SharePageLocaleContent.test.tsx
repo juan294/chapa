@@ -31,12 +31,11 @@ afterEach(() => {
 });
 
 describe("SharePageLocaleContent", () => {
-  it("updates title, heading, and badge label when the active locale changes", () => {
+  it("updates heading and badge label when the active locale changes", () => {
     const { rerender } = render(
       <SharePageLocaleContent handle="octocat" badgeLabelId="badge-label" />,
     );
 
-    expect(document.title).toBe("@octocat — Developer impact, decoded — Chapa");
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.textContent).toBe("Developer impact of octocat");
     // W1 — the h1 exists for WCAG heading-hierarchy compliance but is
@@ -47,10 +46,30 @@ describe("SharePageLocaleContent", () => {
     activeLocale = "es";
     rerender(<SharePageLocaleContent handle="octocat" badgeLabelId="badge-label" />);
 
-    expect(document.title).toBe("@octocat — Impacto de desarrollador, decodificado — Chapa");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
       "Impacto de desarrollador de octocat",
     );
     expect(screen.getByText("Chapa de impacto de octocat").id).toBe("badge-label");
+  });
+
+  // #1184 (FE-L4): document.title is owned entirely by `generateMetadata`
+  // (page.tsx) + the root layout's `"%s — Chapa"` title template. Both
+  // resolve locale (including the `?lang=` deep-link override) via the same
+  // `getServerLocale()` call used for the page body (#1066), so there is no
+  // gap for a client effect to fill — and a duplicate, hardcoded "— Chapa"
+  // suffix here would silently go stale if the layout's template ever
+  // changed. This component must never touch document.title.
+  it("never sets document.title — that stays owned by generateMetadata + the layout title template", () => {
+    const sentinelTitle = "@octocat — Developer impact, decoded — Chapa";
+    document.title = sentinelTitle;
+
+    const { rerender } = render(
+      <SharePageLocaleContent handle="octocat" badgeLabelId="badge-label" />,
+    );
+    expect(document.title).toBe(sentinelTitle);
+
+    activeLocale = "es";
+    rerender(<SharePageLocaleContent handle="octocat" badgeLabelId="badge-label" />);
+    expect(document.title).toBe(sentinelTitle);
   });
 });

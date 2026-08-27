@@ -25,7 +25,15 @@ interface UseSessionReturn {
  */
 let cachedPromise: Promise<SessionUser | null> | null = null;
 
-function fetchSession(): Promise<SessionUser | null> {
+/**
+ * Fetch the current session, deduplicated via the module-level promise cache.
+ *
+ * Exported (#1184 / FE-L6) so callers outside `useSession()` — e.g.
+ * `KeyboardShortcutsListener`'s `go-profile` shortcut — share the same
+ * in-flight request, cache, and `client_api_error` instrumentation instead of
+ * issuing a bespoke `fetch("/api/auth/session")` that silently loses both.
+ */
+export function fetchSession(): Promise<SessionUser | null> {
   if (cachedPromise) return cachedPromise;
 
   // Bound to this specific attempt so the failure handlers below only ever
