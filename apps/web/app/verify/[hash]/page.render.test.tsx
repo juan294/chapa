@@ -6,6 +6,22 @@ vi.mock("@/lib/verification/store", () => ({
   getVerificationRecord: vi.fn(),
 }));
 
+vi.mock("./VerifyPageWebMcpTools", () => ({
+  VerifyPageWebMcpTools: ({
+    hash,
+    record,
+  }: {
+    hash: string;
+    record: { handle: string };
+  }) => (
+    <span
+      data-testid="verify-page-webmcp-tools"
+      data-hash={hash}
+      data-handle={record.handle}
+    />
+  ),
+}));
+
 vi.mock("@/components/Navbar", () => ({
   Navbar: ({ locale }: { locale?: string }) => (
     <nav data-testid="navbar" data-locale={locale}>Navbar</nav>
@@ -206,6 +222,7 @@ describe("VerifyPage", () => {
         screen.getByText("No verification record found for this hash."),
       ).toBeDefined();
       expect(screen.getByText("a1b2c3d4")).toBeDefined();
+      expect(screen.queryByTestId("verify-page-webmcp-tools")).toBeNull();
     });
 
     it("wraps a supported 32-character hash on narrow viewports", async () => {
@@ -239,6 +256,11 @@ describe("VerifyPage", () => {
       expect(screen.getByText("Badge verified")).toBeDefined();
       expect(screen.getByText("@testuser")).toBeDefined();
       expect(screen.getByText("Test User")).toBeDefined();
+      const webMcpHost = screen.getByTestId("verify-page-webmcp-tools");
+      expect(webMcpHost.getAttribute("data-hash")).toBe(
+        "a1b2c3d4e5f6a7b8",
+      );
+      expect(webMcpHost.getAttribute("data-handle")).toBe("testuser");
     });
 
     it("displays impact score and tier", async () => {

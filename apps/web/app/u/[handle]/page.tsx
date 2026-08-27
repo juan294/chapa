@@ -46,6 +46,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { SharePageH2 } from "./SharePageH2";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
+import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -333,8 +334,18 @@ export async function SharePageContent({
       <SharePageShortcuts
         embedMarkdown={embedMarkdown}
         handle={handle}
-
       />
+      {stats && impactForClient && (
+        <SharePageWebMcpTools
+          handle={handle}
+          impact={impactForClient}
+          stats={stats}
+          verification={verification}
+          trend={trendData.trend}
+          diff={diffForClient}
+          craftResult={craftResult}
+        />
+      )}
       {/* SAFETY: renderJsonLd escapes <, >, & to prevent </script> injection. */}
       <script
         type="application/ld+json"

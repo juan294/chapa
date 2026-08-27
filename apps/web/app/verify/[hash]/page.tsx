@@ -1,4 +1,5 @@
 import { getVerificationRecord } from "@/lib/verification/store";
+import type { VerificationRecord } from "@/lib/verification/types";
 import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
@@ -15,6 +16,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { VerifyPageWebMcpTools } from "./VerifyPageWebMcpTools";
 
 const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
@@ -72,7 +74,10 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
       <Navbar locale={locale} />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
-          <VerifiedCard hash={hash} record={record} t={t} />
+          <>
+            <VerifyPageWebMcpTools hash={hash} record={record} />
+            <VerifiedCard hash={hash} record={record} t={t} />
+          </>
         ) : (
           <NotFoundCard hash={hash} t={t} />
         )}
@@ -116,25 +121,7 @@ function VerifiedCard({
   t,
 }: {
   hash: string;
-  record: {
-    handle: string;
-    displayName?: string;
-    adjustedComposite: number;
-    confidence: number;
-    tier: string;
-    archetype: string;
-    dimensions: {
-      delivery: number;
-      quality: number;
-      consistency: number;
-      breadth: number;
-    };
-    commitsTotal: number;
-    prsMergedCount: number;
-    reviewsSubmittedCount: number;
-    generatedAt: string;
-    profileType: string;
-  };
+  record: VerificationRecord;
   t: TFunc;
 }) {
   return (

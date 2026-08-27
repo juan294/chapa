@@ -15,13 +15,6 @@ import {
   type CommandResult,
 } from "@/components/terminal/command-registry";
 import { generateInsights } from "@/lib/dashboard/generate-insights";
-import {
-  buildDimensionExplanation,
-  getDimensionFormulaKey,
-} from "@/lib/dashboard/score-explanation";
-import {
-  type DimensionKey,
-} from "@/lib/dashboard/dimension-sub-metrics";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { getBaseUrl } from "@/lib/env";
 import {
@@ -29,8 +22,13 @@ import {
   getTier,
 } from "@/lib/impact/utils";
 import { useTranslation } from "@/lib/i18n";
-import { interpolate } from "@/lib/i18n/interpolate";
 import type { WebMcpTool } from "@/lib/webmcp/use-model-context-tools";
+import {
+  createExplainDimensionTool,
+  isWebMcpRecord,
+  WEBMCP_EMPTY_INPUT_SCHEMA,
+  WEBMCP_READ_ONLY_ANNOTATIONS,
+} from "@/lib/webmcp/shared-tools";
 import {
   getCategoryLabel,
   getOptionLabel,
@@ -52,12 +50,6 @@ export interface UseStudioWebMcpToolsOptions {
   runCommand: (input: string) => CommandResult<StudioCommandAction>;
   proposeSave: () => void;
 }
-
-const EMPTY_INPUT_SCHEMA = {
-  type: "object",
-  properties: {},
-  additionalProperties: false,
-};
 
 const APPLY_STYLE_INPUT_SCHEMA = {
   type: "object",
@@ -102,22 +94,6 @@ const SIMULATE_SCORE_INPUT_SCHEMA = {
   additionalProperties: false,
 };
 
-const EXPLAIN_DIMENSION_INPUT_SCHEMA = {
-  type: "object",
-  properties: {
-    dimension: {
-      type: "string",
-      enum: [...DIMENSION_KEYS],
-    },
-  },
-  required: ["dimension"],
-  additionalProperties: false,
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function invalidInput(tool: string, message: string): string {
   return `Invalid input for ${tool}: ${message}.`;
 }
@@ -141,7 +117,7 @@ function serializeCommandResult(
 function parseDimensionOverrides(
   inputs: Record<string, unknown>,
 ): Partial<DimensionScores> | string {
-  if (!isRecord(inputs.dimensions)) {
+  if (!isWebMcpRecord(inputs.dimensions)) {
     return invalidInput("simulate_score", "dimensions must be an object");
   }
 
@@ -171,14 +147,13 @@ export function useStudioWebMcpTools({
   const { t } = useTranslation();
 
   return useMemo<WebMcpTool[]>(() => {
-    const text = (key: string) => t(key) as string;
-    const readOnly = { readOnlyHint: true } as const;
+    const readOnly = WEBMCP_READ_ONLY_ANNOTATIONS;
 
     return [
       {
         name: "list_style_options",
         description: "List Creator Studio style categories, presets, and current settings.",
-        inputSchema: EMPTY_INPUT_SCHEMA,
+        inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: readOnly,
         execute: () =>
           JSON.stringify({
@@ -206,7 +181,7 @@ export function useStudioWebMcpTools({
         inputSchema: APPLY_STYLE_INPUT_SCHEMA,
         execute: (inputs) => {
           if (
-            !isRecord(inputs) ||
+            !isWebMcpRecord(inputs) ||
             !isCommandToken(inputs.category) ||
             !isCommandToken(inputs.value)
           ) {
@@ -226,7 +201,7 @@ export function useStudioWebMcpTools({
         description: "Apply a Creator Studio preset through the visible terminal.",
         inputSchema: APPLY_PRESET_INPUT_SCHEMA,
         execute: (inputs) => {
-          const name = isRecord(inputs) ? inputs.name : undefined;
+          const name = isWebMcpRecord(inputs) ? inputs.name : undefined;
           if (
             typeof name !== "string" ||
             !STUDIO_PRESETS.some((preset) => preset.id === name)
@@ -239,7 +214,7 @@ export function useStudioWebMcpTools({
       {
         name: "preview_badge",
         description: "Return the current preview configuration, badge URL, and save status.",
-        inputSchema: EMPTY_INPUT_SCHEMA,
+        inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: readOnly,
         execute: () =>
           JSON.stringify({
@@ -251,13 +226,13 @@ export function useStudioWebMcpTools({
       {
         name: "reset_badge_config",
         description: "Reset Creator Studio through the visible terminal.",
-        inputSchema: EMPTY_INPUT_SCHEMA,
+        inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         execute: () => serializeCommandResult(runCommand("/reset"), config),
       },
       {
         name: "save_badge_config",
         description: "Ask the user to confirm saving the current preview configuration.",
-        inputSchema: EMPTY_INPUT_SCHEMA,
+        inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         execute: () => {
           proposeSave();
           return "Save proposed — the user must confirm on-page.";
@@ -269,7 +244,7 @@ export function useStudioWebMcpTools({
         inputSchema: SIMULATE_SCORE_INPUT_SCHEMA,
         annotations: readOnly,
         execute: (inputs) => {
-          if (!isRecord(inputs)) {
+          if (!isWebMcpRecord(inputs)) {
             return invalidInput("simulate_score", "input must be an object");
           }
           const overrides = parseDimensionOverrides(inputs);
@@ -301,51 +276,11 @@ export function useStudioWebMcpTools({
       {
         name: "suggest_improvements",
         description: "Return grounded improvement suggestions for the current impact profile.",
-        inputSchema: EMPTY_INPUT_SCHEMA,
+        inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: readOnly,
         execute: () => JSON.stringify(generateInsights(impact, null, null, t)),
       },
-      {
-        name: "explain_dimension",
-        description: "Explain one impact dimension using the current profile and activity.",
-        inputSchema: EXPLAIN_DIMENSION_INPUT_SCHEMA,
-        annotations: readOnly,
-        execute: (inputs) => {
-          const dimension = isRecord(inputs) ? inputs.dimension : undefined;
-          if (
-            typeof dimension !== "string" ||
-            !DIMENSION_KEYS.includes(dimension as DimensionKey)
-          ) {
-            return invalidInput("explain_dimension", "dimension must be a known dimension");
-          }
-
-          const key = dimension as DimensionKey;
-          const dimensionExplanation = buildDimensionExplanation(
-            impact,
-            stats,
-            key,
-            craftResult,
-          );
-          const subMetrics = dimensionExplanation.subMetrics.map((metric) => ({
-            ...metric,
-            label: text(`scoreExplanation.subMetrics.${metric.key}`),
-            rawLabel: interpolate(
-              text(`scoreExplanation.rawLabels.${metric.rawLabelKey}`),
-              metric.rawLabelParams,
-            ),
-          }));
-          const tipKey = key === "quality" && impact.profileType === "solo"
-            ? "dimensions.quality.soloTip"
-            : `dimensions.${key}.tip`;
-          return JSON.stringify({
-            dimension: key,
-            score: impact.dimensions[key] ?? null,
-            tip: text(tipKey),
-            formula: text(getDimensionFormulaKey(dimensionExplanation)),
-            subMetrics,
-          });
-        },
-      },
+      createExplainDimensionTool({ impact, stats, craftResult, t }),
     ];
   }, [
     config,

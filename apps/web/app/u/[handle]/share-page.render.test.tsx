@@ -24,6 +24,7 @@ const {
   mockGetTrendData,
   mockHeaders,
   mockGetOptionalServerSessionFromHeaders,
+  mockSharePageWebMcpToolsComponent,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -41,6 +42,7 @@ const {
   mockGetTrendData: vi.fn(),
   mockHeaders: vi.fn(),
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
+  mockSharePageWebMcpToolsComponent: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -141,6 +143,9 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("./SharePageH2", () => ({
   SharePageH2: () => null,
 }));
+vi.mock("./SharePageWebMcpTools", () => ({
+  SharePageWebMcpTools: mockSharePageWebMcpToolsComponent,
+}));
 
 import { generateMetadata, SharePageContent } from "./page";
 
@@ -179,6 +184,30 @@ function findScriptElement(
     }
   } else if (children) {
     return findScriptElement(children, scriptType);
+  }
+  return null;
+}
+
+function findElementByType(
+  node: unknown,
+  type: unknown,
+): { props: Record<string, unknown> } | null {
+  if (!node || typeof node !== "object") return null;
+  const element = node as {
+    type?: unknown;
+    props?: { children?: unknown } & Record<string, unknown>;
+  };
+  if (element.type === type && element.props) {
+    return { props: element.props };
+  }
+  const children = element.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const found = findElementByType(child, type);
+      if (found) return found;
+    }
+  } else if (children) {
+    return findElementByType(children, type);
   }
   return null;
 }
@@ -344,6 +373,34 @@ describe("Phase 4d — Share page i18n", () => {
   });
 
   describe("SharePageContent — en locale", () => {
+    it("mounts the public WebMCP host with the redacted server data", async () => {
+      const trend = { direction: "improving", avgDelta: 2 };
+      const diff = {
+        adjustedComposite: 3,
+        confidence: 4,
+        penaltyChanges: { added: [], removed: [] },
+      };
+      mockGetTrendData.mockResolvedValue({ trend, diff });
+
+      const result = await SharePageContent({ handle: "testuser" });
+      const host = findElementByType(
+        result,
+        mockSharePageWebMcpToolsComponent,
+      );
+
+      expect(host).not.toBeNull();
+      expect(host?.props).toMatchObject({
+        handle: "testuser",
+        stats: FAKE_MATERIALIZED.stats,
+        verification: { hash: "abc12345", date: "2026-05-03" },
+        trend,
+        craftResult: null,
+      });
+      expect(host?.props.impact).not.toHaveProperty("confidence");
+      expect(host?.props.diff).not.toHaveProperty("confidence");
+      expect(host?.props.diff).not.toHaveProperty("penaltyChanges");
+    });
+
     it("renders sr-only h1 with handle interpolated", async () => {
       mockGetServerLocale.mockResolvedValue("en");
       const result = await SharePageContent({ handle: "testuser" });
