@@ -45,7 +45,7 @@ export function QuickControls({
         onClick={onToggle}
         aria-expanded={visible}
         aria-controls={panelId}
-        className="flex items-center justify-between gap-2 px-3 py-2 text-xs font-heading text-terminal-dim transition-colors hover:text-text-secondary w-full"
+        className="flex items-center justify-between gap-2 px-3 py-2 text-xs font-heading text-text-secondary transition-colors hover:text-text-primary w-full"
       >
         <span>{t("studio.quickControls") as string}</span>
         <span className="relative w-3.5 h-3.5">

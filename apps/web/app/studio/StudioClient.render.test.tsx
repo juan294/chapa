@@ -357,6 +357,7 @@ function languageValue(
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.localStorage.clear();
 });
 
 describe("StudioClient render", () => {
@@ -370,7 +371,7 @@ describe("StudioClient render", () => {
           handle="testuser"
         />,
       );
-      expect(screen.getByText("Creator Studio")).toBeDefined();
+      expect(screen.getAllByText("Creator Studio").length).toBeGreaterThanOrEqual(1);
     });
 
     it("renders sr-only h1 heading", () => {
@@ -384,6 +385,26 @@ describe("StudioClient render", () => {
       const heading = screen.getByRole("heading", { level: 1 });
       expect(heading.textContent).toBe("Creator Studio");
       expect(heading.className).toContain("sr-only");
+    });
+
+    // UX-M1 (#1173): the only accessible name for the page was an sr-only h1
+    // — nothing on screen visibly named the tool. Alongside the sr-only h1
+    // (kept for landmark/AT purposes), add a visible title + one-line
+    // subhead so a sighted visitor immediately sees what the page is.
+    it("renders a visible title and subhead alongside the sr-only h1", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(screen.getByTestId("studio-visible-title").textContent).toBe(
+        "Creator Studio",
+      );
+      expect(
+        screen.getByTestId("studio-visible-subtitle").textContent,
+      ).not.toBe("");
     });
 
     it("forwards materialized Craft data to the Studio WebMCP tools", () => {
@@ -704,7 +725,10 @@ describe("StudioClient render", () => {
   });
 
   describe("quick controls", () => {
-    it("quick controls are hidden by default", () => {
+    // UX-M1 (#1173): the only pointer affordance for Studio's 9 customization
+    // categories was the Quick Controls panel, and it started collapsed —
+    // easy to miss entirely. It now defaults to expanded.
+    it("quick controls are shown by default", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -713,7 +737,7 @@ describe("StudioClient render", () => {
         />,
       );
       const qc = screen.getByTestId("quick-controls");
-      expect(qc.getAttribute("data-visible")).toBe("false");
+      expect(qc.getAttribute("data-visible")).toBe("true");
     });
 
     it("clicking toggle shows/hides quick controls", () => {
@@ -728,7 +752,36 @@ describe("StudioClient render", () => {
       fireEvent.click(toggle);
 
       const qc = screen.getByTestId("quick-controls");
-      expect(qc.getAttribute("data-visible")).toBe("true");
+      expect(qc.getAttribute("data-visible")).toBe("false");
+    });
+
+    it("persists a user's collapse choice in localStorage and restores it on the next mount", () => {
+      const { unmount } = render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "true",
+      );
+      fireEvent.click(screen.getByTestId("qc-toggle"));
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "false",
+      );
+      unmount();
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "false",
+      );
     });
 
     it("quick command triggers handleSubmit", async () => {
@@ -1539,14 +1592,14 @@ describe("StudioClient render", () => {
         />,
       );
 
-      // Initially hidden
-      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("false");
+      // Shown by default (UX-M1, #1173)
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("true");
 
       act(() => {
         capturedShortcutHandler?.("toggle-quick-controls");
       });
 
-      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("true");
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("false");
     });
 
     it("refresh-preview shortcut explicitly remounts the preview", () => {
@@ -1604,7 +1657,7 @@ describe("StudioClient render", () => {
           impact={impact}
         />,
       );
-      expect(screen.getByText("Creator Studio")).toBeDefined();
+      expect(screen.getAllByText("Creator Studio").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -1653,6 +1706,105 @@ describe("StudioClient render", () => {
       expect(screen.queryByText(/Reduced motion detected/)).toBeNull();
       const preview = screen.getByTestId("badge-preview");
       expect(preview.getAttribute("data-interactive")).toBe("true");
+    });
+  });
+
+  // FE-M3 (#1173): nothing previously consumed saveState "dirty" to prevent
+  // data loss — a user who tweaked several categories and then navigated (or
+  // closed the tab) lost everything silently. The guard must register only
+  // while dirty (register/unregister on the status transition, not on mount)
+  // and must NEVER fire in demo mode — demo never persists by design, so a
+  // spurious "leave site?" prompt on every judge-demo exit would itself be a
+  // regression.
+  describe("beforeunload guard", () => {
+    function dispatchBeforeUnload(): Event {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event;
+    }
+
+    it("does not warn on unload in the initial 'saved' state", () => {
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("warns on unload once a change makes saveState dirty", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "dirty-1", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Unsaved preview changes");
+
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("stops warning once the dirty change is saved", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("{}", { status: 200 }),
+      );
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand)
+        .mockReturnValueOnce({
+          lines: [],
+          action: { type: "set", category: "background", value: "aurora" },
+        })
+        .mockReturnValueOnce({ lines: [], action: { type: "save" } });
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Unsaved preview changes");
+      expect(dispatchBeforeUnload().defaultPrevented).toBe(true);
+
+      fireEvent.change(input, { target: { value: "/save" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Preview saved");
+
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("never warns in demo mode, even while dirty — demo never persists by design", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set bg aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await screen.findByText("Unsaved preview changes");
+
+      const event = dispatchBeforeUnload();
+      expect(event.defaultPrevented).toBe(false);
     });
   });
 });

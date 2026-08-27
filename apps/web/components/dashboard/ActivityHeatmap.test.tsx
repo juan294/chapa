@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { LanguageProvider } from "@/lib/i18n";
 import { es } from "@/lib/i18n/dictionaries/es";
 
-afterEach(cleanup);
+// FE-M2 (#1173): controllable per-test so both the pre-hydration (SSR-safe)
+// and post-hydration render paths can be exercised. Defaults to true, which
+// matches every pre-existing test below (they were written assuming the
+// always-on-client trimming behavior this hook now gates).
+const isClientState = vi.hoisted(() => ({ current: true }));
+vi.mock("@/hooks/useIsClient", () => ({
+  useIsClient: () => isClientState.current,
+}));
+
+afterEach(() => {
+  cleanup();
+  isClientState.current = true;
+});
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -795,6 +807,46 @@ describe("ActivityHeatmap", () => {
       for (const color of colors) {
         expect(color).toMatch(/^var\(--color-dimension-/);
       }
+    });
+  });
+
+  // FE-M2 (#1173): this component is server-rendered (SharePageOwnerContentLazy
+  // uses next/dynamic with default ssr:true), but its streak calculation
+  // deliberately uses the *local* device clock to decide whether "today" is
+  // over. Server = UTC, browser = the viewer's zone, so a viewer whose local
+  // date differs from UTC could see server HTML and the first client render
+  // disagree — a React 19 text mismatch. The fix gates the trim behind
+  // useIsClient() rather than ever substituting a server-computed UTC date.
+  describe("hydration-safe streak trimming (useIsClient gating)", () => {
+    /** Local calendar date string (matches activity-insights.ts's own formatting). */
+    function localDateStr(offsetDays = 0): string {
+      const d = new Date();
+      d.setDate(d.getDate() + offsetDays);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    it("does not trim a zero-count 'today' entry before hydration (isClient=false), matching an SSR pass", () => {
+      isClientState.current = false;
+      const data = [
+        { date: localDateStr(-2), count: 5 },
+        { date: localDateStr(-1), count: 3 },
+        { date: localDateStr(0), count: 0 },
+      ];
+      render(<ActivityHeatmap heatmapData={data} activeDays={2} />);
+      const streakCard = screen.getByText("Current streak").closest("div");
+      expect(streakCard?.textContent).toContain("0d");
+    });
+
+    it("trims a zero-count 'today' entry after hydration (isClient=true)", () => {
+      isClientState.current = true;
+      const data = [
+        { date: localDateStr(-2), count: 5 },
+        { date: localDateStr(-1), count: 3 },
+        { date: localDateStr(0), count: 0 },
+      ];
+      render(<ActivityHeatmap heatmapData={data} activeDays={2} />);
+      const streakCard = screen.getByText("Current streak").closest("div");
+      expect(streakCard?.textContent).toContain("2d");
     });
   });
 });

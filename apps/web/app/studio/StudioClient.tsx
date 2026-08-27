@@ -64,6 +64,10 @@ type Translate = LanguageContextValue["t"];
 const TERMINAL_WELCOME_LINE_ID = "studio-terminal-welcome";
 const TERMINAL_HINT_LINE_ID = "studio-terminal-hint";
 
+// UX-M1 (#1173): Quick Controls now defaults to expanded (see showQuickControls
+// below) but a user's explicit collapse choice is still respected across visits.
+const QUICK_CONTROLS_STORAGE_KEY = "chapa:studio:quickControlsVisible";
+
 function translation(t: Translate, key: string): string {
   return t(key) as string;
 }
@@ -151,7 +155,45 @@ export function StudioClient({
   const [saveState, setSaveState] = useState<SaveState>({ status: "saved" });
   const [pendingAgentSave, setPendingAgentSave] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
-  const [showQuickControls, setShowQuickControls] = useState(false);
+  // UX-M1 (#1173): defaults to expanded — Quick Controls was the only
+  // pointer affordance for the 9 customization categories, and starting
+  // collapsed behind a low-contrast toggle meant it was easy to miss
+  // entirely. Starting `true` here matches the server-rendered value too
+  // (no localStorage on the server), so there's no hydration mismatch; the
+  // effect below only ever narrows it to a previously-chosen `false`.
+  const [showQuickControls, setShowQuickControlsState] = useState(true);
+  const setShowQuickControls = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      setShowQuickControlsState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next;
+        try {
+          window.localStorage.setItem(QUICK_CONTROLS_STORAGE_KEY, String(value));
+        } catch {
+          // localStorage unavailable (private browsing, etc.) — visibility
+          // still works for this session, it just won't persist.
+        }
+        return value;
+      });
+    },
+    [],
+  );
+  // Hydrate a previously-chosen collapse state after mount only — reading
+  // localStorage during the initial render would disagree with the
+  // server-rendered `true` default and trigger a hydration mismatch. This is
+  // the intended client-only hydration of a browser-derived value (same
+  // pattern as UserMenu.tsx's insights-cooldown read, #892); the lint rule
+  // below is a false positive for that case.
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(QUICK_CONTROLS_STORAGE_KEY);
+      if (stored === "true" || stored === "false") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setShowQuickControlsState(stored === "true");
+      }
+    } catch {
+      // localStorage unavailable — keep the default.
+    }
+  }, []);
   const isClient = useIsClient();
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
@@ -219,6 +261,22 @@ export function StudioClient({
       hasTrackedOpen.current = true;
     }
   }, [trackStudioEvent]);
+
+  // FE-M3 (#1173): warn before an unsaved-changes loss. Registered/removed on
+  // the saveState.status transition (not just on mount) so the listener only
+  // exists while there's actually something to lose. Demo mode never
+  // persists by design (see handleSave above) — the guard must not fire
+  // there, or the judge-demo flow gets a spurious "leave site?" prompt on
+  // every exit even though there was never anything to save.
+  useEffect(() => {
+    if (demo || saveState.status !== "dirty") return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [demo, saveState.status]);
 
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
@@ -394,7 +452,7 @@ export function StudioClient({
       ...prev,
       makeLine("system", translation(t, "studio.agentSave.proposed")),
     ]);
-  }, [t]);
+  }, [t, setShowQuickControls]);
 
   const handleAgentSaveConfirm = useCallback(() => {
     setPendingAgentSave(false);
@@ -502,6 +560,7 @@ export function StudioClient({
     config.background,
     handleConfigChange,
     trackStudioEvent,
+    setShowQuickControls,
   ]);
 
   return (
@@ -553,6 +612,27 @@ export function StudioClient({
 
       {/* Terminal pane (right) */}
       <div className="flex flex-col min-h-[50vh] lg:h-[calc(100vh-3.5rem)] bg-bg">
+        {/* Visible title + subhead (UX-M1, #1173) — the page's only prior
+            accessible name was the sr-only <h1> above, so nothing on screen
+            named the tool. The title text duplicates that h1 and is hidden
+            from assistive tech to avoid a double announcement; the subhead
+            is new descriptive copy and stays in the normal a11y tree. */}
+        <div className="flex flex-col gap-0.5 border-b border-stroke px-3 py-2.5">
+          <span
+            aria-hidden="true"
+            data-testid="studio-visible-title"
+            className="font-heading text-sm font-semibold tracking-tight text-text-primary"
+          >
+            {t("studio.title") as string}
+          </span>
+          <span
+            data-testid="studio-visible-subtitle"
+            className="text-xs text-text-secondary"
+          >
+            {t("studio.subtitle") as string}
+          </span>
+        </div>
+
         {/* Quick Controls toggle */}
         <QuickControls
           config={config}
