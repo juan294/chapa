@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { StatusCallout } from "@/components/StatusCallout";
 import { useTranslation } from "@/lib/i18n";
+import { useErrorBoundaryReport } from "@/lib/analytics/use-error-boundary-report";
 
 // Note: this boundary deliberately uses the terminal-red error variant, not
 // the teal/complement tokens the rest of /verify uses for verification TRUST
@@ -10,11 +11,13 @@ import { useTranslation } from "@/lib/i18n";
 // (#1169 / UX-H5) — switching this page's error state to red does not change
 // how the verify page communicates a *successful* verification.
 export default function ErrorPage({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useErrorBoundaryReport(error, "verify-error");
   const { t } = useTranslation();
 
   return (

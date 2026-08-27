@@ -4,7 +4,7 @@
 // this page since it renders outside the normal component tree.
 "use client";
 
-import { useEffect } from "react";
+import { useErrorBoundaryReport } from "@/lib/analytics/use-error-boundary-report";
 
 export default function GlobalError({
   error,
@@ -13,21 +13,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    void fetch("/api/telemetry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event: "client_error",
-        category: "global_error",
-        message: error.message,
-        stack: error.stack,
-        digest: error.digest,
-        path: typeof window === "undefined" ? undefined : window.location.pathname,
-        source: "global-error",
-      }),
-    }).catch(() => undefined);
-  }, [error]);
+  useErrorBoundaryReport(error, "global-error", "global_error");
 
   return (
     // DEFAULT_LOCALE ('es') — this page can't reach the i18n provider (see note above),
