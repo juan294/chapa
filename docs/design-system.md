@@ -39,6 +39,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-terminal-dim` | `#4A4A5E` | `#9CA3AF` | `text-terminal-dim` | Dim text, prefixes, decorative |
 | `--color-complement` | `#10B981` | `#10B981` | `text-complement`, `bg-complement` | Soft teal accent (sparingly) — verification, secondary CTAs |
 | `--color-complement-light` | `rgba(16,185,129,0.15)` | `#D1FAE5` | `bg-complement-light` | Teal tint |
+| `--color-complement-dark` | `#047857` | `#047857` | `bg-complement-dark` | White-text-on-solid-fill verification CTAs only (`bg-complement` measures 2.54:1 for white text, below AA; this measures ~5.49:1) |
 | `--color-track` | `rgba(255,255,255,0.06)` | `rgba(0,0,0,0.06)` | `bg-track` | Progress bar/gauge track background |
 | | | | | |
 | **Dimension colors** | | | | **Data visualization accents for the 4 impact dimensions** |
@@ -74,6 +75,13 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 - Use Tailwind opacity modifiers: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
 - Cards use `bg-card` with `border-stroke`.
 - Button text on purple background: always `text-white`.
+- **White text on a solid `bg-amber`/`bg-complement` fill fails AA contrast** (`bg-amber` measures 4.06:1, `bg-complement` measures 2.54:1 — both below the 4.5:1 floor). Never change the `--color-amber`/`--color-complement` tokens themselves to fix this (they're used non-textually elsewhere — pills, heatmap, focus rings — and a token change shifts the whole brand/verification hue). Instead, at the specific white-text-on-solid-fill call site, use the darker step of the ramp: `bg-amber-dark` (~5.4:1) or `bg-complement-dark` (~5.49:1). When re-anchoring a hover state that previously went to the *lighter* step (e.g. `hover:bg-amber-light`, 2.72:1), shift the whole ramp one step darker instead (base `bg-amber-dark`, hover `bg-amber`) rather than just swapping the base color.
+
+## Touch targets
+
+- Interactive controls need a minimum 44×44px hit area (WCAG 2.5.5 / mobile touch-target guidance).
+- **Default approach**: size the element itself to `min-h-[44px] min-w-[44px]` (see `ErrorBanner.tsx`, `CopyButton.tsx`, `BadgeToolbar.tsx`, `SubMetricPanel.tsx`'s close button).
+- **When the element's own box is measured for positioning** (e.g. `InfoTooltip`'s trigger button, whose `getBoundingClientRect()` drives the portaled tooltip's placement and the `rect.top < 120` auto-flip — see Tooltips below), do NOT resize the element. Instead add `relative` plus an invisible `before:absolute before:-inset-3.5 before:content-['']` overlay: the pseudo-element grows the clickable/hoverable area without changing its host's own box model, so `getBoundingClientRect()` keeps returning the original visual size.
 
 ## Shadows
 
@@ -161,7 +169,8 @@ hover:border-amber/20 hover:text-text-primary
 
 - Fixed top, dark glass: `fixed top-0 z-50 border-b border-stroke bg-bg/80 backdrop-blur-xl`
 - Logo: `Chapa_` with blinking cursor (`animate-cursor-blink`)
-- Nav links: `/` prefix in `text-amber/50`, label in `text-terminal-dim`
+- Nav links: `/` prefix in `text-amber/50`, label in `text-text-secondary` (was `text-terminal-dim` — 2.29:1 dark / 2.54:1 light, below the 4.5:1 AA floor; `text-text-secondary` measures 6.15:1 / 4.83:1). `terminal-dim` stays reserved for genuinely decorative glyphs (`$`, `>`, `|`).
+- Active nav link (`aria-current="page"`): styled globally via `nav [aria-current="page"], [role="navigation"] [aria-current="page"]` in `globals.css` (covers both the desktop `<nav>` and `MobileNav`'s `role="navigation"` panel) — `color: var(--color-text-primary)` + `font-weight: 600`, deliberately not amber so it stays distinguishable from the `text-amber/50` `/` prefix already inside every link.
 - CTA: `/ login` text link (no button), hover to `text-amber`
 - **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), shows `ES | EN` pill menu on click. Uses `aria-expanded`, `role="menu"`, `role="menuitem"`. Active locale highlighted with `text-amber font-semibold`. Closes on outside click via `useDropdownMenu`. Sits between ThemeToggle and login CTA in the nav bar.
 

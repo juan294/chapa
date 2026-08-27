@@ -65,7 +65,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
 
         {/* Center: Command hints (desktop) */}
         {navLinks && navLinks.length > 0 && (
-          <div className="hidden md:flex items-center gap-4 font-heading text-xs text-terminal-dim">
+          <div className="hidden md:flex items-center gap-4 font-heading text-xs text-text-secondary">
             {navLinks.map((link) => (
               <NavLink
                 key={link.href}

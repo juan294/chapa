@@ -177,11 +177,24 @@ describe("Home page render (en)", () => {
     expect(container.querySelector("footer")).not.toBeNull();
   });
 
-  it("links the Verify a Badge CTA to /verify with the complement token", async () => {
+  it("links the Verify a Badge CTA to /verify with the complement-dark token (#1167 / UX-H1: white-on-bg-complement measured 2.54:1, below AA)", async () => {
     await renderHome();
     const verifyLink = screen.getByRole("link", { name: /verify a badge/i });
     expect(verifyLink.getAttribute("href")).toBe("/verify");
-    expect(verifyLink.className).toContain("bg-complement");
+    const classes = verifyLink.className.split(/\s+/);
+    expect(classes).toContain("bg-complement-dark");
+    expect(classes).not.toContain("bg-complement");
+  });
+
+  // #1167 (UX-B1, launch blocker) — the footer is now the shared SiteFooter
+  // component, so Privacy/Terms are reachable identically from every page,
+  // not just this one.
+  it("renders Privacy and Terms links in the footer", async () => {
+    await renderHome();
+    const privacyLink = screen.getByRole("link", { name: "Privacy" });
+    expect(privacyLink.getAttribute("href")).toBe("/privacy");
+    const termsLink = screen.getByRole("link", { name: "Terms" });
+    expect(termsLink.getAttribute("href")).toBe("/terms");
   });
 });
 
