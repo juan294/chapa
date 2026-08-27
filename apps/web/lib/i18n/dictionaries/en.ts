@@ -988,11 +988,13 @@ export const en: Translations = {
     reducedMotion: 'Reduced motion detected — animations are disabled',
     brandingTagline: 'Forged from purpose. Driven by curiosity.',
     verificationLabel: 'VERIFIED',
+    demoMarker: 'DEMO',
     save: {
       saved: 'Preview saved',
       dirty: 'Unsaved preview changes',
       saving: 'Saving...',
       success: 'Preview configuration saved. Your public badge and share page are unchanged.',
+      demoNotPersisted: '(demo) configuration not persisted',
       changedDuringSave: 'Earlier preview changes were saved. New preview changes are still unsaved.',
       alreadySaving: 'A save is already in progress.',
       transportError: 'Could not reach the server. Your changes are still unsaved. Try again.',

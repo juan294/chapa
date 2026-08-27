@@ -412,6 +412,29 @@ describe("StudioClient render", () => {
   });
 
   describe("preview pane", () => {
+    it("shows a persistent demo marker only in demo mode", () => {
+      const { rerender } = render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+
+      expect(screen.getByTestId("studio-demo-marker").textContent).toBe("DEMO");
+
+      rerender(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      expect(screen.queryByTestId("studio-demo-marker")).toBeNull();
+    });
+
     it("renders BadgePreviewCard with config", () => {
       render(
         <StudioClient
@@ -694,6 +717,34 @@ describe("StudioClient render", () => {
   });
 
   describe("save functionality", () => {
+    it("keeps a confirmed agent save local in demo mode", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+
+      act(() => studioWebMcpMocks.options?.proposeSave());
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId("agent-save-confirm"));
+
+      expect(
+        await screen.findByText("(demo) configuration not persisted"),
+      ).toBeDefined();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("agent-save-confirm")).toBeNull();
+      expect(trackEvent).toHaveBeenCalledWith("config_saved", {
+        config: defaultConfig,
+        demo: true,
+      });
+    });
+
     it("arms an on-page gate and does not save until the user confirms", async () => {
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")
@@ -1352,6 +1403,36 @@ describe("StudioClient render", () => {
       );
 
       expect(trackEvent).toHaveBeenCalledWith("studio_opened");
+    });
+
+    it("marks demo telemetry without changing normal event properties", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "demo-change", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          demo
+        />,
+      );
+      expect(trackEvent).toHaveBeenCalledWith("studio_opened", { demo: true });
+
+      fireEvent.click(screen.getByTestId("qc-command"));
+
+      expect(trackEvent).toHaveBeenCalledWith("effect_changed", {
+        category: "background",
+        from: "solid",
+        to: "aurora",
+        demo: true,
+      });
     });
   });
 

@@ -53,7 +53,7 @@ Test tooling: Model Context Tool Inspector extension. Feature-detect with
 - [x] Phase 0 — runtime spike passed in flagged Chrome 151
 - [x] Phase 1 — WebMCP infrastructure and feature flags
 - [x] Phase 2 — Studio tools and human-gated save
-- [ ] Phase 3 — judge demo mode
+- [x] Phase 3 — judge demo mode
 - [ ] Phase 4 — public read tools
 - [ ] Phase 5 — submission assets
 

@@ -52,6 +52,7 @@ export interface StudioClientProps {
   craftResult?: CraftResult | null;
   handle?: string;
   verification?: PreviewVerification | null;
+  demo?: boolean;
 }
 
 type SaveState =
@@ -141,6 +142,7 @@ export function StudioClient({
   craftResult = null,
   handle = "",
   verification = null,
+  demo = false,
 }: StudioClientProps) {
   const { t } = useTranslation();
   const { webmcpEnabled } = useClientFeatureFlags();
@@ -192,14 +194,26 @@ export function StudioClient({
   const saving = saveState.status === "saving";
   const autocompleteExpanded = showAutocomplete && !!activeSuggestionId;
   const studioCommands = useStudioCommands({ config, handle, saving });
+  const trackStudioEvent = useCallback(
+    (event: string, properties?: Record<string, unknown>) => {
+      if (demo) {
+        trackEvent(event, { ...properties, demo: true });
+      } else if (properties) {
+        trackEvent(event, properties);
+      } else {
+        trackEvent(event);
+      }
+    },
+    [demo],
+  );
 
   // Track studio_opened on mount (once)
   useEffect(() => {
     if (!hasTrackedOpen.current) {
-      trackEvent("studio_opened");
+      trackStudioEvent("studio_opened");
       hasTrackedOpen.current = true;
     }
-  }, []);
+  }, [trackStudioEvent]);
 
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
@@ -207,7 +221,7 @@ export function StudioClient({
       for (const key of Object.keys(newConfig) as (keyof BadgeConfig)[]) {
         if (newConfig[key] !== config[key]) {
           changed = true;
-          trackEvent("effect_changed", {
+          trackStudioEvent("effect_changed", {
             category: key,
             from: config[key],
             to: newConfig[key],
@@ -222,7 +236,7 @@ export function StudioClient({
       }
       setConfig(newConfig);
     },
-    [config],
+    [config, trackStudioEvent],
   );
 
   const handleSave = useCallback(async () => {
@@ -239,13 +253,26 @@ export function StudioClient({
     const configToSave = config;
     setSaveState({ status: "saving" });
     try {
+      if (demo) {
+        trackStudioEvent("config_saved", { config: configToSave });
+        setSaveState({ status: "saved" });
+        setLines((prev) => [
+          ...prev,
+          makeLine(
+            "success",
+            translation(t, "studio.save.demoNotPersisted"),
+          ),
+        ]);
+        return;
+      }
+
       const res = await fetch("/api/studio/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configToSave),
       });
       if (res.ok) {
-        trackEvent("config_saved", { config: configToSave });
+        trackStudioEvent("config_saved", { config: configToSave });
         const hasNewerChanges = configRevisionRef.current !== revision;
         setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
         setLines((prev) => [
@@ -272,7 +299,7 @@ export function StudioClient({
     } finally {
       saveInFlightRef.current = false;
     }
-  }, [config, t]);
+  }, [config, demo, t, trackStudioEvent]);
 
   const handleReset = useCallback(() => {
     const resetConfig = getStudioCommandConfig(config, { type: "reset" });
@@ -288,8 +315,11 @@ export function StudioClient({
         setSaveState({ status: "dirty" });
       }
     }
-    trackEvent("effect_changed", { category: "reset", to: "default" });
-  }, [config]);
+    trackStudioEvent("effect_changed", {
+      category: "reset",
+      to: "default",
+    });
+  }, [config, trackStudioEvent]);
 
   const handleAction = useCallback(
     (action: StudioCommandAction) => {
@@ -302,7 +332,7 @@ export function StudioClient({
         case "preset": {
           const nextConfig = getStudioCommandConfig(config, action);
           if (nextConfig) {
-            trackEvent("preset_selected", { preset: action.name });
+            trackStudioEvent("preset_selected", { preset: action.name });
             handleConfigChange(nextConfig);
           }
           break;
@@ -321,7 +351,7 @@ export function StudioClient({
           break;
       }
     },
-    [config, handleConfigChange, handleSave, handleReset],
+    [config, handleConfigChange, handleSave, handleReset, trackStudioEvent],
   );
 
   const handleSubmit = useCallback(
@@ -444,7 +474,7 @@ export function StudioClient({
           );
           const nextIdx = (currentIdx + 1) % STUDIO_PRESETS.length;
           const preset = STUDIO_PRESETS[nextIdx]!;
-          trackEvent("preset_selected", { preset: preset.id });
+          trackStudioEvent("preset_selected", { preset: preset.id });
           handleConfigChange(preset.config);
           break;
         }
@@ -456,7 +486,12 @@ export function StudioClient({
           break;
       }
     });
-  }, [registerPageShortcuts, config.background, handleConfigChange]);
+  }, [
+    registerPageShortcuts,
+    config.background,
+    handleConfigChange,
+    trackStudioEvent,
+  ]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
@@ -464,6 +499,14 @@ export function StudioClient({
       {/* Preview pane (left, sticky) */}
       <div className="flex items-start justify-center lg:items-center px-3 sm:px-4 py-4 sm:py-6 lg:px-8 lg:py-0 border-b lg:border-b-0 lg:border-r border-stroke" aria-busy={saving}>
         <div className="w-full max-w-xl sticky top-20">
+          {demo && (
+            <div
+              className="mb-3 text-center font-heading text-xs font-bold tracking-[0.2em] text-amber"
+              data-testid="studio-demo-marker"
+            >
+              {t("studio.demoMarker") as string}
+            </div>
+          )}
           <BadgePreviewCard
             key={previewKey}
             config={config}

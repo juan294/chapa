@@ -988,11 +988,13 @@ export const es: Translations = {
     reducedMotion: 'Se ha detectado movimiento reducido — las animaciones están desactivadas',
     brandingTagline: 'Forjada con propósito. Impulsada por la curiosidad.',
     verificationLabel: 'VERIFICADA',
+    demoMarker: 'DEMO',
     save: {
       saved: 'Vista previa guardada',
       dirty: 'Cambios de vista previa sin guardar',
       saving: 'Guardando...',
       success: 'Configuración de vista previa guardada. Tu Chapa pública y tu página compartida no cambian.',
+      demoNotPersisted: '(demo) la configuración no se ha guardado',
       changedDuringSave: 'Se guardaron los cambios anteriores de la vista previa. Los cambios nuevos de la vista previa siguen sin guardar.',
       alreadySaving: 'Ya hay un guardado en curso.',
       transportError: 'No se pudo conectar con el servidor. Tus cambios siguen sin guardar. Inténtalo de nuevo.',
