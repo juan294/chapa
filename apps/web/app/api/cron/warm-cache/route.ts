@@ -26,9 +26,10 @@ import {
   resolveBadgeAvatar,
 } from "@/lib/render/avatar-outcome";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeLocale } from "@/lib/render/badge-locale";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
-  buildBadgeSvgCacheKey,
   readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
@@ -461,7 +462,20 @@ async function warmHandle(
     // deletes this exact key — verified before landing this skip.
     try {
       const today = toDateString(new Date());
-      const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+      // #1181 (UX-H3 follow-up) — this cron has no request/cookie context to
+      // resolve a per-visitor locale from, so it only ever warms the
+      // DEFAULT_LOCALE ('es') badge — the locale most real traffic reads
+      // (badge.svg defaults to it when no `?lang=` is given). The cache key
+      // and the rendered content below MUST come from the same resolved
+      // locale, never independent defaults: `resolveBadgeLocale` (not
+      // `buildBadgeSvgCacheKey` directly) is the only sanctioned way to
+      // derive either here. This is exactly the bug #1181 found — this
+      // route previously rendered English content via `renderBadgeSvg`'s own
+      // default while writing it under `buildBadgeSvgCacheKey`'s separately
+      // defaulted key, so the hourly pre-warm published an English badge
+      // into the Spanish-keyed slot for every handle.
+      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE);
+      const svgCacheKey = badgeLocale.cacheKey(handle, today);
       const existingSvg = await readBadgeSvgCache(svgCacheKey);
 
       if (existingSvg === null) {
@@ -482,6 +496,7 @@ async function warmHandle(
             // Mirrors the request path — this SVG is served to <img> embeds,
             // where SMIL <animate> never runs.
             disableAnimation: true,
+            strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
           });
           if (avatarCachePolicy === "short") {
             await writeBadgeSvgCache(svgCacheKey, svg, handle, {

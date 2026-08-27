@@ -388,6 +388,18 @@ export const es: Translations = {
     craft: 'OFICIO',
     github: 'GITHUB',
   },
+  badge: {
+    metricsSimulated: 'Métricas simuladas',
+    metricsVerified: 'Métricas verificadas',
+    metricsPublic: 'Métricas públicas',
+    radarNoData: 'aún sin datos',
+    verifiedLabel: 'VERIFICADO',
+    sampleDisclosure: 'MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN',
+    invalidHandle: 'Usuario de GitHub no válido.',
+    loadError: 'No se pudieron cargar los datos. Inténtalo de nuevo más tarde.',
+    renderError: 'Algo salió mal. Inténtalo de nuevo más tarde.',
+    tagline: 'Chapa de impacto para desarrolladores',
+  },
   archetypes: {
     dominantDimensionLabel: 'Dimensión dominante:',
     builder: {

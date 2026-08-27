@@ -142,6 +142,41 @@ describe("renderVerificationStrip", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Locale-aware labels (#1181 UX-H3) — both render functions stay pure/sync;
+// resolved label strings are passed in by the caller, never resolved here.
+// ---------------------------------------------------------------------------
+
+describe("locale-aware labels (#1181)", () => {
+  const hash = "abc12345";
+  const date = "2025-06-15";
+
+  it("renderVerificationStrip defaults to 'VERIFIED' when no label is given (backward compatible)", () => {
+    const svg = renderVerificationStrip(hash, date);
+    expect(svg).toContain(">VERIFIED");
+  });
+
+  it("renderVerificationStrip uses a translated verified label when provided", () => {
+    const svg = renderVerificationStrip(hash, date, "VERIFICADO");
+    expect(svg).toContain(">VERIFICADO");
+    expect(svg).not.toContain(">VERIFIED");
+    // hash/date still present and still escaped-safe
+    expect(svg).toContain(hash);
+    expect(svg).toContain(date);
+  });
+
+  it("renderDemoVerificationStrip defaults to the English disclosure when no label is given (backward compatible)", () => {
+    const svg = renderDemoVerificationStrip();
+    expect(svg).toContain(">SAMPLE · NOT A REAL BADGE · FOR ILLUSTRATION ONLY<");
+  });
+
+  it("renderDemoVerificationStrip uses a translated disclosure when provided", () => {
+    const svg = renderDemoVerificationStrip("MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN");
+    expect(svg).toContain(">MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN<");
+    expect(svg).not.toContain("NOT A REAL BADGE");
+  });
+});
+
 describe("renderDemoVerificationStrip", () => {
   // #1168 UX-H4 — the demo "SAMPLE / NOT A REAL BADGE" disclosure had the
   // same unreadable 11px/50%-opacity treatment as the real strip.

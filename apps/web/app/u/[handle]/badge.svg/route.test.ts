@@ -223,15 +223,19 @@ describe("GET /u/[handle]/badge.svg", () => {
     const res = await GET(req, ctx);
 
     expect(res.status).toBe(200);
+    // #1181 — the route now always threads a resolved `strings` bundle
+    // through; see the "locale (#1181)" describe block below for coverage
+    // of its exact shape. This test only cares about the pre-existing
+    // avatar/verification/disableAnimation contract.
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
       FAKE_MATERIALIZED.displayImpact,
-      {
+      expect.objectContaining({
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2026-04-17",
         disableAnimation: true,
-      },
+      }),
     );
   });
 
@@ -1184,6 +1188,173 @@ describe("GET /u/[handle]/badge.svg", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Locale (#1181 UX-H3) — `renderBadgeSvg` stays pure; the route resolves a
+  // `?lang=` query param (falling back to DEFAULT_LOCALE) via the real
+  // `getServerT`/dictionaries (no mocking — this exercises the real wiring)
+  // and threads the resolved strings + locale into the render call and the
+  // shared SVG cache key.
+  // ---------------------------------------------------------------------------
+
+  describe("locale (#1181)", () => {
+    it("resolves badge strings from the default locale (es) when no ?lang= is given", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Métricas verificadas",
+            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            radarLabels: expect.objectContaining({
+              delivery: "Entrega",
+              quality: "Calidad",
+              consistency: "Constancia",
+              breadth: "Alcance",
+            }),
+            radarNoData: "aún sin datos",
+            verifiedLabel: "VERIFICADO",
+          }),
+        }),
+      );
+    });
+
+    it("resolves badge strings from ?lang=en", async () => {
+      const [req, ctx] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      await GET(req, ctx);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Verified metrics",
+            tierLabel: "Solid",
+            radarLabels: expect.objectContaining({
+              delivery: "Delivery",
+              quality: "Quality",
+              consistency: "Consistency",
+              breadth: "Breadth",
+            }),
+            radarNoData: "no data yet",
+            verifiedLabel: "VERIFIED",
+          }),
+        }),
+      );
+    });
+
+    it("falls back to the default locale (es) for an unsupported ?lang= value", async () => {
+      const [req, ctx] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=fr",
+      );
+      await GET(req, ctx);
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({ metricsVerified: "Métricas verificadas" }),
+        }),
+      );
+    });
+
+    it("includes the locale in the shared SVG cache key so es/en never collide", async () => {
+      const today = toDateString(new Date());
+
+      const [reqEs, ctxEs] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(reqEs, ctxEs);
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        buildBadgeSvgCacheKey("testuser", today, "es"),
+      );
+
+      vi.clearAllMocks();
+      mockIsValidHandle.mockReturnValue(true);
+      mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
+      mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
+      mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+      mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+      mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+      mockCacheGet.mockResolvedValue(null);
+      mockCacheSetNx.mockResolvedValue(true);
+
+      const [reqEn, ctxEn] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      await GET(reqEn, ctxEn);
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        buildBadgeSvgCacheKey("testuser", today, "en"),
+      );
+    });
+
+    it("still produces the exact pre-#1181 key format for the default locale (es) — buildBadgeSvgCacheKey's own 2-arg default", async () => {
+      // buildBadgeSvgCacheKey/buildBadgeSvgRenderLockKey default their locale
+      // param to DEFAULT_LOCALE (es), so out-of-scope callers that still pass
+      // only (handle, date) — the share page, warm-cache cron, platform-oauth
+      // invalidation, post-write-invalidation — land on the exact same slot
+      // the route uses for an unqualified (no ?lang=) request.
+      const today = toDateString(new Date());
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheGet).toHaveBeenCalledWith(buildBadgeSvgCacheKey("testuser", today));
+    });
+
+    it("localizes the invalid-handle fallback SVG", async () => {
+      mockIsValidHandle.mockReturnValue(false);
+
+      const [reqEs, ctxEs] = makeRequest("bad!!handle");
+      const resEs = await GET(reqEs, ctxEs);
+      expect(await resEs.text()).toContain("Usuario de GitHub no válido.");
+
+      const [reqEn, ctxEn] = makeRequest("bad!!handle", {}, "?lang=en");
+      const resEn = await GET(reqEn, ctxEn);
+      expect(await resEn.text()).toContain("Invalid GitHub handle.");
+    });
+
+    it("localizes the 'could not load data' fallback SVG when materialize returns null", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+
+      const [reqEs, ctxEs] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const resEs = await GET(reqEs, ctxEs);
+      expect(await resEs.text()).toContain("No se pudieron cargar los datos.");
+
+      const [reqEn, ctxEn] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      const resEn = await GET(reqEn, ctxEn);
+      expect(await resEn.text()).toContain("Could not load data.");
+    });
+
+    it("localizes the catch-all error fallback SVG", async () => {
+      mockMaterializePublicProfile.mockRejectedValue(new Error("boom"));
+
+      const [reqEs, ctxEs] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const resEs = await GET(reqEs, ctxEs);
+      expect(resEs.status).toBe(500);
+      expect(await resEs.text()).toContain("Algo salió mal.");
+
+      const [reqEn, ctxEn] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?lang=en",
+      );
+      const resEn = await GET(reqEn, ctxEn);
+      expect(await resEn.text()).toContain("Something went wrong.");
     });
   });
 });
