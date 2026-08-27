@@ -367,7 +367,11 @@ describe("POST /api/telemetry", () => {
       });
     });
 
-    it("does not check rate limits or validate telemetry shape for client error events", async () => {
+    // #1162 / SE-M1, BE-M4: client_error/client_api_error payloads carry no
+    // targetHandle, so they can never be metered by the per-handle limit —
+    // but they must still be metered by IP, or an unauthenticated caller gets
+    // unlimited PostHog writes by simply never sending a valid payload.
+    it("still applies both IP-based rate limits to client error events, but skips the per-handle check and payload validation", async () => {
       const res = await POST(
         makeRequest({
           event: "client_error",
@@ -376,7 +380,56 @@ describe("POST /api/telemetry", () => {
         }),
       );
       expect(res.status).toBe(200);
-      expect(mockRateLimit).not.toHaveBeenCalled();
+      expect(mockRateLimit).toHaveBeenCalledTimes(2);
+      expect(mockRateLimit).toHaveBeenNthCalledWith(1, "ratelimit:telemetry-ip:127.0.0.1", 60, 60);
+      expect(mockRateLimit).toHaveBeenNthCalledWith(2, "ratelimit:telemetry-ip-day:127.0.0.1", 600, 86400);
+    });
+
+    it("returns 429 for a client_error event when the per-IP floor rate limit is exceeded", async () => {
+      mockRateLimit.mockImplementation(async (key: string) => {
+        if (key.startsWith("ratelimit:telemetry-ip:")) {
+          return { allowed: false, current: 61, limit: 60 };
+        }
+        return { allowed: true, current: 1, limit: 600 };
+      });
+
+      const res = await POST(
+        makeRequest({ event: "client_error", category: "render", message: "boom" }),
+      );
+
+      expect(res.status).toBe(429);
+      expect(mockCaptureServerEvent).not.toHaveBeenCalled();
+    });
+
+    it("returns 429 for a client_error event when the IP/day ceiling is exceeded", async () => {
+      mockRateLimit.mockImplementation(async (key: string) => {
+        if (key.startsWith("ratelimit:telemetry-ip-day:")) {
+          return { allowed: false, current: 601, limit: 600 };
+        }
+        return { allowed: true, current: 1, limit: 60 };
+      });
+
+      const res = await POST(
+        makeRequest({ event: "client_error", category: "render", message: "boom" }),
+      );
+
+      expect(res.status).toBe(429);
+      expect(mockCaptureServerEvent).not.toHaveBeenCalled();
+    });
+
+    it("truncates an oversized category to 128 chars, matching its sibling fields", async () => {
+      const res = await POST(
+        makeRequest({
+          event: "client_error",
+          category: "x".repeat(200),
+          message: "boom",
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "client_error",
+        expect.objectContaining({ category: "x".repeat(128) }),
+      );
     });
   });
 
