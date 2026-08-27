@@ -243,6 +243,31 @@ describe("QuickControls", () => {
     ).toBe(true);
   });
 
+  it("renders and dispatches the human confirmation gate for an agent save", () => {
+    const onConfirmAgentSave = vi.fn();
+    const onDismissAgentSave = vi.fn();
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={true}
+        onToggle={vi.fn()}
+        agentSaveProposal={{
+          onConfirm: onConfirmAgentSave,
+          onDismiss: onDismissAgentSave,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("An agent wants to save this preview configuration."),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(onConfirmAgentSave).toHaveBeenCalledOnce();
+    expect(onDismissAgentSave).toHaveBeenCalledOnce();
+  });
+
   it("renders Spanish control copy while command identifiers stay unchanged", () => {
     render(
       <LanguageProvider initialLocale="es" dictionary={es}>

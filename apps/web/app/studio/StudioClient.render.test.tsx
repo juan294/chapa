@@ -68,6 +68,32 @@ vi.mock("@/lib/effects/defaults", () => ({
 
 const previewLifecycle = vi.hoisted(() => ({ nextInstanceId: 0 }));
 
+interface StudioWebMcpOptionsCapture {
+  craftResult?: unknown;
+  runCommand: (input: string) => unknown;
+  proposeSave: () => void;
+}
+
+const studioWebMcpMocks = vi.hoisted(() => ({
+  options: null as StudioWebMcpOptionsCapture | null,
+  useModelContextTools: vi.fn(),
+}));
+
+vi.mock("./useStudioWebMcpTools", () => ({
+  useStudioWebMcpTools: (options: StudioWebMcpOptionsCapture) => {
+    studioWebMcpMocks.options = options;
+    return [];
+  },
+}));
+
+vi.mock("@/lib/webmcp/use-model-context-tools", () => ({
+  useModelContextTools: studioWebMcpMocks.useModelContextTools,
+}));
+
+vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
+  useClientFeatureFlags: () => ({ webmcpEnabled: true }),
+}));
+
 vi.mock("./BadgePreviewCard", () => ({
   BadgePreviewCard: ({
     config,
@@ -98,11 +124,16 @@ vi.mock("./QuickControls", () => ({
     visible,
     onToggle,
     saveDisabled,
+    agentSaveProposal,
   }: {
     onCommand: (cmd: string) => void;
     visible: boolean;
     onToggle: () => void;
     saveDisabled?: boolean;
+    agentSaveProposal?: {
+      onConfirm: () => void;
+      onDismiss: () => void;
+    };
   }) => (
     <div data-testid="quick-controls" data-visible={String(visible)}>
       <button data-testid="qc-toggle" onClick={onToggle}>
@@ -121,6 +152,17 @@ vi.mock("./QuickControls", () => ({
       >
         /save
       </button>
+      {agentSaveProposal && (
+        <div>
+          <span>An agent wants to save this preview configuration.</span>
+          <button data-testid="agent-save-confirm" onClick={agentSaveProposal.onConfirm}>
+            Confirm save
+          </button>
+          <button data-testid="agent-save-dismiss" onClick={agentSaveProposal.onDismiss}>
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
   ),
 }));
@@ -226,7 +268,12 @@ vi.mock("@/components/KeyboardShortcutsListener", () => ({
 }));
 
 import { parseRetryAfterSeconds, StudioClient } from "./StudioClient";
-import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
+import type {
+  BadgeConfig,
+  CraftResult,
+  StatsData,
+  ImpactV6Result,
+} from "@chapa/shared";
 
 // ---------- Test fixtures ----------
 
@@ -280,6 +327,15 @@ const impact: ImpactV6Result = {
   computedAt: new Date().toISOString(),
 };
 
+const craftResult: CraftResult = {
+  tool: "claude-code",
+  dimensions: { proficiency: 91, effectiveness: 72, sophistication: 83 },
+  craftScore: 82,
+  tier: "Expert",
+  reportPeriod: { start: "2026-08-01", end: "2026-08-27" },
+  computedAt: "2026-08-27T00:00:00.000Z",
+};
+
 function languageValue(
   locale: "en" | "es",
 ): LanguageContextValue {
@@ -326,6 +382,19 @@ describe("StudioClient render", () => {
       const heading = screen.getByRole("heading", { level: 1 });
       expect(heading.textContent).toBe("Creator Studio");
       expect(heading.className).toContain("sr-only");
+    });
+
+    it("forwards materialized Craft data to the Studio WebMCP tools", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          craftResult={craftResult}
+        />,
+      );
+
+      expect(studioWebMcpMocks.options?.craftResult).toBe(craftResult);
     });
   });
 
@@ -495,6 +564,34 @@ describe("StudioClient render", () => {
   });
 
   describe("terminal input interactions", () => {
+    it("returns the same command result that it renders for WebMCP callers", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      const commandResult = {
+        lines: [{ id: "agent-command", type: "success" as const, text: "Applied" }],
+      };
+      vi.mocked(executeCommand).mockReturnValue(commandResult);
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      let returned: unknown;
+      act(() => {
+        returned = studioWebMcpMocks.options?.runCommand("/status");
+      });
+
+      expect(returned).toBe(commandResult);
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        "Applied",
+      );
+      expect(studioWebMcpMocks.useModelContextTools).toHaveBeenCalledWith(
+        [],
+        true,
+      );
+    });
+
     it("shows autocomplete when typing / prefix", () => {
       render(
         <StudioClient
@@ -597,6 +694,54 @@ describe("StudioClient render", () => {
   });
 
   describe("save functionality", () => {
+    it("arms an on-page gate and does not save until the user confirms", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("{}", { status: 200 }));
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      act(() => studioWebMcpMocks.options?.proposeSave());
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
+        "true",
+      );
+      expect(
+        screen.getByText("Agent proposed saving — confirm below."),
+      ).toBeDefined();
+      expect(
+        screen.getByText("An agent wants to save this preview configuration."),
+      ).toBeDefined();
+
+      fireEvent.click(screen.getByTestId("agent-save-confirm"));
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledWith(
+          "/api/studio/config",
+          expect.objectContaining({ method: "PUT" }),
+        );
+      });
+      expect(screen.queryByTestId("agent-save-confirm")).toBeNull();
+    });
+
+    it("dismisses an agent save proposal without persisting", () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+
+      act(() => studioWebMcpMocks.options?.proposeSave());
+      fireEvent.click(screen.getByTestId("agent-save-dismiss"));
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("agent-save-dismiss")).toBeNull();
+      expect(
+        screen.getByText("Agent save proposal dismissed."),
+      ).toBeDefined();
+    });
+
     it("parses numeric and HTTP-date Retry-After values", () => {
       const now = Date.parse("2026-08-26T10:00:00Z");
       expect(parseRetryAfterSeconds("90", now)).toBe(90);

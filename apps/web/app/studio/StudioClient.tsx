@@ -8,8 +8,12 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react";
-import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
-import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
+import type {
+  BadgeConfig,
+  CraftResult,
+  StatsData,
+  ImpactV6Result,
+} from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { useIsClient } from "@/hooks/useIsClient";
@@ -26,8 +30,10 @@ import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown
 import {
   executeCommand,
   makeLine,
+  type CommandResult,
   type OutputLine,
 } from "@/components/terminal/command-registry";
+import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListener";
 import { useTranslation, type LanguageContextValue } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
@@ -35,11 +41,15 @@ import {
   TERMINAL_COMMAND_INPUT_ID,
   TERMINAL_COMMAND_LISTBOX_ID,
 } from "@/lib/keyboard/shortcuts";
+import { useModelContextTools } from "@/lib/webmcp/use-model-context-tools";
+import { useStudioWebMcpTools } from "./useStudioWebMcpTools";
+import { getStudioCommandConfig } from "./studio-command-config";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: StatsData;
   impact: ImpactV6Result;
+  craftResult?: CraftResult | null;
   handle?: string;
   verification?: PreviewVerification | null;
 }
@@ -128,12 +138,15 @@ export function StudioClient({
   initialConfig,
   stats,
   impact,
+  craftResult = null,
   handle = "",
   verification = null,
 }: StudioClientProps) {
   const { t } = useTranslation();
+  const { webmcpEnabled } = useClientFeatureFlags();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
   const [saveState, setSaveState] = useState<SaveState>({ status: "saved" });
+  const [pendingAgentSave, setPendingAgentSave] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [showQuickControls, setShowQuickControls] = useState(false);
   const isClient = useIsClient();
@@ -262,11 +275,13 @@ export function StudioClient({
   }, [config, t]);
 
   const handleReset = useCallback(() => {
-    const changed = Object.keys(DEFAULT_BADGE_CONFIG).some((key) => {
+    const resetConfig = getStudioCommandConfig(config, { type: "reset" });
+    if (!resetConfig) return;
+    const changed = Object.keys(resetConfig).some((key) => {
       const configKey = key as keyof BadgeConfig;
-      return config[configKey] !== DEFAULT_BADGE_CONFIG[configKey];
+      return config[configKey] !== resetConfig[configKey];
     });
-    setConfig({ ...DEFAULT_BADGE_CONFIG });
+    setConfig(resetConfig);
     if (changed) {
       configRevisionRef.current += 1;
       if (!saveInFlightRef.current) {
@@ -280,18 +295,20 @@ export function StudioClient({
     (action: StudioCommandAction) => {
       switch (action.type) {
         case "set": {
-          handleConfigChange({ ...config, [action.category]: action.value });
+          const nextConfig = getStudioCommandConfig(config, action);
+          if (nextConfig) handleConfigChange(nextConfig);
           break;
         }
         case "preset": {
-          const preset = STUDIO_PRESETS.find((p) => p.id === action.name);
-          if (preset) {
-            trackEvent("preset_selected", { preset: preset.id });
-            handleConfigChange(preset.config);
+          const nextConfig = getStudioCommandConfig(config, action);
+          if (nextConfig) {
+            trackEvent("preset_selected", { preset: action.name });
+            handleConfigChange(nextConfig);
           }
           break;
         }
         case "save":
+          setPendingAgentSave(false);
           void handleSave();
           break;
         case "reset":
@@ -308,7 +325,7 @@ export function StudioClient({
   );
 
   const handleSubmit = useCallback(
-    (input: string) => {
+    (input: string): CommandResult<StudioCommandAction> => {
       const inputLine = makeLine("input", input);
       setHistory((h) => [...h, input]);
       setShowAutocomplete(false);
@@ -318,7 +335,7 @@ export function StudioClient({
 
       if (result.action?.type === "clear") {
         setLines([]);
-        return;
+        return result;
       }
 
       setLines((prev) => [...prev, inputLine, ...result.lines]);
@@ -326,9 +343,44 @@ export function StudioClient({
       if (result.action) {
         handleAction(result.action);
       }
+      return result;
     },
     [studioCommands, handleAction],
   );
+
+  const handleAgentSaveProposal = useCallback(() => {
+    setPendingAgentSave(true);
+    setShowQuickControls(true);
+    setLines((prev) => [
+      ...prev,
+      makeLine("system", translation(t, "studio.agentSave.proposed")),
+    ]);
+  }, [t]);
+
+  const handleAgentSaveConfirm = useCallback(() => {
+    setPendingAgentSave(false);
+    void handleSave();
+  }, [handleSave]);
+
+  const handleAgentSaveDismiss = useCallback(() => {
+    setPendingAgentSave(false);
+    setLines((prev) => [
+      ...prev,
+      makeLine("info", translation(t, "studio.agentSave.dismissed")),
+    ]);
+  }, [t]);
+
+  const studioWebMcpTools = useStudioWebMcpTools({
+    config,
+    stats,
+    impact,
+    craftResult,
+    handle,
+    saveStatus: saveState.status,
+    runCommand: handleSubmit,
+    proposeSave: handleAgentSaveProposal,
+  });
+  useModelContextTools(studioWebMcpTools, webmcpEnabled);
 
   const handleQuickCommand = useCallback(
     (cmd: string) => {
@@ -454,6 +506,14 @@ export function StudioClient({
           visible={showQuickControls}
           onToggle={() => setShowQuickControls((v) => !v)}
           saveDisabled={saving}
+          agentSaveProposal={
+            pendingAgentSave
+              ? {
+                  onConfirm: handleAgentSaveConfirm,
+                  onDismiss: handleAgentSaveDismiss,
+                }
+              : undefined
+          }
         />
 
         {/* Terminal output */}

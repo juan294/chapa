@@ -76,6 +76,7 @@ export default async function StudioPage() {
           initialConfig={initialConfig}
           stats={materialized.stats}
           impact={materialized.displayImpact}
+          craftResult={materialized.craftResult}
           handle={session.login}
           verification={verification}
         />

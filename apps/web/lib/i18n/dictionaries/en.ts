@@ -1004,6 +1004,13 @@ export const en: Translations = {
       statusError: 'Could not save (server status {status}). Your changes are still unsaved. Try again.',
       retryAfter: 'Try again in {seconds} seconds.',
     },
+    agentSave: {
+      proposed: 'Agent proposed saving — confirm below.',
+      prompt: 'An agent wants to save this preview configuration.',
+      confirm: 'Confirm save',
+      dismiss: 'Dismiss',
+      dismissed: 'Agent save proposal dismissed.',
+    },
     presetLabels: {
       minimal: 'Minimal',
       premium: 'Premium',

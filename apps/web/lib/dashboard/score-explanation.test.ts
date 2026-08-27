@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { makeImpact, makeStats } from "@/lib/test-helpers/fixtures";
-import { buildScoreExplanation } from "./score-explanation";
+import {
+  buildScoreExplanation,
+  getDimensionFormulaKey,
+} from "./score-explanation";
+
+describe("getDimensionFormulaKey", () => {
+  it("selects collaborative and solo Quality formulas from composite membership", () => {
+    expect(
+      getDimensionFormulaKey({ key: "quality", countsTowardComposite: true }),
+    ).toBe("scoreExplanation.dimensions.qualityCollaborativeFormula");
+    expect(
+      getDimensionFormulaKey({ key: "quality", countsTowardComposite: false }),
+    ).toBe("scoreExplanation.dimensions.qualitySoloFormula");
+  });
+
+  it("selects the standard formula for other dimensions", () => {
+    expect(
+      getDimensionFormulaKey({ key: "craft", countsTowardComposite: true }),
+    ).toBe("scoreExplanation.dimensions.craftFormula");
+  });
+});
 
 describe("buildScoreExplanation", () => {
   it("builds a solo mdburgos-like explanation with Quality shown but excluded", () => {

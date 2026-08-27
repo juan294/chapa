@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import type { StatsData } from "@chapa/shared";
+import type { CraftResult, StatsData } from "@chapa/shared";
 
 const mocks = vi.hoisted(() => ({
   headers: vi.fn(),
@@ -69,11 +69,13 @@ vi.mock("./StudioClient", () => ({
   StudioClient: ({
     handle,
     stats,
+    craftResult,
     initialConfig,
     verification,
   }: {
     handle: string;
     stats: StatsData;
+    craftResult: CraftResult | null;
     initialConfig: { theme?: string; background?: string };
     verification: { hash: string; date: string } | null;
   }) => (
@@ -81,6 +83,7 @@ vi.mock("./StudioClient", () => ({
       data-testid="studio-client"
       data-handle={handle}
       data-commits={String(stats.commitsTotal)}
+      data-craft-score={String(craftResult?.craftScore ?? "none")}
       data-config-theme={initialConfig.theme ?? "none"}
       data-config-background={initialConfig.background ?? "none"}
       data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
@@ -116,6 +119,15 @@ const stats = {
   fetchedAt: "2026-01-01T00:00:00.000Z",
 } satisfies StatsData;
 
+const craftResult = {
+  tool: "claude-code",
+  dimensions: { proficiency: 91, effectiveness: 72, sophistication: 83 },
+  craftScore: 82,
+  tier: "Expert",
+  reportPeriod: { start: "2026-08-01", end: "2026-08-27" },
+  computedAt: "2026-08-27T00:00:00.000Z",
+} satisfies CraftResult;
+
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -128,6 +140,7 @@ beforeEach(() => {
   mocks.getSessionGitHubToken.mockResolvedValue("gho_token");
   mocks.materializeDisplayProfile.mockResolvedValue({
     stats,
+    craftResult,
     displayImpact: { compositeScore: 80 },
     statsComplete: true,
   });
@@ -185,6 +198,7 @@ describe("StudioPage render", () => {
     const client = screen.getByTestId("studio-client");
     expect(client.getAttribute("data-handle")).toBe("octocat");
     expect(client.getAttribute("data-commits")).toBe("42");
+    expect(client.getAttribute("data-craft-score")).toBe("82");
     expect(client.getAttribute("data-config-theme")).toBe("saved-theme");
     expect(client.getAttribute("data-verification")).toBe(
       "abc123:2026-08-26",

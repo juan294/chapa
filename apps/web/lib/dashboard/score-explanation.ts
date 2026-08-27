@@ -18,6 +18,18 @@ export interface DimensionExplanation {
   subMetrics: DimensionSubMetric[];
 }
 
+export function getDimensionFormulaKey(
+  dimension: Pick<DimensionExplanation, "key" | "countsTowardComposite">,
+): string {
+  if (dimension.key === "quality") {
+    return dimension.countsTowardComposite
+      ? "scoreExplanation.dimensions.qualityCollaborativeFormula"
+      : "scoreExplanation.dimensions.qualitySoloFormula";
+  }
+
+  return `scoreExplanation.dimensions.${dimension.key}Formula`;
+}
+
 export interface PlatformProvenance {
   platform: Platform;
   login?: string;
@@ -141,12 +153,15 @@ export function buildScoreExplanation(
 
   const dimensions = DIMENSION_KEYS
     .filter((key) => isDimensionPresent(impact.dimensions, key))
-    .map((key) => ({
-      key,
-      score: impact.dimensions[key]!,
-      countsTowardComposite: activeDimensionKeys.includes(key),
-      subMetrics: getDimensionSubMetrics(key, stats, impact.profileType, craftResult),
-    }));
+    .map((key) =>
+      buildDimensionExplanation(
+        impact,
+        stats,
+        key,
+        craftResult,
+        activeDimensionKeys,
+      ),
+    );
 
   const linkedPlatforms = stats.linkedPlatforms?.filter((platform) => platform !== "github") ?? [];
   const platforms: Platform[] = ["github", ...linkedPlatforms];
@@ -171,5 +186,24 @@ export function buildScoreExplanation(
         "confidencePenalties" in impact ? impact.confidencePenalties ?? [] : []
       ).map(({ flag, penalty }) => ({ flag, penalty })),
     },
+  };
+}
+
+export function buildDimensionExplanation(
+  impact: ClientImpactV6Result,
+  stats: StatsData,
+  key: DimensionKey,
+  craftResult: CraftResult | null = null,
+  activeDimensionKeys?: DimensionKey[],
+): DimensionExplanation {
+  const activeKeys = activeDimensionKeys ?? (
+    impact.profileType === "solo" ? SOLO_DIMENSION_KEYS : DIMENSION_KEYS
+  ).filter((dimension) => isDimensionPresent(impact.dimensions, dimension)) as DimensionKey[];
+
+  return {
+    key,
+    score: impact.dimensions[key] ?? 0,
+    countsTowardComposite: activeKeys.includes(key),
+    subMetrics: getDimensionSubMetrics(key, stats, impact.profileType, craftResult),
   };
 }

@@ -1004,6 +1004,13 @@ export const es: Translations = {
       statusError: 'No se pudo guardar (estado del servidor {status}). Tus cambios siguen sin guardar. Inténtalo de nuevo.',
       retryAfter: 'Inténtalo de nuevo en {seconds} segundos.',
     },
+    agentSave: {
+      proposed: 'El agente ha propuesto guardar. Confirma abajo.',
+      prompt: 'Un agente quiere guardar esta configuración de vista previa.',
+      confirm: 'Confirmar guardado',
+      dismiss: 'Descartar',
+      dismissed: 'Propuesta de guardado del agente descartada.',
+    },
     presetLabels: {
       minimal: 'Mínimo',
       premium: 'Premium',
