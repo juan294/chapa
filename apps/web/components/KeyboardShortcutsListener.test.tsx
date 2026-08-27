@@ -74,6 +74,15 @@ vi.mock("next/dynamic", () => ({
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
+// go-profile shares `useSession`'s fetchSession()/instrumentation (#1184
+// FE-L6) instead of a bespoke fetch — spy on trackEvent so tests can assert
+// that instrumentation actually fires, and use the real `@/hooks/useSession`
+// module (not mocked) so the shared cache is genuinely exercised.
+const { mockTrackEvent } = vi.hoisted(() => ({ mockTrackEvent: vi.fn() }));
+vi.mock("@/lib/analytics/posthog", () => ({
+  trackEvent: mockTrackEvent,
+}));
+
 /* ------------------------------------------------------------------ */
 /* Import tested module AFTER mocks                                   */
 /* ------------------------------------------------------------------ */
@@ -83,6 +92,7 @@ import {
   useKeyboardShortcutsContext,
 } from "./KeyboardShortcutsListener";
 import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
+import { fetchSession, clearSessionCache } from "@/hooks/useSession";
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { resolveDynamicLoader } from "@/lib/test-helpers/dynamic-mock";
@@ -124,6 +134,11 @@ describe("KeyboardShortcutsListener", () => {
     capturedActiveScopes = [];
     mockPush.mockClear();
     mockFetch.mockReset();
+    mockTrackEvent.mockClear();
+    // go-profile now goes through the shared `useSession` module-level
+    // promise cache — reset it so each test's fetch mock is actually
+    // exercised instead of a previous test's cached result being reused.
+    clearSessionCache();
     document.body.innerHTML = "";
   });
 
@@ -276,6 +291,7 @@ describe("KeyboardShortcutsListener", () => {
 
     it("go-profile fetches session and navigates to /u/:handle", async () => {
       mockFetch.mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ user: { login: "testuser" } }),
       });
 
@@ -305,6 +321,7 @@ describe("KeyboardShortcutsListener", () => {
 
     it("go-profile does not navigate when session has no login", async () => {
       mockFetch.mockResolvedValueOnce({
+        ok: true,
         json: () => Promise.resolve({ user: null }),
       });
 
@@ -316,6 +333,52 @@ describe("KeyboardShortcutsListener", () => {
       });
 
       expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    // #1184 (FE-L6) — go-profile previously called `fetch("/api/auth/session")`
+    // directly, bypassing `useSession`'s module-level cache AND its
+    // `client_api_error` instrumentation, so a 429 from the fail-closed rate
+    // limiter silently did nothing observable. It must now go through the
+    // shared `fetchSession()` export.
+    it("go-profile surfaces a client_api_error via the shared fetchSession() instrumentation on a non-ok response", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 429 });
+
+      render(<KeyboardShortcutsListener />);
+
+      await act(async () => {
+        capturedOnShortcut!("go-profile");
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        "client_api_error",
+        expect.objectContaining({
+          route: "/api/auth/session",
+          status: 429,
+          source: "useSession",
+        }),
+      );
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("go-profile reuses the shared useSession() cache instead of issuing its own fetch", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ user: { login: "cacheduser" } }),
+      });
+      // Prime the shared cache exactly as a mounted useSession() consumer would.
+      await fetchSession();
+      mockFetch.mockClear();
+
+      render(<KeyboardShortcutsListener />);
+
+      await act(async () => {
+        capturedOnShortcut!("go-profile");
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith("/u/cacheduser");
     });
 
     it("go-studio navigates to /studio when studio is enabled", () => {
