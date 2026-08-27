@@ -15,6 +15,12 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/auth/cli-token", () => ({
   generateCliToken: vi.fn(),
+  cliDeviceContextKey: (sessionId: string) => `cli:device-context:${sessionId}`,
+  sanitizeDeviceContextField: (value: string | null | undefined) => {
+    const trimmed = value?.trim();
+    if (!trimmed) return "unknown";
+    return trimmed.slice(0, 200);
+  },
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -39,12 +45,18 @@ import { generateCliToken } from "@/lib/auth/cli-token";
 
 const VALID_UUID = "1feae8e3-6bc0-47da-84aa-0e24e2510454";
 
-function makeRequest(session?: string, ip?: string, deviceCode?: string): NextRequest {
+function makeRequest(
+  session?: string,
+  ip?: string,
+  deviceCode?: string,
+  userAgent?: string,
+): NextRequest {
   const url = new URL("https://chapa.thecreativetoken.com/api/cli/auth/poll");
   if (session !== undefined) url.searchParams.set("session", session);
   if (deviceCode !== undefined) url.searchParams.set("device_code", deviceCode);
   const headers: Record<string, string> = {};
   if (ip) headers["x-forwarded-for"] = ip;
+  if (userAgent !== undefined) headers["user-agent"] = userAgent;
   return new NextRequest(url.toString(), { headers });
 }
 
@@ -501,6 +513,63 @@ describe("GET /api/cli/auth/poll — BE-M4 (#953): session TTL", () => {
     );
     const ttlArg = vi.mocked(cacheSet).mock.calls[0]?.[2] as number;
     expect(ttlArg).toBeLessThanOrEqual(300);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SE-H1 interim mitigation (#1174): capture initiating device context (IP +
+// user-agent) at session creation, so /cli/authorize can surface it.
+// ---------------------------------------------------------------------------
+
+describe("GET /api/cli/auth/poll — device context capture (#1174)", () => {
+  beforeEach(() => {
+    vi.mocked(cacheGet).mockResolvedValue(null);
+    vi.mocked(cacheSet).mockResolvedValue(true);
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
+  });
+
+  it("stores the initiating IP and user-agent under a device-context key on first poll", async () => {
+    await GET(
+      makeRequest(VALID_UUID, "9.9.9.9", undefined, "TestAgent/1.0"),
+    );
+
+    expect(cacheSet).toHaveBeenCalledWith(
+      `cli:device-context:${VALID_UUID}`,
+      { ip: "9.9.9.9", userAgent: "TestAgent/1.0" },
+      expect.any(Number),
+    );
+  });
+
+  it("defaults to 'unknown' fields when IP/user-agent are unavailable", async () => {
+    await GET(makeRequest(VALID_UUID));
+
+    expect(cacheSet).toHaveBeenCalledWith(
+      `cli:device-context:${VALID_UUID}`,
+      { ip: "unknown", userAgent: "unknown" },
+      expect.any(Number),
+    );
+  });
+
+  it("does not store device context (or fail the poll) when the primary session write fails", async () => {
+    vi.mocked(cacheSet).mockResolvedValue(false);
+
+    const res = await GET(makeRequest(VALID_UUID, "9.9.9.9", undefined, "TestAgent/1.0"));
+
+    expect(res.status).toBe(503);
+    expect(cacheSet).toHaveBeenCalledTimes(1);
+    expect(cacheSet).not.toHaveBeenCalledWith(
+      expect.stringContaining("cli:device-context:"),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("does not capture device context again on a subsequent poll of an existing session", async () => {
+    vi.mocked(cacheGet).mockResolvedValue({ status: "pending" });
+
+    await GET(makeRequest(VALID_UUID, "9.9.9.9", undefined, "TestAgent/1.0"));
+
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 });
 
