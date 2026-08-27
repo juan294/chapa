@@ -11,10 +11,12 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 
 import {
   isStudioEnabledSync,
+  isStudioDemoEnabledSync,
   isBitbucketEnabledSync,
   isCodebergEnabledSync,
   isGitlabEnabledSync,
   isInsightsEnabledSync,
+  isWebmcpEnabledSync,
 } from "./feature-flags-sync";
 
 // ---------------------------------------------------------------------------
@@ -275,4 +277,34 @@ describe("isInsightsEnabledSync", () => {
     vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", " TRUE ");
     expect(isInsightsEnabledSync()).toBe(false);
   });
+});
+
+describe.each([
+  {
+    label: "WebMCP",
+    envKey: "NEXT_PUBLIC_WEBMCP_ENABLED",
+    check: isWebmcpEnabledSync,
+  },
+  {
+    label: "Studio demo",
+    envKey: "NEXT_PUBLIC_STUDIO_DEMO_ENABLED",
+    check: isStudioDemoEnabledSync,
+  },
+])("$label sync feature flag", ({ envKey, check }) => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns true only for trimmed string "true"', () => {
+    vi.stubEnv(envKey, " true ");
+    expect(check()).toBe(true);
+  });
+
+  it.each([undefined, "false", "1", "TRUE", ""])(
+    "returns false for %s",
+    (value) => {
+      vi.stubEnv(envKey, value);
+      expect(check()).toBe(false);
+    },
+  );
 });

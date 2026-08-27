@@ -26,6 +26,10 @@ import {
   isInsightsEnabledSync,
   isGitlabEnabled,
   isGitlabEnabledSync,
+  isStudioDemoEnabled,
+  isStudioDemoEnabledSync,
+  isWebmcpEnabled,
+  isWebmcpEnabledSync,
   invalidateFeatureFlagCache,
   _resetFlagCache,
 } from "./feature-flags";
@@ -663,5 +667,65 @@ describe("isInsightsEnabled", () => {
 
     const result = await isInsightsEnabled();
     expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WebMCP and Studio demo flags
+// ---------------------------------------------------------------------------
+
+describe.each([
+  {
+    label: "WebMCP",
+    dbKey: "webmcp_enabled",
+    envKey: "NEXT_PUBLIC_WEBMCP_ENABLED",
+    check: isWebmcpEnabled,
+    checkSync: isWebmcpEnabledSync,
+  },
+  {
+    label: "Studio demo",
+    dbKey: "studio_demo_enabled",
+    envKey: "NEXT_PUBLIC_STUDIO_DEMO_ENABLED",
+    check: isStudioDemoEnabled,
+    checkSync: isStudioDemoEnabledSync,
+  },
+])("$label feature flag", ({ dbKey, envKey, check, checkSync }) => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("re-exports the sync env helper", () => {
+    vi.stubEnv(envKey, "true");
+    expect(checkSync()).toBe(true);
+  });
+
+  it("returns the DB flag value when available", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(makeFlag(dbKey, true));
+
+    await expect(check()).resolves.toBe(true);
+    expect(dbGetFeatureFlag).toHaveBeenCalledWith(dbKey);
+  });
+
+  it("keeps a disabled DB flag authoritative over an enabled env fallback", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(makeFlag(dbKey, false));
+    vi.stubEnv(envKey, "true");
+
+    await expect(check()).resolves.toBe(false);
+  });
+
+  it("falls back to the env flag when the DB row is unavailable", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv(envKey, " true ");
+
+    await expect(check()).resolves.toBe(true);
+  });
+
+  it("defaults to false when both sources are absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv(envKey, undefined);
+
+    await expect(check()).resolves.toBe(false);
   });
 });

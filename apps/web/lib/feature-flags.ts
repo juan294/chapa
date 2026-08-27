@@ -19,18 +19,22 @@ import {
 } from "@/lib/env";
 import {
   isStudioEnabledSync,
+  isStudioDemoEnabledSync,
   isBitbucketEnabledSync,
   isCodebergEnabledSync,
   isGitlabEnabledSync,
   isInsightsEnabledSync,
+  isWebmcpEnabledSync,
 } from "./feature-flags-sync";
 
 export {
   isStudioEnabledSync,
+  isStudioDemoEnabledSync,
   isBitbucketEnabledSync,
   isCodebergEnabledSync,
   isGitlabEnabledSync,
   isInsightsEnabledSync,
+  isWebmcpEnabledSync,
 };
 
 // ---------------------------------------------------------------------------
@@ -91,6 +95,32 @@ export async function isStudioEnabled(): Promise<boolean> {
   return checkFlag(
     "studio_enabled",
     isStudioEnabledSync() ? "true" : undefined,
+  );
+}
+
+/**
+ * Check whether anonymous Creator Studio demo mode is enabled.
+ * Keep this server-side; demo access is gated before rendering Studio.
+ *
+ * @returns `true` if the `studio_demo_enabled` flag is on in DB or `NEXT_PUBLIC_STUDIO_DEMO_ENABLED` is `"true"`
+ */
+export async function isStudioDemoEnabled(): Promise<boolean> {
+  return checkFlag(
+    "studio_demo_enabled",
+    isStudioDemoEnabledSync() ? "true" : undefined,
+  );
+}
+
+/**
+ * Check whether browser-side WebMCP registration is enabled.
+ * Use in server components and API routes.
+ *
+ * @returns `true` if the `webmcp_enabled` flag is on in DB or `NEXT_PUBLIC_WEBMCP_ENABLED` is `"true"`
+ */
+export async function isWebmcpEnabled(): Promise<boolean> {
+  return checkFlag(
+    "webmcp_enabled",
+    isWebmcpEnabledSync() ? "true" : undefined,
   );
 }
 

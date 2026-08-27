@@ -22,6 +22,7 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => false),
+  isWebmcpEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
   // Platform flags default to enabled so the status-fetch + link/unlink tests
   // exercise the network path (#885 gates fetches behind these flags).

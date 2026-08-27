@@ -7,10 +7,12 @@ import {
   isGitlabEnabledSync,
   isInsightsEnabledSync,
   isStudioEnabledSync,
+  isWebmcpEnabledSync,
 } from "@/lib/feature-flags-sync";
 
 interface ClientFeatureFlags {
   studioEnabled: boolean;
+  webmcpEnabled: boolean;
   insightsEnabled: boolean;
   bitbucketEnabled: boolean;
   codebergEnabled: boolean;
@@ -39,6 +41,7 @@ export function useClientFeatureFlags(): ClientFeatureFlags {
 
   return {
     studioEnabled: isStudioEnabledSync(),
+    webmcpEnabled: isWebmcpEnabledSync(),
     insightsEnabled: isInsightsEnabledSync(),
     bitbucketEnabled: isBitbucketEnabledSync(),
     codebergEnabled: isCodebergEnabledSync(),

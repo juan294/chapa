@@ -25,6 +25,7 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => false),
+  isWebmcpEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
   // Platform flags default to enabled so existing status-fetch tests behave as
   // before; the gating test (#885) overrides these to false.

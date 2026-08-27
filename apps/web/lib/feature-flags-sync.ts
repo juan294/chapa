@@ -6,10 +6,12 @@
 
 import {
   getStudioEnabledEnv,
+  getStudioDemoEnabledEnv,
   getBitbucketEnabledEnv,
   getCodebergEnabledEnv,
   getGitlabEnabledEnv,
   getInsightsEnabledEnv,
+  getWebmcpEnabledEnv,
 } from "@/lib/env";
 
 /**
@@ -20,6 +22,26 @@ import {
  */
 export function isStudioEnabledSync(): boolean {
   return getStudioEnabledEnv() === "true";
+}
+
+/**
+ * Synchronously check whether anonymous Studio demo mode is enabled.
+ * Server route gates should use the async DB-backed helper.
+ *
+ * @returns `true` if `NEXT_PUBLIC_STUDIO_DEMO_ENABLED` is `"true"`
+ */
+export function isStudioDemoEnabledSync(): boolean {
+  return getStudioDemoEnabledEnv() === "true";
+}
+
+/**
+ * Synchronously check whether browser-side WebMCP registration is enabled.
+ * Client navigation should prefer `useClientFeatureFlags()`.
+ *
+ * @returns `true` if `NEXT_PUBLIC_WEBMCP_ENABLED` is `"true"`
+ */
+export function isWebmcpEnabledSync(): boolean {
+  return getWebmcpEnabledEnv() === "true";
 }
 
 /**

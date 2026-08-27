@@ -1,17 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { messageFromReason } from "@/lib/analytics/error-message";
 import { trackEvent } from "@/lib/analytics/posthog";
-
-function messageFromReason(reason: unknown): string {
-  if (reason instanceof Error) return reason.message;
-  if (typeof reason === "string") return reason;
-  try {
-    return JSON.stringify(reason);
-  } catch {
-    return String(reason);
-  }
-}
 
 export function ClientErrorReporter() {
   useEffect(() => {
