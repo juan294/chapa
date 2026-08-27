@@ -52,6 +52,16 @@ const flagCache = new Map<string, { value: boolean; expiresAt: number }>();
 // the root layout) into dynamic rendering. Without this, every page that
 // inherits the layout — including ISR-eligible pages like /about and
 // /archetypes/* — gets server-rendered on each request.
+// Matches the `revalidate = 3600` declared by the nine `/[locale]/*` content
+// pages that read flags via the root layout on every render. A SHORTER
+// value here than the page's own declared revalidate lets Next clamp each
+// page's effective ISR window to whichever value this data-cache dependency
+// happened to register on a given build worker — nondeterministic per
+// route/locale for identical source (#1178 / PE-M3). Keep these in sync.
+// Staleness is still bounded independently by the in-process `flagCache`
+// Map's 5-minute TTL below (the ONLY bound on a warm serverless instance
+// that never observes `revalidateTag`) and by `revalidateTag` on every
+// admin flag mutation (`apps/web/app/api/admin/feature-flags/route.ts`).
 const fetchFlagFromDbCached = unstable_cache(
   (key: string) =>
     withTimeout(
@@ -60,7 +70,7 @@ const fetchFlagFromDbCached = unstable_cache(
       `featureFlag:${key}`,
     ).catch(() => null),
   ["feature-flag-v1"],
-  { revalidate: 300, tags: [FEATURE_FLAG_CACHE_TAG] },
+  { revalidate: 3600, tags: [FEATURE_FLAG_CACHE_TAG] },
 );
 
 async function checkFlag(
