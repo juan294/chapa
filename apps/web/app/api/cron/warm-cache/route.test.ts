@@ -26,6 +26,7 @@ const {
   mockGetPublicProfileVerification,
   mockBuildBadgeSvgCacheKey,
   mockWriteBadgeSvgCache,
+  mockReadBadgeSvgCache,
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
@@ -50,6 +51,7 @@ const {
   mockGetPublicProfileVerification: vi.fn(),
   mockBuildBadgeSvgCacheKey: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
+  mockReadBadgeSvgCache: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cron", () => ({
@@ -117,6 +119,7 @@ vi.mock("@/lib/render/badge-svg-cache", () => ({
   AVATAR_ABSENT_CACHE_TTL_SECONDS: 900,
   buildBadgeSvgCacheKey: (...args: unknown[]) => mockBuildBadgeSvgCacheKey(...args),
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+  readBadgeSvgCache: (...args: unknown[]) => mockReadBadgeSvgCache(...args),
 }));
 
 vi.mock("@/lib/analytics/server-errors", () => ({
@@ -204,6 +207,9 @@ describe("GET /api/cron/warm-cache", () => {
       (handle: string, date: string) => `badge:v1:${handle}:warm-amber-v3:${date}`,
     );
     mockWriteBadgeSvgCache.mockResolvedValue(true);
+    // Default: no pre-existing badge SVG cache entry for today's key, so the
+    // existing render/write assertions below keep passing unchanged.
+    mockReadBadgeSvgCache.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -730,6 +736,121 @@ describe("GET /api/cron/warm-cache", () => {
       expect(res.status).toBe(200);
       expect(body.warmed).toBe(2);
       expect(body.failed).toBe(0);
+    });
+  });
+
+  // #1177 (PE-M2): the cron previously re-rendered and re-wrote the badge SVG
+  // cache on every hourly run even when the stats TTL (6h) guarantees the SVG
+  // is byte-identical to what's already cached — ~83% redundant renders and
+  // Redis writes. warmHandle now reads today's cache key first and skips the
+  // avatar resolve + render + write entirely when it's already populated.
+  //
+  // Critical invariant verified before landing this: a mid-day score change
+  // (EMU supplemental upload via /api/supplemental, a platform connect via
+  // lib/auth/platform-oauth.ts, or /api/recalculate) already deletes the
+  // exact same date-scoped badge SVG key through invalidateProfileReadModels
+  // / invalidatePlatformReadModels — so the skip below only ever short-
+  // circuits a genuinely-unchanged render, never a stale one.
+  describe("read-before-write skip (#1177 / PE-M2)", () => {
+    it("skips the avatar resolve, render, and cache write when today's badge SVG cache key is already populated", async () => {
+      mockReadBadgeSvgCache.mockResolvedValue("<svg>already cached</svg>");
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
+
+    it("still renders and writes the badge SVG when today's cache key is empty — the first request after UTC rollover must still get a warm cache", async () => {
+      // The date-scoped key means a new UTC day naturally produces a cache
+      // miss (null) even though yesterday's key still holds a value — the
+      // route never reads yesterday's key, only buildBadgeSvgCacheKey(handle,
+      // today), so this is the realistic rollover case (#1089 already solved
+      // the underlying gap; this test guards that the #1177 skip doesn't
+      // reintroduce it).
+      mockReadBadgeSvgCache.mockResolvedValue(null);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledTimes(2);
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledTimes(2);
+    });
+
+    it("checks the cache under the same date-scoped key writeBadgeSvgCache would use", async () => {
+      await GET(makeRequest());
+
+      expect(mockReadBadgeSvgCache).toHaveBeenCalledWith(
+        expect.stringContaining("alice"),
+      );
+      expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
+        "alice",
+        expect.any(String),
+      );
+    });
+
+    it("does not let a badge SVG cache-read failure skip the warm (falls through to render/write)", async () => {
+      mockReadBadgeSvgCache.mockRejectedValue(new Error("redis read boom"));
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(body.failed).toBe(0);
+    });
+  });
+
+  // #1177 (PE-L3): resolveBadgeAvatar was called with no options.deadlineMs,
+  // so a slow avatar CDN could add up to the ~2000ms internal fetch-abort
+  // bound per handle across BATCH_SIZE-concurrent handles, eating into the
+  // 270s time budget that governs rotation coverage. An explicit deadline
+  // (looser than the user-facing request paths' 1000ms/250ms since cron
+  // latency isn't user-facing) bounds this per-handle cost independently of
+  // that internal abort.
+  describe("avatar resolve deadline (#1177 / PE-L3)", () => {
+    it("does not block the run past the explicit warm-cache avatar deadline when the avatar fetch stalls", async () => {
+      vi.useFakeTimers();
+      mockGetAvatarBase64.mockImplementation(
+        () => new Promise<string | undefined>(() => undefined),
+      );
+
+      try {
+        const responsePromise = GET(makeRequest());
+
+        // 1500ms is comfortably below the 2000ms internal getAvatarBase64
+        // abort this test bypasses by mocking it out — if warmHandle relied
+        // on that internal bound alone (no explicit deadlineMs), advancing
+        // only 1500ms would never settle this promise.
+        await vi.advanceTimersByTimeAsync(1500);
+        const res = await responsePromise;
+        const body = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(body.warmed).toBe(2);
+        // Timeout maps to the "skip" avatar cache policy — no SVG published
+        // for this handle this run, consistent with the request-path gates.
+        expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("still writes the badge SVG cache when the avatar resolves comfortably within the deadline", async () => {
+      mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc");
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalledTimes(2);
     });
   });
 
