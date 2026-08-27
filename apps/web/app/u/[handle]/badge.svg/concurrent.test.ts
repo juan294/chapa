@@ -185,4 +185,60 @@ describe("GET /u/[handle]/badge.svg — cold-cache concurrency", () => {
     expect(await res2.text()).toBe(FAKE_SVG);
     expect(mockRenderBadgeSvg).toHaveBeenCalledTimes(1);
   });
+
+  // #1166 (BE-M1) — `readOnly` (the public `__chapa_smoke=1` probe) previously
+  // was not part of the in-memory `inflightBadgeRenders` coalescing key, so a
+  // concurrent smoke probe and a real visitor request for the same handle
+  // could share one render — handing the probe's avatar-less, uncached render
+  // to a real visitor, or vice versa. Anyone can append the query param.
+  it("does not coalesce a concurrent readOnly (smoke) request with a concurrent normal request for the same handle", async () => {
+    let resolveMaterialized!: () => void;
+    const materializedGate = new Promise<void>((resolve) => {
+      resolveMaterialized = resolve;
+    });
+
+    mockMaterializePublicProfile.mockImplementation(
+      async (_handle: string, options: { readOnly: boolean }) => {
+        await materializedGate;
+        return options.readOnly
+          ? { ...FAKE_MATERIALIZED, stats: { ...FAKE_MATERIALIZED.stats, handle: "ro" } }
+          : FAKE_MATERIALIZED;
+      },
+    );
+    mockRenderBadgeSvg.mockImplementation(
+      (_stats: unknown, _impact: unknown, opts: { avatarDataUri?: string }) =>
+        opts.avatarDataUri ? FAKE_SVG : '<svg xmlns="http://www.w3.org/2000/svg">SMOKE</svg>',
+    );
+    mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+    mockCacheGet.mockResolvedValue(null);
+
+    const [reqNormal, ctxNormal] = makeRequest("testuser");
+    const [reqSmoke, ctxSmoke] = [
+      new NextRequest(
+        "https://chapa.thecreativetoken.com/u/testuser/badge.svg?__chapa_smoke=1",
+      ),
+      { params: Promise.resolve({ handle: "testuser" }) },
+    ] as [NextRequest, { params: Promise<{ handle: string }> }];
+
+    const normal = GET(reqNormal, ctxNormal);
+    const smoke = GET(reqSmoke, ctxSmoke);
+
+    await Promise.resolve();
+    resolveMaterialized();
+
+    const [resNormal, resSmoke] = await Promise.all([normal, smoke]);
+
+    expect(resNormal.status).toBe(200);
+    expect(resSmoke.status).toBe(200);
+    // Not coalesced: each request got its own materialize + render call, with
+    // the readOnly branch skipping the avatar fetch and producing a distinct
+    // body from the normal branch.
+    expect(mockMaterializePublicProfile).toHaveBeenCalledTimes(2);
+    expect(mockRenderBadgeSvg).toHaveBeenCalledTimes(2);
+    expect(mockGetAvatarBase64).toHaveBeenCalledTimes(1);
+    expect(await resNormal.text()).toBe(FAKE_SVG);
+    expect(await resSmoke.text()).toBe(
+      '<svg xmlns="http://www.w3.org/2000/svg">SMOKE</svg>',
+    );
+  });
 });
