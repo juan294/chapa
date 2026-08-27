@@ -301,7 +301,7 @@ export function useStudioWebMcpTools({
         annotations: readOnly,
         execute: () => JSON.stringify(generateInsights(impact, null, null, t)),
       },
-      createExplainDimensionTool({ impact, stats, craftResult, t }),
+      createExplainDimensionTool({ impact, stats, craftResult, t, annotations: readOnly }),
     ];
   }, [
     config,

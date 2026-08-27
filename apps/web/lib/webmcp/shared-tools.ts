@@ -11,7 +11,7 @@ import {
 import type { DimensionKey } from "@/lib/dashboard/dimension-sub-metrics";
 import type { LanguageContextValue } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
-import type { WebMcpTool } from "./use-model-context-tools";
+import type { WebMcpTool, WebMcpToolAnnotations } from "./use-model-context-tools";
 
 type Translate = LanguageContextValue["t"];
 
@@ -20,6 +20,41 @@ interface ExplainDimensionToolOptions {
   stats: StatsData;
   craftResult?: CraftResult | null;
   t: Translate;
+  /**
+   * No default on purpose: the caller must state whether the page it's
+   * rendering on shows trusted (Studio) or untrusted (public share page)
+   * data. Defaulting would recreate the silent-classification bug this
+   * option exists to prevent (#1171 / SE-L3 / BE-L3).
+   */
+  annotations: WebMcpToolAnnotations;
+}
+
+/** GitHub's own limit on the profile `name` field. */
+const MAX_AGENT_FREE_TEXT_LENGTH = 255;
+
+/**
+ * Bound and neutralise free text before it crosses into a visitor's browser
+ * AI agent context via a WebMCP tool result (#1171 / SE-M2). Strips ASCII
+ * control characters -- including newlines, which could otherwise be used to
+ * fake structure inside an otherwise-plain-text agent payload -- then caps
+ * length.
+ *
+ * This is a projection for the WebMCP tool boundary ONLY. It must never be
+ * applied to the SVG render path or the share-page HTML render path, which
+ * correctly show the full, untruncated text (mirrors the `impactForClient`
+ * confidence-redaction pattern at `app/u/[handle]/page.tsx`, which is also
+ * scoped to the client/tool boundary and never touches the render paths).
+ */
+export function sanitizeFreeTextForAgent(
+  value: string | undefined,
+  maxLength: number = MAX_AGENT_FREE_TEXT_LENGTH,
+): string | undefined {
+  if (value === undefined) return undefined;
+  const stripped = value
+    // Deliberately matching ASCII control chars (incl. newlines).
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    .trim();
+  return stripped.length > maxLength ? stripped.slice(0, maxLength) : stripped;
 }
 
 export const WEBMCP_EMPTY_INPUT_SCHEMA = {
@@ -60,6 +95,7 @@ export function createExplainDimensionTool({
   stats,
   craftResult = null,
   t,
+  annotations,
 }: ExplainDimensionToolOptions): WebMcpTool {
   const text = (key: string) => t(key) as string;
 
@@ -67,7 +103,7 @@ export function createExplainDimensionTool({
     name: "explain_dimension",
     description: "Explain one impact dimension using the current profile and activity.",
     inputSchema: EXPLAIN_DIMENSION_INPUT_SCHEMA,
-    annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
+    annotations,
     execute: (inputs) => {
       const dimension = isWebMcpRecord(inputs) ? inputs.dimension : undefined;
       if (
