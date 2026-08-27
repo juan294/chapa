@@ -202,11 +202,24 @@ export async function SharePageContent({
   //
   // Session and flag resolution have no data dependency on the profile or
   // trend fetches, so all four run concurrently.
-  const [session, materialized, trendData, webmcpEnabled] = await Promise.all([
+  //
+  // #1180 (PE-L1) — the shared SVG cache read (#720 below) depends on
+  // nothing in this wave: only `handle` and today's date, both known here
+  // already. It used to run as a strictly later `await` step after this
+  // Promise.all resolved, serializing a Redis round-trip behind the whole
+  // wave for no reason. `today`/`svgCacheKey` are computed HERE (not after
+  // the wave) and reused verbatim by the later `writeBadgeSvgCache` call
+  // below — computing the date once and reusing it (rather than recomputing
+  // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
+  // race where a request could read one day's key and write another.
+  const today = toDateString(new Date());
+  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  const [session, materialized, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
     materializePublicProfile(handle, { readOnly }),
     getTrendData(handle).catch(() => ({ trend: null, diff: null })),
     isWebmcpEnabled(),
+    readBadgeSvgCache(svgCacheKey),
   ]);
   const isOwner = session?.login === handle;
   const stats = materialized?.stats ?? null;
@@ -221,13 +234,10 @@ export async function SharePageContent({
     ? getPublicProfileVerification(materialized)
     : null;
 
-  // #720 — try the shared SVG cache first. The /u/[handle]/badge.svg route
-  // writes here after every successful render, so on warm caches the share
-  // page can skip avatar fetch + render entirely.
-  const today = toDateString(new Date());
-  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
-  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
-
+  // #720 — try the shared SVG cache first (read kicked off above, alongside
+  // the rest of the wave). The /u/[handle]/badge.svg route writes here after
+  // every successful render, so on warm caches the share page can skip
+  // avatar fetch + render entirely.
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
   let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";

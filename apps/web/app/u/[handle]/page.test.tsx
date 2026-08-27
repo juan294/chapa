@@ -17,6 +17,7 @@ const {
   mockGetOptionalServerSessionFromHeaders,
   mockWriteBadgeSvgCache,
   mockCaptureServerError,
+  mockCacheGet,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -34,6 +35,7 @@ const {
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockCacheGet: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -95,6 +97,18 @@ vi.mock("@/lib/render/badge-svg-cache", async (importOriginal) => {
   return {
     ...actual,
     writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
+  };
+});
+
+// #1180 (PE-L1) — readBadgeSvgCache (kept real above) calls through to this
+// module's cacheGet. Mocked here (rather than left to the real no-credentials
+// no-op) so tests can control exactly when the read resolves and assert it is
+// kicked off concurrently with materialize/trend/flags, not strictly after.
+vi.mock("@/lib/cache/redis", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/cache/redis")>();
+  return {
+    ...actual,
+    cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   };
 });
 
@@ -247,6 +261,7 @@ describe("SharePage /u/[handle]", () => {
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockWriteBadgeSvgCache.mockResolvedValue(true);
+    mockCacheGet.mockResolvedValue(null);
     mockGetServerLocale.mockResolvedValue("en");
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
     mockHeaders.mockResolvedValue({ get: () => null });
@@ -592,6 +607,60 @@ describe("SharePage /u/[handle]", () => {
       expect(mockCaptureServerError).toHaveBeenCalledWith(
         expect.objectContaining({ error: writeError }),
       );
+    });
+  });
+
+  // #1180 (PE-L1) — the shared badge SVG cache read depends on nothing in
+  // the session/materialize/trend/flags wave (only `handle` and today's
+  // date, both known at entry). It must be kicked off concurrently with
+  // that wave, not strictly after it resolves.
+  describe("SVG cache read parallelized with materialize/trend/flags (#1180 PE-L1)", () => {
+    it("starts the badge SVG cache read without waiting for materializePublicProfile to resolve", async () => {
+      let resolveMaterialize!: (value: typeof FAKE_MATERIALIZED) => void;
+      mockMaterializePublicProfile.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveMaterialize = resolve;
+          }),
+      );
+
+      const contentPromise = SharePageContent({ handle: "testuser" });
+
+      // Flush pending microtasks WITHOUT resolving materializePublicProfile.
+      // If the cache read were still gated behind `await Promise.all([...])`
+      // (the pre-fix ordering), it could not have been invoked yet because
+      // that Promise.all can't settle until materialize does.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockCacheGet).toHaveBeenCalled();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+
+      resolveMaterialize(FAKE_MATERIALIZED);
+      await contentPromise;
+    });
+
+    it("still uses the resolved cached SVG (or falls through to a fresh render) once both settle", async () => {
+      mockCacheGet.mockResolvedValue(FAKE_SVG);
+
+      await renderPage();
+
+      // A cache hit means no fresh render/avatar work was needed.
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+    });
+
+    it("computes one `today` value reused for both the cache read key and the later cache write key", async () => {
+      await renderPage();
+
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      const writeKey = mockWriteBadgeSvgCache.mock.calls[0]![0] as string;
+      expect(writeKey).toBe(readKey);
     });
   });
 
