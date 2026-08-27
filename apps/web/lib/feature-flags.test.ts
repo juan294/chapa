@@ -6,12 +6,16 @@ vi.mock("./db/feature-flags", () => ({
 }));
 
 // `unstable_cache` requires a Next.js incremental cache that doesn't exist in
-// vitest. Pass-through so the wrapped function still calls the mocked DB.
+// vitest. Pass-through (via a spy so call args are inspectable) so the
+// wrapped function still calls the mocked DB.
 vi.mock("next/cache", () => ({
-  unstable_cache: <Args extends unknown[], R>(fn: (...args: Args) => R) => fn,
+  unstable_cache: vi.fn(
+    <Args extends unknown[], R>(fn: (...args: Args) => R) => fn,
+  ),
   revalidateTag: vi.fn(),
 }));
 
+import { unstable_cache } from "next/cache";
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import {
   isStudioEnabled,
@@ -49,6 +53,29 @@ function makeFlag(key: string, enabled: boolean) {
     updatedAt: "",
   };
 }
+
+// ---------------------------------------------------------------------------
+// unstable_cache revalidate configuration (#1178 / PE-M3)
+//
+// The nine `/[locale]/*` content pages declare `export const revalidate =
+// 3600` and read flags via the root layout on every render. If the
+// `unstable_cache` wrapper around `dbGetFeatureFlag` declares a SHORTER
+// revalidate than its page consumers, Next.js clamps each page's effective
+// ISR revalidate to whichever value the data-cache dependency happened to
+// register on that build worker — nondeterministic per route/locale (the
+// same page resolving to 5m for one locale and 1h for the other in the same
+// build, verbatim from a real `pnpm run build`). The two values must match
+// so the page's declared revalidate is what actually governs it.
+// ---------------------------------------------------------------------------
+
+describe("fetchFlagFromDbCached unstable_cache configuration", () => {
+  it("declares the same revalidate window as its page consumers (3600s)", () => {
+    const call = vi.mocked(unstable_cache).mock.calls[0];
+    expect(call).toBeDefined();
+    const options = call?.[2] as { revalidate?: number } | undefined;
+    expect(options?.revalidate).toBe(3600);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // isStudioEnabled
