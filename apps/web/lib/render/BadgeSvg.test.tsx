@@ -847,4 +847,121 @@ describe("renderBadgeSvg", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Locale-aware strings (#1181 UX-H3) — renderBadgeSvg stays a pure,
+  // deterministic function. Locale resolution (getServerT, ?lang=) happens at
+  // the call site (badge.svg route); resolved strings are passed in via the
+  // `strings` option. Omitting `strings` entirely must reproduce the exact
+  // current English output (backward compatible with every existing caller:
+  // share page, og-image route, warm-cache cron, demo/archetype pages).
+  // ---------------------------------------------------------------------------
+
+  describe("locale-aware strings (#1181)", () => {
+    it("defaults to English metrics/tier/radar/verification text when no strings option is given", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "High" }), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+      });
+      expect(svg).toContain("Verified metrics");
+      expect(svg).toContain(">High<");
+      expect(svg).toContain(">Delivery<");
+      expect(svg).toContain(">Quality<");
+      expect(svg).toContain(">Consistency<");
+      expect(svg).toContain(">Breadth<");
+    });
+
+    it("uses translated metrics label (public) when strings option is provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        strings: { metricsPublic: "Métricas públicas" },
+      });
+      expect(svg).toContain("Métricas públicas");
+      expect(svg).not.toContain("Public metrics");
+    });
+
+    it("uses translated metrics label (verified) when strings option is provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+        strings: { metricsVerified: "Métricas verificadas" },
+      });
+      expect(svg).toContain("Métricas verificadas");
+      expect(svg).not.toContain("Verified metrics");
+    });
+
+    it("uses translated metrics label (simulated/demo) when strings option is provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        demoMode: true,
+        strings: { metricsSimulated: "Métricas simuladas" },
+      });
+      expect(svg).toContain("Métricas simuladas");
+      expect(svg).not.toContain("Simulated metrics");
+    });
+
+    it("uses a translated tier label when provided, without altering the raw archetype", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ archetype: "Builder", tier: "Solid" }),
+        { strings: { tierLabel: "Sólido" } },
+      );
+      expect(svg).toContain(">Sólido<");
+      expect(svg).not.toContain(">Solid<");
+      // Archetype names are deliberately untranslated brand terms.
+      expect(svg).toContain("Builder");
+    });
+
+    it("uses translated radar dimension labels when provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        strings: {
+          radarLabels: {
+            delivery: "Entrega",
+            quality: "Calidad",
+            consistency: "Constancia",
+            breadth: "Alcance",
+            craft: "Oficio",
+          },
+        },
+      });
+      expect(svg).toContain(">Entrega<");
+      expect(svg).toContain(">Calidad<");
+      expect(svg).toContain(">Constancia<");
+      expect(svg).toContain(">Alcance<");
+      expect(svg).not.toContain(">Delivery<");
+    });
+
+    it("uses translated radar empty-state text when provided", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 } }),
+        { strings: { radarNoData: "aún sin datos" } },
+      );
+      expect(svg).toContain(">aún sin datos<");
+      expect(svg).not.toContain(">no data yet<");
+    });
+
+    it("uses a translated verified strip label when provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        verificationHash: "abc12345",
+        verificationDate: "2026-08-10",
+        strings: { verifiedLabel: "VERIFICADO" },
+      });
+      expect(svg).toContain("VERIFICADO");
+    });
+
+    it("uses a translated sample disclosure when provided (demo mode)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        demoMode: true,
+        strings: { sampleDisclosure: "MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN" },
+      });
+      expect(svg).toContain("MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN");
+    });
+
+    it("still escapes the translated tier label (XSS boundary preserved)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        strings: { tierLabel: '"onload="alert(1)' },
+      });
+      expect(svg).not.toContain('"onload=');
+      expect(svg).toContain("&quot;onload=");
+    });
+  });
+
 });

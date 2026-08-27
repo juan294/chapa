@@ -60,6 +60,17 @@ export interface RadarAxis {
   angle: number;
 }
 
+/** Locale-resolved dimension labels, keyed the same as `DimensionScores`. */
+export type DimensionLabels = Record<keyof DimensionScores, string>;
+
+const DEFAULT_DIMENSION_LABELS: DimensionLabels = {
+  delivery: "Delivery",
+  quality: "Quality",
+  consistency: "Consistency",
+  breadth: "Breadth",
+  craft: "Craft",
+};
+
 /**
  * Radar axis layout: a 5-axis pentagon (72° spacing) when Craft is present,
  * a 4-axis diamond (90° spacing) otherwise — full label strings only, never
@@ -74,22 +85,28 @@ export interface RadarAxis {
  * which this component's ownership boundary doesn't include — see the
  * angle/label values there if the two ever need to be reconciled into one
  * shared module.
+ *
+ * @param labels - Locale-resolved dimension labels (#1181 UX-H3). Defaults to
+ *   English so existing non-translated callers are unaffected.
  */
-export function getRadarAxes(dimensions: DimensionScores): RadarAxis[] {
+export function getRadarAxes(
+  dimensions: DimensionScores,
+  labels: DimensionLabels = DEFAULT_DIMENSION_LABELS,
+): RadarAxis[] {
   const hasCraft = dimensions.craft != null;
   return hasCraft
     ? [
-        { key: "delivery", label: "Delivery", angle: -Math.PI / 2 },
-        { key: "quality", label: "Quality", angle: -Math.PI / 2 + (2 * Math.PI) / 5 },
-        { key: "consistency", label: "Consistency", angle: -Math.PI / 2 + (4 * Math.PI) / 5 },
-        { key: "breadth", label: "Breadth", angle: -Math.PI / 2 + (6 * Math.PI) / 5 },
-        { key: "craft", label: "Craft", angle: -Math.PI / 2 + (8 * Math.PI) / 5 },
+        { key: "delivery", label: labels.delivery, angle: -Math.PI / 2 },
+        { key: "quality", label: labels.quality, angle: -Math.PI / 2 + (2 * Math.PI) / 5 },
+        { key: "consistency", label: labels.consistency, angle: -Math.PI / 2 + (4 * Math.PI) / 5 },
+        { key: "breadth", label: labels.breadth, angle: -Math.PI / 2 + (6 * Math.PI) / 5 },
+        { key: "craft", label: labels.craft, angle: -Math.PI / 2 + (8 * Math.PI) / 5 },
       ]
     : [
-        { key: "delivery", label: "Delivery", angle: -Math.PI / 2 },
-        { key: "quality", label: "Quality", angle: 0 },
-        { key: "consistency", label: "Consistency", angle: Math.PI / 2 },
-        { key: "breadth", label: "Breadth", angle: Math.PI },
+        { key: "delivery", label: labels.delivery, angle: -Math.PI / 2 },
+        { key: "quality", label: labels.quality, angle: 0 },
+        { key: "consistency", label: labels.consistency, angle: Math.PI / 2 },
+        { key: "breadth", label: labels.breadth, angle: Math.PI },
       ];
 }
 
@@ -173,6 +190,16 @@ export function BadgeContent({
 }: BadgeContentProps) {
   const { t } = useTranslation();
   const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: stats.handle });
+  // #1181 (UX-H3) — reused for both the radar axis labels and the dimension
+  // stat cards below, so the two stay consistent with each other and with
+  // the shipped SVG badge's own `dimensions.*.label` translations.
+  const dimensionLabels: DimensionLabels = {
+    delivery: t('dimensions.delivery.label') as string,
+    quality: t('dimensions.quality.label') as string,
+    consistency: t('dimensions.consistency.label') as string,
+    breadth: t('dimensions.breadth.label') as string,
+    craft: t('dimensions.craft.label') as string,
+  };
   const statsRef = useRef<HTMLDivElement>(null);
   const statsInView = useInView(statsRef);
   void statsInView;
@@ -238,7 +265,7 @@ export function BadgeContent({
             <div className="relative w-[140px] h-[140px]">
               <svg viewBox="0 0 140 140" className="absolute inset-0 w-full h-full" aria-hidden="true">
                 {(() => {
-                  const axes = getRadarAxes(impact.dimensions);
+                  const axes = getRadarAxes(impact.dimensions, dimensionLabels);
                   const cx = RADAR_CENTER;
                   const cy = RADAR_CENTER;
                   const radius = RADAR_RADIUS;
@@ -314,7 +341,7 @@ export function BadgeContent({
                             key={a.key}
                             x={x + dx}
                             y={y + dy}
-                            fontSize="9"
+                            fontSize="10"
                             fill="var(--color-text-secondary)"
                             textAnchor={anchor}
                             className="font-body"
@@ -364,22 +391,22 @@ export function BadgeContent({
       <div className="mt-5 grid grid-cols-4 gap-3">
         <AnimatedStatCard
           value={impact.dimensions.delivery}
-          label="Delivery"
+          label={dimensionLabels.delivery}
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard
           value={impact.dimensions.quality}
-          label="Quality"
+          label={dimensionLabels.quality}
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard
           value={impact.dimensions.consistency}
-          label="Consistency"
+          label={dimensionLabels.consistency}
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard
           value={impact.dimensions.breadth}
-          label="Breadth"
+          label={dimensionLabels.breadth}
           statsDisplay={statsDisplay}
         />
       </div>

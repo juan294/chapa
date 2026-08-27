@@ -27,10 +27,30 @@ beforeEach(() => {
 
 describe("badge-svg-cache", () => {
   describe("buildBadgeSvgCacheKey", () => {
-    it("includes the badge renderer version so visual changes bypass stale SVGs", () => {
+    // #1181 (UX-H3) — the key now carries a locale segment so an es-rendered
+    // and an en-rendered badge for the same handle/day never collide. The
+    // locale param defaults to DEFAULT_LOCALE ('es') so every out-of-scope
+    // caller that still passes only (handle, date) — the share page,
+    // warm-cache cron, platform-oauth invalidation, post-write-invalidation —
+    // keeps compiling and lands on the same slot the badge.svg route uses
+    // for an unqualified (no ?lang=) request.
+    it("includes the badge renderer version and locale so visual/locale changes bypass stale SVGs", () => {
       const key = buildBadgeSvgCacheKey("Octocat", "2026-05-01");
       expect(BADGE_RENDER_VARIANT).toBe("warm-amber-v3");
-      expect(key).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01`);
+      expect(key).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:es`);
+    });
+
+    it("defaults the locale segment to DEFAULT_LOCALE (es) when omitted", () => {
+      expect(buildBadgeSvgCacheKey("octocat", "2026-05-01")).toBe(
+        buildBadgeSvgCacheKey("octocat", "2026-05-01", "es"),
+      );
+    });
+
+    it("produces a distinct key per locale for the same handle/day", () => {
+      const es = buildBadgeSvgCacheKey("octocat", "2026-05-01", "es");
+      const en = buildBadgeSvgCacheKey("octocat", "2026-05-01", "en");
+      expect(es).not.toBe(en);
+      expect(en).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:en`);
     });
 
     it("lowercases the handle so case variants share a cache slot", () => {
@@ -39,9 +59,12 @@ describe("badge-svg-cache", () => {
       expect(a).toBe(b);
     });
 
-    it("uses the same identity for the cross-instance render lock", () => {
+    it("uses the same identity for the cross-instance render lock, including locale", () => {
       expect(buildBadgeSvgRenderLockKey("Octocat", "2026-05-01")).toBe(
-        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01`,
+        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:es`,
+      );
+      expect(buildBadgeSvgRenderLockKey("Octocat", "2026-05-01", "en")).toBe(
+        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:en`,
       );
     });
   });

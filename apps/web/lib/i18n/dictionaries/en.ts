@@ -394,6 +394,23 @@ export const en: Translations = {
     craft: 'CRAFT',
     github: 'GITHUB',
   },
+  // #1181 (UX-H3) — strings rendered directly onto the embeddable badge SVG
+  // (apps/web/lib/render/BadgeSvg.tsx, RadarChart.ts, VerificationStrip.ts)
+  // via the `/u/[handle]/badge.svg` route. Dimension and tier labels reuse
+  // the existing `dimensions.*.label` / `tiers.*` keys below instead of
+  // duplicating them here.
+  badge: {
+    metricsSimulated: 'Simulated metrics',
+    metricsVerified: 'Verified metrics',
+    metricsPublic: 'Public metrics',
+    radarNoData: 'no data yet',
+    verifiedLabel: 'VERIFIED',
+    sampleDisclosure: 'SAMPLE · NOT A REAL BADGE · FOR ILLUSTRATION ONLY',
+    invalidHandle: 'Invalid GitHub handle.',
+    loadError: 'Could not load data. Try again later.',
+    renderError: 'Something went wrong. Try again later.',
+    tagline: 'Developer Impact Badge',
+  },
   archetypes: {
     dominantDimensionLabel: 'Dominant dimension:',
     builder: {

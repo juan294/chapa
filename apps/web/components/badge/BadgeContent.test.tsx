@@ -399,6 +399,22 @@ describe("BadgeContent — render-based", () => {
       expect(screen.getAllByText("Consistency").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("Breadth").length).toBeGreaterThanOrEqual(1);
     });
+
+    // #1181 (UX-H3) — dimension stat card labels reuse the same words as the
+    // radar axis labels; keep both translated consistently.
+    it("renders translated dimension stat card labels under a Spanish LanguageProvider", async () => {
+      const { LanguageProvider } = await import("@/lib/i18n");
+      const { es } = await import("@/lib/i18n/dictionaries/es");
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <BadgeContent stats={makeStats()} impact={makeImpact()} />
+        </LanguageProvider>,
+      );
+      expect(screen.getAllByText("Entrega").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Calidad").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Constancia").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Alcance").length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   describe("stats display animation (statsDisplay prop)", () => {
@@ -549,6 +565,41 @@ describe("BadgeContent — render-based", () => {
         (el) => el.textContent,
       );
       expect(labels).toEqual(["Delivery", "Quality", "Consistency", "Breadth"]);
+    });
+
+    // UX-L1 (#1181, partial) — radar labels were text-[9px] (well below the
+    // 4:1 minimum-legible-size guidance for small UI text). Bumped to 10px;
+    // verified this doesn't push text into the data polygon since the label
+    // position (radius 55 + 20px offset = 75 from center) leaves a 20px gap
+    // from the polygon's own max radius (55) — a 1px font bump doesn't close it.
+    it("renders radar axis labels at 10px or larger (was 9px)", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const svg = container.querySelector('svg[viewBox="0 0 140 140"]');
+      const labelTexts = Array.from(svg!.querySelectorAll("text"));
+      expect(labelTexts.length).toBeGreaterThan(0);
+      for (const el of labelTexts) {
+        expect(Number(el.getAttribute("font-size"))).toBeGreaterThanOrEqual(10);
+      }
+    });
+
+    // #1181 (UX-H3) — RadarChart.ts (the shipped SVG badge) now renders
+    // locale-resolved dimension labels; the Studio preview must stay
+    // consistent rather than silently diverging into English-only.
+    it("renders translated radar axis labels under a Spanish LanguageProvider", async () => {
+      const { LanguageProvider } = await import("@/lib/i18n");
+      const { es } = await import("@/lib/i18n/dictionaries/es");
+      const { container } = render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <BadgeContent stats={makeStats()} impact={makeImpact()} />
+        </LanguageProvider>,
+      );
+      const svg = container.querySelector('svg[viewBox="0 0 140 140"]');
+      const labels = Array.from(svg!.querySelectorAll("text")).map(
+        (el) => el.textContent,
+      );
+      expect(labels).toEqual(["Entrega", "Calidad", "Constancia", "Alcance"]);
     });
 
     it("renders 5 guide ring polygons' vertices and axis lines matching the pentagon axis count when craft is present", () => {
