@@ -73,4 +73,15 @@ describe("studio error.tsx — render", () => {
       "/",
     );
   });
+
+  it("renders with role=alert and terminal-red styling, never amber/purple", () => {
+    const { container } = render(
+      <LanguageProvider initialLocale="en" dictionary={en}>
+        <StudioError error={makeError()} reset={vi.fn()} />
+      </LanguageProvider>,
+    );
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(container.querySelector(".text-terminal-red")).not.toBeNull();
+    expect(container.innerHTML).not.toContain("amber");
+  });
 });

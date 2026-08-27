@@ -65,4 +65,12 @@ describe("cli/authorize error.tsx render", () => {
     expect(main).toBeDefined();
     expect(main?.tagName).toBe("MAIN");
   });
+
+  it("renders with role=alert and terminal-red styling, never amber", async () => {
+    const { default: ErrorPage } = await import("./error");
+    const { container } = render(<ErrorPage error={new Error("auth failed")} reset={vi.fn()} />);
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(container.querySelector(".text-terminal-red")).not.toBeNull();
+    expect(container.innerHTML).not.toContain("amber");
+  });
 });

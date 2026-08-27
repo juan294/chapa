@@ -20,4 +20,12 @@ describe("experiments ErrorPage render", () => {
     fireEvent.click(screen.getByText("Try again"));
     expect(reset).toHaveBeenCalledTimes(1);
   });
+
+  it("renders with role=alert and terminal-red styling, never amber", () => {
+    const reset = vi.fn();
+    const { container } = render(<ErrorPage error={new Error("boom")} reset={reset} />);
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(container.querySelector(".text-terminal-red")).not.toBeNull();
+    expect(container.innerHTML).not.toContain("amber");
+  });
 });
