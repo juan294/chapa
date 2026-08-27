@@ -55,7 +55,7 @@ Test tooling: Model Context Tool Inspector extension. Feature-detect with
 - [x] Phase 2 — Studio tools and human-gated save
 - [x] Phase 3 — judge demo mode
 - [x] Phase 4 — public read tools
-- [ ] Phase 5 — submission assets
+- [x] Phase 5 — submission assets and gated runbook (manual execution pending Juan approval)
 
 ## Success criteria
 

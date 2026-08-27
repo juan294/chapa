@@ -6,7 +6,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)
 ![Node.js](https://img.shields.io/badge/Node.js-20%2B-43853d)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 Generate a **live, embeddable, animated SVG badge** that showcases your developer impact from GitHub, Bitbucket, Codeberg, and GitLab activity — with multi-dimensional scoring, verification, and one-click sharing.
 
@@ -15,6 +15,36 @@ Generate a **live, embeddable, animated SVG badge** that showcases your develope
 </a>
 
 ---
+
+## WebMCP
+
+Chapa adds a WebMCP layer to the Creator Studio and its public profile and verification pages. Studio tools reuse the existing command registry, so agent actions update the same preview and terminal that the user sees. Saving is always human-gated; in judge demo mode (`/studio?demo=1`), confirmed saves stay local and never write production data. Public profile and verification tools are read-only.
+
+Registration uses the current `document.modelContext.registerTool(tool, { signal })` contract, an `AbortController` for cleanup, feature detection for unsupported clients, and a remote feature-flag kill switch.
+
+See the [WebMCP tool catalog and judge guide](docs/webmcp.md) and the [under-three-minute demo script and submission checklist](docs/webmcp-demo-script.md).
+
+Runtime status, 2026-08-27: a preview-only `chapa_hello` spike passed native registration, discovery, and execution in flagged Chrome 151. The completed tool catalog still needs final production verification after release and flag enablement. The ChatGPT in-app client was unavailable for the spike, so this README does not claim ChatGPT runtime validation.
+
+### Prior work and submission-period work
+
+For this submission, all work through 2026-08-24 is prior work. The badge, scoring engine, share and verification pages, CLI, admin surfaces, and earlier Studio foundation already existed. The released baselines are [v2.22.0](https://github.com/juan294/chapa/releases/tag/v2.22.0) (2026-08-19) and [v2.22.1](https://github.com/juan294/chapa/releases/tag/v2.22.1) (2026-08-23).
+
+Submission-period work started after that cutoff:
+
+- The Creator Studio revival and hardening landed on 2026-08-26 and was released as [v2.23.0](https://github.com/juan294/chapa/releases/tag/v2.23.0).
+- The WebMCP layer runs from [3156fcaa](https://github.com/juan294/chapa/commit/3156fcaab716c0712044b9a6b59233ff28767043) through [699f94b0](https://github.com/juan294/chapa/commit/699f94b000a6fb561f9001c3a54b2b509e6efe5d). The local receipt is `git log --oneline 3156fcaa^..699f94b0`:
+
+```text
+699f94b0 feat(webmcp): add public read tools
+15be8695 feat(studio): add judge demo mode
+57142416 feat(webmcp): add Studio tool catalog
+30f4c750 feat(webmcp): add registration infrastructure
+13bdd871 docs(webmcp): pass Chrome runtime gate
+b338942d test(webmcp): add main-world execution probe
+d7777e47 docs(webmcp): record blocked runtime gate
+3156fcaa feat(webmcp): add runtime spike
+```
 
 ## What It Does
 
@@ -70,7 +100,7 @@ Admin-only dashboard with user management, agent fleet monitoring, feature flags
 
 ### Badge Verification
 
-Every badge includes a 32-character HMAC-SHA256 hash. Anyone can verify a badge is authentic at `/api/verify/:hash` — no tampering possible.
+Badges marked **Verified metrics** include a 32-character HMAC-SHA256 hash. Anyone can look up the original stored verification record at `/api/verify/:hash` and compare its returned fields with the badge. The lookup does not scan or re-sign an SVG.
 
 ## Quick Start
 
@@ -228,4 +258,4 @@ See `.env.example` for the full list with descriptions.
 
 ## License
 
-MIT
+Chapa is available under the [MIT License](LICENSE).
