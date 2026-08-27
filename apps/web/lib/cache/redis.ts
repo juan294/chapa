@@ -267,8 +267,50 @@ export interface QuotaReservationResult {
 }
 
 /**
+ * Atomically increment a fixed-window rate-limit counter and ensure it has
+ * a TTL, in a single Redis round trip.
+ *
+ * **BE-M3 fix**: the previous implementation issued `INCR` then, only when
+ * `current === 1`, a separate `EXPIRE` call. Those were two independent REST
+ * round-trips (`retry: { retries: 0 }`) — if the `EXPIRE` failed or the
+ * request was killed in between, the key was left with a counter and NO
+ * TTL. Because the JS-level guard only ever retries `EXPIRE` when
+ * `current === 1`, that state could never self-correct: the counter would
+ * grow forever and the bucket would never reset (a permanent lockout on
+ * fail-closed routes). This script checks the key's actual TTL server-side
+ * on every call — if it's unset (`-1`), it sets it — so a stranded key
+ * self-heals on the very next request instead of staying broken forever.
+ * Doing this inside one atomic `EVAL` (rather than unconditionally calling
+ * `EXPIRE` after every `INCR`, as `cacheIncr()` does) also preserves exact
+ * fixed-window semantics: a client that keeps polling after tripping the
+ * limit does not keep pushing the window's reset time out, and the
+ * fail-open badge/profile/history routes don't pay for a second round trip
+ * on every request.
+ */
+const RATE_LIMIT_INCR_SCRIPT = `
+local current = redis.call("INCR", KEYS[1])
+if redis.call("TTL", KEYS[1]) == -1 then
+  redis.call("EXPIRE", KEYS[1], ARGV[1])
+end
+return current
+`;
+
+async function incrRateLimitCounter(
+  redis: Redis,
+  key: string,
+  windowSeconds: number,
+): Promise<number> {
+  return redis.eval<[string], number>(
+    RATE_LIMIT_INCR_SCRIPT,
+    [key],
+    [String(windowSeconds)],
+  );
+}
+
+/**
  * Check and increment a rate limit counter.
- * Uses Redis INCR + EXPIRE for a fixed-window counter.
+ * Uses an atomic Redis Lua script (INCR + self-healing TTL) for a
+ * fixed-window counter — see `RATE_LIMIT_INCR_SCRIPT` for why.
  *
  * **Fail-open by design**: returns `{ allowed: true }` when Redis is
  * unavailable. See the design decision comment above for rationale.
@@ -287,11 +329,7 @@ export async function rateLimit(
   if (!redis) return { allowed: true, current: 0, limit };
 
   try {
-    const current = await redis.incr(key);
-    // Set expiry only on first increment (when counter is 1)
-    if (current === 1) {
-      await redis.expire(key, windowSeconds);
-    }
+    const current = await incrRateLimitCounter(redis, key, windowSeconds);
     return { allowed: current <= limit, current, limit };
   } catch {
     // Fail open — don't block requests if Redis is down
@@ -325,11 +363,7 @@ export async function rateLimitStrict(
   if (!redis) return { allowed: false, current: 0, limit };
 
   try {
-    const current = await redis.incr(key);
-    // Set expiry only on first increment (when counter is 1)
-    if (current === 1) {
-      await redis.expire(key, windowSeconds);
-    }
+    const current = await incrRateLimitCounter(redis, key, windowSeconds);
     return { allowed: current <= limit, current, limit };
   } catch {
     // Fail closed — block requests if Redis is down on security-sensitive routes
