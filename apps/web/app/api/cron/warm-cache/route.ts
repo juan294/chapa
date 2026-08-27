@@ -11,7 +11,7 @@ import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheGet, cacheSet, cacheSetNxStatus } from "@/lib/cache/redis";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
@@ -301,15 +301,28 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   // rather than assuming the old daily-cadence blast radius. (Full fix — tiered
   // freshness by popularity, or decoupling snapshot recording from warm rotation
   // entirely — is tracked as a follow-up infra task.)
+  // #1162 / BE-L5: once-per-day SETNX guard. This alert fires whenever the
+  // active-user population is at/above the ceiling, which post-#1010 is true
+  // on every hourly run for a population that doesn't shrink — an
+  // unconditional fire means 24 identical emails/day once alert delivery
+  // actually works (see captureOperationalAlert's email fallback). Only the
+  // "exists" outcome (already alerted today) suppresses; a Redis outage
+  // ("unavailable") fails open exactly like persistProfileSnapshot's dedup
+  // guard in lib/profile/public-profile.ts — better to over-alert than to
+  // silently swallow a real ceiling breach because Redis is down.
   if (allHandles.length >= MAX_HANDLES) {
-    const rotationHours = Math.ceil(allHandles.length / MAX_HANDLES);
-    void captureOperationalAlert({
-      signal: "warm_cache_ceiling_approached",
-      severity: "P2",
-      summary: `warm-cache ceiling: ${allHandles.length} active users vs ${MAX_HANDLES}/run (hourly) — full rotation takes ~${rotationHours}h`,
-      route: "/api/cron/warm-cache",
-      properties: { totalUsers: allHandles.length, ceiling: MAX_HANDLES, rotationHours },
-    });
+    const today = new Date().toISOString().slice(0, 10);
+    const guardStatus = await cacheSetNxStatus(`warm-cache:ceiling-alerted:${today}`, 86400);
+    if (guardStatus !== "exists") {
+      const rotationHours = Math.ceil(allHandles.length / MAX_HANDLES);
+      void captureOperationalAlert({
+        signal: "warm_cache_ceiling_approached",
+        severity: "P2",
+        summary: `warm-cache ceiling: ${allHandles.length} active users vs ${MAX_HANDLES}/run (hourly) — full rotation takes ~${rotationHours}h`,
+        route: "/api/cron/warm-cache",
+        properties: { totalUsers: allHandles.length, ceiling: MAX_HANDLES, rotationHours },
+      });
+    }
   }
 
   // Clean expired verification records from Supabase (fire-and-forget safe)

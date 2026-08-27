@@ -12,6 +12,7 @@ const {
   mockDbCleanExpiredMergeOperations,
   mockCacheGet,
   mockCacheSet,
+  mockCacheSetNxStatus,
   mockCompareSnapshots,
   mockIsSignificantChange,
   mockNotifyScoreBump,
@@ -35,6 +36,7 @@ const {
   mockDbCleanExpiredMergeOperations: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockCacheSetNxStatus: vi.fn(),
   mockCompareSnapshots: vi.fn(),
   mockIsSignificantChange: vi.fn(),
   mockNotifyScoreBump: vi.fn(),
@@ -76,6 +78,7 @@ vi.mock("@/lib/db/telemetry", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
 }));
 
 vi.mock("@/lib/history/diff", () => ({
@@ -179,6 +182,10 @@ describe("GET /api/cron/warm-cache", () => {
     mockDbCleanExpiredMergeOperations.mockResolvedValue(0);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    // Day-guard for the ceiling alert (#1162 / BE-L5) defaults to "acquired"
+    // (first run of the day) so existing ceiling-alert tests, which don't
+    // exercise the guard directly, keep firing exactly as before.
+    mockCacheSetNxStatus.mockResolvedValue("acquired");
     mockCompareSnapshots.mockReturnValue({ adjustedComposite: 5, tier: null, archetype: null });
     mockIsSignificantChange.mockReturnValue({ significant: false });
     mockNotifyScoreBump.mockResolvedValue(undefined);
@@ -1008,6 +1015,57 @@ describe("GET /api/cron/warm-cache", () => {
           }),
         }),
       );
+    });
+
+    // #1162 / BE-L5: post-#1010 the cron runs hourly, so an unconditional fire
+    // here means 24 identical emails/day once delivery actually works. A
+    // once-per-day SETNX guard (same pattern as persistProfileSnapshot's
+    // dedup key in lib/profile/public-profile.ts) caps it to one alert/day.
+    it("does not re-emit the ceiling alert on a later run the same day (guard already acquired)", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheSetNxStatus.mockResolvedValue("exists");
+
+      await GET(makeRequest());
+
+      const ceilingAlerts = (mockCaptureOperationalAlert.mock.calls as Array<[{ signal: string }]>).filter(
+        ([opts]) => opts.signal === "warm_cache_ceiling_approached",
+      );
+      expect(ceilingAlerts).toHaveLength(0);
+    });
+
+    it("uses a once-per-day SETNX key with a 24h TTL to guard the ceiling alert", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+
+      await GET(makeRequest());
+
+      expect(mockCacheSetNxStatus).toHaveBeenCalledWith(
+        expect.stringMatching(/^warm-cache:ceiling-alerted:\d{4}-\d{2}-\d{2}$/),
+        86400,
+      );
+    });
+
+    it("still emits the ceiling alert when the day-guard is unavailable (Redis down) — fails open", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+      mockCacheSetNxStatus.mockResolvedValue("unavailable");
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: "warm_cache_ceiling_approached" }),
+      );
+    });
+
+    it("does not consult the day-guard at all when below the ceiling (guard cost only paid when it matters)", async () => {
+      // Default: 2 users (alice, bob) — well below the ceiling
+      await GET(makeRequest());
+
+      expect(mockCacheSetNxStatus).not.toHaveBeenCalled();
     });
   });
 
