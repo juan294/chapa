@@ -122,7 +122,7 @@ export function QuickControls({
                     <span className="text-text-secondary font-heading">
                       {getCategoryLabel(category, t)}
                     </span>
-                    <span className="text-terminal-dim font-heading text-[10px]">
+                    <span className="text-terminal-dim font-heading text-xs">
                       {currentValue}
                     </span>
                   </button>

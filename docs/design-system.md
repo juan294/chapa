@@ -122,6 +122,43 @@ Two fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`:
 - Use `text-balance` on all `<h1>`-`<h3>` elements to prevent orphaned words.
 - Use `text-pretty` on body paragraphs longer than one sentence.
 
+### Type scale
+
+Tailwind's default named steps, plus the project's floor for anything smaller:
+
+| Class | Size | Usage |
+|-------|------|-------|
+| `text-4xl`/`text-3xl` | 36px / 30px | Hero/section headings |
+| `text-2xl`/`text-xl` | 24px / 20px | Card/panel headings |
+| `text-lg` | 18px | Emphasized body, subheadings |
+| `text-base` | 16px | Default body text |
+| `text-sm` | 14px | Secondary body text, form labels |
+| `text-xs` | 12px | Smallest **named** step — captions, meta text, pill/badge labels |
+| 11px (documented floor) | 11px | The floor for **content text** in the product UI (`experiments/*` pages are exempt as prototypes) — see the narrow exception below for decorative micro-labels. Used sparingly for dense inline chrome (e.g. Studio's option-button labels) where 12px would visibly crowd the layout. |
+
+**Rule:** 11px is the documented floor for content text — text conveying
+information the user needs to read (a value, a name, a count, a sentence).
+There is no Tailwind-named step between `text-xs` (12px) and the 11px floor,
+so a genuine 11px use is written as an explicit arbitrary value
+(`text-[11px]`). If a future design need requires 11px in more than one
+place, promote it to a named token (e.g. a `--text-2xs` custom property in
+`globals.css`) rather than repeating the bare arbitrary value — that gives
+reviewers something to point at, which is the gap that let 28 arbitrary
+sub-12px sizes accumulate outside `experiments/` before this table existed
+(#1187).
+
+**Narrow exception:** an uppercase, letter-spaced (`tracking-wide`/
+`tracking-wider`) micro-label used as a section heading (e.g. a "PRESETS" or
+"MORE" caption above a group of controls) is a deliberate hierarchy device,
+not content the user reads at comfortable size — those may go below the
+11px floor (commonly `text-[10px]`) when raising them would flatten the
+hierarchy they exist to create, or would overflow a fixed-width layout (a
+week-grid column, a chart label positioned around a fixed-size graphic).
+This exception is narrow and does not extend to ordinary content text (a
+value, a name, a count) — that text always meets the 11px floor, especially
+when it also uses a dim/secondary color token, since small size and low
+contrast compound.
+
 ## Spacing & Layout
 
 - Max content width: `max-w-7xl` (nav), `max-w-4xl` (terminal session, landing page).
@@ -173,7 +210,21 @@ hover:border-amber/20 hover:text-text-primary
 - Nav links: `/` prefix in `text-amber/50`, label in `text-text-secondary` (was `text-terminal-dim` — 2.29:1 dark / 2.54:1 light, below the 4.5:1 AA floor; `text-text-secondary` measures 6.15:1 / 4.83:1). `terminal-dim` stays reserved for genuinely decorative glyphs (`$`, `>`, `|`).
 - Active nav link (`aria-current="page"`): styled globally via `nav [aria-current="page"], [role="navigation"] [aria-current="page"]` in `globals.css` (covers both the desktop `<nav>` and `MobileNav`'s `role="navigation"` panel) — `color: var(--color-text-primary)` + `font-weight: 600`, deliberately not amber so it stays distinguishable from the `text-amber/50` `/` prefix already inside every link.
 - CTA: `/ login` text link (no button), hover to `text-amber`
-- **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), shows `ES | EN` pill menu on click. Uses `aria-expanded`, `role="menu"`, `role="menuitem"`. Active locale highlighted with `text-amber font-semibold`. Closes on outside click via `useDropdownMenu`. Sits between ThemeToggle and login CTA in the nav bar.
+- **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), shows `ES | EN` pill menu on click. This is a **listbox**, not a menu — a language picker is a single-select choice among options, not a set of commands. The trigger uses `aria-expanded` + `aria-haspopup="listbox"`; the container is `role="group"`; the panel is `role="listbox"` with `role="option"` items (not `role="menu"`/`role="menuitem"`). Active locale highlighted with `text-amber font-semibold`. Own hand-rolled behavior (not `useDropdownMenu` — see "Listbox vs. menu pattern" below): closes on outside click and on Escape, arrow-key (`ArrowUp`/`ArrowDown`/`Home`/`End`) traversal between options, and Escape **returns focus to the trigger button**. Sits between ThemeToggle and login CTA in the nav bar.
+
+#### Listbox vs. menu pattern
+
+Two distinct dropdown patterns exist in the codebase — do not unify them, they are correctly different:
+
+| | `LanguageSwitcher` (listbox) | `useDropdownMenu` (menu) |
+|---|---|---|
+| Used by | `LanguageSwitcher` only | `UserMenu`, `BadgeToolbar` |
+| ARIA roles | `role="listbox"` / `role="option"`, trigger `aria-haspopup="listbox"` | `role="menu"` / `role="menuitem"` (set by each consuming component; the hook queries `[role="menuitem"]`) |
+| Semantics | Single-select choice among mutually exclusive options | A set of independent commands/actions |
+| Escape behavior | Closes **and returns focus to the trigger** | Closes only — does **not** return focus to the trigger |
+| Arrow keys | `ArrowUp`/`ArrowDown` (wrap) + `Home`/`End` | Same, via the shared hook |
+
+A component whose items are alternatives the user picks one of (language, theme, sort order) should follow the listbox pattern; a component whose items are actions to invoke (profile actions, share actions) should use `useDropdownMenu`'s menu pattern. When adding a new dropdown, choose based on this semantic distinction first — don't default to whichever hook already exists.
 
 ### Tooltips (mandatory pattern)
 
