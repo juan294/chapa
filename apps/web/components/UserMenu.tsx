@@ -72,6 +72,29 @@ interface UserMenuProps {
   isAdmin?: boolean;
 }
 
+// Maps the raw `CraftTier` enum value returned by /api/insights and
+// /api/recalculate (see packages/shared's `CraftTier`) to its dictionary key.
+// Kept separate from any single tier's translated string so an unrecognized
+// value (e.g. a tier added server-side before the dictionary catches up)
+// falls back to the raw string instead of resolving to `undefined` or a bare
+// key path (#1170 / FE-M4).
+const CRAFT_TIER_DICTIONARY_KEYS: Record<string, string> = {
+  Novice: 'userMenu.craftTierNovice',
+  Practitioner: 'userMenu.craftTierPractitioner',
+  Expert: 'userMenu.craftTierExpert',
+  Master: 'userMenu.craftTierMaster',
+};
+
+/** Resolves a raw craft tier value to its translated display name, falling
+ * back to the raw value when the tier isn't in the dictionary. */
+function resolveCraftTierLabel(t: (key: string) => unknown, tier: string | undefined | null): string {
+  if (!tier) return '';
+  const dictKey = CRAFT_TIER_DICTIONARY_KEYS[tier];
+  if (!dictKey) return tier;
+  const label = t(dictKey);
+  return typeof label === 'string' ? label : tier;
+}
+
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
   const {
@@ -203,8 +226,13 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         const newScore = recalcData.adjustedComposite;
 
         setToast({
-          message: `Craft: ${craftScore} ${craftTier}`,
-          detail: `Score updated to ${newScore}`,
+          message: interpolate(t('userMenu.insightsCraftResult') as string, {
+            craftScore: String(craftScore),
+            craftTier: resolveCraftTierLabel(t, craftTier),
+          }),
+          detail: interpolate(t('userMenu.insightsScoreUpdated') as string, {
+            score: String(newScore),
+          }),
           type: "success",
         });
       } else {
@@ -212,7 +240,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         const craftTier = uploadData.craftScore?.tier;
         setToast({
           message: craftScore
-            ? `Craft: ${craftScore} ${craftTier}`
+            ? interpolate(t('userMenu.insightsCraftResult') as string, {
+                craftScore: String(craftScore),
+                craftTier: resolveCraftTierLabel(t, craftTier),
+              })
             : t('userMenu.insightsImported') as string,
           detail: t('userMenu.insightsImportedDetail') as string,
           type: "success",
