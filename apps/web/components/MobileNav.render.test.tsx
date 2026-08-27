@@ -65,10 +65,20 @@ describe("MobileNav", () => {
     expect(screen.queryByRole("navigation")).toBeNull();
   });
 
-  it("renders LanguageSwitcher in drawer when open", () => {
+  // #1182 / UX-M8 & FE-L2: NavbarShell's top bar already renders
+  // LanguageSwitcher + ThemeToggle unconditionally at every breakpoint (no
+  // `hidden`/`md:` gating), so a second copy inside this panel produced two
+  // identical globe buttons and two identical theme toggles in the DOM at
+  // once (same aria-label, each with its own document-level mousedown/keydown
+  // listener). Some inner pages (e.g. /privacy, /terms, /about, /archetypes/*,
+  // /admin) never mount MobileNav at all (no navLinks), so the fix must not
+  // hide the bar copies — the panel copies are the redundant ones and are
+  // removed instead.
+  it("does NOT render a second LanguageSwitcher/ThemeToggle in the drawer (#1182)", () => {
     render(<MobileNav links={LINKS} />);
     fireEvent.click(screen.getByLabelText("Toggle navigation"));
-    expect(screen.getByTestId("language-switcher")).toBeDefined();
+    expect(screen.queryByTestId("language-switcher")).toBeNull();
+    expect(screen.queryByTestId("theme-toggle")).toBeNull();
   });
 
   it("closes menu on Escape key", () => {
