@@ -593,9 +593,25 @@ describe("ActivityHeatmap", () => {
   });
 
   // ----------------------------------------------------------------
-  // H4. Keyboard accessibility — day dots are keyboard navigable
+  // H4. Accessibility — day dots are decorative, day-level data survives
+  // in a visually-hidden table (#1182 / UX-M9)
   // ----------------------------------------------------------------
-  describe("H4 – keyboard accessibility for day dots", () => {
+  //
+  // `role="img"` on the timeline wrapper collapses its subtree for
+  // assistive tech (only the wrapper's own summary aria-label is
+  // announced), but the old implementation still put a real
+  // `role="button" tabIndex={0}` on each of the ~90 day dots — a keyboard
+  // user needed ~90 Tab presses to reach the content below the heatmap,
+  // through elements whose only "action" was revealing a hover tooltip.
+  // Fix: the dots become non-focusable decoration (no role, no tabIndex,
+  // `aria-hidden`), and every day's date + contribution count is exposed
+  // instead via a `sr-only` table rendered as a sibling of the `role="img"`
+  // wrapper (a table inside the collapsed subtree would be silently
+  // dropped by the same role="img" collapsing behavior that hides the
+  // dots). Mouse hover still reveals the same portal tooltip — that
+  // behavior is covered by the "tooltip interactions" describe block above
+  // and is unchanged by this fix.
+  describe("H4 – day dots are decorative, day-level data survives for AT", () => {
     function makeDotData(): HeatmapDay[] {
       return makeDays("2025-03-01", [3, 10, 5, 0, 7, 2, 1]);
     }
@@ -610,7 +626,7 @@ describe("ActivityHeatmap", () => {
       );
     }
 
-    it("every day dot has tabIndex={0}", () => {
+    it("no day dot is focusable (no tabIndex) — zero extra tab stops", () => {
       const { container } = render(
         <ActivityHeatmap
           heatmapData={makeDotData()}
@@ -622,11 +638,11 @@ describe("ActivityHeatmap", () => {
       const dots = getActivityDots(container);
       expect(dots.length).toBeGreaterThan(0);
       for (const dot of dots) {
-        expect(dot.getAttribute("tabindex")).toBe("0");
+        expect(dot.getAttribute("tabindex")).toBeNull();
       }
     });
 
-    it("every day dot has role=\"button\"", () => {
+    it("no day dot has role=\"button\" — they are decorative, not controls", () => {
       const { container } = render(
         <ActivityHeatmap
           heatmapData={makeDotData()}
@@ -638,11 +654,12 @@ describe("ActivityHeatmap", () => {
       const dots = getActivityDots(container);
       expect(dots.length).toBeGreaterThan(0);
       for (const dot of dots) {
-        expect(dot.getAttribute("role")).toBe("button");
+        expect(dot.getAttribute("role")).toBeNull();
+        expect(dot.getAttribute("aria-hidden")).toBe("true");
       }
     });
 
-    it("every day dot has an aria-label describing the date and count", () => {
+    it("the timeline contains zero focusable descendants (no ~90-tab-stop trap)", () => {
       const { container } = render(
         <ActivityHeatmap
           heatmapData={makeDotData()}
@@ -651,87 +668,103 @@ describe("ActivityHeatmap", () => {
         />,
       );
 
-      const dots = getActivityDots(container);
-      expect(dots.length).toBeGreaterThan(0);
-      for (const dot of dots) {
-        const label = dot.getAttribute("aria-label");
-        expect(label).toBeTruthy();
-        // Should contain either a date pattern and/or contribution count
-        expect(label).toMatch(/contribution/i);
+      const timeline = container.querySelector(
+        "[role='img'][aria-label*='Activity heatmap']",
+      )!;
+      const focusable = timeline.querySelectorAll(
+        'a[href], button, input, textarea, select, [tabindex]',
+      );
+      expect(focusable.length).toBe(0);
+    });
+
+    it("a visually-hidden table exposes every day's date and contribution count to assistive tech", () => {
+      const data = makeDotData();
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={data}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const table = container.querySelector("table.sr-only");
+      expect(table).not.toBeNull();
+
+      const rows = table!.querySelectorAll("tbody tr");
+      expect(rows.length).toBe(data.length);
+
+      // Spot-check specific days: date 2025-03-02 has count=10 (plural),
+      // date 2025-03-04 has count=0.
+      expect(table!.textContent).toMatch(/10 contributions/);
+      expect(table!.textContent).toMatch(/0 contributions/);
+    });
+
+    it("the hidden table is reachable via the accessible table role (not display:none/visibility:hidden)", () => {
+      render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      // sr-only clips visually but stays in the accessibility tree — RTL's
+      // role queries exclude display:none/visibility:hidden/aria-hidden,
+      // none of which sr-only sets.
+      expect(screen.getByRole("table", { hidden: false })).toBeDefined();
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // UX-L1 (partial, #1182) — day-of-week header and week-label text was
+  // below the readable threshold (7px / 9px) at any contrast. Raised to
+  // 10px. The day-of-week headers are single letters (already shortened,
+  // e.g. "M"/"T"/"W" or "L"/"M"/"X"), so the 7-column grid they sit in
+  // never wraps regardless of font size. The week-label column (`w-14`,
+  // NOT divided across the 7 columns) holds already-abbreviated strings
+  // ("This wk" / "Esta sem.") that are widened rather than shortened
+  // further, since single letters would destroy their meaning.
+  // ----------------------------------------------------------------
+  describe("UX-L1 (partial) – heatmap label font sizes", () => {
+    function getTimeline(container: HTMLElement): HTMLElement {
+      return container.querySelector(
+        "[role='img'][aria-label*='Activity heatmap']",
+      )!;
+    }
+
+    it("day-of-week header labels are at least 10px", () => {
+      const data = makeDays("2025-03-01", [3, 10, 5, 0, 7, 2, 1]);
+      const { container } = render(
+        <ActivityHeatmap heatmapData={data} activeDays={6} dimensions={mockDimensions} />,
+      );
+
+      const timeline = getTimeline(container);
+      // Day-of-week header row: 7 single-letter spans, each flex-1.
+      const headerRow = timeline.querySelector(".flex.items-center.gap-2.mb-1 > .flex-1");
+      expect(headerRow).not.toBeNull();
+      const headers = Array.from(headerRow!.querySelectorAll("span"));
+      expect(headers.length).toBe(7);
+      for (const header of headers) {
+        expect(header.className).not.toMatch(/text-\[[1-9]px\]/);
+        expect(header.className).toMatch(/text-\[(1[0-9]|[2-9][0-9])px\]/);
+        // Still single-character content — no wrap risk introduced.
+        expect(header.textContent!.length).toBeLessThanOrEqual(1);
       }
     });
 
-    it("focus on a dot shows the tooltip (onFocus)", () => {
+    it("week-label column text is at least 10px and the column is widened to avoid wrap", () => {
+      const data = makeDays("2025-03-01", [3, 10, 5, 0, 7, 2, 1, 4, 6, 2, 1, 9, 0, 3]);
       const { container } = render(
-        <ActivityHeatmap
-          heatmapData={makeDotData()}
-          activeDays={6}
-          dimensions={mockDimensions}
-        />,
+        <ActivityHeatmap heatmapData={data} activeDays={12} dimensions={mockDimensions} />,
       );
 
-      const dots = getActivityDots(container);
-      expect(dots.length).toBeGreaterThan(0);
-
-      fireEvent.focus(dots[0]!);
-
-      const tooltip = document.querySelector("[role='tooltip']");
-      expect(tooltip).not.toBeNull();
-    });
-
-    it("blur on a dot hides the tooltip (onBlur)", () => {
-      const { container } = render(
-        <ActivityHeatmap
-          heatmapData={makeDotData()}
-          activeDays={6}
-          dimensions={mockDimensions}
-        />,
-      );
-
-      const dots = getActivityDots(container);
-      // Show tooltip first
-      fireEvent.focus(dots[0]!);
-      expect(document.querySelector("[role='tooltip']")).not.toBeNull();
-
-      // Blur — tooltip should disappear
-      fireEvent.blur(dots[0]!);
-      expect(document.querySelector("[role='tooltip']")).toBeNull();
-    });
-
-    it("Enter key on a dot shows the tooltip (onKeyDown Enter)", () => {
-      const { container } = render(
-        <ActivityHeatmap
-          heatmapData={makeDotData()}
-          activeDays={6}
-          dimensions={mockDimensions}
-        />,
-      );
-
-      const dots = getActivityDots(container);
-      expect(dots.length).toBeGreaterThan(0);
-
-      fireEvent.keyDown(dots[0]!, { key: "Enter" });
-
-      const tooltip = document.querySelector("[role='tooltip']");
-      expect(tooltip).not.toBeNull();
-    });
-
-    it("Space key on a dot shows the tooltip (onKeyDown Space)", () => {
-      const { container } = render(
-        <ActivityHeatmap
-          heatmapData={makeDotData()}
-          activeDays={6}
-          dimensions={mockDimensions}
-        />,
-      );
-
-      const dots = getActivityDots(container);
-      expect(dots.length).toBeGreaterThan(0);
-
-      fireEvent.keyDown(dots[0]!, { key: " " });
-
-      const tooltip = document.querySelector("[role='tooltip']");
-      expect(tooltip).not.toBeNull();
+      const timeline = getTimeline(container);
+      const weekLabel = timeline.querySelector("span.text-right");
+      expect(weekLabel).not.toBeNull();
+      expect(weekLabel!.className).not.toMatch(/text-\[[1-9]px\]/);
+      expect(weekLabel!.className).toMatch(/text-\[(1[0-9]|[2-9][0-9])px\]/);
+      // Widened from w-12 (48px) so the larger font doesn't wrap/overflow.
+      expect(weekLabel!.className).not.toMatch(/\bw-12\b/);
     });
   });
 

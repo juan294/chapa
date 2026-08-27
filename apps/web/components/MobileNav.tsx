@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
-import { LanguageSwitcher } from "./LanguageSwitcher";
-import { ThemeToggle } from "./ThemeToggle";
 
 interface NavLink {
   label: string;
@@ -121,10 +119,6 @@ export function MobileNav({ links }: MobileNavProps) {
                 <span className="text-amber/50">/</span> {link.label.toLowerCase()}
               </a>
             ))}
-            <div className="mt-2 pt-3 border-t border-stroke flex items-center gap-2">
-              <LanguageSwitcher />
-              <ThemeToggle />
-            </div>
           </div>
         </div>
       )}
