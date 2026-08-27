@@ -1,10 +1,24 @@
 /**
  * Supabase data access — studio_configs table.
  *
- * Durable persistence for Creator Studio preview configurations.
- * Redis remains the hot read path with a 365-day TTL; this table is the
- * source of truth so Redis eviction doesn't permanently destroy a user's
- * saved Studio preview configuration. See issue #935.
+ * Durable persistence for Creator Studio preview configurations. This table
+ * is the source of truth and is read directly on every `loadStudioConfig`
+ * call. See issue #935.
+ *
+ * BE-L1 (#1186): `loadStudioConfig` used to consult Redis first, but every
+ * cache hit still had to re-validate against a separate Supabase
+ * revision-only read before it could be trusted — costing a Redis round
+ * trip *plus* a Supabase round trip, strictly more than reading Supabase
+ * directly, while adding a failure mode where a valid cached config was
+ * discarded because that second, independent Supabase call happened to
+ * fail. Reads now go straight to Supabase; there is no cached value for the
+ * read path to go stale against, so the migration-035 staleness concern
+ * (an older instance's stale publish outliving a newer one) does not apply
+ * here — it only ever applied to trusting a cached value on read. The
+ * *write* path below (`cacheStudioConfig`/`refreshStudioConfigCache`) still
+ * publishes a best-effort mirror to Redis for `PUT /api/studio/config`
+ * (`apps/web/app/api/studio/config/route.ts`, out of this file's scope to
+ * change); nothing currently reads that mirror back.
  *
  * Read operations fail open when the database is unavailable. Upserts return
  * typed failure results so callers can handle each failure explicitly.
@@ -14,7 +28,6 @@ import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
 import {
   cacheDel,
-  cacheGet,
   cacheSetVersioned,
 } from "../cache/redis";
 import { withTimeout } from "../async/with-timeout";
@@ -22,13 +35,7 @@ import { isValidBadgeConfig } from "../validation";
 import type { BadgeConfig } from "@chapa/shared";
 
 export const STUDIO_CONFIG_TTL = 31536000;
-export const STUDIO_CONFIG_NEGATIVE_TTL = 60;
 export const STUDIO_CONFIG_READ_TIMEOUT_MS = 2_000;
-export const STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY = {
-  kind: "studio-config-not-found",
-  version: 1,
-  revision: 0,
-} as const;
 export const STUDIO_CONFIG_CACHE_ENTRY_VERSION = 1;
 
 export type StudioConfigUpsertResult =
@@ -41,12 +48,6 @@ export type StudioConfigUpsertResult =
 
 export type StudioConfigReadResult =
   | { status: "found"; config: BadgeConfig; revision: number }
-  | { status: "not_found" }
-  | { status: "unavailable" }
-  | { status: "invalid" };
-
-type StudioConfigRevisionReadResult =
-  | { status: "found"; revision: number }
   | { status: "not_found" }
   | { status: "unavailable" }
   | { status: "invalid" };
@@ -91,35 +92,6 @@ function errorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
-}
-
-function isNegativeCacheEntry(
-  value: unknown,
-): value is typeof STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) {
-    return false;
-  }
-  const entry = value as Record<string, unknown>;
-  return (
-    entry.kind === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.kind &&
-    entry.version === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.version &&
-    entry.revision === STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.revision
-  );
-}
-
-function isStudioConfigCacheEntry(value: unknown): value is StudioConfigCacheEntry {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) {
-    return false;
-  }
-  const entry = value as Record<string, unknown>;
-  return (
-    entry.kind === "studio-config" &&
-    entry.version === STUDIO_CONFIG_CACHE_ENTRY_VERSION &&
-    typeof entry.revision === "number" &&
-    Number.isSafeInteger(entry.revision) &&
-    entry.revision > 0 &&
-    isValidBadgeConfig(entry.config)
-  );
 }
 
 /** Publish a committed Studio config to Redis without changing API success. */
@@ -258,132 +230,19 @@ export async function dbGetStudioConfig(
   }
 }
 
-/** Read only the durable revision used to validate a cached payload. */
-async function dbGetStudioConfigRevision(
-  handle: string,
-): Promise<StudioConfigRevisionReadResult> {
-  const db = getSupabase();
-  if (!db) return { status: "unavailable" };
-
-  try {
-    const { data, error } = await withTimeout(
-      Promise.resolve(
-        db
-          .from("studio_configs")
-          .select("revision")
-          .eq("handle", handle.toLowerCase())
-          .maybeSingle(),
-      ),
-      STUDIO_CONFIG_READ_TIMEOUT_MS,
-      "dbGetStudioConfigRevision",
-    );
-
-    if (error) throw error;
-    if (!data) return { status: "not_found" };
-
-    const revision = (data as { revision?: unknown }).revision;
-    if (!isValidStudioConfigRevision(revision)) {
-      console.error(
-        "[STUDIO_CONFIG_FALLBACK] Invalid persisted Studio configuration revision",
-        { handle: handle.toLowerCase() },
-      );
-      return { status: "invalid" };
-    }
-
-    return { status: "found", revision };
-  } catch (error) {
-    console.error(
-      "[STUDIO_CONFIG_FALLBACK] dbGetStudioConfigRevision failed:",
-      errorMessage(error),
-    );
-    return { status: "unavailable" };
-  }
-}
-
-/** Load and validate a Studio config from Redis, then durable Supabase storage. */
+/**
+ * Load and validate a Studio config for reading.
+ *
+ * BE-L1 (#1186): reads Supabase directly with no Redis involvement. See the
+ * module header for why — every prior "hit" still required a second,
+ * independent Supabase round trip to validate the cached revision, so the
+ * cache read only added latency and a spurious 503 failure mode without
+ * ever avoiding a Supabase call.
+ */
 export async function loadStudioConfig(
   login: string,
 ): Promise<StudioConfigReadResult> {
-  const normalizedLogin = login.toLowerCase();
-  const cacheKey = `config:${normalizedLogin}`;
-  let cached: unknown = null;
-
-  try {
-    cached = await withTimeout(
-      cacheGet<unknown>(cacheKey),
-      STUDIO_CONFIG_READ_TIMEOUT_MS,
-      "loadStudioConfig cache read",
-    );
-  } catch (error) {
-    console.error(
-      "[STUDIO_CONFIG_FALLBACK] Studio config cache read failed:",
-      errorMessage(error),
-    );
-  }
-
-  if (cached !== null) {
-    const positiveEntry = isStudioConfigCacheEntry(cached) ? cached : null;
-    const negativeEntry = isNegativeCacheEntry(cached);
-    if (positiveEntry || negativeEntry) {
-      const durableRevision = await dbGetStudioConfigRevision(normalizedLogin);
-      if (
-        positiveEntry &&
-        durableRevision.status === "found" &&
-        durableRevision.revision === positiveEntry.revision
-      ) {
-        return {
-          status: "found",
-          config: positiveEntry.config,
-          revision: positiveEntry.revision,
-        };
-      }
-      if (negativeEntry && durableRevision.status === "not_found") {
-        return { status: "not_found" };
-      }
-      if (
-        durableRevision.status === "unavailable" ||
-        durableRevision.status === "invalid"
-      ) {
-        return { status: durableRevision.status };
-      }
-
-      await cacheDel(cacheKey);
-      if (durableRevision.status === "not_found") {
-        void cacheSetVersioned(
-          cacheKey,
-          STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY,
-          STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.revision,
-          STUDIO_CONFIG_NEGATIVE_TTL,
-        );
-        return { status: "not_found" };
-      }
-    } else {
-      const legacy = isValidBadgeConfig(cached);
-      console[legacy ? "warn" : "error"](
-        legacy
-          ? "[STUDIO_CONFIG_FALLBACK] Migrating unversioned cached Studio configuration"
-          : "[STUDIO_CONFIG_FALLBACK] Invalid cached Studio configuration",
-        { handle: normalizedLogin },
-      );
-      await cacheDel(cacheKey);
-    }
-  }
-
-  const dbResult = await dbGetStudioConfig(normalizedLogin);
-  if (dbResult.status === "not_found") {
-    void cacheSetVersioned(
-      cacheKey,
-      STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY,
-      STUDIO_CONFIG_NEGATIVE_CACHE_ENTRY.revision,
-      STUDIO_CONFIG_NEGATIVE_TTL,
-    );
-    return dbResult;
-  }
-  if (dbResult.status !== "found") return dbResult;
-
-  void cacheStudioConfig(normalizedLogin, dbResult.config, dbResult.revision);
-
-  return dbResult;
+  return dbGetStudioConfig(login.toLowerCase());
 }
 
 /** Refresh Redis from the current durable row after a successful upsert. */

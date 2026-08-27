@@ -332,6 +332,51 @@ describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () =>
       expect(mockCacheDel).not.toHaveBeenCalled();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // BE-L2 (#1186) — GitHub handles are case-insensitive. Every other
+  // handle-derived cache key (dbReplaceSnapshot's row key, buildSnapshotKey,
+  // buildBadgeSvgCacheKey) lowercases the handle first; the once-per-day
+  // side-effects guard key did not, so `/u/JuanX` and `/u/juanx` claimed
+  // independent day guards and each casing variant re-ran the deferred
+  // sequence (extra Supabase upsert, extra dbUpsertUser, extra
+  // trackBadgeGenerated INCR) once per day instead of sharing one guard.
+  // -------------------------------------------------------------------------
+
+  describe("#1186 case-insensitive day guard (BE-L2)", () => {
+    it("builds the day-guard key from the lowercased handle", async () => {
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("TestUser", materialized);
+
+      expect(mockCacheSetNxStatus).toHaveBeenCalledWith(
+        expect.stringMatching(/^sideeffects:done:testuser:/),
+        86400,
+      );
+    });
+
+    it("releases the day-guard key using the same lowercased casing on a genuine write failure", async () => {
+      mockDbInsertSnapshot.mockResolvedValue("failed");
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("TestUser", materialized);
+
+      expect(mockCacheDel).toHaveBeenCalledWith(
+        expect.stringMatching(/^sideeffects:done:testuser:/),
+      );
+    });
+
+    it("treats differently-cased handles as the same day guard", async () => {
+      const materialized = makeMaterializedProfile();
+
+      await persistProfileSnapshot("TestUser", materialized);
+      await persistProfileSnapshot("TESTUSER", materialized);
+      await persistProfileSnapshot("testuser", materialized);
+
+      const guardKeysUsed = mockCacheSetNxStatus.mock.calls.map((call) => call[0]);
+      expect(new Set(guardKeysUsed).size).toBe(1);
+    });
+  });
 });
 
 describe("runPublicProfileSideEffects", () => {
