@@ -3,12 +3,24 @@
 import { useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 
+interface DeviceContext {
+  ip: string;
+  userAgent: string;
+}
+
 interface Props {
   sessionId: string;
   handle: string;
+  /**
+   * IP/user-agent of the device that initiated this authorization request
+   * (SE-H1 interim mitigation, #1174). `null` when unavailable (session
+   * predates this change, expired, or Redis is unreachable) — the page
+   * degrades gracefully by showing no device details rather than failing.
+   */
+  deviceContext?: DeviceContext | null;
 }
 
-export function AuthorizeClient({ sessionId, handle }: Props) {
+export function AuthorizeClient({ sessionId, handle, deviceContext = null }: Props) {
   const { t } = useTranslation();
   const [state, setState] = useState<"idle" | "approving" | "approved" | "error">("idle");
 
@@ -52,6 +64,38 @@ export function AuthorizeClient({ sessionId, handle }: Props) {
             <div className="rounded-lg border border-stroke bg-bg p-4">
               <p className="text-text-secondary text-xs mb-1">{t('cliAuthorize.loggedInAs') as string}</p>
               <p className="font-heading text-amber font-bold">{handle}</p>
+            </div>
+
+            <div
+              data-testid="cli-device-context"
+              className="rounded-lg border border-stroke bg-bg p-4 space-y-2"
+            >
+              <p className="text-text-secondary text-xs">
+                {t('cliAuthorize.deviceContextHeading') as string}
+              </p>
+              {deviceContext ? (
+                <div className="font-heading text-xs text-text-primary space-y-1 break-all">
+                  <p>
+                    <span className="text-text-secondary">
+                      {t('cliAuthorize.deviceContextIpLabel') as string}:{" "}
+                    </span>
+                    {deviceContext.ip}
+                  </p>
+                  <p>
+                    <span className="text-text-secondary">
+                      {t('cliAuthorize.deviceContextUserAgentLabel') as string}:{" "}
+                    </span>
+                    {deviceContext.userAgent}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-text-secondary text-xs">
+                  {t('cliAuthorize.deviceContextUnavailable') as string}
+                </p>
+              )}
+              <p className="text-terminal-yellow text-xs leading-relaxed">
+                {t('cliAuthorize.deviceContextWarning') as string}
+              </p>
             </div>
 
             <p className="text-text-secondary text-xs leading-relaxed">

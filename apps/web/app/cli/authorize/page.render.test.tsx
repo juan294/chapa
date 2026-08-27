@@ -32,14 +32,31 @@ vi.mock("./AuthorizeClient", () => ({
   AuthorizeClient: ({
     sessionId,
     handle,
+    deviceContext,
   }: {
     sessionId: string;
     handle: string;
+    deviceContext?: { ip: string; userAgent: string } | null;
   }) => (
-    <div data-testid="authorize-client" data-session-id={sessionId} data-handle={handle}>
+    <div
+      data-testid="authorize-client"
+      data-session-id={sessionId}
+      data-handle={handle}
+      data-device-context={JSON.stringify(deviceContext ?? null)}
+    >
       AuthorizeClient
     </div>
   ),
+}));
+
+const mockCacheGet = vi.fn();
+
+vi.mock("@/lib/cache/redis", () => ({
+  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
+}));
+
+vi.mock("@/lib/auth/cli-token", () => ({
+  cliDeviceContextKey: (sessionId: string) => `cli:device-context:${sessionId}`,
 }));
 
 // Mock @/lib/i18n to avoid importing client-side React hooks (useRouter etc.)
@@ -90,6 +107,8 @@ beforeEach(() => {
   mockGetOptionalServerSessionFromHeaders.mockClear();
   mockGetSessionSecret.mockClear();
   mockGetSessionSecret.mockReturnValue("test-secret");
+  mockCacheGet.mockReset();
+  mockCacheGet.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -240,5 +259,47 @@ describe("CliAuthorizePage", () => {
     expect(mockGetOptionalServerSessionFromHeaders).toHaveBeenCalledWith(
       headerStore,
     );
+  });
+
+  // ─── Device context (SE-H1 interim mitigation, #1174) ─────────────────
+
+  it("fetches device context from the correct Redis key and forwards it to AuthorizeClient", async () => {
+    mockHeaders.mockResolvedValue({
+      get: (name: string) =>
+        name === "cookie" ? "chapa_session=encrypted-value" : null,
+    });
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue({
+      login: "testuser",
+      token: "gh-token",
+    });
+    mockCacheGet.mockResolvedValue({ ip: "9.9.9.9", userAgent: "TestAgent/1.0" });
+
+    await renderPage({ session: "my-session-id" });
+
+    expect(mockCacheGet).toHaveBeenCalledWith(
+      "cli:device-context:my-session-id",
+    );
+    const client = screen.getByTestId("authorize-client");
+    expect(JSON.parse(client.getAttribute("data-device-context")!)).toEqual({
+      ip: "9.9.9.9",
+      userAgent: "TestAgent/1.0",
+    });
+  });
+
+  it("forwards null device context when Redis has no entry for the session", async () => {
+    mockHeaders.mockResolvedValue({
+      get: (name: string) =>
+        name === "cookie" ? "chapa_session=encrypted-value" : null,
+    });
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue({
+      login: "testuser",
+      token: "gh-token",
+    });
+    mockCacheGet.mockResolvedValue(null);
+
+    await renderPage({ session: "my-session-id" });
+
+    const client = screen.getByTestId("authorize-client");
+    expect(JSON.parse(client.getAttribute("data-device-context")!)).toBeNull();
   });
 });
