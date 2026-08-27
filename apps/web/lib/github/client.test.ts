@@ -626,6 +626,77 @@ describe("getStats", () => {
         expect.any(Number),
       );
     });
+
+    // #1163 (BE-H2): the rejected-fetch branch reads `existingComposed` at
+    // :522 to detect a concurrent better-scoped write (the documented inflight
+    // race between separate public/authenticated dedup keys — :91-99), but
+    // wrote the composed value to `cacheKey` unconditionally whenever a
+    // baseline existed, regardless of whether `existingComposed` outranked
+    // the value it was about to write. That silently downgraded the shared
+    // cache — the exact #1002/#1050 signature, reintroduced via the
+    // rejection path.
+    it("#1163: a rejected fetch's baseline fallback does not overwrite a better-scoped existingComposed entry (race)", async () => {
+      // The baseline is only public-scoped and lower-value than the entry a
+      // concurrent authenticated fetch already landed at cacheKey.
+      const publicBaseline = makeStats({
+        fetchScope: "public",
+        prsMergedCount: 50,
+        commitsTotal: 100,
+      });
+      const raceWinnerAuthenticated = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 900,
+      });
+      // Not a degraded-fetch collapse (same scope as baseline, comparable
+      // magnitude) — this fetch is rejected purely by the scope-rank check
+      // against the racing authenticated entry.
+      const publicFetch = makeStats({ prsMergedCount: 55, commitsTotal: 100 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // getStats(): cacheKey miss -> triggers fetch
+        .mockResolvedValueOnce(publicBaseline) // staleKey hit -> public baseline
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(raceWinnerAuthenticated); // re-read cacheKey: race winner landed
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "public" }),
+        expect.any(Number),
+      );
+    });
+
+    it("#1163: still refreshes cacheKey TTL on a rejected fetch when existingComposed is not better-scoped than the fallback", async () => {
+      // Anti-thrash requirement: the write must still happen (refreshing the
+      // 6h TTL so a sustained scope-blinded caller doesn't refetch on every
+      // request) whenever existingComposed is present but NOT better-scoped
+      // than the value about to be written.
+      const authenticatedBaseline = makeStats({
+        fetchScope: "authenticated",
+        prsMergedCount: 904,
+        commitsTotal: 500,
+      });
+      const stalePublicExisting = makeStats({ fetchScope: "public", prsMergedCount: 3 });
+      const publicFetch = makeStats({ prsMergedCount: 3, commitsTotal: 500 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // cacheKey miss
+        .mockResolvedValueOnce(authenticatedBaseline) // staleKey hit -> authenticated
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(stalePublicExisting); // re-read cacheKey: existing entry, but NOT better-scoped than the fallback
+
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      await getStats("test-user", "gho_session_token_no_repo_scope");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "authenticated", prsMergedCount: 904 }),
+        expect.any(Number),
+      );
+    });
   });
 
   it("#1083: never issues a live GitHub fetch in read-only mode, even on a cold key", async () => {
