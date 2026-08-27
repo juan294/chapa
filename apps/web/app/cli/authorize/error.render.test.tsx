@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
@@ -24,7 +24,18 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-afterEach(cleanup);
+const mockFetch = vi.fn();
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("cli/authorize error.tsx render", () => {
   it("renders the error heading", async () => {
@@ -72,5 +83,21 @@ describe("cli/authorize error.tsx render", () => {
     expect(screen.getByRole("alert")).toBeDefined();
     expect(container.querySelector(".text-terminal-red")).not.toBeNull();
     expect(container.innerHTML).not.toContain("amber");
+  });
+
+  it("reports the error to /api/telemetry with the cli-authorize-error source", async () => {
+    const { default: ErrorPage } = await import("./error");
+    render(<ErrorPage error={new Error("cli boundary boom")} reset={vi.fn()} />);
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/telemetry");
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({
+      event: "client_error",
+      category: "route_error",
+      source: "cli-authorize-error",
+      message: "cli boundary boom",
+    });
   });
 });

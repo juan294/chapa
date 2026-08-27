@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { StatusCallout } from "@/components/StatusCallout";
 import { useTranslation } from "@/lib/i18n";
+import { useErrorBoundaryReport } from "@/lib/analytics/use-error-boundary-report";
 
 export default function ErrorPage({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useErrorBoundaryReport(error, "about-error");
   const { t } = useTranslation();
   return (
     <main

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { LanguageProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -10,7 +10,18 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
 
-afterEach(cleanup);
+const mockFetch = vi.fn();
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("studio error.tsx — render", () => {
   const makeError = () => new Error("test") as Error & { digest?: string };
@@ -83,5 +94,25 @@ describe("studio error.tsx — render", () => {
     expect(screen.getByRole("alert")).toBeDefined();
     expect(container.querySelector(".text-terminal-red")).not.toBeNull();
     expect(container.innerHTML).not.toContain("amber");
+  });
+
+  it("reports the error to /api/telemetry with the studio-error source", async () => {
+    const error = new Error("studio boundary boom") as Error & { digest?: string };
+    render(
+      <LanguageProvider initialLocale="en" dictionary={en}>
+        <StudioError error={error} reset={vi.fn()} />
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe("/api/telemetry");
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({
+      event: "client_error",
+      category: "route_error",
+      source: "studio-error",
+      message: "studio boundary boom",
+    });
   });
 });
