@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse, after } from "next/server";
-import { renderBadgeSvg, type BadgeI18nStrings } from "@/lib/render/BadgeSvg";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
+import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   getBadgeAvatarCachePolicy,
   getBadgeAvatarDataUri,
@@ -114,40 +115,17 @@ const CACHE_HEADERS = {
 // per-handle locale preference exists yet (would need a DB column — out of
 // scope for this issue; see the PR/issue notes for the follow-up). Kept
 // synchronous and side-effect-free so it can be called before any other work.
-function resolveBadgeLocale(request: NextRequest): Locale {
+//
+// Named distinctly from the imported `resolveBadgeLocale` (badge-locale.ts):
+// this one extracts a `Locale` from a raw `NextRequest`; that one turns an
+// already-resolved `Locale` into locale-consistent strings + cache keys. Any
+// call site that needs BOTH content and a cache key for the SAME locale must
+// go through `resolveBadgeLocale`, never resolve each independently (#1181
+// follow-up — that mismatch is exactly the bug fixed in the share page and
+// warm-cache cron).
+function resolveLocaleFromRequest(request: NextRequest): Locale {
   const lang = request.nextUrl.searchParams.get("lang");
   return isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
-}
-
-/**
- * Resolve the ~8 badge-SVG literals for one locale via the real dictionaries
- * (`getServerT` is a pure, synchronous key lookup — no request/cookie I/O).
- * `tierLabel` is intentionally NOT included here since it depends on the
- * per-render `impact.tier` value; see `tierLabelFor` below.
- */
-function buildBadgeStrings(locale: Locale): Omit<BadgeI18nStrings, "tierLabel"> {
-  const t = getServerT(locale);
-  return {
-    metricsSimulated: t("badge.metricsSimulated") as string,
-    metricsVerified: t("badge.metricsVerified") as string,
-    metricsPublic: t("badge.metricsPublic") as string,
-    radarLabels: {
-      delivery: t("dimensions.delivery.label") as string,
-      quality: t("dimensions.quality.label") as string,
-      consistency: t("dimensions.consistency.label") as string,
-      breadth: t("dimensions.breadth.label") as string,
-      craft: t("dimensions.craft.label") as string,
-    },
-    radarNoData: t("badge.radarNoData") as string,
-    verifiedLabel: t("badge.verifiedLabel") as string,
-    sampleDisclosure: t("badge.sampleDisclosure") as string,
-  };
-}
-
-/** Translated label for a specific `ImpactTier` value (e.g. "Solid" → "Sólido"). */
-function tierLabelFor(locale: Locale, tier: string): string {
-  const t = getServerT(locale);
-  return t(`tiers.${tier.toLowerCase()}`) as string;
 }
 
 function fallbackSvg(handle: string, message: string, tagline: string): string {
@@ -334,12 +312,10 @@ async function finalizeMaterializedBadge(
     // This SVG is always served to <img> embeds (README badges), where SMIL
     // <animate> never runs — animated heatmap cells would stay invisible. (#760)
     disableAnimation: true,
-    // #1181 — resolved strings for `options.locale`; `renderBadgeSvg` itself
-    // stays pure/sync and never resolves locale on its own.
-    strings: {
-      ...buildBadgeStrings(options.locale),
-      tierLabel: tierLabelFor(options.locale, materialized.displayImpact.tier),
-    },
+    // #1181 — resolved strings for `options.locale` via the shared
+    // resolveBadgeLocale helper (never built ad hoc here); `renderBadgeSvg`
+    // itself stays pure/sync and never resolves locale on its own.
+    strings: resolveBadgeLocale(options.locale).stringsFor(materialized.displayImpact.tier),
   });
   const renderMs = Date.now() - renderStart;
 
@@ -459,7 +435,7 @@ export async function GET(
   const { handle } = await params;
   // #1181 — resolved once, up front: synchronous and side-effect-free, so
   // resolving it before handle validation costs nothing.
-  const locale = resolveBadgeLocale(request);
+  const locale = resolveLocaleFromRequest(request);
 
   // Validate handle before any cache/rate-limit work
   if (!isValidHandle(handle)) {

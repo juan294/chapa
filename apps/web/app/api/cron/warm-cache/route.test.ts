@@ -739,6 +739,51 @@ describe("GET /api/cron/warm-cache", () => {
     });
   });
 
+  // #1181 (UX-H3) regression — this route used to build the SVG cache key
+  // (buildBadgeSvgCacheKey, no locale arg → defaults to DEFAULT_LOCALE, 'es')
+  // and the rendered content (renderBadgeSvg, no `strings` → defaults to
+  // English) from two INDEPENDENT defaults. Both wrote an English-rendered
+  // badge into the Spanish-keyed cache slot — content and key silently
+  // disagreed, and since the hourly cron pre-warms every handle, this won in
+  // practice for essentially all real (default-locale) traffic. Fixed via
+  // the shared `resolveBadgeLocale` helper, which derives strings AND the
+  // cache key from the same locale value (DEFAULT_LOCALE — the cron has no
+  // request/cookie context to resolve a different one).
+  describe("badge content and cache key never diverge by locale (#1181 regression)", () => {
+    it("renders Spanish (DEFAULT_LOCALE) content for the badge SVG cache warm", async () => {
+      await GET(makeRequest());
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Métricas verificadas",
+            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            radarLabels: expect.objectContaining({ delivery: "Entrega" }),
+          }),
+        }),
+      );
+    });
+
+    it("builds the cache key for the SAME locale ('es') the content was rendered in", async () => {
+      await GET(makeRequest());
+
+      expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
+        "alice",
+        expect.any(String),
+        "es",
+      );
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          strings: expect.objectContaining({ metricsVerified: "Métricas verificadas" }),
+        }),
+      );
+    });
+  });
+
   // #1177 (PE-M2): the cron previously re-rendered and re-wrote the badge SVG
   // cache on every hourly run even when the stats TTL (6h) guarantees the SVG
   // is byte-identical to what's already cached — ~83% redundant renders and
@@ -789,9 +834,14 @@ describe("GET /api/cron/warm-cache", () => {
       expect(mockReadBadgeSvgCache).toHaveBeenCalledWith(
         expect.stringContaining("alice"),
       );
+      // #1181 — the cron has no request/cookie context, so it always warms
+      // the DEFAULT_LOCALE ('es') slot; the locale is now an explicit third
+      // argument (via the shared resolveBadgeLocale helper) rather than left
+      // to buildBadgeSvgCacheKey's own default.
       expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
         "alice",
         expect.any(String),
+        "es",
       );
     });
 

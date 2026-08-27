@@ -12,9 +12,9 @@ import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
-  buildBadgeSvgCacheKey,
   readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
@@ -213,7 +213,17 @@ export async function SharePageContent({
   // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
   // race where a request could read one day's key and write another.
   const today = toDateString(new Date());
-  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  // #1181 (UX-H3 follow-up) — the cache key and the rendered content below
+  // MUST come from the same resolved locale, never independent defaults.
+  // `resolveBadgeLocale` (not `buildBadgeSvgCacheKey` directly) is the only
+  // sanctioned way to derive either here: it bundles both under one call
+  // bound to this page's own resolved `locale` prop, so the key can no
+  // longer silently disagree with the content written into it (the bug
+  // this fixed — content defaulted to English while the key defaulted to
+  // DEFAULT_LOCALE/Spanish, so the majority Spanish-locale traffic was
+  // served an English badge).
+  const badgeLocale = resolveBadgeLocale(locale);
+  const svgCacheKey = badgeLocale.cacheKey(handle, today);
   const [session, materialized, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
     materializePublicProfile(handle, { readOnly }),
@@ -261,6 +271,9 @@ export async function SharePageContent({
       avatarDataUri,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
+      // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
+      // so content and key are always for the same locale.
+      strings: badgeLocale.stringsFor(impact.tier),
     });
     renderedFresh = true;
   }
@@ -323,6 +336,7 @@ export async function SharePageContent({
   const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
   const badgeSrcParams = new URLSearchParams({
     v: badgeCacheBuster,
+    lang: locale,
     ...(readOnly ? { [READ_ONLY_SMOKE_PARAM]: "1" } : {}),
   });
   const badgeImageSrc = `/u/${encodeURIComponent(handle)}/badge.svg?${badgeSrcParams.toString()}`;

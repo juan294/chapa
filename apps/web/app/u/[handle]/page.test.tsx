@@ -525,14 +525,18 @@ describe("SharePage /u/[handle]", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: false,
     });
+    // #1181 — the call now always also carries a locale-resolved `strings`
+    // bundle; see the "badge content and cache key never diverge by locale"
+    // describe block below for that coverage. This test only cares about
+    // the pre-existing avatar/verification contract.
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
       FAKE_MATERIALIZED.displayImpact,
-      {
+      expect.objectContaining({
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2026-04-17",
-      },
+      }),
     );
   });
 
@@ -661,6 +665,65 @@ describe("SharePage /u/[handle]", () => {
       const readKey = mockCacheGet.mock.calls[0]![0] as string;
       const writeKey = mockWriteBadgeSvgCache.mock.calls[0]![0] as string;
       expect(writeKey).toBe(readKey);
+    });
+  });
+
+  // #1181 (UX-H3) regression — SharePageContent used to build the SVG cache
+  // key (buildBadgeSvgCacheKey, no locale arg → defaults to DEFAULT_LOCALE,
+  // 'es') and the rendered content (renderBadgeSvg, no `strings` → defaults
+  // to English) from two INDEPENDENT defaults instead of the page's own
+  // resolved `locale` prop. Both wrote an English-rendered badge into the
+  // Spanish-keyed cache slot — content and key silently disagreed, and since
+  // the default locale is the majority of real traffic, this defeated the
+  // whole feature. Fixed via the shared `resolveBadgeLocale` helper, which
+  // derives strings AND the cache key from the same locale value.
+  describe("badge content and cache key never diverge by locale (#1181 regression)", () => {
+    it("renders Spanish content into the :es-keyed cache slot for the default (es) locale", async () => {
+      await SharePageContent({ handle: "testuser", locale: "es" });
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Métricas verificadas",
+            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            radarLabels: expect.objectContaining({ delivery: "Entrega" }),
+          }),
+        }),
+      );
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      expect(readKey.endsWith(":es")).toBe(true);
+    });
+
+    it("renders English content into the :en-keyed cache slot for locale=en", async () => {
+      await SharePageContent({ handle: "testuser", locale: "en" });
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({
+          strings: expect.objectContaining({
+            metricsVerified: "Verified metrics",
+            tierLabel: "Solid",
+            radarLabels: expect.objectContaining({ delivery: "Delivery" }),
+          }),
+        }),
+      );
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      expect(readKey.endsWith(":en")).toBe(true);
+    });
+
+    it("writes a fresh render to the exact same locale-tagged key it read from, for a non-default locale", async () => {
+      await SharePageContent({ handle: "testuser", locale: "en" });
+
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      const readKey = mockCacheGet.mock.calls[0]![0] as string;
+      const writeKey = mockWriteBadgeSvgCache.mock.calls[0]![0] as string;
+      expect(writeKey).toBe(readKey);
+      expect(writeKey.endsWith(":en")).toBe(true);
     });
   });
 
