@@ -159,7 +159,7 @@ function VerifiedCard({
       {/* Hash display */}
       <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.verificationCode') as string}</p>
-        <p className="break-all font-heading text-lg tracking-widest text-complement">
+        <p className="break-all font-heading text-lg tracking-widest text-complement-text">
           {hash}
         </p>
       </div>
@@ -170,7 +170,7 @@ function VerifiedCard({
           <span className="text-sm text-text-secondary">{t('verifyDetail.developer') as string}</span>
           <Link
             href={`/u/${record.handle}`}
-            className="font-heading text-sm text-complement hover:text-complement-light"
+            className="font-heading text-sm text-complement-text hover:text-complement-text-hover"
           >
             @{record.handle}
           </Link>
@@ -261,7 +261,7 @@ function VerifiedCard({
         </p>
         <Link
           href={`/u/${record.handle}/badge.svg`}
-          className="text-xs text-complement hover:text-complement-light"
+          className="text-xs text-complement-text hover:text-complement-text-hover"
         >
           {t('verifyDetail.viewBadge') as string}
         </Link>

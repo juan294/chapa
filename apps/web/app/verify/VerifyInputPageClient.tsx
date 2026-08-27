@@ -34,7 +34,7 @@ export function VerifyInputPageClient() {
             <div>
               <h1 className="font-heading text-2xl tracking-tight">
                 {t('verify.headingBefore') as string}{" "}
-                <span className="text-complement">
+                <span className="text-complement-text">
                   {t('verify.headingHighlight') as string}
                 </span>
               </h1>

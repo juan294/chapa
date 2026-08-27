@@ -35,6 +35,24 @@ html[lang="en"] [data-document-locale="es"] {
      ~5.49:1. Same value in both themes, mirroring --color-complement
      itself (defined once here, not redefined per-theme below). */
   --color-complement-dark: #047857;
+  /* #1189 — --color-complement (#10B981) used directly as TEXT measures
+     ~2.54:1 against light-theme backgrounds, below the 4.5:1 AA floor (the
+     dark-theme use as text is fine, ~7.8:1). Unlike --color-complement-dark
+     above (a fixed value for the white-on-solid-fill CTA case), this is
+     THEME-AWARE — light value below, dark value re-declared to the base
+     teal in [data-theme="dark"]. Use this for complement-colored text/icon
+     strokes; never for fills, tints, or borders (those keep --color-complement
+     / --color-complement-light / --color-complement-dark unchanged). */
+  --color-complement-text: #0B835C;
+  /* #1189 follow-up — a hover state must be a legitimate text color that
+     clears AA in its own theme, not --color-complement-light (a translucent
+     BACKGROUND tint that renders near-invisible as text: pale mint on white
+     in light theme, 15%-alpha green in dark theme). --color-complement-text
+     is already the lightest same-hue/saturation shade that clears 4.5:1 on
+     light surfaces, so a light-theme hover can only move DARKER (still
+     4.5:1+, with room to spare); dark theme has headroom to move LIGHTER
+     instead (brighten-on-hover), re-declared in [data-theme="dark"] below. */
+  --color-complement-text-hover: #085E41;
 
   --color-terminal-green: #16A34A;
   --color-terminal-red: #DC2626;
@@ -95,6 +113,8 @@ html[lang="en"] [data-document-locale="es"] {
   --color-dark-card: #252542;
   --color-purple-tint: #F5F3FF;
   --color-complement-light: #D1FAE5;
+  --color-complement-text: #0B835C;
+  --color-complement-text-hover: #085E41;
 
   --color-terminal-green: #16A34A;
   --color-terminal-red: #DC2626;
@@ -145,6 +165,17 @@ html[lang="en"] [data-document-locale="es"] {
   --color-dark-card: #0E0E16;
   --color-purple-tint: rgba(139, 92, 246, 0.06);
   --color-complement-light: rgba(16, 185, 129, 0.15);
+  /* #1189 — dark-theme text value is the same bright teal as the base
+     --color-complement (already ~7.8:1 against dark backgrounds — fine
+     as text). Re-declared here (not just left to inherit @theme's light
+     default) so the token is genuinely theme-aware like every other
+     per-theme color in this block. */
+  --color-complement-text: #10B981;
+  /* #1189 follow-up — dark theme has contrast headroom to move LIGHTER on
+     hover (brighten), the opposite direction from light theme's DARKER
+     hover above — both directions increase contrast against their own
+     background, which is what makes hover a legible, visible change. */
+  --color-complement-text-hover: #14EBA4;
 
   --color-terminal-green: #4ADE80;
   --color-terminal-red: #F87171;

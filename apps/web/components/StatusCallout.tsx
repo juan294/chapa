@@ -41,8 +41,11 @@ const STATUS_STYLES: Record<
   verification: {
     container: "border-complement/30 bg-complement/10",
     iconBg: "bg-complement/15",
-    iconText: "text-complement",
-    title: "text-complement",
+    // #1189 — text-complement (base --color-complement) fails AA contrast
+    // as text/icon-stroke on light-theme backgrounds (~2.54:1); the fill
+    // classes above are unaffected and keep the base teal token.
+    iconText: "text-complement-text",
+    title: "text-complement-text",
     icon: <path d="M20 6L9 17l-5-5" />,
   },
 };

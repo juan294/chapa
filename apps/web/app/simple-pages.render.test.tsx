@@ -118,7 +118,9 @@ describe("VerifyInputPage render", () => {
     expect(screen.getByTestId("verify-form")).toBeDefined();
 
     const heading = screen.getByRole("heading", { level: 1 });
-    expect(heading.querySelector(".text-complement")).not.toBeNull();
+    // #1189 — text-complement fails AA contrast as text on light-theme
+    // backgrounds; the highlighted span uses the theme-aware text token.
+    expect(heading.querySelector(".text-complement-text")).not.toBeNull();
 
     expect(screen.getByText("chapa verify")).toBeDefined();
   });
