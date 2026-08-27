@@ -211,7 +211,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Crypto helpers: `apps/web/lib/crypto/*` — constant-time comparison (`safe-equal.ts`) for HMAC/token verification
 - Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (interactions, borders, cards, celebrations, backgrounds, counters, heatmap animations, tier visuals) behind Creator Studio's 9 customization categories
 - Creator Studio UI: `apps/web/app/studio/*` — authenticated owner preview, controls, save state, command actions, and preview footer composition
-- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — Redis caches validated payloads while Supabase remains authoritative; Supabase commits before Redis is refreshed, migration 035 assigns database-ordered revisions, and each cache hit checks the durable revision so an outage or older serverless instance cannot make stale data authoritative
+- Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — Supabase is the only store; both GET and PUT read/write it directly with no Redis involvement (#1186/BE-L1 removed the Redis read because every cache hit still required a second, independent Supabase revision check to trust it; a later remediation removed the now-orphaned Redis write too, since nothing read that mirror back once the read path stopped consulting it). Migration 035's `revision` column and `set_studio_config_revision` trigger remain — `dbGetStudioConfig` still validates and returns a monotonically-increasing `revision` per row — but nothing outside this module consumes it today.
 - HTTP utilities: `apps/web/lib/http/*` — client IP extraction (`client-ip.ts`) for rate limiting
 - Keyboard shortcuts: `apps/web/lib/keyboard/*` — shortcut registry and React hook for the terminal/command-bar UI
 - Monitoring: `apps/web/lib/monitoring/*` — badge latency SLO budgets and measurement (`latency-slo.ts`) backing `/api/cron/latency-check`
@@ -428,7 +428,7 @@ SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBL
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
-CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1 operational alerts (Discord/Slack/custom — optional; triggers on health_degraded, badge_5xx, oauth_callback_failure, cron_failure, warm_cache_high_failure_rate, warm_cache_ceiling_approached)
+CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1/P2 operational alerts (optional, custom endpoint only — no Discord/Slack integration exists or is planned; triggers on health_degraded, badge_5xx, oauth_callback_failure, cron_failure, warm_cache_high_failure_rate, warm_cache_ceiling_approached, badge_latency_slo_breach). When unset (the current production default), the same signals deliver via email instead (Resend, to SUPPORT_FORWARD_EMAIL) — see docs/runbooks/incident-response.md.
 
 RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
 RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)

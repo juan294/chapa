@@ -76,7 +76,7 @@ Once logs are flowing, set up saved queries for the signals the app already emit
 | Signal | Where it comes from | Why it matters |
 |--------|--------------------|----------------|
 | `[db] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing` | `lib/db/supabase.ts` `console.warn` | DB silently disabled in prod (misconfiguration) |
-| 5xx on `/u/:handle/badge.svg` | function logs | Core public flow broken (P1) — also alerts via webhook |
+| 5xx on `/u/:handle/badge.svg` | function logs | Core public flow broken (P1) — also alerts via the operational alert channel (webhook or email fallback) |
 | 5xx on `/api/auth/callback` | function logs | OAuth login broken (P1) |
 | 5xx / non-200 on `/api/cron/*` | function logs | Cron job failing (warm-cache, sync-audience, process-campaigns, latency-check) |
 | `/api/health` returning `degraded` / 503 | function logs | Dependency outage (Redis/Supabase/GitHub) |
@@ -98,14 +98,15 @@ sends **P1/P2 alerts** for `health_degraded`, `badge_5xx`,
 by the daily `latency-check` cron when the badge route's p95 latency budget is
 exceeded or the probe fails). Alert payloads are JSON with secrets scrubbed.
 
-**Delivery channel (updated by Wave 1 / #1162 / DO-B1):** if
+**Delivery channel (Wave 1 / #1162 / DO-B1, corrected in `CLAUDE.md` and
+`docs/runbooks/incident-response.md` by a later remediation pass):** if
 `CHAPA_ALERT_WEBHOOK_URL` is configured, alerts POST to that webhook. In
 production the webhook is unset, so delivery falls back to **email via the
 existing Resend integration** (`sendAlertEmail`, `apps/web/lib/email/alerts.ts`)
-rather than a Discord/Slack webhook. Both `CLAUDE.md` and
-`docs/runbooks/incident-response.md` still describe the webhook as the primary
-path — check which channel is actually configured before assuming pages will
-arrive as webhook pushes.
+rather than a Discord/Slack webhook — there is deliberately no Discord/Slack
+integration anywhere in this project. Check which channel is actually
+configured (`CHAPA_ALERT_WEBHOOK_URL` first, then `RESEND_API_KEY` +
+`SUPPORT_FORWARD_EMAIL`) before assuming pages will arrive as webhook pushes.
 
 Not all of these signals fire the same way:
 
@@ -174,8 +175,10 @@ operation.
 - [ ] Test traffic visible in Axiom within ~2 minutes.
 - [ ] Saved queries for the signals table above created.
 - [ ] Errors / cron / health dashboards built.
-- [ ] `CHAPA_ALERT_WEBHOOK_URL` confirmed set in Vercel production env (real-time
-      alert path) — see incident-response runbook.
+- [ ] Alert delivery channel confirmed for production — either
+      `CHAPA_ALERT_WEBHOOK_URL`, or `RESEND_API_KEY` + `SUPPORT_FORWARD_EMAIL`
+      as the email fallback (both deliver request-path signals in real time;
+      see incident-response runbook).
 
 ## Useful links
 

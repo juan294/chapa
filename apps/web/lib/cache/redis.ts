@@ -97,53 +97,6 @@ export async function cacheSet<T>(
   }
 }
 
-export type VersionedCacheSetResult = "stored" | "stale" | "failed";
-
-/**
- * Atomically publish a revisioned value unless Redis already holds a newer one.
- * Unversioned legacy values are treated as revision zero and are replaced.
- */
-export async function cacheSetVersioned<T>(
-  key: string,
-  value: T,
-  revision: number,
-  ttlSeconds: number,
-): Promise<VersionedCacheSetResult> {
-  const redis = getRedis();
-  if (!redis) return "failed";
-
-  const script = `
-local raw = redis.call("GET", KEYS[1])
-if raw then
-  local decoded, current = pcall(cjson.decode, raw)
-  if decoded and type(current) == "table" and current.revision then
-    local current_revision = tonumber(current.revision)
-    local incoming_revision = tonumber(ARGV[2])
-    if current_revision and incoming_revision and current_revision > incoming_revision then
-      return 0
-    end
-  end
-end
-redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[3])
-return 1
-`;
-
-  try {
-    const stored = await redis.eval<[string, string, string], number>(
-      script,
-      [key],
-      [JSON.stringify(value), String(revision), String(ttlSeconds)],
-    );
-    return stored === 1 ? "stored" : "stale";
-  } catch (error) {
-    console.error(
-      "[cache] cacheSetVersioned failed:",
-      (error as Error).message,
-    );
-    return "failed";
-  }
-}
-
 /**
  * Atomically merge fields into a JSON object stored in Redis.
  *

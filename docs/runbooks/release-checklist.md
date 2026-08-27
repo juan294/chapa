@@ -34,10 +34,14 @@ The run records the actual duration; elapsed time alone is not a pass.
 
 ## Alerting readiness
 
-Record whether `CHAPA_ALERT_WEBHOOK_URL` is configured for production. It
-receives the active signals documented in
-`docs/runbooks/incident-response.md`. Reading configuration state is distinct
-from changing it; environment changes require explicit authorization.
+Record whether `CHAPA_ALERT_WEBHOOK_URL` is configured for production. When it
+is unset — the current production default — active alert signals still
+deliver via email (Resend, to `SUPPORT_FORWARD_EMAIL`) rather than a webhook;
+record whether `RESEND_API_KEY` and `SUPPORT_FORWARD_EMAIL` are configured in
+that case, since together they are what actually determines whether the
+signals documented in `docs/runbooks/incident-response.md` reach anyone.
+Reading configuration state is distinct from changing it; environment changes
+require explicit authorization.
 
 ## Migration readiness
 

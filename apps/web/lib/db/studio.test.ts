@@ -4,10 +4,6 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 const mockUpsert = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
-const { mockCacheDel, mockCacheSetVersioned } = vi.hoisted(() => ({
-  mockCacheDel: vi.fn(),
-  mockCacheSetVersioned: vi.fn(),
-}));
 let terminalResolve: { data: unknown; error: unknown };
 let terminalNeverResolves = false;
 
@@ -37,20 +33,12 @@ vi.mock("./supabase", () => ({
   getSupabase: vi.fn(() => ({ from: mockFrom })),
 }));
 
-vi.mock("../cache/redis", () => ({
-  cacheDel: mockCacheDel,
-  cacheSetVersioned: mockCacheSetVersioned,
-}));
-
 import { getSupabase } from "./supabase";
 import {
   STUDIO_CONFIG_READ_TIMEOUT_MS,
-  STUDIO_CONFIG_TTL,
-  cacheStudioConfig,
   dbGetStudioConfig,
   dbUpsertStudioConfig,
   loadStudioConfig,
-  refreshStudioConfigCache,
 } from "./studio";
 
 const config = { ...DEFAULT_BADGE_CONFIG, background: "aurora" as const };
@@ -59,8 +47,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   terminalResolve = { data: null, error: null };
   terminalNeverResolves = false;
-  mockCacheSetVersioned.mockResolvedValue("stored");
-  mockCacheDel.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -158,36 +144,6 @@ describe("dbUpsertStudioConfig", () => {
   });
 });
 
-describe("cacheStudioConfig", () => {
-  it("publishes a committed config under the normalized handle", async () => {
-    await cacheStudioConfig("Juan294", config, 42);
-
-    expect(mockCacheSetVersioned).toHaveBeenCalledWith(
-      "config:juan294",
-      {
-        kind: "studio-config",
-        version: 1,
-        revision: 42,
-        config,
-      },
-      42,
-      STUDIO_CONFIG_TTL,
-    );
-  });
-
-  it("logs a false Redis result without rejecting the committed save", async () => {
-    mockCacheSetVersioned.mockResolvedValue("failed");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-    await expect(cacheStudioConfig("juan294", config, 42)).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalledWith(
-      "[studio/config] Redis write failed (best-effort):",
-      "cacheSetVersioned returned failed",
-    );
-    expect(mockCacheDel).toHaveBeenCalledWith("config:juan294");
-  });
-});
-
 describe("dbGetStudioConfig", () => {
   it("returns the config on hit", async () => {
     terminalResolve = {
@@ -278,8 +234,6 @@ describe("loadStudioConfig", () => {
 
     expect(mockFrom).toHaveBeenCalledWith("studio_configs");
     expect(mockSelect).toHaveBeenCalledWith("handle, config, updated_at, revision");
-    expect(mockCacheDel).not.toHaveBeenCalled();
-    expect(mockCacheSetVersioned).not.toHaveBeenCalled();
   });
 
   it("lowercases the handle when reading", async () => {
@@ -299,7 +253,6 @@ describe("loadStudioConfig", () => {
     await expect(loadStudioConfig("nobody")).resolves.toEqual({
       status: "not_found",
     });
-    expect(mockCacheSetVersioned).not.toHaveBeenCalled();
   });
 
   it("returns unavailable when Supabase is unreachable — no stale cache to fall back to", async () => {
@@ -334,33 +287,5 @@ describe("loadStudioConfig", () => {
     await expect(loadStudioConfig("juan294")).resolves.toEqual({
       status: "invalid",
     });
-  });
-});
-
-describe("refreshStudioConfigCache", () => {
-  it("publishes the current durable revision instead of the request body", async () => {
-    const latest = { ...config, background: "particles" as const };
-    terminalResolve = {
-      data: { handle: "juan294", config: latest, updated_at: "2026-06-25T00:00:01Z", revision: 43 },
-      error: null,
-    };
-
-    await refreshStudioConfigCache("Juan294");
-
-    expect(mockCacheSetVersioned).toHaveBeenCalledWith(
-      "config:juan294",
-      { kind: "studio-config", version: 1, revision: 43, config: latest },
-      43,
-      STUDIO_CONFIG_TTL,
-    );
-  });
-
-  it("removes an older cache value when durable readback is unavailable", async () => {
-    vi.mocked(getSupabase).mockReturnValueOnce(null);
-
-    await refreshStudioConfigCache("Juan294");
-
-    expect(mockCacheSetVersioned).not.toHaveBeenCalled();
-    expect(mockCacheDel).toHaveBeenCalledWith("config:juan294");
   });
 });

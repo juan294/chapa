@@ -2,8 +2,8 @@
  * Supabase data access — studio_configs table.
  *
  * Durable persistence for Creator Studio preview configurations. This table
- * is the source of truth and is read directly on every `loadStudioConfig`
- * call. See issue #935.
+ * is the source of truth and is both read and written directly — no Redis
+ * cache sits in front of it. See issue #935.
  *
  * BE-L1 (#1186): `loadStudioConfig` used to consult Redis first, but every
  * cache hit still had to re-validate against a separate Supabase
@@ -14,11 +14,14 @@
  * fail. Reads now go straight to Supabase; there is no cached value for the
  * read path to go stale against, so the migration-035 staleness concern
  * (an older instance's stale publish outliving a newer one) does not apply
- * here — it only ever applied to trusting a cached value on read. The
- * *write* path below (`cacheStudioConfig`/`refreshStudioConfigCache`) still
- * publishes a best-effort mirror to Redis for `PUT /api/studio/config`
- * (`apps/web/app/api/studio/config/route.ts`, out of this file's scope to
- * change); nothing currently reads that mirror back.
+ * here — it only ever applied to trusting a cached value on read.
+ *
+ * BE-L1 remediation: the write side (`cacheStudioConfig`/
+ * `refreshStudioConfigCache`, formerly called from
+ * `apps/web/app/api/studio/config/route.ts`) was removed along with it —
+ * once the read path stopped consulting Redis, nothing read that mirror
+ * back, so publishing it on every save was a pure write with no consumer.
+ * `PUT /api/studio/config` now only commits to Supabase.
  *
  * Read operations fail open when the database is unavailable. Upserts return
  * typed failure results so callers can handle each failure explicitly.
@@ -26,17 +29,11 @@
 
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
-import {
-  cacheDel,
-  cacheSetVersioned,
-} from "../cache/redis";
 import { withTimeout } from "../async/with-timeout";
 import { isValidBadgeConfig } from "../validation";
 import type { BadgeConfig } from "@chapa/shared";
 
-export const STUDIO_CONFIG_TTL = 31536000;
 export const STUDIO_CONFIG_READ_TIMEOUT_MS = 2_000;
-export const STUDIO_CONFIG_CACHE_ENTRY_VERSION = 1;
 
 export type StudioConfigUpsertResult =
   | { ok: true }
@@ -66,13 +63,6 @@ const REQUIRED_KEYS: readonly (keyof StudioConfigRow & string)[] = [
   "revision",
 ];
 
-interface StudioConfigCacheEntry {
-  kind: "studio-config";
-  version: typeof STUDIO_CONFIG_CACHE_ENTRY_VERSION;
-  revision: number;
-  config: BadgeConfig;
-}
-
 function isValidStudioConfigRevision(value: unknown): value is number {
   return (
     typeof value === "number" &&
@@ -92,36 +82,6 @@ function errorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
-}
-
-/** Publish a committed Studio config to Redis without changing API success. */
-export async function cacheStudioConfig(
-  login: string,
-  config: BadgeConfig,
-  revision: number,
-): Promise<void> {
-  const cacheKey = `config:${login.toLowerCase()}`;
-  const entry: StudioConfigCacheEntry = {
-    kind: "studio-config",
-    version: STUDIO_CONFIG_CACHE_ENTRY_VERSION,
-    revision,
-    config,
-  };
-  const stored = await cacheSetVersioned(
-    cacheKey,
-    entry,
-    revision,
-    STUDIO_CONFIG_TTL,
-  );
-  if (stored === "failed") {
-    console.warn(
-      "[studio/config] Redis write failed (best-effort):",
-      "cacheSetVersioned returned failed",
-    );
-    // A failed publication must not leave an older year-long value
-    // authoritative after Redis recovers.
-    await cacheDel(cacheKey);
-  }
 }
 
 /**
@@ -243,18 +203,4 @@ export async function loadStudioConfig(
   login: string,
 ): Promise<StudioConfigReadResult> {
   return dbGetStudioConfig(login.toLowerCase());
-}
-
-/** Refresh Redis from the current durable row after a successful upsert. */
-export async function refreshStudioConfigCache(login: string): Promise<void> {
-  const normalizedLogin = login.toLowerCase();
-  const result = await dbGetStudioConfig(normalizedLogin);
-  if (result.status === "found") {
-    await cacheStudioConfig(normalizedLogin, result.config, result.revision);
-    return;
-  }
-
-  // A durable save already succeeded. If its readback is temporarily
-  // unavailable, remove any older cache value and let the next GET retry.
-  await cacheDel(`config:${normalizedLogin}`);
 }
