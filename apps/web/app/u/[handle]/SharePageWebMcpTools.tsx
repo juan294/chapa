@@ -15,6 +15,7 @@ import { isValidHandle } from "@/lib/validation";
 import {
   createExplainDimensionTool,
   isWebMcpRecord,
+  sanitizeFreeTextForAgent,
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
 } from "@/lib/webmcp/shared-tools";
@@ -58,7 +59,11 @@ async function readJson(response: Response): Promise<Record<string, unknown> | n
 
 function publicStats(stats: StatsData) {
   return {
-    displayName: stats.displayName,
+    // Projection for the WebMCP tool boundary only -- bounded and neutralised
+    // before crossing into a visitor's agent context. The SVG and share-page
+    // HTML render paths consume `stats.displayName` directly and are
+    // untouched by this projection (#1171 / SE-M2).
+    displayName: sanitizeFreeTextForAgent(stats.displayName),
     commitsTotal: stats.commitsTotal,
     activeDays: stats.activeDays,
     prsMergedCount: stats.prsMergedCount,
@@ -187,6 +192,7 @@ export function SharePageWebMcpTools({
       stats,
       craftResult,
       t,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
     });
 
     const compareProfiles: WebMcpTool = {
