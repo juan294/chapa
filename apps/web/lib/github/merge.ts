@@ -14,12 +14,29 @@ import { PR_WEIGHT_AGG_CAP } from "@chapa/shared";
  * - `microCommitRatio` / `docsOnlyPrRatio`: max of both (if defined) via {@link mergeOptionalMax}.
  * - `totalStars` / `totalForks` / `totalWatchers`: max of both (vanity metrics may overlap across accounts).
  * - Identity fields (`handle`, `displayName`, `avatarUrl`, `fetchedAt`, `fetchScope`): kept from primary.
- * - `hasSupplementalData`: set to `true` (controllable via `options.markAsSupplemental`).
+ * - `hasSupplementalData`: `true` when this call (or any earlier call in a
+ *   chain — see #1163 below) was a real EMU/supplemental merge, via
+ *   `options.markAsSupplemental`.
+ * - `primaryReviewsSubmittedCount`: the primary operand's *own* GitHub-derived
+ *   review count, carried through unchanged once established — see #1163 below.
+ *
+ * #1163: `_compose` (client.ts) chains `mergeStats` up to 4x in sequence
+ * (bitbucket -> codeberg -> gitlab -> supplemental), passing each result as
+ * the next call's `primary`. Both `primaryReviewsSubmittedCount` and
+ * `hasSupplementalData` are therefore computed so the final, chained result
+ * is independent of how many calls (and in what order) contributed to it:
+ * - `primaryReviewsSubmittedCount` is taken from `primary`'s own already-set
+ *   field when present (i.e. it was already established by an earlier call
+ *   in the chain), falling back to `primary.reviewsSubmittedCount` only on
+ *   the first call — never resummed from a running total.
+ * - `hasSupplementalData` is OR-accumulated (`this call's flag || primary's
+ *   existing flag`) rather than overwritten, so it can't be reset back to
+ *   `false` by a later call regardless of chain order.
  *
  * @param primary - The user's primary GitHub stats (identity fields are preserved from here)
  * @param supplemental - The supplemental stats to merge in (e.g. EMU / secondary account)
  * @param options - Optional merge configuration
- * @param options.markAsSupplemental - Whether to set `hasSupplementalData` on the result (default: `true`)
+ * @param options.markAsSupplemental - Whether this call counts as a real supplemental merge (default: `true`)
  * @returns A new `StatsData` object combining both sources — never mutates inputs
  */
 export function mergeStats(
@@ -50,7 +67,11 @@ export function mergeStats(
     prsMergedCount: primary.prsMergedCount + supplemental.prsMergedCount,
     prsMergedWeight: Math.min(primary.prsMergedWeight + supplemental.prsMergedWeight, PR_WEIGHT_AGG_CAP),
     reviewsSubmittedCount: primary.reviewsSubmittedCount + supplemental.reviewsSubmittedCount,
-    primaryReviewsSubmittedCount: primary.reviewsSubmittedCount,
+    // #1163: use primary's own already-established value when present (a
+    // prior call in the chain already set it correctly) — only fall back to
+    // primary.reviewsSubmittedCount on the first call in a chain, when it is
+    // still the raw GitHub-derived count.
+    primaryReviewsSubmittedCount: primary.primaryReviewsSubmittedCount ?? primary.reviewsSubmittedCount,
     issuesClosedCount: primary.issuesClosedCount + supplemental.issuesClosedCount,
     linesAdded: primary.linesAdded + supplemental.linesAdded,
     linesDeleted: primary.linesDeleted + supplemental.linesDeleted,
@@ -83,7 +104,9 @@ export function mergeStats(
       supplemental.issueLinkageRate, supplemental.prsMergedCount,
     ),
     heatmapData: mergedHeatmap,
-    hasSupplementalData: options?.markAsSupplemental ?? true,
+    // #1163: OR-accumulate rather than overwrite, so the flag can't be reset
+    // to false by a later call in a chain regardless of order.
+    hasSupplementalData: (options?.markAsSupplemental ?? true) || (primary.hasSupplementalData ?? false),
   };
 }
 

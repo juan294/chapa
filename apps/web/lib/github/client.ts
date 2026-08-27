@@ -535,10 +535,26 @@ async function _fetchAndCache(
   const base = accepted ? primary : (baseline ?? primary);
   const composed = _compose(base, overlays);
 
+  // #1163 (BE-H2) — on the rejected branch, `base` (the baseline fallback)
+  // can itself be lower-scoped than whatever is already sitting at cacheKey
+  // (`existingComposed`): the documented inflight race between separate
+  // public/authenticated dedup keys (:91-99 above), or a prior partial
+  // failure that left cacheKey and baselineKey at different scopes. Writing
+  // `composed` (built from `base`) in that case would silently downgrade
+  // cacheKey — the #1002/#1050 signature, reintroduced via the rejection
+  // path. Skip the write ONLY in that specific case: every other rejected
+  // write still needs to happen to refresh the 6h TTL and avoid a refetch
+  // hot-loop (an untagged/absent existingComposed ranks weakest, per
+  // scopeRank, so it never blocks this write).
+  const rejectedDowngrade =
+    rejected &&
+    existingComposed != null &&
+    scopeRank(existingComposed.fetchScope) > scopeRank(base.fetchScope);
+
   // A rejected fetch with no baseline to fall back on has nothing better to
   // offer the shared cache, so it writes nothing rather than persisting a
   // downgrade — the caller still receives its own composed data below.
-  if (accepted || baseline != null) {
+  if ((accepted || baseline != null) && !rejectedDowngrade) {
     await cacheSet(cacheKey, composed, CACHE_TTL);
   }
 
