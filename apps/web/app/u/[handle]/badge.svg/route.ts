@@ -184,14 +184,66 @@ function createDeferred<T>(): {
  * background continuation below, so a deadline-fallback response's eventual
  * real render warms the cache identically to a non-degraded request.
  */
+/**
+ * #1166 (PE-H2) — the shared SVG cache write itself, extracted so it can be
+ * awaited inline (the background/warm path, which has no response to race)
+ * or deferred into the route's after() block (the foreground winner path,
+ * where nothing in the response depends on it). `readOnly` is re-checked
+ * here (not just inferred from `avatarCachePolicy` staying "skip") so the
+ * "never cache a readOnly/smoke render" invariant holds explicitly regardless
+ * of which caller invokes this.
+ */
+async function persistFinalizedBadgeCache(
+  handle: string,
+  svg: string,
+  options: {
+    readOnly: boolean;
+    svgCacheKey: string;
+    verification: PublicVerificationCode | null;
+    avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
+  },
+): Promise<void> {
+  if (options.readOnly || !options.verification) return;
+
+  if (options.avatarCachePolicy === "short") {
+    // #1088 — short-TTL placeholder write: populates the cache (so a
+    // README embed with real traffic stops forcing a full
+    // materialize+render on every request) without shadowing a later good
+    // render — e.g. avatarUrl reappearing on a subsequent stats refetch —
+    // for anywhere near the 24h+jitter a normal write gets. The shared
+    // outcome policy distinguishes this from transient failure and timeout.
+    await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
+      ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+    });
+  } else if (options.avatarCachePolicy === "standard") {
+    // Covers a real success or a definitive empty result such as 404.
+    await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+  }
+  // else: the avatar fetch timed out or failed transiently. Do not cache;
+  // the next request gets a fresh attempt instead of a stale placeholder.
+}
+
 async function finalizeMaterializedBadge(
   handle: string,
   materialized: MaterializedProfile,
-  options: { readOnly: boolean; svgCacheKey: string },
+  options: {
+    readOnly: boolean;
+    svgCacheKey: string;
+    /**
+     * #1166 (PE-H2) — when true, skip the inline cache write below entirely;
+     * the caller (the route's foreground winner path) will perform it inside
+     * after() instead, since the write blocked the response for up to 500ms
+     * with nothing in the response depending on its result. Must stay false
+     * (the default) for `warmBadgeCacheInBackground` — that call has no
+     * response to race, and cache warming is its entire purpose.
+     */
+    deferCacheWrite?: boolean;
+  },
 ): Promise<{
   svg: string;
   verification: PublicVerificationCode | null;
   renderMs: number;
+  avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
 }> {
   // #1080/#1088 — the avatar step has distinct outcomes, previously
   // conflated into one `avatarResolved` boolean (`avatarDataUri !==
@@ -235,26 +287,18 @@ async function finalizeMaterializedBadge(
   // A missing verification record can be temporary when the first public
   // fetch is incomplete. Do not make that unverified render the terminal
   // 24-hour cache value; a later complete fetch must be able to heal it.
-  if (!options.readOnly && verification) {
-    if (avatarCachePolicy === "short") {
-      // #1088 — short-TTL placeholder write: populates the cache (so a
-      // README embed with real traffic stops forcing a full
-      // materialize+render on every request) without shadowing a later good
-      // render — e.g. avatarUrl reappearing on a subsequent stats refetch —
-      // for anywhere near the 24h+jitter a normal write gets. The shared
-      // outcome policy distinguishes this from transient failure and timeout.
-      await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
-        ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
-      });
-    } else if (avatarCachePolicy === "standard") {
-      // Covers a real success or a definitive empty result such as 404.
-      await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
-    }
-    // else: the avatar fetch timed out or failed transiently. Do not cache;
-    // the next request gets a fresh attempt instead of a stale placeholder.
+  // #1166 — when deferred, the caller performs this write itself inside
+  // after() instead (foreground winner path only).
+  if (!options.deferCacheWrite) {
+    await persistFinalizedBadgeCache(handle, svg, {
+      readOnly: options.readOnly,
+      svgCacheKey: options.svgCacheKey,
+      verification,
+      avatarCachePolicy,
+    });
   }
 
-  return { svg, verification, renderMs };
+  return { svg, verification, renderMs, avatarCachePolicy };
 }
 
 /**
@@ -308,6 +352,11 @@ async function warmBadgeCacheInBackground(
   try {
     const materialized = await materializePromise;
     if (!materialized) return;
+    // #1166 (PE-H2) — `options` never sets `deferCacheWrite`, so this AWAITS
+    // the SVG cache write inline (the default). This call has no response to
+    // race — cache warming is its entire purpose — so the write must not be
+    // deferred to a second after() the way the foreground winner path defers
+    // its own write.
     const { verification } = await finalizeMaterializedBadge(handle, materialized, options);
     await runBadgeSideEffects(handle, materialized, { readOnly: options.readOnly, verification });
   } catch (err) {
@@ -396,7 +445,17 @@ export async function GET(
     });
   }
 
-  const inflightSvg = inflightBadgeRenders.get(svgCacheKey);
+  // #1166 (BE-M1) — `readOnly` (the public `__chapa_smoke=1` probe) must be
+  // part of the IN-MEMORY coalescing key ONLY. A readOnly render skips the
+  // avatar entirely and can be a fallback/degraded SVG on a cold handle —
+  // handing it to a concurrent real visitor (or vice versa) would be wrong.
+  // This must NOT touch `svgCacheKey` (the shared Redis SVG slot the share
+  // page also reads) or `renderLockKey` (derived from it below) — those stay
+  // identical for readOnly and normal requests, or a smoke probe would take
+  // an independent lock and double GitHub fetches at date rollover.
+  const coalesceKey = readOnly ? `${svgCacheKey}:ro` : svgCacheKey;
+
+  const inflightSvg = inflightBadgeRenders.get(coalesceKey);
   if (inflightSvg) {
     const shared = await inflightSvg;
     return badgeSvgResponse(
@@ -409,7 +468,7 @@ export async function GET(
   }
 
   const deferred = createDeferred<BadgeRenderResult>();
-  inflightBadgeRenders.set(svgCacheKey, deferred.promise);
+  inflightBadgeRenders.set(coalesceKey, deferred.promise);
 
   const renderLockKey = buildBadgeSvgRenderLockKey(handle, today);
   let gotRenderLock = false;
@@ -550,26 +609,35 @@ export async function GET(
     // Re-bind to a `const` now that `materialized` is known non-null — `let`
     // narrowing does not persist into the `after()` closure below.
     const profile = materialized;
-    const { svg, verification, renderMs } = await finalizeMaterializedBadge(
+    const { svg, verification, renderMs, avatarCachePolicy } = await finalizeMaterializedBadge(
       handle,
       profile,
-      { readOnly, svgCacheKey },
+      // #1166 (PE-H2) — the SVG cache write blocked the response for up to
+      // 500ms (its own deadline) with nothing in the response depending on
+      // it. Defer it into after(), same as the durable side effects below.
+      { readOnly, svgCacheKey, deferCacheWrite: true },
     );
 
     // #1013 — persistProfileSnapshot is a durable Supabase write with nothing
     // in the response depending on its result; it must not block (or, on
     // failure, retroactively invalidate) an otherwise-successful render. Both
-    // it and the already-deferred cache work now run in after().
+    // it, the already-deferred cache work, and (#1166) the shared SVG cache
+    // write now run in after().
     after(() => {
-      return runBadgeSideEffects(handle, profile, { readOnly, verification }).catch(
-        (err) => {
+      return persistFinalizedBadgeCache(handle, svg, {
+        readOnly,
+        svgCacheKey,
+        verification,
+        avatarCachePolicy,
+      })
+        .then(() => runBadgeSideEffects(handle, profile, { readOnly, verification }))
+        .catch((err) => {
           fireAndForget(() => captureServerError({
             route: `/u/${handle}/badge.svg`,
             statusCode: 500,
             error: err,
           }));
-        },
-      );
+        });
     });
 
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
@@ -601,7 +669,7 @@ export async function GET(
       fallbackResult.status,
     );
   } finally {
-    inflightBadgeRenders.delete(svgCacheKey);
+    inflightBadgeRenders.delete(coalesceKey);
     if (gotRenderLock) {
       fireAndForget(() => cacheDel(renderLockKey), () => undefined);
     }

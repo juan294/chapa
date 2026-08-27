@@ -42,6 +42,18 @@ describe("evaluateBadgeLatency", () => {
     });
     expect(result.breached).toBe(true);
   });
+
+  // #1166 (PE-H2) — the cache-miss budget must equal the badge route's own
+  // deterministic worst-case bound (primary cache read 500ms + rate limit
+  // 150ms + render-lock acquire 250ms + bounded materialize deadline 2200ms +
+  // avatar race 1000ms = 4100ms), now that the SVG cache write no longer
+  // blocks the response. A future change to any of those route deadlines (or
+  // to this budget) should be a deliberate, together edit — this guard makes
+  // silent drift between them visible instead of an assumed-in-sync comment.
+  it("the cache-miss budget matches the badge route's reconciled worst-case bound (#1166)", () => {
+    const routeDeadlineSumMs = 500 + 150 + 250 + 2200 + 1000;
+    expect(BADGE_LATENCY_SLO_MS.cacheMiss).toBe(routeDeadlineSumMs);
+  });
 });
 
 describe("formatServerTiming", () => {

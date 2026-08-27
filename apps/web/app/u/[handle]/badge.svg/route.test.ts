@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { CACHE_VERSION } from "@/lib/cache/version";
-import { BADGE_RENDER_VARIANT } from "@/lib/render/badge-svg-cache";
+import {
+  BADGE_RENDER_VARIANT,
+  buildBadgeSvgCacheKey,
+  buildBadgeSvgRenderLockKey,
+} from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
 
 const {
   mockMaterializePublicProfile,
@@ -270,6 +275,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
     await GET(req, ctx);
+    await flushAfterCallbacks();
 
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
@@ -465,6 +471,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockCacheSet).toHaveBeenCalledWith(
         expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
@@ -478,6 +485,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockCacheSet).toHaveBeenCalledWith(
         expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
@@ -497,6 +505,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockGetAvatarBase64).not.toHaveBeenCalled();
       expect(mockCacheSet).toHaveBeenCalledWith(
@@ -553,6 +562,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(res.status).toBe(200);
       // No avatarUrl to fetch — getAvatarBase64 must never be called.
@@ -574,6 +584,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       const ttl = mockCacheSet.mock.calls[0]![2] as number;
       expect(ttl).toBeLessThan(86400);
@@ -603,6 +614,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       expect(mockCacheSet).not.toHaveBeenCalled();
     });
@@ -648,6 +660,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
+      await flushAfterCallbacks();
 
       // TTL is base 24h + per-handle jitter of 0-2h (PE-S1)
       expect(mockCacheSet).toHaveBeenCalledWith(
@@ -829,6 +842,102 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
   });
 
+  // #1166 (PE-H2) — the cache-miss winner path previously awaited the shared
+  // SVG cache write synchronously before the response was built, adding up to
+  // 500ms to the response-blocking critical path for zero benefit (nothing in
+  // the response depends on the write succeeding). The write must move to the
+  // route's existing after() block, exactly like the durable side effects
+  // already do (#1013) — but ONLY on the foreground winner path. The
+  // background continuation (`warmBadgeCacheInBackground`, covered further
+  // below) has no response to race and must keep awaiting it inline.
+  describe("SVG cache write deferred to after() on the foreground path (#1166 / PE-H2)", () => {
+    it("does not write the shared SVG cache before the response is returned", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      // Not called on the synchronous path — only after() has scheduled it.
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("schedules the SVG cache write inside after(), not on the synchronous path", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).not.toHaveBeenCalled();
+      expect(mockAfter).toHaveBeenCalledWith(expect.any(Function));
+
+      await flushAfterCallbacks();
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:${BADGE_RENDER_VARIANT}:`)),
+        FAKE_SVG,
+        expect.any(Number),
+      );
+    });
+
+    it("still writes the cache and runs durable side effects exactly once each", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+      await flushAfterCallbacks();
+
+      expect(mockCacheSet).toHaveBeenCalledTimes(1);
+      expect(mockPersistProfileSnapshot).toHaveBeenCalledTimes(1);
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledTimes(1);
+    });
+
+    // `writeBadgeSvgCache` itself fails open (`withCacheFallback` catches and
+    // returns `false` — the SVG cache is deliberately best-effort, unlike the
+    // durable Supabase snapshot write). A rejected underlying `cacheSet` call
+    // must therefore never surface as a thrown error out of the deferred
+    // after() write, and must not prevent the durable side effects that run
+    // alongside it in the same after() registration.
+    it("a failed deferred cache write does not affect the already-returned response or block durable side effects", async () => {
+      mockCacheSet.mockRejectedValue(new Error("redis write failed"));
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(FAKE_SVG);
+
+      await flushAfterCallbacks();
+
+      expect(mockCaptureServerError).not.toHaveBeenCalled();
+      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED,
+        { readOnly: false },
+      );
+    });
+  });
+
+  // #1166 (BE-M1) — `readOnly` (the public `__chapa_smoke=1` probe) must never
+  // change the shared Redis SVG cache key or the render-lock key: both are
+  // consumed by the share page too, and a smoke probe taking its own
+  // independent render-lock would double GitHub fetches at date rollover.
+  // Only the in-memory `inflightBadgeRenders` coalescing map (same-instance
+  // dedup only) may distinguish readOnly from normal requests.
+  describe("readOnly does not fork the shared cache/lock keys (#1166 / BE-M1)", () => {
+    it("uses the exact shared cache key and render-lock key for a readOnly (smoke) request", async () => {
+      const today = toDateString(new Date());
+      const [req, ctx] = makeRequest(
+        "testuser",
+        { "x-forwarded-for": "1.2.3.4" },
+        "?__chapa_smoke=1",
+      );
+      await GET(req, ctx);
+
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        buildBadgeSvgCacheKey("testuser", today),
+      );
+      expect(mockCacheSetNx).toHaveBeenCalledWith(
+        buildBadgeSvgRenderLockKey("testuser", today),
+        30,
+      );
+    });
+  });
+
   // #1086 (PE-H1) — nothing bounded the SUM of the cache-miss path's steps;
   // materializePublicProfile alone could take up to the 30s inflight cap, on
   // top of the route's own cache/lock/avatar ceilings. The route now races
@@ -896,6 +1005,48 @@ describe("GET /u/[handle]/badge.svg", () => {
           { readOnly: false },
         );
         expect(mockDeferProfileCacheWork).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // #1166 (PE-H2) — `warmBadgeCacheInBackground` is the ONE caller that must
+    // keep AWAITING the SVG cache write: it runs entirely inside after(), has
+    // no response to race, and cache warming is its whole purpose. Unlike the
+    // foreground winner path (deferred above), its write must complete before
+    // its durable side effects run — not merely be scheduled.
+    it("warmBadgeCacheInBackground awaits the SVG cache write before running durable side effects", async () => {
+      vi.useFakeTimers();
+      try {
+        const order: string[] = [];
+        mockCacheSet.mockImplementation(async () => {
+          order.push("cacheSet-start");
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          order.push("cacheSet-end");
+          return true;
+        });
+        mockPersistProfileSnapshot.mockImplementation(async () => {
+          order.push("persist");
+          return true;
+        });
+
+        mockCacheGet
+          .mockResolvedValueOnce(null) // today's SVG cache: miss
+          .mockResolvedValueOnce(STALE_SVG); // yesterday's stale SVG: hit
+        const { resolve } = deferredMaterialize();
+
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(2300);
+        await responsePromise;
+
+        resolve(FAKE_MATERIALIZED);
+        const flushPromise = flushAfterCallbacks();
+        await vi.advanceTimersByTimeAsync(50);
+        await flushPromise;
+
+        expect(order).toEqual(["cacheSet-start", "cacheSet-end", "persist"]);
       } finally {
         vi.useRealTimers();
       }
