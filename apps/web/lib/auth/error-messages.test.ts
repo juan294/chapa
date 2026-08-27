@@ -4,61 +4,67 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { resolveTranslation } from "@/lib/i18n/resolve";
 
+// #1164 (FE-H1/PE-H1): `getOAuthErrorMessage` no longer defaults `t` to a
+// statically-imported English dictionary (that default was dead in the
+// client path and pulled the dictionary into every client bundle). Tests
+// that previously relied on the default now pass this explicit translator.
+const enT = (key: string) => resolveTranslation(key, en) as string;
+
 describe("getOAuthErrorMessage", () => {
   it("returns a user-friendly message for 'no_code'", () => {
-    const result = getOAuthErrorMessage("no_code");
+    const result = getOAuthErrorMessage("no_code", enT);
     expect(result).toBeTruthy();
     expect(result).not.toContain("no_code");
   });
 
   it("returns a user-friendly message for 'invalid_state'", () => {
-    const result = getOAuthErrorMessage("invalid_state");
+    const result = getOAuthErrorMessage("invalid_state", enT);
     expect(result).toBeTruthy();
     expect(result).not.toContain("invalid_state");
   });
 
   it("returns a user-friendly message for 'config'", () => {
-    const result = getOAuthErrorMessage("config");
+    const result = getOAuthErrorMessage("config", enT);
     expect(result).toBeTruthy();
     expect(result).not.toContain("config");
   });
 
   it("returns a user-friendly message for 'token_exchange'", () => {
-    const result = getOAuthErrorMessage("token_exchange");
+    const result = getOAuthErrorMessage("token_exchange", enT);
     expect(result).toBeTruthy();
     expect(result).not.toContain("token_exchange");
   });
 
   it("returns a user-friendly message for 'user_fetch'", () => {
-    const result = getOAuthErrorMessage("user_fetch");
+    const result = getOAuthErrorMessage("user_fetch", enT);
     expect(result).toBeTruthy();
     expect(result).not.toContain("user_fetch");
   });
 
   it("returns a generic fallback for unknown error codes", () => {
-    const result = getOAuthErrorMessage("unknown_error_xyz");
+    const result = getOAuthErrorMessage("unknown_error_xyz", enT);
     expect(result).toBeTruthy();
     expect(typeof result).toBe("string");
   });
 
   it("returns null for undefined/null/empty input", () => {
-    expect(getOAuthErrorMessage(undefined)).toBeNull();
-    expect(getOAuthErrorMessage(null)).toBeNull();
-    expect(getOAuthErrorMessage("")).toBeNull();
+    expect(getOAuthErrorMessage(undefined, enT)).toBeNull();
+    expect(getOAuthErrorMessage(null, enT)).toBeNull();
+    expect(getOAuthErrorMessage("", enT)).toBeNull();
   });
 
   it("every known error code has a mapped message", () => {
     const knownCodes = ["no_code", "invalid_state", "config", "token_exchange", "user_fetch"];
     for (const code of knownCodes) {
       expect(OAUTH_ERROR_CODES).toContain(code);
-      expect(getOAuthErrorMessage(code)).toBeTruthy();
+      expect(getOAuthErrorMessage(code, enT)).toBeTruthy();
     }
   });
 
   it("messages are non-technical and user-friendly", () => {
     const knownCodes = ["no_code", "invalid_state", "config", "token_exchange", "user_fetch"];
     for (const code of knownCodes) {
-      const msg = getOAuthErrorMessage(code)!;
+      const msg = getOAuthErrorMessage(code, enT)!;
       // Messages should not expose internal error codes
       expect(msg).not.toMatch(/code|state|token|config|fetch/i);
       // Messages should be reasonably short
@@ -78,7 +84,7 @@ describe("getOAuthErrorMessage", () => {
     });
 
     it("returns a user-friendly, non-technical message", () => {
-      const result = getOAuthErrorMessage("session_storage");
+      const result = getOAuthErrorMessage("session_storage", enT);
       expect(result).toBeTruthy();
       expect(result).not.toContain("session_storage");
     });
@@ -104,7 +110,7 @@ describe("getOAuthErrorMessage", () => {
     for (const platform of platforms) {
       for (const suffix of suffixes) {
         it(`returns a truthy message for '${platform}_${suffix}'`, () => {
-          const result = getOAuthErrorMessage(`${platform}_${suffix}`);
+          const result = getOAuthErrorMessage(`${platform}_${suffix}`, enT);
           expect(result).toBeTruthy();
           expect(typeof result).toBe("string");
         });
@@ -112,20 +118,20 @@ describe("getOAuthErrorMessage", () => {
     }
 
     it("names the platform for connection failures instead of using generic GitHub wording", () => {
-      expect(getOAuthErrorMessage("gitlab_token_exchange")).toContain("GitLab");
-      expect(getOAuthErrorMessage("bitbucket_token_exchange")).toContain("Bitbucket");
-      expect(getOAuthErrorMessage("codeberg_token_exchange")).toContain("Codeberg");
+      expect(getOAuthErrorMessage("gitlab_token_exchange", enT)).toContain("GitLab");
+      expect(getOAuthErrorMessage("bitbucket_token_exchange", enT)).toContain("Bitbucket");
+      expect(getOAuthErrorMessage("codeberg_token_exchange", enT)).toContain("Codeberg");
     });
 
     it("does not fall back to GitHub sign-in copy for a platform failure", () => {
-      const msg = getOAuthErrorMessage("gitlab_token_exchange")!;
+      const msg = getOAuthErrorMessage("gitlab_token_exchange", enT)!;
       expect(msg).not.toContain("GitHub");
       expect(msg).not.toContain("sign-in");
     });
 
     it("distinguishes platform connect failures from each other by platform name", () => {
-      const gitlab = getOAuthErrorMessage("gitlab_user_fetch")!;
-      const bitbucket = getOAuthErrorMessage("bitbucket_user_fetch")!;
+      const gitlab = getOAuthErrorMessage("gitlab_user_fetch", enT)!;
+      const bitbucket = getOAuthErrorMessage("bitbucket_user_fetch", enT)!;
       expect(gitlab).not.toBe(bitbucket);
     });
   });
@@ -133,8 +139,11 @@ describe("getOAuthErrorMessage", () => {
   // #1109 (UX-H3): OAuth error messages must render in the visitor's locale,
   // not a hardcoded English literal.
   describe("i18n (#1109)", () => {
-    it("uses the English dictionary by default (no translator passed)", () => {
-      expect(getOAuthErrorMessage("no_code")).toBe(
+    // #1164: `t` is now a required parameter (no more implicit English
+    // default) — this test now asserts the explicit-translator contract
+    // rather than an implicit fallback.
+    it("resolves the English message when given an explicit English translator", () => {
+      expect(getOAuthErrorMessage("no_code", enT)).toBe(
         resolveTranslation("oauthErrors.noCode", en),
       );
     });
@@ -151,7 +160,7 @@ describe("getOAuthErrorMessage", () => {
       for (const code of knownCodes) {
         const msg = getOAuthErrorMessage(code, esT);
         expect(msg).toBeTruthy();
-        expect(msg).not.toBe(getOAuthErrorMessage(code));
+        expect(msg).not.toBe(getOAuthErrorMessage(code, enT));
       }
     });
 
@@ -166,7 +175,7 @@ describe("getOAuthErrorMessage", () => {
       const msg = esT ? getOAuthErrorMessage("gitlab_token_exchange", esT) : null;
       expect(msg).toBeTruthy();
       expect(msg).toContain("GitLab");
-      expect(msg).not.toBe(getOAuthErrorMessage("gitlab_token_exchange"));
+      expect(msg).not.toBe(getOAuthErrorMessage("gitlab_token_exchange", enT));
     });
   });
 });

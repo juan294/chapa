@@ -2,8 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { LanguageProvider } from './provider';
-import { useTranslation } from './use-translation';
+import { useTranslation, __setFallbackDictionary } from './use-translation';
 import { es } from './dictionaries/es';
+import { en } from './dictionaries/en';
 
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(() => ({ refresh: vi.fn() })),
@@ -54,8 +55,11 @@ describe('useTranslation inside LanguageProvider', () => {
   });
 
   it('resolves English translations when locale is en', () => {
+    // #1164 — the provider no longer falls back to a statically-imported
+    // English dictionary, so tests must supply it explicitly (production
+    // always does, via the RSC payload).
     render(
-      <LanguageProvider initialLocale="en">
+      <LanguageProvider initialLocale="en" dictionary={en}>
         <ConsumerInside />
       </LanguageProvider>
     );
@@ -87,11 +91,38 @@ describe('useTranslation outside LanguageProvider (fallback)', () => {
     expect(screen.getByTestId('locale-outside').textContent).toBe('en');
   });
 
-  it('fallback t("meta.defaultTitle") returns the English string', () => {
+  // #1164 (FE-H1/PE-H1) — this fallback used to resolve against a
+  // statically-imported English dictionary, which pulled the ~90KB English
+  // dictionary chunk into every client bundle regardless of locale (it was
+  // referenced from the prerendered SPANISH page too — 17 <script src> refs
+  // in es.html). The dictionary is now injected at test setup
+  // (`vitest.setup.ts` calls `__setFallbackDictionary(en)`) instead of
+  // imported by this application module, so the ~463 existing component
+  // tests that rely on this fallback resolving real English copy keep
+  // passing unchanged.
+  it('fallback t("meta.defaultTitle") resolves real English text via the test-injected dictionary', () => {
     render(<ConsumerOutside />);
 
     expect(screen.getByTestId('title-outside').textContent).toBe(
       'Chapa — Developer Impact, Decoded'
     );
+  });
+
+  // Guard test: prove the safety net independently of the global test-setup
+  // injection above. Production never calls `__setFallbackDictionary`, so
+  // `fallbackDictionary` is `undefined` there — this must never crash or
+  // render literal `undefined`, only degrade to the raw key.
+  it('degrades to the raw key (never crashes, never renders "undefined") when no dictionary is injected', () => {
+    __setFallbackDictionary(undefined);
+    try {
+      render(<ConsumerOutside />);
+      const text = screen.getByTestId('title-outside').textContent;
+      expect(text).toBe('meta.defaultTitle');
+      expect(text).not.toBe('undefined');
+      expect(text).not.toBe('');
+    } finally {
+      // Restore the test-suite-wide injection for any later test in this file.
+      __setFallbackDictionary(en);
+    }
   });
 });
