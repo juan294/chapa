@@ -1,17 +1,14 @@
 # Chapa Production Release Playbook
 
-This is Chapa's single production-release procedure. `/release` executes it.
-Capability detail lives in the linked runbooks; evidence semantics live in
-`docs/playbooks/e2e-pro-release-verification.md`.
+This is Chapa's single production-release procedure. `/release` executes it. Capability detail lives in the linked runbooks; evidence semantics live in `docs/playbooks/e2e-pro-release-verification.md`.
 
 ## Scope and authorization
 
 - Release topology: `develop` to `main`, squash merge, then tag `mainCommit`.
-- Analyzer PASS is evidence, not authorization.
-- STOP separately for version choice, full diff approval, external CI/preview, release PR, merge, production operations beyond the read-only probes below, and tag/publication.
-- Never mutate production data, apply migrations, invoke crons, send messages, change environment configuration, merge, tag, or publish without explicit authorization.
+- Analyzer PASS is evidence, not authorization: a non-PASS decision always blocks and is reported honestly, and only a fresh, explicit override may proceed past it.
+- Two stops. **Gate 1 — approve the release**: version choice and full diff approval, together. **Gate 2 — authorize production**: merge authorization and tag authorization, together, granted once up front — folding in what were previously three separate stops (release PR authorization, **STOP — external CI/preview authorization**, and merge authorization). Everything after Gate 2 — PR creation, the billed verification dispatch, the squash merge, the tag/publish — runs as an already-authorized step, not a fresh stop. Gate 2 authorizes release mechanics only: never production data mutation, migrations, crons, messages, environment changes, or an analyzer override, each of which needs its own explicit authorization.
 
-## 1. Prepare and verify
+## 1. Prepare, verify, and approve
 
 1. Read `CLAUDE.md`, this playbook, and the linked runbooks.
 2. Use an isolated clean release worktree based on current `develop`.
@@ -30,9 +27,8 @@ Capability detail lives in the linked runbooks; evidence semantics live in
 
    An empty tag or any identity mismatch blocks. Then identify the current version, commits, paths, migrations, version-bearing files, exact remote refs, and exact-SHA CI from `baselineTag..develop`.
 4. Present release type, changes, topology, known risks, and retirement review.
-5. **STOP — version choice.**
-6. Update version, changelog, and every current version reference.
-7. Run sequentially:
+5. Update version, changelog, and every current version reference.
+6. Run sequentially:
 
    ```bash
    pnpm run quality:validate
@@ -43,13 +39,14 @@ Capability detail lives in the linked runbooks; evidence semantics live in
    pnpm run build
    ```
 
-8. Present the complete diff and results.
-9. **STOP — full diff approval.**
+7. Present the version choice and the complete diff and results together.
+8. **STOP — Gate 1: approve the release.** Version choice and full diff together; approving only one does not satisfy this gate.
 
-## 2. Fix the candidate and prepare inputs
+## 2. Authorize production and prepare inputs
 
-1. Commit and push only the approved release preparation.
-2. Resolve the immutable Vercel preview for this exact commit, then record:
+1. **STOP — Gate 2: authorize production.** Merge authorization and tag authorization together, before anything below runs: the release PR, the verification dispatch and its billed preview probes, the eventual squash merge, and the eventual tag/publish. Not authorized here: production data mutation, migrations, crons, messages, environment changes, or a non-PASS analyzer override.
+2. Commit and push only the approved release preparation.
+3. Resolve the immutable Vercel preview for this exact commit, then record:
 
    ```bash
    developCommit="$(git rev-parse HEAD)"
@@ -59,8 +56,8 @@ Capability detail lives in the linked runbooks; evidence semantics live in
    rollbackReference="$baselineTag"
    ```
 
-3. Wait for exact-`developCommit` push CI and preview `/api/version`. Protected previews require `VERCEL_AUTOMATION_BYPASS_SECRET`; missing blocks verification.
-4. Prepare the run and candidate record:
+4. Wait for exact-`developCommit` push CI and preview `/api/version`. Protected previews require `VERCEL_AUTOMATION_BYPASS_SECRET`; missing blocks verification.
+5. Prepare the run and candidate record:
 
    ```bash
    pnpm release:prepare-run -- \
@@ -75,8 +72,8 @@ Capability detail lives in the linked runbooks; evidence semantics live in
      "$runDir/release-run.json" > "$runDir/candidate.json"
    ```
 
-5. Run `/explore-release $runDir/candidate.json`, then complete applicable manual arcs in `docs/runbooks/release-checklist.md`.
-6. Create `$runDir/pre-merge-evidence.json`:
+6. Run `/explore-release $runDir/candidate.json`, then complete applicable manual arcs in `docs/runbooks/release-checklist.md`.
+7. Create `$runDir/pre-merge-evidence.json`:
 
    ```json
    {"exploratoryCharters":[],"manualObligations":[],"manualResult":{"scenarioId":"release.manual-arcs","environment":"preview"}}
@@ -86,13 +83,9 @@ Capability detail lives in the linked runbooks; evidence semantics live in
 
 ## 3. Release PR and pre-merge evidence
 
-1. **STOP — release PR authorization.**
-2. Create or reuse the `develop` to `main` PR; never enable auto-merge yet.
-3. Wait for exact release-PR CI. Record its numeric workflow run ID and attempt; a missing, skipped, or failed pending-migration result blocks.
-4. **STOP — external CI/preview authorization.** This authorizes only the
-   read-only release-verification dispatch and its externally billed preview
-   probes.
-5. Dispatch, watch, and download the exact attempt:
+1. Create or reuse the `develop` to `main` PR (Gate 2); never enable auto-merge yet.
+2. Wait for exact release-PR CI. Record its numeric workflow run ID and attempt; a missing, skipped, or failed pending-migration result blocks and must be resolved, never waived.
+3. Dispatch, watch, and download the exact attempt of the release-verification workflow (Gate 2):
 
    ```bash
    gh workflow run release-verification.yml \
@@ -113,24 +106,19 @@ Capability detail lives in the linked runbooks; evidence semantics live in
      --dir "$runDir/pre-merge"
    ```
 
-6. Confirm the workflow did run the pre-merge analyzer and its decision is PASS. Missing/failed/skipped requirements, identity defects, missing oracles, cleanup defects, incomplete charters, skipped high-risk areas, and untriaged findings block.
-7. **STOP — merge authorization.**
+4. Confirm the workflow did run the pre-merge analyzer; report its decision honestly. Missing/failed/skipped requirements, identity defects, missing oracles, cleanup defects, incomplete charters, skipped high-risk areas, and untriaged findings block. A non-PASS decision blocks per Scope above.
 
 ## 4. Promote and assemble final evidence
 
-1. Reconfirm PR head and evidence still identify `developCommit`, then:
+1. Reconfirm PR head and evidence still identify `developCommit`, then merge (Gate 2):
 
    ```bash
    gh pr merge --squash --auto
    ```
 
    Never delete permanent `develop`.
-2. Resolve `mainCommit`; require
-   `git rev-parse "${mainCommit}^{tree}" == candidateTreeDigest`. Record this as
-   the `mainTreeDigest` check.
-3. Wait for production `/api/version` to report `mainCommit` and environment
-   `production`; this is the production identity check. Run only the
-   production-safe read-only scenarios:
+2. Resolve `mainCommit`; require `git rev-parse "${mainCommit}^{tree}" == candidateTreeDigest`. Record this as the `mainTreeDigest` check.
+3. Wait for production `/api/version` to report `mainCommit` and environment `production`; this is the production identity check. Run only the production-safe read-only scenarios:
 
    ```bash
    EXPECTED_DEPLOYMENT_COMMIT="$mainCommit" \
@@ -149,8 +137,7 @@ Capability detail lives in the linked runbooks; evidence semantics live in
      --production-url "$productionUrl" --output "$runDir/final-identity.json"
    ```
 
-4. Assemble the final run and comprehensive manifest. This preserves charters,
-   manual evidence, cleanup, preview observations, and rollback reference:
+4. Assemble the final run and comprehensive manifest. This preserves charters, manual evidence, cleanup, preview observations, and rollback reference:
 
    ```bash
    pnpm exec tsx scripts/quality/merge-release-evidence.ts \
@@ -166,14 +153,11 @@ Capability detail lives in the linked runbooks; evidence semantics live in
      --stage final --output "$runDir/release-report.md"
    ```
 
-## 5. Tag last, observe, or roll back
+5. Confirm the final analyzer decision, honestly stating PASS or non-PASS, and present the report with exact source/tree/deployment, deterministic, exploratory, manual, cleanup, production, and rollback evidence. A non-PASS decision blocks per Scope above.
 
-1. Confirm the final analyzer PASS, then present the report with exact
-   source/tree/deployment, deterministic,
-   exploratory, manual, cleanup, production, and rollback evidence.
-2. **STOP — tag authorization and GitHub release authorization.**
-3. Only after fresh authorization, create/push the named tag, create the GitHub
-   release, and attach evidence:
+## 5. Tag, observe, or roll back
+
+1. Only after the final analyzer PASS (or an explicit override), tag and publish (Gate 2):
 
    ```bash
    git tag -a "$releaseTag" "$mainCommit" -m "$releaseTag"
@@ -184,10 +168,7 @@ Capability detail lives in the linked runbooks; evidence semantics live in
    ```
 
    Verify the remote tag resolves to `mainCommit`.
-4. Perform read-only post-release checks. For incidents use the incident and
-   observability runbooks. Roll back to the previous evidence-approved
-   deployment using the rollback runbook; database recovery remains separately
-   authorized.
+2. Perform read-only post-release checks. For incidents use the incident and observability runbooks. Roll back to the previous evidence-approved deployment using the rollback runbook; database recovery remains separately authorized.
 
 ## Linked operational detail
 
@@ -195,5 +176,4 @@ Capability detail lives in the linked runbooks; evidence semantics live in
 - Deployed probes: `docs/runbooks/deployment-smoke.md`
 - Migrations: `docs/runbooks/migrations.md`
 - Rollback: `docs/runbooks/rollback.md`
-- Incidents and monitoring: `docs/runbooks/incident-response.md`,
-  `docs/runbooks/observability.md`
+- Incidents and monitoring: `docs/runbooks/incident-response.md`, `docs/runbooks/observability.md`
