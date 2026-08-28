@@ -52,8 +52,18 @@ describe("resolveProxyLocale", () => {
     expect(resolveProxyLocale(request)).toBe("en");
   });
 
-  it("falls back to DEFAULT_LOCALE (es) when neither cookie nor header resolve", () => {
+  it("falls back to DEFAULT_LOCALE (en) when neither cookie nor header resolve", () => {
     const request = makeRequest("/about");
+    expect(resolveProxyLocale(request)).toBe("en");
+  });
+
+  it("still prefers a Spanish cookie over the English default (#1201)", () => {
+    const request = makeRequest("/about", { cookie: "chapa-locale=es" });
+    expect(resolveProxyLocale(request)).toBe("es");
+  });
+
+  it("still prefers a Spanish Accept-Language over the English default (#1201)", () => {
+    const request = makeRequest("/about", { acceptLanguage: "es-ES,es;q=0.9" });
     expect(resolveProxyLocale(request)).toBe("es");
   });
 });
@@ -90,7 +100,7 @@ describe("proxy", () => {
     const request = makeRequest("/archetypes/builder");
     const response = proxy(request);
     const rewritten = response.headers.get("x-middleware-rewrite");
-    expect(rewritten).toBe("https://chapa.example.com/es/archetypes/builder");
+    expect(rewritten).toBe("https://chapa.example.com/en/archetypes/builder");
   });
 
   it("is a rewrite, not a redirect (no Location header, 2xx-style passthrough)", () => {

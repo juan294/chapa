@@ -5,6 +5,8 @@ import { useContext } from "react";
 import { LanguageContext, LanguageProvider } from "@/lib/i18n/provider";
 import { LangSync } from "@/lib/i18n/lang-sync";
 import { es } from "@/lib/i18n/dictionaries/es";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 
 // page.tsx computes the demo badge SVG at module scope, resolves the
 // [locale] route param, and calls the REAL getServerT(locale) — this is the
@@ -75,10 +77,14 @@ afterEach(cleanup);
 async function renderHome(locale: "en" | "es" = "en") {
   const { default: Home } = await import("./page");
   const jsx = await Home({ params: Promise.resolve({ locale }) });
-  // Match production: the static root layout owns the default Spanish
-  // provider, while the locale-segmented page may need to override it.
+  // Match production: the static root layout owns the DEFAULT_LOCALE provider
+  // (app/layout.tsx resolves its dictionary the same way), while the
+  // locale-segmented page overrides it for the other locale. Derived from
+  // DEFAULT_LOCALE rather than hardcoded so this keeps mirroring the real
+  // layout if the default moves (#1201).
+  const rootDictionary = DEFAULT_LOCALE === "es" ? es : en;
   return render(
-    <LanguageProvider initialLocale="es" dictionary={es}>
+    <LanguageProvider initialLocale={DEFAULT_LOCALE} dictionary={rootDictionary}>
       <LangSync />
       {jsx}
     </LanguageProvider>,
