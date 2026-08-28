@@ -72,35 +72,46 @@ fi
 
 
 # ─── Guards: git push risks (Error #44, Error #48) ───────────────────────
-# Consolidated: both guards share the outer "git push" check.
+# Consolidated: both guards share the outer "git push" check, then inspect
+# only each genuine `git push` invocation's OWN arguments -- not the whole
+# command string. A compound command (`cmd1 && git push ... && cmd2`) can
+# carry unrelated text elsewhere (a `git pull ... main`, a `git ls-remote
+# --tags ...`) that must never trip these guards; a push's own arguments run
+# from "git push" up to the next shell control operator (&&, ||, ;, |, or a
+# newline).
 if [[ "$COMMAND" == *"git push"* ]]; then
+  # Normalize newlines to `;` so they act as statement separators below.
+  NORMALIZED_COMMAND="${COMMAND//$'\n'/;}"
 
-  # Error #44: --tags pushes ALL local tags, not just the new one.
-  # Old tags that already exist on remote cause a non-zero exit code.
-  if [[ "$COMMAND" == *"--tags"* ]] && [[ "$COMMAND" != *"--follow-tags"* ]]; then
-    emit_block "guard-bash.sh" "Error #44: --tags pushes all local tags" \
-      "--tags pushes every tag, not just new ones; old tags cause failures." \
-      "  git push origin main && git push origin v1.0.0
+  while IFS= read -r PUSH_SEGMENT; do
+    [[ -z "$PUSH_SEGMENT" ]] && continue
+
+    # Error #44: --tags pushes ALL local tags, not just the new one.
+    # Old tags that already exist on remote cause a non-zero exit code.
+    if [[ "$PUSH_SEGMENT" == *"--tags"* ]] && [[ "$PUSH_SEGMENT" != *"--follow-tags"* ]]; then
+      emit_block "guard-bash.sh" "Error #44: --tags pushes all local tags" \
+        "--tags pushes every tag, not just new ones; old tags cause failures." \
+        "  git push origin main && git push origin v1.0.0
   git push origin main --follow-tags"
-    log_event block error-44
-    exit 2
-  fi
+      log_event block error-44
+      exit 2
+    fi
 
-  # Error #48: direct push to main/master instead of a non-production path.
-  # Matches "main" or "master" anywhere in the push args (handles flags like -u
-  # appearing before the remote name: git push -u origin main).
-  # Allows --follow-tags (release flow).
-  if [[ "$COMMAND" =~ (^|[[:space:]])(main|master)($|[[:space:]]|:) ]] \
-     && [[ "$COMMAND" != *"--follow-tags"* ]]; then
-    emit_block "guard-bash.sh" "Error #48: direct push to protected branch" \
-      "Pushing directly to main/master is a high-stakes action." \
-      "  git push origin develop                 # develop/main topology
+    # Error #48: direct push to main/master instead of a non-production path.
+    # Matches "main" or "master" anywhere in the push's own args (handles
+    # flags like -u appearing before the remote name: git push -u origin main).
+    # Allows --follow-tags (release flow).
+    if [[ "$PUSH_SEGMENT" =~ (^|[[:space:]])(main|master)($|[[:space:]]|:) ]] \
+       && [[ "$PUSH_SEGMENT" != *"--follow-tags"* ]]; then
+      emit_block "guard-bash.sh" "Error #48: direct push to protected branch" \
+        "Pushing directly to main/master is a high-stakes action." \
+        "  git push origin develop                 # develop/main topology
   git push -u origin feature/my-change    # main-only or PR flow
   git push origin main --follow-tags      # releases with tags (ask first)"
-    log_event block error-48
-    exit 2
-  fi
-
+      log_event block error-48
+      exit 2
+    fi
+  done < <(grep -oE 'git push[^;&|]*' <<<"$NORMALIZED_COMMAND")
 fi
 
 
