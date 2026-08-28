@@ -23,13 +23,26 @@ import {
  */
 
 const RUN_ID = randomUUID();
-const HANDLE_PREFIX = `chapa-e2e-${RUN_ID}-user-`;
+const HANDLE_PREFIX = `chapa-e2e-${RUN_ID.slice(0, 8)}-user-`;
+const EMU_SOURCE_HANDLE = `chapa-emu-${RUN_ID.slice(0, 8)}_source`;
 const TOTAL_USERS = 1001;
 
 describe("user accessors past the 1000-row max_rows cap (contract)", () => {
   afterAll(async () => {
     const db = getServiceClient();
     await db.from("users").delete().like("handle", `${HANDLE_PREFIX}%`);
+    await db.from("users").delete().eq("handle", EMU_SOURCE_HANDLE);
+  });
+
+  it("excludes an EMU source row from the primary warm-cache registry", async () => {
+    const db = getServiceClient();
+    const { error } = await db.from("users").insert({
+      handle: EMU_SOURCE_HANDLE,
+    });
+    expect(error).toBeNull();
+
+    const allHandles = await dbGetAllUserHandles();
+    expect(allHandles).not.toContain(EMU_SOURCE_HANDLE);
   });
 
   it("seeds past the max_rows cap and returns every row from both accessors", async () => {

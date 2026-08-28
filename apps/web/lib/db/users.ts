@@ -8,6 +8,7 @@
 import { getSupabase } from "./supabase";
 import { parseRows } from "./parse-row";
 import { SUPABASE_MAX_ROWS } from "./paginate";
+import { isValidHandle } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // Row type
@@ -95,6 +96,12 @@ export async function dbUpsertUser(
   handle: string,
   opts?: UpsertUserOpts,
 ): Promise<void> {
+  // The permanent users registry contains primary GitHub identities only.
+  // EMU source handles can contain underscores and are stored separately as
+  // supplemental data; registering one here makes warm-cache retry an account
+  // the server token cannot resolve on every hourly run.
+  if (!isValidHandle(handle)) return;
+
   const db = getSupabase();
   if (!db) return;
 
@@ -259,7 +266,12 @@ export async function dbGetAllUserHandles(): Promise<string[]> {
         USER_HANDLE_REQUIRED_KEYS,
         "users",
       );
-      handles.push(...rows.map((row) => row.handle));
+      // Filter legacy EMU source rows while retaining the raw last row as the
+      // pagination cursor below. Advancing by the filtered list could stall a
+      // page made entirely of invalid primary handles.
+      for (const row of rows) {
+        if (isValidHandle(row.handle)) handles.push(row.handle);
+      }
       if (rows.length < SUPABASE_MAX_ROWS) return handles;
 
       const nextAfter = rows.at(-1)?.handle;
