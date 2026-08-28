@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.25.0] - 2026-08-28
+
+### Changed
+
+- **English is now the default locale when a request carries no locale
+  signal.** `DEFAULT_LOCALE` moves from `'es'` to `'en'`. A `chapa-locale`
+  cookie or an `Accept-Language` header still wins ahead of it in `proxy.ts`,
+  `getServerLocale` and `detect.ts` alike, so a Spanish visitor keeps Spanish;
+  only the signal-less case changes. That case is not rare here: a README
+  `<img>` embed of `/u/:handle/badge.svg` sends no cookie and no useful header
+  (the badge route resolves locale purely from `?lang=`), so every un-qualified
+  embedded badge rendered Spanish for a worldwide audience. It also governs the
+  statically-built shells and the warm-cache cron's pre-warmed badge. (#1201)
+
+### Fixed
+
+- **Creator Studio was unreachable in a real browser.** `fetchFlagFromDbCached`
+  caught its own rejection inside `unstable_cache`, so a 500ms timeout became
+  indistinguishable from "no such row" and that `null` was cached for an hour
+  (and baked into prerendered output). `checkFlag` then fell back to
+  `NEXT_PUBLIC_STUDIO_ENABLED`, unset in production, resolving the flag to
+  `false` while the `studio_enabled` row still read `true`. `/studio?demo=1`
+  answered HTTP 200 while emitting
+  `<meta http-equiv="refresh" content="1;url=/">`, which curl ignores and every
+  browser obeys, so the judge-facing demo URL bounced to the landing page on
+  6/6 measured loads. A failed lookup now degrades for that request only and
+  caches nothing, so the next call retries and picks up the real row. (#1203)
+- **A locale-segmented page could receive the wrong dictionary.**
+  `app/[locale]/page.tsx` chose the client dictionary with
+  `locale === DEFAULT_LOCALE ? undefined : en`, hardcoding English as "the
+  non-default locale". Correct only while the default was `'es'`; after the
+  flip it handed the Spanish landing page the English dictionary. It now
+  derives the dictionary from `locale`, matching `/verify`, `/verify/[hash]`
+  and `/u/[handle]`. (#1201)
+
 ## [2.24.1] - 2026-08-28
 
 ### Fixed
@@ -1232,7 +1267,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.24.1...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.25.0...HEAD
+[2.25.0]: https://github.com/juan294/chapa/compare/v2.24.1...v2.25.0
 [2.24.1]: https://github.com/juan294/chapa/compare/v2.24.0...v2.24.1
 [2.24.0]: https://github.com/juan294/chapa/compare/v2.23.0...v2.24.0
 [2.23.0]: https://github.com/juan294/chapa/compare/v2.22.1...v2.23.0

@@ -11,12 +11,12 @@ describe("RootLoading render", () => {
     expect(screen.getByRole("status")).toBeDefined();
   });
 
-  // #1109 (UX-H3): sourced from the DEFAULT_LOCALE ('es', #861) dictionary
+  // #1109 (UX-H3): sourced from the DEFAULT_LOCALE (#861, English since #1201) dictionary
   // rather than a hardcoded English literal — this static server component
-  // (no client hooks) always renders Spanish, matching the rest of the root
+  // (no client hooks) always renders DEFAULT_LOCALE, matching the rest of the root
   // layout's DEFAULT_LOCALE-first static rendering.
   it("has sr-only loading text", () => {
     render(<RootLoading />);
-    expect(screen.getByText("Cargando Chapa...")).toBeDefined();
+    expect(screen.getByText("Loading Chapa...")).toBeDefined();
   });
 });

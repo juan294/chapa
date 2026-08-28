@@ -83,3 +83,10 @@ supabase/.branches/
 
 # summon layout config (local IDE preference)
 .summon
+
+# Agent run reports (Rule #70): gitignored on public repos, tracked on private.
+# The repository became public for the WebMCP Challenge submission, so these
+# local working artifacts are no longer tracked. Historical copies remain in
+# git history from when the repo was private.
+docs/agents/*.md
+!docs/agents/audit-prompts.md

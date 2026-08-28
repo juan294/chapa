@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+// layout.tsx reads DEFAULT_LOCALE from "@/lib/i18n/types", NOT from the mocked
+// "@/lib/i18n" barrel below, so these assert against the real value (#1201).
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 
 vi.mock("next/font/google", () => ({
   JetBrains_Mono: () => ({ variable: "font-jetbrains" }),
@@ -120,15 +123,15 @@ describe("RootLayout render", () => {
     expect(screen.getByTestId("instrumentation")).toBeTruthy();
   });
 
-  it('renders with lang=DEFAULT_LOCALE ("es") at build time for ISR compatibility', async () => {
+  it("renders with lang=DEFAULT_LOCALE at build time for ISR compatibility", async () => {
     // The layout uses DEFAULT_LOCALE at build time instead of getServerLocale()
     // to avoid dynamic cookie/header calls that would force every page into dynamic rendering.
     // Client-side locale detection (LangSync + LanguageProvider) handles actual user locale.
     const { default: RootLayout } = await import("./layout");
     const element = await RootLayout({ children: <span>test</span> });
 
-    // html lang is always DEFAULT_LOCALE ("es") at build time
-    expect(element.props.lang).toBe("es");
+    // html lang is always DEFAULT_LOCALE at build time
+    expect(element.props.lang).toBe(DEFAULT_LOCALE);
   });
 
   it("wraps children in LanguageProvider", async () => {
@@ -148,9 +151,9 @@ describe("RootLayout render", () => {
 
     render(await RootLayout({ children: <span>content</span> }));
 
-    // Always "es" (DEFAULT_LOCALE) at build time — client-side hydration handles actual locale
+    // Always DEFAULT_LOCALE at build time — client-side hydration handles actual locale
     expect(
       screen.getByTestId("language-provider").getAttribute("data-locale"),
-    ).toBe("es");
+    ).toBe(DEFAULT_LOCALE);
   });
 });
