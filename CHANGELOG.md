@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.24.1] - 2026-08-28
+
 ### Fixed
 
 - **Cache: EMU account handles could pollute the warm-cache registry.**
@@ -1230,7 +1232,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.24.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.24.1...HEAD
+[2.24.1]: https://github.com/juan294/chapa/compare/v2.24.0...v2.24.1
 [2.24.0]: https://github.com/juan294/chapa/compare/v2.23.0...v2.24.0
 [2.23.0]: https://github.com/juan294/chapa/compare/v2.22.1...v2.23.0
 [2.22.1]: https://github.com/juan294/chapa/compare/v2.22.0...v2.22.1
