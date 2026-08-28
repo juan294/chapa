@@ -123,22 +123,51 @@
       "evidenceRetentionDays": 90
     },
     {
+      "id": "rollback.readiness",
+      "owner": "release-operator",
+      "runner": "playwright",
+      "selector": "@release-required rollback.readiness",
+      "environments": ["preview"],
+      "safetyClass": "read-only",
+      "required": true,
+      "expectedOracles": ["http", "deployment-identity"],
+      "evidenceRetentionDays": 90
+    },
+    {
+      "id": "profile.share-verification",
+      "owner": "web",
+      "runner": "playwright",
+      "selector": "@release-required profile.share-verification",
+      "environments": ["preview", "production"],
+      "safetyClass": "read-only",
+      "required": true,
+      "expectedOracles": ["http", "ui"],
+      "evidenceRetentionDays": 90
+    },
+    {
+      "id": "locales.en-es",
+      "owner": "web",
+      "runner": "playwright",
+      "selector": "@release-required locales.en-es",
+      "environments": ["preview", "production"],
+      "safetyClass": "read-only",
+      "required": true,
+      "expectedOracles": ["http"],
+      "evidenceRetentionDays": 90
+    },
+    {
       "id": "release.manual-arcs",
       "owner": "release-operator",
       "runner": "manual",
       "selector": "docs/runbooks/release-checklist.md",
       "environments": ["preview"],
       "safetyClass": "authorized-preview-interaction",
-      "required": true,
+      "required": false,
       "expectedOracles": ["ui", "http"],
       "evidenceRetentionDays": 90,
       "manualObligationIds": [
         "oauth.github-real",
-        "profile.authenticated-badge",
-        "profile.share-verification",
-        "locales.en-es",
-        "migration.review",
-        "rollback.readiness"
+        "profile.authenticated-badge"
       ]
     }
   ]

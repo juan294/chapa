@@ -3,7 +3,10 @@ import {
   assertBadgeSvg,
   assertCoreDependencies,
   assertGitHubLoginRedirect,
+  assertLocales,
+  assertRollbackReadiness,
   assertSharePage,
+  assertShareVerification,
 } from "./helpers/deployment-probes";
 import { releaseRequiredScenarioIds } from "./helpers/release-required-environments";
 
@@ -71,6 +74,24 @@ test.describe("release-required deployed read-only probes", () => {
       expect(response.status()).toBe(401);
       expect(body).toMatchObject({ error: expect.any(String) });
       expect(body).not.toHaveProperty("success", true);
+    });
+  }
+
+  if (selectedScenarioIds.has("profile.share-verification")) {
+    test("@release-required profile.share-verification", async ({ request }) => {
+      await assertShareVerification(request);
+    });
+  }
+
+  if (selectedScenarioIds.has("locales.en-es")) {
+    test("@release-required locales.en-es", async ({ request }) => {
+      await assertLocales(request);
+    });
+  }
+
+  if (selectedScenarioIds.has("rollback.readiness")) {
+    test("@release-required rollback.readiness", async ({ request }) => {
+      await assertRollbackReadiness(request);
     });
   }
 });
