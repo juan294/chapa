@@ -311,7 +311,7 @@ Step 1: User runs CLI on their machine (where they have EMU access)
     |                 |                       | 5. Stores        |
     |                 |                       |    supplemental  |
     |                 |                       |    stats in      |
-    |                 |                       |    Redis (24h)   |
+    |                 |                       |    Supabase      |
     |                 |                       |                  |
     +-----------------+                       +------------------+
 
@@ -347,6 +347,12 @@ Step 2: Next badge request merges the data automatically
                                               +------------------+
 ```
 
+> **Where supplemental data actually lives:** step 5 above durably stores the upload in
+> Supabase's `supplemental_stats` table (one row per handle) — Redis (`supplemental:<handle>`,
+> 24h TTL) is only the hot read path checked in step 2 of the next diagram; on a cache miss,
+> `getStats()` falls back to Supabase and rehydrates Redis. This means a missed CLI upload
+> day, or a Redis cache expiry, no longer drops EMU data from scores.
+>
 > **Partial-fetch protection (#1002):** step 1 ("Fetch primary GitHub stats") is guarded
 > against a degraded fetch. GitHub's contributions API is scoped to the authenticating token,
 > so a request that can't see a user's private-repo merges can return zero merged PRs. Rather
