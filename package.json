@@ -34,6 +34,7 @@
     "test:release-required": "pnpm --filter @chapa/web exec playwright test e2e/release-required.spec.ts --project=chromium",
     "delete-user": "tsx scripts/delete-user.ts",
     "heal-poisoned-stats": "tsx scripts/heal-poisoned-stats.ts",
+    "recalculate-handles": "tsx scripts/recalculate-handles.ts",
     "check:circular": "pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/ packages/shared/src/",
     "prepare": "husky"
   },
