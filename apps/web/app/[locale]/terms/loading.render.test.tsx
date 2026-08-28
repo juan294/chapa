@@ -10,7 +10,7 @@ describe("[locale]/terms loading.tsx render", () => {
     render(<TermsLoading />);
     const status = screen.getByRole("status");
     expect(status).toBeDefined();
-    expect(status.getAttribute("aria-label")).toBe("Cargando...");
+    expect(status.getAttribute("aria-label")).toBe("Loading...");
   });
 
   it("renders a pulsing skeleton indicator", () => {
@@ -20,6 +20,6 @@ describe("[locale]/terms loading.tsx render", () => {
 
   it("has sr-only loading text for screen readers", () => {
     render(<TermsLoading />);
-    expect(screen.getAllByText("Cargando...").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Loading...").length).toBeGreaterThan(0);
   });
 });

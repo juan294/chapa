@@ -4,6 +4,7 @@ import { LandingContent } from "../LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
 import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
@@ -53,11 +54,18 @@ export default async function Home({ params }: HomeProps) {
       <DocumentLocaleScript locale={locale} />
       <LanguageProvider
         initialLocale={locale}
-        // The static root provider is always Spanish. A request selected from an
-        // English Accept-Language header therefore needs a matching client
-        // provider for the navbar, controls, and document language. Spanish can
-        // reuse the root dictionary without serializing a second copy.
-        dictionary={locale === DEFAULT_LOCALE ? undefined : en}
+        // The static root provider always renders at DEFAULT_LOCALE. A request
+        // selected for the OTHER locale therefore needs a matching client
+        // provider for the navbar, controls, and document language; the default
+        // locale reuses the root dictionary without serializing a second copy.
+        //
+        // #1201: this branch must pick the dictionary from `locale`, not
+        // hardcode one. It previously read `: en`, which was only correct while
+        // DEFAULT_LOCALE was 'es' and "non-default" could only mean English.
+        // With the default flipped, that spelling handed the Spanish landing
+        // page the English dictionary. Matches the shape already used by
+        // /verify, /verify/[hash] and /u/[handle].
+        dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
       >
         <LangSync />
         <LandingContent demoBadgeSvg={demoBadgeSvg} t={t} />

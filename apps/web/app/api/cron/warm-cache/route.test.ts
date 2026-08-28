@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { GET } from "./route";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 
 const {
   mockVerifyCronSecret,
@@ -750,7 +751,7 @@ describe("GET /api/cron/warm-cache", () => {
   // cache key from the same locale value (DEFAULT_LOCALE — the cron has no
   // request/cookie context to resolve a different one).
   describe("badge content and cache key never diverge by locale (#1181 regression)", () => {
-    it("renders Spanish (DEFAULT_LOCALE) content for the badge SVG cache warm", async () => {
+    it("renders DEFAULT_LOCALE (English) content for the badge SVG cache warm", async () => {
       await GET(makeRequest());
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
@@ -758,27 +759,27 @@ describe("GET /api/cron/warm-cache", () => {
         FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           strings: expect.objectContaining({
-            metricsVerified: "Métricas verificadas",
-            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
-            radarLabels: expect.objectContaining({ delivery: "Entrega" }),
+            metricsVerified: "Verified metrics",
+            tierLabel: "Solid", // tiers.solid (displayImpact.tier === "Solid")
+            radarLabels: expect.objectContaining({ delivery: "Delivery" }),
           }),
         }),
       );
     });
 
-    it("builds the cache key for the SAME locale ('es') the content was rendered in", async () => {
+    it("builds the cache key for the SAME locale the content was rendered in", async () => {
       await GET(makeRequest());
 
       expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
         "alice",
         expect.any(String),
-        "es",
+        DEFAULT_LOCALE,
       );
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
         expect.objectContaining({
-          strings: expect.objectContaining({ metricsVerified: "Métricas verificadas" }),
+          strings: expect.objectContaining({ metricsVerified: "Verified metrics" }),
         }),
       );
     });
@@ -835,13 +836,13 @@ describe("GET /api/cron/warm-cache", () => {
         expect.stringContaining("alice"),
       );
       // #1181 — the cron has no request/cookie context, so it always warms
-      // the DEFAULT_LOCALE ('es') slot; the locale is now an explicit third
-      // argument (via the shared resolveBadgeLocale helper) rather than left
-      // to buildBadgeSvgCacheKey's own default.
+      // the DEFAULT_LOCALE slot; the locale is now an explicit third argument
+      // (via the shared resolveBadgeLocale helper) rather than left to
+      // buildBadgeSvgCacheKey's own default.
       expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
         "alice",
         expect.any(String),
-        "es",
+        DEFAULT_LOCALE,
       );
     });
 
