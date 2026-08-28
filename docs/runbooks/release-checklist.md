@@ -19,7 +19,7 @@ change the production OAuth callback to make a preview login pass.
 
 Of the six `release.manual-arcs` catalog obligations, four are captured by the
 automated release-required E2E suite (`profile.share-verification`,
-`locales.en-es`, `migration.review`, `rollback.readiness` — see their rows and
+`locales.en-es`, `rollback.readiness` — see their rows and
 sections below) and do not need manual capture unless CI cannot run in this
 environment, in which case complete the documented fallback. The remaining two
 (`oauth.github-real`, `profile.authenticated-badge`) are demoted to
@@ -56,9 +56,13 @@ require explicit authorization.
 
 ## Migration readiness
 
-The `migration.review` obligation is captured by the automated release-required
-E2E suite; the steps below are the fallback when CI could not run it here, and
-document what the automation checks. Use `docs/runbooks/migrations.md`.
+The `migration.review` obligation was removed as redundant: the required
+`database.pending-migrations` scenario already imports the real "Pending
+Migrations Check (release PR)" CI job result, which is exactly what a manual
+review would re-derive. A missing, skipped, or failed result from that gate
+still blocks the release and must be resolved, never waived. The steps below
+document what that gate covers and remain the fallback if it could not run.
+Use `docs/runbooks/migrations.md`.
 
 - Review migrations between the release baseline and `developCommit`.
 - Run `pnpm run validate:migrations`.

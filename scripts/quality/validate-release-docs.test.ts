@@ -229,7 +229,8 @@ describe("repository release procedure", () => {
   it("documents exact dispatch, evidence download, and final assembly", () => {
     expect(playbook.split(/\r?\n/).length).toBeLessThanOrEqual(200);
     for (const required of [
-      "STOP — external CI/preview authorization",
+      "STOP — Gate 1: approve the release",
+      "STOP — Gate 2: authorize production",
       "releasePrRunId",
       "releasePrRunAttempt",
       "pre-merge-evidence.json",
