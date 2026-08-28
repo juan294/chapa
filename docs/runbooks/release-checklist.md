@@ -17,16 +17,27 @@ For the `develop` preview, verify that branch-scoped `GITHUB_CLIENT_ID` and
 `GITHUB_CLIENT_SECRET` overrides select the dedicated preview OAuth app. Never
 change the production OAuth callback to make a preview login pass.
 
+Of the six `release.manual-arcs` catalog obligations, four are captured by the
+automated release-required E2E suite (`profile.share-verification`,
+`locales.en-es`, `rollback.readiness` — see their rows and
+sections below) and do not need manual capture unless CI cannot run in this
+environment, in which case complete the documented fallback. The remaining two
+(`oauth.github-real`, `profile.authenticated-badge`) are demoted to
+**non-required**: a real GitHub OAuth flow and an authenticated badge
+generation are both hard to automate reliably against a preview app, so their
+absence no longer blocks a release, but complete them by hand whenever
+auth- or badge-generation-sensitive changes ship.
+
 | Flow | Evidence |
 |---|---|
-| GitHub login | After proving the `develop` alias resolves to the exact immutable deployment, begin and complete GitHub OAuth on that alias and confirm the authenticated redirect returns to the same alias. OAuth state cookies are host-scoped, so beginning on the immutable hostname and returning through the configured alias is invalid evidence. This is an authorized preview interaction, not the read-only redirect probe. |
-| Badge generation | Authenticate, generate or open the synthetic/test profile, and record visible badge evidence. |
+| GitHub login (`oauth.github-real`, non-required) | After proving the `develop` alias resolves to the exact immutable deployment, begin and complete GitHub OAuth on that alias and confirm the authenticated redirect returns to the same alias. OAuth state cookies are host-scoped, so beginning on the immutable hostname and returning through the configured alias is invalid evidence. This is an authorized preview interaction, not the read-only redirect probe. |
+| Badge generation (`profile.authenticated-badge`, non-required) | Authenticate, generate or open the synthetic/test profile, and record visible badge evidence. |
 | Public badge SVG | Open `/u/{handle}/badge.svg` without authentication; record status, content type, and rendering. |
 | Share page | Open `/u/{handle}` and record badge preview, breakdown, and embed snippet. |
 | Core dependency health | Record `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` from `/api/health`; all must be `ok` for release-required deployed evidence. |
 | Cron freshness | Record each cron component separately. Overall health may be degraded by stale cron heartbeats even when the candidate's core dependencies are healthy. |
-| Verification | Follow the share-page verification link and record `/verify/{hash}` rendering. |
-| Locale | Switch Spanish to English and back; record that the selected locale renders without untranslated release-sensitive copy. |
+| Verification (`profile.share-verification`, automated) | Captured by the release-required E2E suite following the share-page verification link and recording `/verify/{hash}` rendering. If CI could not run it here, follow the link manually and record the same evidence as a fallback. |
+| Locale (`locales.en-es`, automated) | Captured by the release-required E2E suite switching Spanish to English and back and recording that the selected locale renders without untranslated release-sensitive copy. If CI could not run it here, repeat the switch manually as a fallback. |
 
 Recommended preview observation is 24 hours for caching, scoring, OAuth, cron, or
 vendor-sensitive changes and at least one hour for documentation-only changes.
@@ -45,6 +56,12 @@ require explicit authorization.
 
 ## Migration readiness
 
+The `migration.review` obligation was removed as redundant: the required
+`database.pending-migrations` scenario already imports the real "Pending
+Migrations Check (release PR)" CI job result, which is exactly what a manual
+review would re-derive. A missing, skipped, or failed result from that gate
+still blocks the release and must be resolved, never waived. The steps below
+document what that gate covers and remain the fallback if it could not run.
 Use `docs/runbooks/migrations.md`.
 
 - Review migrations between the release baseline and `developCommit`.
@@ -90,7 +107,10 @@ alternative procedure.
 
 ## Rollback readiness
 
-Before merge authorization:
+The `rollback.readiness` obligation is captured by the automated
+release-required E2E suite; the steps below are the fallback when CI could
+not run it here, and document what the automation checks. Before Gate 2
+(authorize production):
 
 - identify the previous evidence-approved production deployment and commit;
 - confirm its evidence report and deployment are retrievable;

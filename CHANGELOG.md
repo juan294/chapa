@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.24.1] - 2026-08-28
+
+### Fixed
+
+- **Cache: EMU account handles could pollute the warm-cache registry.**
+  `dbUpsertUser`/`dbGetAllUserHandles` now reject non-primary (EMU-shaped)
+  handles via `isValidHandle`, so a malformed EMU source handle can no longer
+  get retried forever by the hourly warm-cache cron for an account the server
+  token can never resolve. (#1199)
+- **Push-guard hooks false-positived on compound commands.** The `--tags` and
+  direct-to-`main` push guards previously grepped the entire compound command
+  string, so a benign `git pull origin main && git push origin develop` could
+  trip the direct-to-main guard. Guards now isolate each `git push`
+  invocation's own argument span before matching.
+
+### Changed
+
+- **Release playbook: six approval gates collapsed to two.** Gate 1 covers
+  version choice and full diff approval; Gate 2 authorizes the entire
+  remainder of the pipeline (release PR creation, external verification
+  dispatch, squash merge, tag + publish) in one grant. Production data
+  mutation, migrations, cron invocation, and environment changes still
+  require separate authorization.
+- **4 of 6 manual release QA obligations are now automated** as
+  `@release-required` Playwright scenarios (`profile.share-verification`,
+  `locales.en-es`, `rollback.readiness`) or removed as redundant
+  (`migration.review`). Only `oauth.github-real` and
+  `profile.authenticated-badge` remain genuinely manual.
+
+### Added
+
+- **`.github/workflows/auto-backmerge.yml`** — automatically merges `main`
+  back into `develop` after every release (via `git merge -s ours`), so the
+  next release PR's merge-base no longer risks landing as `CONFLICTING` and
+  silently skipping `pull_request`-triggered CI (previously required three
+  manual fixup merges).
+- **`scripts/recalculate-handles.ts`** — maintenance tool to force a handle's
+  cached/persisted score to recompute with current scoring code after a
+  scoring bugfix ships. Dry-run by default; `--apply` executes.
+
 ## [2.24.0] - 2026-08-27
 
 Pre-launch audit remediation: 73 findings resolved across two waves, plus the
@@ -1192,7 +1232,9 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.23.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.24.1...HEAD
+[2.24.1]: https://github.com/juan294/chapa/compare/v2.24.0...v2.24.1
+[2.24.0]: https://github.com/juan294/chapa/compare/v2.23.0...v2.24.0
 [2.23.0]: https://github.com/juan294/chapa/compare/v2.22.1...v2.23.0
 [2.22.1]: https://github.com/juan294/chapa/compare/v2.22.0...v2.22.1
 [2.22.0]: https://github.com/juan294/chapa/compare/v2.21.0...v2.22.0

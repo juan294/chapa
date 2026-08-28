@@ -14,7 +14,7 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
 4) Creator Studio `/studio`:
    - Terminal-first Studio preview customization (9 visual categories)
    - Live preview updates as settings change
-   - Configuration persisted in Supabase (`studio_configs`, source of truth) with Redis as a cached payload layer (#935, migration 027); migration 035 adds database-ordered revisions that validate cache hits and preserve cross-instance consistency
+   - Configuration persisted in Supabase (`studio_configs`) — the only store; both GET and PUT read/write it directly with no Redis involvement (#1186/BE-L1 removed the Redis cache layer described in earlier revisions of this doc, since every cache hit still required an independent Supabase revision check to trust it). Migration 035's database-ordered `revision` column and trigger remain and are still validated on read, but nothing outside `apps/web/lib/db/studio.ts` consumes that revision today
 5) Public access:
    - Anyone can view `/u/:handle` and `/u/:handle/badge.svg`
 

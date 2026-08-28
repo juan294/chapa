@@ -4,7 +4,10 @@ Model tier: **sonnet** — Sonnet session.
 
 `docs/release/release-playbook.md` is the single production-release procedure.
 Read it completely before acting and execute it in order. Do not reconstruct,
-shorten, or reorder its gates from this command.
+shorten, or reorder its two gates from this command: **Gate 1 — approve the
+release** (version choice and full diff approval, together) and **Gate 2 —
+authorize production** (merge authorization and tag authorization, together,
+granted once up front for the whole release-PR pipeline).
 
 Also read:
 
@@ -35,7 +38,9 @@ Present:
 - known risks; and
 - the retirement review result.
 
-**STOP — version choice.** Never guess or automatically increment the version.
+Do not stop here. Choose the version (never guess or auto-increment beyond a
+reasoned semver decision) and carry it into Preparation; it will be presented
+for approval together with the diff at Gate 1, not on its own.
 
 ## Preparation
 
@@ -44,40 +49,41 @@ reference. Re-run the old-version search and explain every remaining historical
 match.
 
 Run the sequential preflight required by the playbook. Do not combine commands
-in a way that masks an earlier exit status. Present the complete diff and exact
-verification results.
+in a way that masks an earlier exit status. Present the version choice and the
+complete diff and exact verification results together.
 
-**STOP — full diff approval.** Approval of the diff does not authorize a
-production PR, merge, deployment operation, tag, or publication.
+**STOP — Gate 1: approve the release.** Covers version choice and full diff
+approval together; approving one alone does not satisfy this gate. Approval
+does not authorize a production PR, merge, deployment operation, tag, or
+publication.
 
 ## Dispatch the playbook
 
-After full diff approval, resume at **Fix the candidate** in
-`docs/release/release-playbook.md` and follow every subsequent section exactly.
+**STOP — Gate 2: authorize production.** Covers PR authorization, merge
+authorization, and tag authorization together, granted once, before resuming
+the playbook. It authorizes the whole pipeline below — creating/reusing the
+release PR, the externally billed verification dispatch, the eventual squash
+merge, and the eventual tag/publish — as already-authorized steps that do not
+reopen the gate. It does not authorize a non-PASS analyzer override, a
+production data mutation, a migration, a cron invocation, a message, or an
+environment change; each still needs its own explicit authorization.
 
-Maintain these independent stops:
+After Gate 2, resume at **Authorize production and prepare inputs** in
+`docs/release/release-playbook.md` and follow every subsequent section
+exactly, without further stops for the steps Gate 2 already covers:
 
-1. **STOP — external CI/preview authorization** when a new paid or
-   externally-dispatched verification run is required.
-2. **STOP — PR authorization** before creating or reusing the `develop` to
-   `main` release PR as an active release operation.
-3. Import exact release-PR CI, including applicable pending-migration evidence,
-   and obtain a pre-merge analyzer PASS.
-4. **STOP — merge authorization.** PR authorization never implies merge
-   authorization.
-5. Only after merge authorization:
-
-   ```bash
-   gh pr merge --squash --auto
-   ```
-
-   Never pass `--delete-branch`; `develop` is permanent.
-6. Verify `mainTreeDigest == candidateTreeDigest`, wait for production identity,
-   run only the playbook's read-only production probes, and obtain the final
-   analyzer PASS.
-7. **STOP — tag authorization and GitHub release authorization.** Analyzer PASS
-   never implies authorization.
-8. Only then execute the playbook's named `git tag`, named tag push, and
+1. Create or reuse the `develop` to `main` release PR; never pass
+   `--delete-branch` on merge, `develop` is permanent.
+2. Import exact release-PR CI, including applicable pending-migration
+   evidence, and obtain a pre-merge analyzer PASS. A non-PASS decision here
+   blocks and requires a fresh, explicit override — Gate 2 does not grant it.
+3. `gh pr merge --squash --auto`.
+4. Verify `mainTreeDigest == candidateTreeDigest`, wait for production
+   identity, run only the playbook's read-only production probes, and obtain
+   the final analyzer PASS. A non-PASS decision here likewise blocks and
+   requires a fresh, explicit override.
+5. Only after the final analyzer PASS (or an explicit override), execute the
+   playbook's named `git tag`, named tag push, and
    `gh release create --notes-file` commands.
 
 ## Integration rules

@@ -566,6 +566,13 @@ describe("mergeReleaseEvidence", () => {
               http: ["production-share.json"],
               ui: ["production-share.json"],
             }, "production"),
+            result("profile.share-verification", {
+              http: ["production-share-verification.json"],
+              ui: ["production-share-verification.json"],
+            }, "production"),
+            result("locales.en-es", {
+              http: ["production-locales.json"],
+            }, "production"),
           ]),
         },
       ],

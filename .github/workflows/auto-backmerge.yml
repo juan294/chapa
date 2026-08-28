@@ -1,0 +1,106 @@
+name: Auto back-merge main into develop
+
+# Release PRs squash-merge develop -> main. Squashing discards shared
+# history, so main's new commit has no ancestry relationship to develop even
+# when its tree is content-identical. Left unresolved, the *next* develop ->
+# main release PR computes its merge-base against main's old tip and can come
+# back CONFLICTING — which means GitHub never creates refs/pull/N/merge, which
+# means no pull_request-event workflow run exists for that PR at all. The
+# visible symptom is misleading: "Pending Migrations Check (release PR)" in
+# ci.yml reports `skipped` (its condition is
+# `github.event_name == 'pull_request' && github.base_ref == 'main'`), giving
+# no hint that the real cause is three layers upstream in git ancestry.
+#
+# This workflow closes the gap automatically, every time main advances: it
+# merges main into develop with the `ours` strategy so develop's tree is
+# preserved byte-for-byte (develop is always a content superset of main) while
+# recording main's tip as an ancestor of develop, so the next release PR's
+# merge-base is clean.
+#
+# This automates the manual fix applied in 17548d0c (v2.22.1 divergence),
+# f9483d55 (v2.23.0 divergence), and the v2.24.0 catch-up merge that shipped
+# alongside this workflow.
+#
+# Trigger: `push` to `main` is the only reliable signal — it fires at the
+# exact moment the divergence is introduced (the release-PR squash-merge).
+# `release: published` was considered and rejected: tagging/publishing a
+# GitHub Release is a separate, later, human-authorized step
+# (docs/release/release-playbook.md) that can trail the main push by an
+# arbitrary amount of time, during which the *next* release PR could already
+# be opened against the unreconciled main.
+#
+# No self-trigger loop is possible by construction: this workflow only ever
+# pushes to `develop`, and its trigger is `push` to `main` only — a commit
+# this workflow creates can never re-fire it.
+#
+# No-op guarantee: `git merge-base --is-ancestor` gates the merge/push steps,
+# so a push to main that develop has already absorbed produces no commit.
+#
+# Permissions: `develop` branch protection (verified via
+# `gh api repos/juan294/chapa/branches/develop/protection`) requires status
+# checks only for the pull-request merge button (no
+# `required_pull_request_reviews` / no `restrictions` are configured), so a
+# direct authenticated push to `develop` is not blocked by CI status. The
+# default `GITHUB_TOKEN` needs `contents: write` explicitly (the repo's
+# default workflow permission is read-only), granted below at the job level.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: auto-backmerge-develop
+  cancel-in-progress: false
+
+jobs:
+  backmerge:
+    name: Back-merge main into develop
+    if: github.repository == 'juan294/chapa'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check whether main is already reconciled into develop
+        id: check
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          MAIN_SHA=$(git rev-parse origin/main)
+          echo "main_sha=$MAIN_SHA" >> "$GITHUB_OUTPUT"
+          if git merge-base --is-ancestor "$MAIN_SHA" HEAD; then
+            echo "needs_merge=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::develop already has main ($MAIN_SHA) as an ancestor — nothing to reconcile."
+          else
+            echo "needs_merge=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Back-merge main into develop (strategy: ours)"
+        if: steps.check.outputs.needs_merge == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          MAIN_SHA="${{ steps.check.outputs.main_sha }}"
+          git merge -s ours --no-edit -m "chore: back-merge main into develop (automated)
+
+          main advanced to ${MAIN_SHA}. Squash-merging develop -> main discards shared
+          history, so main's new commit has no ancestry relationship to develop.
+          Reconciled with strategy 'ours' so develop's tree is preserved byte-for-byte
+          -- develop remains a content superset of main -- which keeps the next
+          develop -> main release PR's merge-base clean.
+
+          Automated by .github/workflows/auto-backmerge.yml." \
+            origin/main
+
+      - name: Push develop
+        if: steps.check.outputs.needs_merge == 'true'
+        run: git push origin HEAD:develop

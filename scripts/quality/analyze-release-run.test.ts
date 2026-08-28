@@ -655,7 +655,14 @@ describe("analyzeReleaseRun", () => {
     );
   });
 
-  it("requires passed candidate-bound manual evidence when manual arcs apply", () => {
+  it("does not block release.manual-arcs (non-required) from going entirely unattempted", () => {
+    // #1190 — oauth.github-real and profile.authenticated-badge are the only
+    // remaining manual arcs, and release.manual-arcs itself is now
+    // required:false, since auth.github-login-redirect and
+    // auth.protected-write-denied already exercise the auth surface
+    // automatically on every preview. Clearing manualObligations entirely
+    // must NOT block — a required-only enforcement gap here would silently
+    // re-impose the human round trip this catalog change removes.
     const fixtureCatalog = JSON.parse(
       readFileSync("quality/release-required.json", "utf8"),
     ) as unknown;
@@ -664,12 +671,12 @@ describe("analyzeReleaseRun", () => {
     ) as ReleaseRun;
     fixtureRun.manualObligations = [];
 
-    expect(reasons(fixtureRun, fixtureCatalog)).toContain(
+    expect(reasons(fixtureRun, fixtureCatalog)).not.toContain(
       "manual obligations: required id oauth.github-real is missing",
     );
   });
 
-  it("blocks duplicate, unknown, and candidate-mismatched manual arcs", () => {
+  it("still blocks duplicate and unknown manual arcs, but not a mismatched non-required one", () => {
     const fixtureCatalog = JSON.parse(
       readFileSync("quality/release-required.json", "utf8"),
     ) as unknown;
@@ -684,18 +691,127 @@ describe("analyzeReleaseRun", () => {
       },
     );
     fixtureRun.manualObligations.find(
-      (obligation) => obligation.id === "rollback.readiness",
+      (obligation) => obligation.id === "profile.authenticated-badge",
     )!.candidate = "d".repeat(40);
 
     const blockingReasons = reasons(fixtureRun, fixtureCatalog);
+    // Hygiene checks (malformed input) still apply regardless of requiredness.
     expect(blockingReasons).toContain(
       "manual obligations: duplicate id oauth.github-real",
     );
     expect(blockingReasons).toContain(
       "manual obligations: unknown id unknown.manual-arc",
     );
-    expect(blockingReasons).toContain(
-      "manual obligations: rollback.readiness lacks passed candidate-bound evidence",
+    // Evidence-quality enforcement is gated on requiredness — a mismatched
+    // candidate on a non-required bundle must not block.
+    expect(blockingReasons).not.toContain(
+      "manual obligations: profile.authenticated-badge lacks passed candidate-bound evidence",
+    );
+  });
+
+  it("still blocks a REQUIRED manual-arc bundle missing its obligation (genuinely required must still block)", () => {
+    const requiredManualCatalog: RequiredCatalog = {
+      schemaVersion: 1,
+      scenarios: [
+        {
+          id: "deployment.preview-identity",
+          owner: "release-operator",
+          runner: "playwright",
+          selector: "@release-required deployment.preview-identity",
+          environments: ["preview"],
+          safetyClass: "read-only",
+          required: true,
+          expectedOracles: ["http", "deployment-identity"],
+          evidenceRetentionDays: 90,
+        },
+        {
+          id: "release.manual-arcs",
+          owner: "release-operator",
+          runner: "manual",
+          selector: "docs/runbooks/release-checklist.md",
+          environments: ["preview"],
+          safetyClass: "authorized-preview-interaction",
+          required: true,
+          expectedOracles: ["ui", "http"],
+          evidenceRetentionDays: 90,
+          manualObligationIds: ["oauth.github-real"],
+        },
+      ],
+    };
+    const baseRun: ReleaseRun = {
+      schemaVersion: 1,
+      runId: "release-required-manual-arcs",
+      generatedAt: "2026-07-26T10:00:00.000Z",
+      baselineTag: "v2.19.0",
+      candidate: {
+        developCommit: DEVELOP,
+        candidateTreeDigest: TREE,
+        previewUrl: "https://candidate.example.test/",
+        previewIdentity: DEVELOP,
+      },
+      obligations: requiredManualCatalog.scenarios.flatMap((item) =>
+        item.environments.map((environment) => ({
+          scenarioId: item.id,
+          required: item.required,
+          environment,
+          status: "pending" as const,
+        })),
+      ),
+      results: [
+        {
+          scenarioId: "deployment.preview-identity",
+          environment: "preview",
+          status: "passed",
+          startedAt: "2026-07-26T10:01:00.000Z",
+          finishedAt: "2026-07-26T10:02:00.000Z",
+          runner: "playwright",
+          evidence: {
+            http: ["artifacts/version-response.json"],
+            "deployment-identity": ["artifacts/preview-sha.txt"],
+          },
+          fixtures: [],
+        },
+      ],
+      exceptions: [],
+      manualObligations: [],
+      exploratoryCharters: [completeCharter()],
+      rollbackReference: "docs/runbooks/rollback.md",
+      tagAuthorization: { status: "pending" },
+    };
+
+    expect(
+      analyzeReleaseRun(requiredManualCatalog, baseRun, {
+        stage: "pre-merge",
+        now: NOW,
+      }).blockingReasons,
+    ).toContain("manual obligations: required id oauth.github-real is missing");
+
+    // Demoting the same bundle to non-required lets it go unattempted —
+    // proving the gate above is genuinely conditioned on `required`, not a
+    // coincidence of this particular fixture.
+    const optionalManualCatalog: RequiredCatalog = {
+      ...requiredManualCatalog,
+      scenarios: requiredManualCatalog.scenarios.map((scenario) =>
+        scenario.id === "release.manual-arcs"
+          ? { ...scenario, required: false }
+          : scenario,
+      ),
+    };
+    const optionalRun: ReleaseRun = {
+      ...baseRun,
+      obligations: baseRun.obligations.map((obligation) =>
+        obligation.scenarioId === "release.manual-arcs"
+          ? { ...obligation, required: false }
+          : obligation,
+      ),
+    };
+    expect(
+      analyzeReleaseRun(optionalManualCatalog, optionalRun, {
+        stage: "pre-merge",
+        now: NOW,
+      }).blockingReasons,
+    ).not.toContain(
+      "manual obligations: required id oauth.github-real is missing",
     );
   });
 

@@ -153,6 +153,13 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("dbUpsertUser", () => {
+  it("does not register an EMU source handle as a primary user", async () => {
+    await dbUpsertUser("Juan-GonzalezPonce_avoltagh");
+
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
   it("upserts user with lowercase handle", async () => {
     mockUpsert.mockResolvedValue({ error: null });
 
@@ -418,6 +425,19 @@ describe("dbGetUserHandlePage", () => {
 });
 
 describe("dbGetAllUserHandles", () => {
+  it("excludes EMU source handles from the warm-cache registry", async () => {
+    handlePageResolver = () => ({
+      data: [
+        { handle: "alice" },
+        { handle: "juan-gonzalezponce_avoltagh" },
+        { handle: "bob" },
+      ],
+      error: null,
+    });
+
+    await expect(dbGetAllUserHandles()).resolves.toEqual(["alice", "bob"]);
+  });
+
   it("selects only handles and crosses the 1000-row boundary by handle", async () => {
     const first = Array.from({ length: 1000 }, (_, index) => ({
       handle: `user-${String(index).padStart(4, "0")}`,
