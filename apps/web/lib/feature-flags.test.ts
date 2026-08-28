@@ -756,3 +756,57 @@ describe.each([
     await expect(check()).resolves.toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// #1203 — a FAILED lookup must never be cached as a negative.
+//
+// `fetchFlagFromDbCached` used to swallow the error INSIDE `unstable_cache`
+// (`.catch(() => null)`), so a single 500ms timeout resolved to `null`, and
+// `null` is indistinguishable from "no such row". `checkFlag` then fell back
+// to the env var, and Next cached that outcome for an hour (and baked it into
+// statically prerendered output). In production `NEXT_PUBLIC_STUDIO_ENABLED`
+// is unset, so one transient DB blip disabled Creator Studio outright while
+// the `studio_enabled` row still said `true`: `/studio?demo=1` answered 200
+// with a `<meta http-equiv="refresh" content="1;url=/">`, which curl ignores
+// and every real browser obeys.
+//
+// The failure must degrade for the CURRENT request only and leave nothing
+// behind, so the next call retries and picks up the real row.
+// ---------------------------------------------------------------------------
+describe("feature flags — a failed DB lookup is not cached (#1203)", () => {
+  beforeEach(() => {
+    _resetFlagCache();
+    vi.mocked(dbGetFeatureFlag).mockReset();
+  });
+
+  it("retries on the next call after a rejected lookup, instead of sticking to the fallback", async () => {
+    vi.mocked(dbGetFeatureFlag).mockRejectedValueOnce(new Error("db timeout"));
+    expect(await isStudioEnabled()).toBe(false); // degraded for this request
+
+    vi.mocked(dbGetFeatureFlag).mockResolvedValueOnce(makeFlag("studio_enabled", true));
+    expect(await isStudioEnabled()).toBe(true); // real row wins on retry
+  });
+
+  it("does not poison the in-process cache with the degraded value", async () => {
+    vi.mocked(dbGetFeatureFlag).mockRejectedValueOnce(new Error("db down"));
+    await isStudioEnabled();
+
+    // A second call must actually consult the DB again rather than serve a
+    // cached `false` for the full 5-minute TTL.
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(makeFlag("studio_enabled", true));
+    await isStudioEnabled();
+    expect(vi.mocked(dbGetFeatureFlag)).toHaveBeenCalledTimes(2);
+  });
+
+  it("still caches a successful lookup", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(makeFlag("studio_enabled", true));
+    expect(await isStudioEnabled()).toBe(true);
+    expect(await isStudioEnabled()).toBe(true);
+    expect(vi.mocked(dbGetFeatureFlag)).toHaveBeenCalledTimes(1);
+  });
+
+  it("still falls back to the env var when the row genuinely does not exist", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    expect(await isStudioEnabled()).toBe(false);
+  });
+});
