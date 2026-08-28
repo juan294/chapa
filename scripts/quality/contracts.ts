@@ -1267,12 +1267,23 @@ export function analyzeReleaseRun(
     }
     for (const expectedId of expectedManualIds) {
       const matching = manualById.get(expectedId) ?? [];
+      // Duplicate-id hygiene applies regardless of requiredness — a
+      // malformed record is a data-integrity problem whether or not the
+      // bundling scenario currently blocks a release on it.
+      if (matching.length > 1) {
+        reasons.push(`manual obligations: duplicate id ${expectedId}`);
+      }
+      // Per docs/playbooks/e2e-pro-release-verification.md ("the analyzer
+      // rejects a missing required current-release result") — completeness
+      // enforcement below is scoped to REQUIRED manual-arc bundles. A
+      // non-required bundle (release.manual-arcs demoted per #1190) must be
+      // able to go genuinely unattempted without blocking; without this
+      // gate every manual id in manualObligationIds would still force a
+      // human round trip regardless of the scenario's own `required` flag.
+      if (!manualArcScenario.required) continue;
       if (matching.length === 0) {
         reasons.push(`manual obligations: required id ${expectedId} is missing`);
         continue;
-      }
-      if (matching.length > 1) {
-        reasons.push(`manual obligations: duplicate id ${expectedId}`);
       }
       if (
         !matching.some(
