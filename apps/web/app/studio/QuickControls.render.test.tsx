@@ -326,3 +326,98 @@ describe("QuickControls", () => {
     expect(screen.getByRole("button", { name: "/save" })).toBeDefined();
   });
 });
+
+// #1216 — Quick Controls stops being a 48-64px accordion window. The category
+// list owns the column, every option carries its description, and a counter
+// says how far the config has drifted from the default.
+describe("QuickControls — v2 controls column (#1216)", () => {
+  it("shows 'default config' when nothing has changed", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("studio-changed-count").textContent).toBe(
+      "default config",
+    );
+  });
+
+  it("counts how many categories differ from the default", () => {
+    render(
+      <QuickControls
+        config={{ ...baseConfig, background: "aurora", celebration: "confetti" }}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("studio-changed-count").textContent).toBe(
+      "2 of 9 changed",
+    );
+  });
+
+  it("keeps the counter out of the toggle button's accessible name", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Quick Controls" })).toBeDefined();
+  });
+
+  it("shows a description under every option label", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+    expect(screen.getByText("Animated color waves")).toBeDefined();
+    expect(screen.getByText("Floating sparkle particles")).toBeDefined();
+  });
+
+  it("marks the selected option with aria-pressed rather than a glyph in its label", () => {
+    render(
+      <QuickControls
+        config={{ ...baseConfig, background: "aurora" }}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+    const selected = screen
+      .getByText("Aurora Glow")
+      .closest("button") as HTMLButtonElement;
+    expect(selected.getAttribute("aria-pressed")).toBe("true");
+    const other = screen
+      .getByText("Particles")
+      .closest("button") as HTMLButtonElement;
+    expect(other.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("gives every option a 44px hit area", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+    const option = screen
+      .getByText("Aurora Glow")
+      .closest("button") as HTMLButtonElement;
+    expect(option.className).toContain("min-h-[44px]");
+  });
+});

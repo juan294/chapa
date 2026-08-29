@@ -148,6 +148,27 @@ export function getOptionLabel(
   );
 }
 
+/**
+ * The one-line explanation of what an option does. Quick Controls shows this
+ * under every option label since #1216 — before that the descriptions existed
+ * in this file but nothing rendered them, so picking an effect meant guessing
+ * from its name.
+ */
+export function getOptionDescription(
+  key: keyof BadgeConfig,
+  value: string,
+  t?: StudioTranslate,
+): string {
+  const category = STUDIO_CATEGORIES.find((c) => c.key === key);
+  const option = category?.options.find((o) => o.value === value);
+  if (!option) return "";
+  return translatedOrFallback(
+    t,
+    `studio.categories.${key}.descriptions.${value}`,
+    option.description,
+  );
+}
+
 export function getPresetLabel(
   id: string,
   fallback: string,

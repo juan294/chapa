@@ -286,4 +286,34 @@ describe("GlobalCommandBar", () => {
       expect(screen.queryByTestId("terminal-output")).toBeNull();
     });
   });
+
+  // #1214 — the bar is inline and always visible, so the commands have to be
+  // discoverable without typing `/` first. That is what the rejected palette
+  // overlay was for.
+  describe("suggestion chips", () => {
+    it("renders a scrolling row of command chips", () => {
+      render(<GlobalCommandBar />);
+      const row = screen.getByLabelText("Command suggestions");
+      expect(row.className).toContain("overflow-x-auto");
+      const chips = row.querySelectorAll("button");
+      expect(chips.length).toBeGreaterThan(0);
+      for (const chip of Array.from(chips)) {
+        expect(chip.textContent).toMatch(/^\//);
+        expect(chip.className).toContain("whitespace-nowrap");
+      }
+    });
+
+    it("fills the input with the chip's command instead of running it", () => {
+      render(<GlobalCommandBar />);
+      const chip = screen
+        .getByLabelText("Command suggestions")
+        .querySelector("button") as HTMLButtonElement;
+      const command = chip.textContent!;
+      fireEvent.click(chip);
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(
+        (screen.getByTestId("cmd-input") as HTMLInputElement).value,
+      ).toBe(`${command} `);
+    });
+  });
 });

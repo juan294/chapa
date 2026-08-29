@@ -68,7 +68,7 @@ export default async function Home({ params }: HomeProps) {
         dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
       >
         <LangSync />
-        <LandingContent demoBadgeSvg={demoBadgeSvg} t={t} />
+        <LandingContent demoBadgeSvg={demoBadgeSvg} demoImpact={DEMO_IMPACT} t={t} />
       </LanguageProvider>
     </>
   );

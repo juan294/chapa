@@ -8,9 +8,7 @@ afterEach(cleanup);
 // Mock next-themes
 const mockSetTheme = vi.fn();
 let mockTheme = "light";
-// resolvedTheme defaults to mockTheme unless a test overrides it explicitly —
-// this lets most existing tests (which only set mockTheme) keep working
-// unchanged while the system-preference tests below diverge the two.
+// resolvedTheme defaults to mockTheme unless a test overrides it explicitly.
 let mockResolvedTheme: string | undefined;
 
 vi.mock("next-themes", () => ({
@@ -41,125 +39,126 @@ describe("ThemeToggle", () => {
 
   it("renders a button", () => {
     render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    expect(button).toBeDefined();
+    expect(screen.getByRole("button")).toBeDefined();
   });
 
-  it("has an aria-label indicating theme switch direction (light mode)", () => {
+  it("SVG icons are aria-hidden (decorative)", () => {
+    render(<ThemeToggle />);
+    const button = screen.getByRole("button");
+    for (const svg of Array.from(button.querySelectorAll("svg"))) {
+      expect(svg.getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+});
+
+// #1211 — the token layer moved theming onto `color-scheme`, which has three
+// states: follow the OS, force light, force dark. The control is a single
+// button that cycles system -> light -> dark -> system, and its aria-label
+// names the mode the next press selects.
+describe("ThemeToggle — three-mode cycle (#1211)", () => {
+  beforeEach(() => {
+    mockTheme = "light";
+    mockResolvedTheme = undefined;
+    mockSetTheme.mockClear();
+    isClientState.current = true;
+  });
+
+  it("advances system -> light", () => {
+    mockTheme = "system";
+    mockResolvedTheme = "dark";
+    render(<ThemeToggle />);
+    expect(screen.getByRole("button").getAttribute("aria-label")).toBe(
+      "Switch to light theme",
+    );
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockSetTheme).toHaveBeenCalledWith("light");
+  });
+
+  it("advances light -> dark", () => {
     mockTheme = "light";
     render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    expect(button.getAttribute("aria-label")).toBe("Switch to dark theme");
-  });
-
-  it("has an aria-label indicating theme switch direction (dark mode)", () => {
-    mockTheme = "dark";
-    render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    expect(button.getAttribute("aria-label")).toBe("Switch to light theme");
-  });
-
-  it("calls setTheme with 'dark' when currently light", () => {
-    mockTheme = "light";
-    render(<ThemeToggle />);
+    expect(screen.getByRole("button").getAttribute("aria-label")).toBe(
+      "Switch to dark theme",
+    );
     fireEvent.click(screen.getByRole("button"));
     expect(mockSetTheme).toHaveBeenCalledWith("dark");
   });
 
-  it("calls setTheme with 'light' when currently dark", () => {
+  it("advances dark -> system", () => {
     mockTheme = "dark";
+    render(<ThemeToggle />);
+    expect(screen.getByRole("button").getAttribute("aria-label")).toBe(
+      "Switch to system theme",
+    );
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockSetTheme).toHaveBeenCalledWith("system");
+  });
+
+  it("treats an unknown or unset theme as system", () => {
+    mockTheme = "";
     render(<ThemeToggle />);
     fireEvent.click(screen.getByRole("button"));
     expect(mockSetTheme).toHaveBeenCalledWith("light");
   });
 
-  it("contains an SVG icon", () => {
+  it("reports the active mode to assistive tech", () => {
+    mockTheme = "system";
+    mockResolvedTheme = "dark";
     render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    const svg = button.querySelector("svg");
-    expect(svg).toBeDefined();
-    expect(svg).not.toBeNull();
-  });
-
-  it("SVG icon has aria-hidden=true (decorative)", () => {
-    render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    const svg = button.querySelector("svg");
-    expect(svg?.getAttribute("aria-hidden")).toBe("true");
+    // The button is a cycle, not an on/off switch, so it carries the current
+    // mode as a data attribute rather than aria-pressed.
+    expect(screen.getByRole("button").getAttribute("data-theme-mode")).toBe(
+      "system",
+    );
   });
 });
 
 describe("ThemeToggle — icon transition (Phase 6)", () => {
-  it("renders both theme icons wrapped for CSS cross-fade transition", () => {
+  beforeEach(() => {
+    mockTheme = "light";
+    mockResolvedTheme = undefined;
+    isClientState.current = true;
+  });
+
+  it("renders one icon per mode, wrapped for CSS cross-fade transition", () => {
     render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    const svgs = button.querySelectorAll("svg");
-    expect(svgs).toHaveLength(2);
-    // Each icon's wrapping <span> drives the cross-fade.
+    const svgs = screen.getByRole("button").querySelectorAll("svg");
+    expect(svgs).toHaveLength(3);
     svgs.forEach((svg) => {
       const wrapper = svg.parentElement as HTMLElement;
-      expect(wrapper.className).toContain("transition-[opacity,transform] duration-200");
+      expect(wrapper.className).toContain(
+        "transition-[opacity,transform] duration-200",
+      );
     });
   });
 
-  it("uses opacity and scale for icon cross-fade, flipped per theme", () => {
-    mockTheme = "light";
-    const { unmount } = render(<ThemeToggle />);
-    let button = screen.getByRole("button");
-    let [firstIcon, secondIcon] = Array.from(
-      button.querySelectorAll("svg"),
-    ).map((svg) => svg.parentElement as HTMLElement);
-    // In light mode: the first (dark-mode) icon is hidden, the second
-    // (light-mode) icon is shown.
-    expect(firstIcon!.className).toContain("opacity-0 scale-75");
-    expect(secondIcon!.className).toContain("opacity-100 scale-100");
-    unmount();
-
-    mockTheme = "dark";
-    render(<ThemeToggle />);
-    button = screen.getByRole("button");
-    [firstIcon, secondIcon] = Array.from(button.querySelectorAll("svg")).map(
-      (svg) => svg.parentElement as HTMLElement,
-    );
-    // In dark mode the two flip.
-    expect(firstIcon!.className).toContain("opacity-100 scale-100");
-    expect(secondIcon!.className).toContain("opacity-0 scale-75");
-  });
-});
-
-describe("ThemeToggle — resolvedTheme under system preference (UX-M7, #1173)", () => {
-  // ThemeProvider now enables next-themes' `enableSystem`, so `theme` can be
-  // the literal string "system" rather than "light"/"dark". Deriving state
-  // from `theme === "dark"` would then always read as light-mode (wrong icon,
-  // wrong aria-label) for every system-preference user. The toggle must
-  // derive its visual/aria state from `resolvedTheme`, which next-themes
-  // always resolves to the concrete "light" or "dark".
-  it("shows the dark-mode icon/label when theme is 'system' and the OS prefers dark (resolvedTheme='dark')", () => {
-    mockTheme = "system";
-    mockResolvedTheme = "dark";
-    render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    expect(button.getAttribute("aria-label")).toBe("Switch to light theme");
-  });
-
-  it("shows the light-mode icon/label when theme is 'system' and the OS has no preference (resolvedTheme='light')", () => {
-    mockTheme = "system";
-    mockResolvedTheme = "light";
-    render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    expect(button.getAttribute("aria-label")).toBe("Switch to dark theme");
-  });
-
-  it("clicking while theme is 'system' toggles based on resolvedTheme, not the literal 'system' string", () => {
-    mockTheme = "system";
-    mockResolvedTheme = "dark";
-    render(<ThemeToggle />);
-    fireEvent.click(screen.getByRole("button"));
-    expect(mockSetTheme).toHaveBeenCalledWith("light");
+  it("shows exactly the active mode's icon", () => {
+    for (const [mode, index] of [
+      ["system", 0],
+      ["light", 1],
+      ["dark", 2],
+    ] as const) {
+      mockTheme = mode;
+      const { unmount } = render(<ThemeToggle />);
+      const wrappers = Array.from(
+        screen.getByRole("button").querySelectorAll("svg"),
+      ).map((svg) => svg.parentElement as HTMLElement);
+      wrappers.forEach((wrapper, i) => {
+        expect(wrapper.className).toContain(
+          i === index ? "opacity-100 scale-100" : "opacity-0 scale-75",
+        );
+      });
+      unmount();
+    }
   });
 });
 
 describe("ThemeToggle — mobile responsiveness (#240)", () => {
+  beforeEach(() => {
+    mockTheme = "light";
+    isClientState.current = true;
+  });
+
   it("button uses h-11 w-11 for 44px touch target (WCAG 2.5.8)", () => {
     render(<ThemeToggle />);
     const button = screen.getByRole("button");

@@ -219,6 +219,16 @@ export function ActivityHeatmap({
 
   const hasInsights = heatmapData.length > 0 && activeDays > 0;
 
+  const activeDaysLabel = interpolate(
+    text(
+      t,
+      activeDays === 1
+        ? "dashboard.activity.timelineOne"
+        : "dashboard.activity.timelineMany",
+    ),
+    { activeDays: String(activeDays) },
+  );
+
   return (
     <section
       aria-label={t('aria.contributionActivity') as string}
@@ -252,21 +262,33 @@ export function ActivityHeatmap({
         </div>
       )}
 
-      <div className="rounded-xl border border-stroke bg-card p-4">
-        <DotTimeline data={enriched} peakDate={insights.peakDay.date} activeDays={activeDays} />
+      {/* #1217 — a horizontal scroller, so a narrow screen scrolls the chart
+          instead of crushing every column to a few pixels. */}
+      <div className="overflow-x-auto rounded-xl border border-stroke bg-card">
+        <div className="min-w-[560px] p-4">
+          <DotTimeline data={enriched} peakDate={insights.peakDay.date} activeDays={activeDays} />
+        </div>
       </div>
 
       {/* Legends */}
       <div className="flex flex-wrap items-center justify-between mt-3 gap-2">
         {/* Dimension colors */}
         <div className="flex flex-wrap items-center gap-4">
+          {/* The active-days total was only in the chart's aria-label, so a
+              sighted reader had no count anywhere on the page (#1217). */}
+          <span
+            data-testid="activity-active-days"
+            className="font-heading text-[11px] text-text-secondary"
+          >
+            {activeDaysLabel}
+          </span>
           {DIMENSIONS.map((dim) => (
             <div key={dim} className="flex items-center gap-1.5">
               <div
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: DIMENSION_COLORS[dim] }}
               />
-              <span className="text-[10px] text-text-secondary font-body">
+              <span className="text-[11px] text-text-secondary font-body">
                 {text(t, DIMENSION_KEYS[dim])}
               </span>
             </div>
@@ -274,7 +296,7 @@ export function ActivityHeatmap({
         </div>
         {/* Dot size key */}
         <div className="flex items-center gap-3">
-          <span className="text-[10px] text-text-secondary font-body">
+          <span className="text-[11px] text-text-secondary font-body">
             {text(t, "dashboard.activity.activityLabel")}
           </span>
           {[
@@ -287,7 +309,7 @@ export function ActivityHeatmap({
                 className="rounded-full bg-amber/40"
                 style={{ width: size, height: size }}
               />
-              <span className="text-[9px] text-text-secondary font-body">
+              <span className="text-[11px] text-text-secondary font-body">
                 {label}
               </span>
             </div>

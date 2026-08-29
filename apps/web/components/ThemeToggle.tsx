@@ -4,8 +4,27 @@ import { useTheme } from "next-themes";
 import { useIsClient } from "@/hooks/useIsClient";
 import { useTranslation } from "@/lib/i18n";
 
+// #1211 — the token layer themes the page through `color-scheme`, which has
+// three states: follow the OS, force light, force dark. The control is one
+// button that cycles through them; its label names the mode the next press
+// selects, so a screen-reader user hears the outcome, not the current state.
+const MODES = ["system", "light", "dark"] as const;
+type Mode = (typeof MODES)[number];
+
+const NEXT_MODE_LABEL: Record<Mode, string> = {
+  system: "aria.themeToggleLight",
+  light: "aria.themeToggleDark",
+  dark: "aria.themeToggleSystem",
+};
+
+function iconClass(active: boolean): string {
+  return `absolute inset-0 flex items-center justify-center transition-[opacity,transform] duration-200 ${
+    active ? "opacity-100 scale-100" : "opacity-0 scale-75"
+  }`;
+}
+
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const hydrated = useIsClient();
   const { t } = useTranslation();
 
@@ -13,24 +32,36 @@ export function ThemeToggle() {
     return <div className="h-11 w-11" aria-hidden="true" />;
   }
 
-  // ThemeProvider enables next-themes' `enableSystem`, so `theme` can be the
-  // literal string "system" rather than "light"/"dark". `resolvedTheme` is
-  // always the concrete value next-themes actually applied (falling back to
-  // light when the OS reports no preference), so it — not `theme` — is what
-  // determines the icon/label shown here.
-  const isDark = resolvedTheme === "dark";
+  // An unset or unrecognized value means no explicit choice has been made,
+  // which is exactly what "system" represents.
+  const mode: Mode = MODES.includes(theme as Mode) ? (theme as Mode) : "system";
+  const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length]!;
 
   return (
     <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={() => setTheme(next)}
+      data-theme-mode={mode}
       className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg text-terminal-dim transition-colors hover:text-amber"
-      aria-label={isDark ? t('aria.themeToggleLight') as string : t('aria.themeToggleDark') as string}
+      aria-label={t(NEXT_MODE_LABEL[mode]) as string}
     >
-      <span
-        className={`absolute inset-0 flex items-center justify-center transition-[opacity,transform] duration-200 ${
-          isDark ? "opacity-100 scale-100" : "opacity-0 scale-75"
-        }`}
-      >
+      <span className={iconClass(mode === "system")}>
+        {/* auto: a display, meaning "whatever this device prefers" */}
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="2" y="4" width="20" height="13" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      </span>
+      <span className={iconClass(mode === "light")}>
         <svg
           className="h-4 w-4"
           viewBox="0 0 24 24"
@@ -52,11 +83,7 @@ export function ThemeToggle() {
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
         </svg>
       </span>
-      <span
-        className={`flex items-center justify-center transition-[opacity,transform] duration-200 ${
-          isDark ? "opacity-0 scale-75" : "opacity-100 scale-100"
-        }`}
-      >
+      <span className={iconClass(mode === "dark")}>
         <svg
           className="h-4 w-4"
           viewBox="0 0 24 24"

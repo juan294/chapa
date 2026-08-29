@@ -1,4 +1,5 @@
 import { NavbarClient } from "@/components/NavbarClient";
+import { ContentPageHeader } from "@/components/content/ContentPageHeader";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { SiteFooter } from "@/components/SiteFooter";
 import { getServerT } from "@/lib/i18n/server";
@@ -45,10 +46,18 @@ export default async function PrivacyPage({
     <div className="min-h-screen bg-bg">
       <NavbarClient />
       <main id="main-content" className="relative mx-auto max-w-3xl px-6 pt-32 pb-24">
-        <div className="relative">
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-8 animate-fade-in-up">
-            {t('legal.privacy.h1Before') as string}<span className="text-amber">{t('legal.privacy.h1Highlight') as string}</span>
-          </h1>
+        <div className="@container relative">
+          <ContentPageHeader
+            command="chapa explain --privacy"
+            title={
+              <>
+                {t('legal.privacy.h1Before') as string}
+                <span className="text-amber">
+                  {t('legal.privacy.h1Highlight') as string}
+                </span>
+              </>
+            }
+          />
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
             <p className="text-xs text-text-secondary/60">
               {t('legal.privacy.lastUpdated') as string}

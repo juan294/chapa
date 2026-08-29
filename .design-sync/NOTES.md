@@ -251,3 +251,26 @@ Open with Claude Design: whether registration prefers `tokens/*.css` over
 scraping `styles.css`'s import closure. If it does not, the exclusion has to
 happen in registration, because the upload cannot separate the two sources any
 further than this.
+
+## Tailwind engine variables in the synced bundle (#1219)
+
+The design-system validator flags about 70 unclassified `--tw-*` variables on
+every sync. The handoff suggested excluding them "in the sync config".
+
+There is no such option here, and the exclusion cannot happen at either end we
+control:
+
+- `.design-sync/config.json` describes the package, components and prop types.
+  It has no token-registration section, and the converter that reads it is not
+  in this repository.
+- `_ds_bundle.css` must keep the engine variables. Utilities dereference them
+  at runtime and their `@property` blocks set the initial values, so removing
+  them breaks the bundle.
+
+What this repo does instead: `emit-tokens.mjs` writes a separate manifest
+holding the design tokens only, with `--tw-*` filtered out, and
+`scripts/design-sync-emit-tokens.test.ts` fails if that filter or the block it
+reads from ever regresses. A consumer that reads the manifest sees a clean
+palette; one that scrapes `_ds_bundle.css` still sees the engine variables, and
+silencing that needs a converter-side option that does not exist today.
+

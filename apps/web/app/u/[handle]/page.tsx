@@ -49,7 +49,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import { SiteFooter } from "@/components/SiteFooter";
-import { SharePageH2 } from "./SharePageH2";
+import { SharePageHeader } from "./SharePageHeader";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
@@ -420,8 +420,14 @@ export async function SharePageContent({
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
 
-        {/* ── Badge Section Title ──────────────────────────────── */}
-        <SharePageH2 />
+        {/* ── Header: identity paired with the headline score (#1217) ── */}
+        <SharePageHeader
+          handle={handle}
+          displayLabel={displayLabel}
+          score={impact?.adjustedComposite ?? null}
+          tier={impact?.tier ?? null}
+          verificationHash={verification?.hash ?? null}
+        />
 
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">

@@ -6,6 +6,7 @@ import {
   getHeatmapColor,
   getTierColor,
 } from "./theme";
+import { themedTokenValue } from "@/lib/test-helpers/css-tokens";
 
 const globalsCss = readFileSync(
   new URL("../../styles/globals.css", import.meta.url),
@@ -66,7 +67,7 @@ describe("getTierColor", () => {
     // test is the thing to update.
     expect(getTierColor("Elite")).toBe("#8B5CF6");
     expect(getTierColor("High")).toBe("#A78BFA");
-    expect(globalsCss).toContain("--color-amber: oklch(.66 .15 163);");
+    expect(themedTokenValue("--color-amber").light).toBe("oklch(.66 .15 163)");
     expect(globalsCss).not.toContain("--color-amber: #8B5CF6;");
   });
 });
@@ -96,10 +97,12 @@ describe("theme.ts brand-alignment invariant comment (#1168 UX-L2)", () => {
     // #1206 — the app's dark surfaces moved to forest green; the badge's own
     // WARM_AMBER literals below did not. The divergence this test documents is
     // therefore wider than it was, and still intentional.
-    expect(globalsCss).toContain("--color-bg: #08170f;");
-    expect(globalsCss).toContain("--color-card: #0f2419;");
-    expect(globalsCss).toContain("--color-text-primary: #dfeae4;");
-    expect(globalsCss).toContain("--color-text-secondary: #8ba398;");
+    // #1211 folded each token's two per-theme declarations into one
+    // light-dark() value; the dark half is the second argument.
+    expect(themedTokenValue("--color-bg").dark).toBe("#08170f");
+    expect(themedTokenValue("--color-card").dark).toBe("#0f2419");
+    expect(themedTokenValue("--color-text-primary").dark).toBe("#dfeae4");
+    expect(themedTokenValue("--color-text-secondary").dark).toBe("#a9c0b5");
 
     expect(WARM_AMBER.bg).toBe("#0C0D14");
     expect(WARM_AMBER.card).toBe("#13141E");
@@ -109,7 +112,7 @@ describe("theme.ts brand-alignment invariant comment (#1168 UX-L2)", () => {
     expect(WARM_AMBER.bg).not.toBe("#08170f");
     expect(WARM_AMBER.card).not.toBe("#0f2419");
     expect(WARM_AMBER.textPrimary).not.toBe("#dfeae4");
-    expect(WARM_AMBER.textSecondary).not.toBe("#8ba398");
+    expect(WARM_AMBER.textSecondary).not.toBe("#a9c0b5");
   });
 });
 

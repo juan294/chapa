@@ -20,6 +20,7 @@ import { useIsClient } from "@/hooks/useIsClient";
 import { BadgePreviewCard } from "./BadgePreviewCard";
 import type { PreviewVerification } from "./PreviewFooter";
 import { QuickControls } from "./QuickControls";
+import { STUDIO_CATEGORIES } from "./studio-options";
 import {
   useStudioCommands,
   type StudioCommandAction,
@@ -28,6 +29,7 @@ import { TerminalOutput } from "@/components/terminal/TerminalOutput";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
 import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
 import {
+  CATEGORY_KEY_TO_ALIAS,
   executeCommand,
   makeLine,
   type CommandResult,
@@ -586,20 +588,53 @@ export function StudioClient({
             verification={verification}
           />
 
-          <div
-            className={`mt-4 text-center text-sm font-heading ${
-              saveState.status === "error"
-                ? "text-terminal-red"
-                : saveState.status === "saving"
-                  ? "text-amber animate-terminal-fade-in"
-                  : "text-text-secondary"
-            }`}
-            role={saveState.status === "error" ? "alert" : "status"}
-            data-save-state={saveState.status}
-          >
-            {saveState.status === "error"
-              ? saveState.message
-              : (t(`studio.save.${saveState.status}`) as string)}
+          {/* #1216 — a status pill, not a centered line of text. The state is
+              a property of the preview, so it reads as a label on it rather
+              than as a sentence floating underneath. */}
+          <div className="mt-4 flex justify-center">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-heading text-xs ${
+                saveState.status === "error"
+                  ? "border-terminal-red/40 bg-terminal-red/10 text-terminal-red"
+                  : saveState.status === "saving"
+                    ? "animate-terminal-fade-in border-amber/40 bg-amber/10 text-amber"
+                    : saveState.status === "dirty"
+                      ? "border-terminal-yellow/40 bg-terminal-yellow/10 text-terminal-yellow"
+                      : "border-terminal-green/40 bg-terminal-green/10 text-terminal-green"
+              }`}
+              role={saveState.status === "error" ? "alert" : "status"}
+              data-save-state={saveState.status}
+            >
+              {saveState.status === "error"
+                ? saveState.message
+                : (t(`studio.save.${saveState.status}`) as string)}
+            </span>
+          </div>
+
+          {/* #1216 — the whole configuration in one line, so the effect of a
+              /set or /preset is visible without opening nine categories. */}
+          <div className="mt-4 rounded-lg border border-stroke bg-card px-3 py-2">
+            <div className="font-heading text-[10px] tracking-wider text-terminal-dim">
+              {t("studio.activeConfig") as string}
+            </div>
+            <dl
+              data-testid="studio-active-config"
+              className="mt-1.5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-x-4 gap-y-1"
+            >
+              {STUDIO_CATEGORIES.map((category) => (
+                <div
+                  key={category.key}
+                  className="flex items-baseline justify-between gap-2 font-heading text-[11px]"
+                >
+                  <dt className="text-terminal-dim">
+                    {CATEGORY_KEY_TO_ALIAS[category.key] ?? category.key}
+                  </dt>
+                  <dd className="truncate text-text-secondary">
+                    {config[category.key]}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           {reducedMotion && (
@@ -650,11 +685,16 @@ export function StudioClient({
           }
         />
 
-        {/* Terminal output */}
-        <TerminalOutput lines={localizedLines} />
+        {/* #1216 — the log is a bounded strip and the whole cluster sticks to
+            the bottom of the column, so the primary input is never scrolled
+            off-screen by a long session. */}
+        <div className="sticky bottom-0 mt-auto border-t border-stroke bg-bg/95 backdrop-blur-sm">
+        <div className="max-h-40 overflow-y-auto">
+          <TerminalOutput lines={localizedLines} />
+        </div>
 
         {/* Terminal input + autocomplete */}
-        <div className="relative mt-auto">
+        <div className="relative p-2">
           <AutocompleteDropdown
             commands={studioCommands}
             partial={partial}
@@ -674,6 +714,7 @@ export function StudioClient({
             suggestionsListboxId={TERMINAL_COMMAND_LISTBOX_ID}
             activeSuggestionId={activeSuggestionId}
           />
+        </div>
         </div>
       </div>
     </div>

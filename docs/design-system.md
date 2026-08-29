@@ -8,41 +8,56 @@ Bold, developer-tool aesthetic inspired by terminal UIs. The dark theme is the s
 
 ### Theme switching
 
-- Powered by `next-themes` with `attribute="data-theme"` and `defaultTheme="light"`.
-- `ThemeProvider` wraps the app in `layout.tsx`; `ThemeToggle` lives in the nav bar.
-- All color tokens are CSS custom properties defined twice in `globals.css`: light values in `:root` and dark values in `[data-theme="dark"]`. Tailwind utilities (`bg-bg`, `text-text-primary`, etc.) resolve at runtime via `var()`.
-- When adding new color tokens, always define both light and dark values.
+- Powered by `next-themes` with `attribute="data-theme"` and `defaultTheme="system"`.
+- `ThemeProvider` wraps the app in `layout.tsx`; `ThemeToggle` lives in the nav bar and cycles three modes: system, light, dark (#1211).
+- **Every color token is ONE declaration** (#1211): `--color-bg: light-dark(#f7fbf8, #08170f);` inside the `@theme` block of `globals.css`. `color-scheme` on the root element decides which half resolves - `:root` carries `color-scheme: light dark` (follow the OS), and `[data-theme="light"]` / `[data-theme="dark"]` force one. Tailwind utilities (`bg-bg`, `text-text-primary`, etc.) resolve at runtime via `var()`, unchanged.
+- The paired `:root` / `[data-theme="dark"]` custom property blocks are gone. `data-theme` now carries `color-scheme` only. Native form controls, scrollbars and focus rings follow the theme for free.
+- When adding a new color token, write one `light-dark(<light>, <dark>)` value. Do not reintroduce a second per-theme block.
+- No `@supports` fallback is needed or wanted. LightningCSS (Next.js 16's CSS pipeline) compiles `light-dark()` to a custom-property toggle keyed off the same `color-scheme` selectors, so all three modes work below the native floor (Chrome/Edge 123+, Safari 17.5+, Firefox 120+). See `docs/decisions/2026-08-29-light-dark-token-layer.md`.
 
 ## Colors
 
-Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown below are the **dark** theme values; light equivalents are defined in `:root` (see `globals.css`).
+Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-dark(<light>, <dark>)` declaration per token. Both halves are listed below.
 
 | Token | Dark value | Light value | Tailwind class | Usage |
 |-------|-----------|-------------|----------------|-------|
 | `--color-bg` | `#08170f` | `#f7fbf8` | `bg-bg` | Page background |
 | `--color-card` | `#0f2419` | `#edf6f0` | `bg-card` | Card/panel surfaces |
 | `--color-text-primary` | `#dfeae4` | `#0b2018` | `text-text-primary` | Headings, body text |
-| `--color-text-secondary` | `#8ba398` | `#55665e` | `text-text-secondary` | Muted text, labels |
+| `--color-text-secondary` | `#a9c0b5` | `#33453c` | `text-text-secondary` | Muted text, labels (#1212 raised both halves to clear AA) |
 | `--color-amber` | `oklch(.76 .16 163)` | `oklch(.66 .15 163)` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
 | `--color-amber-light` | `oklch(.84 .14 163)` | `oklch(.76 .14 163)` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
 | `--color-amber-dark` | `oklch(.58 .14 165)` | `oklch(.5 .12 165)` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
 | `--color-stroke` | `#7dffbc1f` | `#0d3b2417` | `border-stroke` | Borders, dividers (accent-tinted) |
+| `--color-stroke-strong` | `#7dffbc2e` | `#0d3b2426` | `border-stroke-strong` | The heavier rule: section-header underlines, table separators (#1211) |
 | `--color-warm-bg` | `#08170f` | `#f7fbf8` | `bg-warm-bg` | Alias for page background |
 | `--color-warm-card` | `#0f2419` | `#edf6f0` | `bg-warm-card` | Alias for card background |
 | `--color-warm-stroke` | `#7dffbc1f` | `#0d3b2417` | `border-warm-stroke` | Alias for borders |
 | `--color-dark-section` | `#050f0a` | `#0d2b1d` | `bg-dark-section` | Deeper emphasis band backgrounds |
 | `--color-dark-card` | `#0c1f15` | `#123526` | `bg-dark-card` | Cards inside dark sections |
-| `--color-purple-tint` | `oklch(.76 .16 163 / .1)` | `#dff0e6` | `bg-purple-tint` | Subtle accent section tint |
+| `--color-hero-band` | `#0b2018` | `#e9f3ec` | `bg-hero-band` | Landing hero band. Theme aware on purpose (#1215) |
+| `--color-purple-tint` | `#123526` | `#dff0e6` | `bg-purple-tint` | Subtle accent section tint |
 | `--color-terminal-green` | `oklch(.8 .16 148)` | `oklch(.55 .13 145)` | `text-terminal-green` | Success messages, checkmarks |
 | `--color-terminal-red` | `oklch(.72 .17 25)` | `oklch(.55 .19 25)` | `text-terminal-red` | Error messages |
 | `--color-terminal-yellow` | `oklch(.82 .13 85)` | `oklch(.62 .13 78)` | `text-terminal-yellow` | Warning messages |
-| `--color-terminal-dim` | `#42574c` | `#93a89d` | `text-terminal-dim` | Dim text, prefixes, decorative |
+| `--color-terminal-dim` | `#8ba398` | `oklch(.48 .025 160)` | `text-terminal-dim` | Dim text, prefixes, decorative. #1212 raised both halves: the old pair measured 2.41:1 light and 2.19:1 on the dark band, while carrying informational text (step numbers, section counts, eyebrows, meta lines) |
 | `--color-complement` | `oklch(.7 .11 225)` | `oklch(.55 .1 225)` | `bg-complement`, `border-complement` | Slate-blue accent (sparingly) — verification, secondary CTAs. **Non-textual only** — see `--color-complement-text` below for complement-as-text/icon-stroke |
 | `--color-complement-light` | `oklch(.7 .11 225 / .16)` | `oklch(.94 .035 225)` | `bg-complement-light` | Complement tint |
 | `--color-complement-dark` | `oklch(.42 .09 228)` | `oklch(.42 .09 228)` | `bg-complement-dark` | White-text-on-solid-fill verification CTAs only (`bg-complement` measures 2.54:1 for white text, below AA; this measures ~5.49:1) |
 | `--color-complement-text` | `oklch(.76 .11 222)` | `oklch(.48 .1 228)` | `text-complement-text` | Complement-colored TEXT and icon strokes on `bg-bg`/`bg-card` (#1189). The raw `--color-complement` is a fill/tint value and does not clear AA as text; this theme-aware token is the text-safe counterpart, re-tuned to slate blue in #1206. |
 | `--color-complement-text-hover` | `oklch(.84 .1 220)` | `oklch(.38 .09 228)` | `hover:text-complement-text-hover` | Hover state for `text-complement-text` (#1189 follow-up). Light theme darkens, dark theme brightens; both directions increase contrast against their own ground. Re-tuned to slate blue in #1206. |
 | `--color-track` | `#7dffbc14` | `#0d3b2414` | `bg-track` | Progress bar/gauge track background |
+| | | | | |
+| **Always-dark band** | | | | **One value in both themes (#1211). The hero band, badge panel and CLI blocks frame a server-rendered artifact, so they do not follow the theme.** |
+| `--color-forest` | `#0b2018` | same | `bg-forest` | Band ground |
+| `--color-forest-card` | `#0f2419` | same | `bg-forest-card` | Cards inside the band |
+| `--color-forest-line` | `#7dffbc2e` | same | `border-forest-line` | Hairlines inside the band |
+| `--color-forest-text` | `#dfeae4` | same | `text-forest-text` | Text on the band |
+| `--color-forest-dim` | `#8ba398` | same | `text-forest-dim` | Muted text on the band. Was `#42574c`, which measured 2.19:1 (#1212) |
+| `--color-forest-grid` | `#7dffbc0a` | same | (`.bg-grid-forest`) | The band's 72px hairline grid |
+| `--color-forest-ok` | `oklch(.8 .16 148)` | same | `text-forest-ok` | Success text inside a forest block |
+| `--color-forest-warn` | `oklch(.82 .13 85)` | same | `text-forest-warn` | Warning text inside a forest block |
+| `--color-forest-err` | `oklch(.72 .17 25)` | same | `text-forest-err` | Error text inside a forest block |
 | | | | | |
 | **Dimension colors** | | | | **Data visualization accents for the 4 impact dimensions** |
 | `--color-dimension-delivery` | `oklch(.72 .14 145)` | `oklch(.62 .14 145)` | `text-dimension-delivery`, `bg-dimension-delivery` | Delivery dimension (green, hue 145) |
@@ -70,8 +85,10 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 - Jade is the signature accent. Use sparingly — CTAs, active states, key data points.
 - Use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, etc.) — they resolve correctly in both themes.
 - Never hardcode hex colors in components; always use the CSS variable tokens so theme switching works.
+- The hero band is theme aware: mint in light, forest in dark. Do not make it always dark - that turned light mode into a strip around a dark slab. Only the badge panel and the CLI blocks stay dark in both themes, via the `--color-forest-*` family.
 - Accent-tinted borders (`border-stroke`) are the default for all dividers.
 - Terminal colors used in terminal output only: green for success, red for errors, yellow for warnings. These also have light-appropriate values.
+- **Inside an always-dark forest block, use `text-forest-ok` / `text-forest-warn` / `text-forest-err`, never `text-terminal-green` / `-yellow` / `-red`.** The terminal colors resolve per theme, so on a light page their light values land on the fixed dark ground and measure 3.72:1 (green) and 3.19:1 (red), below AA. The forest variants pin the dark values (#1215).
 - **Error banners and alerts** must use terminal-red tokens (`border-terminal-red/30`, `bg-terminal-red/10`, `text-terminal-red`) — never the brand accent for error states.
 - **Verification-related UI on the site itself** (verify page headings, verify CTAs, in-app verification indicators) must use the complement (slate blue since #1206) tokens: `bg-complement`, `border-complement`, `bg-complement-light` for fills/tints/borders, and — for text and icon strokes specifically — `text-complement-text` (#1189), never `text-complement`. The raw fill value does not clear the AA floor as text.54:1 as text against the site's light-theme backgrounds, below the WCAG AA floor even for large/bold text (3:1), let alone normal text (4.5:1); `--color-complement-text` is the theme-aware, text-safe counterpart (see the color table above). This semantically distinguishes cryptographic trust from primary brand actions while keeping teal legible as text in both themes. **Hovering a `text-complement-text` element** must go to `hover:text-complement-text-hover`, never `hover:text-complement-light` — `--color-complement-light` is a translucent BACKGROUND tint (pale mint on white in light theme, 15%-alpha green in dark theme) that renders as near-invisible text; a hover state that's harder to read than rest is backwards. `--color-complement-text-hover` is the theme-aware, text-safe hover counterpart (darker in light theme, lighter/brighter in dark theme — see the color table above).
 - **The embeddable badge SVG's own "verified" signal** (shield icon + vertical verification strip) is the one deliberate exception: it uses its own coral constant, `VERIFICATION_CORAL` (`#E05A47`, `apps/web/lib/badge-visual-metadata.ts`) — never the teal tokens above. The badge is a static, theme-independent asset rendered server-side before app CSS exists, so it can't reference CSS custom properties at all; coral was already load-bearing in the verification strip pre-dating this rule, and previously coexisted with the brand-purple shield icon (two colors signaling one "verified" concept). #1168 (UX-M10) resolved that duality by recoloring the shield to the same coral, so the badge now has exactly one verified color, distinct from the on-site complement and from the brand accent. (The badge still carries the pre-#1206 violet for its accent and archetype colors; the app moved to jade and the badge deliberately did not, so "brand-purple shield" above is badge history, not the app's current accent.) Contrast: coral is ~5.3:1 against the badge's own fixed dark background (#0C0D14) — comfortably AA. It is only ~3.7:1 against a light background (#FFFFFF/#F9FAFB) — AA for large/bold text only, not small body text — so if a coral accent is ever carried onto the (light/dark-capable) verify page, it needs its own contrast pass and cannot assume the badge's dark-background numbers apply. Coral vs. `--color-terminal-red` (error state) hue is close (~7° apart in HSL) but separated by lightness/saturation on the badge's dark canvas (~13pp lightness gap vs. dark-theme `--color-terminal-red` #F87171); the gap narrows on a hypothetical light-theme use (~7pp vs. light-theme `--color-terminal-red` #DC2626, nearly identical saturation) — verify the two stay visually distinguishable, including for colorblind users, before extending coral beyond the badge.
@@ -238,6 +255,33 @@ Two distinct dropdown patterns exist in the codebase — do not unify them, they
 | Arrow keys | `ArrowUp`/`ArrowDown` (wrap) + `Home`/`End` | Same, via the shared hook |
 
 A component whose items are alternatives the user picks one of (language, theme, sort order) should follow the listbox pattern; a component whose items are actions to invoke (profile actions, share actions) should use `useDropdownMenu`'s menu pattern. When adding a new dropdown, choose based on this semantic distinction first — don't default to whichever hook already exists.
+
+### Section header (`% chapa <command>`)
+
+`apps/web/components/SectionHeader.tsx` (#1214). A flex row with the
+`% chapa <command>` marker on the left and a right-aligned meta readout
+(`exit 0 · 5 results`, `3 steps · ~1 min`, `composite 82 · high`), and a
+`border-stroke-strong` rule underneath. Both spans are `whitespace-nowrap`:
+the pair is one line of terminal output, and the row wraps as a whole instead
+of breaking either half. Pass `title` to put the real section name in the
+accessibility tree, since `% chapa features` is a poor document-outline entry.
+
+Use the meta only for something the reader can act on or verify. On a prose
+page there is usually nothing to report, and an invented meta string is
+decoration.
+
+### Content page shell
+
+`apps/web/components/content/ContentPageHeader.tsx` and
+`OnThisPageIndex.tsx` (#1218). Every long-form route opens with the marker,
+the title and a one-paragraph orientation; pages long enough to need one get
+the sticky index, which highlights the current section with an accent rail.
+
+Two things the index depends on:
+- Each section heading needs a stable `id` and `scroll-mt-28`.
+- The `<nav>` needs `self-start`. As a stretched grid child it would be as
+  tall as the whole article, and sticky positioning would have no range to
+  travel in.
 
 ### Tooltips (mandatory pattern)
 

@@ -22,6 +22,7 @@ import {
 } from "@/lib/keyboard/shortcuts";
 
 const OUTPUT_TIMEOUT_MS = 5000;
+const CHIP_COUNT = 6;
 
 /**
  * Fixed bottom command bar with navigation commands + AuthorTypewriter pill.
@@ -61,6 +62,10 @@ export function GlobalCommandBar({
     () => createNavigationCommands({ isAdmin, studioEnabled, descriptions }),
     [isAdmin, studioEnabled, descriptions],
   );
+
+  // The chips are a scrolling shortcut row, not the full registry — enough to
+  // show what the bar can do without turning it into a menu.
+  const chipCommands = useMemo(() => commands.slice(0, CHIP_COUNT), [commands]);
 
   // Auto-clear output after timeout
   useEffect(() => {
@@ -148,7 +153,11 @@ export function GlobalCommandBar({
   return (
     <>
       {!skipShortcutsListener && <KeyboardShortcutsListener />}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
+      {/* #1214 — the bar stays inline at the bottom of the viewport rather
+          than opening as a full-screen palette. The chips make the commands
+          discoverable without typing `/` first, which is what the palette
+          overlay was there to do. */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 px-4 py-2.5 backdrop-blur-xl">
         <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
           <AuthorTypewriter />
         </div>
@@ -177,7 +186,33 @@ export function GlobalCommandBar({
             suggestionsVisible={autocompleteExpanded}
             suggestionsListboxId={TERMINAL_COMMAND_LISTBOX_ID}
             activeSuggestionId={activeSuggestionId}
+            trailing={
+              <kbd
+                aria-hidden="true"
+                className="hidden shrink-0 rounded border border-stroke-strong px-1.5 py-0.5 font-heading text-[11px] text-terminal-dim sm:block"
+              >
+                /
+              </kbd>
+            }
           />
+          {chipCommands.length > 0 && (
+            <div
+              className="mt-2 flex gap-2 overflow-x-auto pb-0.5"
+              aria-label={t("aria.commandSuggestions") as string}
+            >
+              {chipCommands.map((command) => (
+                <button
+                  key={command.name}
+                  type="button"
+                  onClick={() => handleAutocompleteFill(command.name)}
+                  title={command.description}
+                  className="shrink-0 rounded-full border border-stroke px-3 py-1.5 font-heading text-xs whitespace-nowrap text-text-secondary transition-colors hover:border-amber/40 hover:text-text-primary"
+                >
+                  {command.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>

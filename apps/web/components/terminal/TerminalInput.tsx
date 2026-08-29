@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
@@ -18,6 +19,11 @@ interface TerminalInputProps {
   suggestionsVisible?: boolean;
   suggestionsListboxId?: string;
   activeSuggestionId?: string;
+  /**
+   * Rendered at the trailing edge of the field, inside the border. The v2
+   * command bar puts the `/` keycap here (#1214).
+   */
+  trailing?: ReactNode;
 }
 
 export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>(function TerminalInput({
@@ -29,6 +35,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
   suggestionsVisible = false,
   suggestionsListboxId,
   activeSuggestionId,
+  trailing,
 }, ref) {
   const { t } = useTranslation();
   // `t` is a stable reference per locale (memoized in LanguageProvider), but
@@ -120,9 +127,11 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
   );
 
   return (
-    <div
-      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-terminal text-base sm:text-sm leading-6"
-    >
+    // #1214 — the field is a bordered 46px control, not a bare line on a
+    // divider. The bar chrome around it (sticky positioning, backdrop,
+    // suggestion chips) belongs to the caller, so Studio and the global
+    // command bar can frame the same field differently.
+    <div className="flex min-h-[46px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 font-terminal text-base leading-6 transition-colors focus-within:border-amber sm:text-sm">
       <span className="text-amber select-none shrink-0">
         {prompt} &gt;
       </span>
@@ -151,6 +160,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
           spellCheck={false}
         />
       </div>
+      {trailing}
     </div>
   );
 });

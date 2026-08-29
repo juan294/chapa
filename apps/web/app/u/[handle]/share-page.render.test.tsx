@@ -146,8 +146,8 @@ vi.mock("@/lib/i18n", () => ({
   DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
 }));
-vi.mock("./SharePageH2", () => ({
-  SharePageH2: () => null,
+vi.mock("./SharePageHeader", () => ({
+  SharePageHeader: () => null,
 }));
 vi.mock("./SharePageWebMcpTools", () => ({
   SharePageWebMcpTools: mockSharePageWebMcpToolsComponent,
@@ -620,8 +620,11 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).not.toContain("export const revalidate");
     });
 
-    it("renders SharePageH2 client component for the badge section heading", () => {
-      expect(SOURCE).toContain("SharePageH2");
+    it("renders the SharePageHeader client component for the page heading", () => {
+      // #1217 replaced the small uppercase SharePageH2 line with a header that
+      // names the profile and carries the headline score.
+      expect(SOURCE).toContain("SharePageHeader");
+      expect(SOURCE).not.toContain("SharePageH2");
     });
   });
 });

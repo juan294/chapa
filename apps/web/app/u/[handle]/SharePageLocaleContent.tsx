@@ -19,14 +19,11 @@ export function SharePageLocaleContent({
 }) {
   const { t } = useTranslation();
 
+  // #1217 — the sr-only h1 that used to live here moved into SharePageHeader,
+  // which renders a real, visible one. Two h1s would be worse than none.
   return (
-    <>
-      <h1 className="sr-only">
-        {interpolate(t('sharePage.srH1') as string, { handle })}
-      </h1>
-      <span id={badgeLabelId} className="sr-only">
-        {interpolate(t('sharePage.badgeAriaLabel') as string, { handle })}
-      </span>
-    </>
+    <span id={badgeLabelId} className="sr-only">
+      {interpolate(t('sharePage.badgeAriaLabel') as string, { handle })}
+    </span>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NavbarClient } from "@/components/NavbarClient";
+import { ContentPageHeader } from "@/components/content/ContentPageHeader";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { SiteFooter } from "@/components/SiteFooter";
 import { tArray } from "@/lib/i18n/typed-accessors";
@@ -114,11 +115,11 @@ export function VerificationPageContent({ t }: { t: TFunction }) {
         id="main-content"
         className="relative mx-auto max-w-3xl px-6 pt-32 pb-24"
       >
-        <div className="relative">
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-4 animate-fade-in-up">
-            {t('about.verification.h1') as string}
-            <span className="text-amber animate-cursor-blink">_</span>
-          </h1>
+        <div className="@container relative">
+          <ContentPageHeader
+            command="chapa explain --verification"
+            title={t('about.verification.h1') as string}
+          />
 
           <p className="text-text-secondary text-lg mb-8 animate-fade-in-up [animation-delay:100ms]">
             {t('about.verification.intro') as string}
