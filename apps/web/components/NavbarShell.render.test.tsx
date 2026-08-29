@@ -193,11 +193,12 @@ describe("NavbarShell render", () => {
       expect(cursor?.className).not.toBe("text-amber animate-cursor-blink");
     });
 
-    it("login link has a padded touch target and amber/50 prefix slash", () => {
+    it("login link has a 44px touch target and amber/50 prefix slash", () => {
+      // #1214 raised the target from padding-derived to an explicit 44px
+      // minimum, matching every other interactive control in the bar.
       render(<NavbarShell session={null} isAdmin={false} t={t} />);
       const link = screen.getByText("login").closest("a");
-      expect(link?.className).toContain("px-2");
-      expect(link?.className).toContain("py-2");
+      expect(link?.className).toContain("min-h-[44px]");
       const prefix = link?.querySelector("span");
       expect(prefix?.className).toContain("text-amber/50");
     });

@@ -65,13 +65,15 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
 
         {/* Center: Command hints (desktop) */}
         {navLinks && navLinks.length > 0 && (
-          <div className="hidden md:flex items-center gap-4 font-heading text-xs text-text-secondary">
+          <div className="hidden md:flex items-center gap-1 font-heading text-xs text-text-secondary">
             {navLinks.map((link) => (
               <NavLink
                 key={link.href}
                 href={link.href}
                 label={link.label}
-                className="transition-colors hover:text-text-secondary"
+                // #1214 — 44px hit area, and a tinted pill on hover so the
+                // target is visible before it is clicked.
+                className="flex min-h-[44px] items-center rounded-lg px-3 transition-colors hover:bg-purple-tint hover:text-text-primary"
               />
             ))}
           </div>
@@ -109,7 +111,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
               // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a
                 href="/api/auth/login"
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-2 font-heading text-sm text-text-secondary transition-colors hover:text-amber"
+                className="inline-flex min-h-[44px] items-center gap-1 rounded-lg px-3 font-heading text-sm text-text-secondary transition-colors hover:bg-purple-tint hover:text-text-primary"
               >
                 <span className="text-amber/50">/</span> {t('common.login') as string}
               </a>
