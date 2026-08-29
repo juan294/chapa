@@ -213,3 +213,41 @@ Two exclusions when applying replacements:
 Prefer a token over a corrected literal. `bg-[rgba(26,26,46,0.06)]` became
 `bg-text-primary/[0.06]`, which fixes a latent bug: the hardcoded form did not
 track the theme.
+
+## Emit a token manifest so `--tw-*` engine variables stay out of registration
+
+Claude Design reports that `--tw-*` Tailwind engine variables reach its token
+registration, and that annotating them after each sync does not survive the
+next sync. Measured on this side:
+
+- `ds-bundle/tokens/` ships **empty**. The converter fills it only from
+  `cfg.tokensPkg`, which reads a `node_modules` package. Chapa keeps its tokens
+  inline in `apps/web/styles/globals.css`, so nothing is copied. The
+  `src.tokensCss` fallback at `package-build.mjs:486` is never populated for
+  the package shape.
+- `styles.css` is one line: `@import "./_ds_bundle.css";`. That file holds
+  **196** custom properties: **43** `--color-*` design tokens next to **71**
+  `--tw-*` engine variables, each with its own `@property` block.
+
+With no manifest, the only palette source in the upload is the file that mixes
+both. That matches the symptom.
+
+`--tw-*` cannot be stripped from `_ds_bundle.css`. Utilities dereference the
+variables at runtime, and the 71 `@property` blocks set their initial values
+and types. Removing them breaks rendering of every component.
+
+`.design-sync/emit-tokens.mjs` writes `ds-bundle/tokens/chapa-tokens.css`
+instead: `@theme`, `:root` and `[data-theme="dark"]` custom properties only,
+126 declarations, zero `--tw-*`. Run it after the build, before upload:
+
+    node .ds-sync/package-build.mjs
+    node .design-sync/emit-tokens.mjs      # fills the otherwise-empty tokens/
+    # then upload
+
+The file regenerates from `globals.css`, so a later palette change carries
+through with no hand editing.
+
+Open with Claude Design: whether registration prefers `tokens/*.css` over
+scraping `styles.css`'s import closure. If it does not, the exclusion has to
+happen in registration, because the upload cannot separate the two sources any
+further than this.
