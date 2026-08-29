@@ -28,6 +28,10 @@ vi.mock("@/lib/i18n/server", () => ({
   getServerT: vi.fn().mockReturnValue((key: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const map: Record<string, any> = {
+      // #1222 — the index takes its heading as a prop from the server `t`,
+      // so this mock has to carry the key rather than relying on the client
+      // translation fallback the component used to reach for itself.
+      "content.onThisPage": "On this page",
       "about.scoring.h1": "Scoring Methodology",
       "about.scoring.intro": "Full transparency on how Chapa decodes your developer impact.",
       "about.scoring.videoHeading": "Watch the explainer",

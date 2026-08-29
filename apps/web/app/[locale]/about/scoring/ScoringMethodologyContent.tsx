@@ -170,7 +170,10 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
           </div>
 
           <div className="grid gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
-          <OnThisPageIndex items={SECTION_INDEX(t)} />
+          <OnThisPageIndex
+            items={SECTION_INDEX(t)}
+            heading={t('content.onThisPage') as string}
+          />
           <div className="min-w-0 space-y-2 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:200ms]">
             {/* ---------------------------------------------------------- */}
             {/* Philosophy                                                  */}
