@@ -411,3 +411,49 @@ describe("DataSources — status row (#1217)", () => {
     ).toBe("linked");
   });
 });
+
+// #1220 — the v2 status row shipped without a supplemental entry on the stated
+// grounds that StatsData carried no EMU signal. It does: hasSupplementalData
+// is OR-accumulated by the EMU merge path.
+describe("DataSources — supplemental source (#1220)", () => {
+  it("shows a supplemental row when EMU stats were merged in", () => {
+    render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, hasSupplementalData: true }}
+        handle="testuser"
+      />,
+    );
+    expect(
+      screen.getByTestId("data-source-status-supplemental").textContent,
+    ).toBe("supplemental");
+  });
+
+  it("says 'supplemental', never 'merged'", () => {
+    // "Merged" asserts more than the flag carries — it would need
+    // merge_operations.verified behind it.
+    const { container } = render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, hasSupplementalData: true }}
+        handle="testuser"
+      />,
+    );
+    expect(container.textContent).not.toContain("merged");
+  });
+
+  it("omits the row when no supplemental stats were merged", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    expect(screen.queryByTestId("data-source-status-supplemental")).toBeNull();
+  });
+
+  it("shows it to a visitor too, since it is a real source of the numbers", () => {
+    render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, hasSupplementalData: true }}
+        handle="testuser"
+        isOwner={false}
+      />,
+    );
+    expect(screen.getByTestId("data-source-status-supplemental")).toBeDefined();
+  });
+});
+

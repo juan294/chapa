@@ -11,14 +11,19 @@ export interface OnThisPageItem {
 /**
  * The sticky section index for long-form content routes (#1218).
  *
- * The active item carries an accent rail so a reader can tell where they are
- * in a page that runs to ten sections. Tracking is a plain IntersectionObserver
- * over the section elements: the topmost intersecting section wins, which
- * matches what a reader would call "the section I am in" better than a scroll
- * offset calculation does.
+ * The active item carries an accent rail so a reader can tell where they are in
+ * a page that runs to ten sections. It is resolved from the two things the
+ * reader actually did - the URL hash they arrived on, and the link they
+ * clicked - with an IntersectionObserver refining it as they scroll (#1221).
  *
- * The list renders and links correctly with no JavaScript at all; only the
- * active-item highlight depends on the observer.
+ * That ordering matters. Deriving it from the observer alone left a deep link
+ * marking nothing current until the observer happened to fire, and made the
+ * highlight unexercisable without a live viewport: a backgrounded tab produces
+ * no animation frames, so the observer delivers no entries at all.
+ *
+ * The list itself renders and links correctly with no JavaScript. The
+ * highlight still needs hydration - the hash is read on mount - but it no
+ * longer needs a scroll or a visible viewport.
  */
 export function OnThisPageIndex({ items }: { items: OnThisPageItem[] }) {
   const { t } = useTranslation();
@@ -31,6 +36,18 @@ export function OnThisPageIndex({ items }: { items: OnThisPageItem[] }) {
   // next render: a loop that never settles and never highlights anything.
   // The ids are what the effect actually depends on.
   const observedIds = items.map((item) => item.id).join(",");
+
+  // The hash the reader arrived on, and any later hash change. Read on mount
+  // rather than during render so the server and the first client render agree.
+  useEffect(() => {
+    const fromHash = () => {
+      const id = window.location.hash.replace(/^#/, "");
+      if (id && observedIds.split(",").includes(id)) setActiveId(id);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, [observedIds]);
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
@@ -72,6 +89,7 @@ export function OnThisPageIndex({ items }: { items: OnThisPageItem[] }) {
             <li key={item.id}>
               <a
                 href={`#${item.id}`}
+                onClick={() => setActiveId(item.id)}
                 aria-current={isActive ? "true" : undefined}
                 className={`-ml-px flex min-h-[36px] items-center border-l-2 py-1 pl-3 text-sm transition-colors ${
                   isActive
