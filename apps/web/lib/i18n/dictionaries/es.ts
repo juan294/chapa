@@ -31,6 +31,7 @@ export const es: Translations = {
     userMenuOptions: 'Opciones del menú de usuario',
     themeToggleLight: 'Cambiar a tema claro',
     themeToggleDark: 'Cambiar a tema oscuro',
+    themeToggleSystem: 'Cambiar al tema del sistema',
     dismissError: 'Descartar error',
     dismissNotification: 'Descartar notificación',
     copyEmbed: 'Copiar fragmento embebido',

@@ -37,6 +37,7 @@ export const en: Translations = {
     userMenuOptions: 'User menu options',
     themeToggleLight: 'Switch to light theme',
     themeToggleDark: 'Switch to dark theme',
+    themeToggleSystem: 'Switch to system theme',
     dismissError: 'Dismiss error',
     dismissNotification: 'Dismiss notification',
     copyEmbed: 'Copy embed snippet',

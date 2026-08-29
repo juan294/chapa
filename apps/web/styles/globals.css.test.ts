@@ -27,8 +27,11 @@ describe("globals.css", () => {
       // with Jade deliberately, so the guard now pins the new value and keeps
       // doing its real job: catching an UNINTENDED hue change. The accent is
       // theme-aware since Jade, hence a value per block.
-      expect(SOURCE).toContain("--color-amber: oklch(.66 .15 163);");
-      expect(SOURCE).toContain("--color-amber: oklch(.76 .16 163);");
+      // #1211 folded the two per-theme declarations into one light-dark()
+      // value; the guard still pins both halves.
+      expect(SOURCE).toContain(
+        "--color-amber: light-dark(oklch(.66 .15 163), oklch(.76 .16 163));",
+      );
     });
   });
 

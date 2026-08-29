@@ -8,80 +8,110 @@ html[lang="en"] [data-document-locale="es"] {
   display: none;
 }
 
+/* ── Design tokens (#1211) ────────────────────────────────
+   Every themed color is ONE declaration: `light-dark(<light>, <dark>)`.
+   `color-scheme` on <html> (wired below) decides which half resolves, so
+   there is no paired [data-theme="dark"] block to keep in sync any more, and
+   native form controls, scrollbars and focus rings follow the theme for free.
+
+   Browser floor: none to worry about. light-dark() runs natively in
+   Chrome/Edge 123+, Safari 17.5+ and Firefox 120+, and below that LightningCSS
+   (Next.js 16's CSS pipeline) compiles it to a custom-property toggle keyed off
+   the same color-scheme selectors. Do not hand-write an @supports fallback; see
+   docs/decisions/2026-08-29-light-dark-token-layer.md. */
+
 @theme {
-  /* Light defaults — Tailwind reads these to generate utility classes (bg-bg, text-text-primary, etc.).
-     Runtime values are overridden below in unlayered :root / [data-theme="dark"] blocks. */
-  --color-bg: #f7fbf8;
-  --color-card: #edf6f0;
-  --color-text-primary: #0b2018;
-  --color-text-secondary: #55665e;
-  --color-stroke: #0d3b2417;
+  /* surfaces */
+  --color-bg: light-dark(#f7fbf8, #08170f);
+  --color-card: light-dark(#edf6f0, #0f2419);
+  --color-purple-tint: light-dark(#dff0e6, #123526);
+  --color-dark-section: light-dark(#0d2b1d, #050f0a);
+  --color-dark-card: light-dark(#123526, #0c1f15);
 
-  --color-amber: oklch(.66 .15 163);
-  --color-amber-light: oklch(.76 .14 163);
-  --color-amber-dark: oklch(.5 .12 165);
+  /* aliases kept for the existing bg-warm-* / border-warm-stroke utilities */
+  --color-warm-bg: light-dark(#f7fbf8, #08170f);
+  --color-warm-card: light-dark(#edf6f0, #0f2419);
+  --color-warm-stroke: light-dark(#0d3b2417, #7dffbc1f);
 
-  --color-warm-bg: #f7fbf8;
-  --color-warm-card: #edf6f0;
-  --color-warm-stroke: #0d3b2417;
+  /* text — terminal-dim is AA-safe since #1212. It was #93a89d light
+     (2.41:1 on #f7fbf8) and #42574c dark, while carrying informational text:
+     step numbers, section counts, eyebrows and meta lines. */
+  --color-text-primary: light-dark(#0b2018, #dfeae4);
+  --color-text-secondary: light-dark(#33453c, #a9c0b5);
+  --color-terminal-dim: light-dark(oklch(.48 .025 160), #8ba398);
 
-  --color-dark-section: #0d2b1d;
-  --color-dark-card: #123526;
-  --color-purple-tint: #dff0e6;
-  --color-complement: oklch(.55 .1 225);
-  --color-complement-light: oklch(.94 .035 225);
-  /* #1167 (UX-H1) — the fill for white text on a solid complement surface
-     (verify CTA); the base --color-complement is too light for that at AA.
-     Same value in both themes, mirroring --color-complement itself.
-     #1206 — the complement family moved from emerald teal to slate blue so
-     verification reads as distinct from the jade brand accent; teal sat too
-     close to jade to signal cryptographic trust. */
+  /* lines */
+  --color-stroke: light-dark(#0d3b2417, #7dffbc1f);
+  --color-stroke-strong: light-dark(#0d3b2426, #7dffbc2e);
+  --color-track: light-dark(#0d3b2414, #7dffbc14);
+
+  /* accent (jade, hue 163) — CTAs, active states, key data only.
+     The token name is historical: it was violet, and #1206 made it green.
+     Renaming it touches every consuming utility class, so it stayed. */
+  --color-amber: light-dark(oklch(.66 .15 163), oklch(.76 .16 163));
+  --color-amber-light: light-dark(oklch(.76 .14 163), oklch(.84 .14 163));
+  --color-amber-dark: light-dark(oklch(.5 .12 165), oklch(.58 .14 165));
+
+  /* status — success is hue 145, deliberately NOT the accent's 163. With a
+     green brand accent, an unshifted success color reads as a brand highlight. */
+  --color-terminal-green: light-dark(oklch(.55 .13 145), oklch(.8 .16 148));
+  --color-terminal-yellow: light-dark(oklch(.62 .13 78), oklch(.82 .13 85));
+  --color-terminal-red: light-dark(oklch(.55 .19 25), oklch(.72 .17 25));
+
+  /* verification — slate blue, hue 225-228, never jade. #1206 moved this
+     family off teal so cryptographic trust reads as distinct from the brand.
+     --color-complement is a FILL/TINT value; --color-complement-text is its
+     text-safe counterpart (#1189), and --color-complement-dark backs white
+     text on a solid fill (#1167). */
+  --color-complement: light-dark(oklch(.55 .1 225), oklch(.7 .11 225));
+  --color-complement-light: light-dark(
+    oklch(.94 .035 225),
+    oklch(.7 .11 225 / .16)
+  );
   --color-complement-dark: oklch(.42 .09 228);
-  /* #1189 — --color-complement used directly as TEXT does not clear the
-     4.5:1 AA floor against light-theme backgrounds. Unlike --color-complement-dark
-     above (a fixed value for the white-on-solid-fill CTA case), this is
-     THEME-AWARE — light value below, dark value re-declared to the base
-     teal in [data-theme="dark"]. Use this for complement-colored text/icon
-     strokes; never for fills, tints, or borders (those keep --color-complement
-     / --color-complement-light / --color-complement-dark unchanged). */
-  --color-complement-text: oklch(.48 .1 228);
-  /* #1189 follow-up — a hover state must be a legitimate text color that
-     clears AA in its own theme, not --color-complement-light (a translucent
-     BACKGROUND tint that renders near-invisible as text: pale mint on white
-     in light theme, 15%-alpha green in dark theme). --color-complement-text
-     is already the lightest same-hue/saturation shade that clears 4.5:1 on
-     light surfaces, so a light-theme hover can only move DARKER (still
-     4.5:1+, with room to spare); dark theme has headroom to move LIGHTER
-     instead (brighten-on-hover), re-declared in [data-theme="dark"] below. */
-  --color-complement-text-hover: oklch(.38 .09 228);
+  --color-complement-text: light-dark(oklch(.48 .1 228), oklch(.76 .11 222));
+  /* Light theme darkens on hover, dark theme brightens. Both directions
+     increase contrast against their own ground, which is what makes a hover
+     state a legible change rather than a contrast-neutral swap. */
+  --color-complement-text-hover: light-dark(
+    oklch(.38 .09 228),
+    oklch(.84 .1 220)
+  );
 
-  --color-terminal-green: oklch(.55 .13 145);
-  --color-terminal-red: oklch(.55 .19 25);
-  --color-terminal-yellow: oklch(.62 .13 78);
-  --color-terminal-dim: #93a89d;
+  /* always-dark band (#1211) — the hero, the badge panel and the CLI blocks
+     stay dark in BOTH themes, because the badge is a server-rendered artifact
+     and the band frames it. One value each, deliberately not light-dark().
+     forest-dim was #42574c, which measured 2.19:1 on the forest ground. */
+  --color-forest: #0b2018;
+  --color-forest-card: #0f2419;
+  --color-forest-line: #7dffbc2e;
+  --color-forest-text: #dfeae4;
+  --color-forest-dim: #8ba398;
+  --color-forest-grid: #7dffbc0a;
 
-  --color-track: #0d3b2414;
-
-  --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.06),
-                 0px 1px 2px -1px rgba(0, 0, 0, 0.06),
-                 0px 2px 4px 0px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0px 0px 0px 1px rgba(0, 0, 0, 0.08),
-                       0px 2px 4px -1px rgba(0, 0, 0, 0.08),
-                       0px 4px 8px 0px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0px 0px 0px 1px
+      light-dark(rgba(0, 0, 0, 0.06), color-mix(in oklab, oklch(.76 .16 163) 8%, transparent)),
+    0px 1px 2px -1px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.2)),
+    0px 2px 4px 0px light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.15));
+  --shadow-card-hover: 0px 0px 0px 1px
+      light-dark(rgba(0, 0, 0, 0.08), color-mix(in oklab, oklch(.76 .16 163) 12%, transparent)),
+    0px 2px 4px -1px light-dark(rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.25)),
+    0px 4px 8px 0px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.2));
 
   /* Dimension colors — data visualization accents for the impact dimensions */
-  --color-dimension-delivery: oklch(.62 .14 145);
-  --color-dimension-quality: oklch(.62 .14 50);
-  --color-dimension-consistency: oklch(.62 .14 215);
-  --color-dimension-breadth: oklch(.62 .14 330);
-  --color-dimension-craft: oklch(.62 .14 95);
-  --color-dimension-delivery-light: oklch(.75 .13 145);
-  --color-dimension-quality-light: oklch(.75 .13 50);
-  --color-dimension-consistency-light: oklch(.75 .13 215);
-  --color-dimension-breadth-light: oklch(.75 .13 330);
-  --color-dimension-craft-light: oklch(.75 .13 95);
+  --color-dimension-delivery: light-dark(oklch(.62 .14 145), oklch(.72 .14 145));
+  --color-dimension-quality: light-dark(oklch(.62 .14 50), oklch(.72 .14 50));
+  --color-dimension-consistency: light-dark(oklch(.62 .14 215), oklch(.72 .14 215));
+  --color-dimension-breadth: light-dark(oklch(.62 .14 330), oklch(.72 .14 330));
+  --color-dimension-craft: light-dark(oklch(.62 .14 95), oklch(.72 .14 95));
+  --color-dimension-delivery-light: light-dark(oklch(.75 .13 145), oklch(.8 .13 145));
+  --color-dimension-quality-light: light-dark(oklch(.75 .13 50), oklch(.8 .13 50));
+  --color-dimension-consistency-light: light-dark(oklch(.75 .13 215), oklch(.8 .13 215));
+  --color-dimension-breadth-light: light-dark(oklch(.75 .13 330), oklch(.8 .13 330));
+  --color-dimension-craft-light: light-dark(oklch(.75 .13 95), oklch(.8 .13 95));
 
-  /* Archetype colors — accent color per developer archetype */
+  /* Archetype colors — one lightness and chroma, varying only in hue. Keep
+     that prefix if an eighth archetype is ever added. */
   --color-archetype-builder: oklch(.62 .14 163);
   --color-archetype-guardian: oklch(.62 .14 330);
   --color-archetype-marathoner: oklch(.62 .14 145);
@@ -96,128 +126,20 @@ html[lang="en"] [data-document-locale="es"] {
   --font-terminal: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
-/* ── Theme values (unlayered — same cascade level) ─────── */
+/* ── color-scheme wiring (#1211) ──────────────────────────
+   Three modes with no class toggling. No theme attribute means follow the OS;
+   next-themes writes data-theme once it knows the user's explicit choice. */
 
 :root {
-  /* Light palette (default) */
-  --color-bg: #f7fbf8;
-  --color-card: #edf6f0;
-  --color-text-primary: #0b2018;
-  --color-text-secondary: #55665e;
-  --color-stroke: #0d3b2417;
+  color-scheme: light dark;
+}
 
-  --color-warm-bg: #f7fbf8;
-  --color-warm-card: #edf6f0;
-  --color-warm-stroke: #0d3b2417;
-
-  --color-dark-section: #0d2b1d;
-  --color-dark-card: #123526;
-  --color-purple-tint: #dff0e6;
-  --color-complement-light: oklch(.94 .035 225);
-  --color-complement-text: oklch(.48 .1 228);
-  --color-complement-text-hover: oklch(.38 .09 228);
-
-  --color-terminal-green: oklch(.55 .13 145);
-  --color-terminal-red: oklch(.55 .19 25);
-  --color-terminal-yellow: oklch(.62 .13 78);
-  --color-terminal-dim: #93a89d;
-
-  --color-track: #0d3b2414;
-
-  --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.06),
-                 0px 1px 2px -1px rgba(0, 0, 0, 0.06),
-                 0px 2px 4px 0px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0px 0px 0px 1px rgba(0, 0, 0, 0.08),
-                       0px 2px 4px -1px rgba(0, 0, 0, 0.08),
-                       0px 4px 8px 0px rgba(0, 0, 0, 0.06);
-
-  --color-dimension-delivery: oklch(.62 .14 145);
-  --color-dimension-quality: oklch(.62 .14 50);
-  --color-dimension-consistency: oklch(.62 .14 215);
-  --color-dimension-breadth: oklch(.62 .14 330);
-  --color-dimension-craft: oklch(.62 .14 95);
-  --color-dimension-delivery-light: oklch(.75 .13 145);
-  --color-dimension-quality-light: oklch(.75 .13 50);
-  --color-dimension-consistency-light: oklch(.75 .13 215);
-  --color-dimension-breadth-light: oklch(.75 .13 330);
-  --color-dimension-craft-light: oklch(.75 .13 95);
-
-  --color-archetype-builder: oklch(.62 .14 163);
-  --color-archetype-guardian: oklch(.62 .14 330);
-  --color-archetype-marathoner: oklch(.62 .14 145);
-  --color-archetype-polymath: oklch(.62 .14 110);
-  --color-archetype-balanced: oklch(.62 .14 240);
-  --color-archetype-emerging: oklch(.62 .14 50);
-  --color-archetype-artificer: oklch(.62 .14 75);
+[data-theme="light"] {
+  color-scheme: light;
 }
 
 [data-theme="dark"] {
-  /* Jade (#1206) — the accent had NO dark override under the violet palette
-     (it was one value for both themes). Forest surfaces need a brighter jade
-     to stay legible, so the accent family is theme-aware from here on. */
-  --color-amber: oklch(.76 .16 163);
-  --color-amber-light: oklch(.84 .14 163);
-  --color-amber-dark: oklch(.58 .14 165);
-  --color-complement: oklch(.7 .11 225);
-
-  --color-bg: #08170f;
-  --color-card: #0f2419;
-  --color-text-primary: #dfeae4;
-  --color-text-secondary: #8ba398;
-  --color-stroke: #7dffbc1f;
-
-  --color-warm-bg: #08170f;
-  --color-warm-card: #0f2419;
-  --color-warm-stroke: #7dffbc1f;
-
-  --color-dark-section: #050f0a;
-  --color-dark-card: #0c1f15;
-  --color-purple-tint: oklch(.76 .16 163 / .1);
-  --color-complement-light: oklch(.7 .11 225 / .16);
-  /* #1189 — dark-theme text value is the same bright teal as the base
-     --color-complement (already ~7.8:1 against dark backgrounds — fine
-     as text). Re-declared here (not just left to inherit @theme's light
-     default) so the token is genuinely theme-aware like every other
-     per-theme color in this block. */
-  --color-complement-text: oklch(.76 .11 222);
-  /* #1189 follow-up — dark theme has contrast headroom to move LIGHTER on
-     hover (brighten), the opposite direction from light theme's DARKER
-     hover above — both directions increase contrast against their own
-     background, which is what makes hover a legible, visible change. */
-  --color-complement-text-hover: oklch(.84 .1 220);
-
-  --color-terminal-green: oklch(.8 .16 148);
-  --color-terminal-red: oklch(.72 .17 25);
-  --color-terminal-yellow: oklch(.82 .13 85);
-  --color-terminal-dim: #42574c;
-
-  --color-track: #7dffbc14;
-
-  --shadow-card: 0px 0px 0px 1px color-mix(in oklab, var(--color-amber) 8%, transparent),
-                 0px 1px 2px -1px rgba(0, 0, 0, 0.20),
-                 0px 2px 4px 0px rgba(0, 0, 0, 0.15);
-  --shadow-card-hover: 0px 0px 0px 1px color-mix(in oklab, var(--color-amber) 12%, transparent),
-                       0px 2px 4px -1px rgba(0, 0, 0, 0.25),
-                       0px 4px 8px 0px rgba(0, 0, 0, 0.20);
-
-  --color-dimension-delivery: oklch(.72 .14 145);
-  --color-dimension-quality: oklch(.72 .14 50);
-  --color-dimension-consistency: oklch(.72 .14 215);
-  --color-dimension-breadth: oklch(.72 .14 330);
-  --color-dimension-craft: oklch(.72 .14 95);
-  --color-dimension-delivery-light: oklch(.8 .13 145);
-  --color-dimension-quality-light: oklch(.8 .13 50);
-  --color-dimension-consistency-light: oklch(.8 .13 215);
-  --color-dimension-breadth-light: oklch(.8 .13 330);
-  --color-dimension-craft-light: oklch(.8 .13 95);
-
-  --color-archetype-builder: oklch(.62 .14 163);
-  --color-archetype-guardian: oklch(.62 .14 330);
-  --color-archetype-marathoner: oklch(.62 .14 145);
-  --color-archetype-polymath: oklch(.62 .14 110);
-  --color-archetype-balanced: oklch(.62 .14 240);
-  --color-archetype-emerging: oklch(.62 .14 50);
-  --color-archetype-artificer: oklch(.62 .14 75);
+  color-scheme: dark;
 }
 
 html {
@@ -487,20 +409,24 @@ html {
 /* ── Background grid pattern ─────────────────────────────── */
 
 .bg-grid-warm {
-  background-image: linear-gradient(
-      rgba(0, 0, 0, 0.03) 1px,
-      transparent 1px
-    ),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  /* #1211 — one declaration; the hairline color follows color-scheme. */
+  --grid-line: light-dark(
+    rgba(0, 0, 0, 0.03),
+    color-mix(in oklab, oklch(.76 .16 163) 4%, transparent)
+  );
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 72px 72px;
 }
 
-[data-theme="dark"] .bg-grid-warm {
+/* The always-dark hero band keeps its own hairline grid in both themes. */
+.bg-grid-forest {
   background-image: linear-gradient(
-      color-mix(in oklab, var(--color-amber) 4%, transparent) 1px,
+      var(--color-forest-grid) 1px,
       transparent 1px
     ),
-    linear-gradient(90deg, color-mix(in oklab, var(--color-amber) 4%, transparent) 1px, transparent 1px);
+    linear-gradient(90deg, var(--color-forest-grid) 1px, transparent 1px);
+  background-size: 72px 72px;
 }
 
 /* ── Focus indicators (accessibility) ────────────────────── */
@@ -570,18 +496,17 @@ nav [aria-current="page"],
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
+  background: light-dark(
+    rgba(0, 0, 0, 0.1),
+    color-mix(in oklab, oklch(.76 .16 163) 15%, transparent)
+  );
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--color-amber) 15%, transparent);
-}
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklab, var(--color-amber) 25%, transparent);
+  background: light-dark(
+    rgba(0, 0, 0, 0.2),
+    color-mix(in oklab, oklch(.76 .16 163) 25%, transparent)
+  );
 }
 
 /* ── Collapsible panel (grid-row height transition) ──── */
@@ -603,10 +528,7 @@ nav [aria-current="page"],
 /* ── Image outlines ────────────────────────────────────── */
 
 .img-outline {
-  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline: 1px solid
+    light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.1));
   outline-offset: -1px;
-}
-
-[data-theme="dark"] .img-outline {
-  outline-color: rgba(255, 255, 255, 0.1);
 }
