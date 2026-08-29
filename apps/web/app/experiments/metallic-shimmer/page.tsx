@@ -219,9 +219,9 @@ export default function MetallicShimmerPage() {
     90deg,
     #009365 0%,
     #1BD093 20%,
-    #A99BFF 40%,
-    #D0C9FF 50%,   /* bright highlight */
-    #A99BFF 60%,
+    #65E7B0 40%,
+    #B4F6D5 50%,   /* bright highlight */
+    #65E7B0 60%,
     #1BD093 80%,
     #009365 100%
   );
@@ -293,9 +293,9 @@ function MetallicText({
           90deg,
           var(--color-amber-dark) 0%,
           var(--color-amber) 20%,
-          #A99BFF 40%,
+          #65E7B0 40%,
           ${highlightColor} 50%,
-          #A99BFF 60%,
+          #65E7B0 60%,
           var(--color-amber) 80%,
           var(--color-amber-dark) 100%
         )`,
@@ -362,7 +362,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="40%" stopColor="#A99BFF">
+            <stop offset="40%" stopColor="#65E7B0">
               <animate
                 attributeName="offset"
                 values="-0.6;0.4;1.4"
@@ -372,7 +372,7 @@ function SvgMetallicScore({
             </stop>
             <stop
               offset="50%"
-              stopColor="#D0C9FF"
+              stopColor="#B4F6D5"
               stopOpacity={highlightOpacity}
             >
               <animate
@@ -382,7 +382,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="60%" stopColor="#A99BFF">
+            <stop offset="60%" stopColor="#65E7B0">
               <animate
                 attributeName="offset"
                 values="-0.4;0.6;1.6"
@@ -435,7 +435,7 @@ function SvgMetallicScore({
             </stop>
             <stop
               offset="50%"
-              stopColor="#D0C9FF"
+              stopColor="#B4F6D5"
               stopOpacity={highlightOpacity}
             >
               <animate

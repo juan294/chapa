@@ -60,6 +60,6 @@ describe("featureRow", () => {
 
   it("uses the correct text color for content", () => {
     const html = featureRow("test");
-    expect(html).toContain("color:#E2E4E9");
+    expect(html).toContain("color:#DFEAE4");
   });
 });

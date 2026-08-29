@@ -83,11 +83,11 @@ function buildHtml(handle: string, reason: string, shareUrl: string): string {
           </table>
         </td></tr>
         <tr><td style="padding:32px;">
-          <div style="font-size:22px;font-weight:700;color:#E2E4E9;font-family:'Courier New',monospace;margin-bottom:4px;">@${safeHandle}</div>
+          <div style="font-size:22px;font-weight:700;color:#DFEAE4;font-family:'Courier New',monospace;margin-bottom:4px;">@${safeHandle}</div>
           <a href="${safeShareUrl}" style="font-size:13px;color:#1BD093;">${safeShareUrl}</a>
           <div style="margin-top:24px;padding:16px;background:#08170F;border-radius:8px;border:1px solid rgba(27,208,147,0.10);">
             <div style="font-size:11px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Developer's concern</div>
-            <div style="font-size:14px;color:#E2E4E9;line-height:1.6;">${safeReason}</div>
+            <div style="font-size:14px;color:#DFEAE4;line-height:1.6;">${safeReason}</div>
           </div>
         </td></tr>
         <tr><td style="padding:16px 32px;border-top:1px solid rgba(27,208,147,0.10);">

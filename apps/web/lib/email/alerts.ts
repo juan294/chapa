@@ -97,13 +97,13 @@ function buildHtml(payload: AlertEmailPayload): string {
 <body style="margin:0;padding:0;background:#08170F;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#08170F;padding:32px 16px;">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#0F2419;border-radius:12px;border:1px solid rgba(248,113,113,0.25);overflow:hidden;">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#0F2419;border-radius:12px;border:1px solid rgba(253,115,109,0.25);overflow:hidden;">
         <tr><td style="background:#7C1D1D;padding:20px 32px;">
           <span style="font-family:'Courier New',monospace;font-size:16px;font-weight:700;color:#FFFFFF;letter-spacing:1px;">CHAPA ALERT &middot; ${escapeHtml(payload.severity)}</span>
         </td></tr>
         <tr><td style="padding:24px 32px;">
-          <div style="font-size:16px;font-weight:700;color:#E2E4E9;margin-bottom:8px;">${escapeHtml(payload.signal)}</div>
-          <div style="font-size:14px;color:#8B8FA0;margin-bottom:16px;">${escapeHtml(payload.summary)}</div>
+          <div style="font-size:16px;font-weight:700;color:#DFEAE4;margin-bottom:8px;">${escapeHtml(payload.signal)}</div>
+          <div style="font-size:14px;color:#8BA398;margin-bottom:16px;">${escapeHtml(payload.summary)}</div>
           ${payload.route ? `<div style="font-size:12px;color:#6B6F7B;margin-bottom:4px;">Route: ${escapeHtml(payload.route)}</div>` : ""}
           <div style="font-size:12px;color:#6B6F7B;margin-bottom:16px;">Time: ${escapeHtml(payload.timestamp)}</div>
           <pre style="background:#08170F;border-radius:8px;padding:12px;color:#65E7B0;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;">${propsJson}</pre>

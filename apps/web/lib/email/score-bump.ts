@@ -350,14 +350,14 @@ function buildHtml(data: TemplateData): string {
 
         <!-- Greeting -->
         <tr><td style="padding-bottom:16px;">
-          <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#8B8FA0;">
+          <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#8BA398;">
             Hey @${safeHandle},
           </span>
         </td></tr>
 
         <!-- Headline -->
         <tr><td style="padding-bottom:16px;">
-          <h1 style="margin:0;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:#E2E4E9;line-height:1.3;">
+          <h1 style="margin:0;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:#DFEAE4;line-height:1.3;">
             ${headline}
           </h1>
         </td></tr>
@@ -368,7 +368,7 @@ function buildHtml(data: TemplateData): string {
             <tr>
               <td style="padding:16px 24px;text-align:center;">
                 <span style="font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:#6CD981;">+${delta}</span>
-                <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#8B8FA0;padding-left:8px;">points</span>
+                <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#8BA398;padding-left:8px;">points</span>
               </td>
             </tr>
           </table>
@@ -391,13 +391,13 @@ function buildHtml(data: TemplateData): string {
 
         <!-- Footer -->
         <tr><td>
-          <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#4A4A5E;">
+          <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#42574C;">
             chapa.thecreativetoken.com
           </span>
-          <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#4A4A5E;padding-left:12px;">
+          <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#42574C;padding-left:12px;">
             &middot;
           </span>
-          <a href="${unsubscribeUrl}" style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#4A4A5E;text-decoration:underline;padding-left:12px;">
+          <a href="${unsubscribeUrl}" style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;color:#42574C;text-decoration:underline;padding-left:12px;">
             Unsubscribe
           </a>
         </td></tr>

@@ -33,9 +33,9 @@ export const TIER_VISUALS_CSS = `
     90deg,
     var(--color-amber-dark),
     var(--color-amber),
-    #A99BFF,
-    #D0C9FF,
-    #A99BFF,
+    #65E7B0,
+    #B4F6D5,
+    #65E7B0,
     var(--color-amber),
     var(--color-amber-dark)
   );

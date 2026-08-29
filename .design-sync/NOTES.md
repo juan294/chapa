@@ -176,3 +176,40 @@ moves.
 **The chunk hash was stable this time.** Same source CSS produced the same
 `2du_gthg_lwp4.css`, so the regeneration step is a no-op when nothing changed.
 It still has to run: the step is cheap and the failure is silent.
+
+## Palette-migration sweep: grep for decimal rgba, not only hex (#1206)
+
+A palette migration leaves stale colour literals in app source. A hex-only
+grep does not find all of them. Two gaps caused 63 missed values in the Jade
+migration:
+
+1. **Decimal `rgba()` form.** Tailwind arbitrary utilities carry the colour as
+   a decimal triple, so `#1a1a2e` appears as `rgba(26,26,46,0.15)`. A grep for
+   `1a1a2e` matches nothing. Convert every retired hex to its decimal triple
+   and grep for both forms.
+2. **The handoff's hex list is not the full token set.** The Jade handoff
+   listed the surface and accent values only. It omitted every text and dim
+   value (`#6b7280`, `#9ca3af`, `#e2e4e9`, `#8b8fa0`, `#4a4a5e`). Build the
+   sweep list from the *previous* `globals.css`, not from the handoff.
+
+Sweep recipe:
+
+    # every value in the pre-migration globals.css, both notations
+    git show <pre-migration-ref>:apps/web/styles/globals.css \
+      | grep -oE '#[0-9a-fA-F]{6}' | sort -u
+
+Then, for each hex, also grep the decimal triple: `(26,26,46)`, `(107,114,128)`.
+
+Two exclusions when applying replacements:
+
+- **`.test.` files.** Fix the source first, then read each failing assertion
+  and update it deliberately. A blanket regex over test files rewrites
+  expectations instead of code, which hides regressions.
+- **Badge-owned paths** (`apps/web/lib/render/`, `apps/web/app/u/`,
+  `apps/web/app/og-image/`). The badge SVG is a theme-independent asset on its
+  own fixed `#0C0D14` canvas. Its literals are correct and must not move with
+  the app palette.
+
+Prefer a token over a corrected literal. `bg-[rgba(26,26,46,0.06)]` became
+`bg-text-primary/[0.06]`, which fixes a latent bug: the hardcoded form did not
+track the theme.
