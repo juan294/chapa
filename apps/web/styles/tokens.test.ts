@@ -36,6 +36,7 @@ const THEMED_TOKENS = [
   "--color-warm-stroke",
   "--color-dark-section",
   "--color-dark-card",
+  "--color-hero-band",
   "--color-purple-tint",
   "--color-complement",
   "--color-complement-light",
@@ -107,6 +108,9 @@ describe("v2 token layer (#1211)", () => {
       "--color-forest-text",
       "--color-forest-dim",
       "--color-forest-grid",
+      "--color-forest-ok",
+      "--color-forest-warn",
+      "--color-forest-err",
     ];
 
     for (const token of FOREST_TOKENS) {
@@ -116,9 +120,18 @@ describe("v2 token layer (#1211)", () => {
       });
     }
 
-    it("forest dim text clears AA against the forest ground (#1212)", () => {
-      // Was #42574c on #0b2018 = 2.19:1.
-      const { light } = themedTokenValue("--color-forest-dim", THEME);
+    it.each([
+      // Was #42574c on #0b2018 = 2.19:1 (#1212).
+      "--color-forest-dim",
+      // A forest block on a LIGHT page would otherwise resolve the status
+      // colors to their light-theme values, which measure 3.72:1
+      // (terminal-green) and 3.19:1 (terminal-red) on this ground (#1215).
+      "--color-forest-ok",
+      "--color-forest-warn",
+      "--color-forest-err",
+      "--color-forest-text",
+    ])("%s clears AA against the forest ground", (token) => {
+      const { light } = themedTokenValue(token, THEME);
       const { light: ground } = themedTokenValue("--color-forest", THEME);
       expect(contrastRatio(light, ground)).toBeGreaterThanOrEqual(4.5);
     });

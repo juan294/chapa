@@ -101,12 +101,17 @@ export const es: Translations = {
       comment: 'Añade esto a tu README',
       altText: 'Chapa de impacto',
     },
+    sectionMeta: {
+      preview: 'siempre oscuro · renderizado en el servidor',
+      features: 'exit 0 · {count} resultados',
+      explain: '{count} pasos · ~1 min',
+      score: 'compuesta {score} · {tier}',
+      enterprise: 'emu · opcional',
+    },
     sections: {
       features: 'Funciones',
       howItWorks: 'Cómo funciona',
       enterprise: 'Empresa',
-      stats: 'Datos',
-      getStarted: 'Empieza',
     },
     features: [
       {

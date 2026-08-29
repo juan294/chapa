@@ -204,11 +204,11 @@ export function GlobalCommandBar({
                 <button
                   key={command.name}
                   type="button"
-                  onClick={() => handleAutocompleteFill(`/${command.name}`)}
+                  onClick={() => handleAutocompleteFill(command.name)}
                   title={command.description}
                   className="shrink-0 rounded-full border border-stroke px-3 py-1.5 font-heading text-xs whitespace-nowrap text-text-secondary transition-colors hover:border-amber/40 hover:text-text-primary"
                 >
-                  /{command.name}
+                  {command.name}
                 </button>
               ))}
             </div>

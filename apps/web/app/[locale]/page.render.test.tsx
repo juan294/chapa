@@ -20,7 +20,20 @@ vi.mock("@/lib/render/BadgeSvg", () => ({
 
 vi.mock("@/lib/render/demoData", () => ({
   DEMO_STATS: { handle: "demo" },
-  DEMO_IMPACT: { compositeScore: 70 },
+  // #1215 — the landing scoring section reads the demo dimensions, composite
+  // and tier, so the stub has to carry them.
+  DEMO_IMPACT: {
+    compositeScore: 70,
+    adjustedComposite: 82,
+    tier: "High",
+    dimensions: {
+      delivery: 88,
+      quality: 72,
+      consistency: 80,
+      breadth: 65,
+      craft: 72,
+    },
+  },
 }));
 
 vi.mock("@/components/BadgeOverlay", () => ({
@@ -183,13 +196,19 @@ describe("Home page render (en)", () => {
     expect(container.querySelector("footer")).not.toBeNull();
   });
 
-  it("links the Verify a Badge CTA to /verify with the complement-dark token (#1167 / UX-H1: white-on-bg-complement measured 2.54:1, below AA)", async () => {
+  // #1167 / UX-H1 measured white text on a solid bg-complement fill at 2.54:1,
+  // below AA. #1215 made this CTA an outline button instead of a solid one, so
+  // the guard is now: it stays in the verification family, never jade, and
+  // never a solid complement fill (which would bring the 2.54:1 pairing back).
+  it("links the Verify a Badge CTA to /verify in the verification family", async () => {
     await renderHome();
     const verifyLink = screen.getByRole("link", { name: /verify a badge/i });
     expect(verifyLink.getAttribute("href")).toBe("/verify");
     const classes = verifyLink.className.split(/\s+/);
-    expect(classes).toContain("bg-complement-dark");
+    expect(classes).toContain("border-complement");
+    expect(classes).toContain("text-complement-text");
     expect(classes).not.toContain("bg-complement");
+    expect(classes).not.toContain("text-amber");
   });
 
   // #1167 (UX-B1, launch blocker) — the footer is now the shared SiteFooter

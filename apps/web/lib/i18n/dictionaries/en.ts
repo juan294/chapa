@@ -107,12 +107,17 @@ export const en: Translations = {
       comment: 'Add this to your README',
       altText: 'Impact badge',
     },
+    sectionMeta: {
+      preview: 'always dark · rendered server-side',
+      features: 'exit 0 · {count} results',
+      explain: '{count} steps · ~1 min',
+      score: 'composite {score} · {tier}',
+      enterprise: 'emu · optional',
+    },
     sections: {
       features: 'Features',
       howItWorks: 'How it Works',
       enterprise: 'Enterprise',
-      stats: 'Stats',
-      getStarted: 'Get started',
     },
     features: [
       {

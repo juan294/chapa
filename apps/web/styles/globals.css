@@ -27,6 +27,10 @@ html[lang="en"] [data-document-locale="es"] {
   --color-purple-tint: light-dark(#dff0e6, #123526);
   --color-dark-section: light-dark(#0d2b1d, #050f0a);
   --color-dark-card: light-dark(#123526, #0c1f15);
+  /* The landing hero band. Theme aware on purpose: an always-dark hero made
+     light mode a strip around a dark slab (#1215). Only the badge panel it
+     frames stays dark in both themes, via --color-forest-* below. */
+  --color-hero-band: light-dark(#e9f3ec, #0b2018);
 
   /* aliases kept for the existing bg-warm-* / border-warm-stroke utilities */
   --color-warm-bg: light-dark(#f7fbf8, #08170f);
@@ -88,6 +92,13 @@ html[lang="en"] [data-document-locale="es"] {
   --color-forest-text: #dfeae4;
   --color-forest-dim: #8ba398;
   --color-forest-grid: #7dffbc0a;
+  /* Status colors resolve per theme, so the light-theme values land on this
+     fixed dark ground when a forest block sits on a light page: measured
+     3.72:1 for terminal-green and 3.19:1 for terminal-red, both below AA.
+     These are the dark-theme values, pinned. Use them inside forest blocks. */
+  --color-forest-ok: oklch(.8 .16 148);
+  --color-forest-warn: oklch(.82 .13 85);
+  --color-forest-err: oklch(.72 .17 25);
 
   --shadow-card: 0px 0px 0px 1px
       light-dark(rgba(0, 0, 0, 0.06), color-mix(in oklab, oklch(.76 .16 163) 8%, transparent)),
