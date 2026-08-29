@@ -178,10 +178,16 @@ function assertRunAttempt(value: unknown, label: string): string {
   return stringValue;
 }
 
+// Accepts both second-precision (`date -u +%Y-%m-%dT%H:%M:%SZ`, what the
+// release-verification workflow actually generates) and millisecond-precision
+// (`Date#toISOString()`) UTC timestamps. A stricter round-trip-through-
+// toISOString() check rejects every second-precision timestamp, since
+// toISOString() always appends milliseconds.
+const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+
 function assertIsoTimestamp(value: unknown, label: string): string {
   const stringValue = assertString(value, label);
-  const parsed = new Date(stringValue);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== stringValue) {
+  if (!ISO_TIMESTAMP_PATTERN.test(stringValue) || Number.isNaN(Date.parse(stringValue))) {
     throw new Error(`${label} must be an ISO-8601 timestamp`);
   }
   return stringValue;

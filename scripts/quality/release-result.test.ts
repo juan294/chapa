@@ -169,6 +169,16 @@ describe("buildPreviewResult", () => {
     ).toThrow(/generatedAt/);
   });
 
+  it("accepts a second-precision UTC timestamp, e.g. from `date -u +%Y-%m-%dT%H:%M:%SZ`", () => {
+    // The release-verification workflow generates generatedAt via the shell
+    // `date` command, which has no millisecond precision. A validator that
+    // requires an exact round-trip through Date#toISOString() (which always
+    // appends ".000") rejects every real workflow-generated timestamp.
+    expect(() =>
+      validPreviewResult({ generatedAt: "2026-08-29T17:05:52Z" }),
+    ).not.toThrow();
+  });
+
   it("rejects unknown top-level fields", () => {
     expect(() => validPreviewResult({ unexpectedField: true })).toThrow(
       /unexpectedField/,
