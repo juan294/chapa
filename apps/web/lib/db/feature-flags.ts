@@ -131,6 +131,13 @@ export async function dbGetFeatureFlag(
       .maybeSingle();
 
     if (error) throw error;
+    // `.maybeSingle()` returns null for an absent row, which is the NORMAL
+    // outcome here: `checkFlag` in lib/feature-flags.ts relies on this null to
+    // fall back to the env var for a flag that has no DB row yet. Guard before
+    // `parseRow`, which would otherwise log a schema-mismatch warning for a
+    // correctly-absent flag (#1209). Matches every other single-row reader in
+    // this directory.
+    if (!data) return null;
 
     const row = parseRow<FeatureFlagRow>(data, REQUIRED_KEYS, "feature_flags");
     const flag = row ? rowToFlag(row) : null;
