@@ -1,4 +1,5 @@
 import { NavbarClient } from "@/components/NavbarClient";
+import { ContentPageHeader } from "@/components/content/ContentPageHeader";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { SiteFooter } from "@/components/SiteFooter";
 import { tArray } from "@/lib/i18n/typed-accessors";
@@ -59,20 +60,30 @@ export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
           fixed bottom-0; the smaller reservation left the footer added
           below occluded behind it. */}
       <main id="main-content" className="mx-auto max-w-3xl px-6 pt-32 pb-24">
-        <article className="animate-fade-in-up">
-          <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-            <span className="text-terminal-dim select-none">$</span>
-            <span className="text-text-secondary">{t(`${ns}.terminalCommand`) as string}</span>
-          </div>
+        <article className="@container animate-fade-in-up">
+          {/* #1218 — the shared content-page header, so an archetype guide
+              opens the same way as every other long-form route. The guides
+              stay on this shared shell rather than getting bespoke art. */}
+          <ContentPageHeader
+            command={t(`${ns}.terminalCommand`) as string}
+            title={
+              <>
+                {t(`${ns}.h1Before`) as string}
+                <span className={accentClass}>
+                  {t(`${ns}.h1Highlight`) as string}
+                </span>
+              </>
+            }
+            intro={
+              <span className="font-heading text-sm">
+                {t('archetypes.dominantDimensionLabel') as string}{" "}
+                <span className={accentClass}>
+                  {t(`${ns}.dominantDimension`) as string}
+                </span>
+              </span>
+            }
+          />
           <div className="pl-4 border-l border-stroke space-y-8">
-            <div>
-              <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                {t(`${ns}.h1Before`) as string}<span className={accentClass}>{t(`${ns}.h1Highlight`) as string}</span>
-              </h1>
-              <p className="text-text-secondary text-sm mt-2 font-heading">
-                {t('archetypes.dominantDimensionLabel') as string} <span className={accentClass}>{t(`${ns}.dominantDimension`) as string}</span>
-              </p>
-            </div>
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
               role="img"
