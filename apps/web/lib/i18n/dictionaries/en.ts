@@ -240,6 +240,8 @@ export const en: Translations = {
     badgeAriaLabel: 'Chapa badge for {handle}',
     badgeAlt: 'Chapa badge for {handle}',
     srH1: "{handle}'s developer impact",
+    impactScoreCaption: 'impact score',
+    subtitle: 'Developer Impact Badge — 365 days of activity across five dimensions, re-rendered daily from fresh data.',
     h2: 'Your Impact, Decoded',
     loadingAriaLabel: 'Loading',
     loadingSrText: 'Loading...',
@@ -1273,6 +1275,8 @@ export const en: Translations = {
   dashboard: {
     performanceDimensions: 'Performance Dimensions',
     dataSources: 'Data Sources',
+    dataSourceLinked: 'linked',
+    dataSourceConnect: 'connect',
     insightsCoaching: 'Insights & Coaching',
     keyNumbers: 'Key Numbers',
     vsLastWeek: 'vs last week',

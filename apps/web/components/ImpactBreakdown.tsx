@@ -9,6 +9,7 @@ import type {
 } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
+import { useClientFeatureFlags } from "./ClientFeatureFlagsProvider";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 
@@ -72,17 +73,51 @@ const PLATFORM_URLS: Partial<Record<Platform, (username: string) => string>> = {
   gitlab: (username) => `https://gitlab.com/${username}`,
 };
 
+/**
+ * The canonical order the data-source row lists platforms in. Unlinked ones are
+ * shown to the owner as a "connect" affordance, so the row reads as a status
+ * list rather than a list of things that happen to be connected (#1217).
+ */
+const DATA_SOURCE_PLATFORMS: Platform[] = [
+  "github",
+  "gitlab",
+  "bitbucket",
+  "codeberg",
+];
+
+const PLATFORM_CONNECT_PATHS: Partial<Record<Platform, string>> = {
+  bitbucket: "/api/auth/bitbucket/connect",
+  codeberg: "/api/auth/codeberg/connect",
+  gitlab: "/api/auth/gitlab/connect",
+};
+
 interface DataSourcesProps {
   stats: StatsData;
   handle: string;
+  /**
+   * Only the owner can act on an unconnected platform, so only the owner sees
+   * the "connect" entries. A visitor sees the linked sources alone.
+   */
+  isOwner?: boolean;
 }
 
-export function DataSources({ stats, handle }: DataSourcesProps) {
+export function DataSources({ stats, handle, isOwner = false }: DataSourcesProps) {
   const { t } = useTranslation();
-  const platforms: Platform[] = [
+  const flags = useClientFeatureFlags();
+  const linked = new Set<Platform>([
     "github",
     ...(stats.linkedPlatforms?.filter((p): p is Platform => p !== "github") ?? []),
-  ];
+  ]);
+  const connectable: Partial<Record<Platform, boolean>> = {
+    bitbucket: flags.bitbucketEnabled,
+    codeberg: flags.codebergEnabled,
+    gitlab: flags.gitlabEnabled,
+  };
+  const platforms = DATA_SOURCE_PLATFORMS.filter(
+    (platform) =>
+      linked.has(platform) ||
+      (isOwner && connectable[platform] === true && PLATFORM_CONNECT_PATHS[platform]),
+  );
 
   return (
     <div>
@@ -93,13 +128,16 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
         {platforms.map((platform, i) => {
           const display = PLATFORM_DISPLAY[platform];
           if (!display) return null;
+          const isLinked = linked.has(platform);
           const urlBuilder = PLATFORM_URLS[platform];
           // GitHub uses the main handle; linked platforms use their own username
           const username = platform === "github"
             ? handle
             : stats.linkedPlatformLogins?.[platform];
-          const href = urlBuilder && username ? urlBuilder(username) : null;
-          const sharedClass = "inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors";
+          const href = isLinked
+            ? (urlBuilder && username ? urlBuilder(username) : null)
+            : (PLATFORM_CONNECT_PATHS[platform] ?? null);
+          const sharedClass = "inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 animate-fade-in-up transition-colors";
           const inner = (
             <>
               <svg
@@ -114,6 +152,20 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
               </svg>
               <span className="text-sm text-text-primary font-medium">
                 {display.label}
+              </span>
+              {/* The status word is what turns this from a list of logos into a
+                  row that says where the numbers came from (#1217). */}
+              <span
+                data-testid={`data-source-status-${platform}`}
+                className={`font-heading text-xs ${
+                  isLinked ? "text-terminal-green" : "text-terminal-dim"
+                }`}
+              >
+                {t(
+                  isLinked
+                    ? "dashboard.dataSourceLinked"
+                    : "dashboard.dataSourceConnect",
+                ) as string}
               </span>
             </>
           );

@@ -234,6 +234,8 @@ export const es: Translations = {
     badgeAriaLabel: 'Chapa de {handle}',
     badgeAlt: 'Chapa de {handle}',
     srH1: 'Impacto de desarrollador de {handle}',
+    impactScoreCaption: 'puntuación de impacto',
+    subtitle: 'Insignia de impacto de desarrollador: 365 días de actividad en cinco dimensiones, regenerada a diario con datos frescos.',
     h2: 'Tu Impacto, Decodificado',
     loadingAriaLabel: 'Cargando',
     loadingSrText: 'Cargando...',
@@ -1262,6 +1264,8 @@ export const es: Translations = {
   dashboard: {
     performanceDimensions: 'Dimensiones de rendimiento',
     dataSources: 'Fuentes de datos',
+    dataSourceLinked: 'vinculado',
+    dataSourceConnect: 'conectar',
     insightsCoaching: 'Perspectivas y coaching',
     keyNumbers: 'Números clave',
     vsLastWeek: 'vs semana anterior',

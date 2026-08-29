@@ -381,3 +381,33 @@ describe("DataSources", () => {
     expect(link?.getAttribute("href")).toBe("https://bitbucket.org/mybbuser");
   });
 });
+
+// #1217 — the data sources become a status row: each source says whether it is
+// linked, and the owner sees the platforms they could still connect.
+describe("DataSources — status row (#1217)", () => {
+  it("marks a connected platform as linked", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    expect(
+      screen.getByTestId("data-source-status-github").textContent,
+    ).toBe("linked");
+  });
+
+  it("does not offer connect entries to a visitor", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    expect(screen.queryByTestId("data-source-status-gitlab")).toBeNull();
+    expect(screen.queryByTestId("data-source-status-bitbucket")).toBeNull();
+  });
+
+  it("keeps a linked platform's status even when the viewer is the owner", () => {
+    render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, linkedPlatforms: ["github", "gitlab"] }}
+        handle="testuser"
+        isOwner
+      />,
+    );
+    expect(
+      screen.getByTestId("data-source-status-gitlab").textContent,
+    ).toBe("linked");
+  });
+});
