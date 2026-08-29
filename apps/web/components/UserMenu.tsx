@@ -397,6 +397,9 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     clearPlatformStatusCache();
     clearCacheWarmState();
     await fetch("/api/auth/logout", { method: "POST" });
+    // A full reload is intentional: it discards all client and router state
+    // after the server clears the session cookie.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/";
   }
 
