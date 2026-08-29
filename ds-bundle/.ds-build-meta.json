@@ -1,0 +1,9 @@
+{
+  "namespace": "Chapa",
+  "source": "@chapa/web@2.24.1",
+  "shape": "package",
+  "provider": null,
+  "componentCount": 12,
+  "skippedStoryIds": [],
+  "runtimeFontPrefixes": []
+}

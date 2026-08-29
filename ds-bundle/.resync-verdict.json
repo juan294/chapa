@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "ok": true,
+  "shape": "package",
+  "anchor": "malformed",
+  "learningsUnmerged": [],
+  "stages": {
+    "build": {
+      "ok": true,
+      "exit": 0,
+      "skipped": null
+    },
+    "diff": {
+      "ok": true,
+      "exit": 0,
+      "skipped": null
+    },
+    "validate": {
+      "ok": true,
+      "exit": 0,
+      "skipped": null
+    },
+    "capture": {
+      "ok": true,
+      "exit": 0,
+      "skipped": null
+    }
+  },
+  "verification": {
+    "unchanged": [],
+    "changed": [],
+    "added": [
+      "BitbucketIcon",
+      "ClaudeCodeStar",
+      "CodebergIcon",
+      "ConfirmDialog",
+      "CopyIcon",
+      "GitHubIcon",
+      "GitlabIcon",
+      "InsightCard",
+      "LiteYouTubeEmbed",
+      "LoginCtaButton",
+      "Sparkline",
+      "StatusCallout"
+    ],
+    "removed": [],
+    "pendingGrade": [],
+    "canary": null
+  },
+  "upload": {
+    "any": true,
+    "components": [
+      "BitbucketIcon",
+      "ClaudeCodeStar",
+      "CodebergIcon",
+      "ConfirmDialog",
+      "CopyIcon",
+      "GitHubIcon",
+      "GitlabIcon",
+      "InsightCard",
+      "LiteYouTubeEmbed",
+      "LoginCtaButton",
+      "Sparkline",
+      "StatusCallout"
+    ],
+    "deletePaths": [],
+    "bundle": true,
+    "styling": true,
+    "aux": true
+  }
+}

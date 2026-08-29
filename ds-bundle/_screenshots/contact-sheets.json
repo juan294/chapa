@@ -1,0 +1,19 @@
+[
+  {
+    "sheet": 1,
+    "components": [
+      "BitbucketIcon",
+      "ClaudeCodeStar",
+      "CodebergIcon",
+      "ConfirmDialog",
+      "CopyIcon",
+      "GitHubIcon",
+      "GitlabIcon",
+      "InsightCard",
+      "LiteYouTubeEmbed",
+      "LoginCtaButton",
+      "Sparkline",
+      "StatusCallout"
+    ]
+  }
+]

@@ -1,0 +1,45 @@
+{
+  "styleChanged": false,
+  "anchorUsed": false,
+  "anchorReason": "malformed",
+  "keyedBy": "renderHashes",
+  "unchanged": [],
+  "changed": [],
+  "added": [
+    "BitbucketIcon",
+    "ClaudeCodeStar",
+    "CodebergIcon",
+    "ConfirmDialog",
+    "CopyIcon",
+    "GitHubIcon",
+    "GitlabIcon",
+    "InsightCard",
+    "LiteYouTubeEmbed",
+    "LoginCtaButton",
+    "Sparkline",
+    "StatusCallout"
+  ],
+  "removed": [],
+  "renderChurned": [],
+  "upload": {
+    "any": true,
+    "components": [
+      "BitbucketIcon",
+      "ClaudeCodeStar",
+      "CodebergIcon",
+      "ConfirmDialog",
+      "CopyIcon",
+      "GitHubIcon",
+      "GitlabIcon",
+      "InsightCard",
+      "LiteYouTubeEmbed",
+      "LoginCtaButton",
+      "Sparkline",
+      "StatusCallout"
+    ],
+    "deletePaths": [],
+    "bundle": true,
+    "styling": true,
+    "aux": true
+  }
+}
