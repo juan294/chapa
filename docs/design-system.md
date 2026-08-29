@@ -2,7 +2,7 @@
 
 This is the single source of truth for visual design decisions. All agents working on UI must follow these guidelines.
 
-## Theme: Terminal Dark + Purple Accent (with Light Mode)
+## Theme: Terminal Dark + Jade Accent (with Light Mode)
 
 Bold, developer-tool aesthetic inspired by terminal UIs. The dark theme is the signature brand look: a deep forest ground with a vivid jade accent (`oklch(.66 .15 163)` light, `oklch(.76 .16 163)` dark) used sparingly for CTAs, highlights, and active states (#1206, replacing the previous violet). Terminal-specific colors (green, red, yellow) for output types. A light theme is supported as an alternative, toggled via the `ThemeToggle` component in the nav bar. Badge SVG always renders in dark theme as an independent embeddable asset.
 
@@ -26,35 +26,35 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-amber` | `oklch(.76 .16 163)` | `oklch(.66 .15 163)` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
 | `--color-amber-light` | `oklch(.84 .14 163)` | `oklch(.76 .14 163)` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
 | `--color-amber-dark` | `oklch(.58 .14 165)` | `oklch(.5 .12 165)` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
-| `--color-stroke` | `rgba(139,92,246,0.10)` | `rgba(0,0,0,0.08)` | `border-stroke` | Borders, dividers (purple-tinted) |
+| `--color-stroke` | `#7dffbc1f` | `#0d3b2417` | `border-stroke` | Borders, dividers (accent-tinted) |
 | `--color-warm-bg` | `#08170f` | `#f7fbf8` | `bg-warm-bg` | Alias for page background |
 | `--color-warm-card` | `#0f2419` | `#edf6f0` | `bg-warm-card` | Alias for card background |
-| `--color-warm-stroke` | `rgba(139,92,246,0.10)` | `rgba(0,0,0,0.08)` | `border-warm-stroke` | Alias for borders |
+| `--color-warm-stroke` | `#7dffbc1f` | `#0d3b2417` | `border-warm-stroke` | Alias for borders |
 | `--color-dark-section` | `#050f0a` | `#0d2b1d` | `bg-dark-section` | Deeper emphasis band backgrounds |
 | `--color-dark-card` | `#0c1f15` | `#123526` | `bg-dark-card` | Cards inside dark sections |
-| `--color-purple-tint` | `rgba(139,92,246,0.06)` | `#F5F3FF` | `bg-purple-tint` | Subtle purple section tint |
+| `--color-purple-tint` | `oklch(.76 .16 163 / .1)` | `#dff0e6` | `bg-purple-tint` | Subtle accent section tint |
 | `--color-terminal-green` | `oklch(.8 .16 148)` | `oklch(.55 .13 145)` | `text-terminal-green` | Success messages, checkmarks |
 | `--color-terminal-red` | `oklch(.72 .17 25)` | `oklch(.55 .19 25)` | `text-terminal-red` | Error messages |
 | `--color-terminal-yellow` | `oklch(.82 .13 85)` | `oklch(.62 .13 78)` | `text-terminal-yellow` | Warning messages |
 | `--color-terminal-dim` | `#42574c` | `#93a89d` | `text-terminal-dim` | Dim text, prefixes, decorative |
-| `--color-complement` | `oklch(.7 .11 225)` | `oklch(.55 .1 225)` | `bg-complement`, `border-complement` | Slate-blue accent (sparingly) — verification, secondary CTAs. **Non-textual only** — see `--color-complement-text` below for teal-as-text/icon-stroke |
-| `--color-complement-light` | `rgba(16,185,129,0.15)` | `#D1FAE5` | `bg-complement-light` | Teal tint |
+| `--color-complement` | `oklch(.7 .11 225)` | `oklch(.55 .1 225)` | `bg-complement`, `border-complement` | Slate-blue accent (sparingly) — verification, secondary CTAs. **Non-textual only** — see `--color-complement-text` below for complement-as-text/icon-stroke |
+| `--color-complement-light` | `oklch(.7 .11 225 / .16)` | `oklch(.94 .035 225)` | `bg-complement-light` | Complement tint |
 | `--color-complement-dark` | `oklch(.42 .09 228)` | `oklch(.42 .09 228)` | `bg-complement-dark` | White-text-on-solid-fill verification CTAs only (`bg-complement` measures 2.54:1 for white text, below AA; this measures ~5.49:1) |
 | `--color-complement-text` | `oklch(.76 .11 222)` | `oklch(.48 .1 228)` | `text-complement-text` | Complement-colored TEXT and icon strokes on `bg-bg`/`bg-card` (#1189). The raw `--color-complement` is a fill/tint value and does not clear AA as text; this theme-aware token is the text-safe counterpart, re-tuned to slate blue in #1206. |
 | `--color-complement-text-hover` | `oklch(.84 .1 220)` | `oklch(.38 .09 228)` | `hover:text-complement-text-hover` | Hover state for `text-complement-text` (#1189 follow-up). Light theme darkens, dark theme brightens; both directions increase contrast against their own ground. Re-tuned to slate blue in #1206. |
-| `--color-track` | `rgba(255,255,255,0.06)` | `rgba(0,0,0,0.06)` | `bg-track` | Progress bar/gauge track background |
+| `--color-track` | `#7dffbc14` | `#0d3b2414` | `bg-track` | Progress bar/gauge track background |
 | | | | | |
 | **Dimension colors** | | | | **Data visualization accents for the 4 impact dimensions** |
-| `--color-dimension-delivery` | `#22c55e` | `#22c55e` | `text-dimension-delivery`, `bg-dimension-delivery` | Delivery dimension (green) |
-| `--color-dimension-quality` | `#f97316` | `#f97316` | `text-dimension-quality`, `bg-dimension-quality` | Quality dimension (orange) |
-| `--color-dimension-consistency` | `#06b6d4` | `#06b6d4` | `text-dimension-consistency`, `bg-dimension-consistency` | Consistency dimension (cyan) |
-| `--color-dimension-breadth` | `#ec4899` | `#ec4899` | `text-dimension-breadth`, `bg-dimension-breadth` | Breadth dimension (pink) |
-| `--color-dimension-delivery-light` | `#4ADE80` | `#4ADE80` | `text-dimension-delivery-light` | Lighter delivery accent |
-| `--color-dimension-quality-light` | `#FB923C` | `#FB923C` | `text-dimension-quality-light` | Lighter quality accent |
-| `--color-dimension-consistency-light` | `#22D3EE` | `#22D3EE` | `text-dimension-consistency-light` | Lighter consistency accent |
-| `--color-dimension-breadth-light` | `#F472B6` | `#F472B6` | `text-dimension-breadth-light` | Lighter breadth accent |
-| `--color-dimension-craft` | `#F59E0B` | `#F59E0B` | `text-dimension-craft`, `bg-dimension-craft` | Craft dimension (amber) |
-| `--color-dimension-craft-light` | `#FBBF24` | `#FBBF24` | `text-dimension-craft-light` | Lighter craft accent |
+| `--color-dimension-delivery` | `oklch(.72 .14 145)` | `oklch(.62 .14 145)` | `text-dimension-delivery`, `bg-dimension-delivery` | Delivery dimension (green, hue 145) |
+| `--color-dimension-quality` | `oklch(.72 .14 50)` | `oklch(.62 .14 50)` | `text-dimension-quality`, `bg-dimension-quality` | Quality dimension (orange, hue 50) |
+| `--color-dimension-consistency` | `oklch(.72 .14 215)` | `oklch(.62 .14 215)` | `text-dimension-consistency`, `bg-dimension-consistency` | Consistency dimension (cyan, hue 215) |
+| `--color-dimension-breadth` | `oklch(.72 .14 330)` | `oklch(.62 .14 330)` | `text-dimension-breadth`, `bg-dimension-breadth` | Breadth dimension (pink, hue 330) |
+| `--color-dimension-delivery-light` | `oklch(.8 .13 145)` | `oklch(.75 .13 145)` | `text-dimension-delivery-light` | Lighter delivery accent |
+| `--color-dimension-quality-light` | `oklch(.8 .13 50)` | `oklch(.75 .13 50)` | `text-dimension-quality-light` | Lighter quality accent |
+| `--color-dimension-consistency-light` | `oklch(.8 .13 215)` | `oklch(.75 .13 215)` | `text-dimension-consistency-light` | Lighter consistency accent |
+| `--color-dimension-breadth-light` | `oklch(.8 .13 330)` | `oklch(.75 .13 330)` | `text-dimension-breadth-light` | Lighter breadth accent |
+| `--color-dimension-craft` | `oklch(.72 .14 95)` | `oklch(.62 .14 95)` | `text-dimension-craft`, `bg-dimension-craft` | Craft dimension (amber, hue 95) |
+| `--color-dimension-craft-light` | `oklch(.8 .13 95)` | `oklch(.75 .13 95)` | `text-dimension-craft-light` | Lighter craft accent |
 | | | | | |
 | **Archetype colors** | | | | **Accent color per developer archetype** |
 | `--color-archetype-builder` | `oklch(.62 .14 163)` | `oklch(.62 .14 163)` | `text-archetype-builder`, `bg-archetype-builder` | Builder archetype (jade) |
@@ -70,19 +70,25 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 - Jade is the signature accent. Use sparingly — CTAs, active states, key data points.
 - Use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, etc.) — they resolve correctly in both themes.
 - Never hardcode hex colors in components; always use the CSS variable tokens so theme switching works.
-- Purple-tinted borders (`border-stroke`) are the default for all dividers.
+- Accent-tinted borders (`border-stroke`) are the default for all dividers.
 - Terminal colors used in terminal output only: green for success, red for errors, yellow for warnings. These also have light-appropriate values.
-- **Error banners and alerts** must use terminal-red tokens (`border-terminal-red/30`, `bg-terminal-red/10`, `text-terminal-red`) — never amber/purple for error states.
+- **Error banners and alerts** must use terminal-red tokens (`border-terminal-red/30`, `bg-terminal-red/10`, `text-terminal-red`) — never the brand accent for error states.
 - **Verification-related UI on the site itself** (verify page headings, verify CTAs, in-app verification indicators) must use the complement (slate blue since #1206) tokens: `bg-complement`, `border-complement`, `bg-complement-light` for fills/tints/borders, and — for text and icon strokes specifically — `text-complement-text` (#1189), never `text-complement`. The raw fill value does not clear the AA floor as text.54:1 as text against the site's light-theme backgrounds, below the WCAG AA floor even for large/bold text (3:1), let alone normal text (4.5:1); `--color-complement-text` is the theme-aware, text-safe counterpart (see the color table above). This semantically distinguishes cryptographic trust from primary brand actions while keeping teal legible as text in both themes. **Hovering a `text-complement-text` element** must go to `hover:text-complement-text-hover`, never `hover:text-complement-light` — `--color-complement-light` is a translucent BACKGROUND tint (pale mint on white in light theme, 15%-alpha green in dark theme) that renders as near-invisible text; a hover state that's harder to read than rest is backwards. `--color-complement-text-hover` is the theme-aware, text-safe hover counterpart (darker in light theme, lighter/brighter in dark theme — see the color table above).
-- **The embeddable badge SVG's own "verified" signal** (shield icon + vertical verification strip) is the one deliberate exception: it uses its own coral constant, `VERIFICATION_CORAL` (`#E05A47`, `apps/web/lib/badge-visual-metadata.ts`) — never the teal tokens above. The badge is a static, theme-independent asset rendered server-side before app CSS exists, so it can't reference CSS custom properties at all; coral was already load-bearing in the verification strip pre-dating this rule, and previously coexisted with the brand-purple shield icon (two colors signaling one "verified" concept). #1168 (UX-M10) resolved that duality by recoloring the shield to the same coral, so the badge now has exactly one verified color, distinct from teal (on-site) and from the brand purple accent. Contrast: coral is ~5.3:1 against the badge's own fixed dark background (#0C0D14) — comfortably AA. It is only ~3.7:1 against a light background (#FFFFFF/#F9FAFB) — AA for large/bold text only, not small body text — so if a coral accent is ever carried onto the (light/dark-capable) verify page, it needs its own contrast pass and cannot assume the badge's dark-background numbers apply. Coral vs. `--color-terminal-red` (error state) hue is close (~7° apart in HSL) but separated by lightness/saturation on the badge's dark canvas (~13pp lightness gap vs. dark-theme `--color-terminal-red` #F87171); the gap narrows on a hypothetical light-theme use (~7pp vs. light-theme `--color-terminal-red` #DC2626, nearly identical saturation) — verify the two stay visually distinguishable, including for colorblind users, before extending coral beyond the badge.
-- **Wave 2 decision (#1183): coral stays badge-only — the verify page keeps teal.** The question above ("if a coral accent is ever carried onto the verify page") was evaluated and resolved: `/verify/:hash` and `StatusCallout`'s `verification` variant keep the teal family (`bg-complement`/`border-complement`, and — since #1189 — `text-complement-text` for text/icon-stroke) rather than adopting coral, and `VERIFICATION_CORAL` is not imported by either (enforced by `apps/web/lib/badge-visual-metadata.test.ts` and `apps/web/components/StatusCallout.render.test.tsx`). Two measured reasons, not just inertia:
+- **The embeddable badge SVG's own "verified" signal** (shield icon + vertical verification strip) is the one deliberate exception: it uses its own coral constant, `VERIFICATION_CORAL` (`#E05A47`, `apps/web/lib/badge-visual-metadata.ts`) — never the teal tokens above. The badge is a static, theme-independent asset rendered server-side before app CSS exists, so it can't reference CSS custom properties at all; coral was already load-bearing in the verification strip pre-dating this rule, and previously coexisted with the brand-purple shield icon (two colors signaling one "verified" concept). #1168 (UX-M10) resolved that duality by recoloring the shield to the same coral, so the badge now has exactly one verified color, distinct from the on-site complement and from the brand accent. (The badge still carries the pre-#1206 violet for its accent and archetype colors; the app moved to jade and the badge deliberately did not, so "brand-purple shield" above is badge history, not the app's current accent.) Contrast: coral is ~5.3:1 against the badge's own fixed dark background (#0C0D14) — comfortably AA. It is only ~3.7:1 against a light background (#FFFFFF/#F9FAFB) — AA for large/bold text only, not small body text — so if a coral accent is ever carried onto the (light/dark-capable) verify page, it needs its own contrast pass and cannot assume the badge's dark-background numbers apply. Coral vs. `--color-terminal-red` (error state) hue is close (~7° apart in HSL) but separated by lightness/saturation on the badge's dark canvas (~13pp lightness gap vs. dark-theme `--color-terminal-red` #F87171); the gap narrows on a hypothetical light-theme use (~7pp vs. light-theme `--color-terminal-red` #DC2626, nearly identical saturation) — verify the two stay visually distinguishable, including for colorblind users, before extending coral beyond the badge.
+- **Wave 2 decision (#1183): coral stays badge-only — the verify page keeps the complement family.**
+  > **Superseded in part by #1206.** The conclusion still holds (coral stays
+  > badge-only), but the reasoning below is written against the old emerald
+  > *teal* complement. The complement is now a cool slate blue (hue 225-228),
+  > which sits further from coral than teal did, so the separation argument is
+  > stronger, not weaker. Read the hue-distance numbers below as historical.
+ The question above ("if a coral accent is ever carried onto the verify page") was evaluated and resolved: `/verify/:hash` and `StatusCallout`'s `verification` variant keep the teal family (`bg-complement`/`border-complement`, and — since #1189 — `text-complement-text` for text/icon-stroke) rather than adopting coral, and `VERIFICATION_CORAL` is not imported by either (enforced by `apps/web/lib/badge-visual-metadata.test.ts` and `apps/web/components/StatusCallout.render.test.tsx`). Two measured reasons, not just inertia:
   1. **Contrast.** Coral measures ~5.38:1 against the badge's own fixed dark canvas (comfortably AA for any text size there) but only ~3.67:1 against the site's light-theme backgrounds (`#FFFFFF`/`#F9FAFB`) — that clears the 3:1 large/bold-text AA floor but falls well short of the 4.5:1 normal-text floor. The verify page's body copy (verification hash, handle, dimension values) is normal-weight, non-large text; carrying coral there would mean either an inaccessible page or an inconsistent "coral heading, teal everything else" treatment — undermining the "one verified color" continuity this ticket was meant to serve, not delivering it.
   2. **Colorblind-safe separation from error red.** Coral and `--color-terminal-red` sit ~7.5° apart in hue in both themes; the *lightness* gap that currently keeps them apart on the badge's fixed dark canvas (~12.9pp) shrinks to ~7.3pp on light theme — the site's **default** theme (`defaultTheme="light"` in `next-themes`). A page whose entire purpose is asserting "verified" (not "error") cannot afford that shrinking margin, especially for protanopia/deuteranopia viewers where the red-orange range compresses further.
 
   The badge and the site are different rendering contexts by construction — the badge is a single fixed-dark canvas rendered server-side with no CSS custom properties, while the verify page is light/dark-capable and text-heavy — so this is a deliberate, documented split, not an oversight. Teal was already the intentional, colorblind-distinguishable verification signal for on-site UI (see the bullet above); Wave 2 confirmed it stays that way rather than partially diluting it with coral.
 - Use Tailwind opacity modifiers: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
 - Cards use `bg-card` with `border-stroke`.
-- Button text on purple background: always `text-white`.
+- Button text on a solid accent background: always `text-white`, and use `bg-amber-dark` (see the AA note below).
 - **White text on a solid `bg-amber`/`bg-complement` fill fails AA contrast** (`bg-amber` measures 4.06:1, `bg-complement` measures 2.54:1 — both below the 4.5:1 floor). Never change the `--color-amber`/`--color-complement` tokens themselves to fix this (they're used non-textually elsewhere — pills, heatmap, focus rings — and a token change shifts the whole brand/verification hue). Instead, at the specific white-text-on-solid-fill call site, use the darker step of the ramp: `bg-amber-dark` (~5.4:1) or `bg-complement-dark` (~5.49:1). When re-anchoring a hover state that previously went to the *lighter* step (e.g. `hover:bg-amber-light`, 2.72:1), shift the whole ramp one step darker instead (base `bg-amber-dark`, hover `bg-amber`) rather than just swapping the base color.
 
 ## Touch targets
@@ -104,7 +110,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 - Use `shadow-card-hover` as hover state via `hover:shadow-card-hover` with `transition-shadow`.
 - Terminal-aesthetic components (TerminalInput, TerminalOutput, GlobalCommandBar, Navbar) keep `border border-stroke` — sharp lines are part of the terminal look.
 - The first shadow layer (0px spread, 1px ring) replaces the border — don't combine `border` with `shadow-card`.
-- Dark mode shadows use purple-tinted ring + deeper black spread.
+- Dark mode shadows use an accent-tinted ring + deeper black spread. The ring is `color-mix(in oklab, var(--color-amber) …%, transparent)`, so it follows the theme rather than pinning a hue.
 
 ## Typography
 
@@ -201,7 +207,7 @@ rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white
 hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25
 ```
 
-White text on purple. `rounded-lg` (not `rounded-full`).
+White text on the accent. `rounded-lg` (not `rounded-full`).
 
 ### Buttons (Ghost/Outline)
 
@@ -241,7 +247,7 @@ Every tooltip/popover must be portal-rendered to `document.body` with `position:
 
 - **TerminalOutput**: `role="log" aria-live="polite"`, monospace, color-coded by line type
 - **TerminalInput**: `chapa >` or `studio >` prompt in amber, blinking cursor, input with placeholder
-- **AutocompleteDropdown**: `role="listbox"`, shows on `/` keystroke, purple accent on active item
+- **AutocompleteDropdown**: `role="listbox"`, shows on `/` keystroke, accent color on active item
 - **QuickControls**: Collapsible panel with clickable chips that insert terminal commands
 
 ### Images
@@ -261,7 +267,7 @@ Terminal dots: `bg-terminal-red/60`, `bg-terminal-yellow/60`, `bg-terminal-green
 
 ## Background Effects
 
-- **Grid pattern**: `.bg-grid-warm` — faint 72px grid lines at 4% opacity. Uses subtle black lines in light mode and purple-tinted lines in dark mode (both defined in `globals.css`).
+- **Grid pattern**: `.bg-grid-warm` — faint 72px grid lines at 4% opacity. Uses subtle black lines in light mode and accent-tinted lines in dark mode (both defined in `globals.css`).
 - No ambient glow on dark backgrounds.
 
 ## Animations
@@ -273,7 +279,7 @@ Defined in `globals.css`:
 | `animate-fade-in-up` | Fade in + slide up 30px | 0.8s ease-out |
 | `animate-cursor-blink` | Step cursor blink | 1s infinite |
 | `animate-terminal-fade-in` | Fade in + slide up 8px | 0.3s ease-out |
-| `animate-pulse-glow-amber` | Soft pulsing purple shadow | 3s infinite |
+| `animate-pulse-glow-amber` | Soft pulsing accent shadow | 3s infinite |
 | `animate-float-slow` | Gentle vertical float + slight rotation | 6s infinite |
 | `animate-float-medium` | Medium vertical float + counter-rotation | 7.5s infinite |
 | `animate-float-fast` | Faster vertical float + stronger rotation | 5s infinite |
