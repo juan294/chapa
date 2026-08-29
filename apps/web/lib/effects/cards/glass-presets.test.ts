@@ -76,13 +76,13 @@ describe("glassStyle", () => {
     for (const variant of ALL_VARIANTS) {
       const style = glassStyle(variant);
       expect(style.border).toBeDefined();
-      expect(style.border).toContain("rgba(139, 92, 246");
+      expect(style.border).toContain("rgba(27, 208, 147");
     }
   });
 
   it("aurora-glass uses accent background color", () => {
     const style = glassStyle("aurora-glass");
-    expect(style.background).toContain("rgba(139, 92, 246");
+    expect(style.background).toContain("rgba(27, 208, 147");
   });
 
   it("non-aurora variants use dark background color", () => {

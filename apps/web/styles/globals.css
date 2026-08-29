@@ -11,39 +11,40 @@ html[lang="en"] [data-document-locale="es"] {
 @theme {
   /* Light defaults — Tailwind reads these to generate utility classes (bg-bg, text-text-primary, etc.).
      Runtime values are overridden below in unlayered :root / [data-theme="dark"] blocks. */
-  --color-bg: #FFFFFF;
-  --color-card: #F9FAFB;
-  --color-text-primary: #1A1A2E;
-  --color-text-secondary: #6B7280;
-  --color-stroke: #00000014;
+  --color-bg: #f7fbf8;
+  --color-card: #edf6f0;
+  --color-text-primary: #0b2018;
+  --color-text-secondary: #55665e;
+  --color-stroke: #0d3b2417;
 
-  --color-amber: #8B5CF6;
-  --color-amber-light: #A78BFA;
-  --color-amber-dark: #7C3AED;
+  --color-amber: oklch(.66 .15 163);
+  --color-amber-light: oklch(.76 .14 163);
+  --color-amber-dark: oklch(.5 .12 165);
 
-  --color-warm-bg: #FFFFFF;
-  --color-warm-card: #F9FAFB;
-  --color-warm-stroke: #00000014;
+  --color-warm-bg: #f7fbf8;
+  --color-warm-card: #edf6f0;
+  --color-warm-stroke: #0d3b2417;
 
-  --color-dark-section: #1A1A2E;
-  --color-dark-card: #252542;
-  --color-purple-tint: #F5F3FF;
-  --color-complement: #10B981;
-  --color-complement-light: #D1FAE5;
-  /* #1167 (UX-H1) — white text on bg-complement (#10B981) measures 2.54:1,
-     below the 4.5:1 AA floor (verify CTA). This darker teal measures
-     ~5.49:1. Same value in both themes, mirroring --color-complement
-     itself (defined once here, not redefined per-theme below). */
-  --color-complement-dark: #047857;
-  /* #1189 — --color-complement (#10B981) used directly as TEXT measures
-     ~2.54:1 against light-theme backgrounds, below the 4.5:1 AA floor (the
-     dark-theme use as text is fine, ~7.8:1). Unlike --color-complement-dark
+  --color-dark-section: #0d2b1d;
+  --color-dark-card: #123526;
+  --color-purple-tint: #dff0e6;
+  --color-complement: oklch(.55 .1 225);
+  --color-complement-light: oklch(.94 .035 225);
+  /* #1167 (UX-H1) — the fill for white text on a solid complement surface
+     (verify CTA); the base --color-complement is too light for that at AA.
+     Same value in both themes, mirroring --color-complement itself.
+     #1206 — the complement family moved from emerald teal to slate blue so
+     verification reads as distinct from the jade brand accent; teal sat too
+     close to jade to signal cryptographic trust. */
+  --color-complement-dark: oklch(.42 .09 228);
+  /* #1189 — --color-complement used directly as TEXT does not clear the
+     4.5:1 AA floor against light-theme backgrounds. Unlike --color-complement-dark
      above (a fixed value for the white-on-solid-fill CTA case), this is
      THEME-AWARE — light value below, dark value re-declared to the base
      teal in [data-theme="dark"]. Use this for complement-colored text/icon
      strokes; never for fills, tints, or borders (those keep --color-complement
      / --color-complement-light / --color-complement-dark unchanged). */
-  --color-complement-text: #0B835C;
+  --color-complement-text: oklch(.48 .1 228);
   /* #1189 follow-up — a hover state must be a legitimate text color that
      clears AA in its own theme, not --color-complement-light (a translucent
      BACKGROUND tint that renders near-invisible as text: pale mint on white
@@ -52,14 +53,14 @@ html[lang="en"] [data-document-locale="es"] {
      light surfaces, so a light-theme hover can only move DARKER (still
      4.5:1+, with room to spare); dark theme has headroom to move LIGHTER
      instead (brighten-on-hover), re-declared in [data-theme="dark"] below. */
-  --color-complement-text-hover: #085E41;
+  --color-complement-text-hover: oklch(.38 .09 228);
 
-  --color-terminal-green: #16A34A;
-  --color-terminal-red: #DC2626;
-  --color-terminal-yellow: #D97706;
-  --color-terminal-dim: #9CA3AF;
+  --color-terminal-green: oklch(.55 .13 145);
+  --color-terminal-red: oklch(.55 .19 25);
+  --color-terminal-yellow: oklch(.62 .13 78);
+  --color-terminal-dim: #93a89d;
 
-  --color-track: #0000000F;
+  --color-track: #0d3b2414;
 
   --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.06),
                  0px 1px 2px -1px rgba(0, 0, 0, 0.06),
@@ -69,25 +70,25 @@ html[lang="en"] [data-document-locale="es"] {
                        0px 4px 8px 0px rgba(0, 0, 0, 0.06);
 
   /* Dimension colors — data visualization accents for the impact dimensions */
-  --color-dimension-delivery: #22c55e;
-  --color-dimension-quality: #f97316;
-  --color-dimension-consistency: #06b6d4;
-  --color-dimension-breadth: #ec4899;
-  --color-dimension-craft: #F59E0B;
-  --color-dimension-delivery-light: #4ADE80;
-  --color-dimension-quality-light: #FB923C;
-  --color-dimension-consistency-light: #22D3EE;
-  --color-dimension-breadth-light: #F472B6;
-  --color-dimension-craft-light: #FBBF24;
+  --color-dimension-delivery: oklch(.62 .14 145);
+  --color-dimension-quality: oklch(.62 .14 50);
+  --color-dimension-consistency: oklch(.62 .14 215);
+  --color-dimension-breadth: oklch(.62 .14 330);
+  --color-dimension-craft: oklch(.62 .14 95);
+  --color-dimension-delivery-light: oklch(.75 .13 145);
+  --color-dimension-quality-light: oklch(.75 .13 50);
+  --color-dimension-consistency-light: oklch(.75 .13 215);
+  --color-dimension-breadth-light: oklch(.75 .13 330);
+  --color-dimension-craft-light: oklch(.75 .13 95);
 
   /* Archetype colors — accent color per developer archetype */
-  --color-archetype-builder: #8B5CF6;
-  --color-archetype-guardian: #EC4899;
-  --color-archetype-marathoner: #22C55E;
-  --color-archetype-polymath: #EAB308;
-  --color-archetype-balanced: #0EA5E9;
-  --color-archetype-emerging: #F97316;
-  --color-archetype-artificer: #F59E0B;
+  --color-archetype-builder: oklch(.62 .14 163);
+  --color-archetype-guardian: oklch(.62 .14 330);
+  --color-archetype-marathoner: oklch(.62 .14 145);
+  --color-archetype-polymath: oklch(.62 .14 110);
+  --color-archetype-balanced: oklch(.62 .14 240);
+  --color-archetype-emerging: oklch(.62 .14 50);
+  --color-archetype-artificer: oklch(.62 .14 75);
 
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
   --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
@@ -99,29 +100,29 @@ html[lang="en"] [data-document-locale="es"] {
 
 :root {
   /* Light palette (default) */
-  --color-bg: #FFFFFF;
-  --color-card: #F9FAFB;
-  --color-text-primary: #1A1A2E;
-  --color-text-secondary: #6B7280;
-  --color-stroke: rgba(0, 0, 0, 0.08);
+  --color-bg: #f7fbf8;
+  --color-card: #edf6f0;
+  --color-text-primary: #0b2018;
+  --color-text-secondary: #55665e;
+  --color-stroke: #0d3b2417;
 
-  --color-warm-bg: #FFFFFF;
-  --color-warm-card: #F9FAFB;
-  --color-warm-stroke: rgba(0, 0, 0, 0.08);
+  --color-warm-bg: #f7fbf8;
+  --color-warm-card: #edf6f0;
+  --color-warm-stroke: #0d3b2417;
 
-  --color-dark-section: #1A1A2E;
-  --color-dark-card: #252542;
-  --color-purple-tint: #F5F3FF;
-  --color-complement-light: #D1FAE5;
-  --color-complement-text: #0B835C;
-  --color-complement-text-hover: #085E41;
+  --color-dark-section: #0d2b1d;
+  --color-dark-card: #123526;
+  --color-purple-tint: #dff0e6;
+  --color-complement-light: oklch(.94 .035 225);
+  --color-complement-text: oklch(.48 .1 228);
+  --color-complement-text-hover: oklch(.38 .09 228);
 
-  --color-terminal-green: #16A34A;
-  --color-terminal-red: #DC2626;
-  --color-terminal-yellow: #D97706;
-  --color-terminal-dim: #9CA3AF;
+  --color-terminal-green: oklch(.55 .13 145);
+  --color-terminal-red: oklch(.55 .19 25);
+  --color-terminal-yellow: oklch(.62 .13 78);
+  --color-terminal-dim: #93a89d;
 
-  --color-track: rgba(0, 0, 0, 0.06);
+  --color-track: #0d3b2414;
 
   --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.06),
                  0px 1px 2px -1px rgba(0, 0, 0, 0.06),
@@ -130,85 +131,93 @@ html[lang="en"] [data-document-locale="es"] {
                        0px 2px 4px -1px rgba(0, 0, 0, 0.08),
                        0px 4px 8px 0px rgba(0, 0, 0, 0.06);
 
-  --color-dimension-delivery: #22c55e;
-  --color-dimension-quality: #f97316;
-  --color-dimension-consistency: #06b6d4;
-  --color-dimension-breadth: #ec4899;
-  --color-dimension-craft: #F59E0B;
-  --color-dimension-delivery-light: #4ADE80;
-  --color-dimension-quality-light: #FB923C;
-  --color-dimension-consistency-light: #22D3EE;
-  --color-dimension-breadth-light: #F472B6;
-  --color-dimension-craft-light: #FBBF24;
+  --color-dimension-delivery: oklch(.62 .14 145);
+  --color-dimension-quality: oklch(.62 .14 50);
+  --color-dimension-consistency: oklch(.62 .14 215);
+  --color-dimension-breadth: oklch(.62 .14 330);
+  --color-dimension-craft: oklch(.62 .14 95);
+  --color-dimension-delivery-light: oklch(.75 .13 145);
+  --color-dimension-quality-light: oklch(.75 .13 50);
+  --color-dimension-consistency-light: oklch(.75 .13 215);
+  --color-dimension-breadth-light: oklch(.75 .13 330);
+  --color-dimension-craft-light: oklch(.75 .13 95);
 
-  --color-archetype-builder: #8B5CF6;
-  --color-archetype-guardian: #EC4899;
-  --color-archetype-marathoner: #22C55E;
-  --color-archetype-polymath: #EAB308;
-  --color-archetype-balanced: #0EA5E9;
-  --color-archetype-emerging: #F97316;
-  --color-archetype-artificer: #F59E0B;
+  --color-archetype-builder: oklch(.62 .14 163);
+  --color-archetype-guardian: oklch(.62 .14 330);
+  --color-archetype-marathoner: oklch(.62 .14 145);
+  --color-archetype-polymath: oklch(.62 .14 110);
+  --color-archetype-balanced: oklch(.62 .14 240);
+  --color-archetype-emerging: oklch(.62 .14 50);
+  --color-archetype-artificer: oklch(.62 .14 75);
 }
 
 [data-theme="dark"] {
-  --color-bg: #0A0A0F;
-  --color-card: #111118;
-  --color-text-primary: #E2E4E9;
-  --color-text-secondary: #8B8FA0;
-  --color-stroke: rgba(139, 92, 246, 0.10);
+  /* Jade (#1206) — the accent had NO dark override under the violet palette
+     (it was one value for both themes). Forest surfaces need a brighter jade
+     to stay legible, so the accent family is theme-aware from here on. */
+  --color-amber: oklch(.76 .16 163);
+  --color-amber-light: oklch(.84 .14 163);
+  --color-amber-dark: oklch(.58 .14 165);
+  --color-complement: oklch(.7 .11 225);
 
-  --color-warm-bg: #0A0A0F;
-  --color-warm-card: #111118;
-  --color-warm-stroke: rgba(139, 92, 246, 0.10);
+  --color-bg: #08170f;
+  --color-card: #0f2419;
+  --color-text-primary: #dfeae4;
+  --color-text-secondary: #8ba398;
+  --color-stroke: #7dffbc1f;
 
-  --color-dark-section: #06060A;
-  --color-dark-card: #0E0E16;
-  --color-purple-tint: rgba(139, 92, 246, 0.06);
-  --color-complement-light: rgba(16, 185, 129, 0.15);
+  --color-warm-bg: #08170f;
+  --color-warm-card: #0f2419;
+  --color-warm-stroke: #7dffbc1f;
+
+  --color-dark-section: #050f0a;
+  --color-dark-card: #0c1f15;
+  --color-purple-tint: oklch(.76 .16 163 / .1);
+  --color-complement-light: oklch(.7 .11 225 / .16);
   /* #1189 — dark-theme text value is the same bright teal as the base
      --color-complement (already ~7.8:1 against dark backgrounds — fine
      as text). Re-declared here (not just left to inherit @theme's light
      default) so the token is genuinely theme-aware like every other
      per-theme color in this block. */
-  --color-complement-text: #10B981;
+  --color-complement-text: oklch(.76 .11 222);
   /* #1189 follow-up — dark theme has contrast headroom to move LIGHTER on
      hover (brighten), the opposite direction from light theme's DARKER
      hover above — both directions increase contrast against their own
      background, which is what makes hover a legible, visible change. */
-  --color-complement-text-hover: #14EBA4;
+  --color-complement-text-hover: oklch(.84 .1 220);
 
-  --color-terminal-green: #4ADE80;
-  --color-terminal-red: #F87171;
-  --color-terminal-yellow: #FBBF24;
-  --color-terminal-dim: #4A4A5E;
+  --color-terminal-green: oklch(.8 .16 148);
+  --color-terminal-red: oklch(.72 .17 25);
+  --color-terminal-yellow: oklch(.82 .13 85);
+  --color-terminal-dim: #42574c;
 
-  --color-track: rgba(255, 255, 255, 0.06);
+  --color-track: #7dffbc14;
 
-  --shadow-card: 0px 0px 0px 1px rgba(139, 92, 246, 0.08),
+  --shadow-card: 0px 0px 0px 1px color-mix(in oklab, var(--color-amber) 8%, transparent),
                  0px 1px 2px -1px rgba(0, 0, 0, 0.20),
                  0px 2px 4px 0px rgba(0, 0, 0, 0.15);
-  --shadow-card-hover: 0px 0px 0px 1px rgba(139, 92, 246, 0.12),
+  --shadow-card-hover: 0px 0px 0px 1px color-mix(in oklab, var(--color-amber) 12%, transparent),
                        0px 2px 4px -1px rgba(0, 0, 0, 0.25),
                        0px 4px 8px 0px rgba(0, 0, 0, 0.20);
 
-  --color-dimension-delivery: #22c55e;
-  --color-dimension-quality: #f97316;
-  --color-dimension-consistency: #06b6d4;
-  --color-dimension-breadth: #ec4899;
-  --color-dimension-craft: #F59E0B;
-  --color-dimension-delivery-light: #4ADE80;
-  --color-dimension-quality-light: #FB923C;
-  --color-dimension-consistency-light: #22D3EE;
-  --color-dimension-breadth-light: #F472B6;
-  --color-dimension-craft-light: #FBBF24;
+  --color-dimension-delivery: oklch(.72 .14 145);
+  --color-dimension-quality: oklch(.72 .14 50);
+  --color-dimension-consistency: oklch(.72 .14 215);
+  --color-dimension-breadth: oklch(.72 .14 330);
+  --color-dimension-craft: oklch(.72 .14 95);
+  --color-dimension-delivery-light: oklch(.8 .13 145);
+  --color-dimension-quality-light: oklch(.8 .13 50);
+  --color-dimension-consistency-light: oklch(.8 .13 215);
+  --color-dimension-breadth-light: oklch(.8 .13 330);
+  --color-dimension-craft-light: oklch(.8 .13 95);
 
-  --color-archetype-builder: #8B5CF6;
-  --color-archetype-guardian: #EC4899;
-  --color-archetype-marathoner: #22C55E;
-  --color-archetype-polymath: #EAB308;
-  --color-archetype-balanced: #0EA5E9;
-  --color-archetype-emerging: #F97316;
-  --color-archetype-artificer: #F59E0B;
+  --color-archetype-builder: oklch(.62 .14 163);
+  --color-archetype-guardian: oklch(.62 .14 330);
+  --color-archetype-marathoner: oklch(.62 .14 145);
+  --color-archetype-polymath: oklch(.62 .14 110);
+  --color-archetype-balanced: oklch(.62 .14 240);
+  --color-archetype-emerging: oklch(.62 .14 50);
+  --color-archetype-artificer: oklch(.62 .14 75);
 }
 
 html {
@@ -288,10 +297,10 @@ html {
 @keyframes pulse-glow-amber {
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
+    box-shadow: 0 0 20px color-mix(in oklab, var(--color-amber) 10%, transparent);
   }
   50% {
-    box-shadow: 0 0 40px rgba(139, 92, 246, 0.18);
+    box-shadow: 0 0 40px color-mix(in oklab, var(--color-amber) 18%, transparent);
   }
 }
 
@@ -488,10 +497,10 @@ html {
 
 [data-theme="dark"] .bg-grid-warm {
   background-image: linear-gradient(
-      rgba(139, 92, 246, 0.04) 1px,
+      color-mix(in oklab, var(--color-amber) 4%, transparent) 1px,
       transparent 1px
     ),
-    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
+    linear-gradient(90deg, color-mix(in oklab, var(--color-amber) 4%, transparent) 1px, transparent 1px);
 }
 
 /* ── Focus indicators (accessibility) ────────────────────── */
@@ -569,10 +578,10 @@ nav [aria-current="page"],
 }
 
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.15);
+  background: color-mix(in oklab, var(--color-amber) 15%, transparent);
 }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.25);
+  background: color-mix(in oklab, var(--color-amber) 25%, transparent);
 }
 
 /* ── Collapsible panel (grid-row height transition) ──── */

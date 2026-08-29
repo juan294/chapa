@@ -70,11 +70,11 @@ function buildHtml(handle: string, reason: string, shareUrl: string): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#0A0A0F;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#08170F;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#08170F;padding:32px 16px;">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#111118;border-radius:12px;border:1px solid rgba(139,92,246,0.15);overflow:hidden;">
-        <tr><td style="background:linear-gradient(135deg,#8B5CF6 0%,#7C3AED 100%);padding:20px 32px;">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#0F2419;border-radius:12px;border:1px solid rgba(27,208,147,0.15);overflow:hidden;">
+        <tr><td style="background:linear-gradient(135deg,#1BD093 0%,#009365 100%);padding:20px 32px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="font-family:'Courier New',monospace;font-size:20px;font-weight:700;color:#FFFFFF;letter-spacing:2px;">CHAPA</td>
@@ -84,13 +84,13 @@ function buildHtml(handle: string, reason: string, shareUrl: string): string {
         </td></tr>
         <tr><td style="padding:32px;">
           <div style="font-size:22px;font-weight:700;color:#E2E4E9;font-family:'Courier New',monospace;margin-bottom:4px;">@${safeHandle}</div>
-          <a href="${safeShareUrl}" style="font-size:13px;color:#8B5CF6;">${safeShareUrl}</a>
-          <div style="margin-top:24px;padding:16px;background:#0A0A0F;border-radius:8px;border:1px solid rgba(139,92,246,0.10);">
+          <a href="${safeShareUrl}" style="font-size:13px;color:#1BD093;">${safeShareUrl}</a>
+          <div style="margin-top:24px;padding:16px;background:#08170F;border-radius:8px;border:1px solid rgba(27,208,147,0.10);">
             <div style="font-size:11px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Developer's concern</div>
             <div style="font-size:14px;color:#E2E4E9;line-height:1.6;">${safeReason}</div>
           </div>
         </td></tr>
-        <tr><td style="padding:16px 32px;border-top:1px solid rgba(139,92,246,0.10);">
+        <tr><td style="padding:16px 32px;border-top:1px solid rgba(27,208,147,0.10);">
           <div style="font-size:11px;color:#3A3A4A;">Sent via 'Something seem off?' in the score explanation panel.</div>
         </td></tr>
       </table>

@@ -159,8 +159,36 @@ describe("globals.css", () => {
       return match[1]!.trim();
     }
 
-    function hexToRgb(hex: string): [number, number, number] {
-      const clean = hex.replace("#", "");
+    // #1206 — the Jade palette authors most color tokens in oklch, so the
+    // contrast check has to read both formats. Same WCAG math as before; only
+    // the parsing widened. Alpha is ignored: every token these tests measure is
+    // opaque text, and a translucent one would need its backdrop composited.
+    function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
+      const h = (H * Math.PI) / 180;
+      const a = C * Math.cos(h);
+      const bb = C * Math.sin(h);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * bb) ** 3;
+      const m = (L - 0.1055613458 * a - 0.0638541728 * bb) ** 3;
+      const s2 = (L - 0.0894841775 * a - 1.291485548 * bb) ** 3;
+      const lin = [
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s2,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s2,
+        -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s2,
+      ];
+      return lin.map((x) => {
+        const v = x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055;
+        return Math.max(0, Math.min(255, Math.round(v * 255)));
+      }) as [number, number, number];
+    }
+
+    function hexToRgb(value: string): [number, number, number] {
+      const ok = value.trim().match(
+        /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/i,
+      );
+      if (ok) {
+        return oklchToRgb(Number(ok[1]), Number(ok[2]), Number(ok[3]));
+      }
+      const clean = value.replace("#", "");
       return [
         parseInt(clean.slice(0, 2), 16),
         parseInt(clean.slice(2, 4), 16),
@@ -203,26 +231,29 @@ describe("globals.css", () => {
     it("light-theme value clears 4.5:1 (AA normal text) against both light surfaces", () => {
       const rootBlock = SOURCE.match(/:root\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
       const lightValue = extractTokenValue(rootBlock);
-      expect(contrastRatio(lightValue, "#FFFFFF")).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(lightValue, "#F9FAFB")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(lightValue, "#f7fbf8")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(lightValue, "#edf6f0")).toBeGreaterThanOrEqual(4.5);
     });
 
     it("dark-theme value clears 4.5:1 (AA normal text) against both dark surfaces", () => {
       const darkBlock =
         SOURCE.match(/\[data-theme="dark"\]\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
       const darkValue = extractTokenValue(darkBlock);
-      expect(contrastRatio(darkValue, "#0A0A0F")).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(darkValue, "#111118")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(darkValue, "#08170F")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(darkValue, "#0F2419")).toBeGreaterThanOrEqual(4.5);
     });
 
-    it("does not redefine --color-complement itself (fill/tint/border usages must not shift hue)", () => {
+    it("keeps --color-complement out of :root but theme-aware in dark (#1206)", () => {
       const rootBlock = SOURCE.match(/:root\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
       const darkBlock =
         SOURCE.match(/\[data-theme="dark"\]\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
-      // --color-complement is intentionally defined once (in @theme only —
-      // same value in both themes), not redefined per-theme here.
+      // Under the violet palette --color-complement was one value for both
+      // themes, defined only in @theme. Jade (#1206) makes the complement
+      // family theme-aware: the light value still comes from @theme (so :root
+      // must not restate it), while the dark block carries a brighter slate
+      // blue that stays legible on forest surfaces.
       expect(rootBlock).not.toMatch(/--color-complement:\s*/);
-      expect(darkBlock).not.toMatch(/--color-complement:\s*/);
+      expect(darkBlock).toMatch(/--color-complement:\s*oklch\(/);
     });
   });
 
@@ -244,8 +275,36 @@ describe("globals.css", () => {
       return match[1]!.trim();
     }
 
-    function hexToRgb(hex: string): [number, number, number] {
-      const clean = hex.replace("#", "");
+    // #1206 — the Jade palette authors most color tokens in oklch, so the
+    // contrast check has to read both formats. Same WCAG math as before; only
+    // the parsing widened. Alpha is ignored: every token these tests measure is
+    // opaque text, and a translucent one would need its backdrop composited.
+    function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
+      const h = (H * Math.PI) / 180;
+      const a = C * Math.cos(h);
+      const bb = C * Math.sin(h);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * bb) ** 3;
+      const m = (L - 0.1055613458 * a - 0.0638541728 * bb) ** 3;
+      const s2 = (L - 0.0894841775 * a - 1.291485548 * bb) ** 3;
+      const lin = [
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s2,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s2,
+        -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s2,
+      ];
+      return lin.map((x) => {
+        const v = x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055;
+        return Math.max(0, Math.min(255, Math.round(v * 255)));
+      }) as [number, number, number];
+    }
+
+    function hexToRgb(value: string): [number, number, number] {
+      const ok = value.trim().match(
+        /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/i,
+      );
+      if (ok) {
+        return oklchToRgb(Number(ok[1]), Number(ok[2]), Number(ok[3]));
+      }
+      const clean = value.replace("#", "");
       return [
         parseInt(clean.slice(0, 2), 16),
         parseInt(clean.slice(2, 4), 16),
@@ -288,16 +347,16 @@ describe("globals.css", () => {
     it("light-theme hover value clears 4.5:1 (AA normal text) against both light surfaces", () => {
       const rootBlock = SOURCE.match(/:root\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
       const hoverValue = extractTokenValue(rootBlock, TOKEN);
-      expect(contrastRatio(hoverValue, "#FFFFFF")).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(hoverValue, "#F9FAFB")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(hoverValue, "#f7fbf8")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(hoverValue, "#edf6f0")).toBeGreaterThanOrEqual(4.5);
     });
 
     it("dark-theme hover value clears 4.5:1 (AA normal text) against both dark surfaces", () => {
       const darkBlock =
         SOURCE.match(/\[data-theme="dark"\]\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
       const hoverValue = extractTokenValue(darkBlock, TOKEN);
-      expect(contrastRatio(hoverValue, "#0A0A0F")).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(hoverValue, "#111118")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(hoverValue, "#08170F")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(hoverValue, "#0F2419")).toBeGreaterThanOrEqual(4.5);
     });
 
     it("hover is a visibly different color from rest in both themes (not a contrast-neutral swap)", () => {
@@ -315,13 +374,13 @@ describe("globals.css", () => {
       // Light theme hover moves DARKER (rest is already the lightest value
       // that clears AA, so hover has nowhere to go but darker — verified as
       // a strictly higher contrast ratio against the white surface).
-      expect(contrastRatio(lightHover, "#FFFFFF")).toBeGreaterThan(
-        contrastRatio(lightRest, "#FFFFFF"),
+      expect(contrastRatio(lightHover, "#f7fbf8")).toBeGreaterThan(
+        contrastRatio(lightRest, "#f7fbf8"),
       );
       // Dark theme hover moves LIGHTER/brighter (headroom to spare), which
       // also strictly increases contrast against the dark surface.
-      expect(contrastRatio(darkHover, "#0A0A0F")).toBeGreaterThan(
-        contrastRatio(darkRest, "#0A0A0F"),
+      expect(contrastRatio(darkHover, "#08170F")).toBeGreaterThan(
+        contrastRatio(darkRest, "#08170F"),
       );
     });
   });

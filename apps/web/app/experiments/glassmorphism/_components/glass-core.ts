@@ -15,7 +15,7 @@ export function glassStyle(config: GlassConfig): React.CSSProperties {
     backdropFilter: `blur(${config.blur}px) saturate(${config.saturation}%)`,
     WebkitBackdropFilter: `blur(${config.blur}px) saturate(${config.saturation}%)`,
     border: config.showBorder
-      ? `1px solid rgba(139, 92, 246, ${config.borderOpacity})`
+      ? `1px solid rgba(27, 208, 147, ${config.borderOpacity})`
       : "1px solid transparent",
   };
 }
@@ -72,13 +72,13 @@ export function presetToStyle(variant: GlassVariant, showBorder: boolean): React
     backdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
     WebkitBackdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
     border: showBorder
-      ? `1px solid rgba(139, 92, 246, ${p.borderOpacity})`
+      ? `1px solid rgba(27, 208, 147, ${p.borderOpacity})`
       : "1px solid transparent",
   };
 
   // Amber variant uses amber-tinted background
   if (variant === "amber") {
-    base.background = `rgba(139, 92, 246, ${p.bgOpacity})`;
+    base.background = `rgba(27, 208, 147, ${p.bgOpacity})`;
   } else {
     base.background = `rgba(19, 20, 30, ${p.bgOpacity})`;
   }

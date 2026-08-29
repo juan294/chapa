@@ -59,7 +59,7 @@ describe("buildAnnouncementHtml", () => {
 
     expect(html).toContain('href="https://chapa.thecreativetoken.com"');
     expect(html).toContain("See What");
-    expect(html).toContain("background:#8B5CF6");
+    expect(html).toContain("background:#1BD093");
   });
 
   it("includes unsubscribe link in footer", () => {
@@ -102,8 +102,8 @@ describe("buildAnnouncementHtml", () => {
   it("uses dark theme colors", () => {
     const html = buildAnnouncementHtml(sampleData);
 
-    expect(html).toContain("#0A0A0F"); // dark background
-    expect(html).toContain("#8B5CF6"); // purple accent
+    expect(html).toContain("#08170F"); // dark background
+    expect(html).toContain("#1BD093"); // purple accent
     expect(html).toContain("CHAPA_"); // logo
   });
 
@@ -119,7 +119,7 @@ describe("buildAnnouncementHtml", () => {
     expect(html).toContain("Just a single paragraph.");
     // Should not have the thicker divider that only appears for multi-paragraph
     // (multiple paragraphs get a 0.40 opacity divider around the first paragraph)
-    const dividerCount = (html.match(/rgba\(139,92,246,0\.40\)/g) || []).length;
+    const dividerCount = (html.match(/rgba\(27,208,147,0\.40\)/g) || []).length;
     expect(dividerCount).toBe(0);
   });
 
@@ -134,7 +134,7 @@ describe("buildAnnouncementHtml", () => {
     expect(html).toContain("Second paragraph.");
     expect(html).toContain("Third paragraph.");
     // The 0.40 opacity dividers appear around the first paragraph only
-    const dividerCount = (html.match(/rgba\(139,92,246,0\.40\)/g) || []).length;
+    const dividerCount = (html.match(/rgba\(27,208,147,0\.40\)/g) || []).length;
     expect(dividerCount).toBe(2); // one before, one after first paragraph
   });
 
