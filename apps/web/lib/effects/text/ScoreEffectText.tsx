@@ -13,7 +13,7 @@ export type ScoreEffect =
 export const SCORE_EFFECT_CSS = `
 .te-gold-leaf {
   display: inline-block;
-  background: linear-gradient(to bottom, #1E1645 0%, #6355C0 22%, #A99BFF 45%, #D0C9FF 50%, #A99BFF 55%, #6355C0 78%, #1E1645 100%);
+  background: linear-gradient(to bottom, #1E1645 0%, #6355C0 22%, #65E7B0 45%, #B4F6D5 50%, #65E7B0 55%, #6355C0 78%, #1E1645 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -36,7 +36,7 @@ export const SCORE_EFFECT_CSS = `
 
 .te-gold-shimmer {
   display: inline-block;
-  background: linear-gradient(90deg, #009365 0%, #1BD093 20%, #A99BFF 40%, #D0C9FF 50%, #A99BFF 60%, #1BD093 80%, #009365 100%);
+  background: linear-gradient(90deg, #009365 0%, #1BD093 20%, #65E7B0 40%, #B4F6D5 50%, #65E7B0 60%, #1BD093 80%, #009365 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -56,7 +56,7 @@ export const SCORE_EFFECT_CSS = `
 
 .te-holographic {
   display: inline-block;
-  background: linear-gradient(90deg, #009365, #1BD093, #A99BFF, #65E7B0, #1BD093, #A99BFF, #009365);
+  background: linear-gradient(90deg, #009365, #1BD093, #65E7B0, #65E7B0, #1BD093, #65E7B0, #009365);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

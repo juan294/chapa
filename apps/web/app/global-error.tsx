@@ -28,10 +28,10 @@ export default function GlobalError({
         */}
         <style>{`
           .global-error-body { background-color: #FFFFFF; color: #0D2B1D; }
-          .global-error-subtext { color: #6B7280; }
+          .global-error-subtext { color: #55665E; }
           @media (prefers-color-scheme: dark) {
-            .global-error-body { background-color: #08170F; color: #E2E4E9; }
-            .global-error-subtext { color: #8B8FA0; }
+            .global-error-body { background-color: #08170F; color: #DFEAE4; }
+            .global-error-subtext { color: #8BA398; }
           }
         `}</style>
       </head>
@@ -109,7 +109,7 @@ export default function GlobalError({
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#8B8FA0",
+                color: "#8BA398",
                 textDecoration: "none",
                 cursor: "pointer",
               }}

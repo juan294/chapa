@@ -51,15 +51,19 @@ describe("tierPillClasses (exhaustive)", () => {
     expect(unique.size).toBe(4);
   });
 
-  it("Emerging tier uses rgba background and secondary text", () => {
+  it("Emerging tier uses token-based background and secondary text", () => {
     const classes = tierPillClasses("Emerging");
-    expect(classes).toContain("bg-[rgba(107,114,128,0.08)]");
+    // #1206 — token utilities, not hardcoded rgba: these now track the theme,
+    // matching the High/Elite cases that already used bg-amber/10.
+    expect(classes).toContain("bg-text-secondary/[0.08]");
+    expect(classes).toContain("border-text-secondary/20");
     expect(classes).toContain("text-text-secondary");
   });
 
-  it("Solid tier uses primary text color", () => {
+  it("Solid tier uses token-based background and primary text", () => {
     const classes = tierPillClasses("Solid");
-    expect(classes).toContain("bg-[rgba(26,26,46,0.06)]");
+    expect(classes).toContain("bg-text-primary/[0.06]");
+    expect(classes).toContain("border-text-primary/15");
     expect(classes).toContain("text-text-primary");
   });
 

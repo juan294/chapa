@@ -352,9 +352,9 @@ export default function TextEffectsExperimentPage() {
             to bottom,
             #1E1645 0%,
             #6355C0 22%,
-            #A99BFF 45%,
-            #D0C9FF 50%,
-            #A99BFF 55%,
+            #65E7B0 45%,
+            #B4F6D5 50%,
+            #65E7B0 55%,
             #6355C0 78%,
             #1E1645 100%
           );
@@ -412,9 +412,9 @@ export default function TextEffectsExperimentPage() {
             90deg,
             var(--color-amber-dark) 0%,
             var(--color-amber) 20%,
-            #A99BFF 40%,
-            #D0C9FF 50%,
-            #A99BFF 60%,
+            #65E7B0 40%,
+            #B4F6D5 50%,
+            #65E7B0 60%,
             var(--color-amber) 80%,
             var(--color-amber-dark) 100%
           );

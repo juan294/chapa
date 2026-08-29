@@ -5,9 +5,9 @@ import type { ImpactTier } from "@chapa/shared";
 export function tierPillClasses(tier: ImpactTier): string {
   switch (tier) {
     case "Emerging":
-      return "bg-[rgba(107,114,128,0.08)] border-[rgba(107,114,128,0.20)] text-text-secondary";
+      return "bg-text-secondary/[0.08] border-text-secondary/20 text-text-secondary";
     case "Solid":
-      return "bg-[rgba(26,26,46,0.06)] border-[rgba(26,26,46,0.15)] text-text-primary";
+      return "bg-text-primary/[0.06] border-text-primary/15 text-text-primary";
     case "High":
       return "bg-amber/10 border-amber/25 text-amber";
     case "Elite":
@@ -17,14 +17,14 @@ export function tierPillClasses(tier: ImpactTier): string {
 
 /** CSS for tier-specific visual treatments. Inject once in the page. */
 export const TIER_VISUALS_CSS = `
-.tier-score-emerging { color: #6B7280; }
+.tier-score-emerging { color: #55665E; }
 .tier-score-solid { color: #0D2B1D; text-shadow: none; }
 .tier-score-high {
   background: linear-gradient(135deg, #009365, #1BD093, #65E7B0, #1BD093, #009365);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 .tier-score-elite {
-  background: linear-gradient(90deg, #009365, #1BD093, #A99BFF, #D0C9FF, #A99BFF, #1BD093, #009365);
+  background: linear-gradient(90deg, #009365, #1BD093, #65E7B0, #B4F6D5, #65E7B0, #1BD093, #009365);
   background-size: 200% 100%;
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   animation: tier-shimmer 3s ease-in-out infinite;

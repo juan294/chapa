@@ -147,3 +147,107 @@ upstream change to the skill, not a repo-local override.
 the synced components are jade while a badge rendered next to them is violet.
 This is deliberate and documented in `docs/design-system.md`; the conventions
 header states it too, so the design agent does not try to reconcile them.
+
+## Re-sync 2026-08-29 (second) — anchor semantics, learned the hard way
+
+**`renderHashes` cover component markup, NOT styling.** The pre-Jade and
+post-Jade anchors have byte-identical `renderHashes` for all 12 components; the
+only field the palette moved was `styleSha`. So "renderHashes match" never means
+"the cards look the same" — a full restyle leaves them untouched. Judge a
+styling change by `styleSha`, and expect the driver to re-verify everything
+anyway (it does, correctly, because `styleSha` feeds the verification partition).
+
+**Verify the anchor after uploading it.** On the Jade sync a `get_file` of
+`_ds_sync.json` came back with the pre-Jade `styleSha` even though the write had
+returned success. Re-uploading and re-reading showed the correct value, so it
+was either a stale read or a write that did not land. Either way the check is
+cheap and the failure mode is expensive: an anchor that vouches for content the
+project does not have makes the next sync skip components that actually need
+re-uploading. **Always `get_file` the anchor after the final write and compare
+`styleSha` against the local `ds-bundle/_ds_sync.json`.**
+
+**A converter upgrade invalidates the anchor wholesale.** Moving the staged
+scripts from skill 2.1.247 to 2.1.251 made the driver report all 12 components
+as `added` rather than `unchanged`, so everything re-verified and re-uploaded.
+That is correct and safe, just slow. Re-copy the staged scripts on every
+re-sync (the skill says so) and expect a full pass whenever the skill version
+moves.
+
+**The chunk hash was stable this time.** Same source CSS produced the same
+`2du_gthg_lwp4.css`, so the regeneration step is a no-op when nothing changed.
+It still has to run: the step is cheap and the failure is silent.
+
+## Palette-migration sweep: grep for decimal rgba, not only hex (#1206)
+
+A palette migration leaves stale colour literals in app source. A hex-only
+grep does not find all of them. Two gaps caused 63 missed values in the Jade
+migration:
+
+1. **Decimal `rgba()` form.** Tailwind arbitrary utilities carry the colour as
+   a decimal triple, so `#1a1a2e` appears as `rgba(26,26,46,0.15)`. A grep for
+   `1a1a2e` matches nothing. Convert every retired hex to its decimal triple
+   and grep for both forms.
+2. **The handoff's hex list is not the full token set.** The Jade handoff
+   listed the surface and accent values only. It omitted every text and dim
+   value (`#6b7280`, `#9ca3af`, `#e2e4e9`, `#8b8fa0`, `#4a4a5e`). Build the
+   sweep list from the *previous* `globals.css`, not from the handoff.
+
+Sweep recipe:
+
+    # every value in the pre-migration globals.css, both notations
+    git show <pre-migration-ref>:apps/web/styles/globals.css \
+      | grep -oE '#[0-9a-fA-F]{6}' | sort -u
+
+Then, for each hex, also grep the decimal triple: `(26,26,46)`, `(107,114,128)`.
+
+Two exclusions when applying replacements:
+
+- **`.test.` files.** Fix the source first, then read each failing assertion
+  and update it deliberately. A blanket regex over test files rewrites
+  expectations instead of code, which hides regressions.
+- **Badge-owned paths** (`apps/web/lib/render/`, `apps/web/app/u/`,
+  `apps/web/app/og-image/`). The badge SVG is a theme-independent asset on its
+  own fixed `#0C0D14` canvas. Its literals are correct and must not move with
+  the app palette.
+
+Prefer a token over a corrected literal. `bg-[rgba(26,26,46,0.06)]` became
+`bg-text-primary/[0.06]`, which fixes a latent bug: the hardcoded form did not
+track the theme.
+
+## Emit a token manifest so `--tw-*` engine variables stay out of registration
+
+Claude Design reports that `--tw-*` Tailwind engine variables reach its token
+registration, and that annotating them after each sync does not survive the
+next sync. Measured on this side:
+
+- `ds-bundle/tokens/` ships **empty**. The converter fills it only from
+  `cfg.tokensPkg`, which reads a `node_modules` package. Chapa keeps its tokens
+  inline in `apps/web/styles/globals.css`, so nothing is copied. The
+  `src.tokensCss` fallback at `package-build.mjs:486` is never populated for
+  the package shape.
+- `styles.css` is one line: `@import "./_ds_bundle.css";`. That file holds
+  **196** custom properties: **43** `--color-*` design tokens next to **71**
+  `--tw-*` engine variables, each with its own `@property` block.
+
+With no manifest, the only palette source in the upload is the file that mixes
+both. That matches the symptom.
+
+`--tw-*` cannot be stripped from `_ds_bundle.css`. Utilities dereference the
+variables at runtime, and the 71 `@property` blocks set their initial values
+and types. Removing them breaks rendering of every component.
+
+`.design-sync/emit-tokens.mjs` writes `ds-bundle/tokens/chapa-tokens.css`
+instead: `@theme`, `:root` and `[data-theme="dark"]` custom properties only,
+126 declarations, zero `--tw-*`. Run it after the build, before upload:
+
+    node .ds-sync/package-build.mjs
+    node .design-sync/emit-tokens.mjs      # fills the otherwise-empty tokens/
+    # then upload
+
+The file regenerates from `globals.css`, so a later palette change carries
+through with no hand editing.
+
+Open with Claude Design: whether registration prefers `tokens/*.css` over
+scraping `styles.css`'s import closure. If it does not, the exclusion has to
+happen in registration, because the upload cannot separate the two sources any
+further than this.

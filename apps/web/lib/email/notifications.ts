@@ -139,7 +139,7 @@ function dimensionBar(label: string, value: number): string {
           <div style="background:#1BD093;height:8px;border-radius:4px;width:${pct}%;"></div>
         </div>
       </td>
-      <td style="padding:4px 0 4px 8px;color:#E2E4E9;font-size:13px;font-weight:600;text-align:right;">${value}</td>
+      <td style="padding:4px 0 4px 8px;color:#DFEAE4;font-size:13px;font-weight:600;text-align:right;">${value}</td>
     </tr>`;
 }
 
@@ -169,7 +169,7 @@ function buildHtml(data: EmailData): string {
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
             <tr>
               <td>
-                <div style="font-size:22px;font-weight:700;color:#E2E4E9;font-family:'Courier New',monospace;">@${data.handle}</div>
+                <div style="font-size:22px;font-weight:700;color:#DFEAE4;font-family:'Courier New',monospace;">@${data.handle}</div>
                 <div style="font-size:14px;color:#1BD093;margin-top:4px;font-weight:600;">${data.archetype} &middot; ${data.tier} Tier</div>
               </td>
             </tr>
@@ -183,7 +183,7 @@ function buildHtml(data: EmailData): string {
                 <div style="font-size:11px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;">Adjusted</div>
               </td>
               <td align="center" style="padding:16px;border-right:1px solid rgba(27,208,147,0.10);">
-                <div style="font-size:28px;font-weight:700;color:#E2E4E9;">${data.compositeScore}</div>
+                <div style="font-size:28px;font-weight:700;color:#DFEAE4;">${data.compositeScore}</div>
                 <div style="font-size:11px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;">Composite</div>
               </td>
               <td align="center" style="padding:16px;">
