@@ -147,3 +147,32 @@ upstream change to the skill, not a repo-local override.
 the synced components are jade while a badge rendered next to them is violet.
 This is deliberate and documented in `docs/design-system.md`; the conventions
 header states it too, so the design agent does not try to reconcile them.
+
+## Re-sync 2026-08-29 (second) — anchor semantics, learned the hard way
+
+**`renderHashes` cover component markup, NOT styling.** The pre-Jade and
+post-Jade anchors have byte-identical `renderHashes` for all 12 components; the
+only field the palette moved was `styleSha`. So "renderHashes match" never means
+"the cards look the same" — a full restyle leaves them untouched. Judge a
+styling change by `styleSha`, and expect the driver to re-verify everything
+anyway (it does, correctly, because `styleSha` feeds the verification partition).
+
+**Verify the anchor after uploading it.** On the Jade sync a `get_file` of
+`_ds_sync.json` came back with the pre-Jade `styleSha` even though the write had
+returned success. Re-uploading and re-reading showed the correct value, so it
+was either a stale read or a write that did not land. Either way the check is
+cheap and the failure mode is expensive: an anchor that vouches for content the
+project does not have makes the next sync skip components that actually need
+re-uploading. **Always `get_file` the anchor after the final write and compare
+`styleSha` against the local `ds-bundle/_ds_sync.json`.**
+
+**A converter upgrade invalidates the anchor wholesale.** Moving the staged
+scripts from skill 2.1.247 to 2.1.251 made the driver report all 12 components
+as `added` rather than `unchanged`, so everything re-verified and re-uploaded.
+That is correct and safe, just slow. Re-copy the staged scripts on every
+re-sync (the skill says so) and expect a full pass whenever the skill version
+moves.
+
+**The chunk hash was stable this time.** Same source CSS produced the same
+`2du_gthg_lwp4.css`, so the regeneration step is a no-op when nothing changed.
+It still has to run: the step is cheap and the failure is silent.
