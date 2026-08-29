@@ -67,23 +67,23 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
   </style>
   <!--<![endif]-->
 </head>
-<body style="margin:0;padding:0;background:#0A0A0F;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<body style="margin:0;padding:0;background:#08170F;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   ${previewText ? `<div style="display:none;max-height:0;overflow:hidden;">${previewText}</div>` : ""}
 
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#08170F;">
     <tr><td align="center" style="padding:40px 20px;">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
         <!-- Logo -->
         <tr><td style="padding-bottom:24px;">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#8B5CF6;letter-spacing:0.05em;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#1BD093;letter-spacing:0.05em;">
             CHAPA_
           </span>
         </td></tr>
 
         <!-- Divider -->
         <tr><td style="padding-bottom:32px;">
-          <div style="height:1px;background:rgba(139,92,246,0.15);"></div>
+          <div style="height:1px;background:rgba(27,208,147,0.15);"></div>
         </td></tr>
 
         <!-- Greeting -->
@@ -102,7 +102,7 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
 
         <!-- Body -->
         ${bodyParagraphs.map((p, i) => {
-          const divider = `<tr><td style="padding-bottom:16px;"><div style="height:1px;background:rgba(139,92,246,0.40);"></div></td></tr>`;
+          const divider = `<tr><td style="padding-bottom:16px;"><div style="height:1px;background:rgba(27,208,147,0.40);"></div></td></tr>`;
           let rows = "";
           if (bodyParagraphs.length > 1 && i === 0) rows += divider;
           rows += `<tr><td style="padding-bottom:16px;">
@@ -119,14 +119,14 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
 
         <!-- CTA -->
         <tr><td style="padding-top:24px;padding-bottom:32px;">
-          <a href="${ctaUrl}" style="display:inline-block;padding:12px 28px;background:#8B5CF6;color:#FFFFFF;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">
+          <a href="${ctaUrl}" style="display:inline-block;padding:12px 28px;background:#1BD093;color:#FFFFFF;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">
             ${ctaText}
           </a>
         </td></tr>
 
         <!-- Footer divider -->
         <tr><td style="padding-bottom:16px;">
-          <div style="height:1px;background:rgba(139,92,246,0.10);"></div>
+          <div style="height:1px;background:rgba(27,208,147,0.10);"></div>
         </td></tr>
 
         <!-- Footer -->

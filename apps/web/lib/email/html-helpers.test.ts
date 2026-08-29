@@ -55,7 +55,7 @@ describe("featureRow", () => {
 
   it("uses the correct accent color for the arrow", () => {
     const html = featureRow("test");
-    expect(html).toContain("color:#8B5CF6");
+    expect(html).toContain("color:#1BD093");
   });
 
   it("uses the correct text color for content", () => {

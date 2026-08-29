@@ -138,10 +138,10 @@ Shared types live in: `packages/shared/src/types.ts`
 
 ## Design system (MANDATORY for UI work)
 - Full spec: @docs/design-system.md
-- Accent color: `#8B5CF6` (saturated violet). Use `text-amber`, `bg-amber`.
+- Accent color: jade, `oklch(.66 .15 163)` light / `oklch(.76 .16 163)` dark (#1206, replacing violet `#8B5CF6`). Use `text-amber`, `bg-amber` — the token name is retained deliberately; see design-system.md.
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
-- Light/dark theme support via `next-themes`. Light is the default; dark (`#0A0A0F`) is the signature brand look. Badge SVG always renders dark.
+- Light/dark theme support via `next-themes`. Light is the default; dark (`#08170f`, forest) is the signature brand look. Badge SVG always renders dark.
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## Badge branding

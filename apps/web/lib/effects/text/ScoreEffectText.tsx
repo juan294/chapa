@@ -30,13 +30,13 @@ export const SCORE_EFFECT_CSS = `
 }
 
 .te-embossed {
-  color: rgba(139, 92, 246, 0.8);
+  color: rgba(27, 208, 147, 0.8);
   text-shadow: -1px -1px 1px rgba(255, 255, 255, 0.2), 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .te-gold-shimmer {
   display: inline-block;
-  background: linear-gradient(90deg, #7C3AED 0%, #8B5CF6 20%, #A99BFF 40%, #D0C9FF 50%, #A99BFF 60%, #8B5CF6 80%, #7C3AED 100%);
+  background: linear-gradient(90deg, #009365 0%, #1BD093 20%, #A99BFF 40%, #D0C9FF 50%, #A99BFF 60%, #1BD093 80%, #009365 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -50,13 +50,13 @@ export const SCORE_EFFECT_CSS = `
 }
 
 .te-neon-amber {
-  color: #8B5CF6;
-  text-shadow: 0 0 7px rgba(139, 92, 246, 0.5), 0 0 10px rgba(139, 92, 246, 0.4), 0 0 21px rgba(139, 92, 246, 0.3), 0 0 42px rgba(139, 92, 246, 0.2);
+  color: #1BD093;
+  text-shadow: 0 0 7px rgba(27, 208, 147, 0.5), 0 0 10px rgba(27, 208, 147, 0.4), 0 0 21px rgba(27, 208, 147, 0.3), 0 0 42px rgba(27, 208, 147, 0.2);
 }
 
 .te-holographic {
   display: inline-block;
-  background: linear-gradient(90deg, #7C3AED, #8B5CF6, #A99BFF, #A78BFA, #8B5CF6, #A99BFF, #7C3AED);
+  background: linear-gradient(90deg, #009365, #1BD093, #A99BFF, #65E7B0, #1BD093, #A99BFF, #009365);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

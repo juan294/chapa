@@ -90,3 +90,9 @@ supabase/.branches/
 # git history from when the repo was private.
 docs/agents/*.md
 !docs/agents/audit-prompts.md
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+apps/web/.ds-styles.css

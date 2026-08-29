@@ -35,9 +35,9 @@ export const DIMENSION_COLORS: Record<DataVizDimension, string> = {
  * `heatmap-wave` experiment.
  */
 export const INTENSITY_COLORS: Record<number, string> = {
-  0: "rgba(139,92,246,0.15)",
-  1: "rgba(139,92,246,0.35)",
-  2: "rgba(139,92,246,0.52)",
-  3: "rgba(139,92,246,0.72)",
-  4: "rgba(139,92,246,0.95)",
+  0: "rgba(27,208,147,0.15)",
+  1: "rgba(27,208,147,0.35)",
+  2: "rgba(27,208,147,0.52)",
+  3: "rgba(27,208,147,0.72)",
+  4: "rgba(27,208,147,0.95)",
 };

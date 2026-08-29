@@ -362,7 +362,7 @@ export default function GlassmorphismExperimentPage() {
   backdrop-filter: blur(${blur}px) saturate(${saturation}%);
   -webkit-backdrop-filter: blur(${blur}px) saturate(${saturation}%);${
     showBorder
-      ? `\n  border: 1px solid rgba(139, 92, 246, 0.15);`
+      ? `\n  border: 1px solid rgba(27, 208, 147, 0.15);`
       : ""
   }
 }`}</code>

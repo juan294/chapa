@@ -53,11 +53,21 @@ describe("getTierColor", () => {
     }
   });
 
-  it("keeps tier colors aligned with the CSS brand tokens", () => {
-    expect(globalsCss).toContain("--color-amber: #8B5CF6;");
-    expect(globalsCss).toContain("--color-amber-light: #A78BFA;");
+  it("tier colors intentionally diverge from the app accent until the badge is rebranded (#1206)", () => {
+    // Until #1206 the badge's accent was held in lockstep with --color-amber.
+    // The Jade rebrand moved the app to green and put the badge explicitly out
+    // of scope: it is rendered server-side before app CSS exists, is always
+    // dark regardless of theme, and every already-embedded README image would
+    // change. So the two are now deliberately different, and this test records
+    // that rather than asserting an alignment that no longer holds.
+    //
+    // Both halves are still pinned, so changing EITHER side unintentionally
+    // still fails. Rebranding the badge is its own task; when it happens, this
+    // test is the thing to update.
     expect(getTierColor("Elite")).toBe("#8B5CF6");
     expect(getTierColor("High")).toBe("#A78BFA");
+    expect(globalsCss).toContain("--color-amber: oklch(.66 .15 163);");
+    expect(globalsCss).not.toContain("--color-amber: #8B5CF6;");
   });
 });
 
@@ -83,32 +93,38 @@ describe("theme.ts brand-alignment invariant comment (#1168 UX-L2)", () => {
     // (#1168 UX-L2) — changing these hex values would alter every cached
     // badge SVG and every already-embedded README image for a ~2-RGB-step
     // difference that's imperceptible in practice.
-    expect(globalsCss).toContain("--color-bg: #0A0A0F;");
-    expect(globalsCss).toContain("--color-card: #111118;");
-    expect(globalsCss).toContain("--color-text-primary: #E2E4E9;");
-    expect(globalsCss).toContain("--color-text-secondary: #8B8FA0;");
+    // #1206 — the app's dark surfaces moved to forest green; the badge's own
+    // WARM_AMBER literals below did not. The divergence this test documents is
+    // therefore wider than it was, and still intentional.
+    expect(globalsCss).toContain("--color-bg: #08170f;");
+    expect(globalsCss).toContain("--color-card: #0f2419;");
+    expect(globalsCss).toContain("--color-text-primary: #dfeae4;");
+    expect(globalsCss).toContain("--color-text-secondary: #8ba398;");
 
     expect(WARM_AMBER.bg).toBe("#0C0D14");
     expect(WARM_AMBER.card).toBe("#13141E");
     expect(WARM_AMBER.textPrimary).toBe("#E6EDF3");
     expect(WARM_AMBER.textSecondary).toBe("#9AA4B2");
 
-    expect(WARM_AMBER.bg).not.toBe("#0A0A0F");
-    expect(WARM_AMBER.card).not.toBe("#111118");
-    expect(WARM_AMBER.textPrimary).not.toBe("#E2E4E9");
-    expect(WARM_AMBER.textSecondary).not.toBe("#8B8FA0");
+    expect(WARM_AMBER.bg).not.toBe("#08170f");
+    expect(WARM_AMBER.card).not.toBe("#0f2419");
+    expect(WARM_AMBER.textPrimary).not.toBe("#dfeae4");
+    expect(WARM_AMBER.textSecondary).not.toBe("#8ba398");
   });
 });
 
 describe("getArchetypeColor", () => {
-  it("keeps archetype colors aligned with globals.css tokens", () => {
-    expect(globalsCss).toContain("--color-archetype-builder: #8B5CF6;");
-    expect(globalsCss).toContain("--color-archetype-guardian: #EC4899;");
-    expect(globalsCss).toContain("--color-archetype-marathoner: #22C55E;");
-    expect(globalsCss).toContain("--color-archetype-polymath: #EAB308;");
-    expect(globalsCss).toContain("--color-archetype-balanced: #0EA5E9;");
-    expect(globalsCss).toContain("--color-archetype-emerging: #F97316;");
-    expect(globalsCss).toContain("--color-archetype-artificer: #F59E0B;");
+  it("archetype colors intentionally diverge from globals.css tokens (#1206)", () => {
+    // These were kept in lockstep until #1206. Jade re-tuned all seven app
+    // archetype tokens onto one oklch lightness/chroma (.62 .14, hue only
+    // varying) while the badge stayed on the old literals, because the badge
+    // is out of scope for the rebrand. An archetype is therefore shown in one
+    // color on the badge and another in the app until the badge follows.
+    //
+    // Both sides stay pinned so an unintended change to either still fails.
+    expect(globalsCss).toContain("--color-archetype-builder: oklch(.62 .14 163);");
+    expect(globalsCss).toContain("--color-archetype-guardian: oklch(.62 .14 330);");
+    expect(globalsCss).not.toContain("--color-archetype-builder: #8B5CF6;");
 
     expect(getArchetypeColor("Builder")).toBe("#8B5CF6");
     expect(getArchetypeColor("Quality Champion")).toBe("#EC4899");

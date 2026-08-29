@@ -1,0 +1,13 @@
+/* Chapa ships its brand faces through next/font at runtime, so the compiled
+   stylesheet only references them via var(--font-heading)/var(--font-body).
+   A design built from this system has no Next runtime, so bind the families
+   here and load them from the one font host the renderer admits. */
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  --font-heading: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-terminal: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+}

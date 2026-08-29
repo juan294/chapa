@@ -12,9 +12,9 @@ import { ToggleSwitch } from "./controls";
 type ColorPreset = "amber" | "gold" | "mixed";
 
 const COLOR_PRESETS: Record<ColorPreset, string[]> = {
-  amber: ["#8B5CF6"],
-  gold: ["#A78BFA", "#8B5CF6"],
-  mixed: ["#8B5CF6", "#A78BFA", "#7C3AED"],
+  amber: ["#1BD093"],
+  gold: ["#65E7B0", "#1BD093"],
+  mixed: ["#1BD093", "#65E7B0", "#009365"],
 };
 
 export function PlaygroundSection() {

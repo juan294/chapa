@@ -330,22 +330,22 @@ function buildHtml(data: TemplateData): string {
   </style>
   <!--<![endif]-->
 </head>
-<body style="margin:0;padding:0;background:#0A0A0F;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<body style="margin:0;padding:0;background:#08170F;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#08170F;">
     <tr><td align="center" style="padding:40px 20px;">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
         <!-- Logo -->
         <tr><td style="padding-bottom:24px;">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#8B5CF6;letter-spacing:0.05em;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#1BD093;letter-spacing:0.05em;">
             CHAPA_
           </span>
         </td></tr>
 
         <!-- Divider -->
         <tr><td style="padding-bottom:32px;">
-          <div style="height:1px;background:rgba(139,92,246,0.15);"></div>
+          <div style="height:1px;background:rgba(27,208,147,0.15);"></div>
         </td></tr>
 
         <!-- Greeting -->
@@ -364,10 +364,10 @@ function buildHtml(data: TemplateData): string {
 
         <!-- Score delta highlight -->
         <tr><td style="padding-bottom:24px;">
-          <table cellpadding="0" cellspacing="0" style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.20);border-radius:8px;">
+          <table cellpadding="0" cellspacing="0" style="background:rgba(27,208,147,0.08);border:1px solid rgba(27,208,147,0.20);border-radius:8px;">
             <tr>
               <td style="padding:16px 24px;text-align:center;">
-                <span style="font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:#4ADE80;">+${delta}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:#6CD981;">+${delta}</span>
                 <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#8B8FA0;padding-left:8px;">points</span>
               </td>
             </tr>
@@ -379,14 +379,14 @@ function buildHtml(data: TemplateData): string {
 
         <!-- CTA -->
         <tr><td style="padding-top:24px;padding-bottom:32px;">
-          <a href="${shareUrl}" style="display:inline-block;padding:12px 28px;background:#8B5CF6;color:#FFFFFF;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">
+          <a href="${shareUrl}" style="display:inline-block;padding:12px 28px;background:#1BD093;color:#FFFFFF;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">
             View Your Updated Badge
           </a>
         </td></tr>
 
         <!-- Footer divider -->
         <tr><td style="padding-bottom:16px;">
-          <div style="height:1px;background:rgba(139,92,246,0.10);"></div>
+          <div style="height:1px;background:rgba(27,208,147,0.10);"></div>
         </td></tr>
 
         <!-- Footer -->
