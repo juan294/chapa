@@ -16,24 +16,29 @@ This general job is useful deployment signal, but a conditional skip is not
 release evidence. It does not authorize a release and cannot substitute for the
 candidate-bound workflow.
 
-### E2E Pro release-required smoke
+### Direct release-required Preview proof
 
-`.github/workflows/release-verification.yml` receives an immutable
-`developCommit`, `candidateTreeDigest`, exact preview URL, and `runId`. It runs
-`apps/web/e2e/release-required.spec.ts` with:
+`.github/workflows/release-verification.yml` is one read-only job. It
+receives an immutable `developCommit`, `candidateTreeDigest`, exact Preview
+URL, `baselineTag`, and `runId`, verifies source/tree/baseline identity
+directly, runs `apps/web/e2e/release-required.spec.ts` with:
 
 ```text
 EXPECTED_DEPLOYMENT_COMMIT = developCommit
 EXPECTED_DEPLOYMENT_ENV = preview
-PLAYWRIGHT_BASE_URL = exact preview URL
-E2E_PRO_RUN_ID = runId
+RELEASE_VERIFICATION_MODE = default
+PLAYWRIGHT_BASE_URL = exact Preview URL
 ```
 
-An absent URL, absent identity, stale preview, wrong environment, missing
-artifact, cancelled producer, failure, or required skip is blocking.
+and writes/uploads one `release-result.json`. An absent URL, absent identity,
+stale preview, wrong environment, missing artifact, cancelled producer, or a
+failed check is blocking.
 
-Production release-required smoke uses `mainCommit`, environment `production`,
-and only the production-safe read-only subset after authorized promotion.
+Production release-required smoke uses `mainCommit`, environment
+`production`, and only the four default production-safe scenarios, run
+directly by `/release` after promotion (`RELEASE_VERIFICATION_MODE=default`).
+`RELEASE_VERIFICATION_MODE=deep` (via `/prodplaybook`, never a default-release
+gate) adds broader scenarios to both environments.
 
 ## Identity proof
 
@@ -50,14 +55,21 @@ candidate identity.
 
 ## Required deployed probes
 
-| Stable scenario | Assertion |
-|---|---|
-| `deployment.preview-identity` or `deployment.production-identity` | Exact `/api/version` commit and environment |
-| `health.core-dependencies` | `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` are `ok` |
-| `profile.public-badge-read` | Smoke-only badge is HTTP 200, SVG content type, and contains valid SVG markers |
-| `profile.public-share-read` | Smoke-only share page is HTTP 200 and has a visible body |
-| `auth.github-login-redirect` | Preview login returns a redirect to GitHub |
-| `auth.protected-write-denied` | Unauthenticated generation request is denied and does not report success |
+`apps/web/e2e/helpers/release-required-environments.ts` is the single
+executable authority for which of these run at which environment and mode —
+see its `releaseRequiredScenarioIds(environment, mode)`.
+
+| Stable scenario | Assertion | Preview default | Production default | Deep addition |
+|---|---|:-:|:-:|:-:|
+| `deployment.preview-identity` / `deployment.production-identity` | Exact `/api/version` commit and environment | yes | yes | -- |
+| `health.core-dependencies` | `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` are `ok` | yes | yes | -- |
+| `profile.public-badge-read` | Smoke-only badge is HTTP 200, SVG content type, and contains valid SVG markers | yes | yes | -- |
+| `profile.public-share-read` | Smoke-only share page is HTTP 200 and has a visible body | yes | yes | -- |
+| `rollback.readiness` | Baseline tag is annotated and resolves to current production identity | yes | -- | -- |
+| `profile.share-verification` | Share page verification link resolves and renders verified | -- | -- | both |
+| `locales.en-es` | Share page renders correctly in `en` and `es` | -- | -- | both |
+| `auth.github-login-redirect` | Preview login returns a redirect to GitHub | -- | -- | preview only |
+| `auth.protected-write-denied` | Unauthenticated generation request is denied and does not report success | -- | -- | preview only |
 
 The health probe deliberately does not require overall HTTP 200 or
 `status == "ok"`. Overall health also includes cron-heartbeat freshness, which
@@ -95,16 +107,16 @@ pnpm exec playwright test e2e/smoke.spec.ts
 Record:
 
 - run ID, expected commit, tree, environment, and exact URL;
-- workflow run and job IDs;
+- workflow run and attempt;
 - Playwright JSON result;
-- HTTP response allowlist;
 - trace, screenshot, or test output;
 - actual `/api/version` response; and
-- analyzer blocking reason.
+- the failed `checks` entry in `release-result.json`.
 
 Do not include secrets, bearer headers, OAuth tokens, service-role keys, or
-personal data. The release workflow retains normalized manifests/reports longer
-than raw browser evidence as defined in the evidence README.
+personal data. `release-result.json` is the durable receipt (30-day artifact
+retention); it never contains a field name matching `authorization`,
+`cookie`, `secret`, or `token`.
 
 ## Common interpretations
 

@@ -120,7 +120,7 @@ Follow this section when the release playbook calls for migration evidence.
 2. Run the validator: `pnpm run validate:migrations`
 3. If new migrations must be applied, stop for explicit production-operation
    authorization. Apply them before the code that depends on them goes live;
-   never infer application authority from release preparation or analyzer PASS.
+   never infer application authority from release preparation or a passing check.
 4. Verify with a quick health check: `curl https://chapa.thecreativetoken.com/api/health`
 
 ## Pre-Deploy Migration Check
@@ -156,29 +156,23 @@ Actions secrets. **Both secrets were added on 2026-08-10** (confirmed via
 `gh secret list`), and the gate has run against production on at least one
 release PR since (#1063 — see the "Pending-migrations gate tolerates one
 migra artifact on `admin_users` (#1064)" entry in `docs/accepted-risks.md`).
-It is active today, not self-skipping. If those secrets were ever removed or
-rotated out from under CI, the workflow step would log a clear skip message
-and degrade to the manual checklist below rather than silently reporting
-success — but that is a fail-safe for an unexpected regression, not the
-documented default. See `docs/runbooks/secret-rotation.md` conventions for
-how secrets are managed in this repo, and confirm with `gh secret list` if
-you have any doubt about current state before relying on it as the sole
-gate.
-
-For E2E Pro, that CI skip is recorded as `skipped`, not `passed`. The required
-release obligation remains blocked until the operator attaches explicit manual
-drift evidence for the same candidate. PR creation therefore occurs before the
-pre-merge analyzer, while merge remains separately unauthorized until that
-evidence is complete.
+It is active today. If those secrets were ever removed or rotated out from
+under CI, the job now **fails closed** (`::error::` and a nonzero exit)
+rather than logging a skip and reporting a passing check (#1206) — a missing
+production read credential is itself a release-blocking condition, not a
+benign default. See `docs/runbooks/secret-rotation.md` conventions for how
+secrets are managed in this repo, and confirm with `gh secret list` if you
+have any doubt about current state.
 
 ### Release evidence handoff
 
 Record these results for the release playbook before promotion:
 
 - [ ] Run `git diff main..develop -- supabase/migrations/` — if any new migration files appear, confirm they have been applied to the production Supabase project before merging.
-- [ ] Confirm the `check:pending-migrations` CI step on the release PR passed (or, in the unexpected case that it was skipped because a secret was missing, fall back to the manual check above and investigate why — the secrets are normally configured).
-- [ ] Attach the release-PR run ID, exact head SHA, result, and manual evidence
-      reference when applicable to the E2E Pro run.
+- [ ] Confirm the `Pending Migrations Check (release PR)` conclusion on the
+      release PR is `success` — it is one of the exact required checks the
+      release playbook watches, and it fails closed rather than skipping.
+- [ ] Attach the release-PR run ID and exact head SHA to the release record.
 
 ## Reversing a Migration
 

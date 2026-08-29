@@ -153,8 +153,8 @@ degradation on whatever cadence something is polling `/api/health`.
 
 ## Release evidence correlation
 
-For a release-related alert or investigation, begin with the E2E Pro evidence
-report and correlate:
+For a release-related alert or investigation, begin with the release
+`release-result.json` and correlate:
 
 - `runId`;
 - `developCommit` and `candidateTreeDigest`;
@@ -163,10 +163,9 @@ report and correlate:
 - workflow/job and Playwright artifact references; and
 - any rollback deployment and restored identity.
 
-Add the evidence report reference and `runId` to the incident record. Logs and
-alerts supplement the release manifest; they do not substitute for missing
-required evidence or authorize merge, tag, rollback, or another production
-operation.
+Add the `release-result.json` reference and `runId` to the incident record.
+Logs and alerts supplement it; they do not substitute for a missing required
+check or authorize merge, tag, rollback, or another production operation.
 
 ## Verification checklist
 

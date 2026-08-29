@@ -408,13 +408,12 @@ pnpm run lint           # Check linting
 pnpm run test:watch          # Watch mode
 pnpm run test:coverage       # Coverage report
 pnpm run test:contract:local # Contract suite against local Supabase (run `supabase start` first)
-pnpm quality:validate        # Validate E2E Pro requiredness catalog
 pnpm run test:e2e -- --grep @release-required # Required deployed selectors
 
-# E2E Pro release evidence
-pnpm release:prepare-run -- --baseline-tag "$baselineTag" --develop-commit "$developCommit" --candidate-tree "$candidateTreeDigest" --preview-url "$previewUrl" --run-id "$runId" --output "quality/evidence/runs/$runId/release-run.json"
-pnpm release:analyze -- --run quality/evidence/runs/{runId}/release-run.json --stage final
-pnpm release:render-report -- --run quality/evidence/runs/{runId}/release-run.json --stage final
+# Release direct-proof commands
+pnpm run release:validate-docs   # Validate the release documentation contract
+pnpm run release:verify-identity # Verify a candidate's deployed identity
+pnpm run release:write-result -- --stage preview --input "$inputPath" --output "quality/evidence/runs/$runId/release-result.json"
 
 # Development
 pnpm run dev            # Local dev server (port 3001)

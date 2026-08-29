@@ -10,12 +10,8 @@ function workflow(path: string): string {
 
 describe("release verification workflow contract", () => {
   const release = workflow(".github/workflows/release-verification.yml");
-  const importer = workflow("scripts/quality/import-ci-evidence.ts");
-  const artifactContract = workflow(
-    "scripts/quality/release-artifact-contract.json",
-  );
 
-  it("accepts the complete immutable candidate identity", () => {
+  it("accepts exactly the five retained immutable candidate inputs", () => {
     expect(release).toContain("workflow_dispatch:");
     expect(release).toContain("workflow_call:");
     for (const input of [
@@ -24,190 +20,110 @@ describe("release verification workflow contract", () => {
       "candidateTreeDigest",
       "previewUrl",
       "runId",
-      "releasePrRunId",
-      "releasePrRunAttempt",
-      "preMergeEvidence",
     ]) {
       expect(release).toMatch(new RegExp(`\\n\\s{6}${input}:`));
     }
-    expect(release).toContain("ref: ${{ inputs.developCommit }}");
-    expect(release).toContain("HEAD^{tree}");
-    expect(release).not.toContain("fetch-depth: 0");
-    expect(release).toContain('git fetch --no-tags --depth=1 origin "$BASELINE_TAG"');
-  });
-
-  it("selects and imports one exact-SHA CI run attempt", () => {
-    expect(release).toContain("head_sha=${DEVELOP_COMMIT}");
-    expect(release).toContain('.event == "push"');
-    expect(release).toContain("run_attempt");
-    expect(release).toContain("actions/runs/${CI_RUN_ID}/artifacts");
-    expect(release).toContain("gh run download");
-    expect(importer).toContain("fragment candidate");
-    expect(importer).toContain("does not match selected attempt");
-    expect(release).toContain(
-      'actions/runs/${RELEASE_PR_RUN_ID}',
-    );
-    expect(release).toContain('.event == "pull_request"');
-    expect(release).toContain('.path == ".github/workflows/ci.yml"');
-    expect(release).toContain('.base.ref == "main"');
-    expect(release).toContain(
-      "actions/runs/${PR_RUN_ID}/attempts/${PR_RUN_ATTEMPT}/jobs",
-    );
-    expect(release).toContain("pending-production-migrations.json");
-    expect(artifactContract).toContain("database.pending-migrations");
-    expect(release).toContain(".runId == $runId");
-    expect(importer).toContain(
-      "`${options.contract.buildArtifactSlug}-${options.runId}-`",
-    );
-    expect(importer).toContain(
-      "artifact.name === expectedBuildArtifactName",
-    );
-    expect(importer).not.toContain(
-      'artifact.name === "nextjs-build"',
-    );
-    const importJob = release.slice(
-      release.indexOf("import-ci:"),
-      release.indexOf("import-release-pr:"),
-    );
-    expect(importJob.indexOf("actions/checkout@v6")).toBeLessThan(
-      importJob.indexOf("Download candidate bootstrap"),
-    );
-    const importedEvidenceUpload = importJob.slice(
-      importJob.indexOf("Upload imported exact-CI evidence"),
-      importJob.indexOf("Enforce exact-CI import result"),
-    );
-    expect(importedEvidenceUpload).toContain("include-hidden-files: true");
-  });
-
-  it("packages bootstrap evidence at the paths consumed by every job", () => {
-    expect(release).toContain("name: Stage candidate bootstrap layout");
-    expect(release).toContain('mkdir -p "$bootstrap/ci"');
-    for (const path of [
-      '"$bootstrap/candidate.json"',
-      '"$bootstrap/release-run.json"',
-      '"$bootstrap/pre-merge-evidence.json"',
-      '"$bootstrap/workflow-source.json"',
-      '"$bootstrap/ci/ci-source.json"',
-      '"$bootstrap/ci/release-pr-source.json"',
-      '"$bootstrap/release-artifact-contract.json"',
-    ]) {
-      expect(release).toContain(path);
+    for (const removedInput of ["releasePrRunId", "releasePrRunAttempt", "preMergeEvidence"]) {
+      expect(release).not.toContain(removedInput);
     }
-    expect(release).toContain(
-      "path: quality/evidence/runs/${{ inputs.runId }}/bootstrap",
-    );
-    expect(release).toContain("CI_SOURCE_PATH: bootstrap/ci/ci-source.json");
-    expect(release).toContain("bootstrap/release-artifact-contract.json");
-    expect(release).toContain("preview-evidence/bootstrap/candidate.json");
-    expect(release).toContain("jq -e 'select(");
-    expect(release).toContain(
-      `)' > "$RUN_DIRECTORY/pre-merge-evidence.json"`,
-    );
   });
 
-  it("selects normalized inputs by exact basename and uses the executable merger", () => {
-    expect(artifactContract).toContain(
-      '"contract-and-local-journey.json"',
-    );
-    expect(release).toContain(
-      'jq -r \'.ciArtifacts[] | select(.mergeFragment) | .basename\'',
-    );
-    expect(release).toContain('jq -r \'.journeySidecarBasename\'');
-    expect(release).not.toContain(
-      "JSON.parse(fs.readFileSync(jsonFiles[0]",
-    );
-    expect(release).toContain(
-      "scripts/quality/merge-release-evidence.ts",
-    );
-    expect(release).toContain("--pre-merge-evidence");
-    expect(release).toContain("--journey-sidecar");
-    expect(release).toContain(
-      "(.manualObligations | type == \"array\" and length > 0)",
-    );
+  it("checks out the exact developCommit with minimal history", () => {
+    expect(release).toContain("ref: ${{ inputs.developCommit }}");
+    expect(release).toContain("fetch-depth: 1");
+    expect(release).not.toContain("fetch-depth: 0");
   });
 
-  it("uses the immutable preview URL and candidate identity for required probes", () => {
-    expect(release).toContain("EXPECTED_DEPLOYMENT_COMMIT: ${{ inputs.developCommit }}");
-    expect(release).toContain('EXPECTED_DEPLOYMENT_ENV: "preview"');
-    expect(release).toContain("PLAYWRIGHT_BASE_URL: ${{ inputs.previewUrl }}");
-    expect(release).toContain(
-      "VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}",
-    );
-    expect(
-      release.match(
-        /VERCEL_AUTOMATION_BYPASS_SECRET: \$\{\{ secrets\.VERCEL_AUTOMATION_BYPASS_SECRET \}\}/g,
-      ),
-    ).toHaveLength(3);
+  it("verifies HEAD equals developCommit and HEAD tree equals candidateTreeDigest", () => {
+    expect(release).toContain('ACTUAL_COMMIT="$(git rev-parse HEAD)"');
+    expect(release).toContain("HEAD^{tree}");
+    expect(release).toContain('test "$ACTUAL_COMMIT" = "$DEVELOP_COMMIT"');
+    expect(release).toContain('test "$ACTUAL_TREE" = "$CANDIDATE_TREE_DIGEST"');
+  });
+
+  it("verifies the baseline tag is annotated and resolves to the current production rollback commit", () => {
+    expect(release).toContain('git fetch --no-tags --depth=1 origin "$BASELINE_TAG"');
+    expect(release).toContain('git cat-file -t "$BASELINE_TAG"');
+    expect(release).toMatch(/TAG_TYPE.*=.*"tag"/);
+    expect(release).toContain("https://chapa.thecreativetoken.com/api/version");
+    expect(release).toContain("PRODUCTION_COMMIT");
+    expect(release).toContain('test "$PRODUCTION_COMMIT" = "$TAG_COMMIT"');
+  });
+
+  it("verifies the immutable Preview identity via release:verify-identity", () => {
+    expect(release).toContain("release:verify-identity");
+    expect(release).toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
     expect(release).toMatch(
       /workflow_call:[\s\S]*?secrets:\s+VERCEL_AUTOMATION_BYPASS_SECRET:\s+required: true/,
     );
-    expect(release).toContain("Require Vercel automation bypass secret");
-    const previewJob = release.slice(
-      release.indexOf("  preview:"),
-      release.indexOf("  aggregate:"),
-    );
-    expect(previewJob.slice(0, previewJob.indexOf("    steps:"))).not.toContain(
-      "VERCEL_AUTOMATION_BYPASS_SECRET",
-    );
-    expect(release).toContain('DEPLOYMENT_SMOKE_STRICT: "true"');
+  });
+
+  it("runs the default Preview scenario mode", () => {
+    expect(release).toContain("RELEASE_VERIFICATION_MODE: default");
     expect(release).toContain("e2e/release-required.spec.ts");
     expect(release).toContain("--grep @release-required");
-    expect(release).toContain("uses: actions/cache@v5");
-    expect(release).toContain(
-      "key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}",
-    );
-    expect(release).toContain("playwright install-deps chromium");
-    expect(release).toContain("--stage pre-merge");
-    expect(release).toContain("-git-");
-    expect(release).toContain(
-      'environments: ["local-contract", "ci-build", "preview"]',
-    );
-    expect(release).toContain('"authorized-preview-interaction"');
   });
 
-  it("always publishes allowlisted raw and final evidence", () => {
-    expect(release).toContain("if: always()");
-    expect(release).toContain("name: Release Evidence");
-    expect(release).toContain("retention-days: 90");
-    expect(release).toContain("retention-days: 30");
-    for (const artifact of [
-      "candidate.json",
-      "release-run.json",
-      "evidence-manifest.json",
-      "release-report.md",
-      "cleanup-proof.json",
+  it("writes and uploads exactly one release-result.json unconditionally", () => {
+    expect(release).toContain("release:write-result");
+    expect(release).toContain("--stage preview");
+    const uploadStep = release.slice(
+      release.indexOf("Upload release result"),
+      release.indexOf("Upload release result") + 400,
+    );
+    expect(uploadStep).toContain("if: always()");
+    expect(uploadStep).toContain("release-result.json");
+    expect(release.match(/uses: actions\/upload-artifact@v7/g)?.length).toBe(1);
+  });
+
+  it("propagates the direct check status after uploading the result", () => {
+    const uploadIndex = release.indexOf("Upload release result");
+    const writeResultIndex = release.indexOf("release:write-result");
+    expect(writeResultIndex).toBeLessThan(uploadIndex);
+    expect(release).toContain("outputs:");
+    expect(release).toMatch(/status:\s*\$\{\{\s*steps\.[\w-]+\.outcome/);
+  });
+
+  it("contains no evidence-graph import, aggregation, analyzer, renderer, or charter machinery", () => {
+    for (const removed of [
+      "import-ci",
+      "import-release-pr",
+      "aggregate:",
+      "merge-release-evidence",
+      "analyze-release-run",
+      "render-release-report",
+      "release:analyze",
+      "release:render-report",
+      "release:collect-evidence",
+      "release:prepare-run",
+      "release:merge-evidence",
+      "quality:validate",
+      "preMergeEvidence",
+      "exploratoryCharters",
+      "evidence-manifest",
+      "release-artifact-contract",
     ]) {
-      expect(release).toContain(artifact);
+      expect(release).not.toContain(removed);
     }
-    expect(release).toContain("release-diagnostics.json");
-    const rawEvidenceUpload = release.slice(
-      release.indexOf("Upload allowlisted raw release evidence"),
-      release.indexOf("Set aggregate decision"),
-    );
-    expect(rawEvidenceUpload).toContain("include-hidden-files: true");
-    const diagnosticsStep = release.slice(
-      release.indexOf("- name: Ensure durable blocked diagnostics exist"),
-      release.indexOf("- name: Upload durable final release evidence"),
-    );
-    expect(diagnosticsStep).toContain(
-      "> aggregate/final-evidence/release-diagnostics.json",
-    );
-    expect(diagnosticsStep).toContain(
-      `jq -e 'type == "object" and (.decision | type == "string")'`,
-    );
-    expect(diagnosticsStep).not.toContain(
-      "> aggregate/final-evidence/release-run.json",
-    );
-    expect(
-      workflow("scripts/quality/merge-release-evidence.ts"),
-    ).toContain("duplicate scenario fragment");
-    expect(release).toContain('test "${{ steps.decision.outputs.decision }}" = "pass"');
   });
 
-  it("does not contain release or deployment mutations", () => {
+  it("does not contain release, deploy, database, Git, or publication mutations", () => {
     expect(release).not.toMatch(/\b(vercel\s+deploy|vercel\s+promote|gh\s+release\s+create)\b/);
     expect(release).not.toMatch(/\bgit\s+(push|merge|tag)\b/);
     expect(release).not.toMatch(/\bsupabase\s+(db\s+push|migration\s+up)\b/);
+  });
+
+  it("has read-only permissions and a candidate-scoped concurrency group", () => {
+    expect(release).toMatch(/permissions:\s*\n\s*contents:\s*read/);
+    expect(release).not.toContain("actions: read");
+    expect(release).toContain(
+      "group: release-verification-${{ inputs.developCommit }}-${{ inputs.runId }}",
+    );
+    expect(release).toContain("cancel-in-progress: false");
+  });
+
+  it("contains exactly one job", () => {
+    expect(release.match(/^  [a-z][\w-]*:\n\s+name:/gm)?.length).toBe(1);
   });
 });
 
@@ -215,34 +131,41 @@ describe("producer workflow evidence contract", () => {
   const ci = workflow(".github/workflows/ci.yml");
   const nightly = workflow(".github/workflows/nightly-prod-probe.yml");
 
+  it("no longer creates a .release-evidence directory or uploads release-evidence artifacts", () => {
+    expect(ci).not.toContain(".release-evidence");
+    expect(ci).not.toMatch(/release-evidence-\$\{\{/);
+  });
+
   it("preserves current protected aggregate job names", () => {
     expect(ci).toMatch(/\n\s+name: Test\n/);
     expect(ci).toMatch(/\n\s+name: E2E Tests\n/);
     expect(ci).toMatch(/\n\s+name: Deployment Smoke\n/);
     expect(ci).toMatch(/\n\s+name: Lint & Typecheck\n/);
+    expect(ci).toMatch(/\n\s+name: Contract \(real DB\)\n/);
+    expect(ci).toMatch(/\n\s+name: Pending Migrations Check \(release PR\)\n/);
   });
 
-  it("uploads allowlisted normalized CI evidence even after failures", () => {
-    expect(ci).toContain("if: always()");
-    expect(ci).toContain("release-evidence-${{ github.run_id }}-${{ github.run_attempt }}");
-    expect(ci).toContain(".release-evidence/");
-    expect(ci).toContain("retention-days: 30");
-    expect(ci).toContain('STATUS="skipped"');
-    expect(ci).toContain('scenarioId: "database.pending-migrations"');
-    expect(ci).toContain('environment: "ci-build"');
-    expect(ci).toContain("evidence: {configuration: [$evidenceUri]");
-    expect(ci).toContain('evidence: {ui: [$evidenceUri]');
-    expect(ci).toContain(
-      "nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}",
-    );
+  it("keeps the Next.js build artifact used by E2E shards", () => {
+    expect(ci).toContain("nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}");
     expect(ci).not.toMatch(/\n\s+name: nextjs-build\s*\n/);
+  });
+
+  it("fails the pending-migrations job closed when production read credentials are missing", () => {
+    const migrationJob = ci.slice(
+      ci.indexOf("pending-migrations-check:"),
+    );
+    expect(migrationJob).toContain("::error::");
+    expect(migrationJob).toContain("exit 1");
+    expect(migrationJob).not.toContain("::notice::");
+    expect(migrationJob).not.toMatch(/STATUS="skipped"/);
+    expect(migrationJob).toContain("pnpm run check:pending-migrations");
   });
 
   it("keeps nightly runner and production target identities separate", () => {
     expect(nightly).toContain("runnerCommit");
     expect(nightly).toContain("targetCommit");
     expect(nightly).toContain("targetEnvironment");
-    expect(nightly).toContain('authorizationEligible: false');
+    expect(nightly).toContain("authorizationEligible: false");
     expect(nightly).toContain('environment: "production"');
     expect(nightly).toContain("nightly-production-fragment.json");
     expect(nightly).toContain("if: always()");
