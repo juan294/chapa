@@ -13,14 +13,14 @@ const ITEMS = [
 
 describe("OnThisPageIndex (#1218)", () => {
   it("renders one link per section, pointing at its anchor", () => {
-    render(<OnThisPageIndex items={ITEMS} />);
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     const nav = screen.getByRole("navigation", { name: "On this page" });
     const links = Array.from(nav.querySelectorAll("a"));
     expect(links.map((a) => a.getAttribute("href"))).toEqual(["#one", "#two"]);
   });
 
   it("renders nothing when there are no sections to index", () => {
-    const { container } = render(<OnThisPageIndex items={[]} />);
+    const { container } = render(<OnThisPageIndex items={[]} heading="On this page" />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -30,7 +30,7 @@ describe("OnThisPageIndex (#1218)", () => {
     expect(
       (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver,
     ).toBeUndefined();
-    render(<OnThisPageIndex items={ITEMS} />);
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     const nav = screen.getByRole("navigation", { name: "On this page" });
     expect(nav.querySelectorAll("[aria-current]")).toHaveLength(0);
   });
@@ -54,7 +54,7 @@ describe("OnThisPageIndex (#1218)", () => {
     section.id = "one";
     document.body.appendChild(section);
 
-    const { unmount } = render(<OnThisPageIndex items={ITEMS} />);
+    const { unmount } = render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     expect(observe).toHaveBeenCalledTimes(1);
     expect(observe).toHaveBeenCalledWith(section);
 
@@ -87,10 +87,10 @@ describe("OnThisPageIndex (#1218)", () => {
     section.id = "one";
     document.body.appendChild(section);
 
-    const { rerender } = render(<OnThisPageIndex items={[...ITEMS]} />);
+    const { rerender } = render(<OnThisPageIndex items={[...ITEMS]} heading="On this page" />);
     expect(observe).toHaveBeenCalledTimes(1);
 
-    rerender(<OnThisPageIndex items={ITEMS.map((item) => ({ ...item }))} />);
+    rerender(<OnThisPageIndex items={ITEMS.map((item) => ({ ...item }))} heading="On this page" />);
     expect(observe).toHaveBeenCalledTimes(1);
     expect(disconnect).not.toHaveBeenCalled();
 
@@ -127,7 +127,7 @@ describe("OnThisPageIndex — sticky positioning (#1218)", () => {
   it("does not stretch to the article's height", () => {
     // As a stretched grid child the nav is as tall as the article, so sticky
     // positioning has no range to travel in and the index scrolls away.
-    render(<OnThisPageIndex items={ITEMS} />);
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     const nav = screen.getByRole("navigation", { name: "On this page" });
     expect(nav.className).toContain("sticky");
     expect(nav.className).toContain("self-start");
@@ -144,7 +144,7 @@ describe("OnThisPageIndex — active item without the observer (#1221)", () => {
 
   it("marks the section named by the URL hash on mount", () => {
     window.location.hash = "#two";
-    render(<OnThisPageIndex items={ITEMS} />);
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     const current = screen
       .getByRole("navigation", { name: "On this page" })
       .querySelector("[aria-current]") as HTMLElement;
@@ -153,7 +153,7 @@ describe("OnThisPageIndex — active item without the observer (#1221)", () => {
 
   it("ignores a hash that names no indexed section", () => {
     window.location.hash = "#not-a-section";
-    render(<OnThisPageIndex items={ITEMS} />);
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     expect(
       screen
         .getByRole("navigation", { name: "On this page" })
@@ -162,7 +162,7 @@ describe("OnThisPageIndex — active item without the observer (#1221)", () => {
   });
 
   it("marks a section as soon as its link is clicked", () => {
-    render(<OnThisPageIndex items={ITEMS} />);
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     const nav = screen.getByRole("navigation", { name: "On this page" });
     fireEvent.click(nav.querySelector('a[href="#two"]') as HTMLElement);
     const current = nav.querySelector("[aria-current]") as HTMLElement;
@@ -170,7 +170,7 @@ describe("OnThisPageIndex — active item without the observer (#1221)", () => {
   });
 
   it("follows a later hash change", () => {
-    render(<OnThisPageIndex items={ITEMS} />);
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
     const nav = screen.getByRole("navigation", { name: "On this page" });
     window.location.hash = "#one";
     fireEvent(window, new HashChangeEvent("hashchange"));
@@ -180,3 +180,25 @@ describe("OnThisPageIndex — active item without the observer (#1221)", () => {
   });
 });
 
+
+// #1222 — the component must stay free of the i18n barrel. Importing it for
+// one string pulls Next internals into any bundle containing this component,
+// which breaks the design-system bundle outright.
+describe("OnThisPageIndex — no i18n import (#1222)", () => {
+  it("takes its heading from the caller", () => {
+    render(<OnThisPageIndex items={ITEMS} heading="En esta página" />);
+    const nav = screen.getByRole("navigation", { name: "En esta página" });
+    expect(nav.textContent).toContain("En esta página");
+  });
+
+  it("does not import the i18n barrel", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "OnThisPageIndex.tsx"),
+      "utf8",
+    );
+    expect(source).not.toContain("@/lib/i18n");
+    expect(source).not.toContain("useTranslation");
+  });
+});

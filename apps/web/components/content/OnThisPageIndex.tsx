@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslation } from "@/lib/i18n";
 
 export interface OnThisPageItem {
   id: string;
@@ -25,8 +24,20 @@ export interface OnThisPageItem {
  * highlight still needs hydration - the hash is read on mount - but it no
  * longer needs a scroll or a visible viewport.
  */
-export function OnThisPageIndex({ items }: { items: OnThisPageItem[] }) {
-  const { t } = useTranslation();
+export function OnThisPageIndex({
+  items,
+  heading,
+}: {
+  items: OnThisPageItem[];
+  /**
+   * The index's own label, e.g. "On this page". Taken as a prop rather than
+   * looked up here (#1222): importing the i18n barrel for one string pulls
+   * Next internals into every bundle containing this component, which breaks
+   * the design-system bundle outright. SiteFooter and NavbarShell take their
+   * strings from the caller for the same reason.
+   */
+  heading: string;
+}) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Callers build this list inline from the dictionary, so `items` is a new
@@ -74,13 +85,13 @@ export function OnThisPageIndex({ items }: { items: OnThisPageItem[] }) {
 
   return (
     <nav
-      aria-label={t("content.onThisPage") as string}
+      aria-label={heading}
       // self-start matters: as a stretched grid child the nav would be as tall
       // as the whole article, leaving sticky positioning nothing to travel in.
       className="sticky top-24 hidden self-start lg:block"
     >
       <div className="font-heading text-[10px] tracking-wider text-terminal-dim uppercase">
-        {t("content.onThisPage") as string}
+        {heading}
       </div>
       <ul className="mt-3 space-y-0.5 border-l border-stroke">
         {items.map((item) => {
