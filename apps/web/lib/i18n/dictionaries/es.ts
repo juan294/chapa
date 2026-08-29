@@ -226,6 +226,9 @@ export const es: Translations = {
     badgeAltOf: 'Chapa de',
     ariaBusy: 'Regenerando Chapa',
   },
+  content: {
+    onThisPage: 'En esta página',
+  },
   sharePage: {
     metadataTitle: '{handle} — Impacto de desarrollador, decodificado',
     metadataDescription: 'Ve el perfil de impacto de {handle}: arquetipo, puntuación y desglose de dimensiones.',
@@ -270,6 +273,8 @@ export const es: Translations = {
     headingBefore: 'Verificar una',
     headingHighlight: 'Chapa',
     instructions: 'Introduce el hash de verificación de 8, 16 o 32 caracteres de una Chapa marcada como «Métricas verificadas». Lo encontrarás en el borde derecho. Las Chapas marcadas como «Métricas públicas» no afirman tener verificación criptográfica.',
+    awaitingHash: 'esperando el hash',
+    awaitingHashBody: 'Cada insignia marcada como métricas verificadas lleva un sello HMAC-SHA256 sobre sus puntuaciones y su fecha de captura. Pega el hash de la insignia, o abre el sello directamente desde una insignia para llegar aquí con el campo ya relleno.',
   },
   verifyForm: {
     label: 'Hash de verificación',
@@ -1040,6 +1045,7 @@ export const es: Translations = {
     title: 'Página no encontrada',
     description: 'La página que buscas no existe o ha sido movida.',
     cta: 'Volver al inicio',
+    ctaVerify: 'Verificar una insignia',
   },
   studio: {
     metadataTitle: 'Creator Studio — Chapa',

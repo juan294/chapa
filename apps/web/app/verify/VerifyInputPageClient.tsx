@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { NavbarClient } from "@/components/NavbarClient";
+import { ContentPageHeader } from "@/components/content/ContentPageHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { LocaleSync, useTranslation } from "@/lib/i18n";
 import { tArray } from "@/lib/i18n/typed-accessors";
@@ -23,27 +24,45 @@ export function VerifyInputPageClient() {
       </Suspense>
       <NavbarClient navLinks={innerNavLinks} translationKey="nav.innerLinks" />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
-        <div className="animate-fade-in-up">
-          {/* Terminal command line */}
-          <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-            <span className="text-terminal-dim select-none">$</span>
-            <span className="text-text-secondary">chapa verify</span>
-          </div>
-
-          <div className="pl-4 border-l border-stroke space-y-6">
-            <div>
-              <h1 className="font-heading text-2xl tracking-tight">
+        <div className="@container animate-fade-in-up">
+          <ContentPageHeader
+            command="chapa verify"
+            title={
+              <>
                 {t('verify.headingBefore') as string}{" "}
                 <span className="text-complement-text">
                   {t('verify.headingHighlight') as string}
                 </span>
-              </h1>
-              <p className="text-text-secondary text-sm mt-2">
-                {t('verify.instructions') as string}
-              </p>
-            </div>
+              </>
+            }
+            intro={t('verify.instructions') as string}
+          />
 
-            <VerifyForm />
+          <VerifyForm />
+
+          {/* #1218 — the idle state says so, instead of leaving an unexplained
+              empty page under the input. */}
+          <div className="mt-8 rounded-xl border border-stroke bg-card p-5">
+            <span className="font-heading text-xs tracking-wider text-terminal-dim uppercase">
+              {t('verify.awaitingHash') as string}
+            </span>
+            <p className="mt-2 text-sm text-pretty text-text-secondary">
+              {t('verify.awaitingHashBody') as string}
+            </p>
+          </div>
+
+          {/* The honest limitation, kept on the page rather than buried in the
+              explainer. Copy is the existing about.verification wording. */}
+          <div className="mt-4 rounded-xl border border-stroke bg-card p-5">
+            <h2 className="font-heading text-sm font-semibold text-text-primary">
+              {t('about.verification.limitNotTamperProofHeading') as string}
+            </h2>
+            <p className="mt-2 text-sm text-pretty text-text-secondary">
+              {(t('about.verification.limitNotTamperProofSuffix') as string).replace(
+                /^\s*—\s*/,
+                "",
+              )}
+            </p>
           </div>
         </div>
       </main>

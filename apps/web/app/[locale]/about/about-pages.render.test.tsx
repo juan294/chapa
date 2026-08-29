@@ -516,7 +516,9 @@ describe("ScoringPage render (es)", () => {
     const { default: ScoringPage } = await import("./scoring/page");
     render(await ScoringPage({ params: Promise.resolve({ locale: "es" }) }));
     expect(screen.getByText("Metodología de puntuación")).toBeDefined();
-    expect(screen.getByText("Filosofía")).toBeDefined();
+    // #1218 — section labels appear twice now: in the heading and in the
+    // sticky index that reads the same dictionary keys.
+    expect(screen.getByRole("heading", { name: "Filosofía" })).toBeDefined();
   });
 });
 

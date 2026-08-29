@@ -232,6 +232,9 @@ export const en: Translations = {
     badgeAltOf: 'Chapa Badge of',
     ariaBusy: 'Regenerating badge',
   },
+  content: {
+    onThisPage: 'On this page',
+  },
   sharePage: {
     metadataTitle: '{handle} — Developer Impact, Decoded',
     metadataDescription: "See {handle}'s developer impact profile: archetype, impact score, and dimension breakdown.",
@@ -276,6 +279,8 @@ export const en: Translations = {
     headingBefore: 'Verify a',
     headingHighlight: 'badge',
     instructions: "Enter the 8, 16, or 32-character verification hash from a Chapa badge marked Verified metrics. You'll find it on the right edge. Badges marked Public metrics do not claim cryptographic verification.",
+    awaitingHash: 'awaiting hash',
+    awaitingHashBody: 'Every badge marked Verified metrics carries an HMAC-SHA256 seal over its scores and capture date. Paste the hash from the badge, or open the seal directly from a badge to land here with it filled in.',
   },
   verifyForm: {
     label: 'Verification hash',
@@ -1051,6 +1056,7 @@ export const en: Translations = {
     title: 'Page not found',
     description: "The page you're looking for doesn't exist or has been moved.",
     cta: 'Go home',
+    ctaVerify: 'Verify a badge',
   },
   studio: {
     metadataTitle: 'Creator Studio — Chapa',
