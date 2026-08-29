@@ -144,8 +144,8 @@ jobs:
       - name: Fetch only the immutable baseline
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin "$BASELINE_TAG"
-          git rev-parse --verify 'FETCH_HEAD^{commit}' >/dev/null
+          git fetch --depth=1 origin tag "$BASELINE_TAG"
+          git rev-parse --verify "${BASELINE_TAG}^{commit}" >/dev/null
 
       # Verified here via git + a direct production read, independent of the
       # rollback.readiness Playwright scenario that "Run default Preview
