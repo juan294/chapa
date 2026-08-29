@@ -255,6 +255,19 @@ vi.mock("@/components/terminal/command-registry", () => {
       type,
       text,
     }),
+    // #1216 — the active-config readout labels each row with the category's
+    // short alias, the same one /set accepts.
+    CATEGORY_KEY_TO_ALIAS: {
+      background: "bg",
+      cardStyle: "card",
+      border: "border",
+      scoreEffect: "score",
+      heatmapAnimation: "heatmap",
+      interaction: "interact",
+      statsDisplay: "stats",
+      tierTreatment: "tier",
+      celebration: "celebrate",
+    },
   };
 });
 
@@ -1808,3 +1821,69 @@ describe("StudioClient render", () => {
     });
   });
 });
+
+// #1216 — the v2 controls column: the save state is a pill on the preview, the
+// whole configuration is readable in one block, and the command input sticks
+// to the bottom so a long session cannot push it off-screen.
+describe("StudioClient — v2 layout (#1216)", () => {
+  it("renders the save state as a status pill", () => {
+    render(
+      <StudioClient
+        initialConfig={defaultConfig}
+        stats={stats}
+        impact={impact}
+        handle="testuser"
+      />,
+    );
+    const pill = document.querySelector("[data-save-state]") as HTMLElement;
+    expect(pill).not.toBeNull();
+    expect(pill.tagName).toBe("SPAN");
+    expect(pill.className).toContain("rounded-full");
+    expect(pill.getAttribute("role")).toBe("status");
+  });
+
+  it("lists every category in the active-config readout, keyed by its /set alias", () => {
+    render(
+      <StudioClient
+        initialConfig={defaultConfig}
+        stats={stats}
+        impact={impact}
+        handle="testuser"
+      />,
+    );
+    const readout = screen.getByTestId("studio-active-config");
+    const terms = Array.from(readout.querySelectorAll("dt")).map(
+      (dt) => dt.textContent,
+    );
+    expect(terms).toEqual([
+      "bg",
+      "card",
+      "border",
+      "score",
+      "heatmap",
+      "interact",
+      "stats",
+      "tier",
+      "celebrate",
+    ]);
+  });
+
+  it("keeps the command input reachable at the bottom of a long session", () => {
+    render(
+      <StudioClient
+        initialConfig={defaultConfig}
+        stats={stats}
+        impact={impact}
+        handle="testuser"
+      />,
+    );
+    const input = screen.getByTestId("terminal-input");
+    const cluster = input.closest(".sticky") as HTMLElement;
+    expect(cluster).not.toBeNull();
+    expect(cluster.className).toContain("bottom-0");
+    // The log above it is bounded, so it scrolls instead of growing the column.
+    const log = screen.getByTestId("terminal-output").parentElement as HTMLElement;
+    expect(log.className).toContain("overflow-y-auto");
+  });
+});
+
