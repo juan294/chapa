@@ -256,6 +256,33 @@ Two distinct dropdown patterns exist in the codebase — do not unify them, they
 
 A component whose items are alternatives the user picks one of (language, theme, sort order) should follow the listbox pattern; a component whose items are actions to invoke (profile actions, share actions) should use `useDropdownMenu`'s menu pattern. When adding a new dropdown, choose based on this semantic distinction first — don't default to whichever hook already exists.
 
+### Section header (`% chapa <command>`)
+
+`apps/web/components/SectionHeader.tsx` (#1214). A flex row with the
+`% chapa <command>` marker on the left and a right-aligned meta readout
+(`exit 0 · 5 results`, `3 steps · ~1 min`, `composite 82 · high`), and a
+`border-stroke-strong` rule underneath. Both spans are `whitespace-nowrap`:
+the pair is one line of terminal output, and the row wraps as a whole instead
+of breaking either half. Pass `title` to put the real section name in the
+accessibility tree, since `% chapa features` is a poor document-outline entry.
+
+Use the meta only for something the reader can act on or verify. On a prose
+page there is usually nothing to report, and an invented meta string is
+decoration.
+
+### Content page shell
+
+`apps/web/components/content/ContentPageHeader.tsx` and
+`OnThisPageIndex.tsx` (#1218). Every long-form route opens with the marker,
+the title and a one-paragraph orientation; pages long enough to need one get
+the sticky index, which highlights the current section with an accent rail.
+
+Two things the index depends on:
+- Each section heading needs a stable `id` and `scroll-mt-28`.
+- The `<nav>` needs `self-start`. As a stretched grid child it would be as
+  tall as the whole article, and sticky positioning would have no range to
+  travel in.
+
 ### Tooltips (mandatory pattern)
 
 Every tooltip/popover must be portal-rendered to `document.body` with `position: fixed`, viewport-relative coordinates (from `getBoundingClientRect()`), `z-index: 99999`, and `pointer-events: none`. Add a flip-below rule when the trigger is near the top of the viewport (`rect.top < 120`) so the tooltip doesn't clip off-screen. Never use `position: absolute` inside a scrollable/animated container — an ancestor with a CSS `transform` breaks `position: fixed` positioning unless the tooltip is portaled out of that subtree entirely (#1021). Reference implementations: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/dashboard/ActivityHeatmap.tsx`'s `ChartTooltip`, `apps/web/lib/effects/heatmap/HeatmapGrid.tsx`.

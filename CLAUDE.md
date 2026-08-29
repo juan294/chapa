@@ -196,6 +196,9 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Data access (Supabase): `apps/web/lib/db/*`
 - Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
 - Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
+- Section header pattern: `apps/web/components/SectionHeader.tsx` (#1214) — the `% chapa <command>` marker plus right-aligned meta and rule, used by the landing page's sections
+- Content page shell: `apps/web/components/content/*` (#1218) — `ContentPageHeader` (marker + title + intro) and `OnThisPageIndex` (sticky section index with an accent rail), shared by `/about`, `/about/scoring`, `/about/verification`, `/privacy`, `/terms` and `/verify`
+- Share page header: `apps/web/app/u/[handle]/SharePageHeader.tsx` (#1217) — identity paired with the headline score, tier pill and verification pill
 - Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx` (portal-rendered, viewport-fixed, auto-flip near the top of viewport — #1021)
 - Navigation: `apps/web/components/NavbarShell.tsx` (shared presentational markup), `apps/web/components/Navbar.tsx` (server variant, non-ISR pages), `apps/web/components/NavbarClient.tsx` (client variant, ISR pages) — #1025
 - Dimension/intensity colors (client-rendered heatmap/tooltip surfaces): `apps/web/lib/utils/dimension-colors.ts` (#1040) — deliberately separate from the server-rendered badge SVG's own literals in `apps/web/lib/render/theme.ts`

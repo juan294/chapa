@@ -63,6 +63,40 @@ describe("OnThisPageIndex (#1218)", () => {
     section.remove();
     vi.unstubAllGlobals();
   });
+
+  it("does not re-subscribe when a re-render passes an equal but new array", () => {
+    // Callers build the list inline from the dictionary, so the array identity
+    // changes on every render. Keying the effect on it would re-subscribe each
+    // time, and observing fires the callback immediately, so each subscription
+    // would set state and trigger the next render.
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe = observe;
+        disconnect = disconnect;
+        unobserve = vi.fn();
+        takeRecords = vi.fn();
+        root = null;
+        rootMargin = "";
+        thresholds = [];
+      },
+    );
+    const section = document.createElement("section");
+    section.id = "one";
+    document.body.appendChild(section);
+
+    const { rerender } = render(<OnThisPageIndex items={[...ITEMS]} />);
+    expect(observe).toHaveBeenCalledTimes(1);
+
+    rerender(<OnThisPageIndex items={ITEMS.map((item) => ({ ...item }))} />);
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(disconnect).not.toHaveBeenCalled();
+
+    section.remove();
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("ContentPageHeader (#1218)", () => {
@@ -86,5 +120,16 @@ describe("ContentPageHeader (#1218)", () => {
       <ContentPageHeader command="chapa explain" title="About" />,
     );
     expect(container.querySelector("p")).toBeNull();
+  });
+});
+
+describe("OnThisPageIndex — sticky positioning (#1218)", () => {
+  it("does not stretch to the article's height", () => {
+    // As a stretched grid child the nav is as tall as the article, so sticky
+    // positioning has no range to travel in and the index scrolls away.
+    render(<OnThisPageIndex items={ITEMS} />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    expect(nav.className).toContain("sticky");
+    expect(nav.className).toContain("self-start");
   });
 });

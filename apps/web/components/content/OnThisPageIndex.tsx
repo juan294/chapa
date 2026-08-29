@@ -24,6 +24,14 @@ export function OnThisPageIndex({ items }: { items: OnThisPageItem[] }) {
   const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // Callers build this list inline from the dictionary, so `items` is a new
+  // array on every render. Keying the effect on the array itself would
+  // re-subscribe on every render, and since observing an element fires the
+  // callback immediately, each subscription would set state and trigger the
+  // next render: a loop that never settles and never highlights anything.
+  // The ids are what the effect actually depends on.
+  const observedIds = items.map((item) => item.id).join(",");
+
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver(
@@ -38,19 +46,21 @@ export function OnThisPageIndex({ items }: { items: OnThisPageItem[] }) {
       // when a heading reaches reading position, not when it merely enters.
       { rootMargin: "-96px 0px -60% 0px" },
     );
-    for (const item of items) {
-      const element = document.getElementById(item.id);
+    for (const id of observedIds.split(",")) {
+      const element = id ? document.getElementById(id) : null;
       if (element) observer.observe(element);
     }
     return () => observer.disconnect();
-  }, [items]);
+  }, [observedIds]);
 
   if (items.length === 0) return null;
 
   return (
     <nav
       aria-label={t("content.onThisPage") as string}
-      className="sticky top-24 hidden lg:block"
+      // self-start matters: as a stretched grid child the nav would be as tall
+      // as the whole article, leaving sticky positioning nothing to travel in.
+      className="sticky top-24 hidden self-start lg:block"
     >
       <div className="font-heading text-[10px] tracking-wider text-terminal-dim uppercase">
         {t("content.onThisPage") as string}
