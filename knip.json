@@ -10,6 +10,7 @@
     "test/stubs/server-only.ts",
     "apps/web/test/contract/**",
     ".design-sync/previews/**",
+    ".design-sync/emit-tokens.mjs",
     "apps/web/.ds-entry.tsx"
   ],
   "workspaces": {
