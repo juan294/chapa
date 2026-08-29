@@ -42,7 +42,11 @@ describe("release verification workflow contract", () => {
   });
 
   it("verifies the baseline tag is annotated and resolves to the current production rollback commit", () => {
-    expect(release).toContain('git fetch --no-tags --depth=1 origin "$BASELINE_TAG"');
+    // Fetches the tag by name (`git fetch <remote> tag <name>`), not just its
+    // commit via --no-tags, which never creates a local refs/tags/<name> ref
+    // and leaves "$BASELINE_TAG" unresolvable by name in every later step.
+    expect(release).toContain('git fetch --depth=1 origin tag "$BASELINE_TAG"');
+    expect(release).not.toContain("--no-tags");
     expect(release).toContain('git cat-file -t "$BASELINE_TAG"');
     expect(release).toMatch(/TAG_TYPE.*=.*"tag"/);
     expect(release).toContain("https://chapa.thecreativetoken.com/api/version");
