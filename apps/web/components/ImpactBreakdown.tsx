@@ -190,6 +190,36 @@ export function DataSources({ stats, handle, isOwner = false }: DataSourcesProps
             </span>
           );
         })}
+
+        {/* #1220 — EMU/supplemental stats are a real source of the numbers on
+            this page, and StatsData says so via hasSupplementalData (set by
+            the EMU merge path). It is deliberately labelled "supplemental",
+            not "merged": "merged" asserts a verified merge operation that this
+            flag does not carry. Shown to visitors too, because it explains
+            where the numbers came from. */}
+        {stats.hasSupplementalData && (
+          <span className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 animate-fade-in-up">
+            <svg
+              width="16"
+              height="16"
+              viewBox={PLATFORM_DISPLAY.github.viewBox}
+              fill="currentColor"
+              className="text-text-secondary"
+              aria-hidden="true"
+            >
+              <path d={PLATFORM_DISPLAY.github.svgPath} />
+            </svg>
+            <span className="text-sm font-medium text-text-primary">
+              {t('dashboard.dataSourceSupplementalLabel') as string}
+            </span>
+            <span
+              data-testid="data-source-status-supplemental"
+              className="font-heading text-xs text-terminal-green"
+            >
+              {t('dashboard.dataSourceSupplemental') as string}
+            </span>
+          </span>
+        )}
       </div>
     </div>
   );

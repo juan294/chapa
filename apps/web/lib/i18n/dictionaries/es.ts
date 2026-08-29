@@ -1272,6 +1272,8 @@ export const es: Translations = {
     dataSources: 'Fuentes de datos',
     dataSourceLinked: 'vinculado',
     dataSourceConnect: 'conectar',
+    dataSourceSupplemental: 'complementario',
+    dataSourceSupplementalLabel: 'GitHub EMU',
     insightsCoaching: 'Perspectivas y coaching',
     keyNumbers: 'Números clave',
     vsLastWeek: 'vs semana anterior',

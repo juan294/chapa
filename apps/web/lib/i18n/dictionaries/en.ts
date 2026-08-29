@@ -1283,6 +1283,8 @@ export const en: Translations = {
     dataSources: 'Data Sources',
     dataSourceLinked: 'linked',
     dataSourceConnect: 'connect',
+    dataSourceSupplemental: 'supplemental',
+    dataSourceSupplementalLabel: 'GitHub EMU',
     insightsCoaching: 'Insights & Coaching',
     keyNumbers: 'Key Numbers',
     vsLastWeek: 'vs last week',

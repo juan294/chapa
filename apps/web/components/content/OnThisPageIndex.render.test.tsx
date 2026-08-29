@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { OnThisPageIndex } from "./OnThisPageIndex";
 import { ContentPageHeader } from "./ContentPageHeader";
 
@@ -133,3 +133,50 @@ describe("OnThisPageIndex — sticky positioning (#1218)", () => {
     expect(nav.className).toContain("self-start");
   });
 });
+
+// #1221 — the active item was derived purely from an IntersectionObserver, so
+// a deep link marked nothing current until the observer happened to fire, and
+// the highlight could not be exercised without a live viewport.
+describe("OnThisPageIndex — active item without the observer (#1221)", () => {
+  afterEach(() => {
+    window.location.hash = "";
+  });
+
+  it("marks the section named by the URL hash on mount", () => {
+    window.location.hash = "#two";
+    render(<OnThisPageIndex items={ITEMS} />);
+    const current = screen
+      .getByRole("navigation", { name: "On this page" })
+      .querySelector("[aria-current]") as HTMLElement;
+    expect(current.getAttribute("href")).toBe("#two");
+  });
+
+  it("ignores a hash that names no indexed section", () => {
+    window.location.hash = "#not-a-section";
+    render(<OnThisPageIndex items={ITEMS} />);
+    expect(
+      screen
+        .getByRole("navigation", { name: "On this page" })
+        .querySelectorAll("[aria-current]"),
+    ).toHaveLength(0);
+  });
+
+  it("marks a section as soon as its link is clicked", () => {
+    render(<OnThisPageIndex items={ITEMS} />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    fireEvent.click(nav.querySelector('a[href="#two"]') as HTMLElement);
+    const current = nav.querySelector("[aria-current]") as HTMLElement;
+    expect(current.getAttribute("href")).toBe("#two");
+  });
+
+  it("follows a later hash change", () => {
+    render(<OnThisPageIndex items={ITEMS} />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    window.location.hash = "#one";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    expect(
+      (nav.querySelector("[aria-current]") as HTMLElement).getAttribute("href"),
+    ).toBe("#one");
+  });
+});
+
