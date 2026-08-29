@@ -30,6 +30,7 @@
     "release:collect-evidence": "tsx scripts/quality/collect-playwright-evidence.ts",
     "release:verify-identity": "tsx scripts/quality/verify-deployment-identity.ts",
     "release:merge-evidence": "tsx scripts/quality/merge-release-evidence.ts",
+    "release:write-result": "tsx scripts/quality/release-result.ts",
     "release:validate-docs": "tsx scripts/quality/validate-release-docs.ts",
     "test:release-required": "pnpm --filter @chapa/web exec playwright test e2e/release-required.spec.ts --project=chromium",
     "delete-user": "tsx scripts/delete-user.ts",
