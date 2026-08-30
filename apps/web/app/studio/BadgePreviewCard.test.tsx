@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -65,23 +65,6 @@ vi.mock("@/lib/effects/borders/gradient-border-css", () => ({
   GRADIENT_BORDER_CSS: "/* gradient-border-css */",
 }));
 
-vi.mock("@/lib/effects/interactions/use-tilt", () => ({
-  useTilt: vi.fn(() => ({
-    ref: { current: null },
-    tilt: { rotateX: 0, rotateY: 0, mouseX: "50%", mouseY: "50%", isHovering: false },
-    handleMouseMove: vi.fn(),
-    handleMouseLeave: vi.fn(),
-  })),
-}));
-
-vi.mock("@/lib/effects/interactions/holographic-css", () => ({
-  HOLOGRAPHIC_CSS: "/* holographic-css */",
-}));
-
-vi.mock("@/lib/effects/celebrations/confetti", () => ({
-  fireSingleBurst: vi.fn(),
-}));
-
 // Mock the dynamically imported effect modules so their loader functions
 // and .then() chains resolve (exercising those arrow functions for coverage)
 vi.mock("@/lib/effects/backgrounds/AuroraBackground", () => ({
@@ -98,26 +81,18 @@ vi.mock("@/lib/effects/borders/GradientBorder", () => ({
   ),
 }));
 
-vi.mock("@/lib/effects/interactions/HolographicOverlay", () => ({
-  HolographicOverlay: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="holographic-overlay">{children}</div>
-  ),
-}));
-
 vi.mock("@/components/badge/BadgeContent", () => ({
   BadgeContent: ({
     stats,
     impact,
     scoreEffect,
     heatmapAnimation,
-    statsDisplay,
     tierTreatment,
   }: {
     stats: { handle: string };
     impact: { compositeScore: number };
     scoreEffect: string;
     heatmapAnimation: string;
-    statsDisplay: string;
     tierTreatment: string;
   }) => (
     <div
@@ -126,7 +101,6 @@ vi.mock("@/components/badge/BadgeContent", () => ({
       data-score={impact.compositeScore}
       data-score-effect={scoreEffect}
       data-heatmap-animation={heatmapAnimation}
-      data-stats-display={statsDisplay}
       data-tier-treatment={tierTreatment}
     />
   ),
@@ -136,8 +110,6 @@ vi.mock("@/components/badge/BadgeContent", () => ({
 import { BadgePreviewCard } from "./BadgePreviewCard";
 import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 import { glassStyle } from "@/lib/effects/cards/glass-presets";
-import { fireSingleBurst } from "@/lib/effects/celebrations/confetti";
-import { useTilt } from "@/lib/effects/interactions/use-tilt";
 
 // ---------- Fixtures ----------
 
@@ -147,10 +119,7 @@ const defaultConfig: BadgeConfig = {
   border: "solid-amber",
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
-  interaction: "static",
-  statsDisplay: "static",
   tierTreatment: "standard",
-  celebration: "none",
 };
 
 const stats: StatsData = {
@@ -224,9 +193,6 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("impact: ImpactV6Result");
     });
 
-    it("has optional interactive flag", () => {
-      expect(SOURCE).toContain("interactive?:");
-    });
   });
 
   describe("lazy-loaded effects (dynamic imports)", () => {
@@ -253,22 +219,16 @@ describe("BadgePreviewCard", () => {
       );
     });
 
-    it("lazy-loads HolographicOverlay via dynamic()", () => {
-      expect(SOURCE).toMatch(
-        /dynamic\(\s*\(\)\s*=>\s*import\(["']@\/lib\/effects\/interactions\/HolographicOverlay["']\)/,
-      );
-    });
-
     it("disables SSR for all dynamic effect components", () => {
       // Count occurrences of ssr: false in dynamic() option objects
       const ssrFalseCount = (SOURCE.match(/ssr:\s*false/g) ?? []).length;
-      expect(ssrFalseCount).toBeGreaterThanOrEqual(4);
+      expect(ssrFalseCount).toBeGreaterThanOrEqual(3);
     });
 
     it("provides loading fallbacks for dynamic components", () => {
       // Count occurrences of loading: in dynamic() option objects
       const loadingCount = (SOURCE.match(/loading:\s*\(\)/g) ?? []).length;
-      expect(loadingCount).toBeGreaterThanOrEqual(4);
+      expect(loadingCount).toBeGreaterThanOrEqual(3);
     });
 
     it("does NOT eagerly import AuroraBackground component", () => {
@@ -292,12 +252,6 @@ describe("BadgePreviewCard", () => {
       );
     });
 
-    it("does NOT eagerly import HolographicOverlay component", () => {
-      // Static import of HolographicOverlay component should be gone (CSS constant may still be imported)
-      expect(SOURCE).not.toMatch(
-        /^import\s+\{[^}]*HolographicOverlay[^}]*\}\s+from\s+["']@\/lib\/effects\/interactions\/HolographicOverlay["']/m,
-      );
-    });
   });
 });
 
@@ -346,38 +300,6 @@ describe("BadgePreviewCard — runtime render", () => {
       expect(glassStyle).not.toHaveBeenCalled();
       const card = screen.getByTestId("badge-card");
       expect(card.style.backdropFilter).toBe("");
-    });
-  });
-
-  describe("tilt interaction disabled", () => {
-    it("renders without tilt when interactive is false", () => {
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, interaction: "tilt-3d" }}
-          stats={stats}
-          impact={impact}
-          interactive={false}
-        />,
-      );
-      const card = screen.getByTestId("badge-card");
-      // No perspective transform when tilt is disabled
-      expect(card.style.transform).toBe("");
-    });
-
-    it("mouse events do not crash when tilt is disabled", () => {
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, interaction: "tilt-3d" }}
-          stats={stats}
-          impact={impact}
-          interactive={false}
-        />,
-      );
-      const card = screen.getByTestId("badge-card");
-      // Should not throw
-      fireEvent.mouseMove(card);
-      fireEvent.mouseLeave(card);
-      expect(screen.getByTestId("badge-preview")).toBeDefined();
     });
   });
 
@@ -430,22 +352,6 @@ describe("BadgePreviewCard — runtime render", () => {
       expect(preview.querySelector('[data-effect="gradient-border"]')).not.toBeNull();
     });
 
-    it("renders holographic overlay when interaction is holographic and interactive", () => {
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, interaction: "holographic" }}
-          stats={stats}
-          impact={impact}
-          interactive={true}
-        />,
-      );
-      // The holographic overlay wraps card content — dynamic mock renders children via wrapper
-      const preview = screen.getByTestId("badge-preview");
-      const wrapper = preview.querySelector('[data-testid="dynamic-wrapper"]');
-      expect(wrapper).not.toBeNull();
-      // Card content should still be accessible inside the wrapper
-      expect(screen.getByTestId("badge-card")).toBeDefined();
-    });
   });
 
   describe("badge content props pass-through", () => {
@@ -466,23 +372,6 @@ describe("BadgePreviewCard — runtime render", () => {
       expect(content.getAttribute("data-heatmap-animation")).toBe("ripple");
     });
 
-    it("passes statsDisplay and tierTreatment to BadgeContent", () => {
-      render(
-        <BadgePreviewCard
-          config={{
-            ...defaultConfig,
-            statsDisplay: "animated-ease",
-            tierTreatment: "enhanced",
-          }}
-          stats={stats}
-          impact={impact}
-        />,
-      );
-      const content = screen.getByTestId("badge-content");
-      expect(content.getAttribute("data-stats-display")).toBe("animated-ease");
-      expect(content.getAttribute("data-tier-treatment")).toBe("enhanced");
-    });
-
     it("passes stats handle and impact score to BadgeContent", () => {
       render(
         <BadgePreviewCard config={defaultConfig} stats={stats} impact={impact} />,
@@ -490,142 +379,6 @@ describe("BadgePreviewCard — runtime render", () => {
       const content = screen.getByTestId("badge-content");
       expect(content.getAttribute("data-handle")).toBe("testuser");
       expect(content.getAttribute("data-score")).toBe("65");
-    });
-  });
-
-  describe("confetti celebration effect", () => {
-    it("fires confetti on mount when celebration is confetti and interactive is true", () => {
-      vi.useFakeTimers();
-
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, celebration: "confetti" }}
-          stats={stats}
-          impact={impact}
-          interactive={true}
-        />,
-      );
-
-      // fireSingleBurst should not have been called yet (800ms delay)
-      expect(fireSingleBurst).not.toHaveBeenCalled();
-
-      // Advance past the 800ms timer
-      vi.advanceTimersByTime(800);
-
-      expect(fireSingleBurst).toHaveBeenCalledWith(50, "amber");
-
-      vi.useRealTimers();
-    });
-
-    it("does not fire confetti when interactive is false", () => {
-      vi.useFakeTimers();
-
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, celebration: "confetti" }}
-          stats={stats}
-          impact={impact}
-          interactive={false}
-        />,
-      );
-
-      vi.advanceTimersByTime(1000);
-
-      expect(fireSingleBurst).not.toHaveBeenCalled();
-
-      vi.useRealTimers();
-    });
-
-    it("does not fire confetti when celebration is none", () => {
-      vi.useFakeTimers();
-
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, celebration: "none" }}
-          stats={stats}
-          impact={impact}
-          interactive={true}
-        />,
-      );
-
-      vi.advanceTimersByTime(1000);
-
-      expect(fireSingleBurst).not.toHaveBeenCalled();
-
-      vi.useRealTimers();
-    });
-
-    it("clears confetti timer on unmount", () => {
-      vi.useFakeTimers();
-
-      const { unmount } = render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, celebration: "confetti" }}
-          stats={stats}
-          impact={impact}
-          interactive={true}
-        />,
-      );
-
-      // Unmount before the 800ms timer fires
-      unmount();
-      vi.advanceTimersByTime(1000);
-
-      expect(fireSingleBurst).not.toHaveBeenCalled();
-
-      vi.useRealTimers();
-    });
-  });
-
-  describe("tilt-3d interaction when interactive is true", () => {
-    it("applies perspective transform when tilt-3d is active and interactive", () => {
-      vi.mocked(useTilt).mockReturnValue({
-        ref: { current: null },
-        tilt: { rotateX: 5, rotateY: -3, mouseX: "60%", mouseY: "40%", isHovering: true },
-        handleMouseMove: vi.fn(),
-        handleMouseLeave: vi.fn(),
-      });
-
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, interaction: "tilt-3d" }}
-          stats={stats}
-          impact={impact}
-          interactive={true}
-        />,
-      );
-
-      const card = screen.getByTestId("badge-card");
-      expect(card.style.transform).toContain("perspective(600px)");
-      expect(card.style.transform).toContain("rotateX(5deg)");
-      expect(card.style.transform).toContain("rotateY(-3deg)");
-    });
-
-    it("connects mouse event handlers when tilt-3d is active and interactive", () => {
-      const mockHandleMouseMove = vi.fn();
-      const mockHandleMouseLeave = vi.fn();
-      vi.mocked(useTilt).mockReturnValue({
-        ref: { current: null },
-        tilt: { rotateX: 0, rotateY: 0, mouseX: "50%", mouseY: "50%", isHovering: false },
-        handleMouseMove: mockHandleMouseMove,
-        handleMouseLeave: mockHandleMouseLeave,
-      });
-
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, interaction: "tilt-3d" }}
-          stats={stats}
-          impact={impact}
-          interactive={true}
-        />,
-      );
-
-      const card = screen.getByTestId("badge-card");
-      fireEvent.mouseMove(card);
-      fireEvent.mouseLeave(card);
-
-      expect(mockHandleMouseMove).toHaveBeenCalled();
-      expect(mockHandleMouseLeave).toHaveBeenCalled();
     });
   });
 
@@ -665,23 +418,6 @@ describe("BadgePreviewCard — runtime render", () => {
     });
   });
 
-  describe("holographic interaction disabled when not interactive", () => {
-    it("does not render holographic overlay when interactive is false", () => {
-      render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, interaction: "holographic" }}
-          stats={stats}
-          impact={impact}
-          interactive={false}
-        />,
-      );
-
-      const preview = screen.getByTestId("badge-preview");
-      const holographicLoading = preview.querySelector('[data-effect="holographic-loading"]');
-      expect(holographicLoading).toBeNull();
-    });
-  });
-
   describe("CSS injection for active effects", () => {
     it("includes GRADIENT_BORDER_CSS when border is gradient-rotating", () => {
       const { container } = render(
@@ -696,19 +432,6 @@ describe("BadgePreviewCard — runtime render", () => {
       expect(style?.textContent).toContain("gradient-border-css");
     });
 
-    it("includes HOLOGRAPHIC_CSS when interaction is holographic", () => {
-      const { container } = render(
-        <BadgePreviewCard
-          config={{ ...defaultConfig, interaction: "holographic" }}
-          stats={stats}
-          impact={impact}
-        />,
-      );
-
-      const style = container.querySelector("style");
-      expect(style?.textContent).toContain("holographic-css");
-    });
-
     it("does not include extra CSS for default config", () => {
       const { container } = render(
         <BadgePreviewCard config={defaultConfig} stats={stats} impact={impact} />,
@@ -716,7 +439,6 @@ describe("BadgePreviewCard — runtime render", () => {
 
       const style = container.querySelector("style");
       expect(style?.textContent).not.toContain("gradient-border-css");
-      expect(style?.textContent).not.toContain("holographic-css");
     });
   });
 

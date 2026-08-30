@@ -153,32 +153,6 @@ studio > /set heatmap ripple
 studio > /set heatmap cascade
 ```
 
-#### `interact` (Interaction)
-
-| Value | Description |
-|-------|-------------|
-| `static` | No mouse interaction |
-| `tilt-3d` | Perspective tilt on hover |
-| `holographic` | Rainbow overlay on hover |
-
-```
-studio > /set interact tilt-3d
-studio > /set interact holographic
-```
-
-#### `stats` (Stats Display)
-
-| Value | Description |
-|-------|-------------|
-| `static` | Plain numbers |
-| `animated-ease` | Smooth counting animation |
-| `animated-spring` | Bouncy spring animation |
-
-```
-studio > /set stats animated-spring
-studio > /set stats static
-```
-
 #### `tier` (Tier Treatment)
 
 | Value | Description |
@@ -190,18 +164,6 @@ studio > /set stats static
 studio > /set tier enhanced
 ```
 
-#### `celebrate` (Celebration)
-
-| Value | Description |
-|-------|-------------|
-| `none` | No celebration effect |
-| `confetti` | Burst of confetti on load |
-
-```
-studio > /set celebrate confetti
-studio > /set celebrate none
-```
-
 ### Category Alias Reference
 
 | Alias | Full config key |
@@ -211,10 +173,7 @@ studio > /set celebrate none
 | `border` | `border` |
 | `score` | `scoreEffect` |
 | `heatmap` | `heatmapAnimation` |
-| `interact` | `interaction` |
-| `stats` | `statsDisplay` |
 | `tier` | `tierTreatment` |
-| `celebrate` | `celebration` |
 
 You can use either the alias or the full key name:
 ```
@@ -248,10 +207,7 @@ All defaults. Clean and simple.
 | Border | solid-amber |
 | Score Effect | standard |
 | Heatmap | fade-in |
-| Interaction | static |
-| Stats Display | static |
 | Tier Treatment | standard |
-| Celebration | none |
 
 ```
 studio > /preset minimal
@@ -267,10 +223,7 @@ Rich, warm, animated feel.
 | Border | solid-amber |
 | Score Effect | gold-leaf |
 | Heatmap | diagonal |
-| Interaction | tilt-3d |
-| Stats Display | animated-ease |
 | Tier Treatment | enhanced |
-| Celebration | none |
 
 ```
 studio > /preset premium
@@ -284,12 +237,9 @@ Cool, futuristic holographic effects.
 | Background | solid |
 | Card Style | frost |
 | Border | gradient-rotating |
-| Score Effect | gold-shimmer |
+| Score Effect | holographic |
 | Heatmap | ripple |
-| Interaction | holographic |
-| Stats Display | animated-ease |
 | Tier Treatment | enhanced |
-| Celebration | none |
 
 ```
 studio > /preset holographic
@@ -305,10 +255,7 @@ Everything turned up. All effects enabled.
 | Border | gradient-rotating |
 | Score Effect | gold-shimmer |
 | Heatmap | scatter |
-| Interaction | tilt-3d |
-| Stats Display | animated-spring |
 | Tier Treatment | enhanced |
-| Celebration | confetti |
 
 ```
 studio > /preset maximum
@@ -332,7 +279,7 @@ Persists your badge configuration server-side. The saved configuration is restor
 studio > /status
 ```
 
-Displays all 9 categories with their current values.
+Displays all 6 categories with their current values.
 
 ### Get Embed Code
 
@@ -702,7 +649,7 @@ Use this checklist to verify every feature works.
 - [ ] See two-column layout: preview left, terminal right
 - [ ] See welcome message: "Creator Studio — customize your badge preview"
 - [ ] Type `/help` — see list of all commands
-- [ ] Type `/status` — see current config values for all 9 categories
+- [ ] Type `/status` — see current config values for all 6 categories
 - [ ] Type `/clear` — terminal output is cleared
 
 ### 3. Studio — `/set` Command
@@ -713,12 +660,10 @@ Use this checklist to verify every feature works.
 - [ ] Type `/set border gradient-rotating` — preview shows rotating gradient border
 - [ ] Type `/set score gold-shimmer` — score text gets shimmer effect
 - [ ] Type `/set heatmap ripple` — heatmap animates from center
-- [ ] Type `/set interact tilt-3d` — hover over preview to see 3D tilt
-- [ ] Type `/set stats animated-spring` — stats numbers bounce in
 - [ ] Type `/set tier enhanced` — tier pill gets sparkle dots
-- [ ] Type `/set celebrate confetti` — confetti bursts on load
 - [ ] Type `/set bg invalid` — see error: "Invalid value" with valid options listed
 - [ ] Type `/set xyz solid` — see error: "Unknown category" with valid aliases listed
+- [ ] Type `/set interact tilt-3d` — see the same "Unknown category" error; the three preview-only categories were removed in #1191
 
 ### 4. Studio — Presets
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import Image from "next/image";
 import type {
   BadgeConfig,
@@ -11,8 +10,6 @@ import type {
 } from "@chapa/shared";
 import type { ScoreEffect } from "@/lib/effects/text/ScoreEffectText";
 import { ScoreEffectText, SCORE_EFFECT_CSS } from "@/lib/effects/text/ScoreEffectText";
-import { useAnimatedCounter } from "@/lib/effects/counters/use-animated-counter";
-import { useInView } from "@/lib/effects/counters/use-in-view";
 import { tierPillClasses, SparkleDots, TIER_VISUALS_CSS } from "@/lib/effects/tier/TierVisuals";
 import { HeatmapGrid, HEATMAP_GRID_CSS } from "@/lib/effects/heatmap/HeatmapGrid";
 import { WARM_AMBER } from "@/lib/render/theme";
@@ -28,7 +25,6 @@ export interface BadgeContentProps {
   impact: ImpactV6Result;
   scoreEffect?: BadgeConfig["scoreEffect"];
   heatmapAnimation?: BadgeConfig["heatmapAnimation"];
-  statsDisplay?: BadgeConfig["statsDisplay"];
   tierTreatment?: BadgeConfig["tierTreatment"];
   showFooter?: boolean;
   className?: string;
@@ -140,31 +136,14 @@ export function getBadgeContentCSS(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Animated stat card sub-component
+// Stat card sub-component
 // ---------------------------------------------------------------------------
 
-function AnimatedStatCard({
-  value,
-  label,
-  statsDisplay,
-}: {
-  value: number;
-  label: string;
-  statsDisplay: BadgeConfig["statsDisplay"];
-}) {
-  const isAnimated = statsDisplay !== "static";
-  const easing = statsDisplay === "animated-spring" ? "spring" : "easeOut";
-  const { value: counter } = useAnimatedCounter(
-    value,
-    2000,
-    easing,
-    isAnimated,
-  );
-
+function StatCard({ value, label }: { value: number; label: string }) {
   return (
     <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
       <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
-        {isAnimated ? counter : value}
+        {value}
       </span>
       <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
         {label}
@@ -174,7 +153,7 @@ function AnimatedStatCard({
 }
 
 // ---------------------------------------------------------------------------
-// BadgeContent — inner card content (no wrapper, no background/border/interaction)
+// BadgeContent — inner card content (no wrapper, no background/border)
 // ---------------------------------------------------------------------------
 
 export function BadgeContent({
@@ -182,7 +161,6 @@ export function BadgeContent({
   impact,
   scoreEffect = "standard",
   heatmapAnimation = "fade-in",
-  statsDisplay = "static",
   tierTreatment = "standard",
   showFooter = true,
   className = "",
@@ -200,9 +178,6 @@ export function BadgeContent({
     breadth: t('dimensions.breadth.label') as string,
     craft: t('dimensions.craft.label') as string,
   };
-  const statsRef = useRef<HTMLDivElement>(null);
-  const statsInView = useInView(statsRef);
-  void statsInView;
 
   return (
     <div className={className} style={style} data-testid="badge-content">
@@ -251,7 +226,7 @@ export function BadgeContent({
         </div>
 
         {/* Right: Developer Profile */}
-        <div ref={statsRef} className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
+        <div className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
           <div className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
             Developer Profile
           </div>
@@ -389,25 +364,21 @@ export function BadgeContent({
 
       {/* --- Dimension cards (4 across) --- */}
       <div className="mt-5 grid grid-cols-4 gap-3">
-        <AnimatedStatCard
+        <StatCard
           value={impact.dimensions.delivery}
           label={dimensionLabels.delivery}
-          statsDisplay={statsDisplay}
         />
-        <AnimatedStatCard
+        <StatCard
           value={impact.dimensions.quality}
           label={dimensionLabels.quality}
-          statsDisplay={statsDisplay}
         />
-        <AnimatedStatCard
+        <StatCard
           value={impact.dimensions.consistency}
           label={dimensionLabels.consistency}
-          statsDisplay={statsDisplay}
         />
-        <AnimatedStatCard
+        <StatCard
           value={impact.dimensions.breadth}
           label={dimensionLabels.breadth}
-          statsDisplay={statsDisplay}
         />
       </div>
 

@@ -16,7 +16,6 @@ import type {
 } from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
-import { useIsClient } from "@/hooks/useIsClient";
 import { BadgePreviewCard } from "./BadgePreviewCard";
 import type { PreviewVerification } from "./PreviewFooter";
 import { QuickControls } from "./QuickControls";
@@ -196,7 +195,6 @@ export function StudioClient({
       // localStorage unavailable — keep the default.
     }
   }, []);
-  const isClient = useIsClient();
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
   const configRevisionRef = useRef(0);
@@ -584,7 +582,6 @@ export function StudioClient({
             config={config}
             stats={stats}
             impact={impact}
-            interactive={isClient && !reducedMotion}
             verification={verification}
           />
 

@@ -55,9 +55,22 @@ a scroll position, or a JavaScript loop.
 | `celebration` (confetti on load) | **No** | "On load" is meaningless for a cached image served to every viewer |
 
 So five categories cross cleanly, one crosses partially, and three cannot cross
-at all. The three that cannot are not failures to fix — they are on-page
-enhancements, and Studio should label them as such rather than presenting them
-beside categories that ship.
+at all.
+
+**Amended 2026-08-30 (step 5): the three that cannot cross were removed, not
+labelled.** This section first concluded that Studio should mark them as
+on-page enhancements, and step 4 shipped exactly that — a "preview only" pill
+per category. Reviewing the result, the labelling was the weaker answer. Those
+three effects have one audience: the badge owner, while sitting in Studio.
+Nobody who ever sees the badge — in a README, on the share page, in a social
+card — sees a tilt, a counting number or a confetti burst. Ever. Spending a
+third of the interface on them taught, control by control, that the preview is
+not the artifact, which is corrosive precisely because the other six had just
+stopped being a lookalike. A label mitigates that; it does not remove it.
+
+`BadgeConfig` therefore has six fields, `RETIRED_BADGE_CONFIG_KEYS` names the
+three that were dropped, and configs already persisted with nine keys are
+migrated on read (see Consequences).
 
 ## Invariants that must survive
 
@@ -137,8 +150,19 @@ of this decision.
 
 - Studio stops being a lookalike and becomes a preview of the real thing.
 - `lib/effects/` splits: the five-and-a-bit categories that cross become SVG
-  effect builders consumed by the renderer; the three that cannot stay
-  DOM-only and are labelled as on-page enhancements.
+  effect builders consumed by the renderer; the three that cannot leave the
+  badge surface entirely (amended, step 5 — see above). The modules themselves
+  are not all deleted: `counters/` still drives the dashboard and `use-tilt` /
+  `confetti` still drive their `/experiments/*` prototypes, so only the two
+  with no consumer left (`HolographicOverlay`, `holographic-css`) went.
+- **Dropping a field from `BadgeConfig` is a migration, not a rename.**
+  `isValidBadgeConfig` rejects extra fields, so a stored nine-key row would
+  read back as `invalid` and hand the owner the default — a durable write
+  silently discarded. `stripRetiredBadgeConfigKeys` runs before validation on
+  both the read path (`dbGetStudioConfig`) and the write path (`PUT
+  /api/studio/config`, where a Studio tab loaded before the drop still posts
+  nine keys), so legacy rows migrate in place with no backfill. The same is
+  required of any future field removal.
 - `BadgeContent` shrinks to a wrapper. The duplicate heatmap, radar, tier and
   footer implementations go away, which is the maintenance win.
 - The work is a project, not a change. It should be sequenced behind the

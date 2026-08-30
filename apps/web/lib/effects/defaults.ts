@@ -7,6 +7,11 @@ export interface StudioPreset {
   config: BadgeConfig;
 }
 
+/**
+ * #1191 — "Holographic" was named for interaction: "holographic", a hover
+ * overlay that never reached the badge. It now takes the name from the score
+ * effect, which does.
+ */
 export const STUDIO_PRESETS: StudioPreset[] = [
   {
     id: "minimal",
@@ -22,10 +27,7 @@ export const STUDIO_PRESETS: StudioPreset[] = [
       border: "solid-amber",
       scoreEffect: "gold-leaf",
       heatmapAnimation: "diagonal",
-      interaction: "tilt-3d",
-      statsDisplay: "animated-ease",
       tierTreatment: "enhanced",
-      celebration: "none",
     },
   },
   {
@@ -35,12 +37,9 @@ export const STUDIO_PRESETS: StudioPreset[] = [
       background: "solid",
       cardStyle: "frost",
       border: "gradient-rotating",
-      scoreEffect: "gold-shimmer",
+      scoreEffect: "holographic",
       heatmapAnimation: "ripple",
-      interaction: "holographic",
-      statsDisplay: "animated-ease",
       tierTreatment: "enhanced",
-      celebration: "none",
     },
   },
   {
@@ -52,10 +51,7 @@ export const STUDIO_PRESETS: StudioPreset[] = [
       border: "gradient-rotating",
       scoreEffect: "gold-shimmer",
       heatmapAnimation: "scatter",
-      interaction: "tilt-3d",
-      statsDisplay: "animated-spring",
       tierTreatment: "enhanced",
-      celebration: "confetti",
     },
   },
 ];

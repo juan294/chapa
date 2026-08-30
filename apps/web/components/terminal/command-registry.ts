@@ -59,10 +59,7 @@ export const CATEGORY_ALIASES = {
   border: "border",
   score: "scoreEffect",
   heatmap: "heatmapAnimation",
-  interact: "interaction",
-  stats: "statsDisplay",
   tier: "tierTreatment",
-  celebrate: "celebration",
 } as const satisfies Readonly<Record<string, string>>;
 
 type CategoryAlias = keyof typeof CATEGORY_ALIASES;

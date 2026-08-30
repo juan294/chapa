@@ -21,10 +21,7 @@ const baseConfig: BadgeConfig = {
   border: "solid-amber",
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
-  interaction: "static",
-  statsDisplay: "static",
   tierTreatment: "standard",
-  celebration: "none",
 };
 
 describe("QuickControls", () => {
@@ -348,14 +345,14 @@ describe("QuickControls — v2 controls column (#1216)", () => {
   it("counts how many categories differ from the default", () => {
     render(
       <QuickControls
-        config={{ ...baseConfig, background: "aurora", celebration: "confetti" }}
+        config={{ ...baseConfig, background: "aurora", scoreEffect: "chrome" }}
         onCommand={vi.fn()}
         visible
         onToggle={vi.fn()}
       />,
     );
     expect(screen.getByTestId("studio-changed-count").textContent).toBe(
-      "2 of 9 changed",
+      "2 of 6 changed",
     );
   });
 
@@ -422,12 +419,12 @@ describe("QuickControls — v2 controls column (#1216)", () => {
   });
 });
 
-// #1191 — six of the nine categories now render in the embeddable badge. The
-// other three cannot: the badge is an image with no pointer, no JS loop and no
-// "on load" moment. Saying which is which is the difference between a preview
-// and a promise.
-describe("QuickControls marks the preview-only categories (#1191)", () => {
-  it("marks exactly interaction, statsDisplay and celebration", () => {
+// #1191 step 5 — the three categories that could never reach the embeddable
+// badge were removed rather than labelled, so Quick Controls now offers only
+// controls that change the artifact. No "preview only" marker survives,
+// because there is nothing left to mark.
+describe("QuickControls offers only categories that reach the badge (#1191)", () => {
+  function renderControls() {
     render(
       <QuickControls
         config={baseConfig}
@@ -436,31 +433,33 @@ describe("QuickControls marks the preview-only categories (#1191)", () => {
         onToggle={vi.fn()}
       />,
     );
-    for (const key of ["interaction", "statsDisplay", "celebration"]) {
-      expect(screen.getByTestId(`preview-only-${key}`).textContent).toBe(
-        "preview only",
-      );
+  }
+
+  it("renders no preview-only marker at all", () => {
+    renderControls();
+    expect(
+      document.querySelectorAll('[data-testid^="preview-only-"]'),
+    ).toHaveLength(0);
+  });
+
+  it("offers exactly the six shipping categories", () => {
+    renderControls();
+    for (const label of [
+      "Background",
+      "Card Style",
+      "Border",
+      "Score Effect",
+      "Heatmap Animation",
+      "Tier Treatment",
+    ]) {
+      expect(screen.getByText(label)).toBeTruthy();
     }
   });
 
-  it("does not mark the six categories that reach the badge", () => {
-    render(
-      <QuickControls
-        config={baseConfig}
-        onCommand={vi.fn()}
-        visible
-        onToggle={vi.fn()}
-      />,
-    );
-    for (const key of [
-      "background",
-      "cardStyle",
-      "border",
-      "scoreEffect",
-      "heatmapAnimation",
-      "tierTreatment",
-    ]) {
-      expect(screen.queryByTestId(`preview-only-${key}`)).toBeNull();
+  it("offers none of the retired categories", () => {
+    renderControls();
+    for (const label of ["Interaction", "Stats Display", "Celebration"]) {
+      expect(screen.queryByText(label)).toBeNull();
     }
   });
 });

@@ -42,10 +42,16 @@ describe("resolveCategory", () => {
     expect(resolveCategory("card")).toBe("cardStyle");
     expect(resolveCategory("score")).toBe("scoreEffect");
     expect(resolveCategory("heatmap")).toBe("heatmapAnimation");
-    expect(resolveCategory("interact")).toBe("interaction");
-    expect(resolveCategory("stats")).toBe("statsDisplay");
     expect(resolveCategory("tier")).toBe("tierTreatment");
-    expect(resolveCategory("celebrate")).toBe("celebration");
+  });
+
+  // #1191 step 5 — the three preview-only categories were dropped, so their
+  // aliases must stop resolving too. A /set interact tilt-3d that silently
+  // succeeded would write a key the schema no longer has.
+  it("no longer resolves the retired preview-only aliases", () => {
+    for (const alias of ["interact", "stats", "celebrate"]) {
+      expect(resolveCategory(alias)).toBeNull();
+    }
   });
 
   it("resolves full key names", () => {

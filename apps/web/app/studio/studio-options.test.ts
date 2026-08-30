@@ -8,8 +8,8 @@ import {
 } from "./studio-options";
 
 describe("STUDIO_CATEGORIES", () => {
-  it("has exactly 9 categories (one per BadgeConfig field)", () => {
-    expect(STUDIO_CATEGORIES).toHaveLength(9);
+  it("has exactly 6 categories (one per BadgeConfig field)", () => {
+    expect(STUDIO_CATEGORIES).toHaveLength(6);
   });
 
   it("covers every key in BadgeConfig", () => {
@@ -20,10 +20,7 @@ describe("STUDIO_CATEGORIES", () => {
       "border",
       "scoreEffect",
       "heatmapAnimation",
-      "interaction",
-      "statsDisplay",
       "tierTreatment",
-      "celebration",
     ];
     expect(keys).toEqual(expect.arrayContaining(expectedKeys));
     expect(keys).toHaveLength(expectedKeys.length);
@@ -141,40 +138,42 @@ describe("getOptionDescription", () => {
   });
 });
 
-// #1191 — the previewOnly flag is the single source of truth for which
-// categories reach the embeddable badge, so it must match what the SVG
-// renderer actually consumes.
-describe("previewOnly marks exactly the categories the SVG cannot render (#1191)", () => {
-  it("marks the three that need a live page", () => {
-    const previewOnly = STUDIO_CATEGORIES.filter((c) => c.previewOnly).map(
-      (c) => c.key,
-    );
-    expect(previewOnly.sort()).toEqual(
-      ["celebration", "interaction", "statsDisplay"].sort(),
-    );
-  });
+// #1191 step 5 — every remaining category renders in the real badge. The
+// three that could not (interaction, statsDisplay, celebration) were removed
+// rather than labelled "preview only": a badge is a cached image with no
+// pointer, no JavaScript loop and no "on load" moment, so those controls had
+// exactly one audience — the owner sitting in Studio — and every one of them
+// taught that the preview is not the artifact.
+describe("every category reaches the embeddable badge (#1191)", () => {
+  const RETIRED = ["interaction", "statsDisplay", "celebration"];
 
-  it("every other category is consumed by the SVG renderer", async () => {
+  async function badgeSvgSource() {
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const source = fs.readFileSync(
+    return fs.readFileSync(
       path.resolve(__dirname, "../../lib/render/BadgeSvg.tsx"),
       "utf8",
     );
-    for (const category of STUDIO_CATEGORIES.filter((c) => !c.previewOnly)) {
+  }
+
+  it("offers none of the retired preview-only categories", () => {
+    const keys = STUDIO_CATEGORIES.map((c) => String(c.key));
+    for (const retired of RETIRED) {
+      expect(keys).not.toContain(retired);
+    }
+  });
+
+  it("is consumed by the SVG renderer, category by category", async () => {
+    const source = await badgeSvgSource();
+    for (const category of STUDIO_CATEGORIES) {
       expect(source, category.key).toContain(`config.${category.key}`);
     }
   });
 
-  it("no preview-only category is read by the SVG renderer", async () => {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const source = fs.readFileSync(
-      path.resolve(__dirname, "../../lib/render/BadgeSvg.tsx"),
-      "utf8",
-    );
-    for (const category of STUDIO_CATEGORIES.filter((c) => c.previewOnly)) {
-      expect(source, category.key).not.toContain(`config.${category.key}`);
+  it("leaves no retired category behind in the SVG renderer", async () => {
+    const source = await badgeSvgSource();
+    for (const retired of RETIRED) {
+      expect(source, retired).not.toContain(`config.${retired}`);
     }
   });
 });

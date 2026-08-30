@@ -42,10 +42,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         border: "solid-amber",
         scoreEffect: "standard",
         heatmapAnimation: "fade-in",
-        interaction: "static",
-        statsDisplay: "static",
         tierTreatment: "standard",
-        celebration: "none",
       },
     },
     {
@@ -57,10 +54,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         border: "glow",
         scoreEffect: "counter",
         heatmapAnimation: "wave",
-        interaction: "tilt",
-        statsDisplay: "counter",
         tierTreatment: "glow",
-        celebration: "confetti",
       },
     },
   ],
@@ -263,10 +257,7 @@ vi.mock("@/components/terminal/command-registry", () => {
       border: "border",
       scoreEffect: "score",
       heatmapAnimation: "heatmap",
-      interaction: "interact",
-      statsDisplay: "stats",
       tierTreatment: "tier",
-      celebration: "celebrate",
     },
   };
 });
@@ -298,10 +289,7 @@ const defaultConfig: BadgeConfig = {
   border: "solid-amber",
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
-  interaction: "static",
-  statsDisplay: "static",
   tierTreatment: "standard",
-  celebration: "none",
 };
 
 const stats: StatsData = {
@@ -482,18 +470,6 @@ describe("StudioClient render", () => {
       const preview = screen.getByTestId("badge-preview");
       expect(preview).toBeDefined();
       expect(preview.textContent).toContain('"background":"solid"');
-    });
-
-    it("renders BadgePreviewCard with interactive=true by default", () => {
-      render(
-        <StudioClient
-          initialConfig={defaultConfig}
-          stats={stats}
-          impact={impact}
-        />,
-      );
-      const preview = screen.getByTestId("badge-preview");
-      expect(preview.getAttribute("data-interactive")).toBe("true");
     });
 
     it("forwards verification to BadgePreviewCard", () => {
@@ -1675,7 +1651,7 @@ describe("StudioClient render", () => {
   });
 
   describe("reduced motion", () => {
-    it("shows the reduced-motion notice and disables preview interactivity when the media query matches", () => {
+    it("shows the reduced-motion notice when the media query matches", () => {
       const original = window.matchMedia;
       window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: true,
@@ -1700,14 +1676,12 @@ describe("StudioClient render", () => {
         expect(
           screen.getByText(/Reduced motion detected/),
         ).toBeDefined();
-        const preview = screen.getByTestId("badge-preview");
-        expect(preview.getAttribute("data-interactive")).toBe("false");
       } finally {
         window.matchMedia = original;
       }
     });
 
-    it("hides the reduced-motion notice and keeps preview interactive when the media query does not match", () => {
+    it("hides the reduced-motion notice when the media query does not match", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -1717,8 +1691,6 @@ describe("StudioClient render", () => {
       );
 
       expect(screen.queryByText(/Reduced motion detected/)).toBeNull();
-      const preview = screen.getByTestId("badge-preview");
-      expect(preview.getAttribute("data-interactive")).toBe("true");
     });
   });
 
@@ -1861,10 +1833,7 @@ describe("StudioClient — v2 layout (#1216)", () => {
       "border",
       "score",
       "heatmap",
-      "interact",
-      "stats",
       "tier",
-      "celebrate",
     ]);
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, memo } from "react";
+import { memo } from "react";
 import dynamic from "next/dynamic";
 import type {
   BadgeConfig,
@@ -11,9 +11,6 @@ import type {
 import type { GlassVariant } from "@/lib/effects/cards/glass-presets";
 import { glassStyle } from "@/lib/effects/cards/glass-presets";
 import { GRADIENT_BORDER_CSS } from "@/lib/effects/borders/gradient-border-css";
-import { useTilt } from "@/lib/effects/interactions/use-tilt";
-import { HOLOGRAPHIC_CSS } from "@/lib/effects/interactions/holographic-css";
-import { fireSingleBurst } from "@/lib/effects/celebrations/confetti";
 import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
 import {
   PreviewFooter,
@@ -39,11 +36,6 @@ const LazyGradientBorder = dynamic(
   { ssr: false, loading: () => <div data-effect="gradient-border-loading" /> }
 );
 
-const LazyHolographicOverlay = dynamic(
-  () => import("@/lib/effects/interactions/HolographicOverlay").then((m) => m.HolographicOverlay),
-  { ssr: false, loading: () => <div data-effect="holographic-loading" /> }
-);
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -52,7 +44,6 @@ export interface BadgePreviewCardProps {
   config: BadgeConfig;
   stats: StatsData;
   impact: ImpactV6Result;
-  interactive?: boolean;
   verification?: PreviewVerification | null;
 }
 
@@ -64,12 +55,8 @@ function BadgePreviewCardInner({
   config,
   stats,
   impact,
-  interactive = true,
   verification = null,
 }: BadgePreviewCardProps) {
-  // --- Tilt interaction ---
-  const { ref: tiltRef, tilt, handleMouseMove, handleMouseLeave } = useTilt(15);
-  const useTiltInteraction = interactive && config.interaction === "tilt-3d";
   const linkedPlatforms: Platform[] = [
     "github",
     ...(stats.linkedPlatforms?.filter(
@@ -77,21 +64,12 @@ function BadgePreviewCardInner({
     ) ?? []),
   ];
 
-  // --- Confetti celebration on mount ---
-  useEffect(() => {
-    if (config.celebration === "confetti" && interactive) {
-      const timer = setTimeout(() => fireSingleBurst(50, "amber"), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [config.celebration, interactive]);
-
   // --- Collect CSS for active effects ---
   const css = getBadgeContentCSS({
     scoreEffect: config.scoreEffect,
     tierTreatment: config.tierTreatment,
   });
   if (config.border === "gradient-rotating") css.push(GRADIENT_BORDER_CSS);
-  if (config.interaction === "holographic") css.push(HOLOGRAPHIC_CSS);
 
   // --- Glass / flat card styles ---
   const isGlass = config.cardStyle !== "flat";
@@ -108,24 +86,12 @@ function BadgePreviewCardInner({
       }
     : {};
 
-  // --- Tilt transform ---
-  const tiltStyle: React.CSSProperties | undefined =
-    useTiltInteraction
-      ? {
-          transform: `perspective(600px) rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg)`,
-          transition: "transform 0.15s ease-out",
-        }
-      : undefined;
-
   // ------------------------------------------------------------------
-  // Card content (shared between all border/interaction wrappers)
+  // Card content (shared between all border wrappers)
   // ------------------------------------------------------------------
 
   const cardContent = (
     <div
-      ref={useTiltInteraction ? tiltRef : undefined}
-      onMouseMove={useTiltInteraction ? handleMouseMove : undefined}
-      onMouseLeave={useTiltInteraction ? handleMouseLeave : undefined}
       className={`relative overflow-hidden rounded-2xl p-6 ${
         !isGlass ? "bg-card" : ""
       } ${
@@ -133,7 +99,7 @@ function BadgePreviewCardInner({
           ? "border border-stroke"
           : ""
       }`}
-      style={{ ...cardInlineStyle, ...tiltStyle }}
+      style={cardInlineStyle}
       data-card-style={config.cardStyle}
       data-testid="badge-card"
     >
@@ -142,7 +108,6 @@ function BadgePreviewCardInner({
         impact={impact}
         scoreEffect={config.scoreEffect}
         heatmapAnimation={config.heatmapAnimation}
-        statsDisplay={config.statsDisplay}
         tierTreatment={config.tierTreatment}
         showFooter={false}
       />
@@ -154,29 +119,16 @@ function BadgePreviewCardInner({
   );
 
   // ------------------------------------------------------------------
-  // Wrap with interaction layer
-  // ------------------------------------------------------------------
-
-  const withInteraction =
-    config.interaction === "holographic" && interactive ? (
-      <LazyHolographicOverlay variant="amber" autoAnimate>
-        {cardContent}
-      </LazyHolographicOverlay>
-    ) : (
-      cardContent
-    );
-
-  // ------------------------------------------------------------------
   // Wrap with border layer
   // ------------------------------------------------------------------
 
   const withBorder =
     config.border === "gradient-rotating" ? (
       <div data-effect="gradient-border">
-        <LazyGradientBorder>{withInteraction}</LazyGradientBorder>
+        <LazyGradientBorder>{cardContent}</LazyGradientBorder>
       </div>
     ) : (
-      withInteraction
+      cardContent
     );
 
   // ------------------------------------------------------------------
@@ -206,7 +158,7 @@ function BadgePreviewCardInner({
         </div>
       )}
 
-      {/* Layers 2-6: Border + Card + Interaction + Content + Celebration */}
+      {/* Layers 2-4: Border + Card + Content */}
       {withBorder}
     </div>
   );
