@@ -179,34 +179,49 @@ describe("UserMenu — page refresh after unlink", () => {
     expect(SOURCE).toContain("next/navigation");
   });
 
-  it("Bitbucket and Codeberg handlers delegate to the shared unlink helper", () => {
-    const bbStart = SOURCE.indexOf("async function handleUnlinkBitbucket");
-    const bbEnd = SOURCE.indexOf("async function handleUnlinkCodeberg");
-    expect(SOURCE.slice(bbStart, bbEnd)).toContain("unlinkPlatform({");
-
-    const cbStart = SOURCE.indexOf("async function handleUnlinkCodeberg");
-    const cbEnd = SOURCE.indexOf("async function handleUnlinkGitlab");
-    expect(SOURCE.slice(cbStart, cbEnd)).toContain("unlinkPlatform({");
+  // #1223 — the shared unlink helper moved to
+  // lib/platform/use-platform-connections, so /settings could use the same one
+  // rather than growing a second copy. The intent is unchanged: no platform
+  // gets its own hand-rolled unlink.
+  it("every platform handler delegates to the shared unlink helper", () => {
+    for (const platform of ["Bitbucket", "Codeberg", "Gitlab"]) {
+      expect(SOURCE).toContain(
+        `const handleUnlink${platform} = () => handleUnlink("${platform.toLowerCase()}"`,
+      );
+    }
+    // One parametrized helper, delegating to the hook.
+    expect(SOURCE).toContain("await unlink(platform)");
   });
 });
 
 describe("UserMenu — platform status cache", () => {
-  it("declares a module-level platform status store outside the component", () => {
-    // Cache must be outside the component function so it persists across mounts.
-    // It is now backed by the shared createModuleStore primitive (#774).
-    const componentStart = SOURCE.indexOf("export function UserMenu");
-    const beforeComponent = SOURCE.slice(0, componentStart);
-    expect(beforeComponent).toContain("platformStatusStore");
-    expect(beforeComponent).toContain("createModuleStore");
+  // #1223 — the cache moved to lib/platform/use-platform-connections with the
+  // rest of the connection logic. It must still live at module scope there, so
+  // it persists across mounts and opening the menu does not re-probe three
+  // endpoints. Asserted against its new home.
+  const HOOK_SOURCE = fs.readFileSync(
+    path.resolve(__dirname, "../lib/platform/use-platform-connections.ts"),
+    "utf-8",
+  );
+
+  it("declares a module-level platform status store outside the hook", () => {
+    const hookStart = HOOK_SOURCE.indexOf("export function usePlatformConnections");
+    const beforeHook = HOOK_SOURCE.slice(0, hookStart);
+    expect(beforeHook).toContain("platformStatusStore");
+    expect(beforeHook).toContain("createModuleStore");
+  });
+
+  it("UserMenu no longer keeps its own copy of that store", () => {
+    expect(SOURCE).not.toContain("createModuleStore");
   });
 
   it("cache has per-platform fetched/status entries", () => {
-    expect(SOURCE).toContain("fetched");
-    expect(SOURCE).toContain("pending");
-    expect(SOURCE).toContain("PlatformStatusEntry");
-    expect(SOURCE).toContain("status: null");
+    expect(HOOK_SOURCE).toContain("fetched");
+    expect(HOOK_SOURCE).toContain("pending");
+    expect(HOOK_SOURCE).toContain("PlatformStatusEntry");
+    expect(HOOK_SOURCE).toContain("status: null");
     // The cache type should track platform statuses
-    expect(SOURCE).toMatch(/PlatformStatusCache\b/);
+    expect(HOOK_SOURCE).toMatch(/PlatformStatusCache\b/);
   });
 });
 

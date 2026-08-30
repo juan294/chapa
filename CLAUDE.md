@@ -34,7 +34,8 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ### Pages
 - GET `/` Landing + GitHub login (terminal-first UI)
-- GET `/studio` Creator Studio (badge preview customization, requires auth)
+- GET `/studio` Creator Studio (badge customization, requires auth)
+- GET `/settings` Account settings — connections, AI insights import, identity (requires auth, noindex)
 - GET `/admin` Admin dashboard (requires auth + admin handle, see `ADMIN_HANDLES`)
 - GET `/u/:handle` Share page (badge preview, breakdown, embed snippet, share CTA)
 - GET `/u/:handle/badge.svg` Embeddable badge SVG (cacheable)
@@ -194,6 +195,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Lifetime history: `apps/web/lib/history/*`
 - Data access (Supabase): `apps/web/lib/db/*`
 - Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
+- Account settings: `apps/web/app/settings/*` (#1223) — connections, AI insights import and identity on a real page instead of only inside `UserMenu`'s dropdown. The connection and import logic lives in `apps/web/lib/platform/use-platform-connections.ts` and `apps/web/lib/insights/use-insights-import.ts`, shared with `UserMenu` rather than copied — the badge already taught this lesson (#1191). Account deletion is deliberately out of scope: it exists only as `scripts/delete-user.ts`, and making it self-serve is a retention decision, not a UI one.
 - Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
 - Section header pattern: `apps/web/components/SectionHeader.tsx` (#1214) — the `% chapa <command>` marker plus right-aligned meta and rule, used by the landing page's sections
 - Content page shell: `apps/web/components/content/*` (#1218) — `ContentPageHeader` (marker + title + intro) and `OnThisPageIndex` (sticky section index with an accent rail), shared by `/about`, `/about/scoring`, `/about/verification`, `/privacy`, `/terms` and `/verify`

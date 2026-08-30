@@ -9,8 +9,11 @@ import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
-import { createModuleStore } from "@/hooks/createModuleStore";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
+import {
+  usePlatformConnections,
+  clearPlatformStatusCache,
+  type PlatformId,
+} from "@/lib/platform/use-platform-connections";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 import {
@@ -22,48 +25,13 @@ import {
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Toast } from "./Toast";
 
-/** Module-level cache for platform status fetches — persists across mounts. */
-interface PlatformStatus {
-  linked: boolean;
-  remoteLogin: string | null;
-}
-type PlatformId = "bitbucket" | "codeberg" | "gitlab";
-interface PlatformStatusEntry {
-  fetched: boolean;
-  pending: boolean;
-  status: PlatformStatus | null;
-}
-interface PlatformStatusCache {
-  bitbucket: PlatformStatusEntry;
-  codeberg: PlatformStatusEntry;
-  gitlab: PlatformStatusEntry;
-}
-
-function emptyPlatformStatusCache(): PlatformStatusCache {
-  const emptyEntry = (): PlatformStatusEntry => ({
-    fetched: false,
-    pending: false,
-    status: null,
-  });
-  return {
-    bitbucket: emptyEntry(),
-    codeberg: emptyEntry(),
-    gitlab: emptyEntry(),
-  };
-}
-
-// Backed by the shared module-store primitive (#774). This cache is read
-// imperatively (in useState initializers and effects) and written
-// imperatively after fetches/unlinks — there are no reactive subscribers, so
-// `getSnapshot()`/`set()` are used directly.
-const platformStatusStore = createModuleStore<PlatformStatusCache>(
-  emptyPlatformStatusCache(),
-);
-
-/** Clear the platform status cache — call after link/unlink actions */
-export function clearPlatformStatusCache() {
-  platformStatusStore.set(emptyPlatformStatusCache());
-}
+/**
+ * #1223 — the platform-connection cache, status fetching and unlink flow moved
+ * to `lib/platform/use-platform-connections`, because `/settings` needs exactly
+ * the same behaviour and a second copy is how the badge ended up with two
+ * implementations (#1191). Re-exported here so existing importers keep working.
+ */
+export { clearPlatformStatusCache };
 
 interface UserMenuProps {
   login: string;
@@ -100,9 +68,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const {
     studioEnabled,
     insightsEnabled,
-    bitbucketEnabled,
-    codebergEnabled,
-    gitlabEnabled,
+    // The three platform flags are read by usePlatformConnections, which only
+    // probes the status endpoint for enabled platforms (#885). A disabled
+    // platform therefore has a null status, and the sections below gate on
+    // that rather than on the flag directly.
   } = useClientFeatureFlags();
   const { t } = useTranslation();
   const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: login });
@@ -113,26 +82,20 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const { shouldRender: showDropdown, isAnimatingOut: dropdownExiting } =
     useAnimatedUnmount(open, 200);
 
-  const [bbStatus, setBbStatus] = useState<{
-    linked: boolean;
-    remoteLogin: string | null;
-  } | null>(() => platformStatusStore.getSnapshot().bitbucket.status);
+  const { connections, unlink } = usePlatformConnections();
+  const statusOf = (platform: PlatformId) =>
+    connections.find((c) => c.platform === platform)?.status ?? null;
+  const unlinkingOf = (platform: PlatformId) =>
+    connections.find((c) => c.platform === platform)?.unlinking ?? false;
+  const bbStatus = statusOf("bitbucket");
+  const cbStatus = statusOf("codeberg");
+  const glStatus = statusOf("gitlab");
+  const unlinkLoading = unlinkingOf("bitbucket");
+  const cbUnlinkLoading = unlinkingOf("codeberg");
+  const glUnlinkLoading = unlinkingOf("gitlab");
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
-  const [unlinkLoading, setUnlinkLoading] = useState(false);
-
-  const [cbStatus, setCbStatus] = useState<{
-    linked: boolean;
-    remoteLogin: string | null;
-  } | null>(() => platformStatusStore.getSnapshot().codeberg.status);
   const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
-  const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
-
-  const [glStatus, setGlStatus] = useState<{
-    linked: boolean;
-    remoteLogin: string | null;
-  } | null>(() => platformStatusStore.getSnapshot().gitlab.status);
   const [showGlUnlinkConfirm, setShowGlUnlinkConfirm] = useState(false);
-  const [glUnlinkLoading, setGlUnlinkLoading] = useState(false);
 
   // Insights import — file picker triggered directly from menu
   const insightsFileRef = useRef<HTMLInputElement>(null);
@@ -267,126 +230,23 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     }
   }, []);
 
-  useEffect(() => {
-    // Only probe the status endpoint for platforms whose public feature flag is
-    // enabled. When an integration is flag-gated OFF we skip the network call
-    // entirely instead of relying on the server to answer `{ enabled: false }`,
-    // avoiding wasted requests on every mount (#885). The server still has the
-    // final say for enabled platforms.
-    function fetchPlatformStatus(
-      platform: PlatformId,
-      setter: typeof setBbStatus,
-    ) {
-      if (platformStatusStore.getSnapshot()[platform].fetched || platformStatusStore.getSnapshot()[platform].pending) {
-        return;
-      }
 
-      platformStatusStore.set({
-        ...platformStatusStore.getSnapshot(),
-        [platform]: {
-          ...platformStatusStore.getSnapshot()[platform],
-          pending: true,
-        },
-      });
-      fireAndForget(
-        () =>
-          fetch(`/api/auth/${platform}/status`)
-            .then((r) => r.json())
-            .then((data) => {
-              const status = data.enabled
-                ? { linked: data.linked, remoteLogin: data.remoteLogin }
-                : null;
-              platformStatusStore.set({
-                ...platformStatusStore.getSnapshot(),
-                [platform]: { fetched: true, pending: false, status },
-              });
-              if (data.enabled) {
-                setter(status);
-              }
-            }),
-        () => {
-          platformStatusStore.set({
-            ...platformStatusStore.getSnapshot(),
-            [platform]: {
-              ...platformStatusStore.getSnapshot()[platform],
-              pending: false,
-            },
-          });
-        },
-      ); // Graceful — menu works without status
+  // #1223 — the fetch, cache clear and failure handling live in
+  // usePlatformConnections now; this component keeps only the confirm-dialog
+  // and toast bookkeeping that is specific to the menu.
+  async function handleUnlink(platform: PlatformId, close: (open: boolean) => void) {
+    const ok = await unlink(platform);
+    if (ok) {
+      close(false);
+      router.refresh();
+    } else {
+      setToast({ message: t('userMenu.unlinkFailed') as string, type: "error" });
     }
-    if (bitbucketEnabled) fetchPlatformStatus("bitbucket", setBbStatus);
-    if (codebergEnabled) fetchPlatformStatus("codeberg", setCbStatus);
-    if (gitlabEnabled) fetchPlatformStatus("gitlab", setGlStatus);
-  }, [bitbucketEnabled, codebergEnabled, gitlabEnabled]);
-
-  // Shared unlink flow — collapses the three near-identical platform disconnect
-  // handlers into one parametrized helper (#884). Each named handler below
-  // supplies only its platform-specific endpoint and state setters; the fetch,
-  // success transition (cache clear + router refresh), graceful-failure, and
-  // loading-state bookkeeping live here once.
-  type PlatformStatusSetter = typeof setBbStatus;
-  const unlinkPlatform = useCallback(
-    async (config: {
-      endpoint: string;
-      setLoading: (loading: boolean) => void;
-      setStatus: PlatformStatusSetter;
-      setShowConfirm: (show: boolean) => void;
-    }) => {
-      const { endpoint, setLoading, setStatus, setShowConfirm } = config;
-      setLoading(true);
-      try {
-        const res = await fetch(endpoint, { method: "POST" });
-        const body = await res.json().catch(() => null);
-        if (res.ok && body?.success === true) {
-          clearPlatformStatusCache();
-          setStatus({ linked: false, remoteLogin: null });
-          setShowConfirm(false);
-          router.refresh();
-        } else {
-          setToast({
-            message: t('userMenu.unlinkFailed') as string,
-            type: "error",
-          });
-        }
-      } catch {
-        setToast({
-          message: t('userMenu.unlinkFailed') as string,
-          type: "error",
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [router, t],
-  );
-
-  async function handleUnlinkBitbucket() {
-    await unlinkPlatform({
-      endpoint: "/api/auth/bitbucket/disconnect",
-      setLoading: setUnlinkLoading,
-      setStatus: setBbStatus,
-      setShowConfirm: setShowUnlinkConfirm,
-    });
   }
 
-  async function handleUnlinkCodeberg() {
-    await unlinkPlatform({
-      endpoint: "/api/auth/codeberg/disconnect",
-      setLoading: setCbUnlinkLoading,
-      setStatus: setCbStatus,
-      setShowConfirm: setShowCbUnlinkConfirm,
-    });
-  }
-
-  async function handleUnlinkGitlab() {
-    await unlinkPlatform({
-      endpoint: "/api/auth/gitlab/disconnect",
-      setLoading: setGlUnlinkLoading,
-      setStatus: setGlStatus,
-      setShowConfirm: setShowGlUnlinkConfirm,
-    });
-  }
+  const handleUnlinkBitbucket = () => handleUnlink("bitbucket", setShowUnlinkConfirm);
+  const handleUnlinkCodeberg = () => handleUnlink("codeberg", setShowCbUnlinkConfirm);
+  const handleUnlinkGitlab = () => handleUnlink("gitlab", setShowGlUnlinkConfirm);
 
   async function handleSignOut() {
     // Clear all module-level per-user caches before navigating away.
@@ -515,6 +375,30 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 {t('userMenu.creatorStudio') as string}
               </Link>
             )}
+            {/* #1223 — the menu stops being the only home for account actions.
+                Connections, insights import and sign-out all have a real page
+                now; this is the way in. */}
+            <Link
+              href="/settings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+            >
+              <svg
+                className="h-4 w-4 text-text-secondary"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
+              </svg>
+              {t('settings.settingsLink') as string}
+            </Link>
             {insightsEnabled && (
               <>
                 {/* #1184 (FE-L1) — the file input must be a sibling, not a
