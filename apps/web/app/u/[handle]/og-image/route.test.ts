@@ -176,6 +176,9 @@ describe("GET /u/[handle]/og-image", () => {
         verificationHash: "abc12345",
         verificationDate: "2026-02-14",
         disableAnimation: true,
+        // #1191 — the owner's Studio configuration, resolved through the
+        // shared helper so every render site agrees on the same cache slot.
+        config: expect.objectContaining({ border: expect.any(String) }),
         // #1190 — the badge strings for the request's locale, from the same
         // resolved bundle that keyed the cache entry.
         strings: expect.objectContaining({ metricsVerified: expect.any(String) }),

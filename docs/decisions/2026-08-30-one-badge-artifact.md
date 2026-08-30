@@ -98,10 +98,27 @@ design.** Two axes, and both already have machinery:
   monotonic counter added by migration `035` and validated by
   `dbGetStudioConfig`. Nothing outside that module consumes it today.
 
-**Once config affects the render, the config revision MUST enter the badge
-cache key.** Without it a user saves a change and keeps being served the badge
-built from their previous config until the day rolls over. That single line is
-the difference between this working and this being a bug report.
+**Once config affects the render, a config change must invalidate the badge
+cache.** Without that a user saves a change and keeps being served the badge
+built from their previous config until the day rolls over.
+
+The first draft of this ADR said the revision must enter the badge cache key.
+That is wrong, and the reason is worth recording. The badge cache-hit path is a
+single Redis read against a p95 budget of 800ms
+(`lib/monitoring/latency-slo.ts`). Putting the revision in the key means
+resolving it before the lookup, which puts a Supabase round-trip in front of
+the warmest path in the product on every request, hit or miss.
+
+So the mechanism is invalidation, not keying: saving a Studio config deletes
+that handle's badge entries, exactly as a platform link/unlink already does via
+`invalidateBadgeSvgCache` (which clears every locale's entry since #1190). The
+render path — the cache MISS path, budgeted at 4100ms and already doing GitHub
+and Redis work — is where the config is loaded, and that read can run
+concurrently with materialization.
+
+The accepted risk is the same one link/unlink already carries: an invalidation
+that fails leaves a stale badge until the day rolls over. That is self-healing
+and cheap, where a database read on every badge request is neither.
 
 The verification seal is unaffected and should stay that way: it covers
 `stats + impact + date`, never the rendering. The seal attests that the numbers

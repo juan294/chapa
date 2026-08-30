@@ -12,6 +12,7 @@ import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeConfig } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
@@ -269,6 +270,9 @@ export async function SharePageContent({
     }
     inlineSvg = renderBadgeSvg(stats, impact, {
       avatarDataUri,
+      // #1191 — this render writes to the same cache slot the badge route
+      // reads, so it must use the same config.
+      config: await resolveBadgeConfig(handle),
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
       // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,

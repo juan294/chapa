@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeConfig } from "@/lib/render/badge-config";
 import { getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
@@ -304,9 +305,14 @@ async function finalizeMaterializedBadge(
   }
   const verification = getPublicProfileVerification(materialized);
 
+  // #1191 — the owner's Studio configuration. Resolved on the RENDER path only;
+  // the cache-hit path above must stay a single Redis read.
+  const config = await resolveBadgeConfig(handle);
+
   const renderStart = Date.now();
   const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
     avatarDataUri,
+    config,
     verificationHash: verification?.hash,
     verificationDate: verification?.date,
     // This SVG is always served to <img> embeds (README badges), where SMIL

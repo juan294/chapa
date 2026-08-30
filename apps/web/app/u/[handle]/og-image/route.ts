@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeConfig } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import { DEFAULT_LOCALE, isSupportedLocale } from "@/lib/i18n/types";
 import type { Locale } from "@/lib/i18n/types";
@@ -95,6 +96,7 @@ export async function GET(
 
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
+      config: await resolveBadgeConfig(handle),
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
       // Rasterized to PNG below — SMIL <animate> never runs during rasterization,

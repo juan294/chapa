@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import {
   getOptionalRequestSession,
   getSessionSecret,
@@ -136,6 +139,15 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
       { status: 500 },
     );
   }
+
+  // #1191 — the badge cache key carries handle/variant/date/locale but nothing
+  // about the config, so a save has to say explicitly that the rendered badge
+  // is now wrong. Fire-and-forget: a failed invalidation leaves a stale badge
+  // until the day rolls over, which is the same self-healing risk the platform
+  // link/unlink path already accepts, and is not worth failing a save over.
+  fireAndForget(() =>
+    invalidateBadgeSvgCacheForHandle(normalizedLogin, toDateString(new Date())),
+  );
 
   return NextResponse.json({ success: true });
 });
