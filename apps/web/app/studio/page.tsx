@@ -9,6 +9,10 @@ import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { getPublicProfileVerification } from "@/lib/profile/public-profile";
 import { loadStudioConfig } from "@/lib/db/studio";
+import {
+  resolveBadgeAvatar,
+  getBadgeAvatarDataUri,
+} from "@/lib/render/avatar-outcome";
 import { Navbar } from "@/components/Navbar";
 import { StudioClient, type StudioClientProps } from "./StudioClient";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
@@ -41,6 +45,14 @@ export async function generateMetadata(
     ...(isDemo ? { robots: { index: false, follow: false } } : {}),
   };
 }
+
+/**
+ * Studio is an authenticated, non-cached page a signed-in owner waits on
+ * deliberately, so it can afford a slightly longer avatar deadline than the
+ * share page's 250ms cache-miss path — but still bounded, because a dead image
+ * host must never hang the editor.
+ */
+const STUDIO_AVATAR_DEADLINE_MS = 1_000;
 
 async function renderStudio(clientProps: StudioClientProps) {
   const locale = await getServerLocale();
@@ -113,6 +125,17 @@ export default async function StudioPage(
     ? savedConfigResult.config
     : DEFAULT_BADGE_CONFIG;
 
+  // #1191 step 6 — the preview renders the real badge SVG, which draws the
+  // owner's avatar, so it has to be resolved here the way the badge route
+  // resolves it. Best-effort against a bounded deadline: a slow external image
+  // host must not hold up the page, and the badge already falls back to the
+  // Chapa shield placeholder when no data URI is available.
+  const avatarOutcome = await resolveBadgeAvatar(
+    session.login,
+    materialized.stats.avatarUrl,
+    { deadlineMs: STUDIO_AVATAR_DEADLINE_MS },
+  );
+
   return renderStudio({
     initialConfig,
     stats: materialized.stats,
@@ -120,5 +143,6 @@ export default async function StudioPage(
     craftResult: materialized.craftResult,
     handle: session.login,
     verification,
+    avatarDataUri: getBadgeAvatarDataUri(avatarOutcome),
   });
 }

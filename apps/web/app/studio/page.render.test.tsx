@@ -17,6 +17,13 @@ const mocks = vi.hoisted(() => ({
   loadStudioConfig: vi.fn(),
   getServerLocale: vi.fn(),
   getServerT: vi.fn(),
+  resolveBadgeAvatar: vi.fn(),
+  getBadgeAvatarDataUri: vi.fn(),
+}));
+
+vi.mock("@/lib/render/avatar-outcome", () => ({
+  resolveBadgeAvatar: mocks.resolveBadgeAvatar,
+  getBadgeAvatarDataUri: mocks.getBadgeAvatarDataUri,
 }));
 
 vi.mock("next/headers", () => ({
@@ -77,6 +84,7 @@ vi.mock("./StudioClient", () => ({
     craftResult,
     initialConfig,
     verification,
+    avatarDataUri,
     demo,
   }: {
     handle: string;
@@ -85,6 +93,7 @@ vi.mock("./StudioClient", () => ({
     craftResult: CraftResult | null;
     initialConfig: { theme?: string; background?: string };
     verification: { hash: string; date: string } | null;
+    avatarDataUri?: string;
     demo?: boolean;
   }) => {
     const [mountedMode] = useState(demo ? "demo" : "live");
@@ -98,6 +107,7 @@ vi.mock("./StudioClient", () => ({
         data-config-theme={initialConfig.theme ?? "none"}
         data-config-background={initialConfig.background ?? "none"}
         data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
+        data-avatar={avatarDataUri ?? "none"}
         data-demo={String(demo ?? false)}
         data-mounted-mode={mountedMode}
       />
@@ -167,6 +177,11 @@ beforeEach(() => {
     status: "found",
     config: { theme: "saved-theme" },
   });
+  mocks.resolveBadgeAvatar.mockResolvedValue({
+    status: "resolved",
+    dataUri: "data:image/png;base64,AVATAR",
+  });
+  mocks.getBadgeAvatarDataUri.mockReturnValue("data:image/png;base64,AVATAR");
   mocks.getServerLocale.mockResolvedValue("en");
   mocks.getServerT.mockReturnValue(
     (key: string) =>
@@ -294,6 +309,47 @@ describe("StudioPage render", () => {
       expect.objectContaining({ stats }),
     );
     expect(mocks.loadStudioConfig).toHaveBeenCalledWith("octocat");
+  });
+
+  // #1191 step 6 — Studio previews the real badge SVG, and the real badge
+  // draws the owner's avatar. The page resolves it server-side exactly as the
+  // badge route does; without it the preview shows the shield placeholder and
+  // stops matching the artifact it claims to preview.
+  it("resolves the badge avatar server-side and forwards it to the client", async () => {
+    const { default: StudioPage } = await import("./page");
+
+    render(await StudioPage());
+
+    expect(mocks.resolveBadgeAvatar).toHaveBeenCalledWith(
+      "octocat",
+      stats.avatarUrl,
+      expect.objectContaining({ deadlineMs: expect.any(Number) }),
+    );
+    expect(screen.getByTestId("studio-client").getAttribute("data-avatar")).toBe(
+      "data:image/png;base64,AVATAR",
+    );
+  });
+
+  it("still renders when the avatar cannot be resolved", async () => {
+    mocks.getBadgeAvatarDataUri.mockReturnValue(undefined);
+
+    const { default: StudioPage } = await import("./page");
+
+    render(await StudioPage());
+
+    expect(screen.getByTestId("studio-client").getAttribute("data-avatar")).toBe(
+      "none",
+    );
+  });
+
+  it("does not fetch an avatar for the anonymous demo", async () => {
+    mocks.isStudioDemoEnabled.mockResolvedValue(true);
+
+    const { default: StudioPage } = await import("./page");
+
+    render(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
+
+    expect(mocks.resolveBadgeAvatar).not.toHaveBeenCalled();
   });
 
   it("fails instead of rendering fabricated zero metrics when profile loading fails", async () => {
