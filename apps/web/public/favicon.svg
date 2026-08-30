@@ -2,20 +2,20 @@
   <!-- Dark background with rounded corners -->
   <rect width="32" height="32" rx="6" fill="#0C0D14"/>
 
-  <!-- Purple glow -->
+  <!-- Jade glow -->
   <circle cx="16" cy="16" r="14" fill="url(#glow)" opacity="1"/>
   <defs>
     <radialGradient id="glow">
-      <stop offset="0%" stop-color="rgba(139,92,246,0.25)"/>
-      <stop offset="100%" stop-color="transparent"/>
+      <stop offset="0%" stop-color="#1BD093" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#1BD093" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
   <!-- Shield -->
   <path d="M16 4 L26 8 L26 15 C26 21 21 26 16 28 C11 26 6 21 6 15 L6 8 Z"
-        fill="rgba(139,92,246,0.12)" stroke="#8B5CF6" stroke-width="1.2"/>
+        fill="rgba(27,208,147,0.12)" stroke="#1BD093" stroke-width="1.2"/>
 
   <!-- Chevron -->
-  <path d="M12 19 L16 13 L20 19" stroke="#8B5CF6" stroke-width="2.2"
+  <path d="M12 19 L16 13 L20 19" stroke="#1BD093" stroke-width="2.2"
         stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
