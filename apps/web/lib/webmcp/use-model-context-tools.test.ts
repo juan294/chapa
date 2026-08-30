@@ -94,6 +94,29 @@ describe("useModelContextTools", () => {
     });
   });
 
+  it("supplies a fallback signal when the browser omits the execution context", async () => {
+    const registerTool = vi.fn().mockResolvedValue(undefined);
+    installModelContext(registerTool);
+    const execute = vi.fn().mockResolvedValue("tool result");
+    const tool = { ...makeTool("context_optional_tool"), execute };
+
+    renderHook(() => useModelContextTools([tool], true));
+
+    const registered = readRegisterCall(registerTool);
+    const inputs = { value: "hello" };
+    await expect(
+      Reflect.apply(registered.tool.execute, registered.tool, [inputs]),
+    ).resolves.toBe("tool result");
+    expect(execute).toHaveBeenCalledWith(inputs, {
+      signal: expect.any(AbortSignal),
+    });
+    const [, context] = execute.mock.calls[0] as [
+      Record<string, unknown>,
+      { signal: AbortSignal },
+    ];
+    expect(context.signal.aborted).toBe(false);
+  });
+
   it("does not register tools when disabled", () => {
     const registerTool = vi.fn().mockResolvedValue(undefined);
     installModelContext(registerTool);
