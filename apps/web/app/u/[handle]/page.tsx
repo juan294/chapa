@@ -3,7 +3,6 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { isValidHandle } from "@/lib/validation";
-import { Navbar } from "@/components/Navbar";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
@@ -42,11 +41,9 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { getTrendData } from "@/lib/history/get-trend-data";
 import { redactSnapshotDiffForVisitor } from "@/lib/history/diff";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
-import { DEFAULT_LOCALE, LanguageProvider, LocaleSync } from "@/lib/i18n";
-import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
+import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import type { Locale } from "@/lib/i18n";
-import { en } from "@/lib/i18n/dictionaries/en";
-import { es } from "@/lib/i18n/dictionaries/es";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -135,26 +132,14 @@ export default async function SharePage({ params, searchParams }: SharePageProps
     notFound();
   }
 
+  const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
+
   return (
-    <>
-      {/* #1165 (FE-M1) — this route is dynamic (not ISR, see below), so the
-          resolved-per-request locale is known here already. The root layout
-          always renders `<html lang="es">` statically (#861), so a genuine
-          English request (cookie/header/`?lang=en`) would otherwise ship
-          English body copy inside `<html lang="es">` in the served HTML.
-          Mirrors the landing page's / `/verify` pages' own use of this
-          component (see docs there for the LangSync interplay). */}
-      <DocumentLocaleScript locale={locale} />
-      <LanguageProvider
-        initialLocale={locale}
-        // #1071 — the root layout's LanguageProvider already serializes the
-        // DEFAULT_LOCALE dictionary into the RSC payload. When this page's
-        // per-request locale matches it, omit the prop entirely so it isn't
-        // serialized a second time — LanguageProvider reuses that ancestor's
-        // context instead. Only a genuine mismatch (e.g. `?lang=` override)
-        // needs its own dictionary supplied here.
-        dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
-      >
+    // #1194 (FE-S1) — this route is dynamic, so it needs all three corrections
+    // the static root layout cannot make: the session-aware server Navbar
+    // (FE-H2), `<html lang>` (FE-M1), and the real dictionary. They are one
+    // component now rather than three per-page decisions.
+    <DynamicRouteShell locale={locale} navLinks={innerNavLinks}>
         {/* Establish query ownership in the hydrated shell. The streamed client
             subtree then starts with the same dictionary as its server markup. */}
         <LocaleSync queryLang={queryLang} />
@@ -168,8 +153,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
               visitors. The "/" shortcut and full command bar remain available. */}
           <CommandBarHint />
         </main>
-      </LanguageProvider>
-    </>
+    </DynamicRouteShell>
   );
 }
 
@@ -355,7 +339,6 @@ export async function SharePageContent({
   // #1167 (UX-B1) — real routes (/about, /about/scoring, /verify) for the
   // server Navbar's center nav, NOT the landing page's `landing.navLinks`
   // hash anchors (`#features`, etc.), which are meaningless off that page.
-  const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
   const embedBadgeUrl = `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`;
   const embedAltText = `${t('shareOwner.badgeAltOf') as string} ${handle}`;
   const embedMarkdown = `![${embedAltText}](${embedBadgeUrl})`;
@@ -413,13 +396,6 @@ export async function SharePageContent({
           __html: renderJsonLd(personJsonLd),
         }}
       />
-
-      {/* #1165 (FE-H2) — this route is dynamic (not ISR), so it uses the
-          server Navbar variant (session sourced via headers(), rendered
-          synchronously) instead of the client variant's round trip to
-          /api/auth/session. `locale` is already resolved above; passing it
-          avoids Navbar re-deriving it a second time. */}
-      <Navbar locale={locale} navLinks={innerNavLinks} />
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />

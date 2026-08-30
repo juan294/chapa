@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
-import { Navbar } from "@/components/Navbar";
+import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { SettingsClient } from "./SettingsClient";
 
@@ -32,22 +32,27 @@ export default async function SettingsPage() {
   const t = getServerT(locale);
 
   return (
-    <main id="main-content" className="min-h-screen bg-bg">
-      <Navbar
-        navLinks={[
-          {
-            label: t("settings.navLinkYourBadge") as string,
-            href: `/u/${session.login}`,
-          },
-        ]}
-      />
-      <div className="pt-[57px]">
-        <SettingsClient
-          login={session.login}
-          name={session.name ?? null}
-          avatarUrl={session.avatar_url ?? null}
-        />
-      </div>
-    </main>
+    // #1194 — the shell supplies the navbar AND the two locale corrections
+    // the static root layout cannot make. Before it, this route rendered in
+    // DEFAULT_LOCALE for every visitor regardless of their cookie or header.
+    <DynamicRouteShell
+      locale={locale}
+      navLinks={[
+        {
+          label: t("settings.navLinkYourBadge") as string,
+          href: `/u/${session.login}`,
+        },
+      ]}
+    >
+      <main id="main-content" className="min-h-screen bg-bg">
+        <div className="pt-[57px]">
+          <SettingsClient
+            login={session.login}
+            name={session.name ?? null}
+            avatarUrl={session.avatar_url ?? null}
+          />
+        </div>
+      </main>
+    </DynamicRouteShell>
   );
 }

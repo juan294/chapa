@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/headers", () => ({
   headers: mocks.headers,
+  // #1194 — the page resolves its locale now (via DynamicRouteShell), and
+  // getServerLocale reads the chapa-locale cookie.
+  cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
 }));
 
 vi.mock("next/navigation", () => ({

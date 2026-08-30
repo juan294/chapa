@@ -598,7 +598,10 @@ describe("Phase 4d — Share page i18n", () => {
       const contentStart = SOURCE.indexOf(
         "export async function SharePageContent",
       );
-      const provider = SOURCE.indexOf("<LanguageProvider", pageStart);
+      // #1194 — the provider is inside DynamicRouteShell now; the ordering
+      // this test protects (provider established before the streamed content
+      // starts) is the shell's opening tag.
+      const provider = SOURCE.indexOf("<DynamicRouteShell", pageStart);
       const localeSync = SOURCE.indexOf("<LocaleSync", pageStart);
       const suspense = SOURCE.indexOf("<Suspense", pageStart);
 

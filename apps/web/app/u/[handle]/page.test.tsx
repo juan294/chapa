@@ -183,7 +183,7 @@ import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { Navbar } from "@/components/Navbar";
 import { SiteFooter } from "@/components/SiteFooter";
-import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 
 /**
  * Recursively walk a rendered React element tree (as returned by an async
@@ -347,10 +347,10 @@ describe("SharePage /u/[handle]", () => {
       expect(mockGetServerLocale).toHaveBeenCalledWith("en");
       const provider = findElement(
         result,
-        (el) => !!el.props && "initialLocale" in el.props,
+        (el) => el.type === DynamicRouteShell,
       );
       expect(provider).not.toBeNull();
-      expect(provider!.props.initialLocale).toBe("en");
+      expect(provider!.props.locale).toBe("en");
     });
 
     it("SharePage's LanguageProvider falls back to the cookie-resolved locale when ?lang= is absent", async () => {
@@ -368,9 +368,9 @@ describe("SharePage /u/[handle]", () => {
       expect(mockGetServerLocale).toHaveBeenCalledWith(null);
       const provider = findElement(
         result,
-        (el) => !!el.props && "initialLocale" in el.props,
+        (el) => el.type === DynamicRouteShell,
       );
-      expect(provider!.props.initialLocale).toBe("es");
+      expect(provider!.props.locale).toBe("es");
     });
 
     it("generateMetadata and the body resolve to the same locale for an identical request", async () => {
@@ -389,9 +389,9 @@ describe("SharePage /u/[handle]", () => {
       expect(forwardedValues.every((value) => value === "en")).toBe(true);
       const provider = findElement(
         bodyResult,
-        (el) => !!el.props && "initialLocale" in el.props,
+        (el) => el.type === DynamicRouteShell,
       );
-      expect(provider!.props.initialLocale).toBe("en");
+      expect(provider!.props.locale).toBe("en");
     });
   });
 
@@ -949,11 +949,25 @@ describe("SharePage /u/[handle]", () => {
   // /api/auth/session. isOwner stays a DISPLAY gate only — the redaction
   // tests above are the actual security boundary and must be unaffected.
   describe("server Navbar + isOwner prop threading (#1165 / FE-H2)", () => {
-    it("renders the server Navbar, not NavbarClient", async () => {
-      const result = await renderPage("testuser");
+    // #1194 — the server-vs-client Navbar choice is no longer made here. The
+    // page hands its locale and links to DynamicRouteShell, which renders the
+    // server variant; DynamicRouteShell.render.test.tsx asserts that half.
+    // #1194 — the shell lives on the OUTER page, not inside SharePageContent:
+    // the navbar moved out of the Suspense boundary with it, so it no longer
+    // waits behind the badge skeleton.
+    it("delegates the navbar to the dynamic-route shell", async () => {
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
 
-      const navbarEl = findElement(result, (el) => el.type === Navbar);
-      expect(navbarEl).not.toBeNull();
+      expect(findElement(result, (el) => el.type === DynamicRouteShell)).not.toBeNull();
+      expect(findElement(result, (el) => el.type === Navbar)).toBeNull();
+    });
+
+    it("no longer renders a navbar inside the streamed content", async () => {
+      const inner = await renderPage("testuser");
+      expect(findElement(inner, (el) => el.type === Navbar)).toBeNull();
     });
 
     it("threads isOwner=true to SharePageOwnerContentLazy, SharePageShortcuts, and BadgeToolbar when the session matches the handle", async () => {
@@ -1014,14 +1028,34 @@ describe("SharePage /u/[handle]", () => {
     });
 
     it("passes real-route inner nav links to the server Navbar, not the landing page's hash anchors", async () => {
-      const result = await renderPage("testuser");
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
 
-      const navbarEl = findElement(result, (el) => el.type === Navbar);
-      expect(navbarEl!.props.navLinks).toEqual([
-        { label: "Acerca de", href: "/about" },
-        { label: "Puntuación", href: "/about/scoring" },
-        { label: "Verificar", href: "/verify" },
-      ]);
+      const navbarEl = findElement(result, (el) => el.type === DynamicRouteShell);
+      // Real routes, not the landing page's hash anchors — the point of #1167.
+      expect(
+        (navbarEl!.props.navLinks as { href: string }[]).map((l) => l.href),
+      ).toEqual(["/about", "/about/scoring", "/verify"]);
+    });
+
+    // #1194 — the links are built from the route's RESOLVED locale now, not
+    // from DEFAULT_LOCALE. Before the shell they were computed inside
+    // SharePageContent, which had no resolved locale to work from.
+    it("labels the nav links in the request's resolved locale", async () => {
+      mockGetServerLocale.mockResolvedValue("es");
+
+      const result = await SharePage({
+        params: Promise.resolve({ handle: "testuser" }),
+        searchParams: Promise.resolve({}),
+      });
+
+      const shell = findElement(result, (el) => el.type === DynamicRouteShell);
+      expect(shell!.props.locale).toBe("es");
+      expect(
+        (shell!.props.navLinks as { label: string }[]).map((l) => l.label),
+      ).toEqual(["Acerca de", "Puntuación", "Verificar"]);
     });
   });
 
@@ -1037,7 +1071,7 @@ describe("SharePage /u/[handle]", () => {
         searchParams: Promise.resolve({ lang: "en" }),
       });
 
-      const scriptEl = findElement(result, (el) => el.type === DocumentLocaleScript);
+      const scriptEl = findElement(result, (el) => el.type === DynamicRouteShell);
       expect(scriptEl).not.toBeNull();
       expect(scriptEl!.props.locale).toBe("en");
     });
@@ -1050,7 +1084,7 @@ describe("SharePage /u/[handle]", () => {
         searchParams: Promise.resolve({}),
       });
 
-      const scriptEl = findElement(result, (el) => el.type === DocumentLocaleScript);
+      const scriptEl = findElement(result, (el) => el.type === DynamicRouteShell);
       expect(scriptEl!.props.locale).toBe("es");
     });
   });

@@ -13,7 +13,7 @@ import {
   resolveBadgeAvatar,
   getBadgeAvatarDataUri,
 } from "@/lib/render/avatar-outcome";
-import { Navbar } from "@/components/Navbar";
+import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import { StudioClient, type StudioClientProps } from "./StudioClient";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
@@ -60,22 +60,27 @@ async function renderStudio(clientProps: StudioClientProps) {
   const handle = clientProps.handle ?? clientProps.stats.handle;
 
   return (
-    <main id="main-content" className="min-h-screen bg-bg">
-      <Navbar
-        navLinks={[
-          { label: t('studio.navLinkStudio') as string, href: "/studio" },
-          { label: t('studio.navLinkYourBadge') as string, href: `/u/${handle}` },
-        ]}
-      />
-
-      <div className="pt-[57px]">
-        <KeyboardShortcutsListener />
-        <StudioClient
-          key={clientProps.demo ? "demo" : "live"}
-          {...clientProps}
-        />
-      </div>
-    </main>
+    // #1194 — see DynamicRouteShell: this route is dynamic, so it needs the
+    // session-aware navbar and both locale corrections together. It had
+    // neither locale correction before, so Studio rendered in DEFAULT_LOCALE
+    // for every visitor.
+    <DynamicRouteShell
+      locale={locale}
+      navLinks={[
+        { label: t('studio.navLinkStudio') as string, href: "/studio" },
+        { label: t('studio.navLinkYourBadge') as string, href: `/u/${handle}` },
+      ]}
+    >
+      <main id="main-content" className="min-h-screen bg-bg">
+        <div className="pt-[57px]">
+          <KeyboardShortcutsListener />
+          <StudioClient
+            key={clientProps.demo ? "demo" : "live"}
+            {...clientProps}
+          />
+        </div>
+      </main>
+    </DynamicRouteShell>
   );
 }
 
