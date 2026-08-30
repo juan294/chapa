@@ -389,11 +389,32 @@ async function _loadOverlays(
 /**
  * Layer every non-GitHub source onto a GitHub-derived value.
  *
- * `mergeStats` preserves the left operand's identity fields — including
- * `fetchScope` (merge.ts) — so the composed result always carries the scope of
- * the GitHub-derived value it was built from, with no post-hoc mutation.
+ * `mergeStats` is a two-operand function used here as a FOLD, so any field
+ * whose meaning is "the GitHub-derived source's own value" cannot survive that
+ * shape on its own (#1193 / BE-S1). Three fields have that meaning:
+ *
+ *   - `primaryReviewsSubmittedCount` — reviews from GitHub alone (BE-H1)
+ *   - `hasSupplementalData`          — did an EMU/supplemental merge happen
+ *   - `fetchScope`                   — what the GitHub fetch could see (#1004/#1050)
+ *
+ * BE-H1 made the first two order-TOLERANT inside `mergeStats` (`??` and `||`),
+ * which fixed the live bugs but left their correctness resting on a property
+ * of this fold rather than on anything stated. Adding a fifth overlay would
+ * re-open the same class. So the fold below carries only additive fields, and
+ * all three identity fields are assigned ONCE at the end from the original
+ * `githubDerived` plus the overlay set — order-independent by construction.
+ *
+ * Deliberately NOT moved here: `isDegradedPrFetch` and the scope-rank
+ * comparison. Both take `primary`/`baseline` directly in `_fetchAndCache` and
+ * must stay structurally outside this function (#1060/#1061).
+ *
+ * Exported for tests only, alongside `_resetInflight` — see
+ * `client.compose.test.ts`, which pins all three fields.
  */
-function _compose(githubDerived: StatsData, overlays: StatsOverlays): StatsData {
+export function _compose(
+  githubDerived: StatsData,
+  overlays: StatsOverlays,
+): StatsData {
   let stats = githubDerived;
 
   // markAsSupplemental: false — a linked platform is a first-party source, not
@@ -409,6 +430,29 @@ function _compose(githubDerived: StatsData, overlays: StatsOverlays): StatsData 
   }
   if (overlays.supplemental) {
     stats = mergeStats(stats, overlays.supplemental.stats);
+  }
+
+  // The identity of the GitHub-derived source, restated from the ORIGINAL
+  // operand rather than inherited through the fold. Only when something
+  // actually merged: with no overlays `stats` IS `githubDerived`, the fields
+  // are trivially correct, and restating them would add keys that a
+  // never-merged value does not carry.
+  if (
+    overlays.bitbucket ||
+    overlays.codeberg ||
+    overlays.gitlab ||
+    overlays.supplemental
+  ) {
+    stats = {
+      ...stats,
+      fetchScope: githubDerived.fetchScope,
+      primaryReviewsSubmittedCount:
+        githubDerived.primaryReviewsSubmittedCount ??
+        githubDerived.reviewsSubmittedCount,
+      hasSupplementalData:
+        Boolean(overlays.supplemental) ||
+        (githubDerived.hasSupplementalData ?? false),
+    };
   }
 
   if (overlays.linkedPlatforms.length > 0) {
