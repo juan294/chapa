@@ -41,7 +41,8 @@ describe("invalidateProfileReadModels", () => {
     mockCacheDel.mockResolvedValue(undefined);
     mockBuildCraftKey.mockImplementation((handle: string) => `craft:${handle}`);
     mockBuildBadgeSvgCacheKey.mockImplementation(
-      (handle: string, date: string) => `badge:${handle}:${date}`,
+      (handle: string, date: string, locale: string) =>
+        `badge:${handle}:${date}:${locale}`,
     );
     mockBuildSnapshotKey.mockImplementation((handle: string) => `snapshot:${handle}`);
     mockInvalidateHistoryCache.mockResolvedValue(undefined);
@@ -65,10 +66,13 @@ describe("invalidateProfileReadModels", () => {
       history: true,
     });
 
+    // #1190 — the badge artifact is cached per locale, so this step now
+    // deletes one key per supported locale, in order, before moving on.
     expect(steps).toEqual([
       "stats:v2:merged:mixedcase",
       "craft:mixedcase",
-      expect.stringMatching(/^badge:mixedcase:\d{4}-\d{2}-\d{2}$/),
+      expect.stringMatching(/^badge:mixedcase:\d{4}-\d{2}-\d{2}:en$/),
+      expect.stringMatching(/^badge:mixedcase:\d{4}-\d{2}-\d{2}:es$/),
       "snapshot:mixedcase",
       "history:mixedcase",
     ]);
@@ -98,13 +102,24 @@ describe("invalidateProfileReadModels", () => {
   it("invalidates the same-day badge SVG artifact when badgeSvg=true", async () => {
     await invalidateProfileReadModels("Solo", { badgeSvg: true });
 
+    // #1190 — one entry per locale; clearing only the default left the other
+    // locale serving pre-write data until the TTL rolled over.
     expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
       "solo",
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      "en",
     );
-    expect(mockCacheDel).toHaveBeenCalledTimes(1);
+    expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
+      "solo",
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      "es",
+    );
+    expect(mockCacheDel).toHaveBeenCalledTimes(2);
     expect(mockCacheDel).toHaveBeenCalledWith(
-      expect.stringMatching(/^badge:solo:\d{4}-\d{2}-\d{2}$/),
+      expect.stringMatching(/^badge:solo:\d{4}-\d{2}-\d{2}:en$/),
+    );
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      expect.stringMatching(/^badge:solo:\d{4}-\d{2}-\d{2}:es$/),
     );
   });
 

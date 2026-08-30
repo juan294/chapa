@@ -99,9 +99,13 @@ const FAKE_MATERIALIZED = {
 
 function makeRequest(
   handle: string,
+  lang?: string,
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
+  const query = lang ? `?lang=${lang}` : "";
   return [
-    new NextRequest(`https://chapa.thecreativetoken.com/u/${handle}/og-image`),
+    new NextRequest(
+      `https://chapa.thecreativetoken.com/u/${handle}/og-image${query}`,
+    ),
     { params: Promise.resolve({ handle }) },
   ];
 }
@@ -136,7 +140,7 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(200);
     expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v2:testuser:2026-02-14");
+    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v3:testuser:2026-02-14:en");
   });
 
   it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
@@ -172,10 +176,13 @@ describe("GET /u/[handle]/og-image", () => {
         verificationHash: "abc12345",
         verificationDate: "2026-02-14",
         disableAnimation: true,
+        // #1190 — the badge strings for the request's locale, from the same
+        // resolved bundle that keyed the cache entry.
+        strings: expect.objectContaining({ metricsVerified: expect.any(String) }),
       },
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "og-image:v2:testuser:2026-02-14",
+      "og-image:v3:testuser:2026-02-14:en",
       FAKE_PNG_BASE64,
       172800,
     );
@@ -332,3 +339,76 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.headers.get("Retry-After")).toBe("60");
   });
 });
+
+// #1190 — the OG image is one of the badge's three distribution surfaces, and
+// it was the only one still rendering the default locale unconditionally.
+// Worse than the issue described: its cache key carried no locale either, so
+// whichever locale rendered first won the slot for the day and every other
+// locale was served that PNG.
+describe("GET /u/[handle]/og-image — locale (#1190)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T12:00:00Z"));
+    mockIsValidHandle.mockReturnValue(true);
+    mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockGetPublicProfileVerification.mockReturnValue(null);
+    mockGetAvatarBase64.mockResolvedValue(undefined);
+    mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockSvgToPng.mockReturnValue(FAKE_PNG);
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(true);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keys the cache per locale so one locale cannot serve another's image", async () => {
+    const [en, enCtx] = makeRequest("testuser", "en");
+    await GET(en, enCtx);
+    const enKey = mockCacheGet.mock.calls[0]![0];
+
+    vi.clearAllMocks();
+    mockIsValidHandle.mockReturnValue(true);
+    mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockGetPublicProfileVerification.mockReturnValue(null);
+    mockGetAvatarBase64.mockResolvedValue(undefined);
+    mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockSvgToPng.mockReturnValue(FAKE_PNG);
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(true);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
+
+    const [es, esCtx] = makeRequest("testuser", "es");
+    await GET(es, esCtx);
+    const esKey = mockCacheGet.mock.calls[0]![0];
+
+    expect(enKey).not.toBe(esKey);
+    expect(enKey).toContain("en");
+    expect(esKey).toContain("es");
+  });
+
+  it("renders the badge with the requested locale's strings", async () => {
+    const [req, ctx] = makeRequest("testuser", "es");
+    await GET(req, ctx);
+
+    const options = mockRenderBadgeSvg.mock.calls[0]![2] as {
+      strings?: { metricsVerified?: string };
+    };
+    expect(options.strings).toBeDefined();
+    expect(options.strings!.metricsVerified).toBe("Métricas verificadas");
+  });
+
+  it("falls back to the default locale for an unknown lang", async () => {
+    const [req, ctx] = makeRequest("testuser", "klingon");
+    await GET(req, ctx);
+
+    const key = mockCacheGet.mock.calls[0]![0] as string;
+    expect(key).toContain("en");
+  });
+});
+
