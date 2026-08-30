@@ -229,7 +229,10 @@ export function LandingContent({
               {features.map((feature, index) => (
                 <div
                   key={feature.title}
-                  className={`rounded-xl border border-stroke bg-card p-5 ${
+                  // min-w-0: a grid item defaults to min-width:auto, so the
+                  // embed snippet's content width would set the track width and
+                  // push the whole page wider than a phone screen (#1224).
+                  className={`min-w-0 rounded-xl border border-stroke bg-card p-5 ${
                     index === features.length - 1 ? "sm:col-span-2" : ""
                   }`}
                 >
@@ -249,7 +252,12 @@ export function LandingContent({
                   </p>
                   {index === features.length - 1 && (
                     <div className="mt-4 flex items-center gap-3 overflow-hidden rounded-lg border border-stroke bg-bg px-3 py-2">
-                      <pre className="flex-1 overflow-x-auto font-heading text-xs text-text-secondary">
+                      {/* min-w-0 is load-bearing: a flex item defaults to min-width:auto,
+                          so without it overflow-x-auto never engages, the snippet
+                          holds the row at its full content width, and the page
+                          forces a layout viewport wider than a phone screen -
+                          which pushes the navbar controls off-screen (#1224). */}
+                      <pre className="min-w-0 flex-1 overflow-x-auto font-heading text-xs text-text-secondary">
                         <span className="text-amber">{`![${embed.altText}]`}</span>
                         {"(chapa.thecreativetoken.com/u/"}
                         <span className="text-amber/70">developer</span>

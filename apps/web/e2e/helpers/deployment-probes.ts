@@ -128,11 +128,15 @@ export async function assertShareVerification(
  * Spanish to English and back" step.
  */
 export async function assertLocales(request: APIRequestContext): Promise<void> {
+  // #1217 replaced the sr-only, localized h1 with a visible one carrying the
+  // profile identity, which reads the same in both locales. The badge's
+  // accessible label is the localized string that is still server-rendered
+  // into the HTML, so it is what these probes assert on now.
   const en = await request.get(`${smokeProfilePath}&lang=en`);
   expect(en.status()).toBe(200);
-  expect(await en.text()).toContain("octocat's developer impact");
+  expect(await en.text()).toContain("Chapa badge for octocat");
 
   const es = await request.get(`${smokeProfilePath}&lang=es`);
   expect(es.status()).toBe(200);
-  expect(await es.text()).toContain("Impacto de desarrollador de octocat");
+  expect(await es.text()).toContain("Chapa de octocat");
 }

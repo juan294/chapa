@@ -1,23 +1,41 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Theme toggle — light/dark switching", () => {
-  test("clicking theme toggle switches data-theme attribute", async ({
-    page,
-  }) => {
+  test("theme toggle cycles system, light and dark", async ({ page }) => {
+    await page.goto("/");
+
+    const toggle = page.locator('button[aria-label*="Cambiar"]');
+    // #1211 made this a three-mode cycle, so a single click no longer has to
+    // change data-theme: system -> light leaves a light-resolved page light.
+    // The control reports the mode it is in, which is what to assert.
+    const seen: (string | null)[] = [];
+    for (let i = 0; i < 4; i++) {
+      seen.push(await toggle.getAttribute("data-theme-mode"));
+      await toggle.click();
+    }
+
+    expect(new Set(seen)).toEqual(new Set(["system", "light", "dark"]));
+    // Four clicks from any start returns to where it began.
+    expect(seen[3]).toBe(seen[0]);
+  });
+
+  test("forcing a mode sets data-theme on the document", async ({ page }) => {
     await page.goto("/");
 
     const html = page.locator("html");
     const toggle = page.locator('button[aria-label*="Cambiar"]');
 
-    // Get initial theme
-    const initialTheme = await html.getAttribute("data-theme");
+    // Click until the cycle reaches dark, then light: both are explicit
+    // choices, so each must be reflected on the document.
+    for (let i = 0; i < 3; i++) {
+      if ((await toggle.getAttribute("data-theme-mode")) === "dark") break;
+      await toggle.click();
+    }
+    await expect(html).toHaveAttribute("data-theme", "dark");
 
-    // Click toggle
-    await toggle.click();
-
-    // Theme should change
-    const newTheme = await html.getAttribute("data-theme");
-    expect(newTheme).not.toBe(initialTheme);
+    await toggle.click(); // dark -> system
+    await toggle.click(); // system -> light
+    await expect(html).toHaveAttribute("data-theme", "light");
   });
 
   test("toggle aria-label updates to reflect available action", async ({
@@ -33,8 +51,13 @@ test.describe("Theme toggle — light/dark switching", () => {
     const newLabel = await toggle.getAttribute("aria-label");
     expect(newLabel).not.toBe(initialLabel);
 
-    // Both labels should be one of the valid values
-    const validLabels = ["Cambiar a tema claro", "Cambiar a tema oscuro"];
+    // Both labels should be one of the valid values. #1211 added the third
+    // mode, so the label can also name the system option.
+    const validLabels = [
+      "Cambiar a tema claro",
+      "Cambiar a tema oscuro",
+      "Cambiar al tema del sistema",
+    ];
     expect(validLabels).toContain(initialLabel);
     expect(validLabels).toContain(newLabel);
   });
