@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.26.1] - 2026-08-30
+
+### Changed
+
+- **Release promotions now preserve Git ancestry.** Releases merge `develop`
+  into `main` with a merge commit instead of squashing, and the ineffective
+  auto-back-merge workflow is removed. This keeps `main` as an ancestor of
+  `develop`, so the next release PR can run its required checks instead of
+  becoming conflicting and silently skipping the pending-migrations gate.
+  (#1228)
+- **Every served brand asset now uses the Jade palette.** The SVG, PNG, ICO,
+  BIMI, and web-manifest assets now match the application and badge instead of
+  retaining the retired violet palette. Raster icons are regenerated from the
+  canonical SVG, and the favicon gradient uses explicit SVG opacity. (#1229)
+
+### Fixed
+
+- **Chrome can execute all public WebMCP profile tools.** The shared tool
+  adapter now supplies a non-aborted fallback signal when Chrome omits the
+  optional execution context. `get_impact_history`, `verify_badge`, and
+  `compare_profiles` no longer fail while destructuring a missing `signal`.
+
 ## [2.26.0] - 2026-08-30
 
 ### Added

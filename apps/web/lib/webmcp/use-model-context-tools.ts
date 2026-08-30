@@ -39,7 +39,10 @@ function instrumentTool(
 ): WebMcpTool {
   return {
     ...tool,
-    async execute(inputs, context) {
+    async execute(
+      inputs,
+      context = { signal: new AbortController().signal },
+    ) {
       captureToolEvent("webmcp_tool_called", { tool: tool.name });
       try {
         return await resolveCurrentTool().execute(inputs, context);

@@ -61,7 +61,7 @@ publication.
 **STOP — Gate 2: authorize production.** Covers PR authorization, merge
 authorization, and tag authorization together, granted once, before resuming
 the playbook. It authorizes the whole pipeline below — creating/reusing the
-release PR, the Preview proof dispatch, the eventual squash merge, and the
+release PR, the Preview proof dispatch, the eventual promotion merge, and the
 eventual tag/publish — as already-authorized steps that do not reopen the
 gate. It does not authorize a production data mutation, a migration, a cron
 invocation, a message, an environment change, or a rollback; each still needs
@@ -77,7 +77,7 @@ exactly, without further stops for the steps Gate 2 already covers:
    (including `Pending Migrations Check (release PR)`) and the dispatched
    Preview proof's `release-result.json`. A missing, skipped, or failed
    required check, or a non-passed direct-check status, blocks (`BLOCKED`).
-3. `gh pr merge --squash --auto`.
+3. `gh pr merge --merge --auto`.
 4. Verify `mainTreeDigest == candidateTreeDigest`, wait for production
    identity, and run only the playbook's four default production scenarios.
    A failure here means production already changed (`ROLLED_BACK`-eligible),
