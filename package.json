@@ -30,7 +30,7 @@
     "delete-user": "tsx scripts/delete-user.ts",
     "heal-poisoned-stats": "tsx scripts/heal-poisoned-stats.ts",
     "recalculate-handles": "tsx scripts/recalculate-handles.ts",
-    "check:circular": "pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/ packages/shared/src/",
+    "check:circular": "madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/ packages/shared/src/",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -41,6 +41,7 @@
     "@upstash/redis": "^1.38.0",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.39.4",
+    "madge": "8.0.0",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "knip": "6.27.0",

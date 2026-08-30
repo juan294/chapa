@@ -383,7 +383,8 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
   authorization from feature completion or green CI.
 
 ### CI Gates (enforced in CI, must pass locally too)
-- **Circular dependency check**: `pnpm run check:circular` (via `madge`) — no circular imports allowed.
+- **Circular dependency check**: `pnpm run check:circular` (via `madge`, pinned to 8.0.0 as a devDependency) — no circular imports allowed. It ran as `pnpm dlx madge` until #1153, which resolves the latest version at run time: a gate whose analyzer can change between two runs of the same commit cannot be compared before and after a toolchain upgrade. Changing the resolver is a visible commit now.
+- **Toolchain majors are held back deliberately.** TypeScript stays on 6.x and ESLint on 9.x: `typescript-eslint` admits no TypeScript 7, and three plugins reached through `eslint-config-next` cap at ESLint 9 (`eslint-plugin-react` throws at rule-load time under 10). Measured, with the gate baseline and the unblock conditions, in `docs/decisions/2026-08-30-toolchain-major-upgrades-blocked.md` (#1153). Re-measure the gates before and after any future attempt — a major upgrade can leave a gate green while it analyzes fewer files, edges or rules, so command success is not evidence.
 - **`no-process-env` ESLint rule**: direct `process.env` access is banned outside `apps/web/lib/env.ts` (allowlisted). All env reads go through the centralized env module. Catches both `process.env.X` member access and a bare `process.env` reference (e.g. `{ ...process.env }`, #1017).
 - **`packages/shared` import boundary**: application code may not import from `packages/shared` via relative paths — use the workspace alias (`@chapa/shared`).
 - **Bundle-size budget**: the largest JS chunk must stay under 350 KB (checked in CI via build output analysis).
