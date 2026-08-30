@@ -4,8 +4,8 @@
   "description": "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0A0F",
-  "theme_color": "#8B5CF6",
+  "background_color": "#08170f",
+  "theme_color": "#1BD093",
   "icons": [
     {
       "src": "/logo-512.png",
