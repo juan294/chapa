@@ -20,7 +20,10 @@
     "GitlabIcon": "components/icons/GitlabIcon.tsx",
     "BitbucketIcon": "components/icons/BitbucketIcon.tsx",
     "CodebergIcon": "components/icons/CodebergIcon.tsx",
-    "CopyIcon": "components/icons/CopyIcon.tsx"
+    "CopyIcon": "components/icons/CopyIcon.tsx",
+    "SectionHeader": "components/SectionHeader.tsx",
+    "ContentPageHeader": "components/content/ContentPageHeader.tsx",
+    "OnThisPageIndex": "components/content/OnThisPageIndex.tsx"
   },
   "dtsPropsFor": {
     "StatusCallout": "variant: \"success\" | \"error\" | \"warning\" | \"verification\";\n  title: string;\n  description: string;\n  children?: React.ReactNode;\n  className?: string;\n  titleAs?: \"h1\" | \"h2\" | \"h3\" | \"h4\";",
@@ -34,7 +37,10 @@
     "GitlabIcon": "className?: string;",
     "BitbucketIcon": "className?: string;",
     "CodebergIcon": "className?: string;",
-    "CopyIcon": "className?: string;"
+    "CopyIcon": "className?: string;",
+    "SectionHeader": "/** The command, without the `%` prefix. For example `chapa features`. */\n  command: string;\n  /** Right-aligned meta, e.g. \"exit 0 \\u00b7 5 results\". */\n  meta?: React.ReactNode;\n  /** Rendered as the accessible heading for the section (visually hidden). */\n  title?: string;\n  className?: string;",
+    "ContentPageHeader": "/** The command, without the `%` prefix. For example `chapa explain --scoring`. */\n  command: string;\n  /** Accepts a node so a page can highlight part of its own title. */\n  title: React.ReactNode;\n  intro?: React.ReactNode;",
+    "OnThisPageIndex": "items: { id: string; label: string }[];"
   },
   "overrides": {
     "Sparkline": {
@@ -43,6 +49,16 @@
     "ConfirmDialog": {
       "cardMode": "single",
       "primaryStory": "Destructive"
+    },
+    "OnThisPageIndex": {
+      "cardMode": "column",
+      "viewport": "1120x420"
+    },
+    "SectionHeader": {
+      "cardMode": "column"
+    },
+    "ContentPageHeader": {
+      "cardMode": "column"
     }
   }
 }

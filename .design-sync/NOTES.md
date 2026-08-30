@@ -274,3 +274,100 @@ reads from ever regresses. A consumer that reads the manifest sees a clean
 palette; one that scrapes `_ds_bundle.css` still sees the engine variables, and
 silencing that needs a converter-side option that does not exist today.
 
+## Re-sync 2026-08-30 — v2 redesign (#1211-#1221)
+
+Synced from `develop` after the v2 redesign merged. Three components joined the
+curated set, taking it from 12 to 15: `SectionHeader`, `ContentPageHeader` and
+`OnThisPageIndex`. The first two are plain server components. `OnThisPageIndex`
+is a client leaf, and it qualifies because its only context dependency is
+`useTranslation`, which falls back to the English dictionary when no
+`LanguageProvider` is mounted — that is the test to apply before adding any
+other client component, not "is it small".
+
+### Correction to the `cssEntry` risk note above
+
+The earlier note said a chunk-hash change requires "repointing `cfg.cssEntry`".
+It does not. `cfg.cssEntry` is `.ds-styles.css`, a stable filename; the
+content-hashed chunk is **concatenated into** that file, never referenced by
+name. So the required step is regeneration only:
+
+    cd apps/web && cat ../../.design-sync/fonts.css "$(ls -S .next/static/chunks/*.css | head -1)" > .ds-styles.css
+
+The hash did move again this run (`2du_gthg_lwp4` -> `27a8l76xqy4b5`), so the
+step remains mandatory after every build — just not a config edit.
+
+### The token layer is now `light-dark()`, and the chunk shows it polyfilled
+
+#1211 replaced the paired `:root` / `[data-theme="dark"]` blocks with one
+`light-dark(<light>, <dark>)` declaration per token inside `@theme`. Two
+consequences for this pipeline:
+
+- `.ds-styles.css` contains **no** literal `light-dark(` — LightningCSS
+  compiles it to `var(--lightningcss-light,<a>)var(--lightningcss-dark,<b>)`
+  keyed off the same `color-scheme` selectors. Grepping the built stylesheet
+  for `light-dark(` to confirm the palette shipped returns zero and means
+  nothing. Grep a token name instead (`--color-hero-band:`).
+- `.design-sync/emit-tokens.mjs` now reads `@theme` only; the other two blocks
+  carry `color-scheme` and nothing else. `scripts/design-sync-emit-tokens.test.ts`
+  guards both that and the `--tw-*` filter.
+
+### Always-dark surfaces need their own status colors
+
+`--color-forest-ok/-warn/-err` were added because a fixed-dark block on a light
+page resolved the theme-aware `terminal-green`/`-red` to their light values,
+measuring 3.72:1 and 3.19:1 against the forest ground. The generalized rule now
+lives in `docs/design-system.md`: status colors resolve per **surface**, not per
+theme. Any future fixed-ground surface needs its own family.
+
+### Adding one component can poison the entire bundle
+
+`OnThisPageIndex` called `useTranslation` for one label. That import reaches
+`@/lib/i18n`, whose barrel pulls `next/navigation` and friends, so Next
+internals landed in the bundle (`process.env.__NEXT_DEV_SERVER`,
+`NEXT_RUNTIME`). The bundle then threw `ReferenceError: process is not defined`
+on load in headless chromium and **all 15 cards rendered empty** - including the
+12 that have nothing to do with i18n. Node did not reproduce it, because node
+has `process`.
+
+The test before adding any component to `apps/web/.ds-entry.tsx` is not "is it
+small" or "is it presentational". It is: **does its transitive import graph
+reach `next/*`?** After the build, confirm with
+
+    grep -c "process\.env" ds-bundle/_ds_bundle.js   # must be 0
+
+The fix (#1222) was to give the component a `heading` prop, the same shape
+`SiteFooter` and `NavbarShell` already use. Prefer that over shimming
+`process`: a component that needs app context does not belong in the bundle,
+and the shim would only hide the next one.
+
+Symptom to recognize next time: `[BUNDLE_EXPORT] N/N not a component on
+window.Chapa` together with every `[RENDER] root empty`. That pairing means the
+bundle failed to LOAD, not that N components are individually broken. Read
+`.render-check.json`'s `firstErr` before touching any component.
+
+### The project holds files this sync does not produce - never hand-derive deletes
+
+`list_files` on the project returns the design handoff material alongside the
+synced bundle: `handoff-chapa-v2/`, `templates/`, `design_handoff_jade_palette/`,
+`screenshots/`, `uploads/`, `github.md`, plus the app-generated
+`_ds_manifest.json` and `_adherence.oxlintrc.json`.
+
+The skill's "no anchor" branch says to review `list_files` for files this build
+does not produce and delete them. **Do not apply that branch here.** With an
+anchor present, `upload.deletePaths` is authoritative - it was `[]` this run -
+and a hand-derived list would have deleted the designer's handoffs. Pass the
+diff's list verbatim, empty included.
+
+### `auxSha` covers only `guidelines/` and `README.md`
+
+So `emit-tokens.mjs` can run AFTER the final driver run without desyncing the
+anchor (`lib/sync-hashes.mjs:102`). It has to run after, because the driver's
+build cleans the out dir.
+
+### The anchor read back clean this time
+
+The stale-read scare from the previous sync did not repeat: `styleSha`,
+`auxSha` and `bundleSha12` all matched the local file on the post-upload
+`get_file`. Keep doing the check - it is two calls and the failure it catches is
+silent.
+
