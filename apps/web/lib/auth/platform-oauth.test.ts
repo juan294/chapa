@@ -887,7 +887,9 @@ describe("badge SVG invalidation covers every locale (#1190)", () => {
         "utf8",
       ),
     );
-    expect(source).toContain("SUPPORTED_LOCALES.map");
-    expect(source).toMatch(/buildBadgeSvgCacheKey\(handle, today, locale\)/);
+    // #1191 moved the per-locale deletion into badge-svg-cache.ts, so the
+    // Studio save path and this one share one implementation rather than
+    // drifting apart. What must stay true here is that this path delegates.
+    expect(source).toContain("invalidateBadgeSvgCacheForHandle");
   });
 });

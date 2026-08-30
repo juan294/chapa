@@ -1,10 +1,11 @@
-import type { StatsData, ImpactV6Result, Platform } from "@chapa/shared";
-import { formatCompact } from "@chapa/shared";
+import type { StatsData, ImpactV6Result, Platform, BadgeConfig } from "@chapa/shared";
+import { formatCompact, DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderBadgeBranding } from "./BadgeBranding";
 import { renderRadarChart, type RadarChartLabels } from "./RadarChart";
 import { escapeXml } from "./escape";
+import { renderBorderEffect } from "./badge-effects";
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 
@@ -47,6 +48,16 @@ interface BadgeOptions {
   disableAnimation?: boolean;
   /** Locale-resolved badge strings (#1181). Omit for English (default). */
   strings?: BadgeI18nStrings;
+  /**
+   * Creator Studio's visual configuration (#1191). Omitted means
+   * `DEFAULT_BADGE_CONFIG`, which renders byte-identically to the pre-#1191
+   * badge — no existing cached badge or embedded README image moves.
+   *
+   * Passed IN rather than read from a store: `renderBadgeSvg` must stay pure,
+   * because that purity is what makes the SVG cacheable per handle/day/locale
+   * and rasterizable to PNG.
+   */
+  config?: BadgeConfig;
 }
 
 /**
@@ -69,7 +80,7 @@ export function renderBadgeSvg(
   impact: ImpactV6Result,
   options: BadgeOptions = {},
 ): string {
-  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {} } = options;
+  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {}, config = DEFAULT_BADGE_CONFIG } = options;
   const hasVerification = Boolean(verificationHash && verificationDate);
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
@@ -83,6 +94,17 @@ export function renderBadgeSvg(
   const W = 1200;
   const H = 630;
   const PAD = 60;
+
+  // #1191 — Studio's config compiled to SVG. Pure builders; see badge-effects.ts
+  // for the rules every effect must satisfy (no CSS custom properties, and a
+  // static first frame whenever SMIL cannot run).
+  const effectContext = {
+    width: W,
+    height: H,
+    stroke: t.stroke,
+    disableAnimation,
+  };
+  const borderEffect = renderBorderEffect(config.border, effectContext);
 
   // ── Header row ──────────────────────────────────────────────
   const headerY = 80;
@@ -217,12 +239,13 @@ export function renderBadgeSvg(
           animation: none;
         }
       }
-    </style>
+    </style>${borderEffect.defs ? `
+    ${borderEffect.defs}` : ""}
   </defs>
 
   <!-- Background -->
-  <rect width="${W}" height="${H}" rx="20" fill="${t.bg}"/>
-  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="19" fill="none" stroke="${t.stroke}" stroke-width="2"/>
+  <rect width="${W}" height="${H}" rx="20" fill="${t.bg}"/>${borderEffect.markup ? `
+  ${borderEffect.markup}` : ""}
 
   <!-- ─── Header row ─────────────────────────────────────── -->
   <!-- Avatar (circular clip) -->

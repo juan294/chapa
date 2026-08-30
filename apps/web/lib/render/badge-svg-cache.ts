@@ -4,10 +4,10 @@
  * the key format here ensures both paths point at the same Redis slot and
  * one cannot drift away from the other.
  */
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheDel, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
-import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/types";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/types";
 
 /**
  * #1014 — this deadline was previously 250ms, which under Redis tail latency
@@ -177,5 +177,27 @@ export async function writeBadgeSvgCache(
     cacheSet(key, svg, ttl),
     false,
     "badge cache write",
+  );
+}
+
+/**
+ * Drop every locale's rendered badge for a handle, for today.
+ *
+ * The badge cache key carries handle/variant/date/locale but nothing about the
+ * inputs, so anything that changes what the badge should look like has to say
+ * so explicitly. Two things do: linking or unlinking a platform (#856), and
+ * saving a Studio configuration (#1191).
+ *
+ * Every locale is cleared because there is one entry per locale (#1190) and the
+ * caller has no idea which ones exist.
+ */
+export async function invalidateBadgeSvgCacheForHandle(
+  handle: string,
+  date: string,
+): Promise<void> {
+  await Promise.all(
+    SUPPORTED_LOCALES.map((locale) =>
+      cacheDel(buildBadgeSvgCacheKey(handle, date, locale)),
+    ),
   );
 }

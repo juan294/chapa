@@ -19,8 +19,7 @@ import { cacheDel, rateLimit, rateLimitStrict } from "@/lib/cache/redis";
 import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeTokenExpiry } from "@/lib/auth/bitbucket";
-import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
-import { SUPPORTED_LOCALES } from "@/lib/i18n/types";
+import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
 import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
 import { issueOauthState, consumeOauthState } from "@/lib/auth/oauth-state";
@@ -69,16 +68,10 @@ function readStateStoreCookie(
  * route and the share page both read.
  */
 async function invalidateBadgeSvgCache(handle: string): Promise<void> {
-  // #1190 — one cache entry per locale. Clearing only the default slot meant a
-  // freshly linked platform's logo appeared on the default-locale badge and
-  // stayed missing on the other one until the TTL rolled over, which is the
-  // exact staleness this function exists to prevent.
-  const today = toDateString(new Date());
-  await Promise.all(
-    SUPPORTED_LOCALES.map((locale) =>
-      cacheDel(buildBadgeSvgCacheKey(handle, today, locale)),
-    ),
-  );
+  // #1190 — one cache entry per locale; #1191 — shared with the Studio save
+  // path, which invalidates the same entries for the same reason from a
+  // different trigger.
+  await invalidateBadgeSvgCacheForHandle(handle, toDateString(new Date()));
 }
 
 async function invalidatePlatformReadModels(
