@@ -3,6 +3,7 @@ import { buildCraftKey } from "@/lib/cache/craft-cache";
 import { buildSnapshotKey } from "@/lib/cache/snapshot-cache";
 import { invalidateHistoryCache } from "@/lib/history/history";
 import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
+import { SUPPORTED_LOCALES } from "@/lib/i18n/types";
 import { toDateString } from "@/lib/utils/date";
 
 type ProfileReadModelInvalidationOptions = {
@@ -40,14 +41,16 @@ export async function invalidateProfileReadModels(
   }
 
   if (options.badgeSvg) {
-    await runInvalidationStep(() =>
-      cacheDel(
-        buildBadgeSvgCacheKey(
-          normalizedHandle,
-          toDateString(new Date()),
-        ),
-      ),
-    );
+    // #1190 — the rendered badge is cached per locale, so clearing only the
+    // default slot leaves every other locale serving pre-write data until the
+    // 24h+jitter TTL rolls over. There are two locales; delete both rather
+    // than reasoning about which one a given visitor will ask for.
+    const today = toDateString(new Date());
+    for (const locale of SUPPORTED_LOCALES) {
+      await runInvalidationStep(() =>
+        cacheDel(buildBadgeSvgCacheKey(normalizedHandle, today, locale)),
+      );
+    }
   }
 
   if (options.snapshot) {
