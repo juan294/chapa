@@ -7,20 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-08-30
+
+### Added
+
+- **`/settings` — a real page for account and connection management.** Every
+  account action lived inside `UserMenu`, a dropdown that closes when you look
+  away: three platform connect/unlink flows with a confirm dialog, an insights
+  upload with a cooldown and four toast states, and sign out. Platform
+  connection had no page of its own at all. The new route is session-gated like
+  `/studio` and `noindex`. The connection and insights logic is *shared* with
+  `UserMenu` (`lib/platform/use-platform-connections.ts`,
+  `lib/insights/use-insights-import.ts`), not copied. Account deletion stays
+  out: it exists only as an operator script, and making it self-serve is a
+  retention decision, not a UI one. (#1223)
+
+### Changed
+
+- **The badge and its Creator Studio preview are one artifact.** Studio used to
+  preview `BadgeContent`, a parallel React DOM implementation of the badge, so
+  a customization could look one way in Studio and another in the README.
+  `renderBadgeSvg` now consumes `BadgeConfig` and Studio renders its actual
+  output. `BadgeContent` went from 405 lines to a ~60-line wrapper used only by
+  the flag-gated prototypes, `PreviewFooter` is gone, and the duplicate DOM
+  background, border, card-style and heatmap-grid modules were deleted. A badge
+  visual is changed in one place now. (#1191)
+- **Studio has six customization categories, not nine.** Interaction,
+  stats display and celebration could never reach an embeddable image — a badge
+  is a cached SVG with no pointer, no JavaScript loop and no "on load" moment.
+  They were removed rather than labelled "preview only": each one taught, control
+  by control, that the preview is not the artifact. Configurations saved with
+  the old nine keys are migrated on read, so no saved badge is lost. (#1191)
+- **The whole interface moves to the Jade palette.** The violet accent is
+  replaced by a jade green system with a mint-cast light surface family and a
+  deep forest dark theme, alongside a v2 pass over the landing page, share page,
+  Creator Studio, content pages and archetype guides. Colour tokens collapse to
+  a single `light-dark()` declaration each, and the theme control gains a third
+  mode (system). Several dim text tokens were raised to clear AA contrast.
+  (#1206, #1211-#1219)
+- **The embeddable badge follows the palette (`jade-v1`).** The badge kept the
+  pre-Jade violet while Studio previewed a separate DOM badge; once Studio
+  rendered the real SVG, "jade in Studio, violet in the README" stopped being
+  tenable. The accent measures 9.68:1 on the badge ground, up from the violet's
+  4.58:1. **Every cached badge and every already-embedded README image changes
+  appearance when this ships.** `BADGE_RENDER_VARIANT` moves `warm-amber-v3` to
+  `jade-v1` so caches miss. The verification coral is deliberately untouched.
+  (#1225)
+- **Dynamic routes get session and locale from one shared boundary.** The
+  static root layout cannot read cookies or headers, so every dynamic route
+  needed three separate corrections, chosen by hand and recorded in prose.
+  `DynamicRouteShell` renders all three together. Three routes were still wrong:
+  `/studio`, `/admin` and `/settings` had *neither* locale correction and
+  rendered in the default locale for every visitor. The 13 locale-segmented
+  content pages remain statically generated, verified by comparing the prerender
+  manifest before and after. (#1194)
+- **The default heatmap animation is described truthfully.** It was labelled
+  "Fade In" and described as a "uniform gentle fade"; the badge has always drawn
+  a 60ms-per-column sweep. The label and description changed, the persisted enum
+  value did not. (#1226)
+- **TypeScript and ESLint stay on 6.x and 9.x, deliberately.** Both majors are
+  blocked by third-party peer ranges, measured rather than assumed:
+  `typescript-eslint` admits no TypeScript 7, and three plugins reached through
+  `eslint-config-next` cap at ESLint 9. `madge` is now pinned instead of
+  resolved at run time, so the circular-dependency gate is reproducible across
+  runs of the same commit. (#1153)
+
 ### Fixed
 
 - **An absent feature-flag row logged a false schema-mismatch warning.**
-  `dbGetFeatureFlag` passed `.maybeSingle()`'s result straight into
-  `parseRow`, so a flag with no DB row — the normal path that `checkFlag`
-  relies on to fall back to its env var — emitted
-  `[db] feature_flags: expected row object, got null` on every lookup. Added
-  the `if (!data) return null;` guard that every other single-row reader in
-  `lib/db/` already had. (#1209)
-- **`insights_integration` had no `feature_flags` row.** Migration `037`
-  seeds it, completing `026_seed_integration_flags.sql` (#857), which covered
-  bitbucket/codeberg/gitlab and missed this one. Seeded `enabled = true` to
-  preserve current behaviour, since a present row overrides the env var.
-  (#1210)
+  `dbGetFeatureFlag` passed `.maybeSingle()`'s result straight into `parseRow`,
+  so a flag with no DB row — the normal path `checkFlag` relies on to fall back
+  to its env var — emitted `[db] feature_flags: expected row object, got null`
+  on every lookup. (#1209)
+- **`insights_integration` had no `feature_flags` row.** Migration `037` seeds
+  it, completing `026_seed_integration_flags.sql` (#857), which covered
+  bitbucket/codeberg/gitlab and missed it. (#1210)
 
 ## [2.25.0] - 2026-08-28
 
