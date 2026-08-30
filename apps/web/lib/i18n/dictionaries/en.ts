@@ -1069,6 +1069,8 @@ export const en: Translations = {
     subtitle: 'Preview and customize your badge — changes here never affect your public badge or share page.',
     quickControls: 'Quick Controls',
     presetsHeading: 'Presets',
+    previewOnly: 'preview only',
+    previewOnlyHint: 'This effect needs a live page, so it shows here but not on the badge you embed.',
     activeConfig: 'ACTIVE CONFIG',
     session: 'SESSION',
     changedCount: '{count} of {total} changed',

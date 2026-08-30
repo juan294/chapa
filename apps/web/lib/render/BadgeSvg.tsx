@@ -5,7 +5,13 @@ import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderBadgeBranding } from "./BadgeBranding";
 import { renderRadarChart, type RadarChartLabels } from "./RadarChart";
 import { escapeXml } from "./escape";
-import { renderBorderEffect } from "./badge-effects";
+import {
+  renderBackgroundEffect,
+  renderBorderEffect,
+  renderCardStyleEffect,
+  renderScoreEffect,
+  renderTierTreatment,
+} from "./badge-effects";
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 
@@ -105,6 +111,15 @@ export function renderBadgeSvg(
     disableAnimation,
   };
   const borderEffect = renderBorderEffect(config.border, effectContext);
+  const backgroundEffect = renderBackgroundEffect(config.background, {
+    ...effectContext,
+    fill: t.bg,
+  });
+  const cardStyleEffect = renderCardStyleEffect(config.cardStyle, effectContext);
+  const scoreEffect = renderScoreEffect(config.scoreEffect, {
+    ...effectContext,
+    textPrimary: t.textPrimary,
+  });
 
   // ── Header row ──────────────────────────────────────────────
   const headerY = 80;
@@ -143,7 +158,12 @@ export function renderBadgeSvg(
   // Left column: heatmap (44px cells + 5px gap = 49px per cell)
   const heatmapX = PAD;
   const heatmapY = 190; // shifted down 30px for meta row
-  const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
+  const heatmapCells = buildHeatmapCells(
+    stats.heatmapData,
+    heatmapX,
+    heatmapY,
+    config.heatmapAnimation,
+  );
   const heatmapSvg = renderHeatmapSvg(heatmapCells, { disableAnimation });
 
   // Right column: radar chart + score ring (no pill — it moved above)
@@ -176,6 +196,23 @@ export function renderBadgeSvg(
   const ringCircumference = 2 * Math.PI * ringR; // ≈289.03
   const ringOffset = ringCircumference * (1 - impact.adjustedComposite / 100);
   const tierLabelY = ringCY + ringR + 24;
+  const tierEffect = renderTierTreatment(config.tierTreatment, {
+    tier: impact.tier,
+    centerX: radarCX,
+    y: tierLabelY,
+    color: tierColor,
+  });
+
+  // One <defs> block for every effect that needs one. Concatenated in a fixed
+  // order so the output stays deterministic.
+  const effectDefs = [
+    backgroundEffect.defs,
+    cardStyleEffect.defs,
+    borderEffect.defs,
+    scoreEffect.defs,
+  ]
+    .filter(Boolean)
+    .join("\n    ");
 
   // ── Footer ──────────────────────────────────────────────────
   const footerDividerY = 560;
@@ -239,12 +276,13 @@ export function renderBadgeSvg(
           animation: none;
         }
       }
-    </style>${borderEffect.defs ? `
-    ${borderEffect.defs}` : ""}
+    </style>${effectDefs ? `
+    ${effectDefs}` : ""}
   </defs>
 
   <!-- Background -->
-  <rect width="${W}" height="${H}" rx="20" fill="${t.bg}"/>${borderEffect.markup ? `
+  ${backgroundEffect.markup}${cardStyleEffect.markup ? `
+  ${cardStyleEffect.markup}` : ""}${borderEffect.markup ? `
   ${borderEffect.markup}` : ""}
 
   <!-- ─── Header row ─────────────────────────────────────── -->
@@ -334,9 +372,10 @@ export function renderBadgeSvg(
   <!-- Ring arc (foreground, tier-colored, animates from 0 to score) -->
   <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})" style="animation: ring-draw 1.2s ease-out 0.5s both"/>
   <!-- Score number (centered inside ring) -->
-  <text class="badge-score-pulse" x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" dominant-baseline="central">${scoreStr}</text>
+  <text class="badge-score-pulse" x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${scoreEffect.fill}"${scoreEffect.attrs} text-anchor="middle" dominant-baseline="central">${scoreStr}</text>
   <!-- Tier label (always visible below ring) -->
-  <text x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${escapeXml(tierLabel)}</text>
+  <text x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${escapeXml(tierLabel)}</text>${tierEffect.markup ? `
+  ${tierEffect.markup}` : ""}
 
   <!-- ─── Footer ─────────────────────────────────────────── -->
   <!-- Divider line -->

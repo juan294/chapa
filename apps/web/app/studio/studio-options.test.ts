@@ -140,3 +140,41 @@ describe("getOptionDescription", () => {
     }
   });
 });
+
+// #1191 — the previewOnly flag is the single source of truth for which
+// categories reach the embeddable badge, so it must match what the SVG
+// renderer actually consumes.
+describe("previewOnly marks exactly the categories the SVG cannot render (#1191)", () => {
+  it("marks the three that need a live page", () => {
+    const previewOnly = STUDIO_CATEGORIES.filter((c) => c.previewOnly).map(
+      (c) => c.key,
+    );
+    expect(previewOnly.sort()).toEqual(
+      ["celebration", "interaction", "statsDisplay"].sort(),
+    );
+  });
+
+  it("every other category is consumed by the SVG renderer", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "../../lib/render/BadgeSvg.tsx"),
+      "utf8",
+    );
+    for (const category of STUDIO_CATEGORIES.filter((c) => !c.previewOnly)) {
+      expect(source, category.key).toContain(`config.${category.key}`);
+    }
+  });
+
+  it("no preview-only category is read by the SVG renderer", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "../../lib/render/BadgeSvg.tsx"),
+      "utf8",
+    );
+    for (const category of STUDIO_CATEGORIES.filter((c) => c.previewOnly)) {
+      expect(source, category.key).not.toContain(`config.${category.key}`);
+    }
+  });
+});
