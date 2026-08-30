@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderBadgeSvg } from "./BadgeSvg";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import { accentTint } from "./theme";
 import {
   makeStats as _makeStats,
   makeImpact,
@@ -375,8 +376,15 @@ describe("renderBadgeSvg", () => {
 
     it("contains a score ring track circle", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Background track: circle with dim stroke, no fill
-      expect(svg).toMatch(/stroke="rgba\(139,92,246,0\.10\)"[^/]*stroke-width="4"/);
+      // Background track: circle with dim accent stroke, no fill. Built from
+      // accentTint so the palette conversion in #1225 could not leave this
+      // assertion pinned to a colour the badge no longer uses.
+      const trackStroke = `stroke="${accentTint(0.1)}"`;
+      const trackCircle = svg
+        .split("<circle")
+        .find((element) => element.includes(trackStroke));
+      expect(trackCircle).toBeDefined();
+      expect(trackCircle).toContain('stroke-width="4"');
     });
 
     it("contains a score ring arc with stroke-dasharray", () => {

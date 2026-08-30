@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import { renderBadgeBranding } from "./BadgeBranding";
+import { accentTint } from "./theme";
 
 describe("renderBadgeBranding", () => {
   it("preserves the exact SVG bytes after metadata extraction", () => {
@@ -12,7 +13,7 @@ describe("renderBadgeBranding", () => {
     ]);
 
     expect(createHash("sha256").update(svg).digest("hex")).toBe(
-      "d9645a9ee80a0b96264f2e1159ada863086e88fb4276b22b346bffa64389c904",
+      "ff20e4bd16c90409c890ba442f2d8d670db799a70b188d6ffdf10d55cafbc561",
     );
   });
 
@@ -120,7 +121,7 @@ describe("renderBadgeBranding", () => {
   it("renders grouped pill container around logos", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github", "bitbucket"]);
     // Pill is a rounded rect with purple tint
-    expect(svg).toContain('fill="rgba(139,92,246,0.08)"');
-    expect(svg).toContain('stroke="rgba(139,92,246,0.15)"');
+    expect(svg).toContain(`fill="${accentTint(0.08)}"`);
+    expect(svg).toContain(`stroke="${accentTint(0.15)}"`);
   });
 });

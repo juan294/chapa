@@ -4,11 +4,12 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { renderBadgeSvg } from "./BadgeSvg";
 import { renderBorderEffect, renderCardStyleEffect } from "./badge-effects";
 import { DEMO_STATS, DEMO_IMPACT } from "./demoData";
+import { accentTint } from "./theme";
 
 const ctx = {
   width: 1200,
   height: 630,
-  stroke: "rgba(139,92,246,0.12)",
+  stroke: accentTint(0.12),
   disableAnimation: false,
 };
 
@@ -17,25 +18,33 @@ function hash(svg: string): string {
 }
 
 /**
- * #1191 — the first and most important guard of the "one badge artifact" work.
+ * The default badge is pinned byte-for-byte. Every cached badge and every
+ * embedded README image is keyed on handle/day/locale, not on content, so a
+ * single changed byte in the default path silently changes what thousands of
+ * already-published images look like.
  *
- * Teaching renderBadgeSvg to consume BadgeConfig is only safe if the DEFAULT
- * config renders byte-identically to the pre-#1191 badge. Every cached badge
- * and every embedded README image is keyed on handle/day/locale, not on
- * content, so a single changed byte in the default path silently changes what
- * thousands of already-published images look like.
+ * **These are not a snapshot to regenerate when they fail.** A failure means
+ * the default badge moved, which is either a bug or a deliberate design change
+ * that must bump `BADGE_RENDER_VARIANT` in the same commit (see
+ * `docs/decisions/2026-08-30-one-badge-artifact.md`).
  *
- * These hashes were captured from develop at 7d0cc6ae, immediately before the
- * config parameter existed. They are not a snapshot to be regenerated when
- * they fail: a failure here means the default badge moved, which is either a
- * bug or a deliberate design change that must bump BADGE_RENDER_VARIANT in the
- * same commit (see docs/decisions/2026-08-30-one-badge-artifact.md).
+ * Baseline history — re-baselining is a design-version event, not maintenance:
+ *
+ * | Variant | Captured at | Why |
+ * |---|---|---|
+ * | `warm-amber-v3` | develop @ 7d0cc6ae, before `config` existed | #1191 proved teaching the renderer `BadgeConfig` moved nothing |
+ * | `jade-v1` | this commit | #1225 converged the badge onto the app's Jade palette — the accent and the seven archetype colours changed on purpose |
+ *
+ * #1225 is the first deliberate re-baseline. The badge had kept the pre-#1206
+ * violet, which was recorded as intentional while Studio previewed a separate
+ * DOM badge; once #1191 made Studio render this very SVG, "jade in Studio,
+ * violet in the README" stopped being tenable.
  */
-describe("default config renders the pre-#1191 badge byte-for-byte (#1191)", () => {
+describe("default config renders the jade-v1 badge byte-for-byte", () => {
   it.each([
-    ["plain", {}, "df8b08c4ad25062c", 29978],
-    ["branding + demo", { includeBranding: true, demoMode: true }, "123dc054efa0200e", 30462],
-    ["animation disabled", { disableAnimation: true }, "81c3d7f8e0ee2057", 21585],
+    ["plain", {}, "66c85c46c97e1d53", 30284],
+    ["branding + demo", { includeBranding: true, demoMode: true }, "efc776305828e5e9", 30768],
+    ["animation disabled", { disableAnimation: true }, "35bdf419ee91e335", 21891],
   ] as const)("%s", (_label, options, expectedHash, expectedLength) => {
     const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, options);
     expect(svg.length).toBe(expectedLength);
@@ -57,7 +66,7 @@ describe("renderBorderEffect (#1191)", () => {
     const { defs, markup } = renderBorderEffect("solid-amber", ctx);
     expect(defs).toBe("");
     expect(markup).toBe(
-      '<rect x="1" y="1" width="1198" height="628" rx="19" fill="none" stroke="rgba(139,92,246,0.12)" stroke-width="2"/>',
+      `<rect x="1" y="1" width="1198" height="628" rx="19" fill="none" stroke="${accentTint(0.12)}" stroke-width="2"/>`,
     );
   });
 

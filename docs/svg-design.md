@@ -16,7 +16,7 @@
 - Rendering method: JSX `<svg>` template rendered server-side to string.
 
 ## Layout goals
-- Premium dark card with purple accents (`#8B5CF6`)
+- Premium dark card with jade accents (`#1BD093`)
 - Strong hierarchy: header > archetype + metrics > heatmap + radar + score > footer
 - Readable at small size
 - Subtle animation only
@@ -25,7 +25,7 @@
 
 ### 1) Background frame
 - Rounded rect with subtle gradient
-- Border stroke (low opacity purple): `rgba(139,92,246,0.12)`
+- Border stroke (low opacity purple): `accentTint(0.12)`
 
 ### 2) Header row (top)
 - Avatar circle (30px radius, left-aligned)
@@ -47,11 +47,11 @@
 - 13 weeks x 7 days grid (91 cells)
 - Cell size ~14px with ~3px gap
 - 5 intensity colors from theme (purple-based):
-  - 0: `rgba(139,92,246,0.12)` (none)
-  - 1: `rgba(139,92,246,0.30)` (low)
-  - 2: `rgba(139,92,246,0.48)` (medium)
-  - 3: `rgba(139,92,246,0.68)` (high)
-  - 4: `rgba(139,92,246,0.92)` (intense)
+  - 0: `accentTint(0.12)` (none)
+  - 1: `accentTint(0.30)` (low)
+  - 2: `accentTint(0.48)` (medium)
+  - 3: `accentTint(0.68)` (high)
+  - 4: `accentTint(0.92)` (intense)
 - Animation: left-to-right column sweep, 60ms per week group (the `fade-in` config value; see #1226 for why the value's name does not describe it)
 
 **Center column: Radar chart**
@@ -91,9 +91,10 @@
 - Platform logo paths, canonical platform ordering, and the coral verification color are owned by the client-safe `apps/web/lib/badge-visual-metadata.ts` module. The server SVG renderer and Creator Studio preview both consume this metadata so the two surfaces stay in parity without a client import from server render modules.
 - Creator Studio does not reproduce this footer any more. It renders `renderBadgeSvg` output directly (#1191, step 6), so it gets `BadgeBranding.tsx` and `VerificationStrip.tsx` themselves rather than a parity copy — and a saved Studio configuration does alter the public SVG badge.
 
-## Theme tokens (Warm Amber)
+## Theme tokens (Jade)
 
-Defined in `apps/web/lib/render/theme.ts`:
+Defined in `apps/web/lib/render/theme.ts`. #1225 converged the accent and the
+seven archetype colours onto the app's Jade tokens; the ground stayed as it was.
 
 | Token | Value |
 |-------|-------|
@@ -101,36 +102,45 @@ Defined in `apps/web/lib/render/theme.ts`:
 | card | `#13141E` |
 | textPrimary | `#E6EDF3` |
 | textSecondary | `#9AA4B2` |
-| accent | `#8B5CF6` |
-| stroke | `rgba(139,92,246,0.12)` |
+| accent | `#1BD093` |
+| accentLight | `#65E7B0` |
+| stroke | `accentTint(0.12)` |
+
+Never write an `rgba(...)` accent literal here — derive it with
+`accentTint(alpha)`. The palette lives in one place so it cannot scatter again,
+and `lib/render/badge-palette.test.ts` enforces that.
 
 ### Heatmap palette (0..4)
 | Level | Color |
 |-------|-------|
-| 0 (none) | `rgba(139,92,246,0.12)` |
-| 1 (low) | `rgba(139,92,246,0.30)` |
-| 2 (medium) | `rgba(139,92,246,0.48)` |
-| 3 (high) | `rgba(139,92,246,0.68)` |
-| 4 (intense) | `rgba(139,92,246,0.92)` |
+| 0 (none) | `accentTint(0.12)` |
+| 1 (low) | `accentTint(0.30)` |
+| 2 (medium) | `accentTint(0.48)` |
+| 3 (high) | `accentTint(0.68)` |
+| 4 (intense) | `accentTint(0.92)` |
 
 ### Tier colors
 | Tier | Color |
 |------|-------|
 | Emerging | `#9AA4B2` (muted gray) |
 | Solid | `#E6EDF3` (light) |
-| High | `#A78BFA` (light purple) |
-| Elite | `#8B5CF6` (signature purple) |
+| High | `#65E7B0` (light jade) |
+| Elite | `#1BD093` (signature jade) |
 
 ### Archetype colors
-| Archetype | Color |
-|-----------|-------|
-| Builder | `#8B5CF6` (violet) |
-| Quality Champion | `#EC4899` (pink) |
-| Marathoner | `#22C55E` (green) |
-| Polymath | `#EAB308` (amber/gold) |
-| Balanced | `#0EA5E9` (sky blue) |
-| Emerging | `#F97316` (warm orange) |
-| Artificer | `#F59E0B` (amber) |
+
+Converted from the app's `--color-archetype-*` tokens, all `oklch(.62 .14 <hue>)`
+(#1225). Hue is the only thing that varies; keep that if an eighth is added.
+
+| Archetype | Color | Hue |
+|-----------|-------|-----|
+| Builder | `#009F6D` (jade) | 163 |
+| Quality Champion | `#B464AE` (magenta) | 330 |
+| Marathoner | `#479C4D` (leaf) | 145 |
+| Polymath | `#8C8C00` (olive) | 110 |
+| Balanced | `#0A8FD1` (blue) | 240 |
+| Emerging | `#C7692C` (orange) | 50 |
+| Artificer | `#B67700` (amber) | 75 |
 
 ## Typography
 - All text uses system-safe fonts embedded in SVG

@@ -39,7 +39,9 @@ describe("badge-svg-cache", () => {
     // for an unqualified (no ?lang=) request.
     it("includes the badge renderer version and locale so visual/locale changes bypass stale SVGs", () => {
       const key = buildBadgeSvgCacheKey("Octocat", "2026-05-01");
-      expect(BADGE_RENDER_VARIANT).toBe("warm-amber-v3");
+      // #1225 bumped this from "warm-amber-v3": converging the badge onto the
+      // Jade palette changed the rendered bytes, so every cached SVG must miss.
+      expect(BADGE_RENDER_VARIANT).toBe("jade-v1");
       expect(key).toBe(
         `badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:${DEFAULT_LOCALE}`,
       );

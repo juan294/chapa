@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { WARM_AMBER, accentTint } from "@/lib/render/theme";
 import { svgToPng } from "@/lib/render/svg-to-png";
 
 /**
@@ -30,17 +31,17 @@ function renderOgSvg(): string {
   const H = 630;
 
   const bg = "#0C0D14";
-  const accent = "#8B5CF6";
+  const accent = WARM_AMBER.accent;
   const textPrimary = "#E6EDF3";
   const textSecondary = "#6B6F7B";
 
   // Heatmap colors — 5 intensity levels of the accent purple
   const heatmapColors = [
-    "rgba(139,92,246,0.06)",
-    "rgba(139,92,246,0.18)",
-    "rgba(139,92,246,0.35)",
-    "rgba(139,92,246,0.55)",
-    "rgba(139,92,246,0.80)",
+    accentTint(0.06),
+    accentTint(0.18),
+    accentTint(0.35),
+    accentTint(0.55),
+    accentTint(0.8),
   ];
 
   // Wider heatmap grid: 7 rows x 52 cols (one year of weeks)

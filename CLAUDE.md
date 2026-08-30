@@ -132,7 +132,7 @@ Shared types live in: `packages/shared/src/types.ts`
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)
-- Default theme: Warm Amber (dark + amber/gold accent)
+- Default theme: dark ground (`#0C0D14`) with the app's jade accent (`#1BD093`), converged in #1225. The `WARM_AMBER` constant name is historical; see `docs/svg-design.md`.
 - SVG must be crisp and readable when scaled down
 - Animations must be subtle (heatmap fade-in, impact pulse)
 

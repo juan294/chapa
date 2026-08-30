@@ -18,7 +18,7 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/types
  * and response construction that follow a successful read.
  */
 const CACHE_DEADLINE_MS = 500;
-export const BADGE_RENDER_VARIANT = "warm-amber-v3";
+export const BADGE_RENDER_VARIANT = "jade-v1";
 
 /**
  * Base TTL for badge SVG cache entries.

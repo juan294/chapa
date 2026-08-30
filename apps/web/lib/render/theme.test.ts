@@ -54,21 +54,22 @@ describe("getTierColor", () => {
     }
   });
 
-  it("tier colors intentionally diverge from the app accent until the badge is rebranded (#1206)", () => {
-    // Until #1206 the badge's accent was held in lockstep with --color-amber.
-    // The Jade rebrand moved the app to green and put the badge explicitly out
-    // of scope: it is rendered server-side before app CSS exists, is always
-    // dark regardless of theme, and every already-embedded README image would
-    // change. So the two are now deliberately different, and this test records
-    // that rather than asserting an alignment that no longer holds.
+  it("tier colors are the app's jade accent, converted for the badge (#1225)", () => {
+    // #1206 moved the app to Jade and put the badge out of scope, so the two
+    // deliberately diverged. #1191 then made Creator Studio render this very
+    // SVG, and "jade in Studio, violet in the README" stopped being tenable —
+    // so #1225 converged them.
     //
-    // Both halves are still pinned, so changing EITHER side unintentionally
-    // still fails. Rebranding the badge is its own task; when it happens, this
-    // test is the thing to update.
-    expect(getTierColor("Elite")).toBe("#8B5CF6");
-    expect(getTierColor("High")).toBe("#A78BFA");
-    expect(themedTokenValue("--color-amber").light).toBe("oklch(.66 .15 163)");
-    expect(globalsCss).not.toContain("--color-amber: #8B5CF6;");
+    // The badge always renders dark, so it takes the DARK half of the token.
+    // Hex rather than oklch() because the OG-image route rasterizes through
+    // resvg, which parses a narrower colour syntax than a browser.
+    // oklch(.76 .16 163) -> #1BD093, oklch(.84 .14 163) -> #65E7B0.
+    //
+    // Both halves stay pinned, so changing EITHER side unintentionally fails.
+    expect(getTierColor("Elite")).toBe("#1BD093");
+    expect(getTierColor("High")).toBe("#65E7B0");
+    expect(themedTokenValue("--color-amber").dark).toBe("oklch(.76 .16 163)");
+    expect(themedTokenValue("--color-amber-light").dark).toBe("oklch(.84 .14 163)");
   });
 });
 
@@ -95,8 +96,11 @@ describe("theme.ts brand-alignment invariant comment (#1168 UX-L2)", () => {
     // badge SVG and every already-embedded README image for a ~2-RGB-step
     // difference that's imperceptible in practice.
     // #1206 — the app's dark surfaces moved to forest green; the badge's own
-    // WARM_AMBER literals below did not. The divergence this test documents is
-    // therefore wider than it was, and still intentional.
+    // WARM_AMBER literals below did not. #1225 converged the ACCENT and the
+    // archetypes but deliberately left the ground alone: it is a cooler canvas
+    // tuned for the badge, and moving it is a design decision separate from
+    // the brand colour. The divergence this test documents is therefore
+    // narrower than it was, and still intentional.
     // #1211 folded each token's two per-theme declarations into one
     // light-dark() value; the dark half is the second argument.
     expect(themedTokenValue("--color-bg").dark).toBe("#08170f");
@@ -117,24 +121,26 @@ describe("theme.ts brand-alignment invariant comment (#1168 UX-L2)", () => {
 });
 
 describe("getArchetypeColor", () => {
-  it("archetype colors intentionally diverge from globals.css tokens (#1206)", () => {
-    // These were kept in lockstep until #1206. Jade re-tuned all seven app
-    // archetype tokens onto one oklch lightness/chroma (.62 .14, hue only
-    // varying) while the badge stayed on the old literals, because the badge
-    // is out of scope for the rebrand. An archetype is therefore shown in one
-    // color on the badge and another in the app until the badge follows.
+  it("archetype colors are the app's own tokens, converted for the badge (#1225)", () => {
+    // Jade re-tuned all seven app archetype tokens onto one oklch lightness
+    // and chroma (.62 .14), varying only in hue. #1206 left the badge on the
+    // old literals; #1225 converted those same tokens to hex so an archetype
+    // is one colour everywhere.
+    //
+    // .62 was kept rather than lightened for the badge's dark ground: matching
+    // the app exactly is the point, and all seven clear AA on #0C0D14 anyway
+    // (measured 4.96:1 for Quality Champion up to 5.70:1 for Builder).
     //
     // Both sides stay pinned so an unintended change to either still fails.
     expect(globalsCss).toContain("--color-archetype-builder: oklch(.62 .14 163);");
     expect(globalsCss).toContain("--color-archetype-guardian: oklch(.62 .14 330);");
-    expect(globalsCss).not.toContain("--color-archetype-builder: #8B5CF6;");
 
-    expect(getArchetypeColor("Builder")).toBe("#8B5CF6");
-    expect(getArchetypeColor("Quality Champion")).toBe("#EC4899");
-    expect(getArchetypeColor("Marathoner")).toBe("#22C55E");
-    expect(getArchetypeColor("Polymath")).toBe("#EAB308");
-    expect(getArchetypeColor("Balanced")).toBe("#0EA5E9");
-    expect(getArchetypeColor("Emerging")).toBe("#F97316");
-    expect(getArchetypeColor("Artificer")).toBe("#F59E0B");
+    expect(getArchetypeColor("Builder")).toBe("#009F6D");
+    expect(getArchetypeColor("Quality Champion")).toBe("#B464AE");
+    expect(getArchetypeColor("Marathoner")).toBe("#479C4D");
+    expect(getArchetypeColor("Polymath")).toBe("#8C8C00");
+    expect(getArchetypeColor("Balanced")).toBe("#0A8FD1");
+    expect(getArchetypeColor("Emerging")).toBe("#C7692C");
+    expect(getArchetypeColor("Artificer")).toBe("#B67700");
   });
 });

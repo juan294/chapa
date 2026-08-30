@@ -6,35 +6,62 @@ interface BadgeTheme {
   textPrimary: string;
   textSecondary: string;
   accent: string;
+  /** Lighter accent step. Used by the High tier and the aurora-glass sheen. */
+  accentLight: string;
   stroke: string;
   heatmap: [string, string, string, string, string];
 }
 
-// Badge SVG renders on the server before app CSS is applied, so the palette
-// is duplicated here. Invariant (narrower than it sounds): only the brand
-// `accent`/`accentLight` and the 7 `archetypes` colors below must stay
-// aligned with apps/web/styles/globals.css — enforced by theme.test.ts.
-// `bg`/`card`/`textStrong`/`textMuted` (used to build WARM_AMBER.bg/card/
-// textPrimary/textSecondary below) are an intentionally SEPARATE, slightly
-// cooler palette tuned for the badge's fixed-dark canvas; they do not match
-// --color-bg/--color-card/--color-text-primary/--color-text-secondary, and
-// that is by design, not drift. Prefer correcting this comment over changing
-// those values — a value change alters every cached badge SVG and every
-// already-embedded README image for a ~2-RGB-step difference that's
-// imperceptible in practice (#1168 UX-L2).
+// Badge SVG renders on the server before app CSS is applied, so it cannot read
+// a CSS custom property and the palette is resolved to literals here.
+//
+// #1225 — these are the Jade values, converted from the app's own tokens in
+// apps/web/styles/globals.css. The badge always renders dark, so the accent
+// takes the DARK half of `--color-amber` (`oklch(.76 .16 163)` -> #1BD093) and
+// the archetypes take `oklch(.62 .14 <hue>)`, which globals.css uses in both
+// themes. They are hex rather than `oklch()` because the OG-image route
+// rasterizes this SVG through resvg, which parses a narrower colour syntax
+// than a browser.
+//
+// The badge kept the pre-#1206 violet while Creator Studio previewed a
+// separate DOM badge. #1191 made Studio render this SVG, so "jade in Studio,
+// violet in the README" stopped being tenable.
+//
+// `bg`/`card`/`textStrong`/`textMuted` are deliberately NOT converged: they are
+// a slightly cooler ground tuned for the badge's fixed-dark canvas, and moving
+// the ground is a design decision separate from the accent (#1168 UX-L2).
+//
+// Contrast against the badge ground #0C0D14, measured: accent 9.68:1,
+// accentLight 12.56:1, and every archetype between 4.96:1 (Quality Champion)
+// and 5.70:1 (Builder) — all clear AA. The old violet accent measured 4.58:1,
+// so this is an improvement, not a trade.
+
+/**
+ * The accent as an `r, g, b` triple, so every translucent tint derives from
+ * ONE definition. The violet this replaced was spelled out as 28 separate
+ * literals across six files, which is exactly how it survived the #1206
+ * rebrand; `badge-palette.test.ts` now fails if a literal reappears.
+ */
+export const BADGE_ACCENT_RGB = "27, 208, 147";
+
+/** An accent tint at the given alpha. Use this instead of writing `rgba(...)`. */
+export function accentTint(alpha: number): string {
+  return `rgba(${BADGE_ACCENT_RGB}, ${alpha})`;
+}
+
 const BADGE_BRAND_COLORS = {
-  accent: "#8B5CF6",
-  accentLight: "#A78BFA",
+  accent: "#1BD093",
+  accentLight: "#65E7B0",
   textMuted: "#9AA4B2",
   textStrong: "#E6EDF3",
   archetypes: {
-    Builder: "#8B5CF6",
-    "Quality Champion": "#EC4899",
-    Marathoner: "#22C55E",
-    Polymath: "#EAB308",
-    Balanced: "#0EA5E9",
-    Emerging: "#F97316",
-    Artificer: "#F59E0B",
+    Builder: "#009F6D",
+    "Quality Champion": "#B464AE",
+    Marathoner: "#479C4D",
+    Polymath: "#8C8C00",
+    Balanced: "#0A8FD1",
+    Emerging: "#C7692C",
+    Artificer: "#B67700",
   } satisfies Record<DeveloperArchetype, string>,
 } as const;
 
@@ -44,18 +71,19 @@ export const WARM_AMBER: BadgeTheme = {
   textPrimary: BADGE_BRAND_COLORS.textStrong,
   textSecondary: BADGE_BRAND_COLORS.textMuted,
   accent: BADGE_BRAND_COLORS.accent,
-  stroke: "rgba(139,92,246,0.12)",
+  accentLight: BADGE_BRAND_COLORS.accentLight,
+  stroke: accentTint(0.12),
   heatmap: [
-    "rgba(139,92,246,0.12)", // 0: none
-    "rgba(139,92,246,0.30)", // 1: low
-    "rgba(139,92,246,0.48)", // 2: medium
-    "rgba(139,92,246,0.68)", // 3: high
-    "rgba(139,92,246,0.92)", // 4: intense
+    accentTint(0.12), // 0: none
+    accentTint(0.3), // 1: low
+    accentTint(0.48), // 2: medium
+    accentTint(0.68), // 3: high
+    accentTint(0.92), // 4: intense
   ],
 };
 
 /**
- * Map a daily contribution count to a heatmap cell color (purple opacity ramp).
+ * Map a daily contribution count to a heatmap cell color (jade opacity ramp).
  *
  * Buckets: 0 = none (12%), 1--2 = low (30%), 3--5 = medium (48%),
  * 6--10 = high (68%), 11+ = intense (92%).

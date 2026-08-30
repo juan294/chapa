@@ -91,7 +91,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-da
 - **Status colors resolve per SURFACE, not per theme.** `terminal-green` / `-yellow` / `-red` are correct on a surface that follows the theme. On a surface with a fixed ground they are wrong half the time: inside an always-dark forest block on a light page, the light-theme values land on the dark ground and measure 3.72:1 (green) and 3.19:1 (red), below AA. Use `text-forest-ok` / `text-forest-warn` / `text-forest-err` there, which pin the dark values (#1215). Any future fixed-ground surface needs its own status family for the same reason - do not reach for the theme-aware tokens and hope.
 - **Error banners and alerts** must use terminal-red tokens (`border-terminal-red/30`, `bg-terminal-red/10`, `text-terminal-red`) — never the brand accent for error states.
 - **Verification-related UI on the site itself** (verify page headings, verify CTAs, in-app verification indicators) must use the complement (slate blue since #1206) tokens: `bg-complement`, `border-complement`, `bg-complement-light` for fills/tints/borders, and — for text and icon strokes specifically — `text-complement-text` (#1189), never `text-complement`. The raw fill value does not clear the AA floor as text.54:1 as text against the site's light-theme backgrounds, below the WCAG AA floor even for large/bold text (3:1), let alone normal text (4.5:1); `--color-complement-text` is the theme-aware, text-safe counterpart (see the color table above). This semantically distinguishes cryptographic trust from primary brand actions while keeping teal legible as text in both themes. **Hovering a `text-complement-text` element** must go to `hover:text-complement-text-hover`, never `hover:text-complement-light` — `--color-complement-light` is a translucent BACKGROUND tint (pale mint on white in light theme, 15%-alpha green in dark theme) that renders as near-invisible text; a hover state that's harder to read than rest is backwards. `--color-complement-text-hover` is the theme-aware, text-safe hover counterpart (darker in light theme, lighter/brighter in dark theme — see the color table above).
-- **The embeddable badge SVG's own "verified" signal** (shield icon + vertical verification strip) is the one deliberate exception: it uses its own coral constant, `VERIFICATION_CORAL` (`#E05A47`, `apps/web/lib/badge-visual-metadata.ts`) — never the teal tokens above. The badge is a static, theme-independent asset rendered server-side before app CSS exists, so it can't reference CSS custom properties at all; coral was already load-bearing in the verification strip pre-dating this rule, and previously coexisted with the brand-purple shield icon (two colors signaling one "verified" concept). #1168 (UX-M10) resolved that duality by recoloring the shield to the same coral, so the badge now has exactly one verified color, distinct from the on-site complement and from the brand accent. (The badge still carries the pre-#1206 violet for its accent and archetype colors; the app moved to jade and the badge deliberately did not, so "brand-purple shield" above is badge history, not the app's current accent.) Contrast: coral is ~5.3:1 against the badge's own fixed dark background (#0C0D14) — comfortably AA. It is only ~3.7:1 against a light background (#FFFFFF/#F9FAFB) — AA for large/bold text only, not small body text — so if a coral accent is ever carried onto the (light/dark-capable) verify page, it needs its own contrast pass and cannot assume the badge's dark-background numbers apply. Coral vs. `--color-terminal-red` (error state) hue is close (~7° apart in HSL) but separated by lightness/saturation on the badge's dark canvas (~13pp lightness gap vs. dark-theme `--color-terminal-red` #F87171); the gap narrows on a hypothetical light-theme use (~7pp vs. light-theme `--color-terminal-red` #DC2626, nearly identical saturation) — verify the two stay visually distinguishable, including for colorblind users, before extending coral beyond the badge.
+- **The embeddable badge SVG's own "verified" signal** (shield icon + vertical verification strip) is the one deliberate exception: it uses its own coral constant, `VERIFICATION_CORAL` (`#E05A47`, `apps/web/lib/badge-visual-metadata.ts`) — never the teal tokens above. The badge is a static, theme-independent asset rendered server-side before app CSS exists, so it can't reference CSS custom properties at all; coral was already load-bearing in the verification strip pre-dating this rule, and previously coexisted with the brand-purple shield icon (two colors signaling one "verified" concept). #1168 (UX-M10) resolved that duality by recoloring the shield to the same coral, so the badge now has exactly one verified color, distinct from the on-site complement and from the brand accent. ("Brand-purple shield" above is badge history: the badge carried the pre-#1206 violet until #1225 converged its accent and archetype colours onto Jade. Coral is unaffected by that convergence and must stay distinct from the accent — the whole point of #1168 was one verified colour, separate from the brand.) Contrast: coral is ~5.3:1 against the badge's own fixed dark background (#0C0D14) — comfortably AA. It is only ~3.7:1 against a light background (#FFFFFF/#F9FAFB) — AA for large/bold text only, not small body text — so if a coral accent is ever carried onto the (light/dark-capable) verify page, it needs its own contrast pass and cannot assume the badge's dark-background numbers apply. Coral vs. `--color-terminal-red` (error state) hue is close (~7° apart in HSL) but separated by lightness/saturation on the badge's dark canvas (~13pp lightness gap vs. dark-theme `--color-terminal-red` #F87171); the gap narrows on a hypothetical light-theme use (~7pp vs. light-theme `--color-terminal-red` #DC2626, nearly identical saturation) — verify the two stay visually distinguishable, including for colorblind users, before extending coral beyond the badge.
 - **Wave 2 decision (#1183): coral stays badge-only — the verify page keeps the complement family.**
   > **Superseded in part by #1206.** The conclusion still holds (coral stays
   > badge-only), but the reasoning below is written against the old emerald
@@ -381,16 +381,40 @@ it is now green. Renaming it to `--color-accent` is the right cleanup but
 touches every consuming utility class (`bg-amber` etc.), so it was deliberately
 left out of the palette change to keep that diff a pure value swap.
 
-**The badge SVG did not move.** It is rendered server-side before app CSS
-exists, is always dark, and carries its own constants in `lib/render/theme.ts`.
-Its accent and archetype colors therefore no longer match the app's, which
-`lib/render/theme.test.ts` now records as intentional.
+**The badge SVG has now moved too (#1225).** It is rendered server-side before
+app CSS exists, so it cannot read a custom property and carries literals in
+`lib/render/theme.ts`. Those literals are now the Jade tokens, converted:
 
-That intent has an expiry date. Under the "one badge artifact" decision
-(`docs/decisions/2026-08-30-one-badge-artifact.md`, #1191) the same badge cannot
-be jade in Creator Studio and violet when embedded, so converging
-`lib/render/theme.ts` onto the Jade palette becomes required rather than
-optional. It is deliberately scheduled as its own piece of work: every cached
-badge and every embedded README image changes the day it ships. The same applies to
-`/og-image` and the badge route's fallback SVG, both of which render in the
-badge's visual language (`#0C0D14`) rather than the app's.
+| Badge constant | From the app token | Hex |
+|---|---|---|
+| `accent` | `--color-amber`, dark half `oklch(.76 .16 163)` | `#1BD093` |
+| `accentLight` | `--color-amber-light`, dark half `oklch(.84 .14 163)` | `#65E7B0` |
+| archetypes | `--color-archetype-*`, `oklch(.62 .14 <hue>)` | seven hexes |
+
+Three things about that conversion are deliberate:
+
+- **Hex, not `oklch()`.** The OG-image route rasterizes the badge through
+  resvg, which parses a narrower colour syntax than a browser.
+- **The dark half.** The badge is always dark, so it takes the dark value of
+  any light-dark() token.
+- **The archetypes keep lightness `.62`.** Matching the app exactly is the
+  point, and all seven clear AA on the badge's ground anyway (measured 4.96:1
+  for Quality Champion up to 5.70:1 for Builder). The accent measures 9.68:1,
+  up from the violet's 4.58:1.
+
+The accent is defined **once**, as `BADGE_ACCENT_RGB`, with `accentTint(alpha)`
+deriving every translucent use. The violet it replaced had been spelled out as
+28 separate literals across six files, which is exactly how it survived the
+#1206 rebrand; `lib/render/badge-palette.test.ts` now fails if a literal
+reappears anywhere on the render path.
+
+**The badge ground did not move.** `bg` (`#0C0D14`) and `card` (`#13141E`) are
+a cooler canvas tuned for the badge, and changing them is a design decision
+separate from the brand colour. `lib/render/theme.test.ts` still records that
+divergence as intentional.
+
+Shipping this changed every cached badge and every embedded README image, which
+is why `BADGE_RENDER_VARIANT` moved from `warm-amber-v3` to `jade-v1` in the
+same commit and the byte-for-byte baseline in `badge-effects.test.ts` was
+re-captured. `VERIFICATION_CORAL` is untouched: it is the badge's one "verified"
+colour and deliberately not the brand accent (#1168/#1183).
