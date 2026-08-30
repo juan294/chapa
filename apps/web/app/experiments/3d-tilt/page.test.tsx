@@ -7,7 +7,6 @@ const mockComputeTilt = vi.hoisted(() => vi.fn());
 // Mock BadgeContent — heavy component with CSS injection
 vi.mock("@/components/badge/BadgeContent", () => ({
   BadgeContent: () => <div data-testid="badge-content">badge</div>,
-  getBadgeContentCSS: () => [""],
 }));
 
 // Mock the tilt module

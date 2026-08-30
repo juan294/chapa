@@ -17,7 +17,7 @@ import type {
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { BadgePreviewCard } from "./BadgePreviewCard";
-import type { PreviewVerification } from "./PreviewFooter";
+import type { PreviewVerification } from "./BadgePreviewCard";
 import { QuickControls } from "./QuickControls";
 import { STUDIO_CATEGORIES } from "./studio-options";
 import {
@@ -53,6 +53,13 @@ export interface StudioClientProps {
   craftResult?: CraftResult | null;
   handle?: string;
   verification?: PreviewVerification | null;
+  /**
+   * Badge avatar, resolved server-side in `page.tsx` exactly as the badge
+   * route resolves it (#1191 step 6). The preview renders the real badge SVG,
+   * and that SVG draws the owner's avatar; without this it falls back to the
+   * Chapa shield placeholder and stops matching the shipped badge.
+   */
+  avatarDataUri?: string;
   demo?: boolean;
 }
 
@@ -147,6 +154,7 @@ export function StudioClient({
   craftResult = null,
   handle = "",
   verification = null,
+  avatarDataUri,
   demo = false,
 }: StudioClientProps) {
   const { t } = useTranslation();
@@ -583,6 +591,8 @@ export function StudioClient({
             stats={stats}
             impact={impact}
             verification={verification}
+            avatarDataUri={avatarDataUri}
+            demoMode={demo}
           />
 
           {/* #1216 — a status pill, not a centered line of text. The state is

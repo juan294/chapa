@@ -168,3 +168,41 @@ of this decision.
 - The work is a project, not a change. It should be sequenced behind the
   byte-identical-default test, then category by category, so each step is
   independently verifiable against a real badge.
+
+## Status of the work (updated 2026-08-30, step 6)
+
+Done. `renderBadgeSvg` is the only badge implementation.
+
+| Step | Outcome |
+|---|---|
+| 1 | `renderBadgeSvg` consumes `BadgeConfig`, guarded by pre-parameter hashes — the default badge did not move a byte |
+| 2 | One resolver (`resolveBadgeConfig`) feeds all four render sites, which share a cache slot |
+| 3 | All six crossing categories render in the SVG |
+| 4 | Studio labelled the three that cannot cross "preview only" |
+| 5 | **Reversed step 4** — the three were removed from the schema instead. See the amendment above |
+| 6 | Studio previews `renderBadgeSvg` output. `PreviewFooter` deleted; `BadgeContent` reduced from 405 lines to a ~60-line wrapper serving only `/experiments/*` |
+
+Step 6 removed the DOM effect modules that existed only to draw the second
+badge: `backgrounds/AuroraBackground`, `backgrounds/ParticleBackground`,
+`backgrounds/ParticleCanvas`, `borders/GradientBorder`,
+`borders/gradient-border-css`, `cards/glass-presets` and
+`heatmap/HeatmapGrid`. What remains under `lib/effects/` survives for a
+different consumer — the dashboard, the `/experiments/*` prototypes, or the
+Studio presets — not for the badge.
+
+Two things step 6 forced that were not obvious from the plan:
+
+- **The preview needs the badge's own strings and avatar.** `resolveBadgeLocale`
+  is server-only (`getServerT`), so the ~11 badge string keys moved into a pure
+  `buildBadgeI18nStrings` both sides share rather than being written out twice.
+  `app/studio/page.tsx` resolves the avatar server-side against a bounded
+  deadline exactly as the badge route does; without it the preview falls back
+  to the shield placeholder and stops matching the artifact.
+- **`badge-visual-metadata.ts` changes role.** It existed as a NEUTRAL boundary
+  so Studio could get platform logos and the coral token without importing the
+  renderer. With one implementation, Studio importing the renderer is correct.
+  The dependency direction that still matters — this module importing no
+  renderer — is unchanged and still asserted.
+
+Two follow-ups are tracked separately: the badge's pre-Jade palette (#1225) and
+the misnamed `heatmapAnimation: "fade-in"` default (#1226).

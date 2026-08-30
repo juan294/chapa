@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useId } from "react";
-import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { BadgeContent } from "@/components/badge/BadgeContent";
 import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ──────────────────────────────────────────────────────────────
@@ -108,7 +108,6 @@ export default function GradientBorderExperiment() {
 
   return (
     <>
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Inline styles for the animated gradient border techniques */}
       {/* SAFETY: CSS-only string literal with no user input — used for @property and @keyframes that cannot be expressed in Tailwind. */}
       <style

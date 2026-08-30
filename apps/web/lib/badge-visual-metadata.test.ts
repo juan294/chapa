@@ -50,14 +50,40 @@ describe("badge visual metadata", () => {
     expect(source).not.toMatch(/renderBadge|renderVerification/);
   });
 
-  it("keeps the Studio client on the neutral metadata boundary", () => {
+  /**
+   * #1191 step 6 reverses this module's earlier relationship with Studio.
+   *
+   * This file existed as a NEUTRAL boundary: Studio drew its own badge in the
+   * DOM, so it needed the platform logos and the coral token without importing
+   * the SVG renderer, and the old test asserted `PreviewFooter.tsx` stayed off
+   * `@/lib/render/`. That was the right rule while there were two badge
+   * implementations to keep apart.
+   *
+   * There is one now. Studio renders `renderBadgeSvg` output directly, so
+   * importing the renderer is the correct behaviour and `PreviewFooter` is
+   * gone — the SVG draws its own branding row and verification strip. What
+   * still matters is the direction of the dependency: this module must stay
+   * free of renderer imports (asserted above) so the server renderer and any
+   * client surface can both consume it.
+   */
+  it("has Studio consume the shared renderer rather than redrawing the badge", () => {
     const source = readFileSync(
-      resolve(__dirname, "../app/studio/PreviewFooter.tsx"),
+      resolve(__dirname, "../app/studio/BadgePreviewCard.tsx"),
       "utf8",
     );
 
-    expect(source).toContain('from "@/lib/badge-visual-metadata"');
-    expect(source).not.toMatch(/from ["']@\/lib\/render\//);
+    expect(source).toMatch(/from ["']@\/lib\/render\/BadgeSvg["']/);
+    expect(source).toContain("renderBadgeSvg");
+
+    // It must not compose the DOM lookalike any more. Checked against the
+    // import statements, not the whole file: the component documents what it
+    // replaced, and naming that is not depending on it.
+    const imports = source
+      .split("\n")
+      .filter((line) => /^\s*import\b/.test(line));
+    for (const line of imports) {
+      expect(line).not.toMatch(/\bBadgeContent\b/);
+    }
   });
 });
 

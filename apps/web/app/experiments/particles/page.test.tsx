@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 vi.mock("@/components/badge/BadgeContent", () => ({
   BadgeContent: () => <div data-testid="badge-content">badge</div>,
-  getBadgeContentCSS: () => [""],
 }));
 
 // Mock matchMedia for reduced motion check

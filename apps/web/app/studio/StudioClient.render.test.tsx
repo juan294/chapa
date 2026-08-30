@@ -93,20 +93,20 @@ vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
 vi.mock("./BadgePreviewCard", () => ({
   BadgePreviewCard: ({
     config,
-    interactive,
     verification,
+    avatarDataUri,
   }: {
     config: Record<string, unknown>;
-    interactive: boolean;
     verification?: { hash: string; date: string } | null;
+    avatarDataUri?: string;
   }) => {
     const [instanceId] = useState(() => ++previewLifecycle.nextInstanceId);
     return (
       <div
         data-testid="badge-preview"
         data-instance-id={instanceId}
-        data-interactive={String(interactive)}
         data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
+        data-avatar={avatarDataUri ?? "none"}
       >
         {JSON.stringify(config)}
       </div>
@@ -484,6 +484,38 @@ describe("StudioClient render", () => {
 
       expect(screen.getByTestId("badge-preview").getAttribute("data-verification")).toBe(
         "abc123:2026-08-26",
+      );
+    });
+
+    // #1191 step 6 — the preview renders the real badge SVG now, and the real
+    // badge draws the owner's avatar. Without this the preview falls back to
+    // the Chapa shield placeholder and stops looking like the shipped badge.
+    it("forwards the server-resolved avatar to BadgePreviewCard", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          avatarDataUri="data:image/png;base64,AAAA"
+        />,
+      );
+
+      expect(screen.getByTestId("badge-preview").getAttribute("data-avatar")).toBe(
+        "data:image/png;base64,AAAA",
+      );
+    });
+
+    it("renders without an avatar when the server could not resolve one", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      expect(screen.getByTestId("badge-preview").getAttribute("data-avatar")).toBe(
+        "none",
       );
     });
 

@@ -1,166 +1,85 @@
 "use client";
 
-import { memo } from "react";
-import dynamic from "next/dynamic";
-import type {
-  BadgeConfig,
-  StatsData,
-  ImpactV6Result,
-  Platform,
-} from "@chapa/shared";
-import type { GlassVariant } from "@/lib/effects/cards/glass-presets";
-import { glassStyle } from "@/lib/effects/cards/glass-presets";
-import { GRADIENT_BORDER_CSS } from "@/lib/effects/borders/gradient-border-css";
-import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
-import {
-  PreviewFooter,
-  type PreviewVerification,
-} from "./PreviewFooter";
+import { memo, useMemo } from "react";
+import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
+import type { PublicVerificationCode } from "@/lib/profile/public-profile";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
+import { useTranslation } from "@/lib/i18n";
 
-// ---------------------------------------------------------------------------
-// Lazy-loaded effect components (code-split, client-only)
-// ---------------------------------------------------------------------------
-
-const LazyAuroraBackground = dynamic(
-  () => import("@/lib/effects/backgrounds/AuroraBackground").then((m) => m.AuroraBackground),
-  { ssr: false, loading: () => <div className="absolute inset-0" aria-hidden="true" /> }
-);
-
-const LazyParticleCanvas = dynamic(
-  () => import("@/lib/effects/backgrounds/ParticleCanvas"),
-  { ssr: false, loading: () => <div className="absolute inset-0" aria-hidden="true" /> }
-);
-
-const LazyGradientBorder = dynamic(
-  () => import("@/lib/effects/borders/GradientBorder").then((m) => m.GradientBorder),
-  { ssr: false, loading: () => <div data-effect="gradient-border-loading" /> }
-);
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+export type PreviewVerification = PublicVerificationCode;
 
 export interface BadgePreviewCardProps {
   config: BadgeConfig;
   stats: StatsData;
   impact: ImpactV6Result;
   verification?: PreviewVerification | null;
+  /**
+   * Resolved server-side by `app/studio/page.tsx`, exactly as the badge route
+   * resolves it. Omitted renders the Chapa shield placeholder, which is what
+   * the real badge does for a handle with no avatar.
+   */
+  avatarDataUri?: string;
+  demoMode?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
+/**
+ * Creator Studio's preview: the real badge, not a lookalike (#1191 step 6).
+ *
+ * This used to compose `BadgeContent` — a parallel React DOM implementation of
+ * the badge interior — inside DOM layers that applied `background`, `cardStyle`
+ * and `border` themselves. Every visual element therefore existed twice and was
+ * maintained twice, and a customization could look one way here and another in
+ * the README. It now injects the string `renderBadgeSvg` produces, which is the
+ * same function and the same inputs the badge route uses, so the preview and
+ * the artifact cannot disagree.
+ *
+ * The DOM effect layers are gone rather than kept: the SVG applies all six
+ * crossing categories itself, so a surviving wrapper would double them.
+ *
+ * `dangerouslySetInnerHTML` is safe here for the same reason it is at the three
+ * existing call sites (the landing page, the archetype guides, the share
+ * page's inline render): `renderBadgeSvg` escapes every user-controlled string
+ * itself via `escapeXml`, because React's auto-escaping does not apply to
+ * injected markup and cannot substitute for it. See
+ * `docs/decisions/2026-08-30-one-badge-artifact.md`, invariant 2.
+ */
 function BadgePreviewCardInner({
   config,
   stats,
   impact,
   verification = null,
+  avatarDataUri,
+  demoMode = false,
 }: BadgePreviewCardProps) {
-  const linkedPlatforms: Platform[] = [
-    "github",
-    ...(stats.linkedPlatforms?.filter(
-      (platform): platform is Platform => platform !== "github",
-    ) ?? []),
-  ];
+  const { t } = useTranslation();
 
-  // --- Collect CSS for active effects ---
-  const css = getBadgeContentCSS({
-    scoreEffect: config.scoreEffect,
-    tierTreatment: config.tierTreatment,
-  });
-  if (config.border === "gradient-rotating") css.push(GRADIENT_BORDER_CSS);
-
-  // --- Glass / flat card styles ---
-  const isGlass = config.cardStyle !== "flat";
-  const glass = isGlass
-    ? glassStyle(config.cardStyle as GlassVariant)
-    : null;
-
-  const cardInlineStyle: React.CSSProperties = glass
-    ? {
-        ...glass,
-        // When gradient border wraps the card, strip card's own border
-        ...(config.border === "gradient-rotating" ? { border: "none" } : {}),
-        ...(config.border === "none" ? { border: "none" } : {}),
-      }
-    : {};
-
-  // ------------------------------------------------------------------
-  // Card content (shared between all border wrappers)
-  // ------------------------------------------------------------------
-
-  const cardContent = (
-    <div
-      className={`relative overflow-hidden rounded-2xl p-6 ${
-        !isGlass ? "bg-card" : ""
-      } ${
-        config.border === "solid-amber" && !isGlass
-          ? "border border-stroke"
-          : ""
-      }`}
-      style={cardInlineStyle}
-      data-card-style={config.cardStyle}
-      data-testid="badge-card"
-    >
-      <BadgeContent
-        stats={stats}
-        impact={impact}
-        scoreEffect={config.scoreEffect}
-        heatmapAnimation={config.heatmapAnimation}
-        tierTreatment={config.tierTreatment}
-        showFooter={false}
-      />
-      <PreviewFooter
-        linkedPlatforms={linkedPlatforms}
-        verification={verification}
-      />
-    </div>
+  const svg = useMemo(
+    () =>
+      renderBadgeSvg(stats, impact, {
+        config,
+        avatarDataUri,
+        verificationHash: verification?.hash,
+        verificationDate: verification?.date,
+        demoMode,
+        strings: buildBadgeI18nStrings(t, impact.tier),
+      }),
+    [config, stats, impact, verification, avatarDataUri, demoMode, t],
   );
 
-  // ------------------------------------------------------------------
-  // Wrap with border layer
-  // ------------------------------------------------------------------
-
-  const withBorder =
-    config.border === "gradient-rotating" ? (
-      <div data-effect="gradient-border">
-        <LazyGradientBorder>{cardContent}</LazyGradientBorder>
-      </div>
-    ) : (
-      cardContent
-    );
-
-  // ------------------------------------------------------------------
-  // Final render
-  // ------------------------------------------------------------------
-
   return (
-    <div className="relative" data-testid="badge-preview">
-      {/* Inject CSS */}
-      <style>{css.join("\n")}</style>
-
-      {/* Layer 1: Background */}
-      {config.background === "aurora" && (
-        <div
-          data-effect="aurora"
-          className="absolute inset-0 rounded-2xl overflow-hidden"
-        >
-          <LazyAuroraBackground positioning="absolute" />
-        </div>
-      )}
-      {config.background === "particles" && (
-        <div
-          data-effect="particles"
-          className="absolute inset-0 rounded-2xl overflow-hidden"
-        >
-          <LazyParticleCanvas />
-        </div>
-      )}
-
-      {/* Layers 2-4: Border + Card + Content */}
-      {withBorder}
-    </div>
+    <div
+      data-testid="badge-preview"
+      // The badge is a fixed 1200x630 document with a viewBox, so overriding
+      // the root element's own width/height is what makes it scale to the
+      // Studio column instead of overflowing it.
+      className="relative w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full [&>svg]:rounded-2xl"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }
 

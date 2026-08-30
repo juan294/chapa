@@ -285,7 +285,7 @@ Two things the index depends on:
 
 ### Tooltips (mandatory pattern)
 
-Every tooltip/popover must be portal-rendered to `document.body` with `position: fixed`, viewport-relative coordinates (from `getBoundingClientRect()`), `z-index: 99999`, and `pointer-events: none`. Add a flip-below rule when the trigger is near the top of the viewport (`rect.top < 120`) so the tooltip doesn't clip off-screen. Never use `position: absolute` inside a scrollable/animated container — an ancestor with a CSS `transform` breaks `position: fixed` positioning unless the tooltip is portaled out of that subtree entirely (#1021). Reference implementations: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/dashboard/ActivityHeatmap.tsx`'s `ChartTooltip`, `apps/web/lib/effects/heatmap/HeatmapGrid.tsx`.
+Every tooltip/popover must be portal-rendered to `document.body` with `position: fixed`, viewport-relative coordinates (from `getBoundingClientRect()`), `z-index: 99999`, and `pointer-events: none`. Add a flip-below rule when the trigger is near the top of the viewport (`rect.top < 120`) so the tooltip doesn't clip off-screen. Never use `position: absolute` inside a scrollable/animated container — an ancestor with a CSS `transform` breaks `position: fixed` positioning unless the tooltip is portaled out of that subtree entirely (#1021). Reference implementations: `apps/web/components/InfoTooltip.tsx` and `apps/web/components/dashboard/ActivityHeatmap.tsx`'s `ChartTooltip`. (`lib/effects/heatmap/HeatmapGrid.tsx` was a third until #1191 retired the DOM badge that used it.)
 
 ### Terminal components
 

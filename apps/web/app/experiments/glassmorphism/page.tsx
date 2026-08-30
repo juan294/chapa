@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { getBadgeContentCSS } from "@/components/badge/BadgeContent";
 import {
   type GlassConfig,
   type GlassVariant,
@@ -47,7 +46,6 @@ export default function GlassmorphismExperimentPage() {
       id="main-content"
       className="relative min-h-screen bg-bg"
     >
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Background blobs — essential for glass to look like glass */}
       <BackgroundBlobs visible={showBlobs} />
 
