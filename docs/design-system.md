@@ -384,6 +384,13 @@ left out of the palette change to keep that diff a pure value swap.
 **The badge SVG did not move.** It is rendered server-side before app CSS
 exists, is always dark, and carries its own constants in `lib/render/theme.ts`.
 Its accent and archetype colors therefore no longer match the app's, which
-`lib/render/theme.test.ts` now records as intentional. The same applies to
+`lib/render/theme.test.ts` now records as intentional.
+
+That intent has an expiry date. Under the "one badge artifact" decision
+(`docs/decisions/2026-08-30-one-badge-artifact.md`, #1191) the same badge cannot
+be jade in Creator Studio and violet when embedded, so converging
+`lib/render/theme.ts` onto the Jade palette becomes required rather than
+optional. It is deliberately scheduled as its own piece of work: every cached
+badge and every embedded README image changes the day it ships. The same applies to
 `/og-image` and the badge route's fallback SVG, both of which render in the
 badge's visual language (`#0C0D14`) rather than the app's.

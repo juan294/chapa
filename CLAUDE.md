@@ -152,6 +152,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Branding is isolated in `apps/web/lib/render/BadgeBranding.tsx`
 - Client-safe visual metadata lives in `apps/web/lib/badge-visual-metadata.ts`: platform logo paths, canonical platform order, and the verification coral token. Both the server SVG renderer and Studio preview consume it.
 - Creator Studio composes `BadgeContent` with `apps/web/app/studio/PreviewFooter.tsx` for platform, host, and optional verification parity. Studio config persistence does not change the public SVG badge or share page.
+- **This split is being closed (#1191).** `BadgeContent` is a second, DOM-based implementation of the badge that Studio previews instead of the real `renderBadgeSvg` output, so every visual element exists twice and Studio's nine customization categories reach nothing that ships. The decision to make `renderBadgeSvg` consume `BadgeConfig` and retire `BadgeContent` to a thin wrapper — which of the nine categories can cross to SVG and which cannot, the invariants that must survive, and how badge design versions are tracked — is `docs/decisions/2026-08-30-one-badge-artifact.md`. Until that lands, treat any change to a badge visual as needing the same change in both places.
 - Avatar placeholder (when no user photo) shows the Chapa shield icon
 
 ## Caching rules
