@@ -1058,6 +1058,8 @@ export const es: Translations = {
     subtitle: 'Previsualiza y personaliza tu Chapa — los cambios aquí nunca afectan a tu Chapa pública ni a tu página compartida.',
     quickControls: 'Controles rápidos',
     presetsHeading: 'Preajustes',
+    previewOnly: 'solo vista previa',
+    previewOnlyHint: 'Este efecto necesita una página en vivo, así que se ve aquí pero no en la insignia que insertas.',
     activeConfig: 'CONFIGURACIÓN ACTIVA',
     session: 'SESIÓN',
     changedCount: '{count} de {total} cambiadas',

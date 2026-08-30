@@ -13,6 +13,16 @@ export interface CategoryMeta {
   key: keyof BadgeConfig;
   label: string;
   options: OptionMeta[];
+  /**
+   * True when the category cannot reach the embeddable badge (#1191).
+   *
+   * The badge is an SVG image. It has no pointer, no JavaScript loop, and no
+   * "on load" moment — it is a cached file served to every viewer. So a tilt on
+   * hover, a counting animation and a confetti burst can be previewed on this
+   * page and nowhere else. Everything NOT marked here renders in the real
+   * badge, which is the whole point of the one-artifact work.
+   */
+  previewOnly?: boolean;
 }
 
 export type StudioTranslate = LanguageContextValue["t"];
@@ -87,6 +97,7 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
   {
     key: "interaction",
     label: "Interaction",
+    previewOnly: true,
     options: [
       { value: "static", label: "Static", description: "No mouse interaction" },
       { value: "tilt-3d", label: "3D Tilt", description: "Perspective tilt on hover" },
@@ -96,6 +107,7 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
   {
     key: "statsDisplay",
     label: "Stats Display",
+    previewOnly: true,
     options: [
       { value: "static", label: "Static", description: "Plain numbers" },
       { value: "animated-ease", label: "Smooth Count", description: "Eased counting animation" },
@@ -113,6 +125,7 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
   {
     key: "celebration",
     label: "Celebration",
+    previewOnly: true,
     options: [
       { value: "none", label: "None", description: "No celebration effect" },
       { value: "confetti", label: "Confetti", description: "Burst of confetti on load" },

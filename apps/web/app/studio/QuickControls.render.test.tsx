@@ -421,3 +421,46 @@ describe("QuickControls — v2 controls column (#1216)", () => {
     expect(option.className).toContain("min-h-[44px]");
   });
 });
+
+// #1191 — six of the nine categories now render in the embeddable badge. The
+// other three cannot: the badge is an image with no pointer, no JS loop and no
+// "on load" moment. Saying which is which is the difference between a preview
+// and a promise.
+describe("QuickControls marks the preview-only categories (#1191)", () => {
+  it("marks exactly interaction, statsDisplay and celebration", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    for (const key of ["interaction", "statsDisplay", "celebration"]) {
+      expect(screen.getByTestId(`preview-only-${key}`).textContent).toBe(
+        "preview only",
+      );
+    }
+  });
+
+  it("does not mark the six categories that reach the badge", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    for (const key of [
+      "background",
+      "cardStyle",
+      "border",
+      "scoreEffect",
+      "heatmapAnimation",
+      "tierTreatment",
+    ]) {
+      expect(screen.queryByTestId(`preview-only-${key}`)).toBeNull();
+    }
+  });
+});
