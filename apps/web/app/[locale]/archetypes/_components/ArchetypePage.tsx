@@ -1,5 +1,5 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { ArchetypePageClient } from "./ArchetypePageClient";
+import { ArchetypePageContent } from "./ArchetypePageContent";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import {
@@ -46,5 +46,5 @@ export async function ArchetypePage({ archetypeKey, locale }: Props) {
   });
   const t = getServerT(locale);
 
-  return <ArchetypePageClient archetypeKey={archetypeKey} badgeSvg={badgeSvg} t={t} />;
+  return <ArchetypePageContent archetypeKey={archetypeKey} badgeSvg={badgeSvg} t={t} />;
 }

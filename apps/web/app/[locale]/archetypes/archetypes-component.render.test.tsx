@@ -369,7 +369,7 @@ describe("generateMetadata — [locale] route param", () => {
 
 // Structural/behavioral checks that source-text assertions in
 // archetypes-render.test.ts and archetypes-scoring-signals.test.ts
-// previously covered by regexing ArchetypePage.tsx/ArchetypePageClient.tsx
+// previously covered by regexing ArchetypePage.tsx/ArchetypePageContent.tsx
 // source — converted to real render+query assertions against the actual
 // mocked component tree (#1104).
 describe("ArchetypePage — structure and links (render)", () => {

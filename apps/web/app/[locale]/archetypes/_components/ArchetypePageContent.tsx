@@ -30,7 +30,7 @@ interface Props {
  * both locale variants are statically pre-rendered, so there is no
  * client-side re-render/flash.
  */
-export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
+export function ArchetypePageContent({ archetypeKey, badgeSvg, t }: Props) {
   const ns = `archetypes.${archetypeKey}`;
 
   const essay = tArray<string>(t, `${ns}.essay`);

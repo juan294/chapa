@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// Regression guard for #1170 (UX-H2): ArchetypePageClient rendered the
+// Regression guard for #1170 (UX-H2): ArchetypePageContent rendered the
 // entire `essay` array as one undifferentiated block above `sectionIdentifies`,
 // then emitted `sectionPractice` and `sectionRadar` headings with nothing
 // rendered underneath either of them. This test renders the REAL component
@@ -49,17 +49,17 @@ function contentAfterHeading(h2Headings: Element[], headingText: string): string
   return text.trim();
 }
 
-describe("ArchetypePageClient — every heading has content beneath it (#1170)", () => {
+describe("ArchetypePageContent — every heading has content beneath it (#1170)", () => {
   for (const locale of LOCALES) {
     for (const archetypeKey of ARCHETYPE_KEYS) {
       it(`${locale}/${archetypeKey}: sectionIdentifies, sectionPractice, and sectionRadar all render non-empty content`, async () => {
-        const { ArchetypePageClient } = await import("./ArchetypePageClient");
+        const { ArchetypePageContent } = await import("./ArchetypePageContent");
         const { getServerT } = await import("@/lib/i18n/server");
         const t = getServerT(locale);
         const ns = `archetypes.${archetypeKey}`;
 
         const { container } = render(
-          <ArchetypePageClient
+          <ArchetypePageContent
             archetypeKey={archetypeKey}
             badgeSvg="<svg data-testid='mock-badge'></svg>"
             t={t}
@@ -106,4 +106,29 @@ describe("dictionary shape — practiceEssay/radarEssay (#1170)", () => {
       });
     }
   }
+});
+
+// #1195 — the rename from ArchetypePageClient exists to stop the name
+// asserting a boundary the file does not have. The guard is the absence of
+// "use client": adding it would break the `t` FUNCTION prop this component
+// takes from ArchetypePage (functions do not serialize across the boundary)
+// and pull the archetype dictionaries into the client bundle, undoing the
+// FE-H1/PE-H1 bundle work.
+describe("ArchetypePageContent is a server component (#1195)", () => {
+  it('has no "use client" directive', async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "ArchetypePageContent.tsx"),
+      "utf8",
+    );
+    expect(source).not.toMatch(/^\s*["']use client["']/m);
+  });
+
+  it("is not named *Client, which is this tree's client-boundary convention", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const files = fs.readdirSync(path.resolve(__dirname));
+    expect(files.filter((f) => f.startsWith("ArchetypePageClient"))).toEqual([]);
+  });
 });
