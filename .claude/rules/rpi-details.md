@@ -48,7 +48,12 @@ description: RPI workflow details -- phase rules, pre-release sequence, implemen
 
 ## Pre-Release Workflow
 
-`/pre-launch` -> `/remediate` -> `/update-docs` -> `/release`
+`/pre-launch` -> `/remediate` -> `/update-docs` -> `/release` is an explicit
+milestone, high-risk, or requested readiness sequence -- not an unconditional
+prerequisite for every `/release`. `/release` (`docs/release/release-playbook.md`)
+is independently executable on its own two gates for an ordinary release.
+Run the full sequence for a major milestone, a high-risk release, or when
+asked for a readiness pass.
 
 After `/pre-launch`, run `/simplify` first -- it fixes dead code,
 duplicates, and inefficiencies in one pass. Then address security

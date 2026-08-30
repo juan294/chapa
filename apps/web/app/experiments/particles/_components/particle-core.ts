@@ -205,7 +205,7 @@ export function useParticles(
               ctx.beginPath();
               ctx.moveTo(particles[i]!.x, particles[i]!.y);
               ctx.lineTo(particles[j]!.x, particles[j]!.y);
-              ctx.strokeStyle = `rgba(139, 92, 246, ${opacity})`;
+              ctx.strokeStyle = `rgba(27, 208, 147, ${opacity})`;
               ctx.lineWidth = 0.5;
               ctx.stroke();
             }
@@ -281,7 +281,7 @@ export function useParticles(
 
 export const DOTS_CONFIG: ParticleConfig = {
   count: 60,
-  colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
+  colors: ["#1BD093", "#65E7B0", "#009365"],
   minRadius: 1,
   maxRadius: 3,
   speed: 0.3,
@@ -296,7 +296,7 @@ export const DOTS_CONFIG: ParticleConfig = {
 
 export const CONSTELLATION_CONFIG: ParticleConfig = {
   count: 40,
-  colors: ["#8B5CF6", "#A78BFA"],
+  colors: ["#1BD093", "#65E7B0"],
   minRadius: 1,
   maxRadius: 2.5,
   speed: 0.25,
@@ -311,7 +311,7 @@ export const CONSTELLATION_CONFIG: ParticleConfig = {
 
 export const DUST_CONFIG: ParticleConfig = {
   count: 25,
-  colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
+  colors: ["#1BD093", "#65E7B0", "#009365"],
   minRadius: 2,
   maxRadius: 5,
   speed: 0.1,
@@ -326,7 +326,7 @@ export const DUST_CONFIG: ParticleConfig = {
 
 export const SPARKLE_CONFIG: ParticleConfig = {
   count: 80,
-  colors: ["#8B5CF6", "#A78BFA", "#E6EDF3"],
+  colors: ["#1BD093", "#65E7B0", "#E6EDF3"],
   minRadius: 0.5,
   maxRadius: 1.5,
   speed: 0.2,
@@ -341,7 +341,7 @@ export const SPARKLE_CONFIG: ParticleConfig = {
 
 export const INTERACTIVE_CONFIG: ParticleConfig = {
   count: 50,
-  colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
+  colors: ["#1BD093", "#65E7B0", "#009365"],
   minRadius: 1,
   maxRadius: 3,
   speed: 0.3,

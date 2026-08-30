@@ -8,11 +8,20 @@ import {
   assertSharePage,
   assertShareVerification,
 } from "./helpers/deployment-probes";
-import { releaseRequiredScenarioIds } from "./helpers/release-required-environments";
+import {
+  parseReleaseVerificationMode,
+  releaseRequiredScenarioIds,
+} from "./helpers/release-required-environments";
 
 const expectedCommit = process.env.EXPECTED_DEPLOYMENT_COMMIT?.trim();
 const expectedEnvironment = process.env.EXPECTED_DEPLOYMENT_ENV?.trim();
-const selectedScenarioIds = releaseRequiredScenarioIds(expectedEnvironment);
+const verificationMode = parseReleaseVerificationMode(
+  process.env.RELEASE_VERIFICATION_MODE?.trim() || undefined,
+);
+const selectedScenarioIds = releaseRequiredScenarioIds(
+  expectedEnvironment,
+  verificationMode,
+);
 
 function requireIdentityInputs(environment: "preview" | "production"): string {
   expect(
@@ -24,7 +33,7 @@ function requireIdentityInputs(environment: "preview" | "production"): string {
 }
 
 test.describe("release-required deployed read-only probes", () => {
-  if (expectedEnvironment === "production") {
+  if (selectedScenarioIds.has("deployment.production-identity")) {
     test("@release-required deployment.production-identity", async ({ request }) => {
       const commit = requireIdentityInputs("production");
       const response = await request.get("/api/version");
@@ -34,7 +43,9 @@ test.describe("release-required deployed read-only probes", () => {
         environment: "production",
       });
     });
-  } else {
+  }
+
+  if (selectedScenarioIds.has("deployment.preview-identity")) {
     test("@release-required deployment.preview-identity", async ({ request }) => {
       const commit = requireIdentityInputs("preview");
       const response = await request.get("/api/version");
@@ -47,17 +58,23 @@ test.describe("release-required deployed read-only probes", () => {
     });
   }
 
-  test("@release-required health.core-dependencies", async ({ request }) => {
-    await assertCoreDependencies(request);
-  });
+  if (selectedScenarioIds.has("health.core-dependencies")) {
+    test("@release-required health.core-dependencies", async ({ request }) => {
+      await assertCoreDependencies(request);
+    });
+  }
 
-  test("@release-required profile.public-badge-read", async ({ request }) => {
-    await assertBadgeSvg(request);
-  });
+  if (selectedScenarioIds.has("profile.public-badge-read")) {
+    test("@release-required profile.public-badge-read", async ({ request }) => {
+      await assertBadgeSvg(request);
+    });
+  }
 
-  test("@release-required profile.public-share-read", async ({ page }) => {
-    await assertSharePage(page);
-  });
+  if (selectedScenarioIds.has("profile.public-share-read")) {
+    test("@release-required profile.public-share-read", async ({ page }) => {
+      await assertSharePage(page);
+    });
+  }
 
   if (selectedScenarioIds.has("auth.github-login-redirect")) {
     test("@release-required auth.github-login-redirect", async ({ request }) => {

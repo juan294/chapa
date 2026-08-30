@@ -118,13 +118,21 @@ test.describe("Integration — Share page (/u/:handle)", () => {
     expect(title.toLowerCase()).toContain(HANDLE.toLowerCase());
   });
 
-  test("page has an sr-only h1 with the handle", async ({ page }) => {
+  test("page names the profile in a visible h1, with the handle in the marker", async ({
+    page,
+  }) => {
     const response = await page.goto(`/u/${HANDLE}`, GOTO_OPTS);
     if (!response?.ok()) return;
 
-    // The share page renders: <h1 class="sr-only">@handle -- Developer Impact, Decoded</h1>
+    // #1217 replaced the sr-only h1 with a visible one carrying the display
+    // name. The handle moved to the "% chapa profile @handle" marker above it,
+    // so a profile with a display name no longer repeats the handle in the h1.
     const h1 = page.locator("h1");
-    await expect(h1).toContainText(HANDLE);
+    await expect(h1).toBeVisible();
+    await expect(h1).not.toBeEmpty();
+    await expect(
+      page.getByText(`% chapa profile @${HANDLE}`),
+    ).toBeVisible();
   });
 
   test("badge image element is present with correct src", async ({ page }) => {
@@ -146,14 +154,18 @@ test.describe("Integration — Share page (/u/:handle)", () => {
     }
   });
 
-  test('"Tu Impacto, Decodificado" section heading is visible', async ({
+  test("header subtitle describes the badge in the active locale", async ({
     page,
   }) => {
     const response = await page.goto(`/u/${HANDLE}`, GOTO_OPTS);
     if (!response?.ok()) return;
 
-    const heading = page.getByText("Tu Impacto, Decodificado");
-    await expect(heading).toBeVisible();
+    // Replaces the "Tu Impacto, Decodificado" section heading, which #1217
+    // removed along with SharePageH2. The subtitle is the localized copy in
+    // the header now.
+    await expect(
+      page.getByText("Insignia de impacto de desarrollador", { exact: false }),
+    ).toBeVisible();
   });
 
   test("page includes structured data (JSON-LD)", async ({ page }) => {

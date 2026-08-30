@@ -9,32 +9,45 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
-describe("mobile responsiveness (#240)", () => {
-  it("main container uses responsive section spacing (space-y-16 md:space-y-24)", () => {
-    expect(SOURCE).toContain("space-y-16 md:space-y-24");
+/**
+ * #240 asked for a landing page that survives 390px. It was originally met
+ * with viewport breakpoints (`text-3xl sm:text-4xl`, `flex-col sm:flex-row`,
+ * `sm:w-48`), which meant maintaining two layouts and guessing where the
+ * seams fell.
+ *
+ * #1215 replaced that with one fluid layout: type sizes are
+ * `clamp(min, Ncqi, max)` inside an element carrying container-type, and grids
+ * collapse to a single column rather than reflowing labels. These tests assert
+ * the new mechanism, and that the old fixed widths did not creep back.
+ */
+describe("landing layout is fluid, not breakpoint-driven (#240, #1215)", () => {
+  it("sizes hero type with a container-relative clamp", () => {
+    expect(SOURCE).toContain("@container");
+    expect(SOURCE).toMatch(/text-\[clamp\([^\]]*cqi[^\]]*\)\]/);
   });
 
-  it("main container uses responsive padding (pt-24 pb-20 md:pt-28 md:pb-32)", () => {
-    expect(SOURCE).toContain("pt-24 pb-20 md:pt-28 md:pb-32");
+  it("does not size the hero heading off viewport breakpoints", () => {
+    expect(SOURCE).not.toMatch(/text-3xl sm:text-4xl/);
   });
 
-  it("hero h1 uses smaller text on mobile (text-3xl sm:text-4xl)", () => {
-    expect(SOURCE).toContain("text-3xl sm:text-4xl");
-  });
-
-  it("feature list items use flex-col sm:flex-row (stack on mobile)", () => {
-    expect(SOURCE).toContain("flex-col sm:flex-row");
-  });
-
-  it("feature labels use sm:w-48 without a bare w-44 class (no fixed width on mobile)", () => {
-    expect(SOURCE).toContain("sm:w-48");
+  it("has no fixed label column that would crowd a 390px screen", () => {
+    // The old two-column label/description rows needed a fixed 12rem gutter.
     expect(SOURCE).not.toMatch(/(?<!\S)w-44(?!\S)/);
+    expect(SOURCE).not.toMatch(/(?<!\S)sm:w-48(?!\S)/);
   });
 
-  it("enterprise labels also use flex-col sm:flex-row", () => {
-    // There should be multiple instances of flex-col sm:flex-row (features + enterprise)
-    const matches = SOURCE.match(/flex-col sm:flex-row/g);
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBeGreaterThanOrEqual(2);
+  it("collapses multi-column sections to one column by default", () => {
+    const grids = SOURCE.match(/grid-cols-\d/g) ?? [];
+    expect(grids.length).toBeGreaterThan(0);
+    // Every column count is behind a breakpoint prefix, so the base state is
+    // a single column.
+    for (const match of SOURCE.matchAll(/(\S*)grid-cols-\d/g)) {
+      expect(match[1]).toMatch(/(sm|md|lg):$/);
+    }
+  });
+
+  it("keeps the badge panel from growing unbounded on wide screens", () => {
+    expect(SOURCE).toContain("max-h-[360px]");
+    expect(SOURCE).toContain("aspect-[16/5]");
   });
 });

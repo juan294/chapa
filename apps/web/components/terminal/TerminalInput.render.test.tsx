@@ -336,3 +336,31 @@ describe("TerminalInput", () => {
     });
   });
 });
+
+// #1214 — the field is a bordered 46px control with room for a trailing
+// affordance, not a bare line sitting on a divider.
+describe("TerminalInput — v2 field (#1214)", () => {
+  it("meets the 46px primary-action height", () => {
+    const { container } = render(<TerminalInput onSubmit={() => {}} />);
+    const field = container.firstElementChild as HTMLElement;
+    expect(field.className).toContain("min-h-[46px]");
+    expect(field.className).toContain("rounded-lg");
+    expect(field.className).toContain("border");
+  });
+
+  it("renders a trailing affordance inside the field", () => {
+    const { container } = render(
+      <TerminalInput onSubmit={() => {}} trailing={<kbd>/</kbd>} />,
+    );
+    const field = container.firstElementChild as HTMLElement;
+    const kbd = field.querySelector("kbd");
+    expect(kbd).not.toBeNull();
+    expect(kbd!.textContent).toBe("/");
+  });
+
+  it("renders nothing extra when there is no trailing affordance", () => {
+    const { container } = render(<TerminalInput onSubmit={() => {}} />);
+    expect(container.querySelector("kbd")).toBeNull();
+  });
+});
+

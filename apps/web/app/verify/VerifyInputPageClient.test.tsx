@@ -46,6 +46,13 @@ vi.mock("@/lib/i18n", () => ({
       if (key === "verify.title") return "Verificar una Chapa";
       if (key === "nav.innerLinks") return NAV_INNER_LINKS;
       if (key === "landing.footer.privacy") return "Privacidad";
+      if (key === "verify.awaitingHash") return "awaiting hash";
+      if (key === "verify.awaitingHashBody")
+        return "Every badge carries an HMAC-SHA256 seal.";
+      if (key === "about.verification.limitNotTamperProofHeading")
+        return "Not tamper-proof at the SVG level";
+      if (key === "about.verification.limitNotTamperProofSuffix")
+        return " — anyone can edit an SVG file.";
       return key;
     },
   }),
@@ -89,5 +96,25 @@ describe("VerifyInputPageClient", () => {
       "Puntuación",
     );
     expect(screen.getByTestId("navbar-link-/verify").textContent).toBe("Verificar");
+  });
+});
+
+// #1218 — the verify page opened straight into a bare input with nothing under
+// it, and the honest limitation note lived only in the explainer article.
+describe("VerifyInputPageClient — v2 states (#1218)", () => {
+  it("opens with the terminal marker rather than a bare $ prompt", () => {
+    const { container } = render(<VerifyInputPageClient />);
+    expect(container.textContent).toContain("% chapa verify");
+  });
+
+  it("names the idle state and explains what the hash is", () => {
+    const { container } = render(<VerifyInputPageClient />);
+    expect(container.textContent).toContain("awaiting hash");
+    expect(container.textContent).toContain("HMAC-SHA256");
+  });
+
+  it("keeps the tamper-proofing limitation on the page", () => {
+    const { container } = render(<VerifyInputPageClient />);
+    expect(container.textContent).toContain("Not tamper-proof at the SVG level");
   });
 });

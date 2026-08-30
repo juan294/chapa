@@ -18,6 +18,21 @@ const DELEGATED_FILES = [
   "CLAUDE.md",
 ] as const;
 
+// Terms belonging to the retired proof-of-proof evidence graph. None of
+// these may appear in a live operational instruction — see
+// docs/plans/2026-08-29-direct-proof-release-pipeline.md.
+const RETIRED_EVIDENCE_TERMS = [
+  "quality/release-required.json",
+  "releasePrRunId",
+  "releasePrRunAttempt",
+  "preMergeEvidence",
+  "pre-merge analyzer",
+  "final analyzer",
+  "merge-release-evidence",
+  "evidence-manifest.json",
+  "release-report.md",
+] as const;
+
 function read(root: string, file: string, errors: string[]): string {
   const target = path.join(root, file);
   if (!fs.existsSync(target)) {
@@ -44,6 +59,14 @@ function requireText(
   }
 }
 
+function rejectRetiredTerms(source: string, file: string, errors: string[]): void {
+  for (const term of RETIRED_EVIDENCE_TERMS) {
+    if (source.includes(term)) {
+      errors.push(`${file}: must not reference retired evidence machinery "${term}"`);
+    }
+  }
+}
+
 export function validateReleaseDocs(root = process.cwd()): string[] {
   const errors: string[] = [];
   const playbook = read(root, PLAYBOOK, errors);
@@ -57,52 +80,75 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
 
   for (const stage of [
     "candidateTreeDigest",
-    "pre-merge analyzer",
     "merge authorization",
     "mainTreeDigest",
     "production identity",
-    "final analyzer",
     "tag authorization",
     "rollback",
+    "PAUSED",
+    "BLOCKED",
+    "ROLLED_BACK",
+    "PUBLICATION_PENDING",
   ]) {
     requireText(playbook, PLAYBOOK, stage, errors);
   }
 
   const lowerPlaybook = playbook.toLowerCase();
-  const releasePrIndex = lowerPlaybook.indexOf("create or reuse the");
-  const preMergeAnalyzerIndex = lowerPlaybook.indexOf("run the pre-merge analyzer");
-  const squashMergeIndex = lowerPlaybook.indexOf("gh pr merge --squash --auto");
+
+  const releasePrCreationIndex = lowerPlaybook.indexOf("create or reuse the");
+  const requiredChecksWaitIndex = lowerPlaybook.indexOf("gh pr checks");
   if (
-    releasePrIndex < 0 ||
-    preMergeAnalyzerIndex < 0 ||
-    releasePrIndex > preMergeAnalyzerIndex
+    releasePrCreationIndex < 0 ||
+    requiredChecksWaitIndex < 0 ||
+    releasePrCreationIndex > requiredChecksWaitIndex
   ) {
     errors.push(
-      `${PLAYBOOK}: release PR creation must precede pre-merge analysis`,
-    );
-  }
-  if (
-    preMergeAnalyzerIndex < 0 ||
-    squashMergeIndex < 0 ||
-    preMergeAnalyzerIndex > squashMergeIndex
-  ) {
-    errors.push(
-      `${PLAYBOOK}: pre-merge analysis must precede squash merge`,
+      `${PLAYBOOK}: release PR creation must precede the concurrent required-check and Preview wait`,
     );
   }
 
-  const tagIndex = lowerPlaybook.indexOf("git tag");
-  const finalAnalyzerIndex = lowerPlaybook.indexOf("final analyzer");
-  const tagAuthorizationIndex = lowerPlaybook.indexOf("tag authorization");
+  const previewResultIndex = lowerPlaybook.indexOf("gh run download");
+  const migrationsCheckIndex = lowerPlaybook.indexOf("pending migrations check (release");
+  const squashMergeIndex = lowerPlaybook.indexOf("gh pr merge --squash --auto");
   if (
-    tagIndex < 0 ||
-    finalAnalyzerIndex < 0 ||
-    tagAuthorizationIndex < 0 ||
-    tagIndex < finalAnalyzerIndex ||
-    tagIndex < tagAuthorizationIndex
+    previewResultIndex < 0 ||
+    migrationsCheckIndex < 0 ||
+    squashMergeIndex < 0 ||
+    previewResultIndex > squashMergeIndex ||
+    migrationsCheckIndex > squashMergeIndex
   ) {
     errors.push(
-      `${PLAYBOOK}: git tag must follow final analyzer and tag authorization`,
+      `${PLAYBOOK}: required checks, migrations, and Preview proof must precede squash merge`,
+    );
+  }
+
+  const mainTreeIndex = lowerPlaybook.indexOf("maintreedigest");
+  const productionIdentityIndex = lowerPlaybook.indexOf("production identity");
+  const tagIndex = lowerPlaybook.indexOf("git tag -a");
+  if (
+    mainTreeIndex < 0 ||
+    productionIdentityIndex < 0 ||
+    tagIndex < 0 ||
+    mainTreeIndex > tagIndex ||
+    productionIdentityIndex > tagIndex
+  ) {
+    errors.push(`${PLAYBOOK}: tree equality and production proof must precede tag`);
+  }
+
+  const releaseCreateIndex = lowerPlaybook.indexOf("gh release create");
+  const releaseReadbackIndex = lowerPlaybook.indexOf("gh release view");
+  const finalReceiptIndex = lowerPlaybook.indexOf("release:write-result");
+  if (
+    tagIndex < 0 ||
+    releaseCreateIndex < 0 ||
+    releaseReadbackIndex < 0 ||
+    finalReceiptIndex < 0 ||
+    tagIndex > releaseCreateIndex ||
+    releaseCreateIndex > releaseReadbackIndex ||
+    releaseReadbackIndex > finalReceiptIndex
+  ) {
+    errors.push(
+      `${PLAYBOOK}: tag must precede GitHub Release readback, which must precede the final receipt upload`,
     );
   }
 
@@ -117,21 +163,11 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   }
 
   for (const contract of [
-    "quality/release-required.json",
-    "Release Coverage Freshness Audit",
-    "exact-SHA",
-    "zero passes",
-    "fresh context",
-    "eight maneuvers",
-    "zero unexpected residue",
+    "RELEASE_VERIFICATION_MODE=deep",
+    "docs/agents/prodplaybook-report.md",
     "BLOCKED",
   ]) {
-    requireText(
-      prodplaybookCommand,
-      PRODPLAYBOOK_COMMAND,
-      contract,
-      errors,
-    );
+    requireText(prodplaybookCommand, PRODPLAYBOOK_COMMAND, contract, errors);
   }
   if (
     /\bgh\s+pr\s+(?:create|merge)\b|\bgit\s+tag\b|\bgh\s+release\s+create\b/i.test(
@@ -155,10 +191,23 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   if (!releaseCommand.includes("gh pr merge --squash --auto")) {
     errors.push(`${RELEASE_COMMAND}: missing squash auto-merge command`);
   }
+  // A bare mention that deep verification exists and is optional is fine; an
+  // invocation with an argument (e.g. `/explore-release $runDir/candidate.json`)
+  // would mean the default path actually calls it as a required step.
+  const unconditionalExploreRelease = /\/explore-release\s+\S/;
+  if (
+    unconditionalExploreRelease.test(playbook) ||
+    unconditionalExploreRelease.test(releaseCommand)
+  ) {
+    errors.push(
+      `${PLAYBOOK} and ${RELEASE_COMMAND}: deep verification must not be an unconditional step of the default release`,
+    );
+  }
 
   const scannedFiles = [
     RELEASE_COMMAND,
     EXPLORE_COMMAND,
+    PRODPLAYBOOK_COMMAND,
     PLAYBOOK,
     ...DELEGATED_FILES,
   ];
@@ -168,14 +217,17 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
         ? releaseCommand
         : file === EXPLORE_COMMAND
           ? exploreCommand
-          : file === PLAYBOOK
-            ? playbook
-            : read(root, file, errors);
+          : file === PRODPLAYBOOK_COMMAND
+            ? prodplaybookCommand
+            : file === PLAYBOOK
+              ? playbook
+              : read(root, file, errors);
     if (/\bgh\s+pr\s+merge\s+--merge\b/.test(source)) {
       errors.push(
         `${file}: merge-commit release semantics conflict with squash-only policy`,
       );
     }
+    rejectRetiredTerms(source, file, errors);
   }
 
   for (const file of DELEGATED_FILES) {

@@ -9,7 +9,7 @@ import type { Translations } from "@/lib/i18n/types";
  *
  * #1023 (FE-H1) moved all archetype guide copy (essays, key signals, section
  * headings) out of page.tsx (now a thin, textless wrapper delegating to
- * ArchetypePage/ArchetypePageClient) and into the i18n dictionaries. The
+ * ArchetypePage/ArchetypePageContent) and into the i18n dictionaries. The
  * dictionaries' `archetypes` namespace — not page.tsx — is now the only place
  * this content can leak from, so that's what must be checked.
  */

@@ -7,37 +7,38 @@ authorizes PR creation, merge, production operations, tagging, or publishing.
 
 ## Candidate-bound preview arcs
 
-Record the E2E Pro `runId`, `developCommit`, `candidateTreeDigest`, exact preview
-URL, executor, time, result, and evidence for every applicable row. The immutable
-preview must first pass `/api/version` identity verification. A stable alias is
-not candidate evidence unless Vercel metadata proves it resolves to that exact
-immutable deployment at the time of the interaction.
+Record the release `runId`, `developCommit`, `candidateTreeDigest`, exact
+preview URL, executor, time, result, and the relevant `release-result.json`
+check for every applicable row below. The immutable preview must first pass
+`/api/version` identity verification. A stable alias is not candidate
+evidence unless Vercel metadata proves it resolves to that exact immutable
+deployment at the time of the interaction.
 
 For the `develop` preview, verify that branch-scoped `GITHUB_CLIENT_ID` and
 `GITHUB_CLIENT_SECRET` overrides select the dedicated preview OAuth app. Never
 change the production OAuth callback to make a preview login pass.
 
-Of the six `release.manual-arcs` catalog obligations, four are captured by the
-automated release-required E2E suite (`profile.share-verification`,
-`locales.en-es`, `rollback.readiness` — see their rows and
-sections below) and do not need manual capture unless CI cannot run in this
-environment, in which case complete the documented fallback. The remaining two
-(`oauth.github-real`, `profile.authenticated-badge`) are demoted to
-**non-required**: a real GitHub OAuth flow and an authenticated badge
-generation are both hard to automate reliably against a preview app, so their
-absence no longer blocks a release, but complete them by hand whenever
-auth- or badge-generation-sensitive changes ship.
+Four of the arcs below (`health.core-dependencies`, `profile.public-badge-read`,
+`profile.public-share-read`, `rollback.readiness`) are captured automatically
+by the default release-required Playwright suite and populate the
+corresponding `release-result.json` checks; manual capture is only the
+fallback when CI could not run it here. Two arcs — a real GitHub OAuth flow
+and an authenticated badge generation — are hard to automate reliably against
+a preview app, so their absence never blocks a release; complete them by hand
+whenever auth- or badge-generation-sensitive changes ship. `deep` mode (run on
+request via `/prodplaybook`, never a default-release gate) additionally
+automates `profile.share-verification` and `locales.en-es`.
 
 | Flow | Evidence |
 |---|---|
-| GitHub login (`oauth.github-real`, non-required) | After proving the `develop` alias resolves to the exact immutable deployment, begin and complete GitHub OAuth on that alias and confirm the authenticated redirect returns to the same alias. OAuth state cookies are host-scoped, so beginning on the immutable hostname and returning through the configured alias is invalid evidence. This is an authorized preview interaction, not the read-only redirect probe. |
-| Badge generation (`profile.authenticated-badge`, non-required) | Authenticate, generate or open the synthetic/test profile, and record visible badge evidence. |
-| Public badge SVG | Open `/u/{handle}/badge.svg` without authentication; record status, content type, and rendering. |
-| Share page | Open `/u/{handle}` and record badge preview, breakdown, and embed snippet. |
-| Core dependency health | Record `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` from `/api/health`; all must be `ok` for release-required deployed evidence. |
-| Cron freshness | Record each cron component separately. Overall health may be degraded by stale cron heartbeats even when the candidate's core dependencies are healthy. |
-| Verification (`profile.share-verification`, automated) | Captured by the release-required E2E suite following the share-page verification link and recording `/verify/{hash}` rendering. If CI could not run it here, follow the link manually and record the same evidence as a fallback. |
-| Locale (`locales.en-es`, automated) | Captured by the release-required E2E suite switching Spanish to English and back and recording that the selected locale renders without untranslated release-sensitive copy. If CI could not run it here, repeat the switch manually as a fallback. |
+| GitHub login (manual, non-required) | After proving the `develop` alias resolves to the exact immutable deployment, begin and complete GitHub OAuth on that alias and confirm the authenticated redirect returns to the same alias. OAuth state cookies are host-scoped, so beginning on the immutable hostname and returning through the configured alias is invalid evidence. This is an authorized preview interaction, not the read-only redirect probe. |
+| Badge generation (manual, non-required) | Authenticate, generate or open the synthetic/test profile, and record visible badge evidence. |
+| Public badge SVG (automated, default) | Open `/u/{handle}/badge.svg` without authentication; record status, content type, and rendering. |
+| Share page (automated, default) | Open `/u/{handle}` and record badge preview, breakdown, and embed snippet. |
+| Core dependency health (automated, default) | Record `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` from `/api/health`; all must be `ok`. |
+| Cron freshness (manual) | Record each cron component separately. Overall health may be degraded by stale cron heartbeats even when the candidate's core dependencies are healthy. |
+| Verification (automated, deep only) | `/prodplaybook` or `RELEASE_VERIFICATION_MODE=deep` follows the share-page verification link and records `/verify/{hash}` rendering. Not part of a default release; follow the link manually only when deep verification was requested and CI could not run it. |
+| Locale (automated, deep only) | `/prodplaybook` or `RELEASE_VERIFICATION_MODE=deep` switches Spanish to English and back. Not part of a default release; repeat the switch manually only when deep verification was requested and CI could not run it. |
 
 Recommended preview observation is 24 hours for caching, scoring, OAuth, cron, or
 vendor-sensitive changes and at least one hour for documentation-only changes.
@@ -56,19 +57,20 @@ require explicit authorization.
 
 ## Migration readiness
 
-The `migration.review` obligation was removed as redundant: the required
-`database.pending-migrations` scenario already imports the real "Pending
-Migrations Check (release PR)" CI job result, which is exactly what a manual
-review would re-derive. A missing, skipped, or failed result from that gate
-still blocks the release and must be resolved, never waived. The steps below
-document what that gate covers and remain the fallback if it could not run.
-Use `docs/runbooks/migrations.md`.
+The required `Pending Migrations Check (release PR)` CI job result is the
+release-PR admission gate for migrations directly — a separate manual review
+obligation would only re-derive it. That job now fails closed when its
+production read credentials are missing, so a missing, skipped, or failed
+result always blocks the release and must be resolved, never waived. The
+steps below document what that gate covers and remain the fallback if it
+could not run. Use `docs/runbooks/migrations.md`.
 
 - Review migrations between the release baseline and `developCommit`.
 - Run `pnpm run validate:migrations`.
-- Import the release-PR pending-migration CI result.
-- If CI skipped because its read-only credentials are absent, attach explicit
-  manual drift evidence; a skip is never a required pass.
+- Read the release-PR `Pending Migrations Check (release PR)` conclusion
+  directly; it now fails the job (not a silent skip) when its production
+  read credentials are absent, so there is no separate manual fallback for
+  a missing credential.
 - Applying a migration is a separately authorized production operation.
 
 ## Cron and schedule readiness
@@ -100,20 +102,21 @@ time, response, side effects, and resulting heartbeat.
 - Every current version reference was updated.
 - The old-version scan contains only explained history.
 - The release PR description links the run ID, candidate commit/tree, included
-  commits, relevant issues, and pre-merge evidence report.
+  commits, relevant issues, and the Preview `release-result.json`.
 
 The release command owns PR creation and merge; this runbook contains no
 alternative procedure.
 
 ## Rollback readiness
 
-The `rollback.readiness` obligation is captured by the automated
-release-required E2E suite; the steps below are the fallback when CI could
-not run it here, and document what the automation checks. Before Gate 2
-(authorize production):
+`rollback.readiness` is captured by the default release-required Playwright
+suite and its `release-result.json` check; the steps below are the fallback
+when CI could not run it here, and document what the automation checks.
+Before Gate 2 (authorize production):
 
-- identify the previous evidence-approved production deployment and commit;
-- confirm its evidence report and deployment are retrievable;
+- identify the previous production deployment and commit (the
+  `rollbackReference`/`baselineTag`);
+- confirm its `release-result.json` and deployment are retrievable;
 - distinguish application rollback from any required schema recovery;
 - review `docs/runbooks/rollback.md`; and
 - record the applicable rollback triggers.
@@ -133,5 +136,6 @@ curl -fsSI 'https://chapa.thecreativetoken.com/u/octocat/badge.svg?__chapa_smoke
 ```
 
 Record production identity, core dependencies, cron freshness, badge response,
-Vercel logs/alerts, evidence report, and `runId`. On a rollback trigger, use
-`docs/runbooks/rollback.md`; do not continue the release while investigating.
+Vercel logs/alerts, the final `release-result.json`, and `runId`. On a
+rollback trigger, use `docs/runbooks/rollback.md`; do not continue the
+release while investigating.

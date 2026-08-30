@@ -1,0 +1,208 @@
+# One badge artifact: `renderBadgeSvg` consumes `BadgeConfig`
+
+Date: 2026-08-30
+Status: Accepted (direction); implementation tracked separately
+Issue: #1191 (AR-S1)
+
+## Context
+
+The badge exists twice.
+
+`renderBadgeSvg()` is the real one: a pure server-side function that returns an
+SVG string. Seven surfaces consume it — the badge route, the share page, the OG
+image route, the landing page, the archetype guides, and the warm-cache cron.
+
+Creator Studio consumes none of it. `/studio` imports exactly two things from
+`lib/render`: the demo fixtures and the theme constants. Its preview is
+`components/badge/BadgeContent.tsx`, a parallel React DOM implementation. Every
+visual element exists twice and is maintained twice — the heatmap alone is 105
+lines in the SVG renderer against 344 in the DOM one.
+
+The nine Studio customization categories live in `lib/effects/` (~1,689 lines)
+and the SVG renderer cannot consume any of them. So a user who spends ten
+minutes tuning nine categories is adjusting a lookalike, and the badge they
+embed is unchanged. The Studio copy does say preview changes never affect the
+public badge, so nothing is being misrepresented — but the product invites
+customization that has no path to the artifact being customized.
+
+## Decision
+
+**One artifact.** `renderBadgeSvg` becomes the single renderer and learns to
+consume `BadgeConfig`. `BadgeContent` retires to a thin preview wrapper over the
+same output rather than a second implementation of it.
+
+The principle this serves: *the badge is one thing.* Whatever is rendered —
+in Studio, on the share page, in a README, in a social card — is the same
+artifact produced by the same code from the same inputs. A preview that can
+disagree with the shipped badge is a preview that will eventually be wrong.
+
+## What can actually cross, and what cannot
+
+This is the honest part, and it is narrower than a first look suggests. An SVG
+can express gradients, filters and SMIL animation; it cannot express a pointer,
+a scroll position, or a JavaScript loop.
+
+| Category | Crosses to the SVG? | Why |
+|---|---|---|
+| `background` (solid, aurora, particles) | Yes | Gradients and `feTurbulence` |
+| `border` (solid, rotating gradient, none) | Yes | SMIL can rotate a gradient transform |
+| `scoreEffect` (7 values) | Yes | Gradients and filters |
+| `heatmapAnimation` (6 values) | Yes | SMIL `begin` offsets; the badge already animates its heatmap |
+| `tierTreatment` (standard, enhanced) | Yes | Static marks, or SMIL |
+| `cardStyle` (flat, frost, smoke, crystal, aurora-glass) | **Partly** | The glass looks rely on backdrop blur, which SVG has no equivalent for. Approximations only, and they will not match the DOM version exactly |
+| `interaction` (3D tilt, holographic hover) | **No** | Requires a pointer |
+| `statsDisplay` (counting animations) | **No** | Requires a JS loop |
+| `celebration` (confetti on load) | **No** | "On load" is meaningless for a cached image served to every viewer |
+
+So five categories cross cleanly, one crosses partially, and three cannot cross
+at all.
+
+**Amended 2026-08-30 (step 5): the three that cannot cross were removed, not
+labelled.** This section first concluded that Studio should mark them as
+on-page enhancements, and step 4 shipped exactly that — a "preview only" pill
+per category. Reviewing the result, the labelling was the weaker answer. Those
+three effects have one audience: the badge owner, while sitting in Studio.
+Nobody who ever sees the badge — in a README, on the share page, in a social
+card — sees a tilt, a counting number or a confetti burst. Ever. Spending a
+third of the interface on them taught, control by control, that the preview is
+not the artifact, which is corrosive precisely because the other six had just
+stopped being a lookalike. A label mitigates that; it does not remove it.
+
+`BadgeConfig` therefore has six fields, `RETIRED_BADGE_CONFIG_KEYS` names the
+three that were dropped, and configs already persisted with nine keys are
+migrated on read (see Consequences).
+
+## Invariants that must survive
+
+These are the reasons the two implementations diverged in the first place, and
+none of them is negotiable:
+
+1. **Purity and determinism.** `renderBadgeSvg` must stay a pure function.
+   That is what makes the SVG cacheable per handle/day/locale and what lets
+   `svg-to-png.ts` rasterize it. Adding `BadgeConfig` as an *input* preserves
+   purity; reading it from a store inside the renderer would destroy it.
+2. **The escaping boundary.** The SVG path escapes user-controlled text itself
+   via `escapeXml`, because the result is injected through
+   `dangerouslySetInnerHTML` at three sites (the landing page, the archetype
+   guides, and the share page's inline render). React's auto-escaping does not
+   apply there and cannot substitute for it.
+3. **Always dark, no CSS custom properties.** The badge renders server-side
+   before app CSS exists. Effects must compile to literal values, not tokens.
+4. **Static rasterization.** The OG image route passes `disableAnimation: true`
+   because SMIL never runs during rasterization. Every animated effect needs a
+   defined static first frame, or social cards render blank elements.
+5. **The default must not move.** `DEFAULT_BADGE_CONFIG` has to produce
+   byte-identical output to today's renderer. Otherwise every existing cached
+   badge and every embedded README image changes the day this ships. This is
+   directly testable and should be the first test written.
+
+## Versioning
+
+The badge is a published artifact, so its design is versioned: **whenever an
+element of the badge design changes, that is a new version of the badge
+design.** Two axes, and both already have machinery:
+
+- **Design version (global).** `BADGE_RENDER_VARIANT` in
+  `lib/render/badge-svg-cache.ts`, already part of the badge cache key. It
+  currently reads `"warm-amber-v3"` — a name inherited from a palette the app
+  left two rebrands ago. It is the right hook and it needs a bump discipline:
+  change a design element, bump the variant, in the same commit.
+- **Config revision (per user).** `studio_config.revision`, a database-ordered
+  monotonic counter added by migration `035` and validated by
+  `dbGetStudioConfig`. Nothing outside that module consumes it today.
+
+**Once config affects the render, a config change must invalidate the badge
+cache.** Without that a user saves a change and keeps being served the badge
+built from their previous config until the day rolls over.
+
+The first draft of this ADR said the revision must enter the badge cache key.
+That is wrong, and the reason is worth recording. The badge cache-hit path is a
+single Redis read against a p95 budget of 800ms
+(`lib/monitoring/latency-slo.ts`). Putting the revision in the key means
+resolving it before the lookup, which puts a Supabase round-trip in front of
+the warmest path in the product on every request, hit or miss.
+
+So the mechanism is invalidation, not keying: saving a Studio config deletes
+that handle's badge entries, exactly as a platform link/unlink already does via
+`invalidateBadgeSvgCache` (which clears every locale's entry since #1190). The
+render path — the cache MISS path, budgeted at 4100ms and already doing GitHub
+and Redis work — is where the config is loaded, and that read can run
+concurrently with materialization.
+
+The accepted risk is the same one link/unlink already carries: an invalidation
+that fails leaves a stale badge until the day rolls over. That is self-healing
+and cheap, where a database read on every badge request is neither.
+
+The verification seal is unaffected and should stay that way: it covers
+`stats + impact + date`, never the rendering. The seal attests that the numbers
+are real, not that the badge is pretty. Styling changes must not invalidate it.
+
+## Known divergence, tracked separately
+
+The badge still carries the pre-jade violet accent and archetype colours
+(`lib/render/theme.ts`), which `lib/render/theme.test.ts` currently records as
+intentional. Under "one artifact" that divergence stops being intentional and
+becomes a defect: the same badge cannot be jade in Studio and violet when
+embedded. Converging it is its own piece of work and is deliberately not part
+of this decision.
+
+## Consequences
+
+- Studio stops being a lookalike and becomes a preview of the real thing.
+- `lib/effects/` splits: the five-and-a-bit categories that cross become SVG
+  effect builders consumed by the renderer; the three that cannot leave the
+  badge surface entirely (amended, step 5 — see above). The modules themselves
+  are not all deleted: `counters/` still drives the dashboard and `use-tilt` /
+  `confetti` still drive their `/experiments/*` prototypes, so only the two
+  with no consumer left (`HolographicOverlay`, `holographic-css`) went.
+- **Dropping a field from `BadgeConfig` is a migration, not a rename.**
+  `isValidBadgeConfig` rejects extra fields, so a stored nine-key row would
+  read back as `invalid` and hand the owner the default — a durable write
+  silently discarded. `stripRetiredBadgeConfigKeys` runs before validation on
+  both the read path (`dbGetStudioConfig`) and the write path (`PUT
+  /api/studio/config`, where a Studio tab loaded before the drop still posts
+  nine keys), so legacy rows migrate in place with no backfill. The same is
+  required of any future field removal.
+- `BadgeContent` shrinks to a wrapper. The duplicate heatmap, radar, tier and
+  footer implementations go away, which is the maintenance win.
+- The work is a project, not a change. It should be sequenced behind the
+  byte-identical-default test, then category by category, so each step is
+  independently verifiable against a real badge.
+
+## Status of the work (updated 2026-08-30, step 6)
+
+Done. `renderBadgeSvg` is the only badge implementation.
+
+| Step | Outcome |
+|---|---|
+| 1 | `renderBadgeSvg` consumes `BadgeConfig`, guarded by pre-parameter hashes — the default badge did not move a byte |
+| 2 | One resolver (`resolveBadgeConfig`) feeds all four render sites, which share a cache slot |
+| 3 | All six crossing categories render in the SVG |
+| 4 | Studio labelled the three that cannot cross "preview only" |
+| 5 | **Reversed step 4** — the three were removed from the schema instead. See the amendment above |
+| 6 | Studio previews `renderBadgeSvg` output. `PreviewFooter` deleted; `BadgeContent` reduced from 405 lines to a ~60-line wrapper serving only `/experiments/*` |
+
+Step 6 removed the DOM effect modules that existed only to draw the second
+badge: `backgrounds/AuroraBackground`, `backgrounds/ParticleBackground`,
+`backgrounds/ParticleCanvas`, `borders/GradientBorder`,
+`borders/gradient-border-css`, `cards/glass-presets` and
+`heatmap/HeatmapGrid`. What remains under `lib/effects/` survives for a
+different consumer — the dashboard, the `/experiments/*` prototypes, or the
+Studio presets — not for the badge.
+
+Two things step 6 forced that were not obvious from the plan:
+
+- **The preview needs the badge's own strings and avatar.** `resolveBadgeLocale`
+  is server-only (`getServerT`), so the ~11 badge string keys moved into a pure
+  `buildBadgeI18nStrings` both sides share rather than being written out twice.
+  `app/studio/page.tsx` resolves the avatar server-side against a bounded
+  deadline exactly as the badge route does; without it the preview falls back
+  to the shield placeholder and stops matching the artifact.
+- **`badge-visual-metadata.ts` changes role.** It existed as a NEUTRAL boundary
+  so Studio could get platform logos and the coral token without importing the
+  renderer. With one implementation, Studio importing the renderer is correct.
+  The dependency direction that still matters — this module importing no
+  renderer — is unchanged and still asserted.
+
+Two follow-ups are tracked separately: the badge's pre-Jade palette (#1225) and
+the misnamed `heatmapAnimation: "fade-in"` default (#1226).

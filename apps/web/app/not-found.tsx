@@ -15,12 +15,22 @@ export default async function NotFound() {
       <p className="mt-2 text-sm text-text-secondary">
         {t('notFound.description') as string}
       </p>
-      <Link
-        href="/"
-        className="mt-8 rounded-lg border border-amber/20 bg-amber/10 px-6 py-2.5 text-sm font-medium text-amber transition-colors hover:bg-amber/20"
-      >
-        {t('notFound.cta') as string}
-      </Link>
+      {/* #1218 — two ways out, not one. A visitor who landed here from a badge
+          link wants the verify page at least as often as the home page. */}
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <Link
+          href="/"
+          className="inline-flex min-h-[44px] items-center rounded-lg border border-amber/20 bg-amber/10 px-6 font-heading text-sm font-medium text-amber transition-colors hover:bg-amber/20"
+        >
+          {t('notFound.cta') as string}
+        </Link>
+        <Link
+          href="/verify"
+          className="inline-flex min-h-[44px] items-center rounded-lg border border-stroke px-6 font-heading text-sm font-medium text-text-secondary transition-colors hover:border-complement hover:text-complement-text"
+        >
+          {t('notFound.ctaVerify') as string}
+        </Link>
+      </div>
     </main>
   );
 }

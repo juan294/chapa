@@ -22,9 +22,25 @@ const SOURCE = fs.readFileSync(
 // given the harness this file's render sibling already has).
 describe("SharePage — non-renderable architecture checks", () => {
   describe("config-aware badge rendering", () => {
-    it("does not fetch Studio config on the public share route", () => {
+    // #1191 changed what this constraint means. The share page now DOES render
+    // the owner's configured badge — that is the point of "one badge artifact",
+    // and this page writes to the same cache slot the badge route reads, so
+    // rendering the default here would overwrite a configured badge.
+    //
+    // What must stay true: the config is resolved through the shared helper
+    // (never read ad hoc), and only on the RENDER path. A read before the
+    // cached-SVG check would put a Supabase round-trip on every share-page view.
+    it("resolves badge config through the shared helper, not ad hoc", () => {
+      expect(SOURCE).toContain("resolveBadgeConfig");
       expect(SOURCE).not.toContain("cacheGet<BadgeConfig>");
-      expect(SOURCE).not.toContain("config:");
+      expect(SOURCE).not.toContain("dbGetStudioConfig");
+    });
+
+    it("resolves config only after the cached-SVG check, never before it", () => {
+      const cacheCheck = SOURCE.indexOf("!cachedSvg");
+      const configRead = SOURCE.indexOf("resolveBadgeConfig(handle)");
+      expect(cacheCheck).toBeGreaterThan(-1);
+      expect(configRead).toBeGreaterThan(cacheCheck);
     });
 
     it("does not import the Studio-coupled share preview runtime", () => {
@@ -75,8 +91,11 @@ describe("SharePage — non-renderable architecture checks", () => {
     // of the client NavbarClient variant reserved for ISR pages. Using
     // NavbarClient here forced three downstream client components to
     // re-derive ownership via a redundant `/api/auth/session` fetch.
-    it("uses the server Navbar variant, not the client NavbarClient variant", () => {
-      expect(SOURCE).toMatch(/from ["']@\/components\/Navbar["']/);
+    // #1194 — the server-vs-client Navbar choice moved into
+    // DynamicRouteShell, which renders the server variant. What this route
+    // must still never do is reach for the ISR client variant (FE-H2).
+    it("uses the dynamic-route shell, not the client NavbarClient variant", () => {
+      expect(SOURCE).toMatch(/from ["']@\/components\/DynamicRouteShell["']/);
       expect(SOURCE).not.toContain("NavbarClient");
     });
   });

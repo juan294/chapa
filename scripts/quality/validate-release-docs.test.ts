@@ -21,26 +21,31 @@ function write(root: string, file: string, source: string): void {
   fs.writeFileSync(target, source);
 }
 
+function compliantPlaybook(): string {
+  return [
+    "# Release",
+    "Fix candidateTreeDigest.",
+    "Create or reuse the release PR.",
+    "gh pr checks --required --watch --fail-fast",
+    "pending migrations check (release PR) is a required check.",
+    "gh run download the Preview release-result.json",
+    "Obtain merge authorization.",
+    "gh pr merge --squash --auto",
+    "Verify mainTreeDigest and production identity.",
+    "Obtain tag authorization.",
+    "git tag -a vX.Y.Z mainCommit",
+    "gh release create",
+    "gh release view",
+    "release:write-result",
+    "Use the rollback runbook.",
+    "Recovery outcomes: PAUSED, BLOCKED, ROLLED_BACK, PUBLICATION_PENDING.",
+  ].join("\n");
+}
+
 function compliantRoot(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-docs-"));
   roots.push(root);
-  write(
-    root,
-    "docs/release/release-playbook.md",
-    [
-      "# Release",
-      "Fix developCommit and candidateTreeDigest.",
-      "Obtain release PR authorization and create or reuse the release PR.",
-      "Run the pre-merge analyzer.",
-      "Obtain merge authorization.",
-      "gh pr merge --squash --auto",
-      "Verify mainTreeDigest and production identity.",
-      "Run the final analyzer.",
-      "Obtain tag authorization.",
-      "git tag -a vX.Y.Z mainCommit",
-      "Use the rollback runbook.",
-    ].join("\n"),
-  );
+  write(root, "docs/release/release-playbook.md", compliantPlaybook());
   write(
     root,
     ".claude/commands/release.md",
@@ -52,23 +57,22 @@ function compliantRoot(): string {
       "STOP for merge authorization.",
       "gh pr merge --squash --auto",
       "STOP for tag authorization.",
+      "Deep verification (/prodplaybook, /explore-release) is separate and explicit.",
     ].join("\n"),
   );
   write(
     root,
     ".claude/commands/explore-release.md",
-    "Read docs/release/release-playbook.md. Never tag.",
+    "Read docs/release/release-playbook.md. Accept a fixed commit. Never tag.",
   );
   write(
     root,
     ".claude/commands/prodplaybook.md",
     [
       "Read docs/playbooks/e2e-pro-release-verification.md completely.",
-      "Use quality/release-required.json as requiredness authority.",
-      "Run the Release Coverage Freshness Audit.",
-      "Verify exact-SHA evidence and reject zero passes.",
-      "Use fresh context charters with all eight maneuvers.",
-      "Prove zero unexpected residue or report BLOCKED.",
+      "Run RELEASE_VERIFICATION_MODE=deep deployed probes.",
+      "Write docs/agents/prodplaybook-report.md.",
+      "Report PASS or BLOCKED.",
       "This command never versions, creates a release PR, merges, tags, or publishes.",
     ].join("\n"),
   );
@@ -85,7 +89,7 @@ afterEach(() => {
 });
 
 describe("validateReleaseDocs", () => {
-  it("accepts one short delegated tag-last procedure", () => {
+  it("accepts one short delegated direct-proof procedure", () => {
     expect(validateReleaseDocs(compliantRoot())).toEqual([]);
   });
 
@@ -127,11 +131,9 @@ describe("validateReleaseDocs", () => {
       ".claude/commands/prodplaybook.md",
       [
         "Read docs/playbooks/e2e-pro-release-verification.md completely.",
-        "Use quality/release-required.json as requiredness authority.",
-        "Run the Release Coverage Freshness Audit.",
-        "Verify exact-SHA evidence and reject zero passes.",
-        "Use fresh context charters with all eight maneuvers.",
-        "Prove zero unexpected residue or report BLOCKED.",
+        "Run RELEASE_VERIFICATION_MODE=deep deployed probes.",
+        "Write docs/agents/prodplaybook-report.md.",
+        "Report PASS or BLOCKED.",
         "git tag -a vX.Y.Z mainCommit",
       ].join("\n"),
     );
@@ -141,7 +143,7 @@ describe("validateReleaseDocs", () => {
     );
   });
 
-  it("rejects tag instructions before final analysis and authorization", () => {
+  it("rejects tag instructions before tree/production proof", () => {
     const root = compliantRoot();
     write(
       root,
@@ -150,42 +152,52 @@ describe("validateReleaseDocs", () => {
         "# Release",
         "Fix candidateTreeDigest.",
         "git tag -a vX.Y.Z mainCommit",
-        "Run the pre-merge analyzer.",
-        "Obtain merge authorization.",
-        "Verify mainTreeDigest and production identity.",
-        "Run the final analyzer.",
-        "Obtain tag authorization.",
-        "Use rollback.",
-      ].join("\n"),
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: git tag must follow final analyzer and tag authorization",
-    );
-  });
-
-  it("rejects pre-merge analysis before the release PR exists", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/release/release-playbook.md",
-      [
-        "# Release",
-        "Fix candidateTreeDigest.",
-        "Run the pre-merge analyzer.",
-        "Obtain release PR authorization and create or reuse the release PR.",
+        "gh release create",
+        "gh release view",
+        "release:write-result",
+        "Create or reuse the release PR.",
+        "gh pr checks --required --watch --fail-fast",
+        "pending migrations check (release PR) is a required check.",
+        "gh run download the Preview release-result.json",
         "Obtain merge authorization.",
         "gh pr merge --squash --auto",
         "Verify mainTreeDigest and production identity.",
-        "Run the final analyzer.",
         "Obtain tag authorization.",
-        "git tag -a vX.Y.Z mainCommit",
-        "Use rollback.",
+        "Use rollback. PAUSED BLOCKED ROLLED_BACK PUBLICATION_PENDING",
       ].join("\n"),
     );
 
     expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: release PR creation must precede pre-merge analysis",
+      "docs/release/release-playbook.md: tree equality and production proof must precede tag",
+    );
+  });
+
+  it("rejects required checks and Preview proof after squash merge", () => {
+    const root = compliantRoot();
+    write(
+      root,
+      "docs/release/release-playbook.md",
+      [
+        "# Release",
+        "Fix candidateTreeDigest.",
+        "Create or reuse the release PR.",
+        "gh pr merge --squash --auto",
+        "gh pr checks --required --watch --fail-fast",
+        "pending migrations check (release PR) is a required check.",
+        "gh run download the Preview release-result.json",
+        "Obtain merge authorization.",
+        "Verify mainTreeDigest and production identity.",
+        "Obtain tag authorization.",
+        "git tag -a vX.Y.Z mainCommit",
+        "gh release create",
+        "gh release view",
+        "release:write-result",
+        "Use rollback. PAUSED BLOCKED ROLLED_BACK PUBLICATION_PENDING",
+      ].join("\n"),
+    );
+
+    expect(validateReleaseDocs(root)).toContain(
+      "docs/release/release-playbook.md: required checks, migrations, and Preview proof must precede squash merge",
     );
   });
 
@@ -209,6 +221,32 @@ describe("validateReleaseDocs", () => {
       "docs/runbooks/release-checklist.md: subordinate documentation must not create release PRs or tags",
     );
   });
+
+  it("rejects retired evidence-graph machinery anywhere in the scanned files", () => {
+    const root = compliantRoot();
+    write(
+      root,
+      "docs/runbooks/migrations.md",
+      "Ordering: docs/release/release-playbook.md\nquality/release-required.json\n",
+    );
+
+    expect(validateReleaseDocs(root)).toContain(
+      'docs/runbooks/migrations.md: must not reference retired evidence machinery "quality/release-required.json"',
+    );
+  });
+
+  it("rejects an unconditional /explore-release invocation in the default release path", () => {
+    const root = compliantRoot();
+    write(
+      root,
+      "docs/release/release-playbook.md",
+      `${compliantPlaybook()}\nRun /explore-release $runDir/candidate.json\n`,
+    );
+
+    expect(validateReleaseDocs(root)).toContain(
+      "docs/release/release-playbook.md and .claude/commands/release.md: deep verification must not be an unconditional step of the default release",
+    );
+  });
 });
 
 describe("repository release procedure", () => {
@@ -218,44 +256,36 @@ describe("repository release procedure", () => {
   const playbook = readRepositoryFile("docs/release/release-playbook.md");
   const releaseCommand = readRepositoryFile(".claude/commands/release.md");
   const rollbackRunbook = readRepositoryFile("docs/runbooks/rollback.md");
-  const studioFlagPlan = readRepositoryFile(
-    "docs/plans/2026-08-26-creator-studio-revival-phases/phase-5.md",
-  );
   const explore = readRepositoryFile(".claude/commands/explore-release.md");
-  const prodplaybook = readRepositoryFile(
-    ".claude/commands/prodplaybook.md",
+  const prodplaybook = readRepositoryFile(".claude/commands/prodplaybook.md");
+  const e2eProPlaybook = readRepositoryFile(
+    "docs/playbooks/e2e-pro-release-verification.md",
   );
 
-  it("documents exact dispatch, evidence download, and final assembly", () => {
+  it("documents exact dispatch, one concurrent wave, and tag-last publication", () => {
     expect(playbook.split(/\r?\n/).length).toBeLessThanOrEqual(200);
     for (const required of [
       "STOP — Gate 1: approve the release",
       "STOP — Gate 2: authorize production",
-      "releasePrRunId",
-      "releasePrRunAttempt",
-      "pre-merge-evidence.json",
-      "manualObligationIds",
       "gh workflow run release-verification.yml",
       "gh run download",
-      "merge-release-evidence.ts",
-      "--scenario-ids deployment.production-identity,health.core-dependencies,profile.public-badge-read,profile.public-share-read",
+      "gh pr merge --squash --auto",
+      "gh release create",
+      "gh release view",
+      "release:write-result",
     ]) {
       expect(playbook).toContain(required);
     }
-    expect(playbook.indexOf('rollbackReference="$baselineTag"')).toBeLessThan(
-      playbook.indexOf('--rollback-reference "$rollbackReference"'),
-    );
   });
 
   it("binds the release baseline and rollback target to production identity", () => {
     for (const required of [
-      'productionVersion="$(curl -fsS "$productionUrl/api/version")"',
-      'select(.environment == "production") | .commitSha',
+      'productionCommit="$(printf \'%s\' "$productionVersion" | jq -er \'select(.environment == "production") | .commitSha\')"',
       'mainCommit="$(git rev-parse origin/main)"',
       'test "$productionCommit" = "$mainCommit"',
-      'git for-each-ref --points-at "$mainCommit"',
-      'git cat-file -t "$baselineTag"',
+      'test "$(git cat-file -t "$baselineTag")" = tag',
       '${baselineTag}^{commit}',
+      'rollbackReference="$baselineTag"',
     ]) {
       expect(playbook).toContain(required);
     }
@@ -266,38 +296,32 @@ describe("repository release procedure", () => {
     );
   });
 
-  it("treats early stale Studio flag reads as cache convergence, not failure", () => {
-    expect(studioFlagPlan).toContain("up to about five minutes");
-    expect(studioFlagPlan).toContain(
-      "An early stale flag read is not failure or rollback evidence",
-    );
+  it("keeps deep verification explicit, risk-selected, and never a default gate", () => {
+    expect(explore).toContain("docs/release/release-playbook.md");
+    expect(explore).toContain("Fixed, immutable candidate only");
+    expect(explore).toContain("Never a required or unconditional step");
+    expect(prodplaybook).toContain("docs/playbooks/e2e-pro-release-verification.md");
+    expect(prodplaybook).toContain("never a required step of a default");
   });
 
-  it("binds charter execution to candidate authorization and workflow input", () => {
-    expect(explore).toContain(
-      '"environments": ["local-contract", "ci-build", "preview"]',
-    );
-    expect(explore).toContain('"authorized-preview-interaction"');
-    expect(explore).toContain("pre-merge-evidence.json");
-    expect(explore).toContain("manualObligationIds");
-    expect(explore).toContain("issue-creation authorization");
-  });
-
-  it("keeps prodplaybook exhaustive, fresh, and verification-only", () => {
+  it("keeps prodplaybook read-only and verification-only", () => {
     for (const required of [
-      "Release Coverage Freshness Audit",
-      "quality/release-required.json",
-      "zero passes",
-      "exact-SHA",
-      "fresh context",
-      "all eight maneuvers",
-      "zero unexpected residue",
+      "RELEASE_VERIFICATION_MODE=deep",
       "docs/agents/prodplaybook-report.md",
+      "BLOCKED",
     ]) {
       expect(prodplaybook).toContain(required);
     }
     expect(prodplaybook).not.toMatch(
       /\bgh\s+pr\s+(?:create|merge)\b|\bgit\s+tag\b|\bgh\s+release\s+create\b/i,
     );
+  });
+
+  it("documents default vs. deep scenario scope through the live scenario selector, not a JSON catalog", () => {
+    expect(e2eProPlaybook).toContain(
+      "apps/web/e2e/helpers/release-required-environments.ts",
+    );
+    expect(e2eProPlaybook).toContain("scripts/quality/release-result.ts");
+    expect(e2eProPlaybook).toContain("Historical note");
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { BadgeContent } from "@/components/badge/BadgeContent";
 import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
@@ -206,7 +206,6 @@ export default function HolographicExperimentPage() {
 
   return (
     <>
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Inline styles for the holographic effect (self-contained) */}
       <style>{`
         /* ---- Holographic card base ---- */

@@ -8,7 +8,7 @@ import {
   fireSubtleSparkle,
   type ConfettiPalette,
 } from "@/lib/effects/celebrations/confetti";
-import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { BadgeContent } from "@/components/badge/BadgeContent";
 import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 type Palette = ConfettiPalette;
@@ -107,7 +107,6 @@ export default function ConfettiExperimentPage() {
 
   return (
     <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
         className="pointer-events-none fixed top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]"

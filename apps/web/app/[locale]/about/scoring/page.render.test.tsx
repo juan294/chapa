@@ -28,6 +28,10 @@ vi.mock("@/lib/i18n/server", () => ({
   getServerT: vi.fn().mockReturnValue((key: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const map: Record<string, any> = {
+      // #1222 — the index takes its heading as a prop from the server `t`,
+      // so this mock has to carry the key rather than relying on the client
+      // translation fallback the component used to reach for itself.
+      "content.onThisPage": "On this page",
       "about.scoring.h1": "Scoring Methodology",
       "about.scoring.intro": "Full transparency on how Chapa decodes your developer impact.",
       "about.scoring.videoHeading": "Watch the explainer",
@@ -175,10 +179,29 @@ describe("ScoringMethodologyPage render", () => {
   it("renders section headings", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
     render(await ScoringMethodologyPage({ params: Promise.resolve({ locale: "en" }) }));
-    expect(screen.getByText("Philosophy")).toBeDefined();
-    expect(screen.getByText("Normalization")).toBeDefined();
-    expect(screen.getByText("Signal caps")).toBeDefined();
-    expect(screen.getByText("The core dimensions")).toBeDefined();
+    // #1218 — each heading now also appears in the sticky "on this page"
+    // index, which reads its labels from the same dictionary keys, so match
+    // on the heading role rather than on the text alone.
+    for (const heading of [
+      "Philosophy",
+      "Normalization",
+      "Signal caps",
+      "The core dimensions",
+    ]) {
+      expect(screen.getByRole("heading", { name: heading })).toBeDefined();
+    }
+  });
+
+  it("indexes every section, linked to the heading's own anchor", async () => {
+    const { default: ScoringMethodologyPage } = await import("./page");
+    render(await ScoringMethodologyPage({ params: Promise.resolve({ locale: "en" }) }));
+    const index = screen.getByRole("navigation", { name: "On this page" });
+    const links = Array.from(index.querySelectorAll("a"));
+    expect(links.length).toBeGreaterThanOrEqual(10);
+    for (const link of links) {
+      const id = link.getAttribute("href")!.slice(1);
+      expect(document.getElementById(id)).not.toBeNull();
+    }
   });
 
   it("renders dimension sub-headings", async () => {

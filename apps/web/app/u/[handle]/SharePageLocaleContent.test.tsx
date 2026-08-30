@@ -31,24 +31,19 @@ afterEach(() => {
 });
 
 describe("SharePageLocaleContent", () => {
-  it("updates heading and badge label when the active locale changes", () => {
+  it("updates the badge label when the active locale changes", () => {
     const { rerender } = render(
       <SharePageLocaleContent handle="octocat" badgeLabelId="badge-label" />,
     );
 
-    const heading = screen.getByRole("heading", { level: 1 });
-    expect(heading.textContent).toBe("Developer impact of octocat");
-    // W1 — the h1 exists for WCAG heading-hierarchy compliance but is
-    // visually hidden; the badge label above it is the visible heading.
-    expect(heading.className).toContain("sr-only");
+    // #1217 — the sr-only h1 moved to SharePageHeader, which renders a real,
+    // visible one. This component is now only the badge's accessible label.
+    expect(screen.queryByRole("heading")).toBeNull();
     expect(screen.getByText("Chapa impact badge for octocat").id).toBe("badge-label");
 
     activeLocale = "es";
     rerender(<SharePageLocaleContent handle="octocat" badgeLabelId="badge-label" />);
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "Impacto de desarrollador de octocat",
-    );
     expect(screen.getByText("Chapa de impacto de octocat").id).toBe("badge-label");
   });
 

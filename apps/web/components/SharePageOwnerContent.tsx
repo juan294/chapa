@@ -144,7 +144,7 @@ export function SharePageOwnerContent({
       {/* Data Sources */}
       {stats && (
         <section className="mb-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:260ms]">
-          <DataSources stats={stats} handle={handle} />
+          <DataSources stats={stats} handle={handle} isOwner={isOwner} />
         </section>
       )}
 

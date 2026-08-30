@@ -146,8 +146,8 @@ vi.mock("@/lib/i18n", () => ({
   DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
 }));
-vi.mock("./SharePageH2", () => ({
-  SharePageH2: () => null,
+vi.mock("./SharePageHeader", () => ({
+  SharePageHeader: () => null,
 }));
 vi.mock("./SharePageWebMcpTools", () => ({
   SharePageWebMcpTools: mockSharePageWebMcpToolsComponent,
@@ -598,7 +598,10 @@ describe("Phase 4d — Share page i18n", () => {
       const contentStart = SOURCE.indexOf(
         "export async function SharePageContent",
       );
-      const provider = SOURCE.indexOf("<LanguageProvider", pageStart);
+      // #1194 — the provider is inside DynamicRouteShell now; the ordering
+      // this test protects (provider established before the streamed content
+      // starts) is the shell's opening tag.
+      const provider = SOURCE.indexOf("<DynamicRouteShell", pageStart);
       const localeSync = SOURCE.indexOf("<LocaleSync", pageStart);
       const suspense = SOURCE.indexOf("<Suspense", pageStart);
 
@@ -620,8 +623,11 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).not.toContain("export const revalidate");
     });
 
-    it("renders SharePageH2 client component for the badge section heading", () => {
-      expect(SOURCE).toContain("SharePageH2");
+    it("renders the SharePageHeader client component for the page heading", () => {
+      // #1217 replaced the small uppercase SharePageH2 line with a header that
+      // names the profile and carries the headline score.
+      expect(SOURCE).toContain("SharePageHeader");
+      expect(SOURCE).not.toContain("SharePageH2");
     });
   });
 });

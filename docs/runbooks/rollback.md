@@ -15,10 +15,10 @@ Roll back when a production deployment causes:
 
 ## Resolve the Approved Target
 
-Before using either rollback method, read the failed release report. Resolve
-its `rollbackReference` as `approvedRollbackTag` and its previous
-evidence-approved production commit as `approvedRollbackCommit`. Do not
-recompute either from `develop` ancestry.
+Before using either rollback method, read the failed release's
+`release-result.json`. Resolve its `candidate.rollbackReference` as
+`approvedRollbackTag` and the previous production commit it identifies as
+`approvedRollbackCommit`. Do not recompute either from `develop` ancestry.
 Require the annotated tag to identify that exact commit:
 
 ```bash

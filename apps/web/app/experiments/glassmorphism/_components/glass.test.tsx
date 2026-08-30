@@ -42,7 +42,7 @@ describe("glassmorphism extracted components", () => {
   });
 
   it("presetToStyle uses an amber-tinted background only for the amber variant", () => {
-    expect(presetToStyle("amber", true).background).toContain("139, 92, 246");
+    expect(presetToStyle("amber", true).background).toContain("27, 208, 147");
     expect(presetToStyle("medium", true).background).toContain("19, 20, 30");
   });
 

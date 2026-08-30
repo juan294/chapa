@@ -3,22 +3,18 @@ import {
   toPublicVerificationRecord,
   type VerificationRecord,
 } from "@/lib/verification/types";
-import { Navbar } from "@/components/Navbar";
 import { SiteFooter } from "@/components/SiteFooter";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import {
-  DEFAULT_LOCALE,
   LangSync,
-  LanguageProvider,
   LocaleSync,
   type Locale,
   type Translations,
 } from "@/lib/i18n";
-import { en } from "@/lib/i18n/dictionaries/en";
-import { es } from "@/lib/i18n/dictionaries/es";
-import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { DynamicRouteShell } from "@/components/DynamicRouteShell";
+import type { NavLinkItem } from "@/components/NavbarShell";
 import { isWebmcpEnabled } from "@/lib/feature-flags";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -68,8 +64,12 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
 
   if (!HASH_PATTERN.test(hash)) {
     return (
-      <VerifyLocaleBoundary locale={locale} queryLang={lang} t={t}>
-        <Navbar locale={locale} navLinks={innerNavLinks} />
+      <VerifyLocaleBoundary
+        locale={locale}
+        navLinks={innerNavLinks}
+        queryLang={lang}
+        t={t}
+      >
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
           <InvalidHashCard hash={hash} t={t} />
         </main>
@@ -83,8 +83,12 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   ]);
 
   return (
-    <VerifyLocaleBoundary locale={locale} queryLang={lang} t={t}>
-      <Navbar locale={locale} navLinks={innerNavLinks} />
+    <VerifyLocaleBoundary
+      locale={locale}
+      navLinks={innerNavLinks}
+      queryLang={lang}
+      t={t}
+    >
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
           <>
@@ -104,37 +108,36 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   );
 }
 
+/**
+ * #1194 — this used to hand-assemble DocumentLocaleScript + LanguageProvider
+ * itself, a third copy of the same three-part correction. It now wraps
+ * `DynamicRouteShell` and keeps only what is specific to this page: the
+ * locale sync leaves, the page frame and the footer.
+ */
 function VerifyLocaleBoundary({
   children,
   locale,
+  navLinks,
   queryLang,
   t,
 }: {
   children: React.ReactNode;
   locale: Locale;
+  navLinks?: NavLinkItem[];
   queryLang?: string;
   t: TFunc;
 }) {
   return (
-    <>
-      <DocumentLocaleScript locale={locale} />
-      <LanguageProvider
-        initialLocale={locale}
-        // #1071 — same reasoning as the share page: skip re-serializing the
-        // dictionary the root layout's LanguageProvider already provides when
-        // this page's resolved locale matches DEFAULT_LOCALE.
-        dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
-      >
-        <LangSync />
-        <LocaleSync queryLang={queryLang} />
-        <div className="min-h-screen bg-bg text-text-primary">
-          {children}
-          {/* #1167 (UX-B1) — no fixed-bottom command bar exists on this page,
-              so no bottom spacer is needed before the footer. */}
-          <SiteFooter t={t} />
-        </div>
-      </LanguageProvider>
-    </>
+    <DynamicRouteShell locale={locale} navLinks={navLinks}>
+      <LangSync />
+      <LocaleSync queryLang={queryLang} />
+      <div className="min-h-screen bg-bg text-text-primary">
+        {children}
+        {/* #1167 (UX-B1) — no fixed-bottom command bar exists on this page,
+            so no bottom spacer is needed before the footer. */}
+        <SiteFooter t={t} />
+      </div>
+    </DynamicRouteShell>
   );
 }
 

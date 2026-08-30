@@ -381,3 +381,79 @@ describe("DataSources", () => {
     expect(link?.getAttribute("href")).toBe("https://bitbucket.org/mybbuser");
   });
 });
+
+// #1217 — the data sources become a status row: each source says whether it is
+// linked, and the owner sees the platforms they could still connect.
+describe("DataSources — status row (#1217)", () => {
+  it("marks a connected platform as linked", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    expect(
+      screen.getByTestId("data-source-status-github").textContent,
+    ).toBe("linked");
+  });
+
+  it("does not offer connect entries to a visitor", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    expect(screen.queryByTestId("data-source-status-gitlab")).toBeNull();
+    expect(screen.queryByTestId("data-source-status-bitbucket")).toBeNull();
+  });
+
+  it("keeps a linked platform's status even when the viewer is the owner", () => {
+    render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, linkedPlatforms: ["github", "gitlab"] }}
+        handle="testuser"
+        isOwner
+      />,
+    );
+    expect(
+      screen.getByTestId("data-source-status-gitlab").textContent,
+    ).toBe("linked");
+  });
+});
+
+// #1220 — the v2 status row shipped without a supplemental entry on the stated
+// grounds that StatsData carried no EMU signal. It does: hasSupplementalData
+// is OR-accumulated by the EMU merge path.
+describe("DataSources — supplemental source (#1220)", () => {
+  it("shows a supplemental row when EMU stats were merged in", () => {
+    render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, hasSupplementalData: true }}
+        handle="testuser"
+      />,
+    );
+    expect(
+      screen.getByTestId("data-source-status-supplemental").textContent,
+    ).toBe("supplemental");
+  });
+
+  it("says 'supplemental', never 'merged'", () => {
+    // "Merged" asserts more than the flag carries — it would need
+    // merge_operations.verified behind it.
+    const { container } = render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, hasSupplementalData: true }}
+        handle="testuser"
+      />,
+    );
+    expect(container.textContent).not.toContain("merged");
+  });
+
+  it("omits the row when no supplemental stats were merged", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    expect(screen.queryByTestId("data-source-status-supplemental")).toBeNull();
+  });
+
+  it("shows it to a visitor too, since it is a real source of the numbers", () => {
+    render(
+      <DataSources
+        stats={{ ...SAMPLE_STATS, hasSupplementalData: true }}
+        handle="testuser"
+        isOwner={false}
+      />,
+    );
+    expect(screen.getByTestId("data-source-status-supplemental")).toBeDefined();
+  });
+});
+

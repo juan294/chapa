@@ -32,10 +32,7 @@ const savedConfig = {
   border: "solid-amber",
   scoreEffect: "chrome",
   heatmapAnimation: "ripple",
-  interaction: "tilt-3d",
-  statsDisplay: "animated-ease",
   tierTreatment: "enhanced",
-  celebration: "confetti",
 };
 
 test.skip(!requiredEnvPresent, "journey spec requires local Supabase service-role env");

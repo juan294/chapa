@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { getBadgeContentCSS } from "@/components/badge/BadgeContent";
 import {
   type GlassConfig,
   type GlassVariant,
@@ -47,7 +46,6 @@ export default function GlassmorphismExperimentPage() {
       id="main-content"
       className="relative min-h-screen bg-bg"
     >
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Background blobs — essential for glass to look like glass */}
       <BackgroundBlobs visible={showBlobs} />
 
@@ -362,7 +360,7 @@ export default function GlassmorphismExperimentPage() {
   backdrop-filter: blur(${blur}px) saturate(${saturation}%);
   -webkit-backdrop-filter: blur(${blur}px) saturate(${saturation}%);${
     showBorder
-      ? `\n  border: 1px solid rgba(139, 92, 246, 0.15);`
+      ? `\n  border: 1px solid rgba(27, 208, 147, 0.15);`
       : ""
   }
 }`}</code>

@@ -1,4 +1,4 @@
-import type { HeatmapDay } from "@chapa/shared";
+import type { BadgeConfig, HeatmapDay } from "@chapa/shared";
 import { getHeatmapColor } from "./theme";
 
 const CELL_SIZE = 44;
@@ -23,17 +23,63 @@ interface HeatmapCell {
  * Cells are laid out in a column-major grid: 13 columns (weeks) x 7 rows (days),
  * with each cell sized at {@link CELL_SIZE}px and spaced by {@link CELL_GAP}px.
  * Animation delays are staggered per column (60ms per week) for a left-to-right
- * fade-in effect.
+ * column sweep.
  *
  * @param heatmapData - Array of daily contribution counts (may exceed 91 entries)
  * @param offsetX - Horizontal offset for positioning within the SVG (default: 0)
  * @param offsetY - Vertical offset for positioning within the SVG (default: 0)
  * @returns Array of {@link HeatmapCell} objects ready for {@link renderHeatmapSvg}
  */
+/**
+ * Per-cell reveal delay, in ms (#1191).
+ *
+ * `fade-in` is the DEFAULT and reproduces the pre-#1191 stagger exactly
+ * (60ms per column). It is the same shape as `cascade` (120ms per column) and
+ * differs only in speed.
+ *
+ * #1226 resolved the naming mismatch this comment used to record: Studio
+ * called it "Fade In" / "uniform gentle fade", which is not what it does. The
+ * label and description were corrected; the enum VALUE stays `fade-in`,
+ * because it is persisted in every saved Studio config and renaming it would
+ * need the same read-path migration `RETIRED_BADGE_CONFIG_KEYS` got. The
+ * shipped animation did not change.
+ *
+ * Every function here is deterministic: `renderBadgeSvg` is pure, so `scatter`
+ * derives its order from the cell index rather than from a random source.
+ */
+function heatmapDelay(
+  animation: BadgeConfig["heatmapAnimation"],
+  week: number,
+  day: number,
+  index: number,
+): number {
+  switch (animation) {
+    case "diagonal":
+      return (week + day) * 45;
+    case "ripple": {
+      const dx = week - (WEEKS - 1) / 2;
+      const dy = day - (DAYS - 1) / 2;
+      return Math.round(Math.sqrt(dx * dx + dy * dy) * 70);
+    }
+    case "scatter":
+      // Deterministic shuffle: a fixed multiplier modulo the grid size gives a
+      // scattered-looking but stable order for the same badge every render.
+      return ((index * 61) % (WEEKS * DAYS)) * 9;
+    case "cascade":
+      return week * 120;
+    case "waterfall":
+      return day * 130;
+    case "fade-in":
+    default:
+      return week * 60;
+  }
+}
+
 export function buildHeatmapCells(
   heatmapData: HeatmapDay[],
   offsetX: number = 0,
   offsetY: number = 0,
+  animation: BadgeConfig["heatmapAnimation"] = "fade-in",
 ): HeatmapCell[] {
   // Slice to last 13 weeks (91 days) — scoring window may be 365 days
   const displaySize = WEEKS * DAYS;
@@ -51,7 +97,7 @@ export function buildHeatmapCells(
         x: offsetX + week * (CELL_SIZE + CELL_GAP),
         y: offsetY + day * (CELL_SIZE + CELL_GAP),
         fill: getHeatmapColor(count),
-        delay: week * 60,
+        delay: heatmapDelay(animation, week, day, idx),
       });
     }
   }

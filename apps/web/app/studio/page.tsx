@@ -9,7 +9,11 @@ import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { getPublicProfileVerification } from "@/lib/profile/public-profile";
 import { loadStudioConfig } from "@/lib/db/studio";
-import { Navbar } from "@/components/Navbar";
+import {
+  resolveBadgeAvatar,
+  getBadgeAvatarDataUri,
+} from "@/lib/render/avatar-outcome";
+import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import { StudioClient, type StudioClientProps } from "./StudioClient";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
@@ -42,28 +46,41 @@ export async function generateMetadata(
   };
 }
 
+/**
+ * Studio is an authenticated, non-cached page a signed-in owner waits on
+ * deliberately, so it can afford a slightly longer avatar deadline than the
+ * share page's 250ms cache-miss path — but still bounded, because a dead image
+ * host must never hang the editor.
+ */
+const STUDIO_AVATAR_DEADLINE_MS = 1_000;
+
 async function renderStudio(clientProps: StudioClientProps) {
   const locale = await getServerLocale();
   const t = getServerT(locale);
   const handle = clientProps.handle ?? clientProps.stats.handle;
 
   return (
-    <main id="main-content" className="min-h-screen bg-bg">
-      <Navbar
-        navLinks={[
-          { label: t('studio.navLinkStudio') as string, href: "/studio" },
-          { label: t('studio.navLinkYourBadge') as string, href: `/u/${handle}` },
-        ]}
-      />
-
-      <div className="pt-[57px]">
-        <KeyboardShortcutsListener />
-        <StudioClient
-          key={clientProps.demo ? "demo" : "live"}
-          {...clientProps}
-        />
-      </div>
-    </main>
+    // #1194 — see DynamicRouteShell: this route is dynamic, so it needs the
+    // session-aware navbar and both locale corrections together. It had
+    // neither locale correction before, so Studio rendered in DEFAULT_LOCALE
+    // for every visitor.
+    <DynamicRouteShell
+      locale={locale}
+      navLinks={[
+        { label: t('studio.navLinkStudio') as string, href: "/studio" },
+        { label: t('studio.navLinkYourBadge') as string, href: `/u/${handle}` },
+      ]}
+    >
+      <main id="main-content" className="min-h-screen bg-bg">
+        <div className="pt-[57px]">
+          <KeyboardShortcutsListener />
+          <StudioClient
+            key={clientProps.demo ? "demo" : "live"}
+            {...clientProps}
+          />
+        </div>
+      </main>
+    </DynamicRouteShell>
   );
 }
 
@@ -113,6 +130,17 @@ export default async function StudioPage(
     ? savedConfigResult.config
     : DEFAULT_BADGE_CONFIG;
 
+  // #1191 step 6 — the preview renders the real badge SVG, which draws the
+  // owner's avatar, so it has to be resolved here the way the badge route
+  // resolves it. Best-effort against a bounded deadline: a slow external image
+  // host must not hold up the page, and the badge already falls back to the
+  // Chapa shield placeholder when no data URI is available.
+  const avatarOutcome = await resolveBadgeAvatar(
+    session.login,
+    materialized.stats.avatarUrl,
+    { deadlineMs: STUDIO_AVATAR_DEADLINE_MS },
+  );
+
   return renderStudio({
     initialConfig,
     stats: materialized.stats,
@@ -120,5 +148,6 @@ export default async function StudioPage(
     craftResult: materialized.craftResult,
     handle: session.login,
     verification,
+    avatarDataUri: getBadgeAvatarDataUri(avatarOutcome),
   });
 }

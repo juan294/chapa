@@ -21,10 +21,7 @@ const baseConfig: BadgeConfig = {
   border: "solid-amber",
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
-  interaction: "static",
-  statsDisplay: "static",
   tierTreatment: "standard",
-  celebration: "none",
 };
 
 describe("QuickControls", () => {
@@ -324,5 +321,145 @@ describe("QuickControls", () => {
     fireEvent.click(screen.getByText("Fondo"));
     expect(screen.getByText("Aurora luminosa")).toBeDefined();
     expect(screen.getByRole("button", { name: "/save" })).toBeDefined();
+  });
+});
+
+// #1216 — Quick Controls stops being a 48-64px accordion window. The category
+// list owns the column, every option carries its description, and a counter
+// says how far the config has drifted from the default.
+describe("QuickControls — v2 controls column (#1216)", () => {
+  it("shows 'default config' when nothing has changed", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("studio-changed-count").textContent).toBe(
+      "default config",
+    );
+  });
+
+  it("counts how many categories differ from the default", () => {
+    render(
+      <QuickControls
+        config={{ ...baseConfig, background: "aurora", scoreEffect: "chrome" }}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("studio-changed-count").textContent).toBe(
+      "2 of 6 changed",
+    );
+  });
+
+  it("keeps the counter out of the toggle button's accessible name", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Quick Controls" })).toBeDefined();
+  });
+
+  it("shows a description under every option label", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+    expect(screen.getByText("Animated color waves")).toBeDefined();
+    expect(screen.getByText("Floating sparkle particles")).toBeDefined();
+  });
+
+  it("marks the selected option with aria-pressed rather than a glyph in its label", () => {
+    render(
+      <QuickControls
+        config={{ ...baseConfig, background: "aurora" }}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+    const selected = screen
+      .getByText("Aurora Glow")
+      .closest("button") as HTMLButtonElement;
+    expect(selected.getAttribute("aria-pressed")).toBe("true");
+    const other = screen
+      .getByText("Particles")
+      .closest("button") as HTMLButtonElement;
+    expect(other.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("gives every option a 44px hit area", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+    const option = screen
+      .getByText("Aurora Glow")
+      .closest("button") as HTMLButtonElement;
+    expect(option.className).toContain("min-h-[44px]");
+  });
+});
+
+// #1191 step 5 — the three categories that could never reach the embeddable
+// badge were removed rather than labelled, so Quick Controls now offers only
+// controls that change the artifact. No "preview only" marker survives,
+// because there is nothing left to mark.
+describe("QuickControls offers only categories that reach the badge (#1191)", () => {
+  function renderControls() {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+  }
+
+  it("renders no preview-only marker at all", () => {
+    renderControls();
+    expect(
+      document.querySelectorAll('[data-testid^="preview-only-"]'),
+    ).toHaveLength(0);
+  });
+
+  it("offers exactly the six shipping categories", () => {
+    renderControls();
+    for (const label of [
+      "Background",
+      "Card Style",
+      "Border",
+      "Score Effect",
+      "Heatmap Animation",
+      "Tier Treatment",
+    ]) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+  });
+
+  it("offers none of the retired categories", () => {
+    renderControls();
+    for (const label of ["Interaction", "Stats Display", "Celebration"]) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
   });
 });

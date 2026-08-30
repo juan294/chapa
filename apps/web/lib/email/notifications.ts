@@ -135,11 +135,11 @@ function dimensionBar(label: string, value: number): string {
     <tr>
       <td style="padding:4px 12px 4px 0;color:#9AA4B2;font-size:13px;white-space:nowrap;">${label}</td>
       <td style="padding:4px 0;width:100%;">
-        <div style="background:#1A1A2E;border-radius:4px;height:8px;width:100%;overflow:hidden;">
-          <div style="background:#8B5CF6;height:8px;border-radius:4px;width:${pct}%;"></div>
+        <div style="background:#0D2B1D;border-radius:4px;height:8px;width:100%;overflow:hidden;">
+          <div style="background:#1BD093;height:8px;border-radius:4px;width:${pct}%;"></div>
         </div>
       </td>
-      <td style="padding:4px 0 4px 8px;color:#E2E4E9;font-size:13px;font-weight:600;text-align:right;">${value}</td>
+      <td style="padding:4px 0 4px 8px;color:#DFEAE4;font-size:13px;font-weight:600;text-align:right;">${value}</td>
     </tr>`;
 }
 
@@ -147,13 +147,13 @@ function buildHtml(data: EmailData): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#0A0A0F;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#08170F;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#08170F;padding:32px 16px;">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#111118;border-radius:12px;border:1px solid rgba(139,92,246,0.15);overflow:hidden;">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#0F2419;border-radius:12px;border:1px solid rgba(27,208,147,0.15);overflow:hidden;">
 
         <!-- Header -->
-        <tr><td style="background:linear-gradient(135deg,#8B5CF6 0%,#7C3AED 100%);padding:24px 32px;">
+        <tr><td style="background:linear-gradient(135deg,#1BD093 0%,#009365 100%);padding:24px 32px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="font-family:'Courier New',monospace;font-size:24px;font-weight:700;color:#FFFFFF;letter-spacing:2px;">CHAPA</td>
@@ -169,25 +169,25 @@ function buildHtml(data: EmailData): string {
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
             <tr>
               <td>
-                <div style="font-size:22px;font-weight:700;color:#E2E4E9;font-family:'Courier New',monospace;">@${data.handle}</div>
-                <div style="font-size:14px;color:#8B5CF6;margin-top:4px;font-weight:600;">${data.archetype} &middot; ${data.tier} Tier</div>
+                <div style="font-size:22px;font-weight:700;color:#DFEAE4;font-family:'Courier New',monospace;">@${data.handle}</div>
+                <div style="font-size:14px;color:#1BD093;margin-top:4px;font-weight:600;">${data.archetype} &middot; ${data.tier} Tier</div>
               </td>
             </tr>
           </table>
 
           <!-- Score card -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;border-radius:8px;border:1px solid rgba(139,92,246,0.10);margin-bottom:24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#08170F;border-radius:8px;border:1px solid rgba(27,208,147,0.10);margin-bottom:24px;">
             <tr>
-              <td align="center" style="padding:16px;border-right:1px solid rgba(139,92,246,0.10);">
-                <div style="font-size:28px;font-weight:700;color:#8B5CF6;">${data.adjustedComposite}</div>
+              <td align="center" style="padding:16px;border-right:1px solid rgba(27,208,147,0.10);">
+                <div style="font-size:28px;font-weight:700;color:#1BD093;">${data.adjustedComposite}</div>
                 <div style="font-size:11px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;">Adjusted</div>
               </td>
-              <td align="center" style="padding:16px;border-right:1px solid rgba(139,92,246,0.10);">
-                <div style="font-size:28px;font-weight:700;color:#E2E4E9;">${data.compositeScore}</div>
+              <td align="center" style="padding:16px;border-right:1px solid rgba(27,208,147,0.10);">
+                <div style="font-size:28px;font-weight:700;color:#DFEAE4;">${data.compositeScore}</div>
                 <div style="font-size:11px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;">Composite</div>
               </td>
               <td align="center" style="padding:16px;">
-                <div style="font-size:28px;font-weight:700;color:#4ADE80;">${data.confidence}%</div>
+                <div style="font-size:28px;font-weight:700;color:#6CD981;">${data.confidence}%</div>
                 <div style="font-size:11px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;">Confidence</div>
               </td>
             </tr>
@@ -206,10 +206,10 @@ function buildHtml(data: EmailData): string {
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
             <tr>
               <td align="center" style="padding:0 4px 0 0;">
-                <a href="${data.shareUrl}" style="display:block;background:#8B5CF6;color:#FFFFFF;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;text-align:center;">View Profile</a>
+                <a href="${data.shareUrl}" style="display:block;background:#1BD093;color:#FFFFFF;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;text-align:center;">View Profile</a>
               </td>
               <td align="center" style="padding:0 0 0 4px;">
-                <a href="${data.badgeUrl}" style="display:block;background:#1A1A2E;color:#A78BFA;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;text-align:center;border:1px solid rgba(139,92,246,0.20);">View Badge SVG</a>
+                <a href="${data.badgeUrl}" style="display:block;background:#0D2B1D;color:#65E7B0;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;text-align:center;border:1px solid rgba(27,208,147,0.20);">View Badge SVG</a>
               </td>
             </tr>
           </table>
@@ -217,7 +217,7 @@ function buildHtml(data: EmailData): string {
         </td></tr>
 
         <!-- Footer -->
-        <tr><td style="padding:16px 32px;border-top:1px solid rgba(139,92,246,0.10);">
+        <tr><td style="padding:16px 32px;border-top:1px solid rgba(27,208,147,0.10);">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="font-size:11px;color:#3A3A4A;">Computed at ${data.computedAt}</td>

@@ -260,23 +260,43 @@ export type BadgeCardStyle = "flat" | "frost" | "smoke" | "crystal" | "aurora-gl
 export type BadgeBorder = "solid-amber" | "gradient-rotating" | "none";
 export type BadgeScoreEffect = "standard" | "gold-shimmer" | "gold-leaf" | "chrome" | "embossed" | "neon-amber" | "holographic";
 export type BadgeHeatmapAnimation = "fade-in" | "diagonal" | "ripple" | "scatter" | "cascade" | "waterfall";
-export type BadgeInteraction = "static" | "tilt-3d" | "holographic";
-export type BadgeStatsDisplay = "static" | "animated-ease" | "animated-spring";
 export type BadgeTierTreatment = "standard" | "enhanced";
-export type BadgeCelebration = "none" | "confetti";
 
-/** User-authored badge visual configuration (stored in Redis, no TTL) */
+/**
+ * User-authored badge visual configuration.
+ *
+ * Every field here reaches the embeddable SVG. Three earlier fields did not
+ * and were removed in #1191: `interaction` (a 3D tilt needs a pointer),
+ * `statsDisplay` (a counting animation needs a JavaScript loop) and
+ * `celebration` (an "on load" confetti burst is meaningless for a cached image
+ * served to every viewer). They could only ever be seen by the owner sitting
+ * in Creator Studio, and keeping them beside six categories that do ship
+ * taught that the preview is not the artifact. See
+ * `docs/decisions/2026-08-30-one-badge-artifact.md`.
+ */
 export interface BadgeConfig {
   background: BadgeBackground;
   cardStyle: BadgeCardStyle;
   border: BadgeBorder;
   scoreEffect: BadgeScoreEffect;
   heatmapAnimation: BadgeHeatmapAnimation;
-  interaction: BadgeInteraction;
-  statsDisplay: BadgeStatsDisplay;
   tierTreatment: BadgeTierTreatment;
-  celebration: BadgeCelebration;
 }
+
+/**
+ * Fields that were once part of `BadgeConfig` and no longer are (#1191).
+ *
+ * Studio configs persisted before the drop still carry these keys, and
+ * `isValidBadgeConfig` rejects extra fields — so a stored row must have them
+ * stripped before it is validated, or a durable write would be silently
+ * discarded and the owner handed back the default. Never reuse one of these
+ * names for a new category.
+ */
+export const RETIRED_BADGE_CONFIG_KEYS = [
+  "interaction",
+  "statsDisplay",
+  "celebration",
+] as const;
 
 /** All valid values for each BadgeConfig field (used by validation + UI) */
 export const BADGE_CONFIG_OPTIONS = {
@@ -285,10 +305,7 @@ export const BADGE_CONFIG_OPTIONS = {
   border: ["solid-amber", "gradient-rotating", "none"] as const,
   scoreEffect: ["standard", "gold-shimmer", "gold-leaf", "chrome", "embossed", "neon-amber", "holographic"] as const,
   heatmapAnimation: ["fade-in", "diagonal", "ripple", "scatter", "cascade", "waterfall"] as const,
-  interaction: ["static", "tilt-3d", "holographic"] as const,
-  statsDisplay: ["static", "animated-ease", "animated-spring"] as const,
   tierTreatment: ["standard", "enhanced"] as const,
-  celebration: ["none", "confetti"] as const,
 } as const;
 
 /** Default config — all fields set to their first (most basic) option */
@@ -298,10 +315,7 @@ export const DEFAULT_BADGE_CONFIG: BadgeConfig = {
   border: "solid-amber",
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
-  interaction: "static",
-  statsDisplay: "static",
   tierTreatment: "standard",
-  celebration: "none",
 };
 
 // ---------------------------------------------------------------------------

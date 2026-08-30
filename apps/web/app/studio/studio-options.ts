@@ -29,6 +29,13 @@ function translatedOrFallback(
     : fallback;
 }
 
+/**
+ * The badge's customizable categories, every one of which renders in the
+ * embeddable SVG (#1191). Interaction, stats display and celebration used to
+ * sit here too; they needed a pointer, a JavaScript loop and an "on load"
+ * moment respectively, none of which a cached image has, so they were removed
+ * rather than shown beside controls that ship.
+ */
 export const STUDIO_CATEGORIES: CategoryMeta[] = [
   {
     key: "background",
@@ -76,30 +83,16 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
     key: "heatmapAnimation",
     label: "Heatmap Animation",
     options: [
-      { value: "fade-in", label: "Fade In", description: "Uniform gentle fade" },
+      // #1226 — the value stays `fade-in` because it is persisted in every
+      // saved Studio config; only the label and description, which are not,
+      // were corrected. The badge renders a 60ms-per-column stagger here
+      // (`heatmapDelay` in `lib/render/heatmap.ts`), never a uniform fade.
+      { value: "fade-in", label: "Column Sweep", description: "Quick left-to-right column sweep" },
       { value: "diagonal", label: "Diagonal Wave", description: "Top-left to bottom-right" },
       { value: "ripple", label: "Center Ripple", description: "Expanding from center" },
       { value: "scatter", label: "Random Scatter", description: "Random appearance order" },
-      { value: "cascade", label: "Column Cascade", description: "Column by column reveal" },
+      { value: "cascade", label: "Column Cascade", description: "Slow column-by-column reveal" },
       { value: "waterfall", label: "Row Waterfall", description: "Row by row reveal" },
-    ],
-  },
-  {
-    key: "interaction",
-    label: "Interaction",
-    options: [
-      { value: "static", label: "Static", description: "No mouse interaction" },
-      { value: "tilt-3d", label: "3D Tilt", description: "Perspective tilt on hover" },
-      { value: "holographic", label: "Holographic", description: "Rainbow overlay on hover" },
-    ],
-  },
-  {
-    key: "statsDisplay",
-    label: "Stats Display",
-    options: [
-      { value: "static", label: "Static", description: "Plain numbers" },
-      { value: "animated-ease", label: "Smooth Count", description: "Eased counting animation" },
-      { value: "animated-spring", label: "Spring Count", description: "Bouncy spring animation" },
     ],
   },
   {
@@ -108,14 +101,6 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
     options: [
       { value: "standard", label: "Standard", description: "Simple tier pill" },
       { value: "enhanced", label: "Enhanced", description: "Sparkle dots for high tiers" },
-    ],
-  },
-  {
-    key: "celebration",
-    label: "Celebration",
-    options: [
-      { value: "none", label: "None", description: "No celebration effect" },
-      { value: "confetti", label: "Confetti", description: "Burst of confetti on load" },
     ],
   },
 ];
@@ -145,6 +130,27 @@ export function getOptionLabel(
     t,
     `studio.categories.${key}.options.${value}`,
     option.label,
+  );
+}
+
+/**
+ * The one-line explanation of what an option does. Quick Controls shows this
+ * under every option label since #1216 — before that the descriptions existed
+ * in this file but nothing rendered them, so picking an effect meant guessing
+ * from its name.
+ */
+export function getOptionDescription(
+  key: keyof BadgeConfig,
+  value: string,
+  t?: StudioTranslate,
+): string {
+  const category = STUDIO_CATEGORIES.find((c) => c.key === key);
+  const option = category?.options.find((o) => o.value === value);
+  if (!option) return "";
+  return translatedOrFallback(
+    t,
+    `studio.categories.${key}.descriptions.${value}`,
+    option.description,
   );
 }
 

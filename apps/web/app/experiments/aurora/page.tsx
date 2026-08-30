@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { BadgeContent } from "@/components/badge/BadgeContent";
 import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
@@ -29,9 +29,9 @@ const SPEED_DURATIONS: Record<Speed, { a1: string; a2: string; a3: string }> = {
 };
 
 const COLOR_BLOBS: Record<ColorVariant, [string, string, string]> = {
-  amber: ["#8B5CF6", "#A78BFA", "#7C3AED"],
-  "amber-white": ["#8B5CF6", "#A78BFA", "#E0DBFF"],
-  "amber-deep": ["#8B5CF6", "#A78BFA", "#3D2F8C"],
+  amber: ["#1BD093", "#65E7B0", "#009365"],
+  "amber-white": ["#1BD093", "#65E7B0", "#E0DBFF"],
+  "amber-deep": ["#1BD093", "#65E7B0", "#3D2F8C"],
 };
 
 function AuroraBackground({
@@ -114,7 +114,6 @@ function AuroraBackground({
 function MockBadgeCard() {
   return (
     <div className="relative rounded-2xl border border-stroke bg-card/80 backdrop-blur-sm p-8 w-full max-w-[560px]">
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
   );

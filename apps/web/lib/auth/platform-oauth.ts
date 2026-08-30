@@ -19,7 +19,7 @@ import { cacheDel, rateLimit, rateLimitStrict } from "@/lib/cache/redis";
 import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeTokenExpiry } from "@/lib/auth/bitbucket";
-import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
+import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
 import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
 import { issueOauthState, consumeOauthState } from "@/lib/auth/oauth-state";
@@ -68,7 +68,10 @@ function readStateStoreCookie(
  * route and the share page both read.
  */
 async function invalidateBadgeSvgCache(handle: string): Promise<void> {
-  await cacheDel(buildBadgeSvgCacheKey(handle, toDateString(new Date())));
+  // #1190 — one cache entry per locale; #1191 — shared with the Studio save
+  // path, which invalidates the same entries for the same reason from a
+  // different trigger.
+  await invalidateBadgeSvgCacheForHandle(handle, toDateString(new Date()));
 }
 
 async function invalidatePlatformReadModels(

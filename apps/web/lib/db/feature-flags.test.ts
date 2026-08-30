@@ -219,6 +219,16 @@ describe("dbGetFeatureFlag", () => {
     expect(result).toBeNull();
   });
 
+  it("does not warn when flag not found (absence is the env-var fallback path)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSelectSingle(null);
+
+    await dbGetFeatureFlag("nonexistent");
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it("returns null when DB is unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
     const result = await dbGetFeatureFlag("any_key");

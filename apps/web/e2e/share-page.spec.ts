@@ -34,12 +34,16 @@ test.describe("Share page — /u/:handle", () => {
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
-  test('"Tu Impacto, Decodificado" heading is visible', async ({ page }) => {
+  test("header names the profile and describes the badge", async ({ page }) => {
     const response = await page.goto(smokeProfilePath, GOTO_OPTS);
     if (!response?.ok()) return;
 
-    const heading = page.getByText("Tu Impacto, Decodificado");
-    await expect(heading).toBeVisible();
+    // #1217 removed SharePageH2 ("Tu Impacto, Decodificado") in favour of a
+    // header that names the profile and carries the localized subtitle.
+    await expect(page.locator("h1")).toHaveText("octocat");
+    await expect(
+      page.getByText("Insignia de impacto de desarrollador", { exact: false }),
+    ).toBeVisible();
   });
 
   test("locale switch updates the live profile title and accessible badge label", async ({
@@ -49,9 +53,9 @@ test.describe("Share page — /u/:handle", () => {
     expect(response).not.toBeNull();
     expect(response!.status()).toBeLessThan(500);
 
-    await expect(page.locator("h1")).toHaveText(
-      "Impacto de desarrollador de octocat",
-    );
+    // The h1 is the profile identity and is the same in both locales; the
+    // badge's accessible label is what carries the locale (#1217).
+    await expect(page.locator("h1")).toHaveText("octocat");
     await expect(page.getByRole("img", { name: "Chapa de octocat" })).toBeAttached();
 
     await page.getByRole("button", { name: "ES", exact: true }).click();
@@ -61,9 +65,7 @@ test.describe("Share page — /u/:handle", () => {
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
-    await expect(page.locator("h1")).toHaveText(
-      "octocat's developer impact",
-    );
+    await expect(page.locator("h1")).toHaveText("octocat");
     await expect(
       page.getByRole("img", { name: "Chapa badge for octocat" }),
     ).toBeAttached();
@@ -97,7 +99,7 @@ test.describe("Share page — /u/:handle", () => {
     expect(response!.status()).toBeLessThan(500);
 
     await expect(page).toHaveURL(path);
-    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(page.locator("h1")).toHaveText("octocat");
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
@@ -111,7 +113,7 @@ test.describe("Share page — /u/:handle", () => {
 
     await page.reload(GOTO_OPTS);
     await expect(page).toHaveURL(path);
-    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(page.locator("h1")).toHaveText("octocat");
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
@@ -128,19 +130,22 @@ test.describe("Share page — /u/:handle", () => {
     const spanishPath = `${smokeProfilePath}&lang=es`;
 
     await page.goto(englishPath, GOTO_OPTS);
-    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(page.locator("h1")).toHaveText("octocat");
+    await expect(
+      page.getByRole("img", { name: "Chapa badge for octocat" }),
+    ).toBeAttached();
 
     await page.getByRole("button", { name: "EN", exact: true }).click();
     await page.getByRole("option", { name: "Español" }).click();
     await expect(page).toHaveURL(spanishPath);
-    await expect(page.locator("h1")).toHaveText(
-      "Impacto de desarrollador de octocat",
-    );
+    await expect(page.getByRole("img", { name: "Chapa de octocat" })).toBeAttached();
 
     await page.getByRole("button", { name: "ES", exact: true }).click();
     await page.getByRole("option", { name: "English" }).click();
     await expect(page).toHaveURL(englishPath);
-    await expect(page.locator("h1")).toHaveText("octocat's developer impact");
+    await expect(
+      page.getByRole("img", { name: "Chapa badge for octocat" }),
+    ).toBeAttached();
   });
 
   test("invalid handle returns 404 or error state", async ({ page }) => {

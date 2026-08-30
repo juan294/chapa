@@ -54,7 +54,7 @@ This beat is available only when the `studio_enabled` feature flag is enabled; t
 - Type `/save` → the Studio configuration is restored when you return
 
 Say:
-"The Creator Studio is a design playground with 9 visual categories: backgrounds, card styles, score effects, heatmap animations, and more. Everything is a terminal command, but mouse controls are there too. Saved Studio settings do not change the public SVG badge or share page."
+"The Creator Studio is a design playground with 6 visual categories: backgrounds, card styles, borders, score effects, heatmap animations and tier treatment. Everything is a terminal command, but mouse controls are there too. Every one of the six changes the badge you actually embed — save, and the SVG changes with it."
 
 ### 5) Embed it anywhere (35s)
 - Copy Markdown embed snippet

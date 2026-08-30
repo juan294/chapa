@@ -1,11 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import {
   getOptionalRequestSession,
   getSessionSecret,
   requireRequestSession,
 } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/cache/redis";
-import { isValidBadgeConfig } from "@/lib/validation";
+import { isValidBadgeConfig, stripRetiredBadgeConfigKeys } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { dbUpsertStudioConfig, loadStudioConfig } from "@/lib/db/studio";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
@@ -97,8 +100,12 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Validate config shape
-  if (!isValidBadgeConfig(body)) {
+  // Validate config shape. #1191: a Studio tab loaded before the three
+  // preview-only categories were dropped still posts them, so strip the
+  // retired keys before validating rather than 400-ing a stale client that is
+  // otherwise sending a perfectly good config.
+  const config = stripRetiredBadgeConfigKeys(body);
+  if (!isValidBadgeConfig(config)) {
     return NextResponse.json({ error: "Invalid badge config" }, { status: 400 });
   }
 
@@ -113,7 +120,7 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
 
   const normalizedLogin = session.login.toLowerCase();
   const dbResult = await serializeStudioConfigWrite(normalizedLogin, () =>
-    dbUpsertStudioConfig(normalizedLogin, body),
+    dbUpsertStudioConfig(normalizedLogin, config),
   );
 
   if (!dbResult.ok && dbResult.reason === "constraint") {
@@ -136,6 +143,15 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
       { status: 500 },
     );
   }
+
+  // #1191 — the badge cache key carries handle/variant/date/locale but nothing
+  // about the config, so a save has to say explicitly that the rendered badge
+  // is now wrong. Fire-and-forget: a failed invalidation leaves a stale badge
+  // until the day rolls over, which is the same self-healing risk the platform
+  // link/unlink path already accepts, and is not worth failing a save over.
+  fireAndForget(() =>
+    invalidateBadgeSvgCacheForHandle(normalizedLogin, toDateString(new Date())),
+  );
 
   return NextResponse.json({ success: true });
 });

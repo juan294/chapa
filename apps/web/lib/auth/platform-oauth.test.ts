@@ -874,3 +874,22 @@ describe("createStatusHandler", () => {
     expect(mockDbGetLinkedPlatforms).toHaveBeenCalledWith("testuser");
   });
 });
+
+// #1190 — the rendered badge is cached per locale. Clearing only the default
+// slot meant a freshly linked platform's logo appeared on one locale's badge
+// and stayed missing on the other until the 24h+jitter TTL rolled over, which
+// is the exact staleness invalidateBadgeSvgCache exists to prevent.
+describe("badge SVG invalidation covers every locale (#1190)", () => {
+  it("deletes a badge key per supported locale", async () => {
+    const source = await import("node:fs").then((fs) =>
+      fs.readFileSync(
+        new URL("./platform-oauth.ts", import.meta.url),
+        "utf8",
+      ),
+    );
+    // #1191 moved the per-locale deletion into badge-svg-cache.ts, so the
+    // Studio save path and this one share one implementation rather than
+    // drifting apart. What must stay true here is that this path delegates.
+    expect(source).toContain("invalidateBadgeSvgCacheForHandle");
+  });
+});

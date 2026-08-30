@@ -1,14 +1,23 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["du", "supabase", "osv-scanner"],
+  "ignoreBinaries": [
+    "du",
+    "supabase",
+    "osv-scanner"
+  ],
   "ignore": [
     "test/stubs/server-only.ts",
-    "apps/web/test/contract/**"
+    "apps/web/test/contract/**",
+    ".design-sync/previews/**",
+    ".design-sync/emit-tokens.mjs",
+    "apps/web/.ds-entry.tsx"
   ],
   "workspaces": {
     ".": {
-      "entry": ["scripts/**/*.ts"],
+      "entry": [
+        "scripts/**/*.ts"
+      ],
       "ignoreDependencies": [
         "next"
       ]
@@ -24,11 +33,17 @@
         "e2e/helpers/vercel-protection-global-setup.ts",
         "scripts/**/*.ts"
       ],
-      "project": ["**/*.{ts,tsx}"],
-      "ignoreDependencies": ["tsx"]
+      "project": [
+        "**/*.{ts,tsx}"
+      ],
+      "ignoreDependencies": [
+        "tsx"
+      ]
     },
     "packages/shared": {
-      "project": ["src/**/*.ts"]
+      "project": [
+        "src/**/*.ts"
+      ]
     }
   }
 }

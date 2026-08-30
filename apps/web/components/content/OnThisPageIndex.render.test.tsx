@@ -1,0 +1,204 @@
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { OnThisPageIndex } from "./OnThisPageIndex";
+import { ContentPageHeader } from "./ContentPageHeader";
+
+afterEach(cleanup);
+
+const ITEMS = [
+  { id: "one", label: "The five dimensions" },
+  { id: "two", label: "Caps and weights" },
+];
+
+describe("OnThisPageIndex (#1218)", () => {
+  it("renders one link per section, pointing at its anchor", () => {
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    const links = Array.from(nav.querySelectorAll("a"));
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["#one", "#two"]);
+  });
+
+  it("renders nothing when there are no sections to index", () => {
+    const { container } = render(<OnThisPageIndex items={[]} heading="On this page" />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("works without IntersectionObserver, with no item marked current", () => {
+    // jsdom has no IntersectionObserver. The list must still render and link;
+    // only the active-item highlight depends on it.
+    expect(
+      (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver,
+    ).toBeUndefined();
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    expect(nav.querySelectorAll("[aria-current]")).toHaveLength(0);
+  });
+
+  it("observes each section that exists in the document", () => {
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe = observe;
+        disconnect = disconnect;
+        unobserve = vi.fn();
+        takeRecords = vi.fn();
+        root = null;
+        rootMargin = "";
+        thresholds = [];
+      },
+    );
+    const section = document.createElement("section");
+    section.id = "one";
+    document.body.appendChild(section);
+
+    const { unmount } = render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(observe).toHaveBeenCalledWith(section);
+
+    unmount();
+    expect(disconnect).toHaveBeenCalled();
+    section.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not re-subscribe when a re-render passes an equal but new array", () => {
+    // Callers build the list inline from the dictionary, so the array identity
+    // changes on every render. Keying the effect on it would re-subscribe each
+    // time, and observing fires the callback immediately, so each subscription
+    // would set state and trigger the next render.
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe = observe;
+        disconnect = disconnect;
+        unobserve = vi.fn();
+        takeRecords = vi.fn();
+        root = null;
+        rootMargin = "";
+        thresholds = [];
+      },
+    );
+    const section = document.createElement("section");
+    section.id = "one";
+    document.body.appendChild(section);
+
+    const { rerender } = render(<OnThisPageIndex items={[...ITEMS]} heading="On this page" />);
+    expect(observe).toHaveBeenCalledTimes(1);
+
+    rerender(<OnThisPageIndex items={ITEMS.map((item) => ({ ...item }))} heading="On this page" />);
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(disconnect).not.toHaveBeenCalled();
+
+    section.remove();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("ContentPageHeader (#1218)", () => {
+  it("pairs the terminal marker with the page title", () => {
+    const { container } = render(
+      <ContentPageHeader
+        command="chapa explain --scoring"
+        title="Scoring Methodology"
+        intro="Full transparency."
+      />,
+    );
+    expect(container.textContent).toContain("% chapa explain --scoring");
+    expect(
+      screen.getByRole("heading", { level: 1 }).textContent,
+    ).toContain("Scoring Methodology");
+    expect(screen.getByText("Full transparency.")).toBeDefined();
+  });
+
+  it("omits the intro paragraph when there is none", () => {
+    const { container } = render(
+      <ContentPageHeader command="chapa explain" title="About" />,
+    );
+    expect(container.querySelector("p")).toBeNull();
+  });
+});
+
+describe("OnThisPageIndex — sticky positioning (#1218)", () => {
+  it("does not stretch to the article's height", () => {
+    // As a stretched grid child the nav is as tall as the article, so sticky
+    // positioning has no range to travel in and the index scrolls away.
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    expect(nav.className).toContain("sticky");
+    expect(nav.className).toContain("self-start");
+  });
+});
+
+// #1221 — the active item was derived purely from an IntersectionObserver, so
+// a deep link marked nothing current until the observer happened to fire, and
+// the highlight could not be exercised without a live viewport.
+describe("OnThisPageIndex — active item without the observer (#1221)", () => {
+  afterEach(() => {
+    window.location.hash = "";
+  });
+
+  it("marks the section named by the URL hash on mount", () => {
+    window.location.hash = "#two";
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    const current = screen
+      .getByRole("navigation", { name: "On this page" })
+      .querySelector("[aria-current]") as HTMLElement;
+    expect(current.getAttribute("href")).toBe("#two");
+  });
+
+  it("ignores a hash that names no indexed section", () => {
+    window.location.hash = "#not-a-section";
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    expect(
+      screen
+        .getByRole("navigation", { name: "On this page" })
+        .querySelectorAll("[aria-current]"),
+    ).toHaveLength(0);
+  });
+
+  it("marks a section as soon as its link is clicked", () => {
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    fireEvent.click(nav.querySelector('a[href="#two"]') as HTMLElement);
+    const current = nav.querySelector("[aria-current]") as HTMLElement;
+    expect(current.getAttribute("href")).toBe("#two");
+  });
+
+  it("follows a later hash change", () => {
+    render(<OnThisPageIndex items={ITEMS} heading="On this page" />);
+    const nav = screen.getByRole("navigation", { name: "On this page" });
+    window.location.hash = "#one";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    expect(
+      (nav.querySelector("[aria-current]") as HTMLElement).getAttribute("href"),
+    ).toBe("#one");
+  });
+});
+
+
+// #1222 — the component must stay free of the i18n barrel. Importing it for
+// one string pulls Next internals into any bundle containing this component,
+// which breaks the design-system bundle outright.
+describe("OnThisPageIndex — no i18n import (#1222)", () => {
+  it("takes its heading from the caller", () => {
+    render(<OnThisPageIndex items={ITEMS} heading="En esta página" />);
+    const nav = screen.getByRole("navigation", { name: "En esta página" });
+    expect(nav.textContent).toContain("En esta página");
+  });
+
+  it("does not import the i18n barrel", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "OnThisPageIndex.tsx"),
+      "utf8",
+    );
+    expect(source).not.toContain("@/lib/i18n");
+    expect(source).not.toContain("useTranslation");
+  });
+});

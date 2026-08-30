@@ -30,7 +30,7 @@
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
 import { withTimeout } from "../async/with-timeout";
-import { isValidBadgeConfig } from "../validation";
+import { isValidBadgeConfig, stripRetiredBadgeConfigKeys } from "../validation";
 import type { BadgeConfig } from "@chapa/shared";
 
 export const STUDIO_CONFIG_READ_TIMEOUT_MS = 2_000;
@@ -164,7 +164,13 @@ export async function dbGetStudioConfig(
     if (!data) return { status: "not_found" };
 
     const row = parseRow<StudioConfigRow>(data, REQUIRED_KEYS, "studio_configs");
-    if (!row || !isValidBadgeConfig(row.config)) {
+    // #1191: rows written before the three preview-only categories were
+    // dropped still carry those keys, and isValidBadgeConfig rejects extra
+    // fields. Strip them first so a legacy row migrates in place rather than
+    // being reported invalid, which would silently discard a durable write and
+    // hand the owner back the default badge.
+    const config = row ? stripRetiredBadgeConfigKeys(row.config) : undefined;
+    if (!row || !isValidBadgeConfig(config)) {
       console.error(
         "[STUDIO_CONFIG_FALLBACK] Invalid persisted Studio configuration",
         { handle: handle.toLowerCase() },
@@ -180,7 +186,7 @@ export async function dbGetStudioConfig(
       return { status: "invalid" };
     }
 
-    return { status: "found", config: row.config, revision: row.revision };
+    return { status: "found", config, revision: row.revision };
   } catch (error) {
     console.error(
       "[STUDIO_CONFIG_FALLBACK] dbGetStudioConfig failed:",

@@ -883,3 +883,36 @@ describe("ActivityHeatmap", () => {
     });
   });
 });
+
+// #1217 — the chart's own aria-label carried the active-days total, so a
+// sighted reader had no count anywhere on the page, and the chart had no
+// scroller so a narrow screen crushed every column.
+describe("ActivityHeatmap — v2 chart framing (#1217)", () => {
+  it("shows the active-days count as visible text", () => {
+    render(
+      <ActivityHeatmap
+        heatmapData={mockHeatmapData}
+        activeDays={248}
+        dimensions={mockDimensions}
+      />,
+    );
+    expect(screen.getByTestId("activity-active-days").textContent).toContain(
+      "248",
+    );
+  });
+
+  it("puts the chart in a horizontal scroller with a minimum width", () => {
+    const { container } = render(
+      <ActivityHeatmap
+        heatmapData={mockHeatmapData}
+        activeDays={248}
+        dimensions={mockDimensions}
+      />,
+    );
+    const scroller = container.querySelector(".overflow-x-auto") as HTMLElement;
+    expect(scroller).not.toBeNull();
+    expect(
+      (scroller.firstElementChild as HTMLElement).className,
+    ).toContain("min-w-[560px]");
+  });
+});

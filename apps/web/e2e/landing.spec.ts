@@ -47,16 +47,33 @@ test.describe("Landing page — sections and content", () => {
     await expect(section.getByText("03", { exact: true })).toBeVisible();
   });
 
-  test("stats section shows key numbers", async ({ page }) => {
-    const section = page.locator("#stats");
-    await expect(section).toBeAttached();
+  test("hero shows the key numbers", async ({ page }) => {
+    // #1215 moved the standalone #stats section into the hero, where the three
+    // numbers sit in a <dl> beside the CTAs.
+    const stats = page.locator("main dl").first();
+    await expect(stats).toBeAttached();
 
-    // Scope to #stats to avoid matching unrelated content
-    await expect(section.getByText("7", { exact: true })).toBeVisible();
-    await expect(section.getByText("arquetipos")).toBeVisible();
-    await expect(section.getByText("5", { exact: true })).toBeVisible();
-    await expect(section.getByText("dimensiones")).toBeVisible();
-    await expect(section.getByText("365", { exact: true })).toBeVisible();
+    await expect(stats.getByText("7", { exact: true })).toBeVisible();
+    await expect(stats.getByText("arquetipos")).toBeVisible();
+    await expect(stats.getByText("5", { exact: true })).toBeVisible();
+    await expect(stats.getByText("dimensiones")).toBeVisible();
+    await expect(stats.getByText("365", { exact: true })).toBeVisible();
+  });
+
+  test("layout fits the device width without forcing a wider viewport", async ({
+    page,
+  }) => {
+    // #1224: an `overflow-x-auto` flex item without `min-w-0` kept its full
+    // content width, so the page shrink-to-fit into a layout viewport wider
+    // than the screen and the navbar controls landed off-screen - unclickable
+    // on a real phone. Assert the page lays out at the device width.
+    const { innerWidth, scrollWidth } = await page.evaluate(() => ({
+      innerWidth: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    const viewport = page.viewportSize();
+    expect(innerWidth).toBeLessThanOrEqual(viewport!.width + 1);
+    expect(scrollWidth).toBeLessThanOrEqual(viewport!.width + 1);
   });
 
   test("embed snippet section has copy button", async ({ page }) => {

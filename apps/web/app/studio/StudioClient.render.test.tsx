@@ -42,10 +42,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         border: "solid-amber",
         scoreEffect: "standard",
         heatmapAnimation: "fade-in",
-        interaction: "static",
-        statsDisplay: "static",
         tierTreatment: "standard",
-        celebration: "none",
       },
     },
     {
@@ -57,10 +54,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         border: "glow",
         scoreEffect: "counter",
         heatmapAnimation: "wave",
-        interaction: "tilt",
-        statsDisplay: "counter",
         tierTreatment: "glow",
-        celebration: "confetti",
       },
     },
   ],
@@ -99,20 +93,20 @@ vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
 vi.mock("./BadgePreviewCard", () => ({
   BadgePreviewCard: ({
     config,
-    interactive,
     verification,
+    avatarDataUri,
   }: {
     config: Record<string, unknown>;
-    interactive: boolean;
     verification?: { hash: string; date: string } | null;
+    avatarDataUri?: string;
   }) => {
     const [instanceId] = useState(() => ++previewLifecycle.nextInstanceId);
     return (
       <div
         data-testid="badge-preview"
         data-instance-id={instanceId}
-        data-interactive={String(interactive)}
         data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
+        data-avatar={avatarDataUri ?? "none"}
       >
         {JSON.stringify(config)}
       </div>
@@ -255,6 +249,16 @@ vi.mock("@/components/terminal/command-registry", () => {
       type,
       text,
     }),
+    // #1216 — the active-config readout labels each row with the category's
+    // short alias, the same one /set accepts.
+    CATEGORY_KEY_TO_ALIAS: {
+      background: "bg",
+      cardStyle: "card",
+      border: "border",
+      scoreEffect: "score",
+      heatmapAnimation: "heatmap",
+      tierTreatment: "tier",
+    },
   };
 });
 
@@ -285,10 +289,7 @@ const defaultConfig: BadgeConfig = {
   border: "solid-amber",
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
-  interaction: "static",
-  statsDisplay: "static",
   tierTreatment: "standard",
-  celebration: "none",
 };
 
 const stats: StatsData = {
@@ -471,18 +472,6 @@ describe("StudioClient render", () => {
       expect(preview.textContent).toContain('"background":"solid"');
     });
 
-    it("renders BadgePreviewCard with interactive=true by default", () => {
-      render(
-        <StudioClient
-          initialConfig={defaultConfig}
-          stats={stats}
-          impact={impact}
-        />,
-      );
-      const preview = screen.getByTestId("badge-preview");
-      expect(preview.getAttribute("data-interactive")).toBe("true");
-    });
-
     it("forwards verification to BadgePreviewCard", () => {
       render(
         <StudioClient
@@ -495,6 +484,38 @@ describe("StudioClient render", () => {
 
       expect(screen.getByTestId("badge-preview").getAttribute("data-verification")).toBe(
         "abc123:2026-08-26",
+      );
+    });
+
+    // #1191 step 6 — the preview renders the real badge SVG now, and the real
+    // badge draws the owner's avatar. Without this the preview falls back to
+    // the Chapa shield placeholder and stops looking like the shipped badge.
+    it("forwards the server-resolved avatar to BadgePreviewCard", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+          avatarDataUri="data:image/png;base64,AAAA"
+        />,
+      );
+
+      expect(screen.getByTestId("badge-preview").getAttribute("data-avatar")).toBe(
+        "data:image/png;base64,AAAA",
+      );
+    });
+
+    it("renders without an avatar when the server could not resolve one", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      expect(screen.getByTestId("badge-preview").getAttribute("data-avatar")).toBe(
+        "none",
       );
     });
 
@@ -1662,7 +1683,7 @@ describe("StudioClient render", () => {
   });
 
   describe("reduced motion", () => {
-    it("shows the reduced-motion notice and disables preview interactivity when the media query matches", () => {
+    it("shows the reduced-motion notice when the media query matches", () => {
       const original = window.matchMedia;
       window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: true,
@@ -1687,14 +1708,12 @@ describe("StudioClient render", () => {
         expect(
           screen.getByText(/Reduced motion detected/),
         ).toBeDefined();
-        const preview = screen.getByTestId("badge-preview");
-        expect(preview.getAttribute("data-interactive")).toBe("false");
       } finally {
         window.matchMedia = original;
       }
     });
 
-    it("hides the reduced-motion notice and keeps preview interactive when the media query does not match", () => {
+    it("hides the reduced-motion notice when the media query does not match", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -1704,8 +1723,6 @@ describe("StudioClient render", () => {
       );
 
       expect(screen.queryByText(/Reduced motion detected/)).toBeNull();
-      const preview = screen.getByTestId("badge-preview");
-      expect(preview.getAttribute("data-interactive")).toBe("true");
     });
   });
 
@@ -1808,3 +1825,66 @@ describe("StudioClient render", () => {
     });
   });
 });
+
+// #1216 — the v2 controls column: the save state is a pill on the preview, the
+// whole configuration is readable in one block, and the command input sticks
+// to the bottom so a long session cannot push it off-screen.
+describe("StudioClient — v2 layout (#1216)", () => {
+  it("renders the save state as a status pill", () => {
+    render(
+      <StudioClient
+        initialConfig={defaultConfig}
+        stats={stats}
+        impact={impact}
+        handle="testuser"
+      />,
+    );
+    const pill = document.querySelector("[data-save-state]") as HTMLElement;
+    expect(pill).not.toBeNull();
+    expect(pill.tagName).toBe("SPAN");
+    expect(pill.className).toContain("rounded-full");
+    expect(pill.getAttribute("role")).toBe("status");
+  });
+
+  it("lists every category in the active-config readout, keyed by its /set alias", () => {
+    render(
+      <StudioClient
+        initialConfig={defaultConfig}
+        stats={stats}
+        impact={impact}
+        handle="testuser"
+      />,
+    );
+    const readout = screen.getByTestId("studio-active-config");
+    const terms = Array.from(readout.querySelectorAll("dt")).map(
+      (dt) => dt.textContent,
+    );
+    expect(terms).toEqual([
+      "bg",
+      "card",
+      "border",
+      "score",
+      "heatmap",
+      "tier",
+    ]);
+  });
+
+  it("keeps the command input reachable at the bottom of a long session", () => {
+    render(
+      <StudioClient
+        initialConfig={defaultConfig}
+        stats={stats}
+        impact={impact}
+        handle="testuser"
+      />,
+    );
+    const input = screen.getByTestId("terminal-input");
+    const cluster = input.closest(".sticky") as HTMLElement;
+    expect(cluster).not.toBeNull();
+    expect(cluster.className).toContain("bottom-0");
+    // The log above it is bounded, so it scrolls instead of growing the column.
+    const log = screen.getByTestId("terminal-output").parentElement as HTMLElement;
+    expect(log.className).toContain("overflow-y-auto");
+  });
+});
+

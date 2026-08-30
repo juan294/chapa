@@ -46,6 +46,42 @@ export function isValidEmuHandle(handle: string): boolean {
   return EMU_HANDLE_RE.test(handle);
 }
 
+import {
+  BADGE_CONFIG_OPTIONS,
+  RETIRED_BADGE_CONFIG_KEYS,
+  type BadgeConfig,
+} from "@chapa/shared";
+
+const BADGE_CONFIG_KEYS = Object.keys(BADGE_CONFIG_OPTIONS) as (keyof typeof BADGE_CONFIG_OPTIONS)[];
+
+/**
+ * Drop the fields `BadgeConfig` used to have but no longer does (#1191).
+ *
+ * `isValidBadgeConfig` rejects extra fields, deliberately — that strictness is
+ * what stops a malformed payload reaching the database. But every Studio config
+ * saved before the three preview-only categories were dropped still carries
+ * nine keys, and validating one of those rows as-is would report it invalid and
+ * hand the owner back the default instead of the badge they saved. Stripping
+ * the retired keys first migrates a legacy row in place, on read, with no
+ * database backfill.
+ *
+ * Pure: returns a new object and never mutates its input. Anything that is not
+ * a plain object passes through unchanged for the validator to reject, and
+ * unknown fields are deliberately preserved so they still fail validation.
+ */
+export function stripRetiredBadgeConfigKeys(value: unknown): unknown {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const retired = RETIRED_BADGE_CONFIG_KEYS as readonly string[];
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      ([key]) => !retired.includes(key),
+    ),
+  );
+}
+
 /**
  * Validate a BadgeConfig object from the Creator Studio.
  *
@@ -56,10 +92,6 @@ export function isValidEmuHandle(handle: string): boolean {
  * @param value - The candidate object to validate
  * @returns `true` if the object matches the expected BadgeConfig schema exactly
  */
-import { BADGE_CONFIG_OPTIONS, type BadgeConfig } from "@chapa/shared";
-
-const BADGE_CONFIG_KEYS = Object.keys(BADGE_CONFIG_OPTIONS) as (keyof typeof BADGE_CONFIG_OPTIONS)[];
-
 export function isValidBadgeConfig(value: unknown): value is BadgeConfig {
   if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
   const obj = value as Record<string, unknown>;

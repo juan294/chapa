@@ -1,14 +1,26 @@
 import Link from "next/link";
+import type { ImpactV6Result } from "@chapa/shared";
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { CopyButton } from "@/components/CopyButton";
 import { NavbarClient } from "@/components/NavbarClient";
+import { SectionHeader } from "@/components/SectionHeader";
 import { tArray, tObject } from "@/lib/i18n/typed-accessors";
+import { interpolate } from "@/lib/i18n/interpolate";
 import { LandingUrlEffects } from "./LandingUrlEffects";
 import { LandingTerminal } from "./LandingTerminal";
 import { LoginCtaButton } from "@/components/LoginCtaButton";
 import { SiteFooter } from "@/components/SiteFooter";
 
 type TFunction = (key: string) => unknown;
+
+/** Meter colors, in the order the scoring section lists the dimensions. */
+const DIMENSION_STYLES = [
+  { key: "delivery", bar: "bg-dimension-delivery" },
+  { key: "quality", bar: "bg-dimension-quality" },
+  { key: "consistency", bar: "bg-dimension-consistency" },
+  { key: "breadth", bar: "bg-dimension-breadth" },
+  { key: "craft", bar: "bg-dimension-craft" },
+] as const;
 
 function ArrowRightIcon({ className }: { className?: string }) {
   return (
@@ -41,6 +53,27 @@ function ShieldCheckIcon({ className }: { className?: string }) {
   );
 }
 
+/** The seven archetype names, linked to their guide pages. */
+function ArchetypeLinks({
+  archetypes,
+  orConnector,
+}: {
+  archetypes: Record<string, string>;
+  orConnector: string;
+}) {
+  return (
+    <>
+      <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{archetypes.builder}</Link>,{" "}
+      <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{archetypes.guardian}</Link>,{" "}
+      <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
+      <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
+      <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
+      <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> {orConnector}{" "}
+      <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link>
+    </>
+  );
+}
+
 /* ── Page body ─────────────────────────────────────────────────── */
 
 /**
@@ -52,12 +85,20 @@ function ShieldCheckIcon({ className }: { className?: string }) {
  * re-render/flash. The one genuinely-interactive piece (the `?lang=`/`error`
  * query-param handling that must stay client-side to preserve #982's
  * static/ISR contract) is isolated in the `LandingUrlEffects` client leaf.
+ *
+ * #1215 restructured the page around a theme-aware hero band with the badge
+ * panel overlapping its lower edge, and moved every section onto the shared
+ * `SectionHeader` pattern. Type sizes come from `clamp(min, Ncqi, max)` inside
+ * `@container` wrappers, so one layout serves desktop and 390px with no
+ * breakpoint.
  */
 export function LandingContent({
   demoBadgeSvg,
+  demoImpact,
   t,
 }: {
   demoBadgeSvg: string;
+  demoImpact: ImpactV6Result;
   t: TFunction;
 }) {
   const navLinks = tArray<{ label: string; href: string }>(t, 'landing.navLinks');
@@ -65,11 +106,6 @@ export function LandingContent({
   const hero = tObject<Record<string, string | string[]>>(t, 'landing.hero');
   const heroTitle = hero.title as string;
   const heroHighlight = hero.highlight as string;
-  const heroLeadBefore = hero.leadBefore as string;
-  const heroLeadQuantify = hero.leadQuantify as string;
-  const heroLeadMiddle = hero.leadMiddle as string;
-  const heroLeadImpact = hero.leadImpact as string;
-  const heroLeadAfter = hero.leadAfter as string;
   const heroBullets = tArray<string>(t, 'landing.hero.bullets');
   const heroPrimaryCta = hero.primaryCta as string;
   const heroPrimaryCtaPending = hero.primaryCtaPending as string;
@@ -78,6 +114,7 @@ export function LandingContent({
 
   const embed = tObject<Record<string, string>>(t, 'landing.embed');
   const sections = tObject<Record<string, string>>(t, 'landing.sections');
+  const sectionMeta = tObject<Record<string, string>>(t, 'landing.sectionMeta');
   const features = tArray<{ title: string; description?: string; descriptionBefore?: string; descriptionAfter?: string }>(t, 'landing.features');
   const archetypes = tObject<Record<string, string>>(t, 'landing.archetypes');
   const steps = tArray<{ number: string; title: string; description: string }>(t, 'landing.steps');
@@ -85,7 +122,9 @@ export function LandingContent({
   const dimensions = tArray<{ title: string; description: string }>(t, 'landing.dimensions');
   const enterprise = tObject<Record<string, string>>(t, 'landing.enterprise');
   const stats = tArray<{ value: string; label: string }>(t, 'landing.stats');
-  const finalCta = tObject<Record<string, string>>(t, 'landing.finalCta');
+  const orConnector = t('common.orConnector') as string;
+  const tierLabel = t(`tiers.${demoImpact.tier.toLowerCase()}`) as string;
+  const embedSnippet = `![${embed.altText}](https://chapa.thecreativetoken.com/u/developer/badge.svg)`;
 
   return (
     <div className="bg-bg min-h-screen text-text-primary">
@@ -93,58 +132,76 @@ export function LandingContent({
       <NavbarClient navLinks={navLinks} />
 
       <main id="main-content">
-        {/* ── Terminal session ─────────────────────────────── */}
-        <div className="mx-auto max-w-4xl px-6 pt-24 pb-20 md:pt-28 md:pb-32 space-y-16 md:space-y-24">
-
-          {/* ── Hero: $ chapa ──────────────────────────────── */}
-          <section className="animate-fade-in-up motion-reduce:animate-none">
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
+        {/* ── Hero band ────────────────────────────────────────
+            Theme aware: mint in light, forest in dark. An always-dark hero
+            turned light mode into a strip around a dark slab. */}
+        <section className="bg-hero-band bg-grid-warm border-b border-stroke pt-28 pb-44 md:pt-32">
+          <div className="@container mx-auto max-w-5xl px-6">
+            <div className="flex items-center gap-2 font-heading text-xs text-terminal-dim">
+              <span>chapa@web</span>
+              <span className="select-none">~ %</span>
               <span className="text-text-secondary">chapa</span>
+              <span className="animate-cursor-blink text-amber select-none">_</span>
             </div>
-            <div className="pl-4 border-l border-stroke space-y-4">
-              <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95] text-balance">
-                {heroTitle}
-                <br />
-                <span className="text-amber">{heroHighlight}</span>
-              </h1>
-              <div className="space-y-2 font-heading text-text-secondary">
-                <p className="text-base text-text-primary font-medium text-pretty"><span className="text-amber select-none">&gt;</span> {heroLeadBefore} <span className="bg-amber/10 px-1 rounded">{heroLeadQuantify}</span> {heroLeadMiddle} <span className="bg-amber/10 px-1 rounded">{heroLeadImpact}</span> {heroLeadAfter}</p>
-                <div className="pl-5 space-y-1 text-sm">
-                  {heroBullets.map((bullet) => (
-                    <p key={bullet}><span className="text-terminal-dim select-none">&gt;</span> {bullet}</p>
-                  ))}
-                </div>
-              </div>
-              <div className="pt-4 flex flex-wrap items-center gap-3">
-                <LoginCtaButton
-                  label={heroPrimaryCta}
-                  pendingLabel={heroPrimaryCtaPending}
-                  size="sm"
-                />
-                <Link
-                  href="/verify"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement-dark pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:shadow-xl hover:shadow-complement/25"
-                >
-                  <ShieldCheckIcon className="w-4 h-4" />
-                  {heroVerifyCta}
-                  <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </div>
+            <h1 className="mt-6 font-heading text-[clamp(2.25rem,8cqi,4.5rem)] leading-[0.95] tracking-tight text-balance">
+              {heroTitle}
+              <br />
+              <span className="text-amber">{heroHighlight}</span>
+            </h1>
+            <div className="mt-6 max-w-2xl space-y-2 text-[clamp(0.9rem,1.6cqi,1.0625rem)] text-text-secondary">
+              {heroBullets.map((bullet) => (
+                <p key={bullet} className="text-pretty">{bullet}</p>
+              ))}
             </div>
-          </section>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <LoginCtaButton
+                label={heroPrimaryCta}
+                pendingLabel={heroPrimaryCtaPending}
+                size="lg"
+              />
+              <Link
+                href="/verify"
+                className="group inline-flex min-h-[52px] items-center gap-2.5 rounded-lg border border-complement pl-6 pr-5 text-sm font-semibold text-complement-text transition-colors hover:text-complement-text-hover"
+              >
+                <ShieldCheckIcon className="w-4 h-4" />
+                {heroVerifyCta}
+                <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+            </div>
 
-          {/* ── Badge Preview: $ chapa preview @developer ──── */}
-          <section id="badge-preview" className="relative z-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:200ms]">
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
-              <span className="text-text-secondary">chapa preview @developer</span>
-            </div>
-            <div className="pl-4 border-l border-stroke">
-              <div className="relative">
+            <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4">
+              {stats.map((stat) => (
+                <div key={stat.label} className="border-t border-stroke-strong pt-2">
+                  <dd className="font-heading text-3xl tabular-nums tracking-tight text-text-primary">
+                    {stat.value}
+                  </dd>
+                  <dt className="font-heading text-xs text-terminal-dim">{stat.label}</dt>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+
+        {/* ── Badge preview: overlaps the band's lower edge ───── */}
+        <section id="badge-preview" className="relative z-10 -mt-32">
+          <div className="mx-auto max-w-5xl px-6">
+            <SectionHeader
+              command="chapa preview @developer"
+              meta={sectionMeta.preview}
+            />
+            {/* Always dark in both themes: the badge is a server-rendered
+                artifact, and this panel is its frame. */}
+            <div className="overflow-hidden rounded-2xl border border-forest-line bg-forest shadow-card">
+              <div className="flex items-center gap-2 border-b border-forest-line px-4 py-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-forest-err/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-forest-warn/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-forest-ok/60" />
+                <span className="ml-2 font-heading text-xs text-forest-dim">badge.svg</span>
+              </div>
+              <div className="relative max-h-[360px] aspect-[16/5]">
                 {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded demo data (DEMO_STATS, DEMO_IMPACT) — no user input reaches this point. See lib/render/escape.ts for escaping. */}
                 <div
-                  className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+                  className="h-full [&>svg]:h-full [&>svg]:w-full"
                   role="img"
                   aria-label={heroBadgePreviewLabel}
                   dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
@@ -152,258 +209,195 @@ export function LandingContent({
                 <BadgeOverlay />
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          {/* ── Embed: $ chapa embed ──────────────────────── */}
-          <section className="animate-fade-in-up motion-reduce:animate-none [animation-delay:400ms]">
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
-              <span className="text-text-secondary">chapa embed</span>
-            </div>
-            <div className="pl-4 border-l border-stroke">
-              <div className="rounded-xl border border-stroke bg-card overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
-                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
-                  <span className="ml-2 text-xs text-text-secondary font-heading">
-                    {embed.windowLabel}
-                  </span>
-                  <div className="ml-auto">
-                    <CopyButton text={`![${embed.altText}](https://chapa.thecreativetoken.com/u/developer/badge.svg)`} />
-                  </div>
-                </div>
-                <div className="p-4 font-heading text-sm leading-relaxed">
-                  <p className="text-text-secondary">
-                    <span className="text-amber/50">{"<!-- "}</span>
-                    {embed.comment}
-                    <span className="text-amber/50">{" -->"}</span>
-                  </p>
-                  <p className="text-text-primary/80 mt-1">
-                    <span className="text-amber">{`![${embed.altText}](`}</span>
-                    <span className="text-text-secondary">
-                      {"chapa.thecreativetoken.com/u/"}
-                    </span>
-                    <span className="text-amber/70">{"developer"}</span>
-                    <span className="text-amber">{"/badge.svg)"}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Features: $ chapa features ────────────────── */}
-          <section id="features" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:600ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.features}</h2>
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
-              <span className="text-text-secondary">chapa features</span>
-            </div>
-            <div className="pl-4 border-l border-stroke space-y-4">
-              {features.map((feature) => (
-                <div key={feature.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+        <div className="mx-auto max-w-5xl px-6 pt-20 pb-24 space-y-20">
+          {/* ── Features ─────────────────────────────────────── */}
+          <section id="features">
+            <SectionHeader
+              command="chapa features"
+              title={sections.features}
+              meta={
+                <>
+                  <span className="text-terminal-green">&#10003;</span>{" "}
+                  {interpolate(sectionMeta.features!, { count: String(features.length) })}
+                </>
+              }
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              {features.map((feature, index) => (
+                <div
+                  key={feature.title}
+                  // min-w-0: a grid item defaults to min-width:auto, so the
+                  // embed snippet's content width would set the track width and
+                  // push the whole page wider than a phone screen (#1224).
+                  className={`min-w-0 rounded-xl border border-stroke bg-card p-5 ${
+                    index === features.length - 1 ? "sm:col-span-2" : ""
+                  }`}
+                >
+                  <h3 className="font-heading text-sm lowercase text-amber">
                     {feature.title}
-                  </span>
-                  <span className="text-text-secondary text-sm">
+                  </h3>
+                  <p className="mt-2 text-sm text-pretty text-text-secondary">
                     {"description" in feature ? (
                       feature.description
                     ) : (
                       <>
                         {feature.descriptionBefore} —{" "}
-                        <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{archetypes.builder}</Link>,{" "}
-                        <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{archetypes.guardian}</Link>,{" "}
-                        <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
-                        <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
-                        <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
-                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> {t('common.orConnector') as string}{" "}
-                        <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link> — {feature.descriptionAfter}
+                        <ArchetypeLinks archetypes={archetypes} orConnector={orConnector} />{" "}
+                        — {feature.descriptionAfter}
                       </>
                     )}
-                  </span>
+                  </p>
+                  {index === features.length - 1 && (
+                    <div className="mt-4 flex items-center gap-3 overflow-hidden rounded-lg border border-stroke bg-bg px-3 py-2">
+                      {/* min-w-0 is load-bearing: a flex item defaults to min-width:auto,
+                          so without it overflow-x-auto never engages, the snippet
+                          holds the row at its full content width, and the page
+                          forces a layout viewport wider than a phone screen -
+                          which pushes the navbar controls off-screen (#1224). */}
+                      <pre className="min-w-0 flex-1 overflow-x-auto font-heading text-xs text-text-secondary">
+                        <span className="text-amber">{`![${embed.altText}]`}</span>
+                        {"(chapa.thecreativetoken.com/u/"}
+                        <span className="text-amber/70">developer</span>
+                        {"/badge.svg)"}
+                      </pre>
+                      <CopyButton text={embedSnippet} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </section>
 
-          {/* ── Cómo funciona: $ chapa explain ─────────────── */}
-          <section id="how-it-works" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:800ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.howItWorks}</h2>
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
-              <span className="text-text-secondary">chapa explain</span>
-            </div>
-            <div className="pl-4 border-l border-stroke space-y-6">
+          {/* ── How it works ─────────────────────────────────── */}
+          <section id="how-it-works">
+            <SectionHeader
+              command="chapa explain"
+              title={sections.howItWorks}
+              meta={interpolate(sectionMeta.explain!, { count: String(steps.length) })}
+            />
+            <ol className="grid gap-4 sm:grid-cols-3">
               {steps.map((step) => (
-                <div key={step.number} className="flex gap-4 items-start">
-                  <span className="font-heading text-amber text-lg shrink-0">
+                <li key={step.number} className="rounded-xl border border-stroke bg-card p-5">
+                  <span className="font-heading text-2xl tabular-nums text-amber">
                     {step.number}
                   </span>
-                  <div>
-                    <p className="font-heading text-text-primary text-sm font-medium">
-                      {step.title}
-                    </p>
-                    <p className="text-text-secondary text-sm mt-1">
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
+                  <h3 className="mt-3 font-heading text-sm text-text-primary">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-pretty text-text-secondary">
+                    {step.description}
+                  </p>
+                </li>
               ))}
-
-              <div className="pt-4 space-y-4">
-                <h3 className="font-heading text-sm text-text-primary font-medium">
-                  {measure.title}
-                </h3>
-                <p className="text-text-secondary text-sm text-pretty">
-                  {measure.descriptionBefore}{" "}
-                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{archetypes.builder}</Link>,{" "}
-                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{archetypes.guardian}</Link>,{" "}
-                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
-                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
-                  <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
-                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> {t('common.orConnector') as string}{" "}
-                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link>.
-                </p>
-                {dimensions.map((dim) => (
-                  <div key={dim.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                    <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
-                      {dim.title}
-                    </span>
-                    <span className="text-text-secondary text-sm">
-                      {dim.description}
-                    </span>
-                  </div>
-                ))}
-                <Link
-                  href="/about/scoring"
-                  className="inline-flex items-center gap-1 text-sm text-amber hover:text-amber-light transition-colors font-heading"
-                >
-                  {measure.methodologyLink}
-                  <ArrowRightIcon className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
+            </ol>
           </section>
 
-          {/* ── Enterprise: $ chapa enterprise ────────────── */}
-          <section id="enterprise" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:900ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.enterprise}</h2>
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
-              <span className="text-text-secondary">chapa enterprise</span>
-            </div>
-            <div className="pl-4 border-l border-stroke space-y-5">
+          {/* ── Scoring: a meter list, not prose ─────────────── */}
+          <section id="scoring">
+            <SectionHeader
+              command="chapa score @developer"
+              title={measure.title}
+              meta={interpolate(sectionMeta.score!, {
+                score: String(demoImpact.adjustedComposite),
+                tier: tierLabel.toLowerCase(),
+              })}
+            />
+            <p className="mb-6 max-w-3xl text-sm text-pretty text-text-secondary">
+              {measure.descriptionBefore}{" "}
+              <ArchetypeLinks archetypes={archetypes} orConnector={orConnector} />.
+            </p>
+            <ul className="space-y-3">
+              {DIMENSION_STYLES.map(({ key, bar }, index) => {
+                const value = demoImpact.dimensions[key];
+                const dimension = dimensions[index];
+                if (value === undefined || !dimension) return null;
+                return (
+                  <li key={key} className="flex items-center gap-4">
+                    <span className="w-28 shrink-0 font-heading text-xs lowercase text-text-secondary">
+                      {dimension.title}
+                    </span>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-track">
+                      <span
+                        className={`block h-full rounded-full ${bar}`}
+                        style={{ width: `${value}%` }}
+                      />
+                    </span>
+                    <span className="w-10 shrink-0 text-right font-heading text-sm tabular-nums text-text-primary">
+                      {value}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <Link
+              href="/about/scoring"
+              className="mt-6 inline-flex items-center gap-1 font-heading text-sm text-amber transition-colors hover:text-amber-light"
+            >
+              {measure.methodologyLink}
+              <ArrowRightIcon className="w-3.5 h-3.5" />
+            </Link>
+          </section>
+
+          {/* ── Enterprise ───────────────────────────────────── */}
+          <section id="enterprise">
+            <SectionHeader
+              command="chapa enterprise"
+              title={sections.enterprise}
+              meta={sectionMeta.enterprise}
+            />
+            <div className="grid gap-6 md:grid-cols-2">
               <div>
-                <h3 className="font-heading text-lg tracking-tight text-text-primary">
+                <h3 className="font-heading text-xl tracking-tight text-balance">
                   {enterprise.title} <span className="text-amber">{enterprise.highlight}</span>
                 </h3>
-                <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl text-pretty">
+                <p className="mt-3 text-sm leading-relaxed text-pretty text-text-secondary">
                   {enterprise.description}
                 </p>
+                <dl className="mt-5 space-y-3 text-sm">
+                  <div>
+                    <dt className="font-heading text-xs lowercase text-dimension-delivery">{enterprise.whatItDoes}</dt>
+                    <dd className="text-text-secondary">{enterprise.whatItDoesText}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-heading text-xs lowercase text-dimension-consistency">{enterprise.howToUse}</dt>
+                    <dd className="text-text-secondary">
+                      {enterprise.howToUseTextBefore}{" "}
+                      <code className="rounded bg-amber/10 px-1.5 py-0.5 font-heading text-xs text-text-primary">
+                        npx chapa-cli
+                      </code>{" "}
+                      {enterprise.howToUseTextAfter}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-heading text-xs lowercase text-dimension-breadth">{enterprise.noEmu}</dt>
+                    <dd className="text-text-secondary">{enterprise.noEmuText}</dd>
+                  </div>
+                </dl>
               </div>
 
-              <div className="rounded-xl border border-stroke bg-card overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
-                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
-                  <span className="ml-2 text-xs text-text-secondary font-heading">
-                    terminal
-                  </span>
-                </div>
-                <div className="p-4 font-heading text-sm leading-relaxed space-y-1">
-                  <p>
-                    <span className="text-terminal-dim select-none">$ </span>
-                    <span className="text-text-primary/80">npx chapa-cli</span>
-                  </p>
-                  <p className="text-terminal-green">
-                    <span className="text-terminal-dim select-none">&gt; </span>
-                    {enterprise.terminalAuthenticated}
-                  </p>
-                  <p className="text-terminal-green">
-                    <span className="text-terminal-dim select-none">&gt; </span>
-                    {enterprise.terminalFound}
-                  </p>
-                  <p className="text-terminal-green">
-                    <span className="text-terminal-dim select-none">&gt; </span>
-                    {enterprise.terminalMerged}
-                  </p>
-                </div>
+              {/* The CLI transcript stays dark in both themes: it is a
+                  terminal, not a page surface. */}
+              <div className="self-start rounded-xl border border-forest-line bg-forest p-4 font-heading text-sm leading-relaxed">
+                <p className="text-forest-text">
+                  <span className="select-none text-forest-dim">$ </span>
+                  npx chapa-cli
+                </p>
+                <p className="mt-1 text-forest-ok">
+                  <span className="select-none text-forest-dim">&gt; </span>
+                  {enterprise.terminalAuthenticated}
+                </p>
+                <p className="text-forest-ok">
+                  <span className="select-none text-forest-dim">&gt; </span>
+                  {enterprise.terminalFound}
+                </p>
+                <p className="text-forest-ok">
+                  <span className="select-none text-forest-dim">&gt; </span>
+                  {enterprise.terminalMerged}
+                </p>
               </div>
-
-              <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-dimension-delivery font-heading text-sm shrink-0 sm:w-48">
-                    {enterprise.whatItDoes}
-                  </span>
-                  <span className="text-text-secondary text-sm">
-                    {enterprise.whatItDoesText}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-dimension-consistency font-heading text-sm shrink-0 sm:w-48">
-                    {enterprise.howToUse}
-                  </span>
-                  <span className="text-text-secondary text-sm">
-                    {enterprise.howToUseTextBefore}{" "}
-                    <code className="font-heading text-text-primary/80 bg-amber/10 px-1.5 py-0.5 rounded text-xs">
-                      npx chapa-cli
-                    </code>{" "}
-                    {enterprise.howToUseTextAfter}
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-dimension-breadth font-heading text-sm shrink-0 sm:w-48">
-                    {enterprise.noEmu}
-                  </span>
-                  <span className="text-text-secondary text-sm">
-                    {enterprise.noEmuText}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Stats: $ chapa stats ──────────────────────── */}
-          <section id="stats" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1100ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.stats}</h2>
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
-              <span className="text-text-secondary">chapa stats</span>
-            </div>
-            <div className="pl-4 border-l border-stroke">
-              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-4 font-heading text-sm">
-                {stats.map((stat, i) => (
-                  <span key={stat.label} className="flex items-baseline gap-2">
-                    <span className="text-3xl sm:text-4xl tracking-tight text-amber tabular-nums">
-                      {stat.value}
-                    </span>
-                    <span className="text-text-secondary">{stat.label}</span>
-                    {i < stats.length - 1 && (
-                      <span className="text-terminal-dim ml-4">|</span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* ── CTA: $ chapa login ────────────────────────── */}
-          <section className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1300ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.getStarted}</h2>
-            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-              <span className="text-terminal-dim select-none">$</span>
-              <span className="text-text-secondary">chapa login</span>
-            </div>
-            <div className="pl-4 border-l border-stroke space-y-6">
-              <p className="text-text-secondary text-sm">
-                {finalCta.prompt}
-              </p>
-              <LoginCtaButton
-                label={finalCta.button as string}
-                pendingLabel={finalCta.buttonPending as string}
-                size="lg"
-              />
             </div>
           </section>
         </div>
@@ -413,7 +407,7 @@ export function LandingContent({
       </main>
 
       {/* ── Footer ─────────────────────────────────────────── */}
-      <SiteFooter t={t} />
+      <SiteFooter t={t} showCta />
     </div>
   );
 }

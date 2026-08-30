@@ -1,5 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { resolveBadgeConfig } from "@/lib/render/badge-config";
+import { resolveBadgeLocale } from "@/lib/render/badge-locale";
+import { DEFAULT_LOCALE, isSupportedLocale } from "@/lib/i18n/types";
+import type { Locale } from "@/lib/i18n/types";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
 import { svgToPng } from "@/lib/render/svg-to-png";
@@ -38,7 +42,14 @@ export async function GET(
   }
 
   const today = toDateString(new Date());
-  const ogCacheKey = `og-image:v2:${handle}:${today}`;
+  // #1190 — the OG image is credential-less and publicly cacheable, exactly
+  // like badge.svg, so locale comes from `?lang=` rather than the cookie
+  // chain. It MUST be in the cache key: without it whichever locale rendered
+  // first won the day's slot and every other locale was served that PNG.
+  const lang = request.nextUrl.searchParams.get("lang");
+  const locale: Locale = isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
+  const badgeLocale = resolveBadgeLocale(locale);
+  const ogCacheKey = `og-image:v3:${handle}:${today}:${locale}`;
 
   // PE-L1: Cache-first — serve warm-cache PNG without the rate-limit round-trip.
   // Rate limiting is deferred to the cache-MISS branch (expensive path only).
@@ -85,11 +96,15 @@ export async function GET(
 
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
+      config: await resolveBadgeConfig(handle),
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
       // Rasterized to PNG below — SMIL <animate> never runs during rasterization,
       // so animated heatmap cells would render invisible (stuck at opacity 0). (#760)
       disableAnimation: true,
+      // Same resolved bundle that produced ogCacheKey above, so the image and
+      // the key it is stored under are always for the same locale (#1190).
+      strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
     });
 
     const png = await withTimeout(

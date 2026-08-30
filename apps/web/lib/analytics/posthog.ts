@@ -1,4 +1,6 @@
-import type PostHog from "posthog-js";
+// Types come from the same slim build the provider loads (#1197), so the
+// stored instance's type can never claim methods that build does not ship.
+import type PostHog from "posthog-js/dist/module.slim.js";
 
 let _posthog: typeof PostHog | null = null;
 

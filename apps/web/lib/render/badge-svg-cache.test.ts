@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CACHE_VERSION } from "@/lib/cache/version";
-import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@/lib/i18n/types";
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn(),
+  cacheDel: vi.fn(),
 }));
 
 import {
@@ -13,6 +14,7 @@ import {
   buildBadgeSvgCacheKey,
   buildBadgeSvgRenderLockKey,
   handleCacheJitterSeconds,
+  invalidateBadgeSvgCacheForHandle,
   readBadgeSvgCache,
   readBadgeSvgCacheWithStatus,
   writeBadgeSvgCache,
@@ -37,7 +39,9 @@ describe("badge-svg-cache", () => {
     // for an unqualified (no ?lang=) request.
     it("includes the badge renderer version and locale so visual/locale changes bypass stale SVGs", () => {
       const key = buildBadgeSvgCacheKey("Octocat", "2026-05-01");
-      expect(BADGE_RENDER_VARIANT).toBe("warm-amber-v3");
+      // #1225 bumped this from "warm-amber-v3": converging the badge onto the
+      // Jade palette changed the rendered bytes, so every cached SVG must miss.
+      expect(BADGE_RENDER_VARIANT).toBe("jade-v1");
       expect(key).toBe(
         `badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:${DEFAULT_LOCALE}`,
       );
@@ -267,5 +271,38 @@ describe("badge-svg-cache", () => {
       // given the wide jitter space (7201 possible values).
       expect(ttl1).not.toBe(ttl2);
     });
+  });
+});
+
+// #1191 — the badge cache key carries handle/variant/date/locale but nothing
+// about the inputs, so anything that changes what the badge should look like
+// has to invalidate explicitly. Two triggers do: platform link/unlink (#856)
+// and saving a Studio config (#1191). Both go through this one helper.
+describe("invalidateBadgeSvgCacheForHandle (#1191)", () => {
+  it("deletes one entry per supported locale", async () => {
+    const { cacheDel } = await import("@/lib/cache/redis");
+    vi.mocked(cacheDel).mockClear();
+
+    await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
+
+    const deleted = vi.mocked(cacheDel).mock.calls.map(([key]) => key);
+    expect(deleted).toHaveLength(SUPPORTED_LOCALES.length);
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(deleted).toContain(
+        buildBadgeSvgCacheKey("Octocat", "2026-08-30", locale),
+      );
+    }
+  });
+
+  it("lowercases the handle the same way the key builder does", async () => {
+    const { cacheDel } = await import("@/lib/cache/redis");
+    vi.mocked(cacheDel).mockClear();
+
+    await invalidateBadgeSvgCacheForHandle("MixedCase", "2026-08-30");
+
+    for (const key of vi.mocked(cacheDel).mock.calls.map(([k]) => k)) {
+      expect(key).toContain("mixedcase");
+      expect(key).not.toContain("MixedCase");
+    }
   });
 });

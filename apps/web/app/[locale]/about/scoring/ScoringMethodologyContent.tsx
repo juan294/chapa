@@ -3,6 +3,8 @@ import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { SiteFooter } from "@/components/SiteFooter";
 import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
 import { tArray } from "@/lib/i18n/typed-accessors";
+import { ContentPageHeader } from "@/components/content/ContentPageHeader";
+import { OnThisPageIndex } from "@/components/content/OnThisPageIndex";
 
 type TFunction = (key: string) => unknown;
 
@@ -10,9 +12,23 @@ type TFunction = (key: string) => unknown;
 /* Reusable sub-components                                                 */
 /* ---------------------------------------------------------------------- */
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+/**
+ * #1218 — sections carry a stable anchor id so the sticky index can link to
+ * them and observe them, and a rule underneath so the page reads as a document
+ * with parts rather than one continuous column of prose.
+ */
+function SectionHeading({
+  id,
+  children,
+}: {
+  id?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <h2 className="font-heading text-xl sm:text-2xl font-semibold text-text-primary tracking-tight pt-8 pb-2">
+    <h2
+      id={id}
+      className="scroll-mt-28 border-b border-stroke-strong pt-10 pb-2 font-heading text-xl font-semibold tracking-tight text-text-primary sm:text-2xl"
+    >
       {children}
     </h2>
   );
@@ -68,6 +84,32 @@ function Table({
   );
 }
 
+
+/**
+ * The sticky index's entries. Ids match the SectionHeading anchors below; the
+ * labels come from the same dictionary keys the headings render, so the index
+ * can never drift out of sync with the page it indexes.
+ */
+const SECTION_KEYS = [
+  ["scoring-philosophy", "sectionPhilosophy"],
+  ["scoring-normalization", "sectionNormalization"],
+  ["scoring-caps", "sectionCaps"],
+  ["scoring-dimensions", "sectionDimensions"],
+  ["scoring-craft", "sectionCraft"],
+  ["scoring-archetypes", "sectionArchetypes"],
+  ["scoring-composite", "sectionComposite"],
+  ["scoring-confidence", "sectionConfidence"],
+  ["scoring-smoothing", "sectionSmoothing"],
+  ["scoring-excludes", "sectionExcludes"],
+] as const;
+
+function SECTION_INDEX(t: TFunction) {
+  return SECTION_KEYS.map(([id, key]) => ({
+    id,
+    label: t(`about.scoring.${key}`) as string,
+  }));
+}
+
 /* ---------------------------------------------------------------------- */
 /* Page                                                                    */
 /* ---------------------------------------------------------------------- */
@@ -87,17 +129,14 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
 
       <main
         id="main-content"
-        className="relative mx-auto max-w-3xl px-6 pt-32 pb-24"
+        className="relative mx-auto max-w-5xl px-6 pt-32 pb-24"
       >
-        <div className="relative">
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-4 animate-fade-in-up">
-            {t('about.scoring.h1') as string}
-            <span className="text-amber animate-cursor-blink">_</span>
-          </h1>
-
-          <p className="text-text-secondary text-lg mb-8 animate-fade-in-up [animation-delay:100ms]">
-            {t('about.scoring.intro') as string}
-          </p>
+        <div className="@container relative">
+          <ContentPageHeader
+            command="chapa explain --scoring"
+            title={t('about.scoring.h1') as string}
+            intro={t('about.scoring.intro') as string}
+          />
 
           {/* ---------------------------------------------------------- */}
           {/* Video explainer                                              */}
@@ -130,11 +169,16 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             </p>
           </div>
 
-          <div className="space-y-2 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:200ms]">
+          <div className="grid gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
+          <OnThisPageIndex
+            items={SECTION_INDEX(t)}
+            heading={t('content.onThisPage') as string}
+          />
+          <div className="min-w-0 space-y-2 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:200ms]">
             {/* ---------------------------------------------------------- */}
             {/* Philosophy                                                  */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionPhilosophy') as string}</SectionHeading>
+            <SectionHeading id="scoring-philosophy">{t('about.scoring.sectionPhilosophy') as string}</SectionHeading>
             <p>
               {t('about.scoring.philosophyBody1') as string}
             </p>
@@ -149,7 +193,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* Normalization                                               */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionNormalization') as string}</SectionHeading>
+            <SectionHeading id="scoring-normalization">{t('about.scoring.sectionNormalization') as string}</SectionHeading>
             <p>
               {t('about.scoring.normalizationBody') as string}
               <strong className="text-text-primary">
@@ -167,7 +211,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* Caps                                                        */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionCaps') as string}</SectionHeading>
+            <SectionHeading id="scoring-caps">{t('about.scoring.sectionCaps') as string}</SectionHeading>
             <p>
               {t('about.scoring.capsBody') as string}
             </p>
@@ -179,7 +223,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* The dimensions                                               */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionDimensions') as string}</SectionHeading>
+            <SectionHeading id="scoring-dimensions">{t('about.scoring.sectionDimensions') as string}</SectionHeading>
             <p>
               {t('about.scoring.dimensionsBody') as string}
             </p>
@@ -251,7 +295,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* Craft dimension                                             */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionCraft') as string}</SectionHeading>
+            <SectionHeading id="scoring-craft">{t('about.scoring.sectionCraft') as string}</SectionHeading>
             <p>
               {t('about.scoring.craftIntro') as string}
             </p>
@@ -274,7 +318,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* Archetypes                                                  */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionArchetypes') as string}</SectionHeading>
+            <SectionHeading id="scoring-archetypes">{t('about.scoring.sectionArchetypes') as string}</SectionHeading>
             <p>
               {t('about.scoring.archetypesIntro') as string}
             </p>
@@ -289,7 +333,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* Composite score and tiers                                   */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionComposite') as string}</SectionHeading>
+            <SectionHeading id="scoring-composite">{t('about.scoring.sectionComposite') as string}</SectionHeading>
             <p>
               {t('about.scoring.compositeIntro') as string}
             </p>
@@ -313,7 +357,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* Confidence system                                           */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionConfidence') as string}</SectionHeading>
+            <SectionHeading id="scoring-confidence">{t('about.scoring.sectionConfidence') as string}</SectionHeading>
             <p>
               {t('about.scoring.confidenceIntro1Prefix') as string}
               <strong className="text-text-primary">{t('about.scoring.confidenceIntro1Highlight') as string}</strong>
@@ -340,7 +384,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* Score smoothing                                             */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionSmoothing') as string}</SectionHeading>
+            <SectionHeading id="scoring-smoothing">{t('about.scoring.sectionSmoothing') as string}</SectionHeading>
             <p>
               {t('about.scoring.smoothingIntro1Prefix') as string}
               <strong className="text-text-primary">
@@ -358,7 +402,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* What we don't use                                           */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>{t('about.scoring.sectionExcludes') as string}</SectionHeading>
+            <SectionHeading id="scoring-excludes">{t('about.scoring.sectionExcludes') as string}</SectionHeading>
             <p>
               {t('about.scoring.excludesIntro') as string}
             </p>
@@ -406,6 +450,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
                 </a>
               </div>
             </div>
+          </div>
           </div>
         </div>
       </main>

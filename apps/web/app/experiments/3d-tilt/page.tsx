@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { BadgeContent } from "@/components/badge/BadgeContent";
 import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
@@ -150,7 +150,6 @@ export default function TiltExperimentPage() {
       id="main-content"
       className="flex min-h-screen flex-col items-center bg-bg px-6 py-16"
     >
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
         className="pointer-events-none fixed left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber/[0.04] blur-[150px]"

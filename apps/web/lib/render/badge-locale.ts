@@ -1,6 +1,7 @@
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { BadgeI18nStrings } from "./BadgeSvg";
+import { buildBadgeI18nStrings } from "./badge-i18n-strings";
 import { buildBadgeSvgCacheKey, buildBadgeSvgRenderLockKey } from "./badge-svg-cache";
 
 /**
@@ -47,28 +48,13 @@ export interface ResolvedBadgeLocale {
 export function resolveBadgeLocale(locale: Locale): ResolvedBadgeLocale {
   const t = getServerT(locale);
 
-  const baseStrings: Omit<BadgeI18nStrings, "tierLabel"> = {
-    metricsSimulated: t("badge.metricsSimulated") as string,
-    metricsVerified: t("badge.metricsVerified") as string,
-    metricsPublic: t("badge.metricsPublic") as string,
-    radarLabels: {
-      delivery: t("dimensions.delivery.label") as string,
-      quality: t("dimensions.quality.label") as string,
-      consistency: t("dimensions.consistency.label") as string,
-      breadth: t("dimensions.breadth.label") as string,
-      craft: t("dimensions.craft.label") as string,
-    },
-    radarNoData: t("badge.radarNoData") as string,
-    verifiedLabel: t("badge.verifiedLabel") as string,
-    sampleDisclosure: t("badge.sampleDisclosure") as string,
-  };
-
   return {
     locale,
-    stringsFor: (tier: string): BadgeI18nStrings => ({
-      ...baseStrings,
-      tierLabel: t(`tiers.${tier.toLowerCase()}`) as string,
-    }),
+    // The key list lives in `buildBadgeI18nStrings` because Creator Studio's
+    // in-browser preview needs the same bundle and cannot reach `getServerT`
+    // (#1191 step 6).
+    stringsFor: (tier: string): BadgeI18nStrings =>
+      buildBadgeI18nStrings(t, tier),
     cacheKey: (handle, date) => buildBadgeSvgCacheKey(handle, date, locale),
     renderLockKey: (handle, date) => buildBadgeSvgRenderLockKey(handle, date, locale),
   };

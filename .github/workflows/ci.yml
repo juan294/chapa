@@ -48,45 +48,6 @@ jobs:
         id: vercel-config
         run: pnpm run check:vercel-config
 
-      - name: Write lint and configuration evidence
-        if: always()
-        env:
-          PRODUCER_STATUS: ${{ job.status }}
-          VERCEL_CONFIG_STATUS: ${{ steps.vercel-config.outcome }}
-        run: |
-          mkdir -p .release-evidence
-          STATUS="$PRODUCER_STATUS"
-          REASON="Lint, typecheck, and configuration checks completed."
-          if [ "$STATUS" != "success" ]; then
-            STATUS="failed"
-            REASON="One or more lint, typecheck, or configuration checks failed."
-          else
-            STATUS="passed"
-          fi
-          EVIDENCE_URI="github-actions://${{ github.repository }}/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs/lint-and-typecheck"
-          jq -n \
-            --arg status "$STATUS" \
-            --arg reason "$REASON" \
-            --arg runId "${{ github.run_id }}" \
-            --arg commitSha "${{ github.sha }}" \
-            --arg evidenceUri "$EVIDENCE_URI" \
-            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion: 1, runId: $runId, environment: "ci-build", candidateIdentity: $commitSha,
-              results: [{scenarioId: "operations.vercel-cron-registration",
-                environment: "ci-build", status: $status,
-                startedAt: $generatedAt, finishedAt: $generatedAt, runner: "script",
-                evidence: {configuration: [$evidenceUri]}, fixtures: [], notes: $reason}]}' \
-            > .release-evidence/lint-and-vercel-config.json
-
-      - name: Upload lint and configuration evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-lint-and-typecheck
-          path: .release-evidence/lint-and-vercel-config.json
-          if-no-files-found: error
-          retention-days: 30
-
   # WHY sharded (#ci-perf): the unit+coverage suite is a CPU-bound ~5.5min
   # `vitest run --coverage` on a 2-core runner. Splitting it across 2 shards
   # (each ~half the wall-clock) roughly halves the unit-test critical path.
@@ -278,54 +239,6 @@ jobs:
             echo "No scoring files changed — skipping integrity gate"
           fi
 
-      - name: Write aggregate unit and coverage evidence
-        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
-        env:
-          PRODUCER_STATUS: ${{ job.status }}
-          SHARD_STATUS: ${{ needs.test-shard.result }}
-          MERGE_STATUS: ${{ steps.test.outcome }}
-          TEST_COUNT: ${{ steps.test.outputs.test_count }}
-          TESTS_PASSED: ${{ steps.test.outputs.tests_passed }}
-          TESTS_FAILED: ${{ steps.test.outputs.tests_failed }}
-        run: |
-          mkdir -p .release-evidence
-          STATUS="passed"
-          REASON="Aggregate unit tests and coverage thresholds passed."
-          if [ "$PRODUCER_STATUS" != "success" ] || [ "$SHARD_STATUS" != "success" ] || [ "$MERGE_STATUS" != "success" ]; then
-            STATUS="failed"
-            REASON="A unit-test shard, merged test run, or coverage threshold failed."
-          fi
-          jq -n \
-            --arg scenarioId "ci.unit-and-coverage" \
-            --arg status "$STATUS" \
-            --arg reason "$REASON" \
-            --arg repository "${{ github.repository }}" \
-            --arg runId "${{ github.run_id }}" \
-            --arg runAttempt "${{ github.run_attempt }}" \
-            --arg jobName "Test" \
-            --arg commitSha "${{ github.sha }}" \
-            --arg shardStatus "$SHARD_STATUS" \
-            --arg mergeStatus "$MERGE_STATUS" \
-            --arg testCount "${TEST_COUNT:-0}" \
-            --arg testsPassed "${TESTS_PASSED:-0}" \
-            --arg testsFailed "${TESTS_FAILED:-0}" \
-            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
-              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
-                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
-              details: {shardStatus: $shardStatus, mergeStatus: $mergeStatus, testCount: $testCount,
-                testsPassed: $testsPassed, testsFailed: $testsFailed}, generatedAt: $generatedAt}' \
-            > .release-evidence/unit-and-coverage.json
-
-      - name: Upload aggregate unit and coverage evidence
-        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-test
-          path: .release-evidence/unit-and-coverage.json
-          if-no-files-found: error
-          retention-days: 30
-
   contract:
     name: Contract (real DB)
     needs: develop_push_source
@@ -396,55 +309,6 @@ jobs:
           E2E_PRO_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
         run: pnpm --filter @chapa/web exec playwright test e2e/journey.spec.ts --project=chromium --project=mobile
 
-      - name: Write contract and local journey evidence
-        if: always()
-        env:
-          PRODUCER_STATUS: ${{ job.status }}
-          CONTRACT_STATUS: ${{ steps.contract-tests.outcome }}
-          JOURNEY_STATUS: ${{ steps.journey.outcome }}
-        run: |
-          mkdir -p .release-evidence
-          STATUS="passed"
-          REASON="Contract tests and local-Supabase journey passed."
-          if [ "$PRODUCER_STATUS" != "success" ] || [ "$CONTRACT_STATUS" != "success" ] || [ "$JOURNEY_STATUS" != "success" ]; then
-            STATUS="failed"
-            REASON="Contract setup, contract tests, or local-Supabase journey did not pass."
-          fi
-          EVIDENCE_URI="github-actions://${{ github.repository }}/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/artifacts/release-evidence-contract"
-          jq -n \
-            --arg status "$STATUS" \
-            --arg reason "$REASON" \
-            --arg runId "${{ github.run_id }}" \
-            --arg commitSha "${{ github.sha }}" \
-            --arg evidenceUri "$EVIDENCE_URI" \
-            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion: 1, runId: $runId, environment: "local-contract",
-              candidateIdentity: $commitSha,
-              results: [
-                {scenarioId: "studio.config-persistence",
-                  environment: "local-contract", status: $status,
-                  startedAt: $generatedAt, finishedAt: $generatedAt, runner: "playwright",
-                  evidence: {ui: [$evidenceUri], http: [$evidenceUri], datastore: [$evidenceUri], cleanup: [$evidenceUri]},
-                  fixtures: [], notes: $reason},
-                {scenarioId: "profile.snapshot-integrity",
-                  environment: "local-contract", status: $status,
-                  startedAt: $generatedAt, finishedAt: $generatedAt, runner: "playwright",
-                  evidence: {http: [$evidenceUri], datastore: [$evidenceUri], cleanup: [$evidenceUri]},
-                  fixtures: [], notes: $reason}
-              ]}' \
-            > .release-evidence/contract-and-local-journey.json
-
-      - name: Upload contract and local journey evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-contract
-          path: |
-            .release-evidence/contract-and-local-journey.json
-            apps/web/test-results/**/release-evidence.json
-          if-no-files-found: error
-          retention-days: 30
-
   build:
     name: Build
     # WHY only lint-and-typecheck (#ci-perf): the build consumes a green
@@ -483,47 +347,6 @@ jobs:
           path: apps/web/.next/
           include-hidden-files: true
           retention-days: 1
-
-      - name: Write build evidence
-        if: always()
-        env:
-          PRODUCER_STATUS: ${{ job.status }}
-          BUILD_STATUS: ${{ steps.build.outcome }}
-        run: |
-          mkdir -p .release-evidence
-          STATUS="passed"
-          REASON="Candidate build and bundle-size gate passed."
-          if [ "$PRODUCER_STATUS" != "success" ] || [ "$BUILD_STATUS" != "success" ]; then
-            STATUS="failed"
-            REASON="Candidate build or bundle-size gate did not pass."
-          fi
-          jq -n \
-            --arg scenarioId "ci.build-artifact" \
-            --arg status "$STATUS" \
-            --arg reason "$REASON" \
-            --arg repository "${{ github.repository }}" \
-            --arg runId "${{ github.run_id }}" \
-            --arg runAttempt "${{ github.run_attempt }}" \
-            --arg jobName "Build" \
-            --arg commitSha "${{ github.sha }}" \
-            --arg buildStatus "$BUILD_STATUS" \
-            --arg artifactName "nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}" \
-            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
-              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
-                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
-              details: {buildStatus: $buildStatus, artifactName: $artifactName},
-              generatedAt: $generatedAt}' \
-            > .release-evidence/build-artifact.json
-
-      - name: Upload build evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-build
-          path: .release-evidence/build-artifact.json
-          if-no-files-found: error
-          retention-days: 30
 
   # WHY sharded (#ci-perf): `playwright test` (~3min, chromium + mobile
   # projects) runs unsharded. Splitting the test list across 2 shards roughly
@@ -630,45 +453,6 @@ jobs:
       - if: needs.develop_push_source.outputs.validated_by_pr != 'true'
         run: echo "All E2E shards passed."
 
-      - name: Write aggregate E2E evidence
-        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
-        env:
-          PRODUCER_STATUS: ${{ job.status }}
-          SHARD_STATUS: ${{ needs.e2e-shard.result }}
-        run: |
-          mkdir -p .release-evidence
-          STATUS="passed"
-          REASON="All built-artifact E2E shards passed."
-          if [ "$PRODUCER_STATUS" != "success" ] || [ "$SHARD_STATUS" != "success" ]; then
-            STATUS="failed"
-            REASON="One or more built-artifact E2E shards did not pass."
-          fi
-          jq -n \
-            --arg scenarioId "ci.aggregate-e2e" \
-            --arg status "$STATUS" \
-            --arg reason "$REASON" \
-            --arg repository "${{ github.repository }}" \
-            --arg runId "${{ github.run_id }}" \
-            --arg runAttempt "${{ github.run_attempt }}" \
-            --arg jobName "E2E Tests" \
-            --arg commitSha "${{ github.sha }}" \
-            --arg shardStatus "$SHARD_STATUS" \
-            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
-              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
-                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
-              details: {shardStatus: $shardStatus}, generatedAt: $generatedAt}' \
-            > .release-evidence/aggregate-e2e.json
-
-      - name: Upload aggregate E2E evidence
-        if: always() && needs.develop_push_source.outputs.validated_by_pr != 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-e2e
-          path: .release-evidence/aggregate-e2e.json
-          if-no-files-found: error
-          retention-days: 30
-
   deployment-smoke:
     name: Deployment Smoke
     needs: [develop_push_source, build]
@@ -752,48 +536,6 @@ jobs:
             apps/web/test-results/
           retention-days: 7
 
-      - name: Write deployment smoke evidence
-        if: always()
-        env:
-          PRODUCER_STATUS: ${{ job.status }}
-          SMOKE_STATUS: ${{ steps.deployment-smoke.outcome }}
-        run: |
-          mkdir -p .release-evidence
-          STATUS="passed"
-          REASON="Configured deployment-shaped smoke tests passed."
-          if [ -z "$DEPLOYMENT_SMOKE_BASE_URL" ]; then
-            STATUS="skipped"
-            REASON="DEPLOYMENT_SMOKE_BASE_URL was not configured."
-          elif [ "$PRODUCER_STATUS" != "success" ] || [ "$SMOKE_STATUS" != "success" ]; then
-            STATUS="failed"
-            REASON="Configured deployment-shaped smoke tests did not pass."
-          fi
-          jq -n \
-            --arg scenarioId "ci.deployment-smoke" \
-            --arg status "$STATUS" \
-            --arg reason "$REASON" \
-            --arg repository "${{ github.repository }}" \
-            --arg runId "${{ github.run_id }}" \
-            --arg runAttempt "${{ github.run_attempt }}" \
-            --arg jobName "Deployment Smoke" \
-            --arg commitSha "${{ github.sha }}" \
-            --arg smokeStatus "$SMOKE_STATUS" \
-            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion: 1, scenarioId: $scenarioId, status: $status, reason: $reason,
-              source: {provider: "github-actions", repository: $repository, workflowRunId: $runId,
-                workflowRunAttempt: $runAttempt, jobName: $jobName, commitSha: $commitSha},
-              details: {smokeStatus: $smokeStatus}, generatedAt: $generatedAt}' \
-            > .release-evidence/deployment-smoke.json
-
-      - name: Upload deployment smoke evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-deployment-smoke
-          path: .release-evidence/deployment-smoke.json
-          if-no-files-found: error
-          retention-days: 30
-
   # WHY scoped to the release PR only (#1011): this check confirms
   # supabase/migrations/ has actually been applied to the linked production
   # project. That question only matters right before a develop -> main
@@ -806,88 +548,35 @@ jobs:
     env:
       # SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF were added as repo
       # secrets on 2026-08-10 (confirmed via `gh secret list`) — see
-      # docs/runbooks/migrations.md "Automated CI Gate (#1011)" and the
-      # "Pending-migrations gate tolerates one migra artifact on
-      # admin_users (#1064)" entry in docs/accepted-risks.md, which
-      # documents this gate actually running against production on
-      # release PR #1063. This job is therefore active, not self-skipping,
-      # on release PRs today. The skip path below is a fail-safe for if
-      # those secrets are ever removed/rotated out from under CI, not the
-      # expected steady state — if you see it fire, that's a regression to
-      # investigate, not the documented default.
+      # docs/runbooks/migrations.md "Automated CI Gate (#1011)". This check
+      # is a required admission gate for the release PR (#1206): if either
+      # credential is missing, the job fails closed instead of silently
+      # reporting a skipped pass — a missing production read credential is
+      # itself the release-blocking condition, not a benign default.
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
     steps:
-      - name: Skip when Supabase production credentials are not configured
-        id: pending-migrations-skip
-        if: env.SUPABASE_ACCESS_TOKEN == '' || env.SUPABASE_PROJECT_REF == ''
+      - name: Require Supabase production read credentials
         run: |
           MISSING=""
           [ -z "$SUPABASE_ACCESS_TOKEN" ] && MISSING="${MISSING}SUPABASE_ACCESS_TOKEN "
           [ -z "$SUPABASE_PROJECT_REF" ] && MISSING="${MISSING}SUPABASE_PROJECT_REF"
-          echo "::notice::Missing secret(s): ${MISSING}— skipping the automated pending-migrations check for this release PR. These secrets are normally configured (added 2026-08-10); this is unexpected and worth investigating, not the documented default. Confirm manually via the 'Pre-Deploy Migration Check' steps in docs/runbooks/migrations.md before merging."
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing secret(s): ${MISSING}— the pending-migrations check cannot run without production read credentials. See docs/runbooks/migrations.md."
+            exit 1
+          fi
 
       - uses: actions/checkout@v6
-        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
       - uses: pnpm/action-setup@v5
-        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
       - uses: actions/setup-node@v6
-        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
         with:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
 
       - uses: supabase/setup-cli@v1
-        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
         with:
           version: latest
 
       - name: Check for pending migrations against linked production project
-        id: pending-migrations
-        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
         run: pnpm run check:pending-migrations
-
-      - name: Write pending migration evidence
-        if: always()
-        env:
-          PRODUCER_STATUS: ${{ job.status }}
-          MIGRATION_STATUS: ${{ steps.pending-migrations.outcome }}
-        run: |
-          mkdir -p .release-evidence
-          STATUS="passed"
-          REASON="No pending production migrations were detected."
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
-            STATUS="skipped"
-            MISSING=""
-            [ -z "$SUPABASE_ACCESS_TOKEN" ] && MISSING="${MISSING}SUPABASE_ACCESS_TOKEN "
-            [ -z "$SUPABASE_PROJECT_REF" ] && MISSING="${MISSING}SUPABASE_PROJECT_REF"
-            REASON="Missing secret(s): ${MISSING}(these are normally configured — see docs/runbooks/migrations.md 'Automated CI Gate'; this skip is unexpected, not the documented default)."
-          elif [ "$PRODUCER_STATUS" != "success" ] || [ "$MIGRATION_STATUS" != "success" ]; then
-            STATUS="failed"
-            REASON="Pending migration check did not pass."
-          fi
-          jq -n \
-            --arg status "$STATUS" \
-            --arg reason "$REASON" \
-            --arg runId "${{ github.run_id }}" \
-            --arg commitSha "${{ github.event.pull_request.head.sha }}" \
-            --arg evidenceUri "github-actions://${{ github.repository }}/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs/pending-migrations" \
-            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion: 1, runId: $runId, environment: "ci-build",
-              candidateIdentity: $commitSha,
-              results: [{scenarioId: "database.pending-migrations",
-                environment: "ci-build", status: $status,
-                startedAt: $generatedAt, finishedAt: $generatedAt, runner: "script",
-                evidence: {datastore: [$evidenceUri]}, fixtures: [], notes: $reason}]}' \
-            > .release-evidence/pending-production-migrations.json
-
-      - name: Upload pending migration evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.run_id }}-${{ github.run_attempt }}-pending-migrations
-          path: .release-evidence/pending-production-migrations.json
-          if-no-files-found: error
-          retention-days: 30

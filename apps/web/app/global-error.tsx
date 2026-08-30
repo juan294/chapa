@@ -27,11 +27,11 @@ export default function GlobalError({
           --color-text-secondary tokens (light default, dark override).
         */}
         <style>{`
-          .global-error-body { background-color: #FFFFFF; color: #1A1A2E; }
-          .global-error-subtext { color: #6B7280; }
+          .global-error-body { background-color: #FFFFFF; color: #0D2B1D; }
+          .global-error-subtext { color: #55665E; }
           @media (prefers-color-scheme: dark) {
-            .global-error-body { background-color: #0A0A0F; color: #E2E4E9; }
-            .global-error-subtext { color: #8B8FA0; }
+            .global-error-body { background-color: #08170F; color: #DFEAE4; }
+            .global-error-subtext { color: #8BA398; }
           }
         `}</style>
       </head>
@@ -58,7 +58,7 @@ export default function GlobalError({
             style={{
               fontSize: "2.25rem",
               fontWeight: 700,
-              color: "#F87171",
+              color: "#FD736D",
               fontFamily: '"JetBrains Mono", "Courier New", monospace',
               margin: 0,
             }}
@@ -89,12 +89,12 @@ export default function GlobalError({
               onClick={reset}
               style={{
                 borderRadius: "8px",
-                border: "1px solid rgba(139, 92, 246, 0.3)",
-                backgroundColor: "rgba(139, 92, 246, 0.08)",
+                border: "1px solid rgba(27, 208, 147, 0.3)",
+                backgroundColor: "rgba(27, 208, 147, 0.08)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#8B5CF6",
+                color: "#1BD093",
                 cursor: "pointer",
               }}
             >
@@ -105,11 +105,11 @@ export default function GlobalError({
               href="/"
               style={{
                 borderRadius: "8px",
-                border: "1px solid rgba(139, 92, 246, 0.10)",
+                border: "1px solid rgba(27, 208, 147, 0.10)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#8B8FA0",
+                color: "#8BA398",
                 textDecoration: "none",
                 cursor: "pointer",
               }}

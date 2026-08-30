@@ -1,6 +1,5 @@
 "use client";
 
-import { getBadgeContentCSS } from "@/components/badge/BadgeContent";
 import {
   DOTS_CONFIG,
   CONSTELLATION_CONFIG,
@@ -19,7 +18,6 @@ import { DetailRow } from "./_components/controls";
 export default function ParticlesExperimentPage() {
   return (
     <main id="main-content" className="min-h-screen bg-bg">
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
         className="pointer-events-none fixed top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]"

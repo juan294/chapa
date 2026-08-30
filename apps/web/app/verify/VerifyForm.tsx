@@ -54,7 +54,10 @@ export function VerifyForm() {
 
       <button
         type="submit"
-        className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
+        // White text on a solid bg-complement fill measures 2.54:1, below AA.
+        // bg-complement-dark is the darker step of the same ramp (~5.49:1),
+        // and hover moves to the base rather than to the lighter step.
+        className="group inline-flex min-h-[46px] items-center gap-2.5 rounded-lg bg-complement-dark px-6 text-sm font-semibold text-white transition-all hover:bg-complement hover:shadow-xl hover:shadow-complement/25"
       >
         {t('verifyForm.submit') as string}
         <svg
