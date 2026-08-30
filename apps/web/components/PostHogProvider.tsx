@@ -15,7 +15,13 @@ export function PostHogInit() {
       if (loaded) return;
       loaded = true;
 
-      import("posthog-js").then(({ default: posthog }) => {
+      // #1197 — the slim build, not the default entry. The default pulls
+      // session replay, surveys, autocapture and web-vitals machinery, none of
+      // which this app uses: the only consumer is trackEvent -> capture, with
+      // capture_pageview disabled. Slim keeps `__loaded` (which trackEvent
+      // gates on) and `capture_pageleave`, and posts to the same api_host, so
+      // the CSP connect-src is unchanged.
+      import("posthog-js/dist/module.slim.js").then(({ default: posthog }) => {
         posthog.init(key, {
           api_host: host,
           capture_pageview: false,

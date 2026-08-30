@@ -17,7 +17,11 @@ vi.mock("@/lib/analytics/posthog", () => ({
 // package. A scoped `vi.doMock` call used to only take effect for tests
 // declared after it, which made dynamic-import resolution timing (and which
 // tests observed the mock vs. the real module) depend on declaration order.
-vi.mock("posthog-js", () => ({ default: { init: mockInit } }));
+// #1197 — the provider loads the slim build, not the default entry, so this
+// mock has to intercept that exact specifier.
+vi.mock("posthog-js/dist/module.slim.js", () => ({
+  default: { init: mockInit },
+}));
 
 function renderProvider(children: React.ReactNode) {
   return render(<PostHogProvider>{children}</PostHogProvider>);
