@@ -8,9 +8,9 @@ path. Capability detail lives in the linked runbooks.
 ## Scope and authorization
 
 - Release topology: `develop` to `main`, squash merge, then tag `mainCommit`.
-- Direct commands are authoritative. A required CI check conclusion, a
-  `release-result.json` direct-check status, and a plain identity comparison
-  are the proof. There is no analyzer decision layered on top of them.
+- Direct commands are authoritative: a required CI check conclusion, a
+  `release-result.json` direct-check status, and a plain identity comparison are
+  the proof. No analyzer decision is layered on top of them.
 - Two stops. **Gate 1 — approve the release**: version choice and full diff
   approval, together. **Gate 2 — authorize production**: merge authorization
   and tag authorization, together, granted once up front. Everything after
@@ -24,7 +24,14 @@ path. Capability detail lives in the linked runbooks.
 
 1. Read `CLAUDE.md`, this playbook, and the linked runbooks.
 2. Use an isolated clean release worktree based on current `develop`.
-3. Fetch origin. Bind `baselineTag` to the exact deployed production `main`
+3. Confirm `main` is reconciled into `develop` — the auto-back-merge cannot
+   push to protected `develop` (#1228), so this is manual and fails silently.
+   `git merge-base --is-ancestor origin/main origin/develop` must succeed; if
+   not, repair from a maintainer account with `git merge -s ours origin/main`
+   and push before opening the PR. A diverged `develop` makes the release PR
+   `CONFLICTING`, and a conflicting PR runs none of its `pull_request` checks —
+   `Pending Migrations Check (release PR)` then reports `skipped`, not failed.
+4. Fetch origin. Bind `baselineTag` to the exact deployed production `main`
    identity, not `develop` ancestry:
 
    ```bash
@@ -42,10 +49,10 @@ path. Capability detail lives in the linked runbooks.
    An empty tag or any identity mismatch blocks (`BLOCKED`). Then identify
    the current version, commits, paths, migrations, version-bearing files,
    and exact remote refs from `baselineTag..develop`.
-4. Present release type, changes, topology, known risks, and retirement
+5. Present release type, changes, topology, known risks, and retirement
    review.
-5. Update version, changelog, and every current version reference.
-6. Run the bounded local release checks sequentially — deliberately smaller
+6. Update version, changelog, and every current version reference.
+7. Run the bounded local release checks sequentially — deliberately smaller
    than full CI, which runs as exact-head remote admission checks next:
    ```bash
    git diff --check
@@ -54,16 +61,15 @@ path. Capability detail lives in the linked runbooks.
    pnpm run test:contract:local
    pnpm run build
    ```
-7. Present the version choice and the complete diff and results together.
-8. **STOP — Gate 1: approve the release.** Version choice and full diff
+8. Present the version choice and the complete diff and results together.
+9. **STOP — Gate 1: approve the release.** Version choice and full diff
    together; approving only one does not satisfy this gate.
 
 ## 2. Authorize production and push the candidate
 
 1. **STOP — Gate 2: authorize production.** Merge authorization and tag
    authorization together, before anything below runs.
-2. Commit and push only the approved release preparation, then fix the
-   immutable candidate identity:
+2. Commit and push the approved preparation, then fix candidate identity:
    ```bash
    developCommit="$(git rev-parse HEAD)"
    candidateTreeDigest="$(git rev-parse 'HEAD^{tree}')"
@@ -172,8 +178,7 @@ non-passed status is `BLOCKED`.
 
 ## Recovery outcomes
 
-These are procedural report outcomes only — none of them is a controller
-state machine, and none authorizes anything on its own.
+Procedural report outcomes only. None authorizes anything on its own.
 
 | Outcome | Meaning | Allowed continuation |
 |---|---|---|
@@ -182,8 +187,7 @@ state machine, and none authorizes anything on its own.
 | `ROLLED_BACK` | Production changed, post-promotion proof failed, and a separately authorized rollback (`docs/runbooks/rollback.md`) completed. | End the attempt. Do not tag. A new attempt needs new authorization. |
 | `PUBLICATION_PENDING` | Production proof passed, but the tag, GitHub Release, or readback is incomplete. | Inspect remote state and resume publication only; never redeploy a production-proven candidate. |
 
-No automatic redeployment, production retry loop, or analyzer override
-exists. Every rollback, retry, or override remains separately authorized.
+No automatic redeployment or override exists; each is separately authorized.
 
 ## Linked operational detail
 
@@ -191,5 +195,5 @@ exists. Every rollback, retry, or override remains separately authorized.
 - Deployed probes: `docs/runbooks/deployment-smoke.md`
 - Migrations: `docs/runbooks/migrations.md`
 - Rollback: `docs/runbooks/rollback.md`
-- Incidents and monitoring: `docs/runbooks/incident-response.md`, `docs/runbooks/observability.md`
-- Deep/exhaustive verification (explicit, risk-selected, never a default gate): `docs/playbooks/e2e-pro-release-verification.md` via `/prodplaybook`, and `/explore-release` for fresh-context exploration
+- Incidents: `docs/runbooks/incident-response.md`, `docs/runbooks/observability.md`
+- Deep verification (explicit, risk-selected, never a default gate): `docs/playbooks/e2e-pro-release-verification.md` via `/prodplaybook`; `/explore-release` for fresh-context exploration

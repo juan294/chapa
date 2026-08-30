@@ -36,12 +36,38 @@ name: Auto back-merge main into develop
 # No-op guarantee: `git merge-base --is-ancestor` gates the merge/push steps,
 # so a push to main that develop has already absorbed produces no commit.
 #
-# Permissions: `develop` branch protection (verified via
-# `gh api repos/juan294/chapa/branches/develop/protection`) requires status
-# checks only for the pull-request merge button (no
-# `required_pull_request_reviews` / no `restrictions` are configured), so a
-# direct authenticated push to `develop` is not blocked by CI status. The
-# default `GITHUB_TOKEN` needs `contents: write` explicitly (the repo's
+# PERMISSIONS - THIS WORKFLOW CANNOT CURRENTLY PUSH (#1228).
+#
+# The paragraph that used to sit here asserted that branch protection could not
+# decline this workflow's push. That was wrong, and being confidently wrong in a
+# comment is why nobody looked here for two releases. Every run since this
+# workflow was introduced has failed:
+#
+#   remote: error: GH006: Protected branch update failed for refs/heads/develop.
+#   ! [remote rejected]   HEAD -> develop (protected branch hook declined)
+#
+# Measured cause: `develop` carries classic branch protection with six required
+# status contexts and `enforce_admins: false`. Required status checks block
+# direct pushes for any actor that cannot bypass them. A human maintainer is an
+# admin, so their push succeeds and the setting looks harmless; the
+# `github-actions[bot]` identity behind `GITHUB_TOKEN` is not, so its push --
+# of a brand-new merge commit that by definition has no check results yet -- is
+# declined.
+#
+# Why the obvious workarounds do not apply here:
+#   - A PR-based back-merge cannot work: the repo sets
+#     `allow_merge_commit: false` and permits squash only, and squashing the
+#     back-merge would destroy the very ancestry it exists to create.
+#   - Classic branch protection has no per-actor bypass for required status
+#     checks. `restrictions` is a push ALLOWLIST, not a checks exemption.
+#
+# So a fix needs one of: an admin-scoped token (PAT or GitHub App) in secrets,
+# a ruleset with `github-actions` as a bypass actor, or enabling merge commits
+# and reworking this into a PR. All three are repository-owner decisions; see
+# #1228. Until one lands, the back-merge is manual and
+# `docs/release/release-playbook.md` checks for it.
+#
+# The default `GITHUB_TOKEN` needs `contents: write` explicitly (the repo's
 # default workflow permission is read-only), granted below at the job level.
 
 on:
@@ -101,6 +127,19 @@ jobs:
           Automated by .github/workflows/auto-backmerge.yml." \
             origin/main
 
+      # Failing loudly matters more than failing: this workflow failed silently
+      # for two releases while its own comment said it could not. On GH006 the
+      # message below names the manual repair, so whoever opens the run knows
+      # what to do without re-deriving it (#1228).
       - name: Push develop
         if: steps.check.outputs.needs_merge == 'true'
-        run: git push origin HEAD:develop
+        run: |
+          set -euo pipefail
+          if ! git push origin HEAD:develop 2>push.log; then
+            cat push.log
+            if grep -q 'GH006\|protected branch hook declined' push.log; then
+              REPAIR="git checkout develop && git merge -s ours origin/main && git push origin develop"
+              echo "::error title=Back-merge blocked by branch protection (#1228)::github-actions[bot] cannot push to protected develop - required status checks decline a new commit that has no check results. develop is now BEHIND main and the next release PR's merge-base is dirty. Manual repair from a maintainer account: ${REPAIR} - permanent fix options are in issue #1228."
+            fi
+            exit 1
+          fi

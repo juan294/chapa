@@ -73,6 +73,25 @@ describe("auto-backmerge workflow contract", () => {
     expect(backmerge).toContain("cancel-in-progress: false");
   });
 
+  // #1228 - this workflow failed silently for two releases while its own
+  // comment asserted it could not be blocked. The comment is corrected; these
+  // pin the two things that keep the next reader from re-deriving it.
+  it("does not repeat the disproven claim that its push cannot be blocked", () => {
+    expect(backmerge).not.toContain("is not blocked by CI status");
+  });
+
+  it("records the measured cause and names the manual repair", () => {
+    expect(backmerge).toContain("GH006");
+    expect(backmerge).toContain("merge -s ours origin/main");
+    expect(backmerge).toContain("#1228");
+  });
+
+  it("surfaces a GitHub error annotation when the push is declined", () => {
+    expect(backmerge).toContain("::error title=");
+    // The push must not be allowed to fail quietly.
+    expect(backmerge).toContain("exit 1");
+  });
+
   it("checks out full history so merge-base can see the real ancestry", () => {
     expect(backmerge).toContain("fetch-depth: 0");
     expect(backmerge).toContain("ref: develop");
