@@ -11,7 +11,6 @@ import * as confetti from "@/lib/effects/celebrations/confetti";
 
 vi.mock("@/components/badge/BadgeContent", () => ({
   BadgeContent: () => <div data-testid="badge-content">badge</div>,
-  getBadgeContentCSS: () => [""],
 }));
 
 // Mock confetti — depends on canvas-confetti

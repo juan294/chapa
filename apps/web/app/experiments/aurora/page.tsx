@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { BadgeContent } from "@/components/badge/BadgeContent";
 import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
@@ -114,7 +114,6 @@ function AuroraBackground({
 function MockBadgeCard() {
   return (
     <div className="relative rounded-2xl border border-stroke bg-card/80 backdrop-blur-sm p-8 w-full max-w-[560px]">
-      <style>{getBadgeContentCSS({}).join("\n")}</style>
       <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
   );

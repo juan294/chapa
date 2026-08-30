@@ -4,7 +4,6 @@ import { render } from "@testing-library/react";
 
 vi.mock("@/components/badge/BadgeContent", () => ({
   BadgeContent: () => <div data-testid="badge-content">badge</div>,
-  getBadgeContentCSS: () => [""],
 }));
 
 describe("aurora experiment page", () => {

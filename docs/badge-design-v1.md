@@ -1,9 +1,28 @@
 # Badge Design v1 Spec — React Component (Creator Studio)
 
-> **Scope**: This spec covers the **React preview composition** (`BadgeContent.tsx`, `BadgePreviewCard.tsx`, and `PreviewFooter.tsx`) used in Creator Studio. It does **not** cover the embeddable SVG badge.
-> For the **embeddable SVG badge** served at `/u/:handle/badge.svg`, see [`badge-svg-spec-v1.2.md`](./badge-svg-spec-v1.2.md).
+> **SUPERSEDED (2026-08-30, #1191 step 6). Historical record only — do not
+> build against it.**
 >
-> Implemented in `apps/web/components/badge/BadgeContent.tsx` and `apps/web/app/studio/`.
+> This spec described a **second badge implementation**: a React DOM
+> composition (`BadgeContent.tsx`, `BadgePreviewCard.tsx`, `PreviewFooter.tsx`)
+> that Creator Studio previewed instead of the badge people actually embed.
+> Maintaining every visual element twice is the defect #1191 was filed for, and
+> it has been removed. `BadgePreviewCard` now renders `renderBadgeSvg` output;
+> `BadgeContent` is a thin wrapper over the same function, used only by the
+> flag-gated `/experiments/*` prototypes; `PreviewFooter` is deleted, because
+> the SVG draws its own branding row and verification strip. The DOM
+> background, border, card-style and heatmap-grid modules this spec describes
+> are deleted too.
+>
+> **There is one badge now, and one spec for it:**
+> [`badge-svg-spec-v1.2.md`](./badge-svg-spec-v1.2.md), for the embeddable SVG
+> served at `/u/:handle/badge.svg` and previewed in Studio. The decision and
+> its invariants are in
+> [`decisions/2026-08-30-one-badge-artifact.md`](./decisions/2026-08-30-one-badge-artifact.md).
+>
+> Kept because it records the layout reasoning and colour values the SVG
+> renderer inherited, and because the `/experiments/*` prototypes still borrow
+> from it.
 
 ## Overview
 
