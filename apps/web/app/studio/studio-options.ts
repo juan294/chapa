@@ -83,11 +83,15 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
     key: "heatmapAnimation",
     label: "Heatmap Animation",
     options: [
-      { value: "fade-in", label: "Fade In", description: "Uniform gentle fade" },
+      // #1226 — the value stays `fade-in` because it is persisted in every
+      // saved Studio config; only the label and description, which are not,
+      // were corrected. The badge renders a 60ms-per-column stagger here
+      // (`heatmapDelay` in `lib/render/heatmap.ts`), never a uniform fade.
+      { value: "fade-in", label: "Column Sweep", description: "Quick left-to-right column sweep" },
       { value: "diagonal", label: "Diagonal Wave", description: "Top-left to bottom-right" },
       { value: "ripple", label: "Center Ripple", description: "Expanding from center" },
       { value: "scatter", label: "Random Scatter", description: "Random appearance order" },
-      { value: "cascade", label: "Column Cascade", description: "Column by column reveal" },
+      { value: "cascade", label: "Column Cascade", description: "Slow column-by-column reveal" },
       { value: "waterfall", label: "Row Waterfall", description: "Row by row reveal" },
     ],
   },

@@ -141,11 +141,11 @@ studio > /set score holographic
 
 | Value | Description |
 |-------|-------------|
-| `fade-in` | Uniform gentle fade |
+| `fade-in` | Quick left-to-right column sweep (the default). Named before the behaviour settled; see #1226 |
 | `diagonal` | Top-left to bottom-right wave |
 | `ripple` | Expanding from center |
 | `scatter` | Random appearance order |
-| `cascade` | Column by column reveal |
+| `cascade` | Slow column-by-column reveal — the same shape as `fade-in`, at half the speed |
 | `waterfall` | Row by row reveal |
 
 ```

@@ -177,3 +177,52 @@ describe("every category reaches the embeddable badge (#1191)", () => {
     }
   });
 });
+
+/**
+ * #1226 — the default heatmap animation was labelled "Fade In" and described
+ * as a "uniform gentle fade". The badge has never done that: `heatmapDelay`
+ * returns `week * 60` for `fade-in` (`apps/web/lib/render/heatmap.ts`), a
+ * left-to-right column stagger. It is the same shape as `cascade`
+ * (`week * 120`) and differs only in speed.
+ *
+ * The persisted enum value stays `fade-in` — it is written into every saved
+ * Studio config, and renaming it would need the same read-path migration
+ * `RETIRED_BADGE_CONFIG_KEYS` got. Only the human-facing label and
+ * description change, because those are not persisted.
+ */
+describe("the default heatmap animation is described truthfully (#1226)", () => {
+  const heatmap = STUDIO_CATEGORIES.find(
+    (category) => category.key === "heatmapAnimation",
+  );
+
+  it("still offers the persisted default value", () => {
+    expect(heatmap?.options.map((o) => o.value)).toContain("fade-in");
+  });
+
+  it("does not call the default a uniform fade", () => {
+    const description = getOptionDescription("heatmapAnimation", "fade-in");
+    expect(description.toLowerCase()).not.toContain("uniform");
+    expect(description.toLowerCase()).not.toContain("fade");
+  });
+
+  it("describes the default as the column sweep it actually is", () => {
+    expect(
+      getOptionDescription("heatmapAnimation", "fade-in").toLowerCase(),
+    ).toContain("column");
+  });
+
+  it("keeps the default distinguishable from cascade, its slower twin", () => {
+    const fadeIn = getOptionDescription("heatmapAnimation", "fade-in");
+    const cascade = getOptionDescription("heatmapAnimation", "cascade");
+    expect(cascade.toLowerCase()).toContain("column");
+    expect(fadeIn).not.toBe(cascade);
+    // Speed is the only real difference, so each has to say which it is.
+    expect(`${fadeIn} ${cascade}`.toLowerCase()).toMatch(/quick|fast/);
+    expect(`${fadeIn} ${cascade}`.toLowerCase()).toMatch(/slow/);
+  });
+
+  it("does not label the default a fade either", () => {
+    const label = getOptionLabel("heatmapAnimation", "fade-in");
+    expect(label.toLowerCase()).not.toContain("fade");
+  });
+});

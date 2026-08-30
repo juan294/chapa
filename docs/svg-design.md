@@ -52,7 +52,7 @@
   - 2: `rgba(139,92,246,0.48)` (medium)
   - 3: `rgba(139,92,246,0.68)` (high)
   - 4: `rgba(139,92,246,0.92)` (intense)
-- Animation: fade-in by week group
+- Animation: left-to-right column sweep, 60ms per week group (the `fade-in` config value; see #1226 for why the value's name does not describe it)
 
 **Center column: Radar chart**
 - Dynamic radar/spider chart showing dimension scores

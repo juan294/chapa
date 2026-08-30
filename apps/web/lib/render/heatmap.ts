@@ -23,7 +23,7 @@ interface HeatmapCell {
  * Cells are laid out in a column-major grid: 13 columns (weeks) x 7 rows (days),
  * with each cell sized at {@link CELL_SIZE}px and spaced by {@link CELL_GAP}px.
  * Animation delays are staggered per column (60ms per week) for a left-to-right
- * fade-in effect.
+ * column sweep.
  *
  * @param heatmapData - Array of daily contribution counts (may exceed 91 entries)
  * @param offsetX - Horizontal offset for positioning within the SVG (default: 0)
@@ -34,10 +34,15 @@ interface HeatmapCell {
  * Per-cell reveal delay, in ms (#1191).
  *
  * `fade-in` is the DEFAULT and reproduces the pre-#1191 stagger exactly
- * (60ms per column). Its Studio description reads "uniform gentle fade", which
- * does not match what the badge has always done — but the default badge's
- * appearance is not something to change while renaming things, so the shipped
- * behaviour wins and the naming mismatch is left as its own question.
+ * (60ms per column). It is the same shape as `cascade` (120ms per column) and
+ * differs only in speed.
+ *
+ * #1226 resolved the naming mismatch this comment used to record: Studio
+ * called it "Fade In" / "uniform gentle fade", which is not what it does. The
+ * label and description were corrected; the enum VALUE stays `fade-in`,
+ * because it is persisted in every saved Studio config and renaming it would
+ * need the same read-path migration `RETIRED_BADGE_CONFIG_KEYS` got. The
+ * shipped animation did not change.
  *
  * Every function here is deterministic: `renderBadgeSvg` is pure, so `scatter`
  * derives its order from the cell index rather than from a random source.
