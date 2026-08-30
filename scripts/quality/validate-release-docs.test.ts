@@ -30,7 +30,7 @@ function compliantPlaybook(): string {
     "pending migrations check (release PR) is a required check.",
     "gh run download the Preview release-result.json",
     "Obtain merge authorization.",
-    "gh pr merge --squash --auto",
+    "gh pr merge --merge --auto",
     "Verify mainTreeDigest and production identity.",
     "Obtain tag authorization.",
     "git tag -a vX.Y.Z mainCommit",
@@ -55,7 +55,7 @@ function compliantRoot(): string {
       "STOP for full diff approval.",
       "STOP for PR authorization.",
       "STOP for merge authorization.",
-      "gh pr merge --squash --auto",
+      "gh pr merge --merge --auto",
       "STOP for tag authorization.",
       "Deep verification (/prodplaybook, /explore-release) is separate and explicit.",
     ].join("\n"),
@@ -160,7 +160,7 @@ describe("validateReleaseDocs", () => {
         "pending migrations check (release PR) is a required check.",
         "gh run download the Preview release-result.json",
         "Obtain merge authorization.",
-        "gh pr merge --squash --auto",
+        "gh pr merge --merge --auto",
         "Verify mainTreeDigest and production identity.",
         "Obtain tag authorization.",
         "Use rollback. PAUSED BLOCKED ROLLED_BACK PUBLICATION_PENDING",
@@ -172,7 +172,7 @@ describe("validateReleaseDocs", () => {
     );
   });
 
-  it("rejects required checks and Preview proof after squash merge", () => {
+  it("rejects required checks and Preview proof after the promotion merge", () => {
     const root = compliantRoot();
     write(
       root,
@@ -181,7 +181,7 @@ describe("validateReleaseDocs", () => {
         "# Release",
         "Fix candidateTreeDigest.",
         "Create or reuse the release PR.",
-        "gh pr merge --squash --auto",
+        "gh pr merge --merge --auto",
         "gh pr checks --required --watch --fail-fast",
         "pending migrations check (release PR) is a required check.",
         "gh run download the Preview release-result.json",
@@ -197,11 +197,11 @@ describe("validateReleaseDocs", () => {
     );
 
     expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: required checks, migrations, and Preview proof must precede squash merge",
+      "docs/release/release-playbook.md: required checks, migrations, and Preview proof must precede the promotion merge",
     );
   });
 
-  it("rejects merge-commit semantics and subordinate procedures", () => {
+  it("rejects squash release semantics and subordinate procedures", () => {
     const root = compliantRoot();
     write(
       root,
@@ -209,13 +209,13 @@ describe("validateReleaseDocs", () => {
       [
         "Ordering: docs/release/release-playbook.md",
         "gh pr create --base main --head develop",
-        "gh pr merge --merge",
+        "gh pr merge --squash",
       ].join("\n"),
     );
 
     const errors = validateReleaseDocs(root);
     expect(errors).toContain(
-      "docs/runbooks/release-checklist.md: merge-commit release semantics conflict with squash-only policy",
+      "docs/runbooks/release-checklist.md: squash release semantics discard ancestry — releases merge (#1228)",
     );
     expect(errors).toContain(
       "docs/runbooks/release-checklist.md: subordinate documentation must not create release PRs or tags",
@@ -269,7 +269,7 @@ describe("repository release procedure", () => {
       "STOP — Gate 2: authorize production",
       "gh workflow run release-verification.yml",
       "gh run download",
-      "gh pr merge --squash --auto",
+      "gh pr merge --merge --auto",
       "gh release create",
       "gh release view",
       "release:write-result",

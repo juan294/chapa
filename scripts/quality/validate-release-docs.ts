@@ -109,16 +109,16 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
 
   const previewResultIndex = lowerPlaybook.indexOf("gh run download");
   const migrationsCheckIndex = lowerPlaybook.indexOf("pending migrations check (release");
-  const squashMergeIndex = lowerPlaybook.indexOf("gh pr merge --squash --auto");
+  const promoteMergeIndex = lowerPlaybook.indexOf("gh pr merge --merge --auto");
   if (
     previewResultIndex < 0 ||
     migrationsCheckIndex < 0 ||
-    squashMergeIndex < 0 ||
-    previewResultIndex > squashMergeIndex ||
-    migrationsCheckIndex > squashMergeIndex
+    promoteMergeIndex < 0 ||
+    previewResultIndex > promoteMergeIndex ||
+    migrationsCheckIndex > promoteMergeIndex
   ) {
     errors.push(
-      `${PLAYBOOK}: required checks, migrations, and Preview proof must precede squash merge`,
+      `${PLAYBOOK}: required checks, migrations, and Preview proof must precede the promotion merge`,
     );
   }
 
@@ -188,8 +188,8 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   ]) {
     requireText(releaseCommand, RELEASE_COMMAND, gate, errors);
   }
-  if (!releaseCommand.includes("gh pr merge --squash --auto")) {
-    errors.push(`${RELEASE_COMMAND}: missing squash auto-merge command`);
+  if (!releaseCommand.includes("gh pr merge --merge --auto")) {
+    errors.push(`${RELEASE_COMMAND}: missing merge-commit auto-merge command`);
   }
   // A bare mention that deep verification exists and is optional is fine; an
   // invocation with an argument (e.g. `/explore-release $runDir/candidate.json`)
@@ -222,9 +222,16 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
             : file === PLAYBOOK
               ? playbook
               : read(root, file, errors);
-    if (/\bgh\s+pr\s+merge\s+--merge\b/.test(source)) {
+    // #1228 — inverted. Squash-merging develop into main discards ancestry, so
+    // main's tip stops being an ancestor of develop and the NEXT release PR
+    // computes a stale merge-base. That produced a CONFLICTING PR, and a
+    // conflicting PR runs none of its pull_request checks — the migrations gate
+    // reports `skipped`, not failed. Chapa carried 40 hand-made back-merge
+    // commits before this changed. A merge commit preserves ancestry by
+    // construction and needs no reconciliation at all.
+    if (/\bgh\s+pr\s+merge\s+--squash\b/.test(source)) {
       errors.push(
-        `${file}: merge-commit release semantics conflict with squash-only policy`,
+        `${file}: squash release semantics discard ancestry — releases merge (#1228)`,
       );
     }
     rejectRetiredTerms(source, file, errors);

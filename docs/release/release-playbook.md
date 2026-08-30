@@ -7,7 +7,8 @@ path. Capability detail lives in the linked runbooks.
 
 ## Scope and authorization
 
-- Release topology: `develop` to `main`, squash merge, then tag `mainCommit`.
+- Release topology: `develop` to `main`, **merge commit**, then tag `mainCommit`.
+  Squashing discarded ancestry and cost 40 hand-made back-merges (#1228).
 - Direct commands are authoritative: a required CI check conclusion, a
   `release-result.json` direct-check status, and a plain identity comparison are
   the proof. No analyzer decision is layered on top of them.
@@ -24,13 +25,10 @@ path. Capability detail lives in the linked runbooks.
 
 1. Read `CLAUDE.md`, this playbook, and the linked runbooks.
 2. Use an isolated clean release worktree based on current `develop`.
-3. Confirm `main` is reconciled into `develop` — the auto-back-merge cannot
-   push to protected `develop` (#1228), so this is manual and fails silently.
-   `git merge-base --is-ancestor origin/main origin/develop` must succeed; if
-   not, repair from a maintainer account with `git merge -s ours origin/main`
-   and push before opening the PR. A diverged `develop` makes the release PR
-   `CONFLICTING`, and a conflicting PR runs none of its `pull_request` checks —
-   `Pending Migrations Check (release PR)` then reports `skipped`, not failed.
+3. Confirm ancestry is intact: `git merge-base --is-ancestor origin/main
+   origin/develop`. With merge-commit promotion this holds by construction; a
+   failure means someone squashed a release PR and reintroduced the drift
+   #1228 removed.
 4. Fetch origin. Bind `baselineTag` to the exact deployed production `main`
    identity, not `develop` ancestry:
 
@@ -129,7 +127,7 @@ non-passed status is `BLOCKED`.
 1. Reconfirm PR head still identifies `developCommit`, then merge:
    ```bash
    test "$(gh pr view "$releasePrNumber" --json headRefOid --jq .headRefOid)" = "$developCommit"
-   gh pr merge --squash --auto
+   gh pr merge --merge --auto
    ```
    Never delete permanent `develop`.
 2. Resolve `mainCommit`; require the promoted tree to equal the candidate
