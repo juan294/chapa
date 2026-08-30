@@ -14,7 +14,7 @@ const PAGES_WITH_FOOTER_AND_COMMAND_BAR = [
   "about/verification/VerificationPageContent.tsx",
   "privacy/page.tsx",
   "terms/page.tsx",
-  "archetypes/_components/ArchetypePageClient.tsx",
+  "archetypes/_components/ArchetypePageContent.tsx",
 ];
 
 describe("footer / GlobalCommandBar spacing (#1167 / UX-B1)", () => {
