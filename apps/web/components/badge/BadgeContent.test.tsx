@@ -41,22 +41,6 @@ vi.mock("@/lib/effects/heatmap/HeatmapGrid", () => ({
   HEATMAP_GRID_CSS: ".heatmap-stub {}",
 }));
 
-const { useAnimatedCounterMock } = vi.hoisted(() => ({
-  useAnimatedCounterMock: vi.fn(
-    (...args: [target: number, duration?: number, easing?: string, startOnMount?: boolean]) => ({
-      value: args[0],
-    }),
-  ),
-}));
-
-vi.mock("@/lib/effects/counters/use-animated-counter", () => ({
-  useAnimatedCounter: useAnimatedCounterMock,
-}));
-
-vi.mock("@/lib/effects/counters/use-in-view", () => ({
-  useInView: () => true,
-}));
-
 vi.mock("@/lib/render/theme", () => ({
   WARM_AMBER: { accent: "#8B5CF6" },
 }));
@@ -66,7 +50,6 @@ const { BadgeContent } = await import("./BadgeContent");
 
 afterEach(() => {
   cleanup();
-  useAnimatedCounterMock.mockClear();
 });
 
 const SOURCE = fs.readFileSync(
@@ -417,22 +400,22 @@ describe("BadgeContent — render-based", () => {
     });
   });
 
-  describe("stats display animation (statsDisplay prop)", () => {
-    it("threads isAnimated=false to useAnimatedCounter by default (statsDisplay defaults to static)", () => {
+  // #1191 step 5 — the counting animation was a Studio-only flourish: the
+  // shipped badge is a cached SVG whose numbers have always been static. The
+  // preview now shows the same static numbers, and reaches for no counter hook
+  // at all.
+  describe("dimension numbers render statically", () => {
+    it("shows each dimension value as plain text", () => {
       render(<BadgeContent stats={makeStats()} impact={makeImpact()} />);
-      expect(useAnimatedCounterMock).toHaveBeenCalled();
-      const [, , , isAnimated] = useAnimatedCounterMock.mock.calls[0]!;
-      expect(isAnimated).toBe(false);
+      const impact = makeImpact();
+      for (const value of Object.values(impact.dimensions)) {
+        expect(screen.getAllByText(String(value)).length).toBeGreaterThan(0);
+      }
     });
 
-    it("threads statsDisplay=animated-spring to isAnimated/easing args", () => {
-      render(
-        <BadgeContent stats={makeStats()} impact={makeImpact()} statsDisplay="animated-spring" />,
-      );
-      expect(useAnimatedCounterMock).toHaveBeenCalled();
-      const [, , easing, isAnimated] = useAnimatedCounterMock.mock.calls[0]!;
-      expect(isAnimated).toBe(true);
-      expect(easing).toBe("spring");
+    it("does not import the counter hooks", () => {
+      expect(SOURCE).not.toContain("effects/counters/use-animated-counter");
+      expect(SOURCE).not.toContain("effects/counters/use-in-view");
     });
   });
 

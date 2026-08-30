@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidHandle, isValidEmuHandle, isValidStatsShape, isValidBadgeConfig, isValidTelemetryPayload } from "./validation";
+import { isValidHandle, isValidEmuHandle, isValidStatsShape, isValidBadgeConfig, isValidTelemetryPayload, stripRetiredBadgeConfigKeys } from "./validation";
 import { DEFAULT_BADGE_CONFIG, BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 
 describe("isValidHandle", () => {
@@ -389,12 +389,23 @@ describe("isValidBadgeConfig", () => {
         border: "gradient-rotating",
         scoreEffect: "gold-shimmer",
         heatmapAnimation: "diagonal",
-        interaction: "tilt-3d",
-        statsDisplay: "animated-ease",
         tierTreatment: "enhanced",
-        celebration: "confetti",
       }),
     ).toBe(true);
+  });
+
+  // #1191 step 5 — the write path stays strict. A payload still carrying a
+  // retired key is normalized by stripRetiredBadgeConfigKeys before it gets
+  // here, so this guard never has to soften.
+  it("rejects a config still carrying the retired preview-only keys", () => {
+    expect(
+      isValidBadgeConfig({
+        ...DEFAULT_BADGE_CONFIG,
+        interaction: "tilt-3d",
+        statsDisplay: "animated-ease",
+        celebration: "confetti",
+      }),
+    ).toBe(false);
   });
 
   it("rejects null", () => {
@@ -437,10 +448,7 @@ describe("isValidBadgeConfig", () => {
       ["border", "neon"],
       ["scoreEffect", "neon"],
       ["heatmapAnimation", "neon"],
-      ["interaction", "neon"],
-      ["statsDisplay", "neon"],
       ["tierTreatment", "neon"],
-      ["celebration", "neon"],
     ] as const;
 
     for (const [field, badValue] of fields) {
@@ -609,5 +617,78 @@ describe("isValidTelemetryPayload", () => {
 
   it("accepts payload without errorCategory when success is true", () => {
     expect(isValidTelemetryPayload(without(validPayload, "errorCategory"))).toBe(true);
+  });
+});
+
+/**
+ * #1191 step 5 — dropping three categories from the schema would otherwise
+ * orphan every Studio config already saved with nine keys: `isValidBadgeConfig`
+ * rejects extra fields, so `dbGetStudioConfig` would report `invalid` and
+ * silently hand the owner back the default. Stripping the retired keys on read
+ * turns a legacy row into a valid six-key config instead of discarding a
+ * durable write.
+ */
+describe("stripRetiredBadgeConfigKeys", () => {
+  const LEGACY_CONFIG = {
+    background: "aurora",
+    cardStyle: "frost",
+    border: "gradient-rotating",
+    scoreEffect: "gold-shimmer",
+    heatmapAnimation: "diagonal",
+    interaction: "tilt-3d",
+    statsDisplay: "animated-ease",
+    tierTreatment: "enhanced",
+    celebration: "confetti",
+  };
+
+  it("turns a legacy nine-key config into a valid six-key one", () => {
+    const stripped = stripRetiredBadgeConfigKeys(LEGACY_CONFIG);
+    expect(isValidBadgeConfig(stripped)).toBe(true);
+  });
+
+  it("preserves every surviving choice", () => {
+    expect(stripRetiredBadgeConfigKeys(LEGACY_CONFIG)).toEqual({
+      background: "aurora",
+      cardStyle: "frost",
+      border: "gradient-rotating",
+      scoreEffect: "gold-shimmer",
+      heatmapAnimation: "diagonal",
+      tierTreatment: "enhanced",
+    });
+  });
+
+  it("leaves an already-current config untouched", () => {
+    expect(stripRetiredBadgeConfigKeys(DEFAULT_BADGE_CONFIG)).toEqual(
+      DEFAULT_BADGE_CONFIG,
+    );
+  });
+
+  it("does not mutate its input", () => {
+    const input = { ...LEGACY_CONFIG };
+    stripRetiredBadgeConfigKeys(input);
+    expect(input).toEqual(LEGACY_CONFIG);
+  });
+
+  it("keeps unknown fields so the validator still rejects them", () => {
+    const stripped = stripRetiredBadgeConfigKeys({
+      ...DEFAULT_BADGE_CONFIG,
+      unknownField: "evil",
+    });
+    expect(stripped).toHaveProperty("unknownField");
+    expect(isValidBadgeConfig(stripped)).toBe(false);
+  });
+
+  it("passes non-objects through for the validator to reject", () => {
+    expect(stripRetiredBadgeConfigKeys(null)).toBe(null);
+    expect(stripRetiredBadgeConfigKeys("string")).toBe("string");
+    expect(isValidBadgeConfig(stripRetiredBadgeConfigKeys(null))).toBe(false);
+  });
+
+  it("does not rescue a legacy config whose surviving values are invalid", () => {
+    const stripped = stripRetiredBadgeConfigKeys({
+      ...LEGACY_CONFIG,
+      background: "not-a-background",
+    });
+    expect(isValidBadgeConfig(stripped)).toBe(false);
   });
 });

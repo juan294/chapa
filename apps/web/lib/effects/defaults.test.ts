@@ -22,23 +22,38 @@ describe("effects/defaults", () => {
       }
     });
 
-    it("each preset config has all 9 badge config keys", () => {
+    it("each preset config has all 6 badge config keys", () => {
       const requiredKeys = [
         "background",
         "cardStyle",
         "border",
         "scoreEffect",
         "heatmapAnimation",
-        "interaction",
-        "statsDisplay",
         "tierTreatment",
-        "celebration",
       ];
       for (const preset of STUDIO_PRESETS) {
-        for (const key of requiredKeys) {
-          expect(preset.config).toHaveProperty(key);
+        expect(Object.keys(preset.config).sort()).toEqual(
+          [...requiredKeys].sort(),
+        );
+      }
+    });
+
+    // #1191 step 5 — a preset that still set interaction/statsDisplay/
+    // celebration would fail validation the moment it was saved.
+    it("no preset carries a retired preview-only key", () => {
+      for (const preset of STUDIO_PRESETS) {
+        for (const retired of ["interaction", "statsDisplay", "celebration"]) {
+          expect(preset.config, preset.id).not.toHaveProperty(retired);
         }
       }
+    });
+
+    // The "Holographic" preset was named for interaction: "holographic", which
+    // never reached the badge. It now earns the name from the score effect,
+    // which does.
+    it("keeps the holographic preset holographic in the shipped badge", () => {
+      const holographic = STUDIO_PRESETS.find((p) => p.id === "holographic");
+      expect(holographic?.config.scoreEffect).toBe("holographic");
     });
 
     it("has unique preset ids", () => {

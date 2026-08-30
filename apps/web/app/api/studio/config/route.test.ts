@@ -223,6 +223,32 @@ describe("PUT /api/studio/config", () => {
     expect(mockDbUpsertStudioConfig).toHaveBeenCalledWith("juan294", config);
   });
 
+  // #1191 step 5 — a Studio tab loaded before the three preview-only
+  // categories were dropped still posts nine keys. Rejecting it would 400 a
+  // client that is otherwise sending a perfectly good config, and persisting
+  // it verbatim would write retired keys back into the database that the read
+  // path then has to strip again forever.
+  it("accepts a stale client's legacy config and persists only the surviving keys", async () => {
+    const res = await PUT(
+      makePutRequest(
+        {
+          ...DEFAULT_BADGE_CONFIG,
+          background: "aurora",
+          interaction: "tilt-3d",
+          statsDisplay: "animated-ease",
+          celebration: "confetti",
+        },
+        "session=abc",
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockDbUpsertStudioConfig).toHaveBeenCalledWith("juan294", {
+      ...DEFAULT_BADGE_CONFIG,
+      background: "aurora",
+    });
+  });
+
   it("serializes concurrent saves for one handle so the last request wins", async () => {
     const operations: string[] = [];
     let releaseFirstWrite!: () => void;

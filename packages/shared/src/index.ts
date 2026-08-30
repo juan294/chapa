@@ -19,10 +19,7 @@ export type {
   BadgeBorder,
   BadgeScoreEffect,
   BadgeHeatmapAnimation,
-  BadgeInteraction,
-  BadgeStatsDisplay,
   BadgeTierTreatment,
-  BadgeCelebration,
   BadgeConfig,
   FeatureFlag,
   InsightsTool,
@@ -32,7 +29,7 @@ export type {
   CraftResult,
 } from "./types";
 
-export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";
+export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG, RETIRED_BADGE_CONFIG_KEYS } from "./types";
 
 export type { Platform, LinkedPlatform } from "./platforms";
 

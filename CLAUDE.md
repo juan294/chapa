@@ -11,7 +11,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
      - Note: "Quality Champion" is the display name; internal code/routes use "guardian" (e.g., `/archetypes/guardian`, `--color-archetype-guardian`)
    - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
 
-3. Serve **Creator Studio**: `/studio` (badge preview customization with 9 visual categories).
+3. Serve **Creator Studio**: `/studio` (badge customization with 6 visual categories, every one of which renders in the embedded badge).
 4. Serve **embeddable SVG badge**: `/u/:handle/badge.svg`
 5. Serve **share page**: `/u/:handle`
 6. Badge **verification** via HMAC-SHA256 hash (proves badge data hasn't been tampered with).
@@ -125,7 +125,7 @@ Shared types live in: `packages/shared/src/types.ts`
 - `StatsData` — aggregated GitHub stats (30 fields, includes `batchSizeScore`, `medianPrLeadTimeHours`, `primaryReviewsSubmittedCount`)
 - `ImpactV6Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `PublicImpactV6Result` / `ClientImpactV6Result` — `ImpactV6Result` with `confidence`/`confidencePenalties` omitted; used to redact confidence data out of the share page's server→client payload for visitors (#1067/#1122)
-- `BadgeConfig` — Creator Studio visual customization (9 categories)
+- `BadgeConfig` — Creator Studio visual customization (6 categories, all of which reach the SVG badge; `RETIRED_BADGE_CONFIG_KEYS` names the three dropped in #1191 and must be stripped from a persisted config before validation)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape
 - `MetricsSnapshot` — compact historical metric record (~300 bytes, stored in Supabase `metrics_snapshots` table)
@@ -152,7 +152,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Branding is isolated in `apps/web/lib/render/BadgeBranding.tsx`
 - Client-safe visual metadata lives in `apps/web/lib/badge-visual-metadata.ts`: platform logo paths, canonical platform order, and the verification coral token. Both the server SVG renderer and Studio preview consume it.
 - Creator Studio composes `BadgeContent` with `apps/web/app/studio/PreviewFooter.tsx` for platform, host, and optional verification parity. Studio config persistence does not change the public SVG badge or share page.
-- **This split is being closed (#1191).** `BadgeContent` is a second, DOM-based implementation of the badge that Studio previews instead of the real `renderBadgeSvg` output, so every visual element exists twice and Studio's nine customization categories reach nothing that ships. The decision to make `renderBadgeSvg` consume `BadgeConfig` and retire `BadgeContent` to a thin wrapper — which of the nine categories can cross to SVG and which cannot, the invariants that must survive, and how badge design versions are tracked — is `docs/decisions/2026-08-30-one-badge-artifact.md`. Until that lands, treat any change to a badge visual as needing the same change in both places.
+- **This split is being closed (#1191).** `BadgeContent` is a second, DOM-based implementation of the badge that Studio previews instead of the real `renderBadgeSvg` output, so every visual element still exists twice. The decision to make `renderBadgeSvg` consume `BadgeConfig` and retire `BadgeContent` to a thin wrapper — which categories can cross to SVG and which cannot, the invariants that must survive, and how badge design versions are tracked — is `docs/decisions/2026-08-30-one-badge-artifact.md`. `renderBadgeSvg` now consumes all six surviving `BadgeConfig` categories, and the three that could never cross were dropped from the schema rather than labelled (see that ADR's step 5 amendment). Until `BadgeContent` itself is retired, treat any change to a badge visual as needing the same change in both places.
 - Avatar placeholder (when no user photo) shows the Chapa shield icon
 
 ## Caching rules
@@ -212,7 +212,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Campaigns: `apps/web/lib/campaigns/*` — campaign send payload construction/validation shared by `/api/admin/campaigns/*` and `/api/cron/process-campaigns`
 - Score challenge: `apps/web/lib/challenge/*` — validation for `/api/challenge` score dispute submissions
 - Crypto helpers: `apps/web/lib/crypto/*` — constant-time comparison (`safe-equal.ts`) for HMAC/token verification
-- Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (interactions, borders, cards, celebrations, backgrounds, counters, heatmap animations, tier visuals) behind Creator Studio's 9 customization categories
+- Creator Studio effects: `apps/web/lib/effects/*` — visual effect implementations (borders, cards, backgrounds, heatmap animations, tier visuals) behind Creator Studio's 6 customization categories. `counters/` is no longer one of them: it survives because the dashboard uses it. `interactions/use-tilt` and `celebrations/confetti` likewise survive only for their `/experiments/*` prototypes (#1191)
 - Creator Studio UI: `apps/web/app/studio/*` — authenticated owner preview, controls, save state, command actions, and preview footer composition
 - Creator Studio config: `apps/web/app/api/studio/config/route.ts`, `apps/web/lib/db/studio.ts` — Supabase is the only store; both GET and PUT read/write it directly with no Redis involvement (#1186/BE-L1 removed the Redis read because every cache hit still required a second, independent Supabase revision check to trust it; a later remediation removed the now-orphaned Redis write too, since nothing read that mirror back once the read path stopped consulting it). Migration 035's `revision` column and `set_studio_config_revision` trigger remain — `dbGetStudioConfig` still validates and returns a monotonically-increasing `revision` per row — but nothing outside this module consumes it today.
 - HTTP utilities: `apps/web/lib/http/*` — client IP extraction (`client-ip.ts`) for rate limiting
@@ -232,7 +232,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
 - Repo contains `docs/impact-v6.md` (current spec truth), `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
-- Creator Studio at `/studio` allows badge preview customization (9 visual categories); saved settings do not alter the public badge or share page.
+- Creator Studio at `/studio` allows badge customization (6 visual categories). Saving a config changes the embedded SVG badge and invalidates its cache. The three categories that could never reach an SVG — a hover tilt, a counting animation, a confetti burst on load — were removed in #1191 rather than shown as preview-only decoration.
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
 - Lifetime metric snapshots are recorded automatically (cron, badge route, refresh).

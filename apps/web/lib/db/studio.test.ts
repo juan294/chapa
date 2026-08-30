@@ -199,6 +199,54 @@ describe("dbGetStudioConfig", () => {
     expect(await dbGetStudioConfig("juan294")).toEqual({ status: "invalid" });
   });
 
+  // #1191 step 5 — rows written before the three preview-only categories were
+  // dropped still carry nine keys. isValidBadgeConfig rejects extra fields, so
+  // without stripping them on read every one of those saved configs would come
+  // back "invalid" and the owner would silently get the default instead of the
+  // badge they saved. A durable write must not be discarded by a schema change.
+  it("loads a legacy nine-key row as a valid six-key config", async () => {
+    terminalResolve = {
+      data: {
+        handle: "juan294",
+        config: {
+          ...config,
+          interaction: "tilt-3d",
+          statsDisplay: "animated-ease",
+          celebration: "confetti",
+        },
+        updated_at: "2026-06-25T00:00:00Z",
+        revision: 42,
+      },
+      error: null,
+    };
+
+    expect(await dbGetStudioConfig("juan294")).toEqual({
+      status: "found",
+      config,
+      revision: 42,
+    });
+  });
+
+  it("still reports invalid when a legacy row's surviving values are bad", async () => {
+    terminalResolve = {
+      data: {
+        handle: "juan294",
+        config: {
+          ...config,
+          background: "not-a-background",
+          interaction: "tilt-3d",
+          statsDisplay: "animated-ease",
+          celebration: "confetti",
+        },
+        updated_at: "2026-06-25T00:00:00Z",
+        revision: 42,
+      },
+      error: null,
+    };
+
+    expect(await dbGetStudioConfig("juan294")).toEqual({ status: "invalid" });
+  });
+
   it("fails open with unavailable when the Supabase read exceeds its deadline", async () => {
     vi.useFakeTimers();
     terminalNeverResolves = true;

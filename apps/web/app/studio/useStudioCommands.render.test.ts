@@ -22,10 +22,7 @@ const DEFAULT_CONFIG: BadgeConfig = {
   border: "solid-amber",
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
-  interaction: "static",
-  statsDisplay: "static",
   tierTreatment: "standard",
-  celebration: "none",
 };
 
 function getCommands(config = DEFAULT_CONFIG, handle = "testuser", locale?: "es") {

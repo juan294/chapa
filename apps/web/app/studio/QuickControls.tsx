@@ -146,19 +146,6 @@ export function QuickControls({
                   >
                     <span className="flex items-center gap-2 font-heading text-text-secondary">
                       {getCategoryLabel(category, t)}
-                      {/* #1191 — the badge is an image: no pointer, no JS loop,
-                          no "on load". These three can be previewed here and
-                          nowhere else, and saying so is the difference between
-                          a preview and a promise. */}
-                      {category.previewOnly && (
-                        <span
-                          data-testid={`preview-only-${category.key}`}
-                          title={t("studio.previewOnlyHint") as string}
-                          className="rounded-full border border-stroke px-1.5 py-0.5 text-[10px] tracking-wide text-terminal-dim uppercase"
-                        >
-                          {t("studio.previewOnly") as string}
-                        </span>
-                      )}
                     </span>
                     <span className="text-terminal-dim font-heading text-xs">
                       {currentValue}
