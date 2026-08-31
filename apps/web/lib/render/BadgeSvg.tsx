@@ -92,7 +92,7 @@ export function renderBadgeSvg(
   // so a Studio palette reaches the artifact people embed rather than only the
   // preview. `jade` (the default) resolves to the values the badge already
   // shipped, so an omitted or default config renders byte-identically.
-  const t = badgeTheme(config.palette);
+  const t = badgeTheme(config.colorPalette);
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
     ? escapeXml(stats.displayName)

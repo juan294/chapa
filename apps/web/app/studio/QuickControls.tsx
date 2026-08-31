@@ -231,8 +231,10 @@ export function QuickControls({
                                 text-safe accent, used for the row value where
                                 the type is larger. */}
                             <span
-                              className={`font-heading text-[11px] text-text-primary ${
-                                opt.value === currentValue ? "font-bold" : ""
+                              className={`font-heading text-xs ${
+                                opt.value === currentValue
+                                  ? "font-bold text-amber-text"
+                                  : "text-text-primary"
                               }`}
                             >
                               {opt.value === currentValue && (
@@ -243,23 +245,35 @@ export function QuickControls({
                             {/* The description was already in STUDIO_CATEGORIES
                                 but nothing rendered it, so picking an effect
                                 meant guessing from its name (#1216). */}
-                            <span className="text-[11px] text-text-secondary">
+                            <span
+                              className={`text-[11px] ${
+                                opt.value === currentValue
+                                  ? "text-text-secondary"
+                                  : "text-terminal-dim"
+                              }`}
+                            >
                               {getOptionDescription(category.key, opt.value, t)}
                             </span>
-                            {/* #1242 — a colour choice shows its colours. The
-                                dots are the palette's own ground, card and
-                                accent; decorative, so the label and the
-                                description carry the meaning. */}
+                            {/* #1242/#1245 — a colour choice shows its colours,
+                                to the handoff's pixel spec: three 14px rounded
+                                squares (a circle reads as a radio input), in
+                                primary -> secondary -> accent order, each with
+                                the HEAVIER hairline — without it a dark primary
+                                vanishes into a dark-theme chip. The dots are the
+                                palette's own ground, card and accent, read from
+                                the renderer, and they are literal hex: they must
+                                not flip with the app theme. Decorative, so the
+                                label and description carry the meaning. */}
                             {opt.swatches && (
                               <span
                                 aria-hidden="true"
                                 data-testid={`swatch-${category.key}-${opt.value}`}
-                                className="mt-1 flex gap-1"
+                                className="mt-[3px] flex gap-1"
                               >
                                 {opt.swatches.map((color) => (
                                   <span
                                     key={color}
-                                    className="block size-3 rounded-[3px] border border-stroke"
+                                    className="block size-3.5 rounded-[4px] border border-stroke-strong"
                                     style={{ backgroundColor: color }}
                                   />
                                 ))}

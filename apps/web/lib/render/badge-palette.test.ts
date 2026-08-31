@@ -26,7 +26,7 @@ const RENDER_PATH_FILES = [
 ];
 
 const REPO_ROOT = resolve(__dirname, "../../../..");
-const PALETTES = BADGE_CONFIG_OPTIONS.palette;
+const PALETTES = BADGE_CONFIG_OPTIONS.colorPalette;
 
 /** sRGB relative luminance, per WCAG 2.x. */
 function luminance(hex: string): number {

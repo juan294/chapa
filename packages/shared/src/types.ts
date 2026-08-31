@@ -292,7 +292,7 @@ export interface BadgeConfig {
   scoreEffect: BadgeScoreEffect;
   heatmapAnimation: BadgeHeatmapAnimation;
   tierTreatment: BadgeTierTreatment;
-  palette: BadgePalette;
+  colorPalette: BadgePalette;
 }
 
 /**
@@ -318,7 +318,7 @@ export const BADGE_CONFIG_OPTIONS = {
   scoreEffect: ["standard", "gold-shimmer", "gold-leaf", "chrome", "embossed", "neon-amber", "holographic"] as const,
   heatmapAnimation: ["fade-in", "diagonal", "ripple", "scatter", "cascade", "waterfall"] as const,
   tierTreatment: ["standard", "enhanced"] as const,
-  palette: ["jade", "indigo", "amber", "crimson", "mono"] as const,
+  colorPalette: ["jade", "indigo", "amber", "crimson", "mono"] as const,
 } as const;
 
 /** Default config — all fields set to their first (most basic) option */
@@ -329,7 +329,7 @@ export const DEFAULT_BADGE_CONFIG: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
-  palette: "jade",
+  colorPalette: "jade",
 };
 
 // ---------------------------------------------------------------------------

@@ -390,7 +390,7 @@ describe("isValidBadgeConfig", () => {
         scoreEffect: "gold-shimmer",
         heatmapAnimation: "diagonal",
         tierTreatment: "enhanced",
-        palette: "indigo",
+        colorPalette: "indigo",
       }),
     ).toBe(true);
   });
@@ -653,12 +653,12 @@ describe("withDefaultBadgeConfigKeys", () => {
   it("fills the missing key with its default and preserves every stored choice", () => {
     expect(withDefaultBadgeConfigKeys(PRE_PALETTE_CONFIG)).toEqual({
       ...PRE_PALETTE_CONFIG,
-      palette: "jade",
+      colorPalette: "jade",
     });
   });
 
   it("never overwrites a value the owner actually saved", () => {
-    const saved = { ...DEFAULT_BADGE_CONFIG, palette: "indigo" as const };
+    const saved = { ...DEFAULT_BADGE_CONFIG, colorPalette: "indigo" as const };
     expect(withDefaultBadgeConfigKeys(saved)).toEqual(saved);
   });
 

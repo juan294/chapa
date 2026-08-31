@@ -32,7 +32,7 @@ describe("BadgeConfig schema after the preview-only drop (#1191)", () => {
         // #1242 — palette resolves in the renderer, so it crosses like the
         // rest. A category that could only be seen in the preview does not
         // belong in this list; that was the whole point of #1191.
-        "palette",
+        "colorPalette",
       ].sort(),
     );
   });
