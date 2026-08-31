@@ -189,25 +189,17 @@ export function LandingContent({
               command="chapa preview @developer"
               meta={sectionMeta.preview}
             />
-            {/* Always dark in both themes: the badge is a server-rendered
-                artifact, and this panel is its frame. */}
-            <div className="overflow-hidden rounded-2xl border border-forest-line bg-forest shadow-card">
-              <div className="flex items-center gap-2 border-b border-forest-line px-4 py-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-forest-err/60" />
-                <div className="w-2.5 h-2.5 rounded-full bg-forest-warn/60" />
-                <div className="w-2.5 h-2.5 rounded-full bg-forest-ok/60" />
-                <span className="ml-2 font-heading text-xs text-forest-dim">badge.svg</span>
-              </div>
-              <div className="relative max-h-[360px] aspect-[16/5]">
-                {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded demo data (DEMO_STATS, DEMO_IMPACT) — no user input reaches this point. See lib/render/escape.ts for escaping. */}
-                <div
-                  className="h-full [&>svg]:h-full [&>svg]:w-full"
-                  role="img"
-                  aria-label={heroBadgePreviewLabel}
-                  dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
-                />
-                <BadgeOverlay />
-              </div>
+            {/* The badge carries its own dark ground and rounded corners, so it
+                needs no frame here — it renders exactly as in a README embed. */}
+            <div className="relative mx-auto w-full max-w-[1200px]">
+              {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded demo data (DEMO_STATS, DEMO_IMPACT) — no user input reaches this point. See lib/render/escape.ts for escaping. */}
+              <div
+                className="drop-shadow-2xl [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+                role="img"
+                aria-label={heroBadgePreviewLabel}
+                dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
+              />
+              <BadgeOverlay />
             </div>
           </div>
         </section>
