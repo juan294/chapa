@@ -29,14 +29,30 @@ import { loadConfig, type Config } from "./lib/env";
 // Pure helpers (unit-tested in delete-user.test.ts)
 // ---------------------------------------------------------------------------
 
-/** Every Supabase table that stores per-user rows, keyed by handle column. */
+/**
+ * Every Supabase table that stores per-user rows, keyed by handle column.
+ *
+ * A table appears once per handle-bearing column: `merge_operations` and
+ * `supplemental_stats` each record BOTH sides of an EMU merge, and the work
+ * account named in `source_handle` is this user's data just as much as the
+ * primary identity in `target_handle` is.
+ *
+ * Keep this list exhaustive. `delete-user.test.ts` reads
+ * `supabase/migrations/` and fails if any handle-bearing column is missing
+ * here, because the script's verify pass only re-checks the tables it knows
+ * about — an omission reports a clean deletion while leaving rows behind.
+ */
 export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string }> =
   [
     { table: "users", column: "handle" },
     { table: "metrics_snapshots", column: "handle" },
     { table: "verification_records", column: "handle" },
     { table: "user_platforms", column: "handle" },
+    { table: "studio_configs", column: "handle" },
     { table: "supplemental_stats", column: "target_handle" },
+    { table: "supplemental_stats", column: "source_handle" },
+    { table: "merge_operations", column: "target_handle" },
+    { table: "merge_operations", column: "source_handle" },
     { table: "tool_insights", column: "handle" },
     { table: "campaign_sends", column: "handle" },
   ];
