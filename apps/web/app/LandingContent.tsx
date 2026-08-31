@@ -40,6 +40,25 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
+/**
+ * Splits a hero bullet on `**keyword**` markers into text and bolded nodes
+ * (#1240). Bold-only, no markdown lib: translators mark emphasis per locale
+ * without needing the same substring to exist across languages (the
+ * structured-bullets alternative would break on that).
+ */
+function renderBoldedBullet(text: string) {
+  return text.split(/(\*\*.+?\*\*)/g).map((part, index) => {
+    const match = /^\*\*(.+)\*\*$/.exec(part);
+    return match ? (
+      <strong key={index} className="font-semibold">
+        {match[1]}
+      </strong>
+    ) : (
+      part
+    );
+  });
+}
+
 function ShieldCheckIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -148,9 +167,15 @@ export function LandingContent({
               <br />
               <span className="text-amber">{heroHighlight}</span>
             </h1>
-            <div className="mt-6 space-y-2 text-[clamp(0.9rem,1.6cqi,1.0625rem)] text-text-secondary">
+            <div className="mt-6 flex flex-col gap-2.5">
               {heroBullets.map((bullet) => (
-                <p key={bullet} className="text-pretty">{bullet}</p>
+                <p
+                  key={bullet}
+                  className="flex gap-2.5 text-[clamp(0.9rem,1.6cqi,1.0625rem)] text-text-secondary text-pretty"
+                >
+                  <span className="shrink-0 text-terminal-green" aria-hidden="true">▸</span>
+                  <span>{renderBoldedBullet(bullet)}</span>
+                </p>
               ))}
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3">

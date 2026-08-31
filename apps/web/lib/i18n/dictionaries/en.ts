@@ -93,9 +93,9 @@ export const en: Translations = {
       leadImpact: 'impact',
       leadAfter: 'in AI-assisted coding.',
       bullets: [
-        'Commit counts and green squares no longer tell the whole story.',
-        'Chapa measures what matters: how you build, care for quality, stay consistent, and explore — 365 days of activity.',
-        'One embeddable badge. Multiple dimensions. Verified metrics include a cryptographic seal.',
+        'Commit counts and green squares no longer tell the **whole story**.',
+        'Chapa measures what matters: how you **build**, care for **quality**, stay **consistent**, and **explore** — 365 days of activity.',
+        'One embeddable badge. Multiple dimensions. Verified metrics include a **cryptographic seal**.',
       ],
       primaryCta: 'Get your badge',
       primaryCtaPending: 'Connecting…',

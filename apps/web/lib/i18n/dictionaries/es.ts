@@ -87,9 +87,9 @@ export const es: Translations = {
       leadImpact: 'impacto',
       leadAfter: 'en programación asistida por IA.',
       bullets: [
-        'Los commits y los cuadros verdes ya no cuentan toda la historia.',
-        'Chapa mide lo que importa: cómo construyes, cuidas la calidad, mantienes la constancia y exploras, con 365 días de actividad.',
-        'Una Chapa embebible. Múltiples dimensiones. Las métricas verificadas incluyen un sello criptográfico.',
+        'Los commits y los cuadros verdes ya no cuentan **toda la historia**.',
+        'Chapa mide lo que importa: cómo **construyes**, cuidas la **calidad**, mantienes la **constancia** y **exploras**, con 365 días de actividad.',
+        'Una Chapa embebible. Múltiples dimensiones. Las métricas verificadas incluyen un **sello criptográfico**.',
       ],
       primaryCta: 'Consigue tu Chapa',
       primaryCtaPending: 'Conectando…',
