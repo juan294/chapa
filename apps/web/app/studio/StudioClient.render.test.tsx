@@ -269,6 +269,7 @@ const defaultConfig: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
+  palette: "jade",
 };
 
 const stats: StatsData = {

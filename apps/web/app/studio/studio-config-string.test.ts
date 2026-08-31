@@ -15,6 +15,7 @@ describe("formatConfigSummary", () => {
         "score=standard",
         "heatmap=fade-in",
         "tier=standard",
+        "palette=jade",
       ].join("  ·  "),
     );
   });
@@ -38,6 +39,7 @@ describe("formatConfigCommands", () => {
       "/set score standard",
       "/set heatmap fade-in",
       "/set tier standard",
+      "/set palette jade",
     ]);
   });
 

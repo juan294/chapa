@@ -197,6 +197,25 @@ export function QuickControls({
                             <span className="text-[11px] text-text-secondary">
                               {getOptionDescription(category.key, opt.value, t)}
                             </span>
+                            {/* #1242 — a colour choice shows its colours. The
+                                dots are the palette's own ground, card and
+                                accent; decorative, so the label and the
+                                description carry the meaning. */}
+                            {opt.swatches && (
+                              <span
+                                aria-hidden="true"
+                                data-testid={`swatch-${category.key}-${opt.value}`}
+                                className="mt-1 flex gap-1"
+                              >
+                                {opt.swatches.map((color) => (
+                                  <span
+                                    key={color}
+                                    className="block size-3 rounded-[3px] border border-stroke"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                ))}
+                              </span>
+                            )}
                           </button>
                         ))}
                       </div>

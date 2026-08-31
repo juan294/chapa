@@ -1,11 +1,37 @@
-import type { BadgeConfig } from "@chapa/shared";
+import type { BadgeConfig, BadgePalette } from "@chapa/shared";
+import { BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 import type { LanguageContextValue } from "@/lib/i18n";
+import { badgeTheme } from "@/lib/render/theme";
+
+const PALETTE_LABELS: Record<
+  BadgePalette,
+  { label: string; description: string }
+> = {
+  jade: { label: "Jade", description: "Chapa default" },
+  indigo: { label: "Indigo Night", description: "Violet-blue on deep navy" },
+  amber: { label: "Amber Forge", description: "Warm gold on charcoal" },
+  crimson: { label: "Crimson", description: "Rose on oxblood" },
+  mono: { label: "Monochrome", description: "Neutral grays" },
+};
+
+function paletteSwatches(
+  palette: BadgePalette,
+): readonly [string, string, string] {
+  const theme = badgeTheme(palette);
+  return [theme.bg, theme.card, theme.accent];
+}
 
 /** Metadata for a single selectable option */
 export interface OptionMeta {
   value: string;
   label: string;
   description: string;
+  /**
+   * Colour chips shown on the option, for a category whose choice IS a colour
+   * (#1242). Quick Controls renders them as dots; a name like "Indigo Night"
+   * says nothing about what the badge will look like on its own.
+   */
+  swatches?: readonly [string, string, string];
 }
 
 /** Metadata for one effect category in the Studio controls */
@@ -102,6 +128,19 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
       { value: "standard", label: "Standard", description: "Simple tier pill" },
       { value: "enhanced", label: "Enhanced", description: "Sparkle dots for high tiers" },
     ],
+  },
+  {
+    // #1242 — the swatches are the palette's own ground, card and accent, read
+    // from `lib/render/theme.ts` rather than re-typed. A swatch that drifts
+    // from the badge it advertises is worse than no swatch.
+    key: "palette",
+    label: "Color Palette",
+    options: BADGE_CONFIG_OPTIONS.palette.map((value) => ({
+      value,
+      label: PALETTE_LABELS[value].label,
+      description: PALETTE_LABELS[value].description,
+      swatches: paletteSwatches(value),
+    })),
   },
 ];
 

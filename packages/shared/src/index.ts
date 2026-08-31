@@ -20,6 +20,7 @@ export type {
   BadgeScoreEffect,
   BadgeHeatmapAnimation,
   BadgeTierTreatment,
+  BadgePalette,
   BadgeConfig,
   FeatureFlag,
   InsightsTool,

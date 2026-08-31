@@ -20,7 +20,7 @@ describe("BadgeConfig schema after the preview-only drop (#1191)", () => {
     expect([...RETIRED_BADGE_CONFIG_KEYS].sort()).toEqual([...RETIRED].sort());
   });
 
-  it("has exactly the six categories that reach the SVG", () => {
+  it("has exactly the categories that reach the SVG", () => {
     expect(Object.keys(BADGE_CONFIG_OPTIONS).sort()).toEqual(
       [
         "background",
@@ -29,6 +29,10 @@ describe("BadgeConfig schema after the preview-only drop (#1191)", () => {
         "heatmapAnimation",
         "scoreEffect",
         "tierTreatment",
+        // #1242 — palette resolves in the renderer, so it crosses like the
+        // rest. A category that could only be seen in the preview does not
+        // belong in this list; that was the whole point of #1191.
+        "palette",
       ].sort(),
     );
   });

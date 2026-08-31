@@ -1,6 +1,6 @@
 import type { StatsData, ImpactV6Result, Platform, BadgeConfig } from "@chapa/shared";
 import { formatCompact, DEFAULT_BADGE_CONFIG } from "@chapa/shared";
-import { WARM_AMBER, accentTint, getTierColor, getArchetypeColor } from "./theme";
+import { badgeTheme, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderBadgeBranding } from "./BadgeBranding";
 import { renderRadarChart, type RadarChartLabels } from "./RadarChart";
@@ -88,12 +88,16 @@ export function renderBadgeSvg(
 ): string {
   const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {}, config = DEFAULT_BADGE_CONFIG } = options;
   const hasVerification = Boolean(verificationHash && verificationDate);
-  const t = WARM_AMBER;
+  // #1242 — the palette is resolved from the config, not a module singleton,
+  // so a Studio palette reaches the artifact people embed rather than only the
+  // preview. `jade` (the default) resolves to the values the badge already
+  // shipped, so an omitted or default config renders byte-identically.
+  const t = badgeTheme(config.palette);
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
     ? escapeXml(stats.displayName)
     : `@${safeHandle}`;
-  const tierColor = getTierColor(impact.tier);
+  const tierColor = getTierColor(impact.tier, t);
   const archetypeColor = getArchetypeColor(impact.archetype);
 
   // Layout constants
@@ -107,7 +111,7 @@ export function renderBadgeSvg(
   const effectContext = {
     width: W,
     height: H,
-    stroke: t.stroke,
+    theme: t,
     disableAnimation,
   };
   const borderEffect = renderBorderEffect(config.border, effectContext);
@@ -163,6 +167,7 @@ export function renderBadgeSvg(
     heatmapX,
     heatmapY,
     config.heatmapAnimation,
+    t,
   );
   const heatmapSvg = renderHeatmapSvg(heatmapCells, { disableAnimation });
 
@@ -182,7 +187,7 @@ export function renderBadgeSvg(
     craft: strings.radarLabels?.craft ?? "Craft",
     noData: strings.radarNoData ?? "no data yet",
   };
-  const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR, radarLabels);
+  const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR, radarLabels, t);
 
   // ── Hero score ring (right column, below radar) ───────────
   const scoreStr = String(impact.adjustedComposite);
@@ -223,7 +228,7 @@ export function renderBadgeSvg(
     ? ["github", "bitbucket", "codeberg", "gitlab"]
     : ["github" as Platform, ...(stats.linkedPlatforms?.filter((p): p is Platform => p !== "github") ?? [])];
   const brandingSvg = includeBranding
-    ? renderBadgeBranding(PAD, footerY, W - PAD, brandingPlatforms)
+    ? renderBadgeBranding(PAD, footerY, W - PAD, brandingPlatforms, t)
     : "";
 
   // Verification strip (right edge)
@@ -292,7 +297,7 @@ export function renderBadgeSvg(
       <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}"/>
     </clipPath>
   </defs>
-  <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}" fill="${accentTint(0.1)}" stroke="${accentTint(0.25)}" stroke-width="2"/>
+  <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}" fill="${t.tint(0.1)}" stroke="${t.tint(0.25)}" stroke-width="2"/>
   ${avatarDataUri ? `<image href="${escapeXml(avatarDataUri)}" x="${avatarCX - avatarR}" y="${avatarCY - avatarR}" width="${avatarR * 2}" height="${avatarR * 2}" clip-path="url(#avatar-clip)"/>` : `<g transform="translate(${avatarCX - 14}, ${avatarCY - 14})">
     <path d="M14 0.875L25.375 5.25L25.375 13.125C25.375 20.125 20.125 25.375 14 27.125C7.875 25.375 2.625 20.125 2.625 13.125L2.625 5.25Z" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" opacity="0.5"/>
     <path d="M8.75 17.5L14 10.5L19.25 17.5" fill="none" stroke="${t.accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
@@ -312,7 +317,7 @@ export function renderBadgeSvg(
   <!-- ─── Archetype + metric pills row (above heatmap) ────── -->
   <!-- Archetype pill with code-brackets icon -->
   <g transform="translate(${heatmapX}, ${metaRowY - pillH / 2})">
-    <rect width="${archetypePillWidth}" height="${pillH}" rx="${pillR}" fill="${accentTint(0.1)}" stroke="${accentTint(0.25)}" stroke-width="1"/>
+    <rect width="${archetypePillWidth}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.1)}" stroke="${t.tint(0.25)}" stroke-width="1"/>
     <g transform="translate(14, 8)">
       <path d="M8 2L3 8.5L8 15" fill="none" stroke="${archetypeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M14 2L19 8.5L14 15" fill="none" stroke="${archetypeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -323,7 +328,7 @@ export function renderBadgeSvg(
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Repos pill -->
   <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
-    <rect width="${reposPillW}" height="${pillH}" rx="${pillR}" fill="${accentTint(0.06)}" stroke="${accentTint(0.15)}" stroke-width="1"/>
+    <rect width="${reposPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <g transform="translate(12, 9)" opacity="0.7">
       <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3zm6 0v10M2 8h12" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
@@ -333,7 +338,7 @@ export function renderBadgeSvg(
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Watch pill -->
   <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
-    <rect width="${watchPillW}" height="${pillH}" rx="${pillR}" fill="${accentTint(0.06)}" stroke="${accentTint(0.15)}" stroke-width="1"/>
+    <rect width="${watchPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <g transform="translate(12, 9)">
       <path d="M1 7.5C1 7.5 3.5 2.5 8 2.5S15 7.5 15 7.5S12.5 12.5 8 12.5S1 7.5 1 7.5Z" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
       <circle cx="8" cy="7.5" r="2.5" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" opacity="0.7"/>
@@ -344,7 +349,7 @@ export function renderBadgeSvg(
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Fork pill -->
   <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
-    <rect width="${forkPillW}" height="${pillH}" rx="${pillR}" fill="${accentTint(0.06)}" stroke="${accentTint(0.15)}" stroke-width="1"/>
+    <rect width="${forkPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <g transform="translate(12, 9)" opacity="0.7">
       <path d="M6 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM6 11a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM14 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM4 5v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V5" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="scale(0.95)"/>
     </g>
@@ -354,7 +359,7 @@ export function renderBadgeSvg(
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Star pill -->
   <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
-    <rect width="${starPillW}" height="${pillH}" rx="${pillR}" fill="${accentTint(0.06)}" stroke="${accentTint(0.15)}" stroke-width="1"/>
+    <rect width="${starPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <text x="12" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}"><tspan fill="${t.accent}">\u2605</tspan> ${starLabel}</text>
   </g>
 
@@ -368,7 +373,7 @@ export function renderBadgeSvg(
 
   <!-- ─── Hero composite score ring (right column) ────────── -->
   <!-- Ring track (background) -->
-  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${accentTint(0.1)}" stroke-width="4"/>
+  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${t.tint(0.1)}" stroke-width="4"/>
   <!-- Ring arc (foreground, tier-colored, animates from 0 to score) -->
   <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})" style="animation: ring-draw 1.2s ease-out 0.5s both"/>
   <!-- Score number (centered inside ring) -->
