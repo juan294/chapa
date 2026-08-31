@@ -694,7 +694,7 @@ export function StudioClient({
                     onClick={() => setZoom(option.id)}
                     className={`min-h-[36px] rounded-md px-3 font-heading text-[11.5px] transition-colors ${
                       selected
-                        ? "bg-amber/10 font-bold text-text-primary"
+                        ? "bg-amber/10 font-bold text-amber-text"
                         : "text-text-secondary hover:text-text-primary"
                     }`}
                   >

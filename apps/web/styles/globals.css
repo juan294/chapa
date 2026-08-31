@@ -55,6 +55,13 @@ html[lang="en"] [data-document-locale="es"] {
   --color-amber: light-dark(oklch(.66 .15 163), oklch(.76 .16 163));
   --color-amber-light: light-dark(oklch(.76 .14 163), oklch(.84 .14 163));
   --color-amber-dark: light-dark(oklch(.5 .12 165), oklch(.58 .14 165));
+  /* Accent-coloured TEXT and icon strokes (#1243). `--color-amber` is a
+     fill/tint value: it measures 2.75:1 on the light ground, below AA for any
+     text size. This is its text-safe counterpart - the light half darkens, the
+     dark half brightens, so both gain contrast against their own ground
+     (5.28:1 light, 11.94:1 dark). Same shape and same reason as
+     --color-complement-text. */
+  --color-amber-text: light-dark(oklch(.5 .12 165), oklch(.84 .14 163));
 
   /* status — success is hue 145, deliberately NOT the accent's 163. With a
      green brand accent, an unshifted success color reads as a brand highlight. */
