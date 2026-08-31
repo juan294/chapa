@@ -227,6 +227,32 @@ describe("dbGetStudioConfig", () => {
     });
   });
 
+  it("loads a row saved before palette was renamed to colorPalette", async () => {
+    terminalResolve = {
+      data: {
+        handle: "juan294",
+        config: {
+          background: "aurora",
+          cardStyle: "flat",
+          border: "solid-amber",
+          scoreEffect: "standard",
+          heatmapAnimation: "fade-in",
+          tierTreatment: "standard",
+          palette: "indigo",
+        },
+        updated_at: "2026-08-31T13:15:00Z",
+        revision: 42,
+      },
+      error: null,
+    };
+
+    expect(await dbGetStudioConfig("juan294")).toEqual({
+      status: "found",
+      config: { ...config, colorPalette: "indigo" },
+      revision: 42,
+    });
+  });
+
   it("still reports invalid when a legacy row's surviving values are bad", async () => {
     terminalResolve = {
       data: {

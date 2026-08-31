@@ -32,6 +32,7 @@ import { parseRow } from "./parse-row";
 import { withTimeout } from "../async/with-timeout";
 import {
   isValidBadgeConfig,
+  renameLegacyBadgeConfigKeys,
   stripRetiredBadgeConfigKeys,
   withDefaultBadgeConfigKeys,
 } from "../validation";
@@ -174,12 +175,13 @@ export async function dbGetStudioConfig(
     // being reported invalid, which would silently discard a durable write and
     // hand the owner back the default badge.
     //
-    // #1242: the same hazard in the other direction. isValidBadgeConfig also
-    // requires every key to be PRESENT, so a row saved before `palette` existed
-    // would fail for the field it could not have had. Default the missing ones
-    // in, then validate.
+    // #1242/#1245: the same hazard in the other direction. Rename the briefly
+    // persisted `palette` key to `colorPalette`, then fill fields a row predates.
+    // isValidBadgeConfig requires every current key and rejects every extra one.
     const config = row
-      ? withDefaultBadgeConfigKeys(stripRetiredBadgeConfigKeys(row.config))
+      ? withDefaultBadgeConfigKeys(
+          renameLegacyBadgeConfigKeys(stripRetiredBadgeConfigKeys(row.config)),
+        )
       : undefined;
     if (!row || !isValidBadgeConfig(config)) {
       console.error(
