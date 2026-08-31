@@ -342,15 +342,16 @@ Go directly to these paths -- never search for them.
 2. Never commit directly to `main` — it represents what's deployed
 3. Release to production via a `develop` → `main` **merge-commit** PR, following
    `docs/release/release-playbook.md`; PR, merge, and tag approvals are separate.
-   **Never squash a release PR.** Squashing discards shared history, so `main`'s
-   tip stops being an ancestor of `develop` and the *next* release PR computes a
-   stale merge-base — it comes back `CONFLICTING`, and a conflicting PR runs
+   **Never squash a release PR.** A squash does not record the released
+   `develop` commit as a parent, so the *next* release PR computes a stale
+   merge-base — it comes back `CONFLICTING`, and a conflicting PR runs
    none of its `pull_request` checks, so the pending-migrations gate reports
    `skipped` rather than failing. That cost 40 hand-made back-merge commits and
    an auto-back-merge workflow that never once succeeded (it could not push to
-   protected `develop`). A merge commit preserves ancestry by construction and
-   needs no reconciliation; `git log --first-parent main` still reads one line
-   per release. See #1228. Feature PRs into `develop` may still squash.
+   protected `develop`). A merge commit records the released `develop` commit
+   as a parent, advances the shared merge-base, and needs no reconciliation;
+   `git log --first-parent main` still reads one line per release. See #1228.
+   Feature PRs into `develop` may still squash.
 4. Always run checks before committing (pre-commit hooks enforce this)
 5. Always `git pull --rebase` before pushing
 6. Run verification sequentially with `;` or `&&`, never as parallel Bash calls

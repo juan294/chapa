@@ -95,6 +95,20 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
 
   const lowerPlaybook = playbook.toLowerCase();
 
+  const topologyProof = [
+    "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"",
+    "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"",
+    "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"",
+  ];
+  if (
+    topologyProof.some((instruction) => !playbook.includes(instruction)) ||
+    playbook.includes("git merge-base --is-ancestor origin/main origin/develop")
+  ) {
+    errors.push(
+      `${PLAYBOOK}: preflight must prove the prospective main tree equals the develop tree`,
+    );
+  }
+
   const releasePrCreationIndex = lowerPlaybook.indexOf("create or reuse the");
   const requiredChecksWaitIndex = lowerPlaybook.indexOf("gh pr checks");
   if (
@@ -222,13 +236,13 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
             : file === PLAYBOOK
               ? playbook
               : read(root, file, errors);
-    // #1228 — inverted. Squash-merging develop into main discards ancestry, so
-    // main's tip stops being an ancestor of develop and the NEXT release PR
-    // computes a stale merge-base. That produced a CONFLICTING PR, and a
+    // #1228 — inverted. Squash-merging develop into main does not record the
+    // released develop commit as a parent, so the NEXT release PR computes a
+    // stale merge-base. That produced a CONFLICTING PR, and a
     // conflicting PR runs none of its pull_request checks — the migrations gate
     // reports `skipped`, not failed. Chapa carried 40 hand-made back-merge
-    // commits before this changed. A merge commit preserves ancestry by
-    // construction and needs no reconciliation at all.
+    // commits before this changed. A merge commit advances the shared merge-base
+    // to the released develop commit and needs no reconciliation.
     if (/\bgh\s+pr\s+merge\s+--squash\b/.test(source)) {
       errors.push(
         `${file}: squash release semantics discard ancestry — releases merge (#1228)`,
