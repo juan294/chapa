@@ -236,9 +236,9 @@ describe("categories that cross to SVG (#1191)", () => {
 // approximated it with a CSS filter over the preview; that route is closed
 // here, because #1191 made Studio render this very SVG.
 describe("a palette recolours the artifact (#1242)", () => {
-  const render = (palette: BadgeConfig["palette"]) =>
+  const render = (palette: BadgeConfig["colorPalette"]) =>
     renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
-      config: { ...DEFAULT_BADGE_CONFIG, palette },
+      config: { ...DEFAULT_BADGE_CONFIG, colorPalette: palette },
     });
 
   it.each(["indigo", "amber", "crimson", "mono"] as const)(
@@ -266,7 +266,7 @@ describe("a palette recolours the artifact (#1242)", () => {
     for (const palette of ["jade", "indigo", "amber", "crimson", "mono"] as const) {
       const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
         demoMode: true,
-        config: { ...DEFAULT_BADGE_CONFIG, palette },
+        config: { ...DEFAULT_BADGE_CONFIG, colorPalette: palette },
       });
       expect(svg).toContain(VERIFICATION_CORAL);
     }
@@ -277,7 +277,7 @@ describe("a palette recolours the artifact (#1242)", () => {
     const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
       config: {
         ...DEFAULT_BADGE_CONFIG,
-        palette: "indigo",
+        colorPalette: "indigo",
         background: "aurora",
         border: "gradient-rotating",
         cardStyle: "aurora-glass",

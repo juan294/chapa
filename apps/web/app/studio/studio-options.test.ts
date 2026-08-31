@@ -21,7 +21,7 @@ describe("STUDIO_CATEGORIES", () => {
       "scoreEffect",
       "heatmapAnimation",
       "tierTreatment",
-      "palette",
+      "colorPalette",
     ];
     expect(keys).toEqual(expect.arrayContaining(expectedKeys));
     expect(keys).toHaveLength(expectedKeys.length);

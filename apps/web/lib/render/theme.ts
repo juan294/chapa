@@ -34,28 +34,46 @@ export interface BadgeTheme {
 // rather than `oklch()` because the OG-image route rasterizes this SVG through
 // resvg, which parses a narrower colour syntax than a browser.
 //
-// #1242 — the ground stopped being fixed. A Studio palette is "accent on
-// ground", so `bg`/`card` move with it. The five grounds are the SAME oklch
-// lightness and chroma as jade's (`.1615 .0149` and `.1952 .0202`), hue-shifted
-// to the palette, which is why contrast barely varies across them:
+// #1242/#1245 — the ground stopped being fixed. A Studio palette is "accent on
+// ground", so `bg`/`card` move with it.
 //
-//   palette   accent   accent/bg  accentLight/bg  worst archetype/bg
-//   jade      #1BD093       9.68           12.56   4.96 (Quality Champion)
-//   indigo    #96ACFF       8.91           11.78   4.97
-//   amber     #DEA800       8.96           11.79   4.96
-//   crimson   #FF879C       8.51           11.51   4.97
-//   mono      #AEB2B6       9.07           11.86   4.95
+// The hues come from the design handoff (`CHANGE-color-palette.md`); the
+// LIGHTNESS does not. Every ground sits at jade's own oklch lightness and every
+// accent at the app accent's, which is why contrast barely varies across the
+// five:
+//
+//   palette   accent   ground   accent/bg  accentLight/bg  worst archetype/bg
+//   jade      #1BD093  #0C0D14       9.68           12.56   4.96 (Quality Champion)
+//   indigo    #9BAAFF  #090C1D       8.86           11.76   4.97
+//   amber     #F19C16  #150B02       8.80           11.71   4.97
+//   crimson   #FF879C  #1A070A       8.53           11.53   4.98
+//   mono      #B1B1B1  #0E0E0E       9.00           11.78   4.94
+//
+// Taking the handoff's own hexes literally was measured and rejected three
+// times over:
+//
+//   1. Its `jade` triple (#0b2018/#123526/#2fd58e) is labelled "current badge"
+//      but is the APP's forest palette. Adopting it would move the default
+//      badge's ground, changing every cached badge and every README embed —
+//      the one thing the jade default exists to avoid. Jade here is the real
+//      current badge, which is what that label actually asks for.
+//   2. Its grounds sit lighter (oklch L .19-.23 against this family's .1615).
+//      On them the archetype pills fall below AA — Quality Champion measures
+//      4.36:1 on its jade and 4.37:1 on its amber. The handoff sets its bar at
+//      ">=3:1 on primary" for the ACCENT and does not consider the archetype
+//      hues, which are fixed by decision (see getArchetypeColor).
+//   3. Its crimson accent (#ff6b7a) sits 13.7 degrees from VERIFICATION_CORAL
+//      with a 7.7pp lightness gap. The rose shipped here is 20.5 degrees and
+//      12.4pp — see the coral note below.
 //
 // Archetype colours deliberately do NOT follow the palette: one hue per
 // archetype is a semantic signal, and collapsing seven into the palette accent
-// would mean the hue stops carrying meaning. All seven measure between 4.95:1
+// would mean the hue stops carrying meaning. All seven measure between 4.94:1
 // and 5.72:1 on every ground above, so they clear AA in all five.
 //
-// `crimson` is a rose, not the coral its design brief named. `VERIFICATION_CORAL`
+// `crimson` is a rose, not the coral its brief named. `VERIFICATION_CORAL`
 // (#E05A47) is the badge's one "verified" colour and is deliberately not the
-// accent (#1168/#1183); a coral accent sat 2.4 degrees from it in hue and would
-// have collapsed that distinction. The shipped rose sits 20.5 degrees away with
-// a 12.4pp lightness gap.
+// accent (#1168/#1183) — a rule the handoff restates itself.
 
 interface PaletteDefinition {
   accent: string;
@@ -74,32 +92,32 @@ const PALETTE_DEFINITIONS: Record<BadgePalette, PaletteDefinition> = {
     card: "#13141E",
   },
   indigo: {
-    accent: "#96ACFF",
-    accentLight: "#B8C8FF",
-    accentRgb: "150, 172, 255",
-    bg: "#0B0D14",
-    card: "#12141E",
+    accent: "#9BAAFF",
+    accentLight: "#BBC7FF",
+    accentRgb: "155, 170, 255",
+    bg: "#090C1D",
+    card: "#0D122D",
   },
   amber: {
-    accent: "#DEA800",
-    accentLight: "#F4C351",
-    accentRgb: "222, 168, 0",
-    bg: "#100D09",
-    card: "#18150E",
+    accent: "#F19C16",
+    accentLight: "#FFBC6A",
+    accentRgb: "241, 156, 22",
+    bg: "#150B02",
+    card: "#201100",
   },
   crimson: {
     accent: "#FF879C",
     accentLight: "#FFB3BD",
     accentRgb: "255, 135, 156",
-    bg: "#130B0B",
-    card: "#1D1111",
+    bg: "#1A070A",
+    card: "#28090F",
   },
   mono: {
-    accent: "#AEB2B6",
-    accentLight: "#C7CBCF",
-    accentRgb: "174, 178, 182",
-    bg: "#0C0E0F",
-    card: "#131517",
+    accent: "#B1B1B1",
+    accentLight: "#CACACA",
+    accentRgb: "177, 177, 177",
+    bg: "#0E0E0E",
+    card: "#151515",
   },
 };
 

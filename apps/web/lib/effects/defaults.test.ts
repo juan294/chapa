@@ -30,7 +30,7 @@ describe("effects/defaults", () => {
         "scoreEffect",
         "heatmapAnimation",
         "tierTreatment",
-        "palette",
+        "colorPalette",
       ];
       for (const preset of STUDIO_PRESETS) {
         expect(Object.keys(preset.config).sort()).toEqual(

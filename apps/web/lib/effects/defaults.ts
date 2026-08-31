@@ -12,7 +12,7 @@ export interface StudioPreset {
  * overlay that never reached the badge. It now takes the name from the score
  * effect, which does.
  *
- * #1242 — every preset pins `palette: "jade"`. A preset sets every category by
+ * #1242 - every preset pins `colorPalette: "jade"`. A preset sets every category by
  * contract ("preset X applied - N categories set"), so leaving palette out
  * would make it the one field a preset silently preserved. Applying a preset
  * therefore returns the palette to jade, the same way it returns every other
@@ -34,7 +34,7 @@ export const STUDIO_PRESETS: StudioPreset[] = [
       scoreEffect: "gold-leaf",
       heatmapAnimation: "diagonal",
       tierTreatment: "enhanced",
-      palette: "jade",
+      colorPalette: "jade",
     },
   },
   {
@@ -47,7 +47,7 @@ export const STUDIO_PRESETS: StudioPreset[] = [
       scoreEffect: "holographic",
       heatmapAnimation: "ripple",
       tierTreatment: "enhanced",
-      palette: "jade",
+      colorPalette: "jade",
     },
   },
   {
@@ -60,7 +60,7 @@ export const STUDIO_PRESETS: StudioPreset[] = [
       scoreEffect: "gold-shimmer",
       heatmapAnimation: "scatter",
       tierTreatment: "enhanced",
-      palette: "jade",
+      colorPalette: "jade",
     },
   },
 ];

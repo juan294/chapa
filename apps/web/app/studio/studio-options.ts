@@ -133,9 +133,9 @@ export const STUDIO_CATEGORIES: CategoryMeta[] = [
     // #1242 — the swatches are the palette's own ground, card and accent, read
     // from `lib/render/theme.ts` rather than re-typed. A swatch that drifts
     // from the badge it advertises is worse than no swatch.
-    key: "palette",
+    key: "colorPalette",
     label: "Color Palette",
-    options: BADGE_CONFIG_OPTIONS.palette.map((value) => ({
+    options: BADGE_CONFIG_OPTIONS.colorPalette.map((value) => ({
       value,
       label: PALETTE_LABELS[value].label,
       description: PALETTE_LABELS[value].description,

@@ -21,7 +21,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         scoreEffect: "standard",
         heatmapAnimation: "fade-in",
         tierTreatment: "standard",
-        palette: "jade",
+        colorPalette: "jade",
       },
     },
     {
@@ -34,7 +34,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         scoreEffect: "gold-shimmer",
         heatmapAnimation: "scatter",
         tierTreatment: "enhanced",
-        palette: "indigo",
+        colorPalette: "indigo",
       },
     },
   ],
@@ -49,7 +49,7 @@ const baseConfig: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
-  palette: "jade",
+  colorPalette: "jade",
 };
 
 describe("QuickControls", () => {
@@ -301,6 +301,38 @@ describe("QuickControls — v2 controls column (#1216)", () => {
     );
   });
 
+  // #1245 — the pixel spec in CHANGE-color-palette.md, value for value.
+  it("builds the palette swatch strip to the pixel spec (#1245)", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Color Palette"));
+
+    const strip = screen.getByTestId("swatch-colorPalette-indigo");
+    // Third child of the button, under label and description - never beside
+    // the label, never outside the button.
+    const chip = strip.closest("button") as HTMLElement;
+    expect(Array.from(chip.children).indexOf(strip)).toBe(2);
+    expect(strip.className).toContain("mt-[3px]");
+    expect(strip.className).toContain("gap-1");
+
+    const dots = Array.from(strip.children) as HTMLElement[];
+    expect(dots).toHaveLength(3);
+    for (const dot of dots) {
+      // 14x14, 4px radius (a rounded square - a circle reads as a radio input),
+      // and the heavier hairline, without which dark primaries vanish into a
+      // dark-theme chip.
+      expect(dot.className).toContain("size-3.5");
+      expect(dot.className).toContain("rounded-[4px]");
+      expect(dot.className).toContain("border-stroke-strong");
+    }
+  });
+
   it("shows the palette's own colours on each palette option (#1242)", () => {
     render(
       <QuickControls
@@ -314,12 +346,12 @@ describe("QuickControls — v2 controls column (#1216)", () => {
 
     // The swatch is the ground, card and accent the badge will actually use,
     // read from the renderer rather than re-typed here.
-    const swatch = screen.getByTestId("swatch-palette-indigo");
+    const swatch = screen.getByTestId("swatch-colorPalette-indigo");
     const colors = Array.from(swatch.children).map(
       (dot) => (dot as HTMLElement).style.backgroundColor,
     );
     expect(colors).toHaveLength(3);
-    expect(colors).toContain("rgb(150, 172, 255)"); // #96ACFF, the indigo accent
+    expect(colors).toContain("rgb(155, 170, 255)"); // #9BAAFF, the indigo accent
     // Decorative: the label and description carry the meaning.
     expect(swatch.getAttribute("aria-hidden")).toBe("true");
   });
@@ -383,7 +415,7 @@ describe("QuickControls — v2 controls column (#1216)", () => {
     expect(other.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("never carries selection in accent-coloured 11px text", () => {
+  it("carries selection in the text-safe accent, never the raw fill token", () => {
     render(
       <QuickControls
         config={baseConfig}
@@ -394,14 +426,17 @@ describe("QuickControls — v2 controls column (#1216)", () => {
     );
     fireEvent.click(screen.getByText("Background"));
 
-    // `text-amber` measures ~2.8:1 against the light ground — below AA for any
-    // text, let alone 11px. The accent border and tint carry selection.
+    // The raw fill token `text-amber` measures 2.75:1 against the light
+    // ground. The label uses `text-amber-text` instead (#1243) — the
+    // theme-aware, text-safe counterpart at 5.28:1 light and 11.94:1 dark —
+    // which is what makes the handoff's accent-coloured selected label
+    // (#1245) affordable at all.
     const selected = screen.getByRole("button", { name: /Solid Dark/ });
     expect(selected.getAttribute("aria-pressed")).toBe("true");
     expect(selected.className).toContain("border-amber");
-    expect(selected.querySelector("span")?.className).not.toContain(
-      "text-amber",
-    );
+    const label = selected.querySelector("span")!;
+    expect(label.className).toContain("text-amber-text");
+    expect(label.className.split(/\s+/)).not.toContain("text-amber");
   });
 
   it("gives every option a 44px hit area", () => {
