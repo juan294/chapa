@@ -18,36 +18,40 @@ export default async function StudioLoading() {
         </div>
       </div>
 
-      <div className="pt-[57px] grid grid-cols-1 lg:grid-cols-2">
-        {/* Preview skeleton */}
-        <div className="flex items-center justify-center px-8 py-12 border-b lg:border-b-0 lg:border-r border-stroke">
-          <div className="w-full max-w-xl">
-            <div className="rounded-2xl border border-stroke bg-card p-6 space-y-5">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full animate-pulse bg-amber/10" />
-                <div className="space-y-1.5">
-                  <div className="h-4 w-24 animate-pulse rounded bg-amber/10" />
-                  <div className="h-3 w-16 animate-pulse rounded bg-amber/[0.06]" />
-                </div>
-              </div>
-              <div className="h-24 w-full animate-pulse rounded-lg bg-amber/[0.04]" />
-              <div className="flex justify-center gap-4 pt-4 border-t border-stroke">
-                <div className="h-4 w-20 animate-pulse rounded bg-amber/[0.06]" />
-                <div className="h-4 w-16 animate-pulse rounded bg-amber/[0.06]" />
-                <div className="h-4 w-20 animate-pulse rounded bg-amber/[0.06]" />
-              </div>
-            </div>
+      {/* #1241 — mirrors StudioClient's shape: a full-width stage over a
+          tools band that splits on its own width. A fallback with the old
+          two-column shape made the real page look like it jumped on load. */}
+      <div className="flex flex-col pt-[57px]">
+        {/* Stage skeleton */}
+        <div className="border-b border-stroke px-3 py-4 sm:px-6 sm:py-6">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="h-4 w-56 animate-pulse rounded bg-amber/[0.06]" />
+            <div className="h-9 w-48 animate-pulse rounded-lg bg-amber/[0.06]" />
+          </div>
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-forest-line bg-forest p-4 sm:p-6">
+            <div className="aspect-[1200/630] w-[min(720px,100%)] animate-pulse rounded-xl bg-forest-card" />
+            <div className="h-3 w-72 max-w-full animate-pulse rounded bg-forest-card" />
           </div>
         </div>
 
-        {/* Terminal skeleton */}
-        <div className="flex flex-col bg-bg p-4 space-y-3">
-          <div className="h-4 w-64 animate-pulse rounded bg-amber/[0.06]" />
-          <div className="h-3 w-48 animate-pulse rounded bg-amber/[0.04]" />
-          <div className="flex-1" />
-          <div className="h-10 w-full animate-pulse rounded-lg bg-card border border-stroke" />
+        {/* Tools band skeleton */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))]">
+          <div className="space-y-3 border-r border-b border-stroke p-4">
+            <div className="h-5 w-40 animate-pulse rounded bg-amber/10" />
+            <div className="h-3 w-64 max-w-full animate-pulse rounded bg-amber/[0.06]" />
+            <div className="h-10 w-full animate-pulse rounded-lg bg-amber/[0.04]" />
+            <div className="h-32 w-full animate-pulse rounded-lg bg-amber/[0.04]" />
+          </div>
+          <div className="flex flex-col gap-3 border-b border-stroke bg-card p-4">
+            <div className="h-3 w-20 animate-pulse rounded bg-amber/[0.06]" />
+            <div className="h-24 w-full animate-pulse rounded bg-amber/[0.04]" />
+            <div className="flex-1" />
+            <div className="h-11 w-full animate-pulse rounded-lg border border-stroke bg-bg" />
+            <div className="h-11 w-full animate-pulse rounded-lg bg-amber/10" />
+          </div>
         </div>
       </div>
+
     </main>
   );
 }

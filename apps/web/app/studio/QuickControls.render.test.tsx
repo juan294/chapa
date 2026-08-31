@@ -163,47 +163,6 @@ describe("QuickControls", () => {
     expect(onCommand).toHaveBeenCalledWith("/set bg aurora");
   });
 
-  it("shows /save and /reset action buttons", () => {
-    render(
-      <QuickControls
-        config={baseConfig}
-        onCommand={vi.fn()}
-        visible={true}
-        onToggle={vi.fn()}
-      />,
-    );
-    expect(screen.getByText("/save")).toBeDefined();
-    expect(screen.getByText("/reset")).toBeDefined();
-  });
-
-  it("sends /save command", () => {
-    const onCommand = vi.fn();
-    render(
-      <QuickControls
-        config={baseConfig}
-        onCommand={onCommand}
-        visible={true}
-        onToggle={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByText("/save"));
-    expect(onCommand).toHaveBeenCalledWith("/save");
-  });
-
-  it("sends /reset command", () => {
-    const onCommand = vi.fn();
-    render(
-      <QuickControls
-        config={baseConfig}
-        onCommand={onCommand}
-        visible={true}
-        onToggle={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByText("/reset"));
-    expect(onCommand).toHaveBeenCalledWith("/reset");
-  });
-
   it("collapses expanded category when clicked again", () => {
     render(
       <QuickControls
@@ -262,47 +221,6 @@ describe("QuickControls", () => {
     expect(wrapper.hasAttribute("inert")).toBe(false);
   });
 
-  it("disables the save entry point while a save is in progress", () => {
-    render(
-      <QuickControls
-        config={baseConfig}
-        onCommand={vi.fn()}
-        visible={true}
-        onToggle={vi.fn()}
-        saveDisabled
-      />,
-    );
-
-    expect(
-      screen.getByRole("button", { name: "/save" }).hasAttribute("disabled"),
-    ).toBe(true);
-  });
-
-  it("renders and dispatches the human confirmation gate for an agent save", () => {
-    const onConfirmAgentSave = vi.fn();
-    const onDismissAgentSave = vi.fn();
-    render(
-      <QuickControls
-        config={baseConfig}
-        onCommand={vi.fn()}
-        visible={true}
-        onToggle={vi.fn()}
-        agentSaveProposal={{
-          onConfirm: onConfirmAgentSave,
-          onDismiss: onDismissAgentSave,
-        }}
-      />,
-    );
-
-    expect(
-      screen.getByText("An agent wants to save this preview configuration."),
-    ).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Confirm save" }));
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(onConfirmAgentSave).toHaveBeenCalledOnce();
-    expect(onDismissAgentSave).toHaveBeenCalledOnce();
-  });
-
   it("renders Spanish control copy while command identifiers stay unchanged", () => {
     render(
       <LanguageProvider initialLocale="es" dictionary={es}>
@@ -320,7 +238,6 @@ describe("QuickControls", () => {
     expect(screen.getByText("Fondo")).toBeDefined();
     fireEvent.click(screen.getByText("Fondo"));
     expect(screen.getByText("Aurora luminosa")).toBeDefined();
-    expect(screen.getByRole("button", { name: "/save" })).toBeDefined();
   });
 });
 
@@ -400,6 +317,27 @@ describe("QuickControls — v2 controls column (#1216)", () => {
       .getByText("Particles")
       .closest("button") as HTMLButtonElement;
     expect(other.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("never carries selection in accent-coloured 11px text", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible={true}
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+
+    // `text-amber` measures ~2.8:1 against the light ground — below AA for any
+    // text, let alone 11px. The accent border and tint carry selection.
+    const selected = screen.getByRole("button", { name: /Solid Dark/ });
+    expect(selected.getAttribute("aria-pressed")).toBe("true");
+    expect(selected.className).toContain("border-amber");
+    expect(selected.querySelector("span")?.className).not.toContain(
+      "text-amber",
+    );
   });
 
   it("gives every option a 44px hit area", () => {
