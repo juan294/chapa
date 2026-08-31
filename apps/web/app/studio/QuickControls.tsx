@@ -20,20 +20,22 @@ interface QuickControlsProps {
   onCommand: (command: string) => void;
   visible: boolean;
   onToggle: () => void;
-  saveDisabled?: boolean;
-  agentSaveProposal?: {
-    onConfirm: () => void;
-    onDismiss: () => void;
-  };
 }
 
+/**
+ * The pointer affordance for the six badge categories: presets, then one
+ * accordion row per category.
+ *
+ * `/save` and `/reset` used to live at the bottom of this panel. They moved to
+ * the session column in #1241, because collapsing Quick Controls took the only
+ * pointer route to saving with it, and because the actions belong beside the
+ * prompt that runs the same two commands.
+ */
 export function QuickControls({
   config,
   onCommand,
   visible,
   onToggle,
-  saveDisabled = false,
-  agentSaveProposal,
 }: QuickControlsProps) {
   const { t } = useTranslation();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -175,11 +177,13 @@ export function QuickControls({
                                 : "border-stroke hover:border-amber/20"
                             }`}
                           >
+                            {/* Selection is carried by the accent border and
+                                tint, not by accent-coloured text: `text-amber`
+                                measures ~2.8:1 on the light ground, which no
+                                11px label can afford (#1241). */}
                             <span
-                              className={`font-heading text-[11px] ${
-                                opt.value === currentValue
-                                  ? "text-amber"
-                                  : "text-text-primary"
+                              className={`font-heading text-[11px] text-text-primary ${
+                                opt.value === currentValue ? "font-bold" : ""
                               }`}
                             >
                               {opt.value === currentValue && (
@@ -203,52 +207,6 @@ export function QuickControls({
           })}
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2 px-3 py-2 border-t border-stroke">
-            <button
-              type="button"
-              onClick={() => onCommand("/save")}
-              disabled={saveDisabled}
-              className="flex-1 rounded-md bg-amber px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-amber-light disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              /save
-            </button>
-            <button
-              type="button"
-              onClick={() => onCommand("/reset")}
-              className="rounded-md border border-stroke px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary"
-            >
-              /reset
-            </button>
-        </div>
-        {agentSaveProposal && (
-          <div
-            className="border-t border-amber/20 bg-amber/[0.04] px-3 py-2"
-            role="group"
-            aria-label={t("studio.agentSave.prompt") as string}
-          >
-            <p className="mb-2 text-xs text-text-secondary">
-              {t("studio.agentSave.prompt") as string}
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={agentSaveProposal.onConfirm}
-                disabled={saveDisabled}
-                className="flex-1 rounded-md bg-amber px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-amber-light disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {t("studio.agentSave.confirm") as string}
-              </button>
-              <button
-                type="button"
-                onClick={agentSaveProposal.onDismiss}
-                className="rounded-md border border-stroke px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary"
-              >
-                {t("studio.agentSave.dismiss") as string}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
