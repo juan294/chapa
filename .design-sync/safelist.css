@@ -1,0 +1,20 @@
+/* Utilities the conventions header names that Tailwind did not emit into the
+ * shipped chunk, because no component in the synced bundle happens to use them.
+ *
+ * The header is inlined into the design agent's system prompt, so a class named
+ * there that has no rule in `styles.css`'s import closure is worse than no
+ * guidance at all: the agent writes it, it resolves to nothing, and the design
+ * ships silently unstyled. `text-forest-ok` survived the chunk; `-warn` and
+ * `-err` did not, and the "status colours resolve per surface" rule is unusable
+ * with only one of the three.
+ *
+ * Concatenated into apps/web/.ds-styles.css after the font bindings and before
+ * the compiled chunk - see .design-sync/NOTES.md for the recipe. Add an entry
+ * here only for a class the header actually names.
+ */
+.text-forest-warn {
+  color: var(--color-forest-warn);
+}
+.text-forest-err {
+  color: var(--color-forest-err);
+}
