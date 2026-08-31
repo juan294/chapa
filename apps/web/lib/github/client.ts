@@ -5,7 +5,6 @@ import { OAUTH_GRANTS_PRIVATE_REPO_ACCESS } from "@/lib/auth/github";
 import { getGithubToken } from "@/lib/env";
 import { captureServerEvent } from "@/lib/analytics/server-errors";
 import { cacheGet, cacheSet } from "../cache/redis";
-import { dbUpsertUser } from "@/lib/db/users";
 import { dbGetSupplemental } from "@/lib/db/supplemental";
 import { isBitbucketEnabled, isCodebergEnabled, isGitlabEnabled } from "@/lib/feature-flags";
 import { dbGetLinkedPlatform } from "@/lib/db/user-platforms";
@@ -617,8 +616,11 @@ async function _fetchAndCache(
     await cacheSet(baselineKey, primary, STALE_TTL);
   }
 
-  // Record in permanent user registry (fire-and-forget)
-  fireAndForget(() => dbUpsertUser(handle), () => undefined);
+  // #1239 — No user-registry write happens here. `getStats` runs for ANY
+  // handle the public badge and share-page routes are asked about, so
+  // registering the fetched handle turned a stranger's badge view into a
+  // signup for a person who had never visited Chapa. Registration belongs to
+  // the OAuth callback, which is the only place consent is established.
 
   return composed;
 }

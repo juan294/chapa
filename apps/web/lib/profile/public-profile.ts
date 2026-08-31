@@ -2,7 +2,7 @@ import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { cacheDel, cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
-import { dbUpsertUser } from "@/lib/db/users";
+import { dbUpdateUserProfile } from "@/lib/db/users";
 import { notifyFirstBadge } from "@/lib/email/notifications";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
@@ -226,7 +226,10 @@ export async function deferProfileCacheWork(
 
   if (materialized.stats.displayName || materialized.stats.avatarUrl) {
     ops.push(
-      dbUpsertUser(handle, {
+      // Refreshes an already-registered user's name/avatar so /admin stays
+      // current. Deliberately an UPDATE: this path must never be the reason a
+      // row exists (#1239).
+      dbUpdateUserProfile(handle, {
         displayName: materialized.stats.displayName ?? undefined,
         avatarUrl: materialized.stats.avatarUrl ?? undefined,
       }).catch(() => undefined),

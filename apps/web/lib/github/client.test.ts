@@ -1133,16 +1133,21 @@ describe("getStats", () => {
     expect(baselineWrite![1].hasSupplementalData).toBeUndefined();
   });
 
-  it("upserts user in Supabase on successful fetch", async () => {
+  // #1239 — Fetching stats is not consent. `/u/:handle` and the badge route
+  // accept ANY handle, so registering the fetched handle in the permanent
+  // `users` table turned every public badge view into a signup for a person
+  // who had never visited Chapa. Registration belongs to the OAuth callback
+  // alone; these tests fail if the write is ever reintroduced here.
+  it("#1239: does not register the handle on a successful live fetch", async () => {
     const fresh = makeStats();
     setupCacheMiss(fresh);
 
     await getStats("Test-User");
 
-    expect(mockDbUpsertUser).toHaveBeenCalledWith("Test-User");
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
   });
 
-  it("does NOT upsert user when serving from cache", async () => {
+  it("#1239: does not register the handle when serving from cache", async () => {
     const cached = makeStats();
     mockCacheGet.mockResolvedValue(cached);
 
@@ -1151,7 +1156,7 @@ describe("getStats", () => {
     expect(mockDbUpsertUser).not.toHaveBeenCalled();
   });
 
-  it("does NOT upsert user when API fails", async () => {
+  it("#1239: does not register the handle when the API fails", async () => {
     mockCacheGet
       .mockResolvedValueOnce(null) // merged
       .mockResolvedValueOnce(null); // stale
