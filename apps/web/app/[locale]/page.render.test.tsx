@@ -134,14 +134,6 @@ describe("Home page render (en)", () => {
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
   });
 
-  it("emits an early document-language assignment for the selected route", async () => {
-    const { container } = await renderHome();
-    const script = container.querySelector(
-      'script[data-chapa-document-locale="en"]',
-    );
-    expect(script?.textContent).toBe('document.documentElement.lang="en";');
-  });
-
   it("renders feature cards", async () => {
     await renderHome();
     // English dict: landing.features[0].title = 'MULTI-DIMENSIONAL'

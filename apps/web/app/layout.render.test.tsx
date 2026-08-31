@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 // layout.tsx reads DEFAULT_LOCALE from "@/lib/i18n/types", NOT from the mocked
 // "@/lib/i18n" barrel below, so these assert against the real value (#1201).
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { DOCUMENT_LOCALE_BOOTSTRAP } from "@/lib/i18n/document-locale-bootstrap";
 
 vi.mock("next/font/google", () => ({
   JetBrains_Mono: () => ({ variable: "font-jetbrains" }),
@@ -121,6 +123,11 @@ describe("RootLayout render", () => {
     ).toBe("true");
     expect(screen.getByText("Child route")).toBeTruthy();
     expect(screen.getByTestId("instrumentation")).toBeTruthy();
+    expect(
+      document.querySelector(
+        `template[data-chapa-document-locale="${DEFAULT_LOCALE}"]`,
+      ),
+    ).not.toBeNull();
   });
 
   it("renders with lang=DEFAULT_LOCALE at build time for ISR compatibility", async () => {
@@ -132,6 +139,25 @@ describe("RootLayout render", () => {
 
     // html lang is always DEFAULT_LOCALE at build time
     expect(element.props.lang).toBe(DEFAULT_LOCALE);
+  });
+
+  it("mounts the initial locale bootstrap before hydration", async () => {
+    const { default: RootLayout } = await import("./layout");
+    const element = await RootLayout({ children: <span>test</span> });
+    const body = element.props.children as ReactElement<{ children: ReactNode }>;
+    const bootstrap = Children.toArray(body.props.children).find(
+      (child) =>
+        isValidElement<{ id?: string }>(child) &&
+        child.props.id === "chapa-document-locale",
+    );
+
+    expect(bootstrap).toBeDefined();
+    expect(
+      (bootstrap as ReactElement<{ strategy: string }>).props.strategy,
+    ).toBe("beforeInteractive");
+    expect(
+      (bootstrap as ReactElement<{ children: string }>).props.children,
+    ).toBe(DOCUMENT_LOCALE_BOOTSTRAP);
   });
 
   it("wraps children in LanguageProvider", async () => {

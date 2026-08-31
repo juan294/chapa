@@ -2,7 +2,6 @@ import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingContent } from "../LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
-import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { getServerT } from "@/lib/i18n/server";
@@ -47,11 +46,6 @@ export default async function Home({ params }: HomeProps) {
   const t = getServerT(locale);
   return (
     <>
-      {/* The root layout stays static for ISR and therefore emits the default
-          language. Run this parser-blocking, enum-only assignment before the
-          landing content so fresh English responses expose the correct
-          document language and root-level localized controls before hydration. */}
-      <DocumentLocaleScript locale={locale} />
       <LanguageProvider
         initialLocale={locale}
         // The static root provider always renders at DEFAULT_LOCALE. A request

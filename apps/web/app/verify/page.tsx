@@ -4,7 +4,7 @@ import {
   LangSync,
   LanguageProvider,
 } from "@/lib/i18n";
-import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { DocumentLocaleMarker } from "@/lib/i18n/document-locale";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
@@ -44,7 +44,7 @@ export default async function VerifyInputPage({
 
   return (
     <>
-      <DocumentLocaleScript locale={locale} />
+      <DocumentLocaleMarker locale={locale} />
       <LanguageProvider
         initialLocale={locale}
         dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}

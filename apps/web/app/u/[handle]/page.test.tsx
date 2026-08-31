@@ -1059,11 +1059,11 @@ describe("SharePage /u/[handle]", () => {
     });
   });
 
-  // #1165 (FE-M1) — an early <html lang> assignment must be emitted for the
+  // #1165 (FE-M1) — an early <html lang> marker must be emitted for the
   // page's own resolved locale (query > cookie > Accept-Language > default),
   // matching the pattern already used on the landing page and /verify pages.
-  describe("DocumentLocaleScript (#1165 / FE-M1)", () => {
-    it("emits an early document-language assignment for the resolved locale", async () => {
+  describe("DocumentLocaleMarker (#1165 / FE-M1)", () => {
+    it("emits an early document-language marker for the resolved locale", async () => {
       mockGetServerLocale.mockResolvedValue("en");
 
       const result = await SharePage({
@@ -1071,9 +1071,9 @@ describe("SharePage /u/[handle]", () => {
         searchParams: Promise.resolve({ lang: "en" }),
       });
 
-      const scriptEl = findElement(result, (el) => el.type === DynamicRouteShell);
-      expect(scriptEl).not.toBeNull();
-      expect(scriptEl!.props.locale).toBe("en");
+      const shell = findElement(result, (el) => el.type === DynamicRouteShell);
+      expect(shell).not.toBeNull();
+      expect(shell!.props.locale).toBe("en");
     });
 
     it("resolves the same locale as the LanguageProvider body (no disagreement)", async () => {
@@ -1084,8 +1084,8 @@ describe("SharePage /u/[handle]", () => {
         searchParams: Promise.resolve({}),
       });
 
-      const scriptEl = findElement(result, (el) => el.type === DynamicRouteShell);
-      expect(scriptEl!.props.locale).toBe("es");
+      const shell = findElement(result, (el) => el.type === DynamicRouteShell);
+      expect(shell!.props.locale).toBe("es");
     });
   });
 

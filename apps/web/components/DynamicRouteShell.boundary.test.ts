@@ -74,7 +74,7 @@ describe("DynamicRouteShell stays out of statically generated routes (#1194)", (
       resolve(__dirname, "DynamicRouteShell.tsx"),
       "utf8",
     );
-    expect(source).toContain("DocumentLocaleScript");
+    expect(source).toContain("DocumentLocaleMarker");
     expect(source).toContain("LanguageProvider");
     expect(source).toContain("<Navbar");
   });

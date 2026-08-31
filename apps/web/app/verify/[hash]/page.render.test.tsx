@@ -265,7 +265,7 @@ describe("VerifyPage", () => {
 
       expect(screen.getByText(hash).className).toContain("break-all");
       expect(
-        document.querySelector('script[data-chapa-document-locale="en"]'),
+        document.querySelector('template[data-chapa-document-locale="en"]'),
       ).not.toBeNull();
     });
   });

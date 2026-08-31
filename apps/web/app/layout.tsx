@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/globals.css";
 import { ClientInstrumentation } from "@/components/ClientInstrumentation";
@@ -23,6 +24,8 @@ import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { resolveTranslation } from "@/lib/i18n/resolve";
+import { DocumentLocaleMarker } from "@/lib/i18n/document-locale";
+import { DOCUMENT_LOCALE_BOOTSTRAP } from "@/lib/i18n/document-locale-bootstrap";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -125,6 +128,16 @@ export default async function RootLayout({
       data-scroll-behavior="smooth"
     >
       <body className="bg-bg text-text-primary font-body antialiased">
+        {/*
+          The bootstrap runs once from the root layout and watches inert route
+          markers while the initial response streams. Hydrated markers handle
+          later navigation without rendering an executable script inside the
+          changing React route tree.
+        */}
+        <Script id="chapa-document-locale" strategy="beforeInteractive">
+          {DOCUMENT_LOCALE_BOOTSTRAP}
+        </Script>
+        <DocumentLocaleMarker locale={locale} />
         {/* SAFETY: JSON-LD from hardcoded constants — renderJsonLd escapes <, >, & to prevent </script> injection. */}
         <script
           type="application/ld+json"

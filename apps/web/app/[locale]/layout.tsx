@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { SUPPORTED_LOCALES, DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
-import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { DocumentLocaleMarker } from "@/lib/i18n/document-locale";
 
 /**
  * Generates both supported locale variants at build time for every page
@@ -59,7 +59,7 @@ export default async function LocaleSegmentLayout({
   const locale: Locale = isSupportedLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   return (
     <>
-      <DocumentLocaleScript locale={locale} />
+      <DocumentLocaleMarker locale={locale} />
       {children}
     </>
   );
