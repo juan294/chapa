@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { WARM_AMBER, accentTint } from "@/lib/render/theme";
+import { WARM_AMBER } from "@/lib/render/theme";
 import { resolveBadgeConfig } from "@/lib/render/badge-config";
 import { getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
@@ -133,7 +133,7 @@ function resolveLocaleFromRequest(request: NextRequest): Locale {
 function fallbackSvg(handle: string, message: string, tagline: string): string {
   const safe = escapeXml(handle);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" rx="16" fill="#0C0D14" stroke="${accentTint(0.12)}" stroke-width="2"/>
+  <rect width="1200" height="630" rx="16" fill="#0C0D14" stroke="${WARM_AMBER.tint(0.12)}" stroke-width="2"/>
   <text x="60" y="80" font-family="'JetBrains Mono', monospace" font-size="42" font-weight="700" fill="${WARM_AMBER.accent}">CHAPA</text>
   <text x="60" y="120" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" fill="#9AA4B2">${escapeXml(tagline)}</text>
   <text x="60" y="340" font-family="'JetBrains Mono', monospace" font-size="28" fill="#E6EDF3">@${safe}</text>

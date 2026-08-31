@@ -22,6 +22,7 @@ const baseConfig: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
+  palette: "jade",
 };
 
 describe("QuickControls", () => {
@@ -269,8 +270,44 @@ describe("QuickControls — v2 controls column (#1216)", () => {
       />,
     );
     expect(screen.getByTestId("studio-changed-count").textContent).toBe(
-      "2 of 6 changed",
+      "2 of 7 changed",
     );
+  });
+
+  it("shows the palette's own colours on each palette option (#1242)", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Color Palette"));
+
+    // The swatch is the ground, card and accent the badge will actually use,
+    // read from the renderer rather than re-typed here.
+    const swatch = screen.getByTestId("swatch-palette-indigo");
+    const colors = Array.from(swatch.children).map(
+      (dot) => (dot as HTMLElement).style.backgroundColor,
+    );
+    expect(colors).toHaveLength(3);
+    expect(colors).toContain("rgb(150, 172, 255)"); // #96ACFF, the indigo accent
+    // Decorative: the label and description carry the meaning.
+    expect(swatch.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("puts swatches only on the category whose choice is a colour", () => {
+    render(
+      <QuickControls
+        config={baseConfig}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText("Background"));
+    expect(screen.queryByTestId("swatch-background-aurora")).toBeNull();
   });
 
   it("keeps the counter out of the toggle button's accessible name", () => {

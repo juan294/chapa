@@ -30,7 +30,11 @@
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
 import { withTimeout } from "../async/with-timeout";
-import { isValidBadgeConfig, stripRetiredBadgeConfigKeys } from "../validation";
+import {
+  isValidBadgeConfig,
+  stripRetiredBadgeConfigKeys,
+  withDefaultBadgeConfigKeys,
+} from "../validation";
 import type { BadgeConfig } from "@chapa/shared";
 
 export const STUDIO_CONFIG_READ_TIMEOUT_MS = 2_000;
@@ -169,7 +173,14 @@ export async function dbGetStudioConfig(
     // fields. Strip them first so a legacy row migrates in place rather than
     // being reported invalid, which would silently discard a durable write and
     // hand the owner back the default badge.
-    const config = row ? stripRetiredBadgeConfigKeys(row.config) : undefined;
+    //
+    // #1242: the same hazard in the other direction. isValidBadgeConfig also
+    // requires every key to be PRESENT, so a row saved before `palette` existed
+    // would fail for the field it could not have had. Default the missing ones
+    // in, then validate.
+    const config = row
+      ? withDefaultBadgeConfigKeys(stripRetiredBadgeConfigKeys(row.config))
+      : undefined;
     if (!row || !isValidBadgeConfig(config)) {
       console.error(
         "[STUDIO_CONFIG_FALLBACK] Invalid persisted Studio configuration",
