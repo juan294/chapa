@@ -8,8 +8,35 @@ import { es } from "@/lib/i18n/dictionaries/es";
 
 vi.mock("@/lib/effects/defaults", () => ({
   STUDIO_PRESETS: [
-    { id: "minimal", label: "Minimal", config: {} },
-    { id: "flashy", label: "Flashy", config: {} },
+    // Real-shaped configs: #1243 marks the applied preset by comparing every
+    // category, so an empty config would never match and the marker would be
+    // untestable.
+    {
+      id: "minimal",
+      label: "Minimal",
+      config: {
+        background: "solid",
+        cardStyle: "flat",
+        border: "solid-amber",
+        scoreEffect: "standard",
+        heatmapAnimation: "fade-in",
+        tierTreatment: "standard",
+        palette: "jade",
+      },
+    },
+    {
+      id: "flashy",
+      label: "Flashy",
+      config: {
+        background: "aurora",
+        cardStyle: "crystal",
+        border: "gradient-rotating",
+        scoreEffect: "gold-shimmer",
+        heatmapAnimation: "scatter",
+        tierTreatment: "enhanced",
+        palette: "indigo",
+      },
+    },
   ],
 }));
 
@@ -398,6 +425,95 @@ describe("QuickControls — v2 controls column (#1216)", () => {
 // badge were removed rather than labelled, so Quick Controls now offers only
 // controls that change the artifact. No "preview only" marker survives,
 // because there is nothing left to mark.
+// #1243 — the shipped column drifted from templates/studio-v3: the category
+// list was capped at the height that suited #1216's narrow sticky column, the
+// presets were buried under the Quick Controls label with no selected state,
+// and the rows had no disclosure affordance.
+describe("QuickControls — v3 fidelity (#1243)", () => {
+  const render_ = (config = baseConfig) =>
+    render(
+      <QuickControls
+        config={config}
+        onCommand={vi.fn()}
+        visible
+        onToggle={vi.fn()}
+      />,
+    );
+
+  it("lets the category list flow instead of capping it to a scroll window", () => {
+    render_();
+    const list = screen.getByTestId("qc-categories");
+    // 256px was right beside a 50%-width preview; in the v3 tools column it is
+    // a small scroll window above a large void.
+    expect(list.className).not.toContain("max-h-64");
+    expect(list.className).not.toContain("overflow-y-auto");
+  });
+
+  it("gives presets their own section above Quick Controls", () => {
+    render_();
+    const presets = screen.getByTestId("qc-presets");
+    const label = screen.getByText("Quick Controls");
+    expect(
+      presets.compareDocumentPosition(label) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("marks the preset whose config is currently applied", () => {
+    // baseConfig is the default, which is exactly the Minimal preset.
+    render_();
+    const minimal = screen.getByRole("button", { name: /Minimal/ });
+    expect(minimal.getAttribute("aria-pressed")).toBe("true");
+    expect(minimal.className).toContain("bg-amber/10");
+
+    const flashy = screen.getByRole("button", { name: /Flashy/ });
+    expect(flashy.getAttribute("aria-pressed")).toBe("false");
+    expect(flashy.className).not.toContain("bg-amber/10");
+    expect(flashy.className).toContain("border-stroke");
+  });
+
+  it("gives every preset and category row a 44px+ hit area", () => {
+    render_();
+    for (const preset of screen.getAllByTestId(/^qc-preset-/)) {
+      expect(preset.className).toContain("min-h-[44px]");
+    }
+    for (const row of screen.getAllByTestId(/^qc-category-/)) {
+      expect(row.className).toContain("min-h-[52px]");
+    }
+  });
+
+  it("shows a disclosure chevron that follows the expanded state", () => {
+    render_();
+    const row = screen.getByTestId("qc-category-background");
+    const chevron = screen.getByTestId("qc-chevron-background");
+    expect(chevron.textContent).toBe("\u25b8");
+    expect(chevron.getAttribute("aria-hidden")).toBe("true");
+
+    fireEvent.click(row);
+    expect(screen.getByTestId("qc-chevron-background").textContent).toBe(
+      "\u25be",
+    );
+  });
+
+  it("renders the current value in an accent that clears AA on the column ground", () => {
+    render_();
+    // `text-amber` measures 2.75:1 on the light ground. `--color-amber-text` is
+    // the theme-aware, text-safe counterpart (5.28:1 light, 11.94:1 dark), the
+    // same shape as --color-complement-text.
+    const value = screen.getByTestId("qc-value-background");
+    expect(value.className).toContain("text-amber-text");
+    expect(value.className).not.toContain("text-terminal-dim");
+  });
+
+  it("wraps options as chips rather than stacking them one per row", () => {
+    render_();
+    fireEvent.click(screen.getByTestId("qc-category-background"));
+    const options = screen.getByTestId("qc-options-background");
+    expect(options.className).toContain("flex-wrap");
+    expect(options.className).not.toContain("flex-col");
+  });
+});
+
 describe("QuickControls offers only categories that reach the badge (#1191)", () => {
   function renderControls() {
     render(

@@ -28,6 +28,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-da
 | `--color-amber` | `oklch(.76 .16 163)` | `oklch(.66 .15 163)` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
 | `--color-amber-light` | `oklch(.84 .14 163)` | `oklch(.76 .14 163)` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
 | `--color-amber-dark` | `oklch(.58 .14 165)` | `oklch(.5 .12 165)` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
+| `--color-amber-text` | `oklch(.84 .14 163)` | `oklch(.5 .12 165)` | `text-amber-text` | Accent-coloured TEXT and icon strokes on `bg-bg`/`bg-card` (#1243). `--color-amber` is a fill/tint value and measures 2.75:1 on the light ground - below AA at any size. This is its text-safe counterpart: the light half darkens, the dark half brightens, so both gain contrast against their own ground (5.28:1 light, 11.94:1 dark). Exactly the same shape and reason as `--color-complement-text`. |
 | `--color-stroke` | `#7dffbc1f` | `#0d3b2417` | `border-stroke` | Borders, dividers (accent-tinted) |
 | `--color-stroke-strong` | `#7dffbc2e` | `#0d3b2426` | `border-stroke-strong` | The heavier rule: section-header underlines, table separators (#1211) |
 | `--color-warm-bg` | `#08170f` | `#f7fbf8` | `bg-warm-bg` | Alias for page background |
@@ -106,6 +107,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-da
 - Use Tailwind opacity modifiers: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
 - Cards use `bg-card` with `border-stroke`.
 - Button text on a solid accent background: always `text-white`, and use `bg-amber-dark` (see the AA note below).
+- **Accent-coloured text is `text-amber-text`, never `text-amber`.** The raw accent is a fill value (pills, heatmap, focus rings, tints) and fails AA as text in the light theme. This is the same split the complement family already has (`--color-complement` fill vs `--color-complement-text`), and it exists for the same measured reason.
 - **White text on a solid `bg-amber`/`bg-complement` fill fails AA contrast** (`bg-amber` measures 4.06:1, `bg-complement` measures 2.54:1 — both below the 4.5:1 floor). Never change the `--color-amber`/`--color-complement` tokens themselves to fix this (they're used non-textually elsewhere — pills, heatmap, focus rings — and a token change shifts the whole brand/verification hue). Instead, at the specific white-text-on-solid-fill call site, use the darker step of the ramp: `bg-amber-dark` (~5.4:1) or `bg-complement-dark` (~5.49:1). When re-anchoring a hover state that previously went to the *lighter* step (e.g. `hover:bg-amber-light`, 2.72:1), shift the whole ramp one step darker instead (base `bg-amber-dark`, hover `bg-amber`) rather than just swapping the base color.
 
 ## Touch targets
