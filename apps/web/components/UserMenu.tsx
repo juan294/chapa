@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
@@ -9,27 +8,19 @@ import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
-import {
-  usePlatformConnections,
-  clearPlatformStatusCache,
-  type PlatformId,
-} from "@/lib/platform/use-platform-connections";
+import { clearPlatformStatusCache } from "@/lib/platform/use-platform-connections";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
-import {
-  GitHubIcon,
-  BitbucketIcon,
-  CodebergIcon,
-  GitlabIcon,
-} from "@/components/icons";
-import { ConfirmDialog } from "./ConfirmDialog";
-import { Toast } from "./Toast";
+import { GitHubIcon } from "@/components/icons";
 
 /**
  * #1223 — the platform-connection cache, status fetching and unlink flow moved
  * to `lib/platform/use-platform-connections`, because `/settings` needs exactly
  * the same behaviour and a second copy is how the badge ended up with two
  * implementations (#1191). Re-exported here so existing importers keep working.
+ *
+ * #1238 — the menu no longer reads that state at all. Sign-out still clears the
+ * cache, so the import (and this re-export) stay.
  */
 export { clearPlatformStatusCache };
 
@@ -40,213 +31,15 @@ interface UserMenuProps {
   isAdmin?: boolean;
 }
 
-// Maps the raw `CraftTier` enum value returned by /api/insights and
-// /api/recalculate (see packages/shared's `CraftTier`) to its dictionary key.
-// Kept separate from any single tier's translated string so an unrecognized
-// value (e.g. a tier added server-side before the dictionary catches up)
-// falls back to the raw string instead of resolving to `undefined` or a bare
-// key path (#1170 / FE-M4).
-const CRAFT_TIER_DICTIONARY_KEYS: Record<string, string> = {
-  Novice: 'userMenu.craftTierNovice',
-  Practitioner: 'userMenu.craftTierPractitioner',
-  Expert: 'userMenu.craftTierExpert',
-  Master: 'userMenu.craftTierMaster',
-};
-
-/** Resolves a raw craft tier value to its translated display name, falling
- * back to the raw value when the tier isn't in the dictionary. */
-function resolveCraftTierLabel(t: (key: string) => unknown, tier: string | undefined | null): string {
-  if (!tier) return '';
-  const dictKey = CRAFT_TIER_DICTIONARY_KEYS[tier];
-  if (!dictKey) return tier;
-  const label = t(dictKey);
-  return typeof label === 'string' ? label : tier;
-}
-
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
-  const router = useRouter();
-  const {
-    studioEnabled,
-    insightsEnabled,
-    // The three platform flags are read by usePlatformConnections, which only
-    // probes the status endpoint for enabled platforms (#885). A disabled
-    // platform therefore has a null status, and the sections below gate on
-    // that rather than on the flag directly.
-  } = useClientFeatureFlags();
+  const { studioEnabled } = useClientFeatureFlags();
   const { t } = useTranslation();
   const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: login });
-  const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
   const { shouldRender: showDropdown, isAnimatingOut: dropdownExiting } =
     useAnimatedUnmount(open, 200);
-
-  const { connections, unlink } = usePlatformConnections();
-  const statusOf = (platform: PlatformId) =>
-    connections.find((c) => c.platform === platform)?.status ?? null;
-  const unlinkingOf = (platform: PlatformId) =>
-    connections.find((c) => c.platform === platform)?.unlinking ?? false;
-  const bbStatus = statusOf("bitbucket");
-  const cbStatus = statusOf("codeberg");
-  const glStatus = statusOf("gitlab");
-  const unlinkLoading = unlinkingOf("bitbucket");
-  const cbUnlinkLoading = unlinkingOf("codeberg");
-  const glUnlinkLoading = unlinkingOf("gitlab");
-  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
-  const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
-  const [showGlUnlinkConfirm, setShowGlUnlinkConfirm] = useState(false);
-
-  // Insights import — file picker triggered directly from menu
-  const insightsFileRef = useRef<HTMLInputElement>(null);
-  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    detail?: string;
-    type: "loading" | "success" | "error" | "info";
-  } | null>(null);
-  const handleToastDismiss = useCallback(() => setToast(null), []);
-
-  // Insights cooldown — read last-submitted timestamp from localStorage.
-  // State is seeded with deterministic defaults (0 / null) so the initial
-  // server and client renders match; the real values are populated in a
-  // mount-time effect below to avoid hydration mismatches and the use of
-  // Date.now()/localStorage inside a useState initializer (#892).
-  const INSIGHTS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
-  const [insightsNow, setInsightsNow] = useState(0);
-  const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(null);
-
-  useEffect(() => {
-    // Read the cooldown timestamp from localStorage and capture "now" AFTER
-    // mount so the initial server/client render stays deterministic (#892):
-    // we never call Date.now() or touch localStorage inside a useState
-    // initializer. Setting state here is the intended client-only hydration of
-    // browser-derived values; the rule below is a false positive for that case.
-    setInsightsNow(Date.now()); // eslint-disable-line react-hooks/set-state-in-effect
-    if (typeof window === "undefined" || !window.localStorage) return;
-    const stored = window.localStorage.getItem(insightsStorageKey);
-    if (!stored) return;
-    try {
-      const date = new Date(stored);
-      if (!Number.isNaN(date.getTime())) {
-        setInsightsLastSubmitted(date);
-      }
-    } catch {
-      // Ignore malformed stored values — cooldown stays inactive.
-    }
-  }, [insightsStorageKey]);
-  const insightsCooldownActive =
-    insightsLastSubmitted !== null &&
-    insightsNow - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
-  const insightsTooltip =
-    insightsCooldownActive && insightsLastSubmitted
-      ? `${t('userMenu.insightsCooldownPrefix') as string}${new Date(insightsLastSubmitted.getTime() + INSIGHTS_COOLDOWN_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
-      : undefined;
-
-  async function handleInsightsFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-
-    if (file.size > 10 * 1024 * 1024) {
-      setToast({ message: t('userMenu.insightsFileTooLarge') as string, detail: t('userMenu.insightsFileTooLargeDetail') as string, type: "error" });
-      return;
-    }
-
-    setOpen(false);
-    setToast({ message: t('userMenu.insightsProcessing') as string, type: "loading" });
-
-    try {
-      const html = await file.text();
-      const { parseInsightsHtml } = await import("@/lib/insights/parser");
-      const data = parseInsightsHtml(html);
-
-      const uploadRes = await fetch("/api/insights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!uploadRes.ok) throw new Error("Upload failed");
-
-      setToast({ message: t('userMenu.insightsRecalculating') as string, type: "loading" });
-
-      // Parse upload response and start recalculate in parallel
-      const [uploadData, recalcRes] = await Promise.all([
-        uploadRes.json(),
-        fetch("/api/recalculate", { method: "POST" }),
-      ]);
-
-      const now = new Date();
-      localStorage.setItem(insightsStorageKey, now.toISOString());
-      setInsightsLastSubmitted(now);
-      setInsightsNow(now.getTime());
-
-      if (recalcRes.ok) {
-        const recalcData = await recalcRes.json();
-        const craftScore = uploadData.craftScore?.craftScore ?? recalcData.craftScore;
-        const craftTier = uploadData.craftScore?.tier ?? recalcData.craftTier;
-        const newScore = recalcData.adjustedComposite;
-
-        setToast({
-          message: interpolate(t('userMenu.insightsCraftResult') as string, {
-            craftScore: String(craftScore),
-            craftTier: resolveCraftTierLabel(t, craftTier),
-          }),
-          detail: interpolate(t('userMenu.insightsScoreUpdated') as string, {
-            score: String(newScore),
-          }),
-          type: "success",
-        });
-      } else {
-        const craftScore = uploadData.craftScore?.craftScore;
-        const craftTier = uploadData.craftScore?.tier;
-        setToast({
-          message: craftScore
-            ? interpolate(t('userMenu.insightsCraftResult') as string, {
-                craftScore: String(craftScore),
-                craftTier: resolveCraftTierLabel(t, craftTier),
-              })
-            : t('userMenu.insightsImported') as string,
-          detail: t('userMenu.insightsImportedDetail') as string,
-          type: "success",
-        });
-      }
-
-      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
-      reloadTimerRef.current = setTimeout(() => {
-        if (typeof window !== "undefined") {
-          window.location.reload();
-        }
-      }, 2500);
-    } catch {
-      setToast({ message: t('userMenu.insightsImportFailed') as string, detail: t('userMenu.insightsImportFailedDetail') as string, type: "error" });
-    }
-  }
-
-  useEffect(() => () => {
-    if (reloadTimerRef.current) {
-      clearTimeout(reloadTimerRef.current);
-    }
-  }, []);
-
-
-  // #1223 — the fetch, cache clear and failure handling live in
-  // usePlatformConnections now; this component keeps only the confirm-dialog
-  // and toast bookkeeping that is specific to the menu.
-  async function handleUnlink(platform: PlatformId, close: (open: boolean) => void) {
-    const ok = await unlink(platform);
-    if (ok) {
-      close(false);
-      router.refresh();
-    } else {
-      setToast({ message: t('userMenu.unlinkFailed') as string, type: "error" });
-    }
-  }
-
-  const handleUnlinkBitbucket = () => handleUnlink("bitbucket", setShowUnlinkConfirm);
-  const handleUnlinkCodeberg = () => handleUnlink("codeberg", setShowCbUnlinkConfirm);
-  const handleUnlinkGitlab = () => handleUnlink("gitlab", setShowGlUnlinkConfirm);
 
   async function handleSignOut() {
     // Clear all module-level per-user caches before navigating away.
@@ -342,7 +135,8 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             </div>
           </div>
 
-          {/* My Badge + Creator Studio */}
+          {/* Navigation. #1238 — account actions are not here any more; the
+              Settings link below is the way to them. */}
           <div className="px-2 py-1.5">
             <Link
               href={`/u/${login}`}
@@ -375,9 +169,9 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 {t('userMenu.creatorStudio') as string}
               </Link>
             )}
-            {/* #1223 — the menu stops being the only home for account actions.
-                Connections, insights import and sign-out all have a real page
-                now; this is the way in. */}
+            {/* #1223 gave account actions a real page; #1238 removed the
+                copies that stayed behind in this menu. Connections and the
+                insights import live on /settings only. */}
             <Link
               href="/settings"
               role="menuitem"
@@ -399,160 +193,6 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               </svg>
               {t('settings.settingsLink') as string}
             </Link>
-            {insightsEnabled && (
-              <>
-                {/* #1184 (FE-L1) — the file input must be a sibling, not a
-                    descendant of this <button>: HTML forbids interactive
-                    content nested inside <button>, and HTMLElement.click()
-                    (called below) bubbles a synthetic click back up into the
-                    button's own onClick, bounded only by the spec's "click in
-                    progress" flag. Ref, handler, and sr-only visibility are
-                    unchanged — only the nesting moved. */}
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={insightsCooldownActive}
-                  title={insightsTooltip}
-                  onClick={() => insightsFileRef.current?.click()}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${insightsCooldownActive ? "cursor-not-allowed opacity-50 text-text-secondary" : "text-text-primary hover:bg-amber/[0.06]"}`}
-                >
-                  <svg
-                    className="h-4 w-4 text-text-secondary"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  {t('userMenu.importInsights') as string}
-                </button>
-                <input
-                  ref={insightsFileRef}
-                  type="file"
-                  accept=".html"
-                  onChange={handleInsightsFile}
-                  className="sr-only"
-                  aria-label={t('aria.selectInsightsReport') as string}
-                />
-              </>
-            )}
-            {bbStatus && (
-              bbStatus.linked ? (
-                <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
-                  <a
-                    href={`https://bitbucket.org/${bbStatus.remoteLogin}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 transition-colors hover:text-amber"
-                  >
-                    <BitbucketIcon className="h-4 w-4 text-text-secondary" />
-                    <span className="text-sm text-text-primary">{bbStatus.remoteLogin}</span>
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setShowUnlinkConfirm(true)}
-                    aria-label={t('aria.unlinkBitbucket') as string}
-                    className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
-                  >
-                    {t('userMenu.unlinkBtn') as string}
-                  </button>
-                </div>
-              ) : (
-                // Intentional native <a> for a server-redirect API route
-                // (Bitbucket OAuth connect), not a client-side page
-                // navigation. The #1023 top-level app/[locale] dynamic
-                // segment makes this lint rule's page-path heuristic
-                // false-positive on any /api/* href.
-                // eslint-disable-next-line @next/next/no-html-link-for-pages
-                <a
-                  href="/api/auth/bitbucket/connect"
-                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
-                >
-                  <BitbucketIcon width={16} height={16} />
-                  {t('userMenu.linkBitbucket') as string}
-                </a>
-              )
-            )}
-            {cbStatus && (
-              cbStatus.linked ? (
-                <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
-                  <a
-                    href={`https://codeberg.org/${cbStatus.remoteLogin}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 transition-colors hover:text-amber"
-                  >
-                    <CodebergIcon className="h-4 w-4 text-text-secondary" />
-                    <span className="text-sm text-text-primary">{cbStatus.remoteLogin}</span>
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setShowCbUnlinkConfirm(true)}
-                    aria-label={t('aria.unlinkCodeberg') as string}
-                    className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
-                  >
-                    {t('userMenu.unlinkBtn') as string}
-                  </button>
-                </div>
-              ) : (
-                // Intentional native <a> for a server-redirect API route
-                // (Codeberg OAuth connect), not a client-side page
-                // navigation. The #1023 top-level app/[locale] dynamic
-                // segment makes this lint rule's page-path heuristic
-                // false-positive on any /api/* href.
-                // eslint-disable-next-line @next/next/no-html-link-for-pages
-                <a
-                  href="/api/auth/codeberg/connect"
-                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
-                >
-                  <CodebergIcon className="h-4 w-4 text-text-secondary" />
-                  {t('userMenu.linkCodeberg') as string}
-                </a>
-              )
-            )}
-            {glStatus && (
-              glStatus.linked ? (
-                <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
-                  <a
-                    href={`https://gitlab.com/${glStatus.remoteLogin}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 transition-colors hover:text-amber"
-                  >
-                    <GitlabIcon className="h-4 w-4 text-text-secondary" />
-                    <span className="text-sm text-text-primary">{glStatus.remoteLogin}</span>
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setShowGlUnlinkConfirm(true)}
-                    aria-label={t('aria.unlinkGitlab') as string}
-                    className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
-                  >
-                    {t('userMenu.unlinkBtn') as string}
-                  </button>
-                </div>
-              ) : (
-                // Intentional native <a> for a server-redirect API route
-                // (GitLab OAuth connect), not a client-side page navigation.
-                // The #1023 top-level app/[locale] dynamic segment makes
-                // this lint rule's page-path heuristic false-positive on
-                // any /api/* href.
-                // eslint-disable-next-line @next/next/no-html-link-for-pages
-                <a
-                  href="/api/auth/gitlab/connect"
-                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
-                >
-                  <GitlabIcon className="h-4 w-4 text-text-secondary" />
-                  {t('userMenu.linkGitlab') as string}
-                </a>
-              )
-            )}
             {isAdmin && (
               <Link
                 href="/admin"
@@ -575,74 +215,6 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 {t('userMenu.adminPanel') as string}
               </Link>
             )}
-          </div>
-
-          <div className="mx-3 border-t border-stroke" />
-
-          {/* Links */}
-          <div className="px-2 py-1.5">
-            <Link
-              href="/about"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
-            >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4M12 8h.01" />
-              </svg>
-              {t('userMenu.aboutChapa') as string}
-            </Link>
-            <Link
-              href="/terms"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
-            >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-              </svg>
-              {t('userMenu.termsOfService') as string}
-            </Link>
-            <Link
-              href="/privacy"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
-            >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              {t('userMenu.privacyPolicy') as string}
-            </Link>
           </div>
 
           <div className="mx-3 border-t border-stroke" />
@@ -672,48 +244,6 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             </form>
           </div>
         </div>
-      )}
-      <ConfirmDialog
-        open={showUnlinkConfirm}
-        title={t('userMenu.confirmUnlinkBitbucketTitle') as string}
-        description={t('userMenu.confirmUnlinkBitbucketBody') as string}
-        confirmLabel={t('userMenu.confirmBtn') as string}
-        cancelLabel={t('userMenu.cancelBtn') as string}
-        variant="destructive"
-        loading={unlinkLoading}
-        onConfirm={handleUnlinkBitbucket}
-        onCancel={() => setShowUnlinkConfirm(false)}
-      />
-      <ConfirmDialog
-        open={showCbUnlinkConfirm}
-        title={t('userMenu.confirmUnlinkCodebergTitle') as string}
-        description={t('userMenu.confirmUnlinkCodebergBody') as string}
-        confirmLabel={t('userMenu.confirmBtn') as string}
-        cancelLabel={t('userMenu.cancelBtn') as string}
-        variant="destructive"
-        loading={cbUnlinkLoading}
-        onConfirm={handleUnlinkCodeberg}
-        onCancel={() => setShowCbUnlinkConfirm(false)}
-      />
-      <ConfirmDialog
-        open={showGlUnlinkConfirm}
-        title={t('userMenu.confirmUnlinkGitlabTitle') as string}
-        description={t('userMenu.confirmUnlinkGitlabBody') as string}
-        confirmLabel={t('userMenu.confirmBtn') as string}
-        cancelLabel={t('userMenu.cancelBtn') as string}
-        variant="destructive"
-        loading={glUnlinkLoading}
-        onConfirm={handleUnlinkGitlab}
-        onCancel={() => setShowGlUnlinkConfirm(false)}
-      />
-      {toast && (
-        <Toast
-          message={toast.message}
-          detail={toast.detail}
-          type={toast.type}
-          duration={toast.type === "loading" ? 0 : toast.type === "error" ? 5000 : 4000}
-          onDismiss={handleToastDismiss}
-        />
       )}
     </div>
   );

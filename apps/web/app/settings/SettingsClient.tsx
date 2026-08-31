@@ -59,6 +59,12 @@ const CONFIRM_KEYS: Record<PlatformId, { title: string; body: string }> = {
   },
 };
 
+const UNLINK_ARIA_KEYS: Record<PlatformId, string> = {
+  bitbucket: "aria.unlinkBitbucket",
+  codeberg: "aria.unlinkCodeberg",
+  gitlab: "aria.unlinkGitlab",
+};
+
 const LINK_KEYS: Record<PlatformId, string> = {
   bitbucket: "userMenu.linkBitbucket",
   codeberg: "userMenu.linkCodeberg",
@@ -231,6 +237,9 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
                         setPendingUnlink(platform);
                       }}
                       disabled={unlinking}
+                      // Three rows render this button with the same visible
+                      // label, so the accessible name has to name the platform.
+                      aria-label={t(UNLINK_ARIA_KEYS[platform]) as string}
                       className="min-h-[44px] rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary transition-colors hover:border-terminal-red/40 hover:text-terminal-red disabled:opacity-50"
                     >
                       {t("userMenu.unlinkBtn") as string}
@@ -273,6 +282,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
               ref={fileRef}
               type="file"
               accept=".html,text/html"
+              aria-label={t("aria.selectInsightsReport") as string}
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
