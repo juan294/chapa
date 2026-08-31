@@ -1,16 +1,27 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 
+const cacheProducerRejections: unknown[] = [];
+
 // Mock the DB layer
 vi.mock("./db/feature-flags", () => ({
   dbGetFeatureFlag: vi.fn(),
 }));
 
 // `unstable_cache` requires a Next.js incremental cache that doesn't exist in
-// vitest. Pass-through (via a spy so call args are inspectable) so the
-// wrapped function still calls the mocked DB.
+// vitest. This spy passes calls through to the mocked DB and records producer
+// rejections so timeout tests can distinguish a request fallback from a cache
+// revalidation failure.
 vi.mock("next/cache", () => ({
   unstable_cache: vi.fn(
-    <Args extends unknown[], R>(fn: (...args: Args) => R) => fn,
+    <Args extends unknown[], R>(fn: (...args: Args) => R) =>
+      async (...args: Args): Promise<Awaited<R>> => {
+        try {
+          return await fn(...args);
+        } catch (error) {
+          cacheProducerRejections.push(error);
+          throw error;
+        }
+      },
   ),
   revalidateTag: vi.fn(),
 }));
@@ -143,6 +154,31 @@ describe("isStudioEnabled", () => {
     await vi.advanceTimersByTimeAsync(501);
 
     await expect(resultPromise).resolves.toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("does not reject the data-cache producer when a DB lookup exceeds the request deadline", async () => {
+    vi.useFakeTimers();
+    cacheProducerRejections.length = 0;
+    vi.mocked(dbGetFeatureFlag).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () => resolve(makeFlag("studio_enabled", true)),
+            600,
+          );
+        }),
+    );
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", undefined);
+
+    const resultPromise = isStudioEnabled();
+    await vi.advanceTimersByTimeAsync(501);
+
+    await expect(resultPromise).resolves.toBe(false);
+    expect(cacheProducerRejections).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(cacheProducerRejections).toEqual([]);
     vi.useRealTimers();
   });
 });
