@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-08-31
+
+### Added
+
+- **The badge now has five selectable colour palettes.** Creator Studio adds
+  Color Palette as its seventh category, available from Quick Controls and
+  `/set palette`. Each option renders through the real embeddable SVG while
+  preserving the semantic archetype colours and the unique verification coral.
+  Existing saved configurations gain the default palette, and the brief-lived
+  `palette` key migrates to `colorPalette` on read. (#1242, #1245)
+
+### Changed
+
+- **Creator Studio now puts the badge on a full-width stage.** Fit, 50%, and
+  100% zoom controls show the fixed-size artifact without squeezing it beside
+  the tools. Quick Controls and the session log share a responsive band below,
+  presets and category options have clearer selected states, and `/copy config`
+  produces replayable `/set` commands. Save and reset remain available when
+  Quick Controls is collapsed. (#1241, #1243)
+- **The landing hero shows the real badge at its natural aspect ratio.** The
+  decorative browser frame and crop are gone, and the supporting copy gains a
+  clearer marker and keyword hierarchy. Other constrained layouts no longer
+  apply a second text-width cap. (#1237)
+- **The profile menu is navigation-only.** Platform connections and AI insights
+  import now live only on `/settings`, while the menu keeps badge, Studio,
+  settings, admin, and sign-out links. The settings controls also receive the
+  accessible labels that were missing after their earlier move. (#1238)
+
+### Fixed
+
+- **Public badge and share views no longer register arbitrary GitHub handles as
+  Chapa users.** Only OAuth creates a user row; public reads can update an
+  existing profile but cannot enroll a stranger into warm-cache and snapshot
+  processing. (#1239)
+- **Account deletion covers every handle-bearing Supabase record.** Studio
+  configs, both sides of merge operations, and supplemental source identities
+  are included, with a migration-derived test that fails when a future table is
+  omitted. (#1240)
+- **Slow feature-flag reads no longer surface as cache revalidation errors.** A
+  timed-out request still uses its environment fallback, while the underlying
+  lookup can finish and warm the shared cache for later requests.
+- **Document locale markers are safe across initial streaming and client
+  navigation.** One root bootstrap observes inert route markers, avoiding
+  executable script nodes inside changing route trees.
+- **The release preflight now verifies the prospective production tree.** It
+  accepts expected `main`/`develop` divergence after a merge promotion and
+  blocks only conflicts or a tree mismatch.
+- **The authenticated journey fixture follows the complete badge-config
+  schema.** Adding another Studio category no longer leaves CI posting an
+  invalid hand-written configuration. (#1244)
+
 ## [2.26.1] - 2026-08-30
 
 ### Changed
