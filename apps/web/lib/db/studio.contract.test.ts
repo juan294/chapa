@@ -58,4 +58,36 @@ describe("Studio config durable boundary (contract)", () => {
       status: "invalid",
     });
   });
+
+  it("renames a persisted palette key after reading it through PostgREST", async () => {
+    const db = getServiceClient();
+    const legacyConfig = {
+      background: "aurora",
+      cardStyle: "frost",
+      border: "gradient-rotating",
+      scoreEffect: "gold-shimmer",
+      heatmapAnimation: "diagonal",
+      tierTreatment: "enhanced",
+      palette: "indigo",
+    };
+    const { error } = await db.from("studio_configs").insert({
+      handle: HANDLE,
+      config: legacyConfig,
+    });
+    expect(error).toBeNull();
+
+    await expect(dbGetStudioConfig(HANDLE)).resolves.toEqual({
+      status: "found",
+      config: {
+        background: "aurora",
+        cardStyle: "frost",
+        border: "gradient-rotating",
+        scoreEffect: "gold-shimmer",
+        heatmapAnimation: "diagonal",
+        tierTreatment: "enhanced",
+        colorPalette: "indigo",
+      },
+      revision: expect.any(Number),
+    });
+  });
 });

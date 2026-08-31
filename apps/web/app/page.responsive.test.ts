@@ -46,8 +46,13 @@ describe("landing layout is fluid, not breakpoint-driven (#240, #1215)", () => {
     }
   });
 
-  it("keeps the badge panel from growing unbounded on wide screens", () => {
-    expect(SOURCE).toContain("max-h-[360px]");
-    expect(SOURCE).toContain("aspect-[16/5]");
+  it("keeps the badge from growing past its intrinsic width on wide screens", () => {
+    // #1237 dropped the fake browser frame and the 16:5 letterbox. The badge
+    // now renders at its natural 1200x630 aspect, capped at its intrinsic
+    // width, so the cap is horizontal and the height follows.
+    expect(SOURCE).toContain("max-w-[1200px]");
+    expect(SOURCE).toContain("[&>svg]:h-auto");
+    expect(SOURCE).not.toContain("max-h-[360px]");
+    expect(SOURCE).not.toContain("aspect-[16/5]");
   });
 });

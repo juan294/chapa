@@ -32,7 +32,7 @@ export default function TierVisualsExperimentPage() {
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 py-16 sm:py-24">
           {/* Header */}
-          <header className="mb-12 sm:mb-16 max-w-3xl animate-fade-in-up">
+          <header className="mb-12 sm:mb-16 animate-fade-in-up">
             <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
               Experiment #47
             </p>

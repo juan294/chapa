@@ -48,7 +48,7 @@ export function SharePageHeader({
           <h1 className="font-heading text-[clamp(1.75rem,5cqi,2.75rem)] leading-tight tracking-tight text-balance">
             {displayLabel}
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-pretty text-text-secondary">
+          <p className="mt-2 text-sm text-pretty text-text-secondary">
             {t("sharePage.subtitle") as string}
           </p>
         </div>

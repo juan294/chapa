@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 
 const requiredEnvPresent = Boolean(
   process.env.SUPABASE_URL &&
@@ -26,10 +27,17 @@ type FeatureFlagState = {
   config: unknown;
 };
 
+// #1244 — derived from DEFAULT_BADGE_CONFIG, not hand-enumerated.
+// `isValidBadgeConfig` requires an exact key set, so a hand-written literal
+// silently becomes a 400 payload the moment a category is added: #1242's
+// `palette` turned this fixture into a six-key body and CI went red on a
+// change that had nothing to do with the journey. Spreading the default means
+// the fixture tracks the schema and only the fields this test cares about are
+// spelled out.
 const savedConfig = {
+  ...DEFAULT_BADGE_CONFIG,
   background: "aurora",
   cardStyle: "frost",
-  border: "solid-amber",
   scoreEffect: "chrome",
   heatmapAnimation: "ripple",
   tierTreatment: "enhanced",

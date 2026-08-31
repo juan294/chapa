@@ -6,6 +6,10 @@ import { LanguageContext, type LanguageContextValue } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { resolveTranslation } from "@/lib/i18n/resolve";
+import {
+  formatConfigCommands,
+  formatConfigSummary,
+} from "./studio-config-string";
 
 // ---------- Browser API mocks ----------
 
@@ -119,17 +123,10 @@ vi.mock("./QuickControls", () => ({
     onCommand,
     visible,
     onToggle,
-    saveDisabled,
-    agentSaveProposal,
   }: {
     onCommand: (cmd: string) => void;
     visible: boolean;
     onToggle: () => void;
-    saveDisabled?: boolean;
-    agentSaveProposal?: {
-      onConfirm: () => void;
-      onDismiss: () => void;
-    };
   }) => (
     <div data-testid="quick-controls" data-visible={String(visible)}>
       <button data-testid="qc-toggle" onClick={onToggle}>
@@ -141,24 +138,6 @@ vi.mock("./QuickControls", () => ({
       >
         Run Command
       </button>
-      <button
-        data-testid="qc-save"
-        disabled={saveDisabled}
-        onClick={() => onCommand("/save")}
-      >
-        /save
-      </button>
-      {agentSaveProposal && (
-        <div>
-          <span>An agent wants to save this preview configuration.</span>
-          <button data-testid="agent-save-confirm" onClick={agentSaveProposal.onConfirm}>
-            Confirm save
-          </button>
-          <button data-testid="agent-save-dismiss" onClick={agentSaveProposal.onDismiss}>
-            Dismiss
-          </button>
-        </div>
-      )}
     </div>
   ),
 }));
@@ -290,6 +269,7 @@ const defaultConfig: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
+  colorPalette: "jade",
 };
 
 const stats: StatsData = {
@@ -423,15 +403,24 @@ describe("StudioClient render", () => {
   });
 
   describe("responsive layout", () => {
-    it("uses a two-column grid on large screens", () => {
-      const { container } = render(
+    it("stacks a full-width stage over a two-column tools band", () => {
+      render(
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
           impact={impact}
         />,
       );
-      expect(container.firstElementChild?.className).toContain("lg:grid-cols-2");
+      const stage = screen.getByTestId("studio-stage");
+      const tools = screen.getByTestId("studio-tools");
+      expect(
+        stage.compareDocumentPosition(tools) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(stage.contains(screen.getByTestId("badge-preview"))).toBe(true);
+      // The tools band is what splits, and it splits on its own width rather
+      // than a viewport breakpoint, so one layout serves desktop and 390px.
+      expect(tools.className).toContain("minmax(min(100%,460px),1fr)");
     });
   });
 
@@ -1089,7 +1078,7 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      fireEvent.click(screen.getByTestId("qc-save"));
+      fireEvent.click(screen.getByTestId("studio-save"));
 
       expect(
         await screen.findAllByText(
@@ -1119,7 +1108,7 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      fireEvent.click(screen.getByTestId("qc-save"));
+      fireEvent.click(screen.getByTestId("studio-save"));
 
       expect(
         await screen.findAllByText(
@@ -1149,7 +1138,7 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      fireEvent.click(screen.getByTestId("qc-save"));
+      fireEvent.click(screen.getByTestId("studio-save"));
 
       expect((await screen.findByRole("alert")).textContent).toBe(message);
     });
@@ -1170,7 +1159,7 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      const save = screen.getByTestId("qc-save");
+      const save = screen.getByTestId("studio-save");
       fireEvent.click(save);
       fireEvent.click(save);
 
@@ -1228,7 +1217,7 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      fireEvent.click(screen.getByTestId("qc-save"));
+      fireEvent.click(screen.getByTestId("studio-save"));
 
       vi.mocked(executeCommand).mockReturnValue({
         lines: [{ id: "set-new", type: "system", text: "Changed" }],
@@ -1826,11 +1815,13 @@ describe("StudioClient render", () => {
   });
 });
 
-// #1216 — the v2 controls column: the save state is a pill on the preview, the
-// whole configuration is readable in one block, and the command input sticks
-// to the bottom so a long session cannot push it off-screen.
-describe("StudioClient — v2 layout (#1216)", () => {
-  it("renders the save state as a status pill", () => {
+// #1241 — the v3 layout: a full-width badge stage on top, a tools band below.
+// The stage carries the save state and the whole configuration; the session
+// column owns the prompt and the save actions.
+describe("StudioClient — v3 horizontal split (#1241)", () => {
+  const enString = (key: string) => resolveTranslation(key, en) as string;
+
+  const renderStudio = () =>
     render(
       <StudioClient
         initialConfig={defaultConfig}
@@ -1839,52 +1830,197 @@ describe("StudioClient — v2 layout (#1216)", () => {
         handle="testuser"
       />,
     );
+
+  it("renders the save state as a status pill in the stage header", () => {
+    renderStudio();
     const pill = document.querySelector("[data-save-state]") as HTMLElement;
     expect(pill).not.toBeNull();
     expect(pill.tagName).toBe("SPAN");
     expect(pill.className).toContain("rounded-full");
     expect(pill.getAttribute("role")).toBe("status");
+    expect(screen.getByTestId("studio-stage").contains(pill)).toBe(true);
   });
 
-  it("lists every category in the active-config readout, keyed by its /set alias", () => {
-    render(
-      <StudioClient
-        initialConfig={defaultConfig}
-        stats={stats}
-        impact={impact}
-        handle="testuser"
-      />,
+  it("summarises the whole configuration on one line under the badge", () => {
+    renderStudio();
+    expect(screen.getByTestId("studio-config-summary").textContent).toBe(
+      formatConfigSummary(defaultConfig),
     );
-    const readout = screen.getByTestId("studio-active-config");
-    const terms = Array.from(readout.querySelectorAll("dt")).map(
-      (dt) => dt.textContent,
-    );
-    expect(terms).toEqual([
-      "bg",
-      "card",
-      "border",
-      "score",
-      "heatmap",
-      "tier",
-    ]);
   });
 
-  it("keeps the command input reachable at the bottom of a long session", () => {
-    render(
-      <StudioClient
-        initialConfig={defaultConfig}
-        stats={stats}
-        impact={impact}
-        handle="testuser"
-      />,
+  it("drops the ACTIVE CONFIG readout the summary replaces", () => {
+    renderStudio();
+    expect(screen.queryByTestId("studio-active-config")).toBeNull();
+  });
+
+  it("copies the configuration as replayable /set commands and says so", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    renderStudio();
+
+    fireEvent.click(screen.getByTestId("studio-copy-config"));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        formatConfigCommands(defaultConfig),
+      ),
     );
-    const input = screen.getByTestId("terminal-input");
-    const cluster = input.closest(".sticky") as HTMLElement;
-    expect(cluster).not.toBeNull();
-    expect(cluster.className).toContain("bottom-0");
-    // The log above it is bounded, so it scrolls instead of growing the column.
-    const log = screen.getByTestId("terminal-output").parentElement as HTMLElement;
+    await waitFor(() =>
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        enString("studio.copyConfig.logLine"),
+      ),
+    );
+  });
+
+  it("reports a rejected copy in the log instead of failing silently", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    renderStudio();
+
+    fireEvent.click(screen.getByTestId("studio-copy-config"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        enString("studio.copyConfig.errorLine"),
+      ),
+    );
+  });
+
+  it("reports an unavailable clipboard in the log", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: undefined,
+    });
+    renderStudio();
+
+    fireEvent.click(screen.getByTestId("studio-copy-config"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        enString("studio.copyConfig.errorLine"),
+      ),
+    );
+  });
+
+  it("zooms the stage without touching the saved configuration", () => {
+    renderStudio();
+    expect(screen.getByTestId("studio-badge-frame").className).toContain(
+      "w-[min(720px,100%)]",
+    );
+
+    fireEvent.click(screen.getByTestId("studio-zoom-full"));
+
+    const frame = screen.getByTestId("studio-badge-frame");
+    expect(frame.className).toContain("w-[1200px]");
+    // Flex children of the scrolling viewport collapse back to the container
+    // width without this, which silently defeats the whole zoom.
+    expect(frame.className).toContain("shrink-0");
+    expect(screen.getByTestId("badge-preview").textContent).toBe(
+      JSON.stringify(defaultConfig),
+    );
+    expect(
+      document
+        .querySelector("[data-save-state]")
+        ?.getAttribute("data-save-state"),
+    ).toBe("saved");
+  });
+
+  it("exposes the selected zoom to assistive tech", () => {
+    renderStudio();
+    const group = screen.getByRole("group", {
+      name: enString("studio.zoom.groupLabel"),
+    });
+    expect(
+      screen.getByTestId("studio-zoom-fit").getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByTestId("studio-zoom-half").getAttribute("aria-pressed"),
+    ).toBe("false");
+    expect(group.contains(screen.getByTestId("studio-zoom-half"))).toBe(true);
+
+    fireEvent.click(screen.getByTestId("studio-zoom-half"));
+    expect(
+      screen.getByTestId("studio-zoom-half").getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("anchors the prompt and its actions to the bottom of the session column", () => {
+    renderStudio();
+    const session = screen.getByTestId("studio-session");
+    expect(session.contains(screen.getByTestId("terminal-input"))).toBe(true);
+    expect(screen.getByTestId("studio-prompt-row").className).toContain(
+      "mt-auto",
+    );
+    // The log is the flexible region now — it grows with the column instead of
+    // being a bounded strip above a sticky cluster.
+    const log = screen.getByTestId("terminal-output")
+      .parentElement as HTMLElement;
+    expect(log.className).toContain("flex-1");
     expect(log.className).toContain("overflow-y-auto");
   });
-});
 
+  it("keeps /save and /reset reachable when Quick Controls is collapsed", () => {
+    renderStudio();
+    fireEvent.click(screen.getByTestId("qc-toggle"));
+    expect(
+      screen.getByTestId("quick-controls").getAttribute("data-visible"),
+    ).toBe("false");
+    expect(screen.getByTestId("studio-save")).toBeDefined();
+    expect(screen.getByTestId("studio-reset")).toBeDefined();
+  });
+
+  it("runs /reset from the session column action", async () => {
+    const { executeCommand } = await import(
+      "@/components/terminal/command-registry"
+    );
+    vi.mocked(executeCommand).mockReturnValue({
+      lines: [{ id: "reset-btn", type: "system", text: "Reset done" }],
+      action: { type: "reset" },
+    });
+
+    render(
+      <StudioClient
+        initialConfig={{ ...defaultConfig, background: "aurora" }}
+        stats={stats}
+        impact={impact}
+        handle="testuser"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("studio-reset"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("badge-preview").textContent).toContain(
+        '"background":"solid"',
+      ),
+    );
+  });
+
+  it("clears the session from the column header", async () => {
+    const { executeCommand } = await import(
+      "@/components/terminal/command-registry"
+    );
+    vi.mocked(executeCommand).mockReturnValue({
+      lines: [],
+      action: { type: "clear" },
+    });
+
+    renderStudio();
+    expect(screen.getByTestId("terminal-output").textContent).toContain(
+      "2 lines",
+    );
+
+    fireEvent.click(screen.getByTestId("studio-clear-session"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("terminal-output").textContent).toContain(
+        "0 lines",
+      ),
+    );
+  });
+});

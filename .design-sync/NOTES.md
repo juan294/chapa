@@ -371,3 +371,92 @@ The stale-read scare from the previous sync did not repeat: `styleSha`,
 `get_file`. Keep doing the check - it is two calls and the failure it catches is
 silent.
 
+
+## Re-sync 2026-08-31 — studio v3, badge palettes, and a correction
+
+Synced from `develop` @ 7d092a81, after #1241 (studio horizontal split), #1242
+and #1245 (badge colour palettes), #1243 (Quick Controls v3 fidelity) and #1244.
+Scope unchanged at 15 components; nothing added or removed.
+
+### CORRECTION: verification is keyed on `sourceKeys`, NOT `styleSha`
+
+The entry above ("expect the driver to re-verify everything anyway, because
+`styleSha` feeds the verification partition") is **wrong for this converter
+version**. Measured this run: `styleSha` moved
+(`c9f01d5b58da...` -> `b67225ee135c...`, #1243 added `--color-amber-text`) and
+all 15 components still came back `unchanged` / verified-by-upload. The driver
+says so explicitly:
+
+    verify: 15 verified-by-upload (skip capture/grade), 0 changed, 0 new, 0 removed [keyed on sourceKeys]
+
+Consequence, and it matters: **a pure restyle triggers no re-grading at all.**
+`upload.styling` goes true so the new CSS ships, but no sheet is recaptured and
+no grade is revisited. After any token or palette change, read
+`_screenshots/contact-sheet-N.png` yourself — that eyeball is the only check
+that the restyle did not break a card. Done this run; all 15 correct.
+
+### Verify header-named utilities against the SHIPPED css, not the token list
+
+`conventions.md` named `text-forest-warn` and `text-forest-err`. Both **tokens**
+are defined in the bundle, but Tailwind emits a utility only where something
+uses it, and nothing in the bundled chunk used those two — so the classes had no
+rule at all. The header is inlined into the design agent's system prompt, so a
+class named there with no rule is worse than silence: the agent writes it, it
+resolves to nothing, and the design ships unstyled. `text-forest-ok` survived
+and its two siblings did not, which made the "status colours resolve per
+surface" rule unusable.
+
+Check both, separately:
+
+    # token defined?
+    grep -c -- '--color-forest-warn' ds-bundle/_ds_bundle.css
+    # utility rule shipped?
+    grep -cE '\.text-forest-warn([^a-z-]|$)' ds-bundle/_ds_bundle.css
+
+### New durable file: `.design-sync/safelist.css`
+
+Holds hand-written rules for utilities the header names that Tailwind did not
+emit. Concatenated into `.ds-styles.css` **between** the font bindings and the
+compiled chunk. The regeneration recipe is now:
+
+    cd apps/web && cat ../../.design-sync/fonts.css ../../.design-sync/safelist.css \
+      "$(ls -S .next/static/chunks/*.css | head -1)" > .ds-styles.css
+
+Add an entry only for a class `conventions.md` actually names.
+
+### The chunk hash moved again — third consecutive run
+
+`27a8l76xqy4b5` -> `3h8p69-9fz6h-`. The regeneration step has now fired on every
+re-sync since it was written. Treat it as unconditional.
+
+### emit-tokens now emits 58, not 126
+
+Not a regression: #1211 collapsed the paired `:root` / `[data-theme="dark"]`
+blocks into one `light-dark()` declaration per token, so the same palette is
+58 declarations instead of 126 across three blocks. Still zero `--tw-*`, and
+`scripts/design-sync-emit-tokens.test.ts` guards both facts.
+
+### Conventions header changed, so the driver ran twice
+
+Per the skill's rebuild rule the header must exist before the build whose
+receipt describes the upload. Two driver runs: one to see the state, one after
+editing `conventions.md`. The second is the one that shipped.
+
+Header edits this run: added `text-amber-text` (#1243) to the accent row with
+the fill-vs-text rule, since the header had been telling the agent to use
+`text-amber` — the fill token, 2.75:1 on the light ground; and corrected
+"light is the default", which contradicted the next sentence. With no
+`data-theme` attribute the page follows the OS, which is what
+`color-scheme: light dark` on `:root` means.
+
+### The anchor read back clean
+
+`styleSha`, `auxSha` and `bundleSha12` all matched the local file on the
+post-upload `get_file`. Third run in a row clean; keep doing it anyway, the
+stale-read scare from the Jade sync is what the check exists for.
+
+### `upload.deletePaths` was `[]` again, and again that is correct
+
+The project still holds the designer's `handoff-chapa-v2/`, `templates/`,
+`screenshots/` and `uploads/` alongside the synced bundle. Passed the diff's
+empty list verbatim; all of it survived. Never hand-derive this list.

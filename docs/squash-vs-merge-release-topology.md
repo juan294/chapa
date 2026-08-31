@@ -15,9 +15,9 @@ Chapa's own change is `d4eb9abb`; the reasoning is on issue #1228.
 If you release by squash-merging `develop` into `main`:
 
 A squash creates a commit on `main` whose *content* matches `develop` but whose
-*ancestry* does not. Git can no longer see that `main`'s changes are already in
-`develop`. So `main`'s tip stops being an ancestor of `develop`, and the **next**
-release PR computes its merge-base against a stale point.
+parents do not include the released `develop` commit. The **next** release PR
+therefore computes its merge-base against the previous common ancestor instead
+of the released `develop` commit.
 
 The consequences compound per release:
 
@@ -40,24 +40,27 @@ on every release, and it is silent when skipped.
 ```bash
 git fetch origin
 
-# 1. Are you diverged right now?
-git merge-base --is-ancestor origin/main origin/develop \
-  && echo "CLEAN" || echo "DIVERGED"
+# 1. Would the next promotion merge clean and preserve develop's tree?
+developTreeDigest="$(git rev-parse 'origin/develop^{tree}')"
+prospectiveMainTreeDigest="$(git merge-tree --write-tree origin/main origin/develop)" \
+  && test "$prospectiveMainTreeDigest" = "$developTreeDigest" \
+  && echo "CLEAN" || echo "WOULD CONFLICT OR CHANGE THE TREE"
 
 # 2. How much have you already paid by hand?
 git log --oneline origin/develop \
   --grep="Merge branch 'main'" --grep="back-merge" | wc -l
 
-# 3. Would the next release PR conflict?
-git merge-tree --write-tree origin/main origin/develop >/dev/null 2>&1 \
-  && echo "would merge clean" || echo "WOULD CONFLICT"
+# 3. Which commit is the next release PR's merge-base?
+git merge-base origin/main origin/develop
 
 # 4. Are you squash-only? (the precondition for all of the above)
 gh api repos/OWNER/REPO --jq '{allow_merge_commit, allow_squash_merge}'
 ```
 
-Reading it: a non-zero count in (2) is the tax you are already paying. `DIVERGED`
-in (1) is normal right after a release and harmless on its own — it compounds.
+Reading it: a non-zero count in (2) is the tax you are already paying. A merge
+promotion makes the released `develop` commit a parent of `main`, not the other
+way around, so branch divergence after a release is normal. The useful proof is
+whether the next promotion is conflict-free and preserves `develop`'s tree.
 
 ## What the survey found (30 repos)
 
@@ -74,7 +77,8 @@ Every squash-only `develop`+`main` project carried hand-made back-merge commits:
 | clarity, chapa-cli | 2 each |
 
 Repos that promote with a **merge commit** (`spoken-letter`, `gh-glance`) had
-none, and no divergence — the property holds by construction.
+none. Each promotion records the released integration commit as a parent, so
+the next release starts from that merge-base without a back-merge.
 
 One summon commit names the cause outright:
 `merge: back-merge main (v1.8.0 squash #625)`.
@@ -134,7 +138,7 @@ a back-merge work — check whether you need the back-merge at all first.
 
 ```bash
 gh api -X PATCH repos/OWNER/REPO -f allow_merge_commit=true
-# reconcile once, if currently diverged:
+# reconcile once if an earlier squash left the prospective tree check failing:
 git checkout develop && git merge -s ours origin/main && git push origin develop
 # then: change the release merge command to --merge, delete any back-merge
 # workflow, and add a check that rejects --squash on the release path.

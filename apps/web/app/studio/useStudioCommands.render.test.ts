@@ -23,6 +23,7 @@ const DEFAULT_CONFIG: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
+  colorPalette: "jade",
 };
 
 function getCommands(config = DEFAULT_CONFIG, handle = "testuser", locale?: "es") {

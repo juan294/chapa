@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidHandle, isValidEmuHandle, isValidStatsShape, isValidBadgeConfig, isValidTelemetryPayload, stripRetiredBadgeConfigKeys } from "./validation";
+import { isValidHandle, isValidEmuHandle, isValidStatsShape, isValidBadgeConfig, isValidTelemetryPayload, renameLegacyBadgeConfigKeys, stripRetiredBadgeConfigKeys, withDefaultBadgeConfigKeys } from "./validation";
 import { DEFAULT_BADGE_CONFIG, BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 
 describe("isValidHandle", () => {
@@ -390,6 +390,7 @@ describe("isValidBadgeConfig", () => {
         scoreEffect: "gold-shimmer",
         heatmapAnimation: "diagonal",
         tierTreatment: "enhanced",
+        colorPalette: "indigo",
       }),
     ).toBe(true);
   });
@@ -628,6 +629,130 @@ describe("isValidTelemetryPayload", () => {
  * turns a legacy row into a valid six-key config instead of discarding a
  * durable write.
  */
+describe("withDefaultBadgeConfigKeys", () => {
+  // #1242 — `colorPalette` was the first category added since isValidBadgeConfig
+  // started requiring an exact key set. Without this, every Studio config
+  // saved before it validated as invalid and the owner silently got the
+  // default badge back.
+  const PRE_PALETTE_CONFIG = {
+    background: "aurora",
+    cardStyle: "frost",
+    border: "gradient-rotating",
+    scoreEffect: "gold-shimmer",
+    heatmapAnimation: "diagonal",
+    tierTreatment: "enhanced",
+  };
+
+  it("makes a config saved before a new category valid again", () => {
+    expect(isValidBadgeConfig(PRE_PALETTE_CONFIG)).toBe(false);
+    expect(isValidBadgeConfig(withDefaultBadgeConfigKeys(PRE_PALETTE_CONFIG))).toBe(
+      true,
+    );
+  });
+
+  it("fills the missing key with its default and preserves every stored choice", () => {
+    expect(withDefaultBadgeConfigKeys(PRE_PALETTE_CONFIG)).toEqual({
+      ...PRE_PALETTE_CONFIG,
+      colorPalette: "jade",
+    });
+  });
+
+  it("never overwrites a value the owner actually saved", () => {
+    const saved = { ...DEFAULT_BADGE_CONFIG, colorPalette: "indigo" as const };
+    expect(withDefaultBadgeConfigKeys(saved)).toEqual(saved);
+  });
+
+  it("leaves an already-current config untouched", () => {
+    expect(withDefaultBadgeConfigKeys(DEFAULT_BADGE_CONFIG)).toEqual(
+      DEFAULT_BADGE_CONFIG,
+    );
+  });
+
+  it("does not mutate its input", () => {
+    const input = { ...PRE_PALETTE_CONFIG };
+    withDefaultBadgeConfigKeys(input);
+    expect(input).toEqual(PRE_PALETTE_CONFIG);
+  });
+
+  it("does not rescue an unknown field, or a bad stored value", () => {
+    expect(
+      isValidBadgeConfig(
+        withDefaultBadgeConfigKeys({ ...PRE_PALETTE_CONFIG, unknownField: "evil" }),
+      ),
+    ).toBe(false);
+    expect(
+      isValidBadgeConfig(
+        withDefaultBadgeConfigKeys({ ...PRE_PALETTE_CONFIG, background: "nope" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("passes non-objects through for the validator to reject", () => {
+    expect(withDefaultBadgeConfigKeys(null)).toBe(null);
+    expect(withDefaultBadgeConfigKeys("string")).toBe("string");
+    expect(isValidBadgeConfig(withDefaultBadgeConfigKeys(null))).toBe(false);
+  });
+});
+
+describe("renameLegacyBadgeConfigKeys", () => {
+  const LEGACY_PALETTE_CONFIG = {
+    background: "solid",
+    cardStyle: "flat",
+    border: "solid-amber",
+    scoreEffect: "standard",
+    heatmapAnimation: "fade-in",
+    tierTreatment: "standard",
+    palette: "indigo",
+  };
+
+  it("preserves a palette saved before the colorPalette rename", () => {
+    const renamed = renameLegacyBadgeConfigKeys(LEGACY_PALETTE_CONFIG);
+
+    expect(renamed).toEqual({
+      ...DEFAULT_BADGE_CONFIG,
+      colorPalette: "indigo",
+    });
+    expect(isValidBadgeConfig(renamed)).toBe(true);
+  });
+
+  it("prefers the current key when both names are present", () => {
+    expect(
+      renameLegacyBadgeConfigKeys({
+        ...DEFAULT_BADGE_CONFIG,
+        colorPalette: "crimson",
+        palette: "indigo",
+      }),
+    ).toEqual({ ...DEFAULT_BADGE_CONFIG, colorPalette: "crimson" });
+  });
+
+  it("keeps unknown fields and invalid legacy values invalid", () => {
+    expect(
+      isValidBadgeConfig(
+        renameLegacyBadgeConfigKeys({
+          ...LEGACY_PALETTE_CONFIG,
+          unknownField: "evil",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isValidBadgeConfig(
+        renameLegacyBadgeConfigKeys({
+          ...LEGACY_PALETTE_CONFIG,
+          palette: "invalid",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not mutate its input and passes non-objects through", () => {
+    const input = { palette: "indigo" };
+    renameLegacyBadgeConfigKeys(input);
+    expect(input).toEqual({ palette: "indigo" });
+    expect(renameLegacyBadgeConfigKeys(null)).toBe(null);
+    expect(renameLegacyBadgeConfigKeys("string")).toBe("string");
+  });
+});
+
 describe("stripRetiredBadgeConfigKeys", () => {
   const LEGACY_CONFIG = {
     background: "aurora",
@@ -641,9 +766,13 @@ describe("stripRetiredBadgeConfigKeys", () => {
     celebration: "confetti",
   };
 
-  it("turns a legacy nine-key config into a valid six-key one", () => {
-    const stripped = stripRetiredBadgeConfigKeys(LEGACY_CONFIG);
-    expect(isValidBadgeConfig(stripped)).toBe(true);
+  it("turns a legacy nine-key config into a valid current one, with defaults filled", () => {
+    // The read path runs both migrations: strip what was retired (#1191), then
+    // default what was added since (#1242).
+    const migrated = withDefaultBadgeConfigKeys(
+      stripRetiredBadgeConfigKeys(LEGACY_CONFIG),
+    );
+    expect(isValidBadgeConfig(migrated)).toBe(true);
   });
 
   it("preserves every surviving choice", () => {

@@ -10,11 +10,11 @@ the design language lives entirely in CSS custom properties in the shipped
 stylesheet. Each is written once as `light-dark(<light>, <dark>)`; the root's
 `color-scheme` decides which half resolves.
 
-Themes: **light is the default** (a mint-cast surface family); dark is the
-signature brand look (a deep forest ground). No attribute at all follows the
-operating system; set `data-theme="light"` or `data-theme="dark"` on a root
-element to force one. Both halves of every token are defined, so never
-hand-write a dark variant of a colour.
+Themes: light is a mint-cast surface family; dark is the signature brand look,
+a deep forest ground. **With no attribute set the page follows the operating
+system** — that is what `color-scheme: light dark` on the root means. Set
+`data-theme="light"` or `data-theme="dark"` to force one. Both halves of every
+token are defined, so never hand-write a dark variant of a colour.
 
 ```jsx
 <div data-theme="dark" className="bg-bg text-text-primary font-body">
@@ -33,7 +33,7 @@ tokens are the design language, and raw colours break theming.
 |---|---|
 | Surfaces | `bg-bg` (page), `bg-card` (panels), `bg-dark-section` (emphasis band) |
 | Text | `text-text-primary`, `text-text-secondary`, `text-terminal-dim` (meta lines, prefixes, `$`/`>` glyphs) |
-| Accent | `text-amber`, `bg-amber`, `bg-amber-dark` (white text on a solid fill) |
+| Accent | `bg-amber` (fills, tints, pills), `bg-amber-dark` (white text on a solid fill), `text-amber-text` (accent-coloured TEXT and icon strokes) |
 | Borders | `border-stroke` (accent-tinted, the default divider), `border-stroke-strong` (section rules, table separators) |
 | Status | `text-terminal-green`, `text-terminal-red`, `text-complement-text` (slate blue, verification) |
 | Type | `font-heading` (JetBrains Mono), `font-body` (Plus Jakarta Sans), `font-terminal` |
@@ -45,10 +45,15 @@ Opacity modifiers are idiomatic: `bg-amber/10`, `border-amber/20`.
 Rules worth obeying exactly:
 
 - The accent is **jade** green, `oklch(.66 .15 163)` in light and
-  `oklch(.76 .16 163)` in dark, exposed as `text-amber` / `bg-amber`. The token
-  name is doubly inaccurate: it was amber, then violet, and is now green. It is
-  kept deliberately so the palette change stayed a pure value swap. Use the
-  accent sparingly, for calls to action, active states, and key data.
+  `oklch(.76 .16 163)` in dark, exposed as `bg-amber`. The token name is doubly
+  inaccurate: it was amber, then violet, and is now green. It is kept
+  deliberately so the palette change stayed a pure value swap. Use the accent
+  sparingly, for calls to action, active states, and key data.
+- **Accent-coloured text is `text-amber-text`, never `text-amber`.** The raw
+  accent is a fill value and measures 2.75:1 on the light ground, below AA at
+  any size; `text-amber-text` is its text-safe counterpart (5.28:1 light,
+  11.94:1 dark). Same split, same reason, as `complement` vs
+  `complement-text` below.
 - **Success green is not the accent green.** The accent sits at hue 163;
   `text-terminal-green` sits at hue 145, leafier and darker. Do not collapse
   them, or every success state reads as a brand highlight.

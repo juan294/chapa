@@ -1,4 +1,4 @@
-import { accentTint } from "./theme";
+import { WARM_AMBER, type BadgeTheme } from "./theme";
 import type { Platform } from "@chapa/shared";
 import {
   BADGE_PLATFORM_LOGOS,
@@ -23,6 +23,7 @@ export function renderBadgeBranding(
   y: number,
   rightX: number,
   platforms: Platform[],
+  theme: BadgeTheme = WARM_AMBER,
 ): string {
   const logoSize = 20;
   const logoGap = 12;
@@ -36,7 +37,7 @@ export function renderBadgeBranding(
   const pillW = pillPadX * 2 + sorted.length * logoSize + (sorted.length - 1) * logoGap;
   const pillH = logoSize + pillPadY * 2;
   const pillY = y - pillPadY;
-  const pillSvg = `<rect x="${x}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="${accentTint(0.08)}" stroke="${accentTint(0.15)}" stroke-width="1"/>`;
+  const pillSvg = `<rect x="${x}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="${theme.tint(0.08)}" stroke="${theme.tint(0.15)}" stroke-width="1"/>`;
 
   const scale = (logoSize / 24).toFixed(4);
   const logosSvg = sorted

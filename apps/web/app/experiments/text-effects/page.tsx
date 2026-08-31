@@ -516,7 +516,7 @@ export default function TextEffectsExperimentPage() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold font-heading text-text-primary tracking-tight mb-6">
               Premium Material Text Effects
             </h1>
-            <p className="text-text-secondary text-lg leading-relaxed max-w-2xl mx-auto mb-12">
+            <p className="text-text-secondary text-lg leading-relaxed mb-12">
               Embossed, chrome, gold leaf, sparkle -- making text look crafted
               and luxurious on the dark background. Pure CSS, no JavaScript
               dependencies.
@@ -567,7 +567,7 @@ export default function TextEffectsExperimentPage() {
             <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary tracking-tight mb-2">
               Plain vs. Effects
             </h2>
-            <p className="text-text-secondary text-sm leading-relaxed mb-8 max-w-2xl">
+            <p className="text-text-secondary text-sm leading-relaxed mb-8">
               Side by side comparison showing how material effects elevate
               otherwise flat text. Each effect adds depth and character.
             </p>
@@ -582,7 +582,7 @@ export default function TextEffectsExperimentPage() {
             <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary tracking-tight mb-2">
               Badge Mockup
             </h2>
-            <p className="text-text-secondary text-sm leading-relaxed mb-8 max-w-2xl">
+            <p className="text-text-secondary text-sm leading-relaxed mb-8">
               How the effects look when applied to an actual badge card. Score
               in gold shimmer, tier in gold leaf, section labels embossed, stats
               in neon glow.

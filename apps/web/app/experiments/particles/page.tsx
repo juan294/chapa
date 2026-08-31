@@ -37,7 +37,7 @@ export default function ParticlesExperimentPage() {
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold font-heading text-text-primary tracking-tight mb-4">
             Canvas <span className="text-amber">Particle System</span>
           </h1>
-          <p className="text-text-secondary text-lg leading-relaxed max-w-2xl">
+          <p className="text-text-secondary text-lg leading-relaxed">
             Lightweight, custom-built canvas particle system for ambient
             floating particles behind the badge card. Zero external
             dependencies.

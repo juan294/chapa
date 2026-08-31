@@ -130,6 +130,7 @@ vi.mock("./supabase", () => ({
 import { getSupabase } from "./supabase";
 import {
   dbUpsertUser,
+  dbUpdateUserProfile,
   dbGetUsers,
   dbGetUserEmail,
   dbUpdateEmailNotifications,
@@ -253,6 +254,77 @@ describe("dbUpsertUser", () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
 
     await expect(dbUpsertUser("testuser")).resolves.toBeUndefined();
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbUpdateUserProfile (#1239)
+// ---------------------------------------------------------------------------
+
+describe("dbUpdateUserProfile", () => {
+  it("refreshes display_name and avatar_url on the existing row", async () => {
+    await dbUpdateUserProfile("TestUser", {
+      displayName: "Test User",
+      avatarUrl: "https://avatars.example.com/test.png",
+    });
+
+    expect(mockFrom).toHaveBeenCalledWith("users");
+    expect(mockUpdate).toHaveBeenCalledWith({
+      display_name: "Test User",
+      avatar_url: "https://avatars.example.com/test.png",
+    });
+    expect(mockEq).toHaveBeenCalledWith("handle", "testuser");
+  });
+
+  it("never inserts, so an unregistered handle stays unregistered", async () => {
+    await dbUpdateUserProfile("gvanrossum", {
+      displayName: "Guido van Rossum",
+      avatarUrl: "https://avatars.example.com/guido.png",
+    });
+
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
+  it("updates only the fields that were provided", async () => {
+    await dbUpdateUserProfile("TestUser", {
+      avatarUrl: "https://avatars.example.com/test.png",
+    });
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      avatar_url: "https://avatars.example.com/test.png",
+    });
+  });
+
+  it("writes nothing when no profile fields are provided", async () => {
+    await dbUpdateUserProfile("TestUser", {});
+
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects an EMU source handle without touching the DB", async () => {
+    await dbUpdateUserProfile("Juan-GonzalezPonce_avoltagh", {
+      displayName: "EMU User",
+    });
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when the update fails", async () => {
+    updateResolve = { error: new Error("DB down") };
+
+    await expect(
+      dbUpdateUserProfile("testuser", { displayName: "Test" }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("returns void when DB is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    await expect(
+      dbUpdateUserProfile("testuser", { displayName: "Test" }),
+    ).resolves.toBeUndefined();
     expect(mockFrom).not.toHaveBeenCalled();
   });
 });

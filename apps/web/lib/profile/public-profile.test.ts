@@ -18,6 +18,7 @@ const mockNotifyFirstBadge = vi.fn();
 const mockDbInsertSnapshot = vi.fn();
 const mockDbReplaceSnapshot = vi.fn();
 const mockUpdateSnapshotCache = vi.fn();
+const mockDbUpdateUserProfile = vi.fn();
 const mockDbUpsertUser = vi.fn();
 const mockCacheSetNxStatus = vi.fn();
 const mockCacheDel = vi.fn();
@@ -64,6 +65,7 @@ vi.mock("@/lib/cache/snapshot-cache", () => ({
 
 vi.mock("@/lib/db/users", () => ({
   dbUpsertUser: (...args: unknown[]) => mockDbUpsertUser(...args),
+  dbUpdateUserProfile: (...args: unknown[]) => mockDbUpdateUserProfile(...args),
 }));
 
 vi.mock("@/lib/analytics/server-errors", () => ({
@@ -386,7 +388,7 @@ describe("runPublicProfileSideEffects", () => {
     mockNotifyFirstBadge.mockResolvedValue(undefined);
     mockDbInsertSnapshot.mockResolvedValue("inserted");
     mockUpdateSnapshotCache.mockResolvedValue(true);
-    mockDbUpsertUser.mockResolvedValue(undefined);
+    mockDbUpdateUserProfile.mockResolvedValue(undefined);
     mockStoreVerificationRecord.mockResolvedValue(undefined);
     mockGenerateVerificationCode.mockReturnValue({ hash: "abc123", date: "2026-04-17" });
     // SETNX guard: first call succeeds (key was unset) by default
@@ -411,7 +413,7 @@ describe("runPublicProfileSideEffects", () => {
     expect(mockNotifyFirstBadge).not.toHaveBeenCalled();
     expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
     expect(mockUpdateSnapshotCache).toHaveBeenCalledWith("testuser", materialized.snapshot);
-    expect(mockDbUpsertUser).toHaveBeenCalledWith("testuser", {
+    expect(mockDbUpdateUserProfile).toHaveBeenCalledWith("testuser", {
       displayName: "Test User",
       avatarUrl: "https://avatars.example.com/testuser.png",
     });
@@ -464,7 +466,7 @@ describe("runPublicProfileSideEffects", () => {
     expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
     expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
     expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
-    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+    expect(mockDbUpdateUserProfile).not.toHaveBeenCalled();
   });
 
   it("sends the first-badge notification only when explicitly requested", async () => {
@@ -477,7 +479,7 @@ describe("runPublicProfileSideEffects", () => {
     expect(mockNotifyFirstBadge).toHaveBeenCalledWith("testuser", materialized.displayImpact);
   });
 
-  it("skips dbUpsertUser when displayName and avatarUrl are both absent", async () => {
+  it("skips the profile refresh when displayName and avatarUrl are both absent", async () => {
     const materialized = makeMaterializedProfile();
     materialized.stats = makeFullStats({
       handle: "testuser",
@@ -487,16 +489,36 @@ describe("runPublicProfileSideEffects", () => {
 
     await runPublicProfileSideEffects("testuser", materialized);
 
-    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+    expect(mockDbUpdateUserProfile).not.toHaveBeenCalled();
     expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
   });
 
-  it("silently ignores dbUpsertUser rejection via catch handler", async () => {
+  it("silently ignores a profile refresh rejection via catch handler", async () => {
     const materialized = makeMaterializedProfile();
-    mockDbUpsertUser.mockRejectedValue(new Error("DB write failed"));
+    mockDbUpdateUserProfile.mockRejectedValue(new Error("DB write failed"));
 
     await expect(runPublicProfileSideEffects("testuser", materialized)).resolves.toBeUndefined();
-    expect(mockDbUpsertUser).toHaveBeenCalled();
+    expect(mockDbUpdateUserProfile).toHaveBeenCalled();
+  });
+
+  // #1239 — The badge path may refresh the name/avatar of someone who already
+  // signed up, but it must never be the reason a row exists. A public badge
+  // view is not consent, and `/u/:handle` accepts any handle on earth.
+  it("#1239: refreshes the profile with an update that cannot insert", async () => {
+    const materialized = makeMaterializedProfile();
+    materialized.stats = makeFullStats({
+      handle: "testuser",
+      displayName: "Test User",
+      avatarUrl: "https://avatars.example.com/test.png",
+    });
+
+    await runPublicProfileSideEffects("testuser", materialized);
+
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+    expect(mockDbUpdateUserProfile).toHaveBeenCalledWith("testuser", {
+      displayName: "Test User",
+      avatarUrl: "https://avatars.example.com/test.png",
+    });
   });
 
   describe("sideeffect guard (#718 / #695)", () => {
@@ -510,7 +532,7 @@ describe("runPublicProfileSideEffects", () => {
       expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
       expect(mockNotifyFirstBadge).not.toHaveBeenCalled();
       expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
-      expect(mockDbUpsertUser).not.toHaveBeenCalled();
+      expect(mockDbUpdateUserProfile).not.toHaveBeenCalled();
     });
 
     it("fires all writes when SETNX succeeds (first CDN miss of the day)", async () => {
@@ -523,7 +545,7 @@ describe("runPublicProfileSideEffects", () => {
       expect(mockTrackBadgeGenerated).toHaveBeenCalled();
       expect(mockNotifyFirstBadge).not.toHaveBeenCalled();
       expect(mockDbInsertSnapshot).toHaveBeenCalled();
-      expect(mockDbUpsertUser).toHaveBeenCalled();
+      expect(mockDbUpdateUserProfile).toHaveBeenCalled();
     });
 
     it("uses the correct key prefix for the guard", async () => {
@@ -626,7 +648,7 @@ describe("runPublicProfileSideEffects", () => {
       expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
       expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
       expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
-      expect(mockDbUpsertUser).toHaveBeenCalled();
+      expect(mockDbUpdateUserProfile).toHaveBeenCalled();
     });
 
     it("does not store a verification record when stats are incomplete", async () => {
@@ -644,7 +666,7 @@ describe("runPublicProfileSideEffects", () => {
       await runPublicProfileSideEffects("testuser", materialized, { readOnly: true });
 
       expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
-      expect(mockDbUpsertUser).not.toHaveBeenCalled();
+      expect(mockDbUpdateUserProfile).not.toHaveBeenCalled();
       expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
     });
 

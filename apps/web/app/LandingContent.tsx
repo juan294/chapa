@@ -40,6 +40,25 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
+/**
+ * Splits a hero bullet on `**keyword**` markers into text and bolded nodes
+ * (#1240). Bold-only, no markdown lib: translators mark emphasis per locale
+ * without needing the same substring to exist across languages (the
+ * structured-bullets alternative would break on that).
+ */
+function renderBoldedBullet(text: string) {
+  return text.split(/(\*\*.+?\*\*)/g).map((part, index) => {
+    const match = /^\*\*(.+)\*\*$/.exec(part);
+    return match ? (
+      <strong key={index} className="font-semibold">
+        {match[1]}
+      </strong>
+    ) : (
+      part
+    );
+  });
+}
+
 function ShieldCheckIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -148,9 +167,15 @@ export function LandingContent({
               <br />
               <span className="text-amber">{heroHighlight}</span>
             </h1>
-            <div className="mt-6 max-w-2xl space-y-2 text-[clamp(0.9rem,1.6cqi,1.0625rem)] text-text-secondary">
+            <div className="mt-6 flex flex-col gap-2.5">
               {heroBullets.map((bullet) => (
-                <p key={bullet} className="text-pretty">{bullet}</p>
+                <p
+                  key={bullet}
+                  className="flex gap-2.5 text-[clamp(0.9rem,1.6cqi,1.0625rem)] text-text-secondary text-pretty"
+                >
+                  <span className="shrink-0 text-terminal-green" aria-hidden="true">▸</span>
+                  <span>{renderBoldedBullet(bullet)}</span>
+                </p>
               ))}
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -189,25 +214,17 @@ export function LandingContent({
               command="chapa preview @developer"
               meta={sectionMeta.preview}
             />
-            {/* Always dark in both themes: the badge is a server-rendered
-                artifact, and this panel is its frame. */}
-            <div className="overflow-hidden rounded-2xl border border-forest-line bg-forest shadow-card">
-              <div className="flex items-center gap-2 border-b border-forest-line px-4 py-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-forest-err/60" />
-                <div className="w-2.5 h-2.5 rounded-full bg-forest-warn/60" />
-                <div className="w-2.5 h-2.5 rounded-full bg-forest-ok/60" />
-                <span className="ml-2 font-heading text-xs text-forest-dim">badge.svg</span>
-              </div>
-              <div className="relative max-h-[360px] aspect-[16/5]">
-                {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded demo data (DEMO_STATS, DEMO_IMPACT) — no user input reaches this point. See lib/render/escape.ts for escaping. */}
-                <div
-                  className="h-full [&>svg]:h-full [&>svg]:w-full"
-                  role="img"
-                  aria-label={heroBadgePreviewLabel}
-                  dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
-                />
-                <BadgeOverlay />
-              </div>
+            {/* The badge carries its own dark ground and rounded corners, so it
+                needs no frame here — it renders exactly as in a README embed. */}
+            <div className="relative mx-auto w-full max-w-[1200px]">
+              {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded demo data (DEMO_STATS, DEMO_IMPACT) — no user input reaches this point. See lib/render/escape.ts for escaping. */}
+              <div
+                className="drop-shadow-2xl [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+                role="img"
+                aria-label={heroBadgePreviewLabel}
+                dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
+              />
+              <BadgeOverlay />
             </div>
           </div>
         </section>
@@ -305,7 +322,7 @@ export function LandingContent({
                 tier: tierLabel.toLowerCase(),
               })}
             />
-            <p className="mb-6 max-w-3xl text-sm text-pretty text-text-secondary">
+            <p className="mb-6 text-sm text-pretty text-text-secondary">
               {measure.descriptionBefore}{" "}
               <ArchetypeLinks archetypes={archetypes} orConnector={orConnector} />.
             </p>

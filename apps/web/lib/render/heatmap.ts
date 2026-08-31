@@ -1,5 +1,5 @@
 import type { BadgeConfig, HeatmapDay } from "@chapa/shared";
-import { getHeatmapColor } from "./theme";
+import { getHeatmapColor, WARM_AMBER, type BadgeTheme } from "./theme";
 
 const CELL_SIZE = 44;
 const CELL_GAP = 5;
@@ -80,6 +80,7 @@ export function buildHeatmapCells(
   offsetX: number = 0,
   offsetY: number = 0,
   animation: BadgeConfig["heatmapAnimation"] = "fade-in",
+  theme: BadgeTheme = WARM_AMBER,
 ): HeatmapCell[] {
   // Slice to last 13 weeks (91 days) — scoring window may be 365 days
   const displaySize = WEEKS * DAYS;
@@ -96,7 +97,7 @@ export function buildHeatmapCells(
       cells.push({
         x: offsetX + week * (CELL_SIZE + CELL_GAP),
         y: offsetY + day * (CELL_SIZE + CELL_GAP),
-        fill: getHeatmapColor(count),
+        fill: getHeatmapColor(count, theme),
         delay: heatmapDelay(animation, week, day, idx),
       });
     }

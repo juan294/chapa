@@ -8,8 +8,8 @@ import {
 } from "./studio-options";
 
 describe("STUDIO_CATEGORIES", () => {
-  it("has exactly 6 categories (one per BadgeConfig field)", () => {
-    expect(STUDIO_CATEGORIES).toHaveLength(6);
+  it("has exactly 7 categories (one per BadgeConfig field)", () => {
+    expect(STUDIO_CATEGORIES).toHaveLength(7);
   });
 
   it("covers every key in BadgeConfig", () => {
@@ -21,6 +21,7 @@ describe("STUDIO_CATEGORIES", () => {
       "scoreEffect",
       "heatmapAnimation",
       "tierTreatment",
+      "colorPalette",
     ];
     expect(keys).toEqual(expect.arrayContaining(expectedKeys));
     expect(keys).toHaveLength(expectedKeys.length);

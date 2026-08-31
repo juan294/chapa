@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   parseArgs,
@@ -283,19 +286,144 @@ describe("redisScanPattern", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Migration scanner (#1240)
+//
+// `SUPABASE_TABLES` is a hand-maintained list, and a migration that adds a new
+// per-user table has no reason to remind anyone to update it. `studio_configs`
+// (migration 027) and `merge_operations` (007) were both missed that way, so a
+// "complete" deletion silently left rows behind and the script's own verify
+// pass reported success because it only re-checks the tables it knows about.
+//
+// Reading the migrations makes the next omission a test failure instead. The
+// output of this scanner was cross-checked against the production
+// `information_schema` on 2026-08-31 and matched exactly: 9 base tables, the
+// same handle columns, both views excluded.
+// ---------------------------------------------------------------------------
+
+const MIGRATIONS_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "supabase",
+  "migrations",
+);
+
+const CONSTRAINT_START = /^(constraint|primary|unique|foreign|check|exclude|like)\b/i;
+
+/** Every base table in the migrations, mapped to its column names. */
+function scanMigrations(): { tables: Map<string, Set<string>>; views: Set<string> } {
+  const tables = new Map<string, Set<string>>();
+  const views = new Set<string>();
+
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  for (const file of files) {
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
+
+    for (const m of sql.matchAll(
+      /create\s+(?:or\s+replace\s+)?view\s+(?:if\s+not\s+exists\s+)?(?:public\.)?([a-z0-9_]+)/gi,
+    )) {
+      views.add(m[1].toLowerCase());
+    }
+
+    for (const m of sql.matchAll(
+      /create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?([a-z0-9_]+)\s*\(([\s\S]*?)\n\);/gi,
+    )) {
+      const table = m[1].toLowerCase();
+      const columns = tables.get(table) ?? new Set<string>();
+      // Only lines at paren-depth zero are column definitions; a multi-line
+      // CHECK or a composite constraint must not contribute a "column".
+      let depth = 0;
+      for (const raw of m[2].split("\n")) {
+        const line = raw.trim();
+        const atTopLevel = depth === 0;
+        depth +=
+          (line.match(/\(/g) ?? []).length - (line.match(/\)/g) ?? []).length;
+        if (!line || line.startsWith("--") || !atTopLevel) continue;
+        if (CONSTRAINT_START.test(line)) continue;
+        const name = /^([a-z0-9_]+)/i.exec(line)?.[1];
+        if (name) columns.add(name.toLowerCase());
+      }
+      tables.set(table, columns);
+    }
+
+    for (const m of sql.matchAll(
+      /alter\s+table\s+(?:if\s+exists\s+)?(?:public\.)?([a-z0-9_]+)([\s\S]*?);/gi,
+    )) {
+      const table = m[1].toLowerCase();
+      const columns = tables.get(table) ?? new Set<string>();
+      for (const add of m[2].matchAll(
+        /add\s+column\s+(?:if\s+not\s+exists\s+)?([a-z0-9_]+)/gi,
+      )) {
+        columns.add(add[1].toLowerCase());
+      }
+      for (const drop of m[2].matchAll(
+        /drop\s+column\s+(?:if\s+exists\s+)?([a-z0-9_]+)/gi,
+      )) {
+        columns.delete(drop[1].toLowerCase());
+      }
+      if (columns.size > 0) tables.set(table, columns);
+    }
+  }
+
+  return { tables, views };
+}
+
+/** Every `table.column` in the schema that identifies a user by handle. */
+function handleColumnsInSchema(): string[] {
+  const { tables, views } = scanMigrations();
+  const found: string[] = [];
+  for (const [table, columns] of tables) {
+    if (views.has(table)) continue;
+    for (const column of columns) {
+      if (column.includes("handle")) found.push(`${table}.${column}`);
+    }
+  }
+  return found.sort();
+}
+
 describe("SUPABASE_TABLES", () => {
   it("covers every per-user table with the correct handle column", () => {
-    const map = Object.fromEntries(
-      SUPABASE_TABLES.map((t) => [t.table, t.column]),
+    const covered = SUPABASE_TABLES.map((t) => `${t.table}.${t.column}`).sort();
+
+    expect(covered).toEqual([
+      "campaign_sends.handle",
+      "merge_operations.source_handle",
+      "merge_operations.target_handle",
+      "metrics_snapshots.handle",
+      "studio_configs.handle",
+      "supplemental_stats.source_handle",
+      "supplemental_stats.target_handle",
+      "tool_insights.handle",
+      "user_platforms.handle",
+      "users.handle",
+      "verification_records.handle",
+    ]);
+  });
+
+  it("#1240: leaves no handle-bearing column in the migrations uncovered", () => {
+    const covered = new Set(
+      SUPABASE_TABLES.map((t) => `${t.table}.${t.column}`),
     );
-    expect(map).toEqual({
-      users: "handle",
-      metrics_snapshots: "handle",
-      verification_records: "handle",
-      user_platforms: "handle",
-      supplemental_stats: "target_handle",
-      tool_insights: "handle",
-      campaign_sends: "handle",
-    });
+    const missing = handleColumnsInSchema().filter((c) => !covered.has(c));
+
+    expect(missing).toEqual([]);
+  });
+
+  it("#1240: names no table or column the migrations do not define", () => {
+    const inSchema = new Set(handleColumnsInSchema());
+    const stale = SUPABASE_TABLES.map((t) => `${t.table}.${t.column}`).filter(
+      (c) => !inSchema.has(c),
+    );
+
+    expect(stale).toEqual([]);
+  });
+
+  it("#1240: the scanner actually finds the schema (guards against a silent no-op)", () => {
+    // A scanner that parsed nothing would make the coverage test vacuously
+    // pass, which is the failure mode that matters most here.
+    expect(handleColumnsInSchema().length).toBeGreaterThanOrEqual(11);
   });
 });

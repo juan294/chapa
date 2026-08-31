@@ -1,5 +1,5 @@
 import type { BadgeConfig } from "@chapa/shared";
-import { WARM_AMBER } from "./theme";
+import type { BadgeTheme } from "./theme";
 
 /**
  * SVG effect builders for the badge (#1191).
@@ -23,8 +23,12 @@ import { WARM_AMBER } from "./theme";
 export interface BadgeEffectContext {
   width: number;
   height: number;
-  /** The badge theme's border colour, used by the default border. */
-  stroke: string;
+  /**
+   * The resolved badge theme (#1242). Effects paint in the palette's accent —
+   * a Studio palette has to reach the effects too, or picking Indigo would
+   * leave a jade border and a jade shimmer on a violet badge.
+   */
+  theme: BadgeTheme;
   /**
    * True for `<img>` embeds and PNG rasterization, where SMIL never runs.
    * An effect must still render its resting appearance.
@@ -54,7 +58,8 @@ export function renderBorderEffect(
   border: BadgeConfig["border"],
   ctx: BadgeEffectContext,
 ): BadgeEffectFragment {
-  const { width, height, stroke, disableAnimation } = ctx;
+  const { width, height, theme, disableAnimation } = ctx;
+  const stroke = theme.stroke;
   const rect = (paint: string) =>
     `<rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="19" fill="none" stroke="${paint}" stroke-width="2"/>`;
 
@@ -72,9 +77,9 @@ export function renderBorderEffect(
         : `<animateTransform attributeName="gradientTransform" type="rotate" from="0 0.5 0.5" to="360 0.5 0.5" dur="6s" repeatCount="indefinite"/>`;
       return {
         defs: `<linearGradient id="${BORDER_GRADIENT_ID}" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="${WARM_AMBER.accent}"/>
+      <stop offset="0%" stop-color="${ctx.theme.accent}"/>
       <stop offset="50%" stop-color="#F59E0B"/>
-      <stop offset="100%" stop-color="${WARM_AMBER.accent}"/>
+      <stop offset="100%" stop-color="${ctx.theme.accent}"/>
       ${animate}
     </linearGradient>`,
         markup: rect(`url(#${BORDER_GRADIENT_ID})`),
@@ -112,7 +117,7 @@ export function renderBackgroundEffect(
         : `<animate attributeName="x1" values="0;0.4;0" dur="12s" repeatCount="indefinite"/>`;
       return {
         defs: `<linearGradient id="${AURORA_GRADIENT_ID}" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="${WARM_AMBER.accent}" stop-opacity="0.20"/>
+      <stop offset="0%" stop-color="${ctx.theme.accent}" stop-opacity="0.20"/>
       <stop offset="55%" stop-color="#0EA5E9" stop-opacity="0.10"/>
       <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.16"/>
       ${drift}
@@ -298,7 +303,7 @@ export function renderCardStyleEffect(
     frost: `<stop offset="0%" stop-color="#E0F2FE" stop-opacity="0.10"/><stop offset="100%" stop-color="#E0F2FE" stop-opacity="0.02"/>`,
     smoke: `<stop offset="0%" stop-color="#F5F3FF" stop-opacity="0.08"/><stop offset="100%" stop-color="#1F2937" stop-opacity="0.06"/>`,
     crystal: `<stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.14"/><stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.02"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.10"/>`,
-    "aurora-glass": `<stop offset="0%" stop-color="${WARM_AMBER.accentLight}" stop-opacity="0.12"/><stop offset="50%" stop-color="#38BDF8" stop-opacity="0.07"/><stop offset="100%" stop-color="#FBBF24" stop-opacity="0.10"/>`,
+    "aurora-glass": `<stop offset="0%" stop-color="${ctx.theme.accentLight}" stop-opacity="0.12"/><stop offset="50%" stop-color="#38BDF8" stop-opacity="0.07"/><stop offset="100%" stop-color="#FBBF24" stop-opacity="0.10"/>`,
   };
 
   const stops = sheens[cardStyle];

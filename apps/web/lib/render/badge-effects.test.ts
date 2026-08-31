@@ -1,15 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
-import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
+import { DEFAULT_BADGE_CONFIG, type BadgeConfig } from "@chapa/shared";
 import { renderBadgeSvg } from "./BadgeSvg";
 import { renderBorderEffect, renderCardStyleEffect } from "./badge-effects";
 import { DEMO_STATS, DEMO_IMPACT } from "./demoData";
-import { accentTint } from "./theme";
+import { WARM_AMBER, badgeTheme, getArchetypeColor } from "./theme";
+import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 
 const ctx = {
   width: 1200,
   height: 630,
-  stroke: accentTint(0.12),
+  theme: WARM_AMBER,
   disableAnimation: false,
 };
 
@@ -66,7 +67,7 @@ describe("renderBorderEffect (#1191)", () => {
     const { defs, markup } = renderBorderEffect("solid-amber", ctx);
     expect(defs).toBe("");
     expect(markup).toBe(
-      `<rect x="1" y="1" width="1198" height="628" rx="19" fill="none" stroke="${accentTint(0.12)}" stroke-width="2"/>`,
+      `<rect x="1" y="1" width="1198" height="628" rx="19" fill="none" stroke="${WARM_AMBER.tint(0.12)}" stroke-width="2"/>`,
     );
   });
 
@@ -231,8 +232,65 @@ describe("categories that cross to SVG (#1191)", () => {
   });
 });
 
+// #1242 — a palette is only real if it reaches the artifact. The mock
+// approximated it with a CSS filter over the preview; that route is closed
+// here, because #1191 made Studio render this very SVG.
+describe("a palette recolours the artifact (#1242)", () => {
+  const render = (palette: BadgeConfig["colorPalette"]) =>
+    renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+      config: { ...DEFAULT_BADGE_CONFIG, colorPalette: palette },
+    });
+
+  it.each(["indigo", "amber", "crimson", "mono"] as const)(
+    "%s replaces the jade accent, ground and heatmap ramp",
+    (palette) => {
+      const svg = render(palette);
+      const theme = badgeTheme(palette);
+      expect(svg).toContain(theme.bg);
+      expect(svg).toContain(theme.tint(0.12));
+      expect(svg).not.toContain(WARM_AMBER.accentRgb);
+      expect(svg).not.toContain(WARM_AMBER.bg);
+    },
+  );
+
+  it("leaves the archetype colour alone — it is a signal, not decoration", () => {
+    const builder = getArchetypeColor(DEMO_IMPACT.archetype);
+    for (const palette of ["jade", "indigo", "amber", "crimson", "mono"] as const) {
+      expect(render(palette)).toContain(builder);
+    }
+  });
+
+  it("never lets a palette claim the verification coral", () => {
+    // The strip carries the badge's one "verified" colour (#1168/#1183), so it
+    // must render the same coral whatever the palette is.
+    for (const palette of ["jade", "indigo", "amber", "crimson", "mono"] as const) {
+      const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+        demoMode: true,
+        config: { ...DEFAULT_BADGE_CONFIG, colorPalette: palette },
+      });
+      expect(svg).toContain(VERIFICATION_CORAL);
+    }
+  });
+
+  it("recolours the effects too, not just the base badge", () => {
+    // A jade shimmer on a violet badge is the failure this guards.
+    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+      config: {
+        ...DEFAULT_BADGE_CONFIG,
+        colorPalette: "indigo",
+        background: "aurora",
+        border: "gradient-rotating",
+        cardStyle: "aurora-glass",
+      },
+    });
+    expect(svg).toContain(badgeTheme("indigo").accent);
+    expect(svg).toContain(badgeTheme("indigo").accentLight);
+    expect(svg).not.toContain(WARM_AMBER.accent);
+  });
+});
+
 describe("cardStyle crosses only partially (#1191)", () => {
-  const ctx2 = { width: 1200, height: 630, stroke: "#000", disableAnimation: false };
+  const ctx2 = { width: 1200, height: 630, theme: WARM_AMBER, disableAnimation: false };
 
   it("flat is the default and adds nothing", () => {
     expect(renderCardStyleEffect("flat", ctx2)).toEqual({ defs: "", markup: "" });

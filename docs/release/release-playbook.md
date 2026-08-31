@@ -7,15 +7,14 @@ path. Capability detail lives in the linked runbooks.
 
 ## Scope and authorization
 
-- Release topology: `develop` to `main`, **merge commit**, then tag `mainCommit`.
-  Squashing discarded ancestry and cost 40 hand-made back-merges (#1228).
+- Release topology: `develop` to `main`, **merge commit**, then tag `mainCommit`. Squashing discarded ancestry and cost 40 hand-made back-merges (#1228).
 - Direct commands are authoritative: a required CI check conclusion, a
   `release-result.json` direct-check status, and a plain identity comparison are
   the proof. No analyzer decision is layered on top of them.
 - Two stops. **Gate 1 — approve the release**: version choice and full diff
   approval, together. **Gate 2 — authorize production**: merge authorization
   and tag authorization, together, granted once up front. Everything after
-  Gate 2 — PR creation, the Preview proof dispatch, the squash merge, the
+  Gate 2 — PR creation, the Preview proof dispatch, the promotion merge, the
   tag/publish — runs as an already-authorized step, not a fresh stop. Gate 2
   authorizes release mechanics only: never production data mutation,
   migrations, crons, messages, environment changes, or a rollback, each of
@@ -25,11 +24,14 @@ path. Capability detail lives in the linked runbooks.
 
 1. Read `CLAUDE.md`, this playbook, and the linked runbooks.
 2. Use an isolated clean release worktree based on current `develop`.
-3. Confirm ancestry is intact: `git merge-base --is-ancestor origin/main
-   origin/develop`. With merge-commit promotion this holds by construction; a
-   failure means someone squashed a release PR and reintroduced the drift
-   #1228 removed.
-4. Fetch origin. Bind `baselineTag` to the exact deployed production `main`
+3. Fetch origin, then prove the next promotion is mergeable and preserves the candidate tree:
+   ```bash
+   developTreeDigest="$(git rev-parse 'origin/develop^{tree}')"
+   prospectiveMainTreeDigest="$(git merge-tree --write-tree origin/main origin/develop)"
+   test "$prospectiveMainTreeDigest" = "$developTreeDigest"
+   ```
+   A conflict or tree mismatch blocks (`BLOCKED`). Branch divergence after a merge promotion is expected; the merge-base advances to the released `develop` commit because that commit is a parent of the promotion.
+4. Bind `baselineTag` to the exact deployed production `main`
    identity, not `develop` ancestry:
 
    ```bash
