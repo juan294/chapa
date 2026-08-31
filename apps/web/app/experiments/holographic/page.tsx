@@ -339,7 +339,7 @@ export default function HolographicExperimentPage() {
             <h1 className="font-heading text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
               Holographic / Iridescent Effect
             </h1>
-            <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
+            <p className="mt-3 text-base leading-relaxed text-text-secondary">
               A trading-card-style holographic shimmer that plays on hover. Three
               variants: warm amber (on-brand), full rainbow, and
               mouse-tracking. Adjust intensity and speed below.

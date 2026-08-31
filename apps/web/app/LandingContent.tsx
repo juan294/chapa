@@ -148,7 +148,7 @@ export function LandingContent({
               <br />
               <span className="text-amber">{heroHighlight}</span>
             </h1>
-            <div className="mt-6 max-w-2xl space-y-2 text-[clamp(0.9rem,1.6cqi,1.0625rem)] text-text-secondary">
+            <div className="mt-6 space-y-2 text-[clamp(0.9rem,1.6cqi,1.0625rem)] text-text-secondary">
               {heroBullets.map((bullet) => (
                 <p key={bullet} className="text-pretty">{bullet}</p>
               ))}
@@ -297,7 +297,7 @@ export function LandingContent({
                 tier: tierLabel.toLowerCase(),
               })}
             />
-            <p className="mb-6 max-w-3xl text-sm text-pretty text-text-secondary">
+            <p className="mb-6 text-sm text-pretty text-text-secondary">
               {measure.descriptionBefore}{" "}
               <ArchetypeLinks archetypes={archetypes} orConnector={orConnector} />.
             </p>

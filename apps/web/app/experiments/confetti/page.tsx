@@ -126,7 +126,7 @@ export default function ConfettiExperimentPage() {
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold font-heading text-text-primary tracking-tight mb-4">
             Confetti Burst
           </h1>
-          <p className="text-text-secondary text-lg leading-relaxed max-w-2xl">
+          <p className="text-text-secondary text-lg leading-relaxed">
             Celebratory effects for Elite-tier badges. When a developer reaches
             the Elite tier, the page erupts with amber-themed confetti to
             celebrate their achievement.

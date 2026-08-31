@@ -46,7 +46,7 @@ export default function MetallicShimmerPage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight text-text-primary sm:text-4xl md:text-5xl">
           Metallic Gold Shimmer
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-text-secondary">
+        <p className="mt-4 text-lg leading-relaxed text-text-secondary">
           A moving metallic highlight sweeps across the impact score, creating a
           premium gold-foil feel. Shown in both CSS (for the share page) and SVG
           (for the embeddable badge).
