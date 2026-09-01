@@ -9,6 +9,18 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
+    # TypeScript 7 and ESLint 10 are blocked by the plugin ecosystem, not by
+    # this codebase: no `typescript-eslint` release supports TS 7, and three
+    # plugins reached through `eslint-config-next` cap at ESLint 9. Measured in
+    # docs/decisions/2026-08-30-toolchain-major-upgrades-blocked.md (#1153).
+    # Without these entries the blocked major rides inside the `production`
+    # group and holds every other bump in it hostage (#1235). Remove them when
+    # that ADR's unblock conditions are met.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       production:
         applies-to: version-updates
