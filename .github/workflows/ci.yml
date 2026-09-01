@@ -275,7 +275,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Write-route registration
         run: pnpm run check:write-registration
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
       - run: supabase start
@@ -574,7 +574,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 
