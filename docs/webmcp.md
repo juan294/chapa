@@ -4,7 +4,7 @@ Chapa exposes 19 browser-native WebMCP page/tool registrations across 18 distinc
 
 Public tools that can return GitHub-controlled names or fetched public content also set `untrustedContentHint: true`. Verification records are projected to their public shape and never expose the internal confidence value.
 
-Runtime status in this document is based on the 2026-08-27 preview-only `chapa_hello` spike. Flagged Google Chrome 151 passed native registration, discovery, and execution for that hello-world tool. The completed catalog still needs final production verification after release and flag enablement. The ChatGPT in-app browser was not available in that Codex session, so it remains untested. This is not evidence of a ChatGPT compatibility failure.
+Runtime status was verified against production on 2026-09-01. Flagged Google Chrome 151 passed native registration, discovery, and execution for the preview-only `chapa_hello` gate, then the production preflight found all 19 registrations across 18 distinct names on the four live surfaces. Release v2.29.0 added the nine-tool remote MCP endpoint and static discovery declarations. The ChatGPT in-app browser remains untested. This is not evidence of a ChatGPT compatibility failure.
 
 ## Input schema shorthand
 
@@ -179,7 +179,7 @@ The complete tool array is memoized. A catalog-definition change causes the effe
 Three feature flags control exposure:
 
 - `studio_enabled` controls Creator Studio itself.
-- `webmcp_enabled` is the remote WebMCP kill switch. When it is false, Studio builds no catalog and public pages omit the client hosts.
+- `webmcp_enabled` is the browser WebMCP kill switch. When it is false, Studio builds no catalog and public pages omit the client hosts.
 - `studio_demo_enabled` controls anonymous access to `/studio?demo=1`. It does not bypass `studio_enabled`.
 
 Browsers without `document.modelContext` get the normal Chapa interface with no WebMCP tools. No polyfill is shipped because the native flagged runtime passed and a polyfill would add dependency and CSP surface without solving a demonstrated failure.

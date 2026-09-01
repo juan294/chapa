@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.29.1] - 2026-09-01
+
+### Added
+
+- **The approved Glama connector can verify its owner.** A public
+  `/.well-known/glama.json` route serves the account-bound ownership claim with
+  an exact contract test. The long WebMCP write-up and the short directory
+  field report now link the live Glama listing.
+
 ## [2.29.0] - 2026-09-01
 
 ### Added

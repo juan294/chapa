@@ -1,6 +1,6 @@
 # WebMCP, Explained. And What Happened When I Shipped It
 
-*Part one is a plain explanation of WebMCP for anyone. Part two is a build log: the 18 tools I registered in Chapa, the three rules I ended up with, and the parts that surprised me.*
+*Part one is a plain explanation of WebMCP for anyone. Part two is a build log: 19 page registrations across 18 distinct tool names, a nine-tool remote MCP endpoint, the rules I ended up with, and the parts that surprised me.*
 
 ---
 
@@ -24,6 +24,8 @@ This works well enough to impress people in a demo or when you have a lot of tim
 Now here is the part that should bother you. That restaurant site already knows, exactly and unambiguously, that it can search availability, hold a table, and confirm a booking. Those are named functions in its codebase. A developer wrote them. They have parameters and return values.
 
 None of that is visible to the agent. All of it is buried under a layout that was designed for a person with eyes.
+
+Runtime registration creates a second visibility problem. A WebMCP tool exists only after a compatible browser loads the page, runs its JavaScript, and keeps the tab open. Search crawlers, remote MCP clients, and agents that only read static text never see that runtime catalog. I missed this distinction at first. Making a page operable inside one browser does not make the site discoverable outside that browser.
 
 So the agent is not failing at reading pages. The pages were simply never written for anything except people. It made sense before. It doesn't make sense anymore.
 
@@ -110,6 +112,25 @@ I shipped **19 WebMCP tool registrations across 18 distinct names**, spread over
 <!-- PROMPT: An architecture diagram on a dark forest-green background (#08170f) with jade green (#10b981) accents and thin hairline borders. Four browser-window cards arranged horizontally, labeled "/", "/studio", "/u/:handle", "/verify/:hash". Above each card, a small stack of rounded pill shapes representing registered tools: 2 pills over the first card, 9 over the second, 6 over the third, 2 over the fourth. A single AI agent icon floats above all four, with thin jade lines reaching down to each pill stack. Below the cards, one shared horizontal bar labeled "feature flag: webmcp_enabled" acting as a gate. Flat vector, technical-editorial style, minimal text. 16:9. -->
 <!-- CAPTION: 19 registrations, four surfaces, one kill switch. -->
 
+### Design the journey before naming the tools
+
+I did not start with a list of endpoints. I wrote down one user goal for each visible surface, then role-played how an agent and a person would move through it.
+
+| Surface | User goal | Tool role |
+| --- | --- | --- |
+| `/` | Discover Chapa and route to the right page | Explain capabilities and resolve a profile URL |
+| `/studio` | Co-design a badge | Read options, change visible state, and propose a save |
+| `/u/:handle` | Read a public developer credential | Read, compare, verify, and embed public data |
+| `/verify/:hash` | Understand one verification record | Return the record and explain what it proves |
+
+That goal-first pass exposed an important boundary before I wrote any code. The landing page had to tell the agent that GitHub login is human-only and that an agent may propose a save but cannot confirm it. Those limits belong in the first capability result, not in an error after an agent has already tried to cross them.
+
+### The published tool map is a tested contract
+
+The four surfaces share one pure `SITE_TOOL_MAP`. The landing page, `llms.txt`, `llms-full.txt`, the WebMCP catalog, and the remote MCP tests all import or assert against that same map. A test compares every published name with the actual catalog source. If I add, remove, or rename a tool without updating its public description, the build fails.
+
+This sounds like a small detail. It is what keeps machine-readable advertising honest. A hand-written list can become wrong in one release. A tested contract makes drift a failed change instead of stale documentation.
+
 ### Rule 1: Do not build an agent API. Point at the one you have.
 
 Chapa's Creator Studio is a terminal. You type `/set background solid` or `/preset maximum`, and the badge preview re-renders. There is also a panel of clickable Quick Controls that insert those same commands.
@@ -155,7 +176,7 @@ Studio has nine tools. Eight of them do exactly what they say. The ninth is `sav
   inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
   execute: () => {
     proposeSave();
-    return "Save proposed — the user must confirm on-page.";
+    return "Save proposed \u2014 the user must confirm on-page.";
   },
 }
 ```
@@ -255,6 +276,8 @@ controller.abort();
 
 **Instrument at the wrapper, and never let instrumentation change behavior.** Tool calls emit an analytics event, failures emit a bounded error event, and the tracking call itself is inside a try/catch that swallows everything. If PostHog is blocked by an ad blocker, the tool still works.
 
+The server now records the same kind of operational signal. A small user-agent classifier recognizes known agent traffic without retaining the raw user-agent string. Static agent-surface requests emit `agent_surface_fetch`, and remote MCP calls emit `mcp_tool_called` with the tool name, outcome, duration, and agent class. I did not have a reliable usage window large enough to publish counts when I finished this article, so I am not turning deployment checks into adoption numbers.
+
 ### What I did not build
 
 **No polyfill.** There is a library that shims `document.modelContext`. I ran a hello-world tool through real flagged Chrome first, and it registered, was discovered, and executed correctly. Adding a dependency and CSP surface to solve a problem I had not observed did not pass the bar. If native support had failed, the answer would have been different.
@@ -263,15 +286,23 @@ controller.abort();
 
 **No production rollout without a switch.** Three feature flags gate this: `studio_enabled` for the Studio itself, `studio_demo_enabled` for anonymous demo access, and `webmcp_enabled` as a remote kill switch. When `webmcp_enabled` is off, the catalog is empty and the client hosts are not rendered. For an experimental browser API touching a live product, the ability to turn it off from a database row without a deploy is not optional.
 
+### Browser operation and external discovery are separate surfaces
+
+Shipping the runtime tools did not make Chapa easy to find. I added four static declarations: [the landing-page tool map](https://chapa.thecreativetoken.com/#agent-tools), [llms.txt](https://chapa.thecreativetoken.com/llms.txt), [llms-full.txt](https://chapa.thecreativetoken.com/llms-full.txt), and [the well-known MCP marker](https://chapa.thecreativetoken.com/.well-known/mcp.json). These surfaces advertise the same tested catalog without requiring JavaScript or flagged Chrome.
+
+I also shipped a stateless [Streamable HTTP MCP endpoint](https://chapa.thecreativetoken.com/api/mcp) for clients that do not control a browser tab. It exposes nine public, read-only tools and calls the same application libraries as Chapa's public routes. Studio mutation tools stay browser-only because their value comes from shared, visible page state and the human confirmation gate.
+
+The endpoint is active in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.juan294/chapa) as `io.github.juan294/chapa` version `2.29.1`, and the [Glama connector listing](https://glama.ai/mcp/connectors/com.thecreativetoken.chapa/chapa) is live. I also submitted Chapa to WebMCP and `llms.txt` directories and to MCP Servers. Some directory reviews were still pending when I finished this article. One WebMCP scanner rejected the site because it looked for an older browser API signature instead of the current `document.modelContext` API. That result was useful: directory compatibility is another contract, and it can lag the runtime specification.
+
 ### The evidence, and its limits
 
 I want to be precise about what I have actually verified, because "I shipped WebMCP" can mean several very different things.
 
 Verified: a hello-world tool passed **native registration, discovery, and execution in Google Chrome 151.0.7922.174** with `chrome://flags/#enable-webmcp-testing` enabled, deployed on a real preview. That was the gate I set before writing the full catalog, and it passed.
 
-Verified: the full 18-tool catalog is implemented and tested, with each tool host carrying its own render test. The focused WebMCP suite is 7 files and 78 tests.
+Verified: the full browser catalog is implemented and tested, with each tool host carrying its own render test. The remote endpoint has a separate transport contract matrix and a parity assertion that keeps its nine tool names tied to the browser catalog.
 
-Verified: the code is in production. It merged to `main` in v2.24.0 and has shipped in every release since, most recently v2.29.0.
+Verified: the browser code has shipped in every release since v2.24.0. The static discovery surfaces, telemetry, and remote MCP endpoint first shipped in v2.29.0. The current production endpoint identifies itself as Chapa v2.29.1 and lists all nine read-only tools.
 
 One more practical note if you are planning a demo. Chrome's WebMCP origin trial runs from Chrome 149 to 156 and ends **17 November 2026**. Without a trial token, your visitors need to enable the flag themselves. With a token, unflagged Chrome works. Decide which of those your audience is before you record anything.
 
