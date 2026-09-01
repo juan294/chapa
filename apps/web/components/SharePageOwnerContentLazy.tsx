@@ -26,6 +26,7 @@ interface Props {
   // no logic of its own beyond the next/dynamic lazy split.
   isOwner?: boolean;
   embedMarkdown?: string;
+  embedHtml?: string;
 }
 
 export function SharePageOwnerContentLazy(props: Props) {

@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import type { ClientImpactV6Result } from "@chapa/shared";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
+import {
+  WEBMCP_EMPTY_INPUT_SCHEMA,
+  WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
+} from "@/lib/webmcp/shared-tools";
 import type { WebMcpTool } from "@/lib/webmcp/use-model-context-tools";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
@@ -12,10 +16,16 @@ const mocks = vi.hoisted(() => ({
   createExplainDimensionTool: vi.fn(),
 }));
 
-vi.mock("@/lib/webmcp/use-model-context-tools", () => ({
-  useModelContextTools: (...args: unknown[]) =>
-    mocks.useModelContextTools(...args),
-}));
+vi.mock("@/lib/webmcp/use-model-context-tools", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/lib/webmcp/use-model-context-tools")
+  >();
+  return {
+    ...actual,
+    useModelContextTools: (...args: unknown[]) =>
+      mocks.useModelContextTools(...args),
+  };
+});
 
 vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
   useClientFeatureFlags: () => mocks.useClientFeatureFlags(),
@@ -62,6 +72,8 @@ function renderHost(
       trend={null}
       diff={null}
       craftResult={null}
+      embedMarkdown="![Chapa Badge of developer](https://chapa.thecreativetoken.com/u/developer/badge.svg)"
+      embedHtml={'<img src="https://chapa.thecreativetoken.com/u/developer/badge.svg" alt="Chapa Badge of developer" width="600" height="315" />'}
       {...overrides}
     />,
   );
@@ -112,8 +124,8 @@ afterEach(() => {
 });
 
 describe("SharePageWebMcpTools", () => {
-  it("registers exactly five read-only tools behind the WebMCP flag", () => {
-    const { tools, enabled } = renderHost();
+  it("registers exactly six read-only tools behind the WebMCP flag", () => {
+    const { tools, enabled, getTool } = renderHost();
 
     expect(enabled).toBe(true);
     expect(tools.map((tool) => tool.name)).toEqual([
@@ -122,6 +134,7 @@ describe("SharePageWebMcpTools", () => {
       "verify_badge",
       "explain_dimension",
       "compare_profiles",
+      "get_embed_snippet",
     ]);
     expect(tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(
       true,
@@ -131,6 +144,10 @@ describe("SharePageWebMcpTools", () => {
     });
     expect(tools.find((tool) => tool.name === "verify_badge")?.annotations).toMatchObject({
       untrustedContentHint: true,
+    });
+    expect(getTool("get_embed_snippet")).toMatchObject({
+      inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
     });
     expect(mocks.createExplainDimensionTool).toHaveBeenCalledOnce();
   });
@@ -279,7 +296,8 @@ describe("SharePageWebMcpTools", () => {
     await expect(
       execute(getTool("compare_profiles"), { other_handle: "bad/handle" }),
     ).resolves.toMatchObject({
-      output: expect.stringContaining("Invalid input for compare_profiles"),
+      output:
+        "Invalid input for compare_profiles: other_handle must be a public GitHub handle.",
     });
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -330,15 +348,43 @@ describe("SharePageWebMcpTools", () => {
     expect(fetch).toHaveBeenCalledWith("/api/profile/other-user", { signal });
   });
 
-  it.each([
-    [404, "No public impact profile was found for @other-user."],
-    [429, "Profile comparison is temporarily rate limited. Please try again later."],
-  ])("returns a friendly compare response for HTTP %i", async (status, message) => {
-    respondWith({ error: "request failed" }, status);
+  it("guides the agent to generate a missing comparison profile and retry", async () => {
+    respondWith({ error: "request failed" }, 404);
+    const { getTool } = renderHost();
+
+    const { output } = await execute(getTool("compare_profiles"), {
+      other_handle: "other-user",
+    });
+
+    expect(output).toContain(
+      "https://chapa.thecreativetoken.com/u/other-user",
+    );
+    expect(output).toContain("retry this comparison");
+  });
+
+  it("returns a friendly compare response when rate limited", async () => {
+    respondWith({ error: "request failed" }, 429);
     const { getTool } = renderHost();
 
     await expect(
       execute(getTool("compare_profiles"), { other_handle: "other-user" }),
-    ).resolves.toMatchObject({ output: message });
+    ).resolves.toMatchObject({
+      output: "Profile comparison is temporarily rate limited. Please try again later.",
+    });
+  });
+
+  it("returns the canonical embed snippets from the page props verbatim", async () => {
+    const embedMarkdown = "![Custom Markdown](https://example.test/custom.svg)";
+    const embedHtml = '<img src="https://example.test/custom.svg" alt="Custom HTML" />';
+    const { getTool } = renderHost({ embedMarkdown, embedHtml });
+
+    const { output } = await execute(getTool("get_embed_snippet"));
+
+    expect(JSON.parse(output)).toEqual({
+      handle: "developer",
+      markdown: embedMarkdown,
+      html: embedHtml,
+      note: "The badge image is live; embed it once and it stays current.",
+    });
   });
 });

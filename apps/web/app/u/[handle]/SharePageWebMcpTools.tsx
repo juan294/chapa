@@ -20,6 +20,7 @@ import {
   WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
 } from "@/lib/webmcp/shared-tools";
 import {
+  invalidInput,
   useModelContextTools,
   type WebMcpTool,
 } from "@/lib/webmcp/use-model-context-tools";
@@ -37,6 +38,8 @@ interface SharePageWebMcpToolsProps {
   trend: TrendSummary | null;
   diff: ClientSnapshotDiff | null;
   craftResult?: CraftResult | null;
+  embedMarkdown: string;
+  embedHtml: string;
 }
 
 const COMPARE_PROFILES_INPUT_SCHEMA = {
@@ -99,6 +102,8 @@ export function SharePageWebMcpTools({
   trend,
   diff,
   craftResult = null,
+  embedMarkdown,
+  embedHtml,
 }: SharePageWebMcpToolsProps) {
   const { webmcpEnabled } = useClientFeatureFlags();
   const { t } = useTranslation();
@@ -205,7 +210,10 @@ export function SharePageWebMcpTools({
           ? inputs.other_handle.trim()
           : "";
         if (!isValidHandle(otherHandle)) {
-          return "Invalid input for compare_profiles: other_handle must be a public GitHub handle.";
+          return invalidInput(
+            "compare_profiles",
+            "other_handle must be a public GitHub handle",
+          );
         }
 
         const response = await fetch(
@@ -213,7 +221,7 @@ export function SharePageWebMcpTools({
           { signal },
         );
         if (response.status === 404) {
-          return `No public impact profile was found for @${otherHandle}.`;
+          return `No public impact profile was found for @${otherHandle}. A profile is generated on first visit: ask the user to open https://chapa.thecreativetoken.com/u/${otherHandle} once, then retry this comparison.`;
         }
         if (response.status === 429) {
           return "Profile comparison is temporarily rate limited. Please try again later.";
@@ -258,16 +266,34 @@ export function SharePageWebMcpTools({
       },
     };
 
+    const getEmbedSnippet: WebMcpTool = {
+      name: "get_embed_snippet",
+      description:
+        "Return ready-to-paste Markdown and HTML snippets that embed this " +
+        "profile's live badge, for example in a GitHub README.",
+      inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
+      execute: () => JSON.stringify({
+        handle,
+        markdown: embedMarkdown,
+        html: embedHtml,
+        note: "The badge image is live; embed it once and it stays current.",
+      }),
+    };
+
     return [
       getImpactProfile,
       getImpactHistory,
       verifyBadge,
       explainDimension,
       compareProfiles,
+      getEmbedSnippet,
     ];
   }, [
     craftResult,
     diff,
+    embedHtml,
+    embedMarkdown,
     handle,
     impact,
     stats,

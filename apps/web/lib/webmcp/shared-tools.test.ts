@@ -3,6 +3,7 @@ import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { resolveTranslation } from "@/lib/i18n/resolve";
 import type { LanguageContextValue } from "@/lib/i18n";
+import { invalidInput } from "./use-model-context-tools";
 import {
   createExplainDimensionTool,
   sanitizeFreeTextForAgent,
@@ -63,7 +64,7 @@ describe("shared WebMCP tools", () => {
         { signal: new AbortController().signal },
       )),
     ).resolves.toBe(
-      "Invalid input for explain_dimension: dimension must be a known dimension.",
+      invalidInput("explain_dimension", "dimension must be a known dimension"),
     );
   });
 

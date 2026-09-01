@@ -381,8 +381,14 @@ describe("InfoTooltip", () => {
       const tooltip = screen.getByRole("tooltip");
       expect(tooltip.getBoundingClientRect().width).toBe(240);
       await waitFor(() => expect(tooltip.style.left).toBe("128px"));
-      expect(tooltip.style.maxWidth).toBe(
-        "min(240px, calc(100vw - 16px))",
+      // The component authors `min(240px, calc(100vw - 16px))`, but the CSSOM
+      // is free to re-serialize the calc() term and jsdom changed how it does
+      // so in v30 (`calc(100vw - 16px)` -> `-16px + 100vw`), in both the
+      // property and the style attribute -- so the authored string cannot be
+      // read back. What matters here is the clamp itself, not the engine's
+      // spelling of it, so accept either serialization.
+      expect(tooltip.style.maxWidth).toMatch(
+        /^min\(240px, (calc\(100vw - 16px\)|-16px \+ 100vw)\)$/,
       );
     });
   });

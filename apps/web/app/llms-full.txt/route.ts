@@ -56,7 +56,7 @@ Each archetype has a dedicated guide page at /archetypes/{type} explaining the t
 - **Radar Chart**: Dynamic radar visualization — five-point pentagon when Craft data exists, four-point diamond otherwise.
 - **Score and Tier**: Prominent adjusted score with tier badge.
 - **Archetype Label**: Primary archetype classification.
-- **Creator Studio**: Visual customization tool at /studio with 6 categories (background, card style, border, score effect, heatmap animation, tier treatment), every one of which renders in the embeddable badge.
+- **Creator Studio**: Visual customization tool at /studio with 7 categories (background, card style, border, score effect, heatmap animation, tier treatment, color palette), every one of which renders in the embeddable badge.
 
 ## API Endpoints
 

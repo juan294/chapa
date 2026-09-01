@@ -4,7 +4,9 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { trackEvent } from "@/lib/analytics/posthog";
 import {
+  invalidInput,
   useModelContextTools,
+  WEBMCP_INVALID_INPUT_PREFIX,
   type WebMcpTool,
 } from "./use-model-context-tools";
 
@@ -49,6 +51,15 @@ function readRegisterCall(registerTool: ReturnType<typeof vi.fn>, index = 0): Re
   return { tool, options };
 }
 
+describe("invalidInput", () => {
+  it("returns the shared invalid-input format", () => {
+    const result = invalidInput("some_tool", "message");
+
+    expect(result).toBe("Invalid input for some_tool: message.");
+    expect(result.startsWith(WEBMCP_INVALID_INPUT_PREFIX)).toBe(true);
+  });
+});
+
 describe("useModelContextTools", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,6 +102,54 @@ describe("useModelContextTools", () => {
     });
     expect(trackEvent).toHaveBeenCalledWith("webmcp_tool_called", {
       tool: "hello_tool",
+      outcome: "ok",
+      durationMs: expect.any(Number),
+    });
+  });
+
+  it("captures successful execution once after the tool settles", async () => {
+    const registerTool = vi.fn().mockResolvedValue(undefined);
+    installModelContext(registerTool);
+    let resolveExecution!: (value: string) => void;
+    const execute = vi.fn(() => new Promise<string>((resolve) => {
+      resolveExecution = resolve;
+    }));
+    const tool = { ...makeTool("deferred_tool"), execute };
+
+    renderHook(() => useModelContextTools([tool], true));
+    const registered = readRegisterCall(registerTool);
+    const execution = registered.tool.execute({}, {
+      signal: new AbortController().signal,
+    });
+
+    expect(trackEvent).not.toHaveBeenCalled();
+    resolveExecution("tool result");
+    await expect(execution).resolves.toBe("tool result");
+    expect(trackEvent).toHaveBeenCalledOnce();
+    expect(trackEvent).toHaveBeenCalledWith("webmcp_tool_called", {
+      tool: "deferred_tool",
+      outcome: "ok",
+      durationMs: expect.any(Number),
+    });
+  });
+
+  it("classifies shared invalid-input results", async () => {
+    const registerTool = vi.fn().mockResolvedValue(undefined);
+    installModelContext(registerTool);
+    const tool = makeTool("invalid_tool");
+    tool.execute = vi.fn().mockResolvedValue(invalidInput("invalid_tool", "bad"));
+
+    renderHook(() => useModelContextTools([tool], true));
+    const registered = readRegisterCall(registerTool);
+
+    await expect(
+      registered.tool.execute({}, { signal: new AbortController().signal }),
+    ).resolves.toBe("Invalid input for invalid_tool: bad.");
+    expect(trackEvent).toHaveBeenCalledOnce();
+    expect(trackEvent).toHaveBeenCalledWith("webmcp_tool_called", {
+      tool: "invalid_tool",
+      outcome: "invalid_input",
+      durationMs: expect.any(Number),
     });
   });
 
@@ -266,6 +325,8 @@ describe("useModelContextTools", () => {
     ).rejects.toBe(executionError);
     expect(trackEvent).toHaveBeenNthCalledWith(1, "webmcp_tool_called", {
       tool: "failing_tool",
+      outcome: "error",
+      durationMs: expect.any(Number),
     });
     expect(trackEvent).toHaveBeenNthCalledWith(2, "client_error", {
       source: "webmcp_tool_execute",

@@ -101,13 +101,15 @@ interface SharePageOwnerContentProps {
   // Optional so any other/future caller keeps working via the useSession()
   // fallback below.
   isOwner?: boolean;
-  // #1165 (UX-M5) — canonical, localized, handle-bearing Markdown embed
-  // string built ONCE server-side (SharePageContent in page.tsx) so the "e"
-  // keyboard shortcut (SharePageShortcuts) and this Markdown Copy button
-  // always produce byte-identical clipboard content. Optional for backward
-  // compatibility with direct callers/tests that don't pass it — falls back
-  // to a locally-built equivalent using the same formula.
+  // #1165 (UX-M5) — canonical, localized, handle-bearing embed strings built
+  // ONCE server-side (SharePageContent in page.tsx) so the "e" keyboard
+  // shortcut (SharePageShortcuts), these Copy buttons, and the share page's
+  // get_embed_snippet WebMCP tool always produce byte-identical clipboard
+  // content. Both are optional for backward compatibility with direct
+  // callers/tests that don't pass them — each falls back to a locally-built
+  // equivalent using the same formula.
   embedMarkdown?: string;
+  embedHtml?: string;
 }
 
 export function SharePageOwnerContent({
@@ -119,6 +121,7 @@ export function SharePageOwnerContent({
   diff = null,
   isOwner: isOwnerProp,
   embedMarkdown: embedMarkdownProp,
+  embedHtml: embedHtmlProp,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -135,7 +138,8 @@ export function SharePageOwnerContent({
   // text independently (#1165 / UX-M5). Both now share this formula.
   const embedAltText = `${badgeAltOf} ${handle}`;
   const embedMarkdown = embedMarkdownProp ?? `![${embedAltText}](${badgeUrl})`;
-  const embedHtml = `<img src="${badgeUrl}" alt="${embedAltText}" width="600" height="315" />`;
+  const embedHtml = embedHtmlProp ??
+    `<img src="${badgeUrl}" alt="${embedAltText}" width="600" height="315" />`;
 
   return (
     <>

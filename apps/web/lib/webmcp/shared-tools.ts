@@ -11,7 +11,11 @@ import {
 import type { DimensionKey } from "@/lib/dashboard/dimension-sub-metrics";
 import type { LanguageContextValue } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
-import type { WebMcpTool, WebMcpToolAnnotations } from "./use-model-context-tools";
+import {
+  invalidInput,
+  type WebMcpTool,
+  type WebMcpToolAnnotations,
+} from "./use-model-context-tools";
 
 type Translate = LanguageContextValue["t"];
 
@@ -110,7 +114,7 @@ export function createExplainDimensionTool({
         typeof dimension !== "string" ||
         !DIMENSION_KEYS.includes(dimension as DimensionKey)
       ) {
-        return "Invalid input for explain_dimension: dimension must be a known dimension.";
+        return invalidInput("explain_dimension", "dimension must be a known dimension");
       }
 
       const key = dimension as DimensionKey;

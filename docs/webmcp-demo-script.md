@@ -51,7 +51,7 @@ Keep the badge and terminal visible. Pause long enough to show the preview re-re
 
 **Type or say to the agent**
 
-> Keep the border and spring stats. Use a solid background.
+> Keep the spinning border and shimmering score. Use a solid background.
 
 **Expected agent call**
 
@@ -65,11 +65,11 @@ Show the second re-render. Point to the terminal line that records the same acti
 
 **Interrupt before the agent continues**
 
-> No confetti. Keep everything else.
+> Use a calmer column sweep. Keep everything else.
 
 **Expected agent call**
 
-`apply_badge_style` with `{ "category": "celebration", "value": "none" }`
+`apply_badge_style` with `{ "category": "heatmapAnimation", "value": "fade-in" }`
 
 **Say**
 
@@ -119,7 +119,7 @@ Show the public, redacted profile result and its page-render freshness metadata.
 
 > These tools make public claims discoverable. The live Studio session is the leverage core.
 
-**1:48-2:05 — Verify the known badge code**
+#### 1:48-2:05 — Verify the known badge code
 
 **Expected second call**
 
@@ -184,14 +184,16 @@ Stop recording by 2:50. Keep ten seconds of safety margin under the three-minute
 
 ### Judge instructions
 
-1. Open `TODO_LIVE_URL/studio?demo=1`. No login is required. The `DEMO` marker must be visible, and confirmed saves are local-only.
-2. In Chrome, open `chrome://flags/#enable-webmcp-testing`, enable WebMCP testing, and relaunch. The hello-world runtime spike was verified in flagged Chrome 151; confirm the completed production catalog during this judging preflight.
-3. Use the Model Context Tool Inspector or another WebMCP-capable client to discover the Studio tools.
-4. Call `list_style_options`, `apply_preset`, and `apply_badge_style`. Confirm that each action appears in the terminal and re-renders the badge.
-5. Call `save_badge_config`. Confirm that no save occurs until a human clicks **Confirm save**, then confirm that demo mode reports `(demo) configuration not persisted`.
-6. Open `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`. Call `get_impact_profile`, then `verify_badge`.
-7. Open the returned verification URL. Change one hex character to confirm that an unknown code has no stored verification record.
-8. ChatGPT in-app browser support is **untested**, not known to fail. Use the tested Chrome setup for judging.
+1. In Chrome, open `chrome://flags/#enable-webmcp-testing`, enable WebMCP testing, and relaunch. The hello-world runtime spike was verified in flagged Chrome 151; confirm the completed production catalog during this judging preflight.
+2. Open `TODO_LIVE_URL/`. Call `get_site_capabilities` and follow its `demoStudio` entry point to `/studio?demo=1`.
+3. Confirm that no login is required, the persistent `DEMO` marker is visible, and confirmed saves are local-only.
+4. Use the Model Context Tool Inspector or another WebMCP-capable client to discover the Studio tools.
+5. Call `list_style_options`, `apply_preset`, and `apply_badge_style`. Confirm that each action appears in the terminal and re-renders the badge.
+6. Call `save_badge_config`. Confirm that no save occurs until a human clicks **Confirm save**, then confirm that demo mode reports `(demo) configuration not persisted`.
+7. Open `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`. Call `get_impact_profile`, then `verify_badge`.
+8. Call `get_embed_snippet`. Confirm that the returned Markdown matches the on-page embed snippet.
+9. Open the verification URL returned by `verify_badge` in step 7. Change one hex character to confirm that an unknown code has no stored verification record.
+10. ChatGPT in-app browser support is **untested**, not known to fail. Use the tested Chrome setup for judging.
 
 ### Juan-gated execution order
 

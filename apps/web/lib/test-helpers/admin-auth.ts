@@ -17,7 +17,7 @@
  *   vi.mock("@/lib/http/client-ip", () => ({ getClientIp: () => "127.0.0.1" }));
  *
  *   // 2. Import the helper + re-exported mocks
- *   import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
+ *   import { adminAuthBeforeEach, readSessionCookie, isAdminHandle } from "@/lib/test-helpers/admin-auth";
  *
  *   // 3. Use in beforeEach
  *   beforeEach(() => { adminAuthBeforeEach(); });
@@ -26,10 +26,8 @@
 import { vi } from "vitest";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
-
 // Re-export so test files can import everything from one place
-export { readSessionCookie, isAdminHandle, rateLimit };
+export { readSessionCookie, isAdminHandle };
 
 /**
  * Standard `beforeEach` body: clear mocks, set `NEXTAUTH_SECRET`, and

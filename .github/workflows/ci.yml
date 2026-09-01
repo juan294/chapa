@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm
@@ -69,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm
@@ -138,7 +138,7 @@ jobs:
           fetch-depth: 0
       - uses: pnpm/action-setup@v5
         if: needs.develop_push_source.outputs.validated_by_pr != 'true'
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.develop_push_source.outputs.validated_by_pr != 'true'
         with:
           node-version: 20
@@ -268,14 +268,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Write-route registration
         run: pnpm run check:write-registration
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
       - run: supabase start
@@ -329,7 +329,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm
@@ -379,7 +379,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm
@@ -387,7 +387,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
@@ -481,7 +481,7 @@ jobs:
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
       - uses: pnpm/action-setup@v5
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
         with:
           node-version: 20
@@ -492,7 +492,7 @@ jobs:
       - name: Cache Playwright browsers
         id: deployment-playwright-cache
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
@@ -568,13 +568,13 @@ jobs:
 
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 

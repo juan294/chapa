@@ -22,7 +22,10 @@ import {
   getTier,
 } from "@/lib/impact/utils";
 import { useTranslation } from "@/lib/i18n";
-import type { WebMcpTool } from "@/lib/webmcp/use-model-context-tools";
+import {
+  invalidInput,
+  type WebMcpTool,
+} from "@/lib/webmcp/use-model-context-tools";
 import {
   createExplainDimensionTool,
   isWebMcpRecord,
@@ -95,10 +98,6 @@ const SIMULATE_SCORE_INPUT_SCHEMA = {
   required: ["dimensions"],
   additionalProperties: false,
 };
-
-function invalidInput(tool: string, message: string): string {
-  return `Invalid input for ${tool}: ${message}.`;
-}
 
 function isCommandToken(value: unknown): value is string {
   return typeof value === "string" && value !== "" && !/\s/.test(value);
@@ -181,7 +180,7 @@ export function useStudioWebMcpTools({
       },
       {
         name: "apply_badge_style",
-        description: "Apply one Creator Studio style option through the visible terminal.",
+        description: "Apply one Creator Studio style option through the visible terminal. Get valid categories and values from list_style_options first.",
         inputSchema: APPLY_STYLE_INPUT_SCHEMA,
         execute: (inputs) => {
           if (
@@ -191,7 +190,7 @@ export function useStudioWebMcpTools({
           ) {
             return invalidInput(
               "apply_badge_style",
-              "category and value must be single non-empty tokens",
+              "category and value must be single non-empty tokens; call list_style_options for valid categories and values",
             );
           }
           const result = runCommand(`/set ${inputs.category} ${inputs.value}`);
@@ -255,6 +254,12 @@ export function useStudioWebMcpTools({
         description: "Ask the user to confirm saving the current preview configuration.",
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         execute: () => {
+          if (saveStatus === "saved") {
+            return "No unsaved changes. The current configuration is already saved.";
+          }
+          if (saveStatus === "saving") {
+            return "A save is already in progress. Wait for it to finish, then check preview_badge for the save status.";
+          }
           proposeSave();
           return "Save proposed — the user must confirm on-page.";
         },

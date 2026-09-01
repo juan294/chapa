@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-09-01
+
+### Added
+
+- **An agent can now discover the site from the landing page.** `/` registers
+  two read-only tools, `get_site_capabilities` and `find_profile`. The first
+  returns what Chapa is, a map of every route and the tools it carries, entry
+  points into the demo Studio and the scoring methodology, and the boundaries
+  the agent must respect. The second resolves a GitHub handle to its share and
+  badge URLs without a network request. A test asserts the published tool map
+  against every real registration, so the map cannot drift from the code.
+- **The share page can hand an agent the embed snippet.** `get_embed_snippet`
+  returns the same Markdown and HTML the page displays, threaded from the
+  server rather than rebuilt, so the agent and the reader get identical text.
+
+### Changed
+
+- **Agent-facing errors now say how to recover.** A rejected style value names
+  the tool that lists valid options, an unknown handle explains that a profile
+  is generated on first visit, and a save asked for when nothing is unsaved
+  reports that instead of opening a confirmation the user cannot act on.
+- **Tool telemetry records the outcome, not the attempt.** `webmcp_tool_called`
+  now fires once when a call settles, carrying `outcome` (`ok`,
+  `invalid_input`, or `error`) and `durationMs`. It previously fired before
+  execution and reported only the tool name, so a failure was invisible and a
+  duration was not measurable.
+- **Dependabot no longer proposes the toolchain majors that are held back.**
+  TypeScript and ESLint major updates are ignored at the proposal stage. A
+  blocked major previously rode inside the grouped production bump and held
+  every unrelated update in that group behind it. Minor and patch updates for
+  both still flow, and the ignore entries are removed when the blocking
+  conditions clear. (#1247)
+
+### Fixed
+
+- **The license gate no longer rejects a compound SPDX expression.** A package
+  published as `(Apache-2.0 AND MIT)` failed the check even though both terms
+  are allowed. The two operators now run in the directions they mean: `OR`
+  passes when any alternative is allowed, `AND` passes only when every term
+  is. No package was granted an exception.
+
+### Chore
+
+- Agent workflows are synchronized with cc-rpi blueprint v1.29.0, which adds a
+  WebMCP editing rule, a `/tool-design` command, and a conditional agent
+  surface specialist in the pre-launch audit. An edit to a file outside the
+  project root no longer blocks on a lint crash.
+
+### Dependencies
+
+- @supabase/supabase-js: 2.108.1 → 2.112.4
+- @upstash/redis: 1.38.0 → 1.38.3
+- posthog-js: 1.386.6 → 1.422.5
+- react / react-dom: 19.2.7 → 19.2.8
+- resend: 6.12.4 → 6.25.0
+- svix: 1.95.2 → 1.99.1
+- zod: 4.4.3 → 4.5.2
+- jsdom: 29.1.1 → 30.0.1
+- knip: 6.27.0 → 6.33.0
+- vitest / @vitest/coverage-v8: 4.1.10 → 4.1.11
+- vite: 8.1.4 → 8.2.2
+- tsx: 4.23.1 → 4.23.12
+- @playwright/test: 1.60.0 → 1.62.1
+- tailwindcss / @tailwindcss/postcss: 4.3.1 → 4.3.3
+- @testing-library/react: 16.3.2 → 16.3.3
+- @types/node: 25.9.3 → 26.4.0
+- actions/setup-node: 6 → 7; actions/cache: 5 → 6; supabase/setup-cli: 1 → 3
+
 ## [2.27.0] - 2026-08-31
 
 ### Added
