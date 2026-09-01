@@ -6,6 +6,7 @@ import { NavbarClient } from "@/components/NavbarClient";
 import { SectionHeader } from "@/components/SectionHeader";
 import { tArray, tObject } from "@/lib/i18n/typed-accessors";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 import { LandingUrlEffects } from "./LandingUrlEffects";
 import { LandingTerminal } from "./LandingTerminal";
 import { LoginCtaButton } from "@/components/LoginCtaButton";
@@ -21,6 +22,10 @@ const DIMENSION_STYLES = [
   { key: "breadth", bar: "bg-dimension-breadth" },
   { key: "craft", bar: "bg-dimension-craft" },
 ] as const;
+
+const SITE_TOOL_COUNT = new Set(
+  SITE_TOOL_MAP.flatMap((entry) => entry.tools),
+).size;
 
 function ArrowRightIcon({ className }: { className?: string }) {
   return (
@@ -140,6 +145,7 @@ export function LandingContent({
   const measure = tObject<Record<string, string>>(t, 'landing.measure');
   const dimensions = tArray<{ title: string; description: string }>(t, 'landing.dimensions');
   const enterprise = tObject<Record<string, string>>(t, 'landing.enterprise');
+  const agentTools = tObject<Record<string, string>>(t, 'landing.agentTools');
   const stats = tArray<{ value: string; label: string }>(t, 'landing.stats');
   const orConnector = t('common.orConnector') as string;
   const tierLabel = t(`tiers.${demoImpact.tier.toLowerCase()}`) as string;
@@ -416,6 +422,49 @@ export function LandingContent({
                 </p>
               </div>
             </div>
+          </section>
+
+          {/* ── Agent tools ─────────────────────────────────── */}
+          <section id="agent-tools">
+            <SectionHeader
+              command="chapa mcp"
+              title={sections.agentTools}
+              meta={interpolate(sectionMeta.agentTools!, {
+                tools: String(SITE_TOOL_COUNT),
+                pages: String(SITE_TOOL_MAP.length),
+              })}
+            />
+            <p className="mb-6 text-sm leading-relaxed text-pretty text-text-secondary">
+              {agentTools.intro}
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {SITE_TOOL_MAP.map((entry) => (
+                <div
+                  key={entry.route}
+                  className="rounded-xl border border-stroke bg-card p-5"
+                >
+                  <h3 className="font-heading text-sm text-amber">
+                    {entry.route}
+                  </h3>
+                  <p className="mt-2 text-sm text-pretty text-text-secondary">
+                    {entry.goal}
+                  </p>
+                  <ul className="mt-4 flex flex-wrap gap-2">
+                    {entry.tools.map((tool) => (
+                      <li
+                        key={tool}
+                        className="rounded-lg bg-amber/10 px-2 py-1 font-heading text-xs text-text-primary"
+                      >
+                        {tool}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <p className="mt-5 text-sm leading-relaxed text-pretty text-text-secondary">
+              {agentTools.boundary}
+            </p>
           </section>
         </div>
 

@@ -27,6 +27,19 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 - \`GET /api/history/{handle}\` — Score history, trend analysis, and snapshot diffs. Public, rate-limited.
 - \`GET /studio\` — Creator Studio for badge visual customization.
 
+## Agent Tools (WebMCP)
+
+Chapa registers browser-native WebMCP tools through \`document.modelContext\` on 4 pages. An agent driving a WebMCP-capable browser can operate the site directly. There are 18 distinct tools across these pages:
+
+- \`/\`: \`get_site_capabilities\`, \`find_profile\`
+- \`/studio\` and \`/studio?demo=1\` (no login in demo mode): \`list_style_options\`, \`apply_badge_style\`, \`apply_preset\`, \`preview_badge\`, \`reset_badge_config\`, \`save_badge_config\`, \`simulate_score\`, \`suggest_improvements\`, \`explain_dimension\`
+- \`/u/{handle}\`: \`get_impact_profile\`, \`get_impact_history\`, \`verify_badge\`, \`explain_dimension\`, \`compare_profiles\`, \`get_embed_snippet\`
+- \`/verify/{hash}\`: \`get_verification_record\`, \`explain_verification\`
+
+Tool registration happens at page load in client JavaScript. Full catalog: https://chapa.thecreativetoken.com/llms-full.txt
+
+Machine-readable catalog: https://chapa.thecreativetoken.com/.well-known/mcp.json
+
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com

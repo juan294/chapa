@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 import { GET as getLlmsFullTxt } from "./route";
 
 describe("GET /llms-full.txt", () => {
@@ -48,6 +49,20 @@ describe("GET /llms-full.txt", () => {
     expect(text).toContain("Markdown");
     expect(text).toContain("HTML");
     expect(text).toContain("Creator Studio");
+  });
+
+  it("lists every registered WebMCP tool", async () => {
+    const text = await getLlmsFullTxt().text();
+
+    for (const entry of SITE_TOOL_MAP) {
+      for (const tool of entry.tools) {
+        expect(text).toContain(tool);
+      }
+    }
+  });
+
+  it("mentions WebMCP by name", async () => {
+    expect(await getLlmsFullTxt().text()).toContain("WebMCP");
   });
 
   it("lists all seven Creator Studio badge categories", async () => {

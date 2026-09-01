@@ -107,11 +107,13 @@ export const es: Translations = {
       explain: '{count} pasos · ~1 min',
       score: 'compuesta {score} · {tier}',
       enterprise: 'emu · opcional',
+      agentTools: 'exit 0 · {tools} herramientas · {pages} páginas',
     },
     sections: {
       features: 'Funciones',
       howItWorks: 'Cómo funciona',
       enterprise: 'Empresa',
+      agentTools: 'Herramientas para agentes',
     },
     features: [
       {
@@ -188,6 +190,10 @@ export const es: Translations = {
       howToUseTextAfter: 'y sigue los pasos. Tarda menos de un minuto.',
       noEmu: '¿SIN EMU?',
       noEmuText: 'No pasa nada: tu actividad pública de desarrollo es suficiente. La CLI es opcional.',
+    },
+    agentTools: {
+      intro: 'Este sitio habla WebMCP. Abre una página de la lista en un navegador compatible con WebMCP para usar sus herramientas.',
+      boundary: 'Las herramientas de solo lectura consultan datos públicos. Las herramientas de Creator Studio pueden cambiar el estado visible de la página, pero guardar siempre espera el clic de una persona.',
     },
     stats: [
       { value: '7', label: 'arquetipos' },
