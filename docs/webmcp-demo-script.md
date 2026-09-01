@@ -4,20 +4,20 @@ Target duration: 2 minutes 50 seconds. Do not exceed 3 minutes.
 
 ## Recording setup
 
-- [ ] Use the production URL only after Juan authorizes the production release and flag changes.
+- [x] Use the production URL only after Juan authorizes the production release and flag changes. Both are done: v2.28.0 is live (`4d8a6b70`) and the flags were already enabled.
 - [ ] Use Chrome with `chrome://flags/#enable-webmcp-testing` enabled, then relaunch Chrome. A preview-only `chapa_hello` spike passed native registration, discovery, and execution in flagged Chrome 151 on 2026-08-27. The completed catalog must pass the production preflight below.
 - [ ] Do not claim ChatGPT compatibility. The ChatGPT in-app browser has not been tested because no browser binding was available during the runtime spike.
 - [ ] Open the WebMCP-capable agent or tool inspector beside the page so the agent, page, live preview, and terminal are visible on one screen.
 - [ ] Prepare these tabs:
-  - `TODO_LIVE_URL/` — the landing page, where the recording starts
-  - `TODO_LIVE_URL/studio?demo=1`
-  - `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`
-  - `TODO_LIVE_URL/verify/TODO_VALID_HASH`
-- [ ] Prepare one unknown hash by changing one hexadecimal character in `TODO_VALID_HASH`.
+  - `https://chapa.thecreativetoken.com/` — the landing page, where the recording starts
+  - `https://chapa.thecreativetoken.com/studio?demo=1`
+  - `https://chapa.thecreativetoken.com/u/juan294`
+  - `https://chapa.thecreativetoken.com/verify/84567a48984e0c2e287acb78d1404a57`
+- [ ] Prepare one unknown hash by changing one hexadecimal character in `84567a48984e0c2e287acb78d1404a57`.
 - [ ] Preload the public profile, valid verification, and unknown-hash tabs. Do not type URLs during the timed trust segment.
 - [ ] Reset the demo Studio to its default configuration before recording.
-- [ ] Confirm that `studio_enabled`, `webmcp_enabled`, and `studio_demo_enabled` are on before recording. This is a Juan-gated production action.
-- [ ] Replace every placeholder, then confirm `rg -n 'TODO_[A-Z]' docs/webmcp-demo-script.md` returns no matches.
+- [x] Confirm that `studio_enabled`, `webmcp_enabled`, and `studio_demo_enabled` are on before recording. Verified 2026-09-01 against production: all three enabled since 2026-08-27, no flip needed. Re-check with `curl -s https://chapa.thecreativetoken.com/api/feature-flags | jq '.flags[] | select(.key|test("studio|webmcp"))'`.
+- [ ] Replace the remaining placeholders. `rg -n 'TODO_[A-Z]' docs/webmcp-demo-script.md` should return exactly two, `TODO_YOUTUBE_URL` and `TODO_DEVPOST_SUBMISSION_URL`, until the video is uploaded and the submission is filed; it returns none once both are done.
 
 ## Script
 
@@ -29,16 +29,16 @@ makes. It also matches judge step 2.
 
 **On screen**
 
-Show `TODO_LIVE_URL/` with the agent or tool inspector beside it.
+Show `https://chapa.thecreativetoken.com/` with the agent or tool inspector beside it.
 
 **Type or say to the agent**
 
-> What can I do on this site, and where is TODO_PUBLIC_HANDLE's badge?
+> What can I do on this site, and where is juan294's badge?
 
 **Expected agent calls**
 
 1. `get_site_capabilities`
-2. `find_profile` with `{ "handle": "TODO_PUBLIC_HANDLE" }`
+2. `find_profile` with `{ "handle": "juan294" }`
 
 **On screen**
 
@@ -171,7 +171,7 @@ Show the public, redacted profile result and its page-render freshness metadata.
 
 **On screen**
 
-Show `status: "verified"`, the stored original record, and the verification URL. Open `TODO_LIVE_URL/verify/TODO_VALID_HASH` if needed.
+Show `status: "verified"`, the stored original record, and the verification URL. Open `https://chapa.thecreativetoken.com/verify/84567a48984e0c2e287acb78d1404a57` if needed.
 
 **Say**
 
@@ -179,7 +179,15 @@ Show `status: "verified"`, the stored original record, and the verification URL.
 
 **2:05-2:20 — Show an unknown or altered code failing lookup**
 
-Change one hexadecimal character in the verification URL and load it.
+Change one hexadecimal character in the verification URL and load it. A
+prepared example, verified 2026-09-01: the valid code ends `...a57`, so load
+`...a58`.
+
+Expect an on-page not-found state, **not** a browser error page. The route
+still responds 200 and renders the unverified state; only the API
+(`/api/verify/<hash>`) answers 404. Verified against production: the altered
+page renders "Could not", "No verification", "Not found" and "Unknown", with
+no verified language, while the valid page is dominated by "Verified".
 
 **On screen**
 
@@ -222,8 +230,8 @@ Stop recording by 2:50. Keep ten seconds of safety margin under the three-minute
 
 ### Required submission fields
 
-- [ ] **Live application URL:** `TODO_LIVE_URL`
-- [ ] **Public repository URL:** `TODO_PUBLIC_REPO_URL` — publication is Juan-gated.
+- [ ] **Live application URL:** `https://chapa.thecreativetoken.com`
+- [x] **Public repository URL:** <https://github.com/juan294/chapa> — published and verified public.
 - [ ] **YouTube demo URL:** `TODO_YOUTUBE_URL` — recording and upload are Juan-gated.
 - [ ] **Concise description:**
 
@@ -235,12 +243,12 @@ Stop recording by 2:50. Keep ten seconds of safety margin under the three-minute
 ### Judge instructions
 
 1. In Chrome, open `chrome://flags/#enable-webmcp-testing`, enable WebMCP testing, and relaunch. The hello-world runtime spike was verified in flagged Chrome 151; confirm the completed production catalog during this judging preflight.
-2. Open `TODO_LIVE_URL/`. Call `get_site_capabilities` and follow its `demoStudio` entry point to `/studio?demo=1`.
+2. Open `https://chapa.thecreativetoken.com/`. Call `get_site_capabilities` and follow its `demoStudio` entry point to `/studio?demo=1`.
 3. Confirm that no login is required, the persistent `DEMO` marker is visible, and confirmed saves are local-only.
 4. Use the Model Context Tool Inspector or another WebMCP-capable client to discover the Studio tools.
 5. Call `list_style_options`, `apply_preset`, and `apply_badge_style`. Confirm that each action appears in the terminal and re-renders the badge.
 6. Call `save_badge_config`. Confirm that no save occurs until a human clicks **Confirm save**, then confirm that demo mode reports `(demo) configuration not persisted`.
-7. Open `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`. **Let the page finish loading before you list tools.** This page registers its six tools after hydration, later than the Studio does, so a tool list requested immediately on navigation can come back empty. Wait for the score and badge to be visible, then call `get_impact_profile`, then `verify_badge`.
+7. Open `https://chapa.thecreativetoken.com/u/juan294`. **Let the page finish loading before you list tools.** This page registers its six tools after hydration, later than the Studio does, so a tool list requested immediately on navigation can come back empty. Wait for the score and badge to be visible, then call `get_impact_profile`, then `verify_badge`.
 8. Call `get_embed_snippet`. Confirm that the returned Markdown matches the on-page embed snippet.
 9. Open the verification URL returned by `verify_badge` in step 7. Change one hex character to confirm that an unknown code has no stored verification record.
 10. ChatGPT in-app browser support is **untested**, not known to fail. Use the tested Chrome setup for judging.
@@ -249,9 +257,9 @@ Stop recording by 2:50. Keep ten seconds of safety margin under the three-minute
 
 Do not reorder these actions. Do not perform any production or outward-facing action without Juan's explicit authorization at that execution step.
 
-1. [ ] **[JUAN GATE] Release to production:** run `/pre-launch` → `/remediate` → `/update-docs` → `/release` for the approved `develop` to `main` candidate, then verify its exact production identity. Target no later than August 31, 2026. `TODO_RELEASE_SHA`
-2. [ ] **[JUAN GATE] Flip production flags without a deploy:** use the existing admin PATCH to enable `webmcp_enabled`, then `studio_demo_enabled`; verify the live tool list and logged-out `/studio?demo=1` access. `TODO_FLAG_EVIDENCE`
-3. [ ] **[JUAN GATE] Publish the repository:** record the existing clean secret-scan receipt dated 2026-08-26, rerun gitleaks on the final publication HEAD, publish the approved repository, and verify that the MIT license renders prominently. `TODO_PUBLIC_REPO_URL`
+1. [x] **[JUAN GATE] Release to production:** done 2026-09-01 as **v2.28.0**. Production `/api/version` reports `4d8a6b70fb99336ccea84073582b8ef6a5026b85` in the `production` environment, the promoted tree matches the candidate tree, and all four `@release-required` production scenarios passed. Evidence: `quality/evidence/runs/release-203b06b3b80e/release-result.json` (`status: passed`), PR #1252, tag `v2.28.0`.
+2. [x] **[JUAN GATE] Flip production flags without a deploy:** no flip was required. Verified 2026-09-01 that `webmcp_enabled`, `studio_demo_enabled` and `studio_enabled` were already enabled (since 2026-08-27), so no production write was made. Live tool list confirmed in flagged Chrome against production: **19 registrations across 18 distinct names** — `/` 2, `/studio?demo=1` 9, `/u/:handle` 6, `/verify/:hash` 2. Logged-out `/studio?demo=1` returns 200 with the `DEMO` marker and no login gate.
+3. [x] **[JUAN GATE] Publish the repository:** done. <https://github.com/juan294/chapa> is public (`visibility: PUBLIC`), anonymous fetches of the repository page and raw `README.md` both return 200, and GitHub detects the root `LICENSE` as MIT (`spdx_id: MIT`), so it renders on the landing page. The Secret Scanning workflow is green on the current `develop` HEAD.
 4. [ ] **[JUAN GATE] Record and upload the video:** record against the verified production release, keep it under three minutes, and upload it publicly to YouTube. `TODO_YOUTUBE_URL`
 5. [ ] **[JUAN GATE] Submit on Devpost:** verify every URL and judge step, then submit. Target **September 2, 2026**. `TODO_DEVPOST_SUBMISSION_URL`
 6. [ ] **Freeze after submission:** schedule nothing on `main` and make no repository, application, or Devpost changes until winners are announced, expected around **September 23, 2026**, except an explicitly authorized emergency response.
