@@ -41,10 +41,22 @@ Public URL for all submissions: `https://chapa.thecreativetoken.com/api/mcp`.
 ```
 POST handler order:
   1. if !(await isMcpServerEnabled()) -> 503 { error, hint }
-  2. ip = getClientIp(req); rateLimit(`ratelimit:mcp:${ip}`, 60, 60)  // fail-open
+  2. ip = getClientIp(req)
+     if ip === NO_TRUSTED_IP:
+       rateLimit("ratelimit:mcp:untrusted", 10, 60)     // shared global cap
+     else:
+       rateLimit(`ratelimit:mcp:${ip}`, 60, 60)         // per trusted IP
+     (both fail-open)
   3. hand off to the MCP handler
 Wrapped in withErrorCapture("/api/mcp", ...).
 ```
+
+Correction (2026-09-01, phase 4 review): the original plan keyed one
+bucket off the raw `getClientIp` value. That violates the documented
+`NO_TRUSTED_IP` rule (`lib/http/client-ip.ts`, BE-M1/#868): callers must
+branch on the sentinel, never key a shared bucket by it as if it were an
+IP. Untrusted clients get a deliberate stricter shared cap (10/min)
+instead of rejection, keeping the public-read fail-open posture.
 
 - New env accessor in `lib/env.ts`: `getMcpServerEnabledEnv()` reading
   `MCP_SERVER_ENABLED` (server-only, no `NEXT_PUBLIC_`). Documented in
@@ -94,9 +106,13 @@ only does gating + transport wiring.
   `tools/list` returns the 9 names; a `tools/call` round-trip with mocks.
 - `app/api/mcp/route.contract.test.ts`: payload matrix
   (`generatePayloads` over the JSON-RPC envelope fields) with
-  `runMatrix(..., { allowedStatuses: [400, 405, 406, 415, 503] })`; no 5xx
-  on any legal or malformed input. Flag mocked on via the contract setup's
-  feature-flag mock.
+  `runMatrix(..., { allowedStatuses: [400, 405, 406, 415] })`; no 5xx on
+  any legal or malformed input. Flag mocked ON for the matrix run.
+  Correction (2026-09-01): 503 was originally listed in `allowedStatuses`,
+  but `runMatrix` rejects every 5xx unconditionally (`payload-matrix.ts`),
+  so the flag-off 503 cannot pass through the matrix. It is covered
+  separately: a dedicated contract-file case (outside `runMatrix`) or the
+  unit test asserts 503 with the flag mocked off.
 - Extend `site-tool-map.test.ts` scope deliberately NOT: the server file
   is a fifth surface the regex harness does not scan. Instead
   `server-tools.test.ts` asserts every server tool name exists in the union
