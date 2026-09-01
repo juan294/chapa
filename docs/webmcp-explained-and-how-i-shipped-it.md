@@ -271,7 +271,7 @@ Verified: a hello-world tool passed **native registration, discovery, and execut
 
 Verified: the full 18-tool catalog is implemented and tested, with each tool host carrying its own render test. The focused WebMCP suite is 7 files and 78 tests.
 
-Verified: the code is in production. It merged to `main` in v2.24.0 and has shipped in every release since, most recently v2.28.0.
+Verified: the code is in production. It merged to `main` in v2.24.0 and has shipped in every release since, most recently v2.29.0.
 
 One more practical note if you are planning a demo. Chrome's WebMCP origin trial runs from Chrome 149 to 156 and ends **17 November 2026**. Without a trial token, your visitors need to enable the flag themselves. With a token, unflagged Chrome works. Decide which of those your audience is before you record anything.
 
