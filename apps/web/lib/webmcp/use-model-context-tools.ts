@@ -25,6 +25,12 @@ export interface WebMcpTool {
   ): string | Promise<string>;
 }
 
+export const WEBMCP_INVALID_INPUT_PREFIX = "Invalid input for ";
+
+export function invalidInput(tool: string, message: string): string {
+  return `${WEBMCP_INVALID_INPUT_PREFIX}${tool}: ${message}.`;
+}
+
 function captureToolEvent(event: string, properties: Record<string, unknown>): void {
   try {
     trackEvent(event, properties);
@@ -43,10 +49,23 @@ function instrumentTool(
       inputs,
       context = { signal: new AbortController().signal },
     ) {
-      captureToolEvent("webmcp_tool_called", { tool: tool.name });
+      const start = performance.now();
       try {
-        return await resolveCurrentTool().execute(inputs, context);
+        const result = await resolveCurrentTool().execute(inputs, context);
+        captureToolEvent("webmcp_tool_called", {
+          tool: tool.name,
+          outcome: result.startsWith(WEBMCP_INVALID_INPUT_PREFIX)
+            ? "invalid_input"
+            : "ok",
+          durationMs: Math.round(performance.now() - start),
+        });
+        return result;
       } catch (error) {
+        captureToolEvent("webmcp_tool_called", {
+          tool: tool.name,
+          outcome: "error",
+          durationMs: Math.round(performance.now() - start),
+        });
         captureToolEvent("client_error", {
           source: "webmcp_tool_execute",
           tool: tool.name,
