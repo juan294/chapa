@@ -192,6 +192,18 @@ export interface BadgeInvalidationResult {
 }
 
 /**
+ * Whether a caller can trust the badge is actually showing the new state
+ * everywhere. `edge: "skipped"` (outside Vercel — local dev, unit tests, CI)
+ * still counts: there is no edge cache there to be stale. Owned here, next to
+ * the result shape it interprets, so a future caller that needs to report
+ * success (the way the Studio save route reports `badgeRefreshed`) doesn't
+ * re-derive this formula independently.
+ */
+export function isBadgeCacheRefreshed(result: BadgeInvalidationResult): boolean {
+  return result.redis && result.edge !== "failed";
+}
+
+/**
  * Drop every locale's rendered badge for a handle, for today, in BOTH cache
  * layers (hotfix v2.29.2).
  *

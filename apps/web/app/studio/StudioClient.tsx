@@ -379,21 +379,23 @@ export function StudioClient({
         setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
         // hotfix v2.29.2 — an older server during a rolling deploy omits
         // `badgeRefreshed` from the body; treat that as refreshed rather than
-        // showing a deferred warning for a save that actually succeeded.
+        // showing a deferred warning for a save that actually succeeded. One
+        // status value drives both the line's tone and its translation key,
+        // so the two can't drift out of sync with each other.
         const payload: { badgeRefreshed?: boolean } = await res
           .json()
           .catch(() => ({}));
         const badgeRefreshed = payload.badgeRefreshed !== false;
-        const key = hasNewerChanges
-          ? "studio.save.changedDuringSave"
+        const status = hasNewerChanges
+          ? "changedDuringSave"
           : badgeRefreshed
-            ? "studio.save.success"
-            : "studio.save.successDeferred";
+            ? "success"
+            : "successDeferred";
         setLines((prev) => [
           ...prev,
           makeLine(
-            hasNewerChanges || !badgeRefreshed ? "warning" : "success",
-            translation(t, key),
+            status === "success" ? "success" : "warning",
+            translation(t, `studio.save.${status}`),
           ),
         ]);
       } else {

@@ -20,6 +20,7 @@ import {
   buildBadgeSvgRenderLockKey,
   handleCacheJitterSeconds,
   invalidateBadgeSvgCacheForHandle,
+  isBadgeCacheRefreshed,
   readBadgeSvgCache,
   readBadgeSvgCacheWithStatus,
   writeBadgeSvgCache,
@@ -349,5 +350,23 @@ describe("invalidateBadgeSvgCacheForHandle (#1191)", () => {
 
     expect(result).toEqual({ redis: false, edge: "purged" });
     expect(purgeEdgeCacheTag).toHaveBeenCalledWith("badge-octocat");
+  });
+});
+
+describe("isBadgeCacheRefreshed", () => {
+  it("is true when redis succeeded and the edge was purged", () => {
+    expect(isBadgeCacheRefreshed({ redis: true, edge: "purged" })).toBe(true);
+  });
+
+  it("is true when redis succeeded and there is no edge to purge (outside Vercel)", () => {
+    expect(isBadgeCacheRefreshed({ redis: true, edge: "skipped" })).toBe(true);
+  });
+
+  it("is false when the edge purge failed, even if redis succeeded", () => {
+    expect(isBadgeCacheRefreshed({ redis: true, edge: "failed" })).toBe(false);
+  });
+
+  it("is false when the redis delete failed, regardless of the edge outcome", () => {
+    expect(isBadgeCacheRefreshed({ redis: false, edge: "purged" })).toBe(false);
   });
 });

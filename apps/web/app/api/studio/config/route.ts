@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
+import {
+  invalidateBadgeSvgCacheForHandle,
+  isBadgeCacheRefreshed,
+} from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
 import {
   getOptionalRequestSession,
@@ -10,7 +13,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig, stripRetiredBadgeConfigKeys } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { dbUpsertStudioConfig, loadStudioConfig } from "@/lib/db/studio";
-import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 
 const studioConfigWriteTails = new Map<string, Promise<void>>();
 
@@ -155,9 +158,19 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
       normalizedLogin,
       toDateString(new Date()),
     );
-    badgeRefreshed = invalidation.redis && invalidation.edge !== "failed";
+    badgeRefreshed = isBadgeCacheRefreshed(invalidation);
   } catch (error) {
-    console.error("[studio] badge invalidation threw:", error);
+    // invalidateBadgeSvgCacheForHandle's own contract is "never throws" — this
+    // is a defensive backstop, not an expected path. Routed through the same
+    // structured capture the sibling badge-edge-purge failure uses
+    // (badge_edge_purge_failed in lib/cache/edge-cache.ts) rather than a bare
+    // console.error, so it's observable instead of silent.
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[studio] badge invalidation threw:", message);
+    void captureServerEvent("studio_badge_invalidation_threw", {
+      handle: normalizedLogin,
+      message,
+    });
   }
 
   return NextResponse.json({ success: true, badgeRefreshed });

@@ -46,6 +46,8 @@ vi.mock("@/lib/db/studio", () => ({
 
 vi.mock("@/lib/render/badge-svg-cache", () => ({
   invalidateBadgeSvgCacheForHandle: mockInvalidateBadgeSvgCacheForHandle,
+  isBadgeCacheRefreshed: (result: { redis: boolean; edge: string }) =>
+    result.redis && result.edge !== "failed",
 }));
 
 // Re-export real validation functions through the mock to avoid alias resolution issues

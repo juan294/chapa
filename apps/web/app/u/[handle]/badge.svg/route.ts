@@ -106,6 +106,11 @@ const inflightBadgeRenders = new Map<string, Promise<BadgeRenderResult>>();
 // a Studio save could leave a stale badge on the README for up to a day.
 const BADGE_EDGE_POLICY = "public, s-maxage=21600, stale-while-revalidate=86400";
 const BADGE_CLIENT_POLICY = "public, max-age=300";
+// Shared by both degraded-fallback response sites below (materialize-deadline
+// fallback and load-error fallback): short-lived on the client too, so a
+// browser or GitHub's camo proxy re-checks soon rather than caching a
+// placeholder for the normal 5-minute window.
+const DEGRADED_CLIENT_POLICY = "public, max-age=60";
 
 function badgeCacheHeaders(
   handle: string,
@@ -640,7 +645,7 @@ export async function GET(
           headers: badgeCacheHeaders(
             handle,
             "public, s-maxage=60, stale-while-revalidate=300",
-            "public, max-age=60",
+            DEGRADED_CLIENT_POLICY,
           ),
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
@@ -672,7 +677,7 @@ export async function GET(
         headers: badgeCacheHeaders(
           handle,
           "public, s-maxage=300, stale-while-revalidate=600",
-          "public, max-age=60",
+          DEGRADED_CLIENT_POLICY,
         ),
       } satisfies BadgeRenderResult;
       deferred.resolve(fallbackResult);
