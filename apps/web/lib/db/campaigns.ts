@@ -15,10 +15,7 @@
 
 export type {
   CampaignType,
-  CampaignStatus,
-  CampaignSendStatus,
   Campaign,
-  CampaignSend,
   CampaignSendStats,
 } from "./campaigns/index";
 

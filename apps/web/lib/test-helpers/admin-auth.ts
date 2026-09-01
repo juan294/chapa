@@ -26,10 +26,8 @@
 import { vi } from "vitest";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
-
 // Re-export so test files can import everything from one place
-export { readSessionCookie, isAdminHandle, rateLimit };
+export { readSessionCookie, isAdminHandle };
 
 /**
  * Standard `beforeEach` body: clear mocks, set `NEXTAUTH_SECRET`, and
