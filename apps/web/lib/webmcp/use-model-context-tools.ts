@@ -11,9 +11,7 @@ export {
   WEBMCP_INVALID_INPUT_PREFIX,
 } from "./errors";
 export type {
-  WebMcpExecutionContext,
   WebMcpTool,
-  WebMcpToolAnnotations,
 } from "./shared-tools";
 
 function captureToolEvent(event: string, properties: Record<string, unknown>): void {
