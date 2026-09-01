@@ -40,6 +40,8 @@ Tool registration happens at page load in client JavaScript. Full catalog: https
 
 Machine-readable catalog: https://chapa.thecreativetoken.com/.well-known/mcp.json
 
+Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless Streamable HTTP with the same 9 public read-only tools as their WebMCP twins.
+
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com

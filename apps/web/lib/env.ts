@@ -262,6 +262,11 @@ export function getInsightsEnabledEnv(): string | undefined {
   return clean(process.env.NEXT_PUBLIC_INSIGHTS_ENABLED);
 }
 
+/** Raw `MCP_SERVER_ENABLED` value — server-only fallback for the remote MCP endpoint. */
+export function getMcpServerEnabledEnv(): string | undefined {
+  return readTrimmed("MCP_SERVER_ENABLED");
+}
+
 /** Raw `NEXT_PUBLIC_STUDIO_ENABLED` value — `"true"` when Creator Studio is on. */
 export function getStudioEnabledEnv(): string | undefined {
   return clean(process.env.NEXT_PUBLIC_STUDIO_ENABLED);

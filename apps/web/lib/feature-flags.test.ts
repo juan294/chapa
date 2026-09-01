@@ -39,6 +39,7 @@ import {
   isCodebergEnabledSync,
   isInsightsEnabled,
   isInsightsEnabledSync,
+  isMcpServerEnabled,
   isGitlabEnabled,
   isGitlabEnabledSync,
   isStudioDemoEnabled,
@@ -790,6 +791,46 @@ describe.each([
     vi.stubEnv(envKey, undefined);
 
     await expect(check()).resolves.toBe(false);
+  });
+});
+
+describe("remote MCP server feature flag", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("returns the DB flag value when available", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("mcp_server_enabled", true),
+    );
+
+    await expect(isMcpServerEnabled()).resolves.toBe(true);
+    expect(dbGetFeatureFlag).toHaveBeenCalledWith("mcp_server_enabled");
+  });
+
+  it("keeps a disabled DB flag authoritative over the env fallback", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("mcp_server_enabled", false),
+    );
+    vi.stubEnv("MCP_SERVER_ENABLED", "true");
+
+    await expect(isMcpServerEnabled()).resolves.toBe(false);
+  });
+
+  it("falls back to the server-only env flag when the DB row is absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv("MCP_SERVER_ENABLED", " true ");
+
+    await expect(isMcpServerEnabled()).resolves.toBe(true);
+  });
+
+  it("defaults to false when both sources are absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv("MCP_SERVER_ENABLED", undefined);
+
+    await expect(isMcpServerEnabled()).resolves.toBe(false);
   });
 });
 

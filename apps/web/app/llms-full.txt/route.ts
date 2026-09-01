@@ -97,6 +97,8 @@ Demo mode at \`/studio?demo=1\` needs no login and uses fixed local data. Tools 
 
 Machine-readable catalog: https://chapa.thecreativetoken.com/.well-known/mcp.json
 
+Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless Streamable HTTP with the same 9 public read-only tools as their browser WebMCP twins.
+
 ## API Endpoints
 
 ### Public (no auth required)

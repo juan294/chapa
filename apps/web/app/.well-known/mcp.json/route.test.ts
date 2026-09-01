@@ -10,6 +10,10 @@ describe("GET /.well-known/mcp.json", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
     expect(body).toHaveProperty("webmcp");
+    expect(body).toEqual(expect.objectContaining({
+      mcpEndpoint: "https://chapa.thecreativetoken.com/api/mcp",
+      transport: expect.stringContaining("Streamable HTTP"),
+    }));
 
     const serialized = JSON.stringify(body);
     for (const entry of SITE_TOOL_MAP) {
