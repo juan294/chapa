@@ -11,11 +11,28 @@ import {
 import type { DimensionKey } from "@/lib/dashboard/dimension-sub-metrics";
 import type { LanguageContextValue } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
-import {
-  invalidInput,
-  type WebMcpTool,
-  type WebMcpToolAnnotations,
-} from "./use-model-context-tools";
+import { invalidInput } from "./errors";
+
+export interface WebMcpToolAnnotations {
+  readOnlyHint?: boolean;
+  untrustedContentHint?: boolean;
+}
+
+export interface WebMcpExecutionContext {
+  signal: AbortSignal;
+}
+
+export interface WebMcpTool {
+  name: string;
+  title?: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  annotations?: WebMcpToolAnnotations;
+  execute(
+    inputs: Record<string, unknown>,
+    context: WebMcpExecutionContext,
+  ): string | Promise<string>;
+}
 
 type Translate = LanguageContextValue["t"];
 
