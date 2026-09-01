@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.juan294/chapa",
+  "title": "Chapa",
+  "description": "Read, compare, and verify public developer impact profiles and Chapa badges.",
+  "repository": {
+    "url": "https://github.com/juan294/chapa",
+    "source": "github"
+  },
+  "version": "2.29.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://chapa.thecreativetoken.com/api/mcp"
+    }
+  ]
+}
