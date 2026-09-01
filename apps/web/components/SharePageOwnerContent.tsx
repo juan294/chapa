@@ -108,6 +108,7 @@ interface SharePageOwnerContentProps {
   // compatibility with direct callers/tests that don't pass it — falls back
   // to a locally-built equivalent using the same formula.
   embedMarkdown?: string;
+  embedHtml?: string;
 }
 
 export function SharePageOwnerContent({
@@ -119,6 +120,7 @@ export function SharePageOwnerContent({
   diff = null,
   isOwner: isOwnerProp,
   embedMarkdown: embedMarkdownProp,
+  embedHtml: embedHtmlProp,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -135,7 +137,8 @@ export function SharePageOwnerContent({
   // text independently (#1165 / UX-M5). Both now share this formula.
   const embedAltText = `${badgeAltOf} ${handle}`;
   const embedMarkdown = embedMarkdownProp ?? `![${embedAltText}](${badgeUrl})`;
-  const embedHtml = `<img src="${badgeUrl}" alt="${embedAltText}" width="600" height="315" />`;
+  const embedHtml = embedHtmlProp ??
+    `<img src="${badgeUrl}" alt="${embedAltText}" width="600" height="315" />`;
 
   return (
     <>

@@ -342,6 +342,8 @@ export async function SharePageContent({
   const embedBadgeUrl = `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`;
   const embedAltText = `${t('shareOwner.badgeAltOf') as string} ${handle}`;
   const embedMarkdown = `![${embedAltText}](${embedBadgeUrl})`;
+  const embedHtml =
+    `<img src="${embedBadgeUrl}" alt="${embedAltText}" width="600" height="315" />`;
 
   const displayLabel = stats?.displayName ?? handle;
 
@@ -387,6 +389,8 @@ export async function SharePageContent({
           trend={trendData.trend}
           diff={diffForClient}
           craftResult={craftResult}
+          embedMarkdown={embedMarkdown}
+          embedHtml={embedHtml}
         />
       )}
       {/* SAFETY: renderJsonLd escapes <, >, & to prevent </script> injection. */}
@@ -459,6 +463,7 @@ export async function SharePageContent({
           diff={diffForClient}
           isOwner={isOwner}
           embedMarkdown={embedMarkdown}
+          embedHtml={embedHtml}
         />
       </div>
 

@@ -1093,7 +1093,7 @@ describe("SharePage /u/[handle]", () => {
   // button must produce byte-identical clipboard content: a single,
   // localized, handle-bearing string built once, server-side, and threaded
   // to both consumers.
-  describe("canonical embed markdown (#1165 / UX-M5)", () => {
+  describe("canonical embed snippets (#1165 / UX-M5)", () => {
     it("passes a handle-bearing, non-hardcoded-English embed markdown to SharePageShortcuts", async () => {
       const result = await renderPage("testuser");
 
@@ -1115,6 +1115,16 @@ describe("SharePage /u/[handle]", () => {
       const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
 
       expect(ownerEl!.props.embedMarkdown).toBe(shortcutsEl!.props.embedMarkdown);
+    });
+
+    it("passes the canonical embed HTML string to SharePageOwnerContentLazy", async () => {
+      const result = await SharePageContent({ handle: "testuser", locale: "en" });
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+
+      expect(ownerEl!.props.embedHtml).toBe(
+        '<img src="https://chapa.thecreativetoken.com/u/testuser/badge.svg" alt="Chapa Badge of testuser" width="600" height="315" />',
+      );
     });
 
     it("localizes the embed markdown alt text to the resolved locale", async () => {

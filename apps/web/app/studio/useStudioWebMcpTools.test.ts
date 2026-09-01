@@ -11,6 +11,7 @@ import {
 } from "@chapa/shared";
 import type { CommandResult } from "@/components/terminal/command-registry";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
+import { WEBMCP_INVALID_INPUT_PREFIX } from "@/lib/webmcp/use-model-context-tools";
 import type { StudioCommandAction } from "./useStudioCommands";
 import { useStudioWebMcpTools } from "./useStudioWebMcpTools";
 
@@ -196,6 +197,9 @@ describe("useStudioWebMcpTools", () => {
       required: ["category", "value"],
       additionalProperties: false,
     });
+    expect(getTool("apply_badge_style").description).toContain(
+      "Get valid categories and values from list_style_options first.",
+    );
     expect(getTool("apply_preset").inputSchema).toEqual({
       type: "object",
       properties: {
@@ -319,6 +323,12 @@ describe("useStudioWebMcpTools", () => {
         value: "aurora /save",
       }),
     ).resolves.toContain("Invalid input");
+    const recoveryResult = await execute(getTool("apply_badge_style"), {
+      category: "two words",
+      value: "x",
+    });
+    expect(recoveryResult).toContain(WEBMCP_INVALID_INPUT_PREFIX);
+    expect(recoveryResult).toContain("call list_style_options");
     expect(runCommand).not.toHaveBeenCalled();
   });
 
@@ -334,18 +344,37 @@ describe("useStudioWebMcpTools", () => {
     });
   });
 
-  it("only proposes saves and never runs a command or fetch", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const { getTool, runCommand, proposeSave } = setup();
+  it.each([
+    ["saved", "No unsaved changes. The current configuration is already saved."],
+    [
+      "saving",
+      "A save is already in progress. Wait for it to finish, then check preview_badge for the save status.",
+    ],
+  ] as const)(
+    "does not propose a save while the status is %s",
+    async (saveStatus, message) => {
+      const { getTool, proposeSave } = setup({ saveStatus });
 
-    await expect(execute(getTool("save_badge_config"))).resolves.toBe(
-      "Save proposed — the user must confirm on-page.",
-    );
-    expect(proposeSave).toHaveBeenCalledOnce();
-    expect(runCommand).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
+      await expect(execute(getTool("save_badge_config"))).resolves.toBe(message);
+      expect(proposeSave).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["dirty", "error"] as const)(
+    "only proposes saves from the %s state and never runs a command or fetch",
+    async (saveStatus) => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      const { getTool, runCommand, proposeSave } = setup({ saveStatus });
+
+      await expect(execute(getTool("save_badge_config"))).resolves.toBe(
+        "Save proposed — the user must confirm on-page.",
+      );
+      expect(proposeSave).toHaveBeenCalledOnce();
+      expect(runCommand).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it("simulates a fixed score from merged dimensions and current confidence", async () => {
     const { getTool } = setup();

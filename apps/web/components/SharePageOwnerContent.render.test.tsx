@@ -272,6 +272,23 @@ describe("SharePageOwnerContent — render", () => {
       const copyButtons = screen.getAllByTestId("copy-button");
       expect(copyButtons[0]!.getAttribute("data-text")).toBe(canonicalMarkdown);
     });
+
+    it("uses the server-provided embedHtml prop verbatim for the HTML Copy button when supplied", () => {
+      const canonicalHtml =
+        '<img src="https://chapa.thecreativetoken.com/u/testuser/badge.svg" alt="Canonical HTML" width="600" height="315" />';
+
+      render(
+        <SharePageOwnerContent
+          handle="testuser"
+          stats={MOCK_STATS}
+          impact={MOCK_IMPACT}
+          embedHtml={canonicalHtml}
+        />,
+      );
+
+      const copyButtons = screen.getAllByTestId("copy-button");
+      expect(copyButtons[1]!.getAttribute("data-text")).toBe(canonicalHtml);
+    });
   });
 
   // #1165 (FE-H2) — server-resolved isOwner prop is authoritative over the

@@ -389,7 +389,7 @@ describe("Phase 4d — Share page i18n", () => {
       };
       mockGetTrendData.mockResolvedValue({ trend, diff });
 
-      const result = await SharePageContent({ handle: "testuser" });
+      const result = await SharePageContent({ handle: "testuser", locale: "en" });
       const host = findElementByType(
         result,
         mockSharePageWebMcpToolsComponent,
@@ -402,6 +402,10 @@ describe("Phase 4d — Share page i18n", () => {
         verification: { hash: "abc12345", date: "2026-05-03" },
         trend,
         craftResult: null,
+        embedMarkdown:
+          "![Chapa Badge of testuser](https://chapa.thecreativetoken.com/u/testuser/badge.svg)",
+        embedHtml:
+          '<img src="https://chapa.thecreativetoken.com/u/testuser/badge.svg" alt="Chapa Badge of testuser" width="600" height="315" />',
       });
       expect(host?.props.impact).not.toHaveProperty("confidence");
       expect(host?.props.diff).not.toHaveProperty("confidence");
