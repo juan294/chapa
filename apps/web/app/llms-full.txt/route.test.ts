@@ -65,6 +65,13 @@ describe("GET /llms-full.txt", () => {
     expect(await getLlmsFullTxt().text()).toContain("WebMCP");
   });
 
+  it("advertises the remote Streamable HTTP MCP endpoint", async () => {
+    const text = await getLlmsFullTxt().text();
+    expect(text).toContain("https://chapa.thecreativetoken.com/api/mcp");
+    expect(text).toContain("Streamable HTTP");
+    expect(text).toContain("same 9 public read-only tools");
+  });
+
   it("lists all seven Creator Studio badge categories", async () => {
     const res = getLlmsFullTxt();
     const text = await res.text();

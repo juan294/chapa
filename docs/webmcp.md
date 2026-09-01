@@ -67,6 +67,24 @@ These tools are present only when the page found a verification record.
 | `get_verification_record` | `EMPTY` | yes | Serializes the hash and the verification record already displayed on the page. It makes no request. |
 | `explain_verification` | `EMPTY` | yes | Explains the HMAC-SHA256 process, what the record proves, what it does not prove, record expiry, and whether the displayed code is current or legacy format. |
 
+## Remote MCP endpoint
+
+`https://chapa.thecreativetoken.com/api/mcp` is Chapa's stateless Streamable HTTP endpoint for clients that do not operate a browser page. It is independently gated by the DB-backed `mcp_server_enabled` flag with the server-only `MCP_SERVER_ENABLED` fallback. The endpoint exposes 9 public read-only tools and uses the same raw JSON Schemas and hand-written validation as the browser WebMCP catalog.
+
+| Remote tool | Difference from the browser twin |
+| --- | --- |
+| `get_site_capabilities` | Identifies the remote transport and endpoint. |
+| `find_profile` | No difference; it remains pure URL construction. |
+| `get_impact_profile` | Takes `{handle}` instead of reading the current page. |
+| `get_impact_history` | Takes `{handle}` and calls the history library directly. |
+| `verify_badge` | Takes `{hash}` instead of reading the page's verification state. |
+| `explain_verification` | No difference; it returns the shared explanation. |
+| `explain_dimension` | Takes `{handle, dimension}` and materializes public profile data read-only. |
+| `compare_profiles` | Takes `{handle, other_handle}` because there is no on-page current profile. |
+| `get_embed_snippet` | Takes `{handle}` and builds the canonical English snippets. |
+
+Studio mutation tools are browser-only by design. They change visible page state, and saves require an explicit human click on the on-page confirmation control. The remote endpoint therefore cannot apply styles, reset a session, or save a badge configuration.
+
 ## Design methodology
 
 Chapa follows the framework in Chrome's [Build your user's agentic workflows with WebMCP tools](https://developer.chrome.com/docs/ai/webmcp/build-tools) article, published on 2026-08-26. The framework defines the user goal and initial state, then role-plays the conversation to find the required tools and recovery paths. The [WebMCP demo script](webmcp-demo-script.md) is Chapa's role-play artifact.

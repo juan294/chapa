@@ -63,6 +63,13 @@ describe("GET /llms.txt", () => {
     expect(await getLlmsTxt().text()).toContain("WebMCP");
   });
 
+  it("advertises the remote Streamable HTTP MCP endpoint", async () => {
+    const text = await getLlmsTxt().text();
+    expect(text).toContain("https://chapa.thecreativetoken.com/api/mcp");
+    expect(text).toContain("Streamable HTTP");
+    expect(text).toContain("same 9 public read-only tools");
+  });
+
   it("limits cryptographic claims to badges marked Verified metrics", async () => {
     const res = getLlmsTxt();
     const text = await res.text();

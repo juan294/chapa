@@ -30,6 +30,40 @@ export const COMPARE_PROFILES_INPUT_SCHEMA = {
   additionalProperties: false,
 };
 
+export const COMPARE_PROFILES_SERVER_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    handle: { type: "string" },
+    other_handle: { type: "string" },
+  },
+  required: ["handle", "other_handle"],
+  additionalProperties: false,
+};
+
+export const EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    handle: { type: "string" },
+    dimension: {
+      type: "string",
+      enum: [...DIMENSION_KEYS],
+    },
+  },
+  required: ["handle", "dimension"],
+  additionalProperties: false,
+};
+
+export const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
+
+export const VERIFY_BADGE_SERVER_INPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    hash: { type: "string", pattern: HASH_PATTERN.source },
+  },
+  required: ["hash"],
+  additionalProperties: false,
+};
+
 export const SITE_CAPABILITIES = {
   whatIsChapa:
     "Chapa turns developer activity into a live, verifiable Impact Profile and embeddable badge that summarizes delivery, quality, consistency, breadth, and optional craft.",
