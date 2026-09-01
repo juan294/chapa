@@ -91,15 +91,24 @@ export const DEFAULT_EXCLUDED_PACKAGES: readonly ExcludedPackage[] = [
 
 function licenseSatisfiesAllowlist(license: string, allowed: ReadonlySet<string>): boolean {
   if (allowed.has(license)) return true;
-  // SPDX "OR" expressions (e.g. "(MPL-2.0 OR Apache-2.0)") are satisfied if
-  // any one alternative is on the allowlist -- the consumer may rely on
-  // whichever license is more favorable.
-  const trimmed = license.replace(/^\(|\)$/g, "");
+
+  // Compound SPDX expressions carry the two operators in opposite directions,
+  // so each needs its own rule:
+  //
+  //   OR  ("(MPL-2.0 OR Apache-2.0)")  -- the consumer picks one, so ANY
+  //       allowed alternative satisfies the policy.
+  //   AND ("(Apache-2.0 AND MIT)")     -- the consumer is bound by all of
+  //       them, so EVERY term must be allowed.
+  //
+  // AND binds tighter than OR in SPDX, so split on OR first and evaluate each
+  // alternative's AND terms within it.
+  const trimmed = license.replace(/^\(|\)$/g, "").trim();
   const alternatives = trimmed.split(/\s+OR\s+/i);
-  if (alternatives.length > 1) {
-    return alternatives.some((alt) => allowed.has(alt.trim()));
-  }
-  return false;
+
+  return alternatives.some((alternative) => {
+    const terms = alternative.split(/\s+AND\s+/i);
+    return terms.every((term) => allowed.has(term.trim().replace(/^\(|\)$/g, "")));
+  });
 }
 
 function isExcluded(
