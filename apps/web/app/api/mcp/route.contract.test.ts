@@ -21,7 +21,11 @@ vi.mock("@/lib/webmcp/server-tools", () => ({
       properties: { handle: { type: "string" } },
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
     execute: async () => JSON.stringify({ ok: true }),
   })),
 }));

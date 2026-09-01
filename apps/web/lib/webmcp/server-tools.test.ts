@@ -136,7 +136,11 @@ describe("remote MCP server tools", () => {
     const browserNames = new Set<string>(SITE_TOOL_MAP.flatMap((entry) => entry.tools));
     for (const definition of SERVER_MCP_TOOLS) {
       expect(browserNames.has(definition.name)).toBe(true);
-      expect(definition.annotations.readOnlyHint).toBe(true);
+      expect(definition.annotations).toEqual(expect.objectContaining({
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      }));
       expect(Boolean(definition.annotations.untrustedContentHint)).toBe(
         untrustedTools.has(definition.name),
       );
@@ -257,7 +261,11 @@ describe("remote MCP server tools", () => {
       name: "rejecting_tool",
       description: "Reject for the instrumentation test.",
       inputSchema: { type: "object" },
-      annotations: { readOnlyHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
       execute: async () => {
         throw new Error("tool exploded");
       },
