@@ -7,10 +7,19 @@ paths:
 
 # WebMCP Rules
 
-Chapa's WebMCP surface: the adapter and shared tools live in
-`apps/web/lib/webmcp/`; per-page tool registrations are the
-`*WebMcpTools*` files under `apps/web/app/` (studio, share page, verify
-page). The whole surface is gated by `NEXT_PUBLIC_WEBMCP_ENABLED`.
+Chapa's WebMCP surface: the adapter, the shared tools, and the published
+route/tool map live in `apps/web/lib/webmcp/`. Per-page tool registrations
+sit beside the page they belong to, so they are not all in one directory:
+the landing tools are `apps/web/components/LandingWebMcpTools.tsx`, and the
+studio, share and verify tools are the `*WebMcpTools*` files under
+`apps/web/app/`. Four surfaces, 19 registrations across 18 distinct names.
+The whole surface is gated by `NEXT_PUBLIC_WEBMCP_ENABLED`.
+
+`SITE_TOOL_MAP` (`site-tool-map.ts`) is what the landing page answers
+"what can I do here" with, so it is a contract rather than a comment:
+`site-tool-map.test.ts` reads the four registration files and fails when
+the published map and the real registrations disagree. Adding or renaming
+a tool means updating that map in the same commit.
 
 ## Adapter Isolation
 

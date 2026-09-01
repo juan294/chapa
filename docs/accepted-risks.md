@@ -298,10 +298,11 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## useTranslation fallback locale is English, not app default (2026-05-03)
 
-- **Risk:** `useTranslation()` falls back to English (`'en'`) when called outside a `LanguageProvider`. The app default locale is Spanish (`'es'`). Any client component rendered outside the provider tree (e.g., in tests, Storybook, isolated embeds) will display English strings.
-- **Mitigation:** All public-facing pages wrap children in `LanguageProvider` via `layout.tsx`. Tests exercise English strings via the fallback intentionally. The fallback behavior is documented and logged with `console.warn`. No production path renders outside the provider.
-- **Severity:** Low
-- **Accepted:** 2026-05-03
+- **Risk:** `useTranslation()` falls back to English (`'en'`) when called outside a `LanguageProvider`. The app default locale was Spanish (`'es'`), so any client component rendered outside the provider tree (e.g., in tests, Storybook, isolated embeds) displayed a different language from the rest of the app.
+- **Mitigation (while the risk stood):** All public-facing pages wrap children in `LanguageProvider` via `layout.tsx`. Tests exercise English strings via the fallback intentionally. The fallback behavior is documented and logged with `console.warn`. No production path renders outside the provider.
+- **Resolution:** The mismatch this entry describes no longer exists. #1201 set `DEFAULT_LOCALE` to `'en'` (`apps/web/lib/i18n/types.ts`), which is the same locale the hook already fell back to, so the fallback and the app default now agree by construction. `apps/web/lib/i18n/default-locale.test.ts` asserts the constant is `'en'` as its own contract, so a silent flip back would fail CI rather than quietly reintroduce the divergence. The mitigations above still hold and are still worth keeping; they are simply no longer load-bearing for this risk.
+- **Severity:** None (resolved)
+- **Accepted:** 2026-05-03 | **Resolved:** 2026-09-01
 
 ---
 

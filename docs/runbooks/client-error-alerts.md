@@ -2,8 +2,12 @@
 
 Client runtime errors are captured in two streams:
 
-- `client_error`: global React error boundary, `window.onerror`, and
-  `unhandledrejection`.
+- `client_error`: global React error boundary, `window.onerror`,
+  `unhandledrejection`, and a WebMCP tool handler that threw
+  (`source: "webmcp_tool_execute"`, message bounded to 500 characters). A
+  thrown tool also emits `webmcp_tool_called` with `outcome: "error"`, so a
+  spike in one without the other points at the reporting path rather than at
+  the tool.
 - `client_api_error`: non-2xx client fetches from session, owner cache warm, and
   trend data paths.
 

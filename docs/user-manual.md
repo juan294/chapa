@@ -493,7 +493,7 @@ The language picker appears in the top navigation bar as a globe icon (🌐), be
 
 ### Default Language Detection
 
-If you have not set a preference, the app detects your browser's `Accept-Language` header and defaults to Spanish. If your browser prefers Spanish-speaking locales (e.g., `es`, `es-ES`, `es-MX`), you will see the Spanish UI automatically.
+If you have not set a preference, the app reads your browser's `Accept-Language` header. If your browser prefers a Spanish locale (e.g., `es`, `es-ES`, `es-MX`), you will see the Spanish UI automatically. English is used only when a request carries no locale signal at all.
 
 ---
 

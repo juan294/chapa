@@ -1,6 +1,6 @@
 # WebMCP, Explained. And What Happened When I Shipped It
 
-*Part one is a plain explanation of WebMCP for anyone. Part two is a build log: the 16 tools I registered in Chapa, the three rules I ended up with, and the parts that surprised me.*
+*Part one is a plain explanation of WebMCP for anyone. Part two is a build log: the 18 tools I registered in Chapa, the three rules I ended up with, and the parts that surprised me.*
 
 ---
 
@@ -103,12 +103,12 @@ But the cost of trying is close to zero, because you are wrapping functions you 
 
 **[Chapa](https://chapa.thecreativetoken.com)** generates a live, embeddable SVG badge that shows a developer's impact profile computed from twelve months of GitHub activity: four or five scored dimensions, an archetype, a composite score, and a cryptographic verification record. It has a Creator Studio where you customize the badge, a public share page, and a verification page.
 
-I shipped **16 WebMCP tool registrations across 15 distinct names**, spread over three page types. Here is what I learned building them.
+I shipped **19 WebMCP tool registrations across 18 distinct names**, spread over four page types. Here is what I learned building them.
 
 <!-- IMAGE 3 -->
 <!-- INSERT IMAGE HERE -->
-<!-- PROMPT: An architecture diagram on a dark forest-green background (#08170f) with jade green (#10b981) accents and thin hairline borders. Three browser-window cards arranged horizontally, labeled "/studio", "/u/:handle", "/verify/:hash". Above each card, a small stack of rounded pill shapes representing registered tools: 9 pills over the first card, 5 over the second, 2 over the third. A single AI agent icon floats above all three, with thin jade lines reaching down to each pill stack. Below the cards, one shared horizontal bar labeled "feature flag: webmcp_enabled" acting as a gate. Flat vector, technical-editorial style, minimal text. 16:9. -->
-<!-- CAPTION: 16 registrations, three surfaces, one kill switch. -->
+<!-- PROMPT: An architecture diagram on a dark forest-green background (#08170f) with jade green (#10b981) accents and thin hairline borders. Four browser-window cards arranged horizontally, labeled "/", "/studio", "/u/:handle", "/verify/:hash". Above each card, a small stack of rounded pill shapes representing registered tools: 2 pills over the first card, 9 over the second, 6 over the third, 2 over the fourth. A single AI agent icon floats above all four, with thin jade lines reaching down to each pill stack. Below the cards, one shared horizontal bar labeled "feature flag: webmcp_enabled" acting as a gate. Flat vector, technical-editorial style, minimal text. 16:9. -->
+<!-- CAPTION: 19 registrations, four surfaces, one kill switch. -->
 
 ### Rule 1: Do not build an agent API. Point at the one you have.
 
@@ -269,9 +269,9 @@ I want to be precise about what I have actually verified, because "I shipped Web
 
 Verified: a hello-world tool passed **native registration, discovery, and execution in Google Chrome 151.0.7922.174** with `chrome://flags/#enable-webmcp-testing` enabled, deployed on a real preview. That was the gate I set before writing the full catalog, and it passed.
 
-Verified: the full 16-tool catalog is implemented and tested, with each tool host carrying its own render test. The focused WebMCP suite is 5 files and 60 tests.
+Verified: the full 18-tool catalog is implemented and tested, with each tool host carrying its own render test. The focused WebMCP suite is 7 files and 78 tests.
 
-Verified: the code is in production. It merged to `main` in v2.24.0 and is still there as of v2.25.0.
+Verified: the code is in production. It merged to `main` in v2.24.0 and has shipped in every release since, most recently v2.27.0.
 
 One more practical note if you are planning a demo. Chrome's WebMCP origin trial runs from Chrome 149 to 156 and ends **17 November 2026**. Without a trial token, your visitors need to enable the flag themselves. With a token, unflagged Chrome works. Decide which of those your audience is before you record anything.
 

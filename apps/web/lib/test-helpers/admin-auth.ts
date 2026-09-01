@@ -17,7 +17,7 @@
  *   vi.mock("@/lib/http/client-ip", () => ({ getClientIp: () => "127.0.0.1" }));
  *
  *   // 2. Import the helper + re-exported mocks
- *   import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
+ *   import { adminAuthBeforeEach, readSessionCookie, isAdminHandle } from "@/lib/test-helpers/admin-auth";
  *
  *   // 3. Use in beforeEach
  *   beforeEach(() => { adminAuthBeforeEach(); });

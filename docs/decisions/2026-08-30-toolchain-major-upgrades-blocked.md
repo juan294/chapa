@@ -100,6 +100,27 @@ Re-attempt when **all** of these hold, and re-run the measurement above:
 The two halves are independent and should ship as separate commits, so a
 regression in gate strength is attributable to one tool.
 
+**Remove the Dependabot ignores in the same commit that lifts the block.**
+`.github/dependabot.yml` ignores `version-update:semver-major` for
+`typescript` and `eslint`, and cites this file by name. That block is the
+enforcement point for the decision above, so leaving it in place after the
+conditions clear would keep the upgrade blocked with no record of why.
+
+## How this is enforced (added after #1235)
+
+The pins alone were not enough. A blocked major still reached CI, because
+Dependabot grouped it: in #1235 TypeScript 7 rode inside the 16-package
+`production` group and failed the Knip gate, which held 15 unrelated and
+otherwise mergeable bumps hostage behind a decision that had already been
+made here.
+
+#1247 moved the block one stage earlier, to proposal time, with an `ignore`
+entry per tool in `.github/dependabot.yml`. Two properties of that choice
+matter. It is scoped to majors only, so minor and patch updates for both
+tools still flow normally. And it is ecosystem-imposed rather than
+codebase-imposed, which is why it is recorded here and not treated as a
+project preference.
+
 ## Consequences
 
 - The upgrade is deferred with evidence rather than left as an open question.

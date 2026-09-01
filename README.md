@@ -18,7 +18,7 @@ Generate a **live, embeddable, animated SVG badge** that showcases your develope
 
 ## WebMCP
 
-Chapa adds a WebMCP layer to the Creator Studio and its public profile and verification pages. Studio tools reuse the existing command registry, so agent actions update the same preview and terminal that the user sees. Saving is always human-gated; in judge demo mode (`/studio?demo=1`), confirmed saves stay local and never write production data. Public profile and verification tools are read-only.
+Chapa adds a WebMCP layer to four surfaces: the landing page, the Creator Studio, and the public profile and verification pages. The landing page is the front door, where `get_site_capabilities` returns a map of every route and the tools it carries, so an agent can find the right page instead of guessing at one. Studio tools reuse the existing command registry, so agent actions update the same preview and terminal that the user sees. Saving is always human-gated; in judge demo mode (`/studio?demo=1`), confirmed saves stay local and never write production data. Landing, public profile, and verification tools are read-only.
 
 Registration uses the current `document.modelContext.registerTool(tool, { signal })` contract, an `AbortController` for cleanup, feature detection for unsupported clients, and a remote feature-flag kill switch.
 
@@ -48,6 +48,18 @@ Submission-period work started after that cutoff:
 b338942d test(webmcp): add main-world execution probe
 d7777e47 docs(webmcp): record blocked runtime gate
 3156fcaa feat(webmcp): add runtime spike
+```
+
+- The layer has continued since that first contiguous block, so later WebMCP commits are no longer one range. The receipt for them is `git log --oneline -E --grep='^[a-z]+\(webmcp\):' 699f94b0..HEAD`:
+
+```text
+71e2ff47 docs(webmcp): add submission package
+e72a4e3a refactor(webmcp): harden tool lifecycle
+f5e9e85e feat(webmcp): add tool outcome telemetry
+80e327d5 feat(webmcp): improve agent workflow recovery
+5551020d docs(webmcp): document agent workflow design
+d771b544 feat(webmcp): add landing discovery tools
+18779e40 docs(webmcp): document landing discovery
 ```
 
 ## What It Does
@@ -94,9 +106,9 @@ npx chapa-cli merge
 
 Supports `--insecure` for corporate networks with TLS interception and `--verbose` for diagnostics.
 
-### Bilingual UI (ES / EN)
+### Bilingual UI (EN / ES)
 
-Chapa's interface is available in Spanish (default) and English. A language picker (globe icon, next to the theme toggle in the nav bar) saves your preference in a cookie. The default locale is auto-detected from your browser's `Accept-Language` header. The main content pages (landing, about, privacy, terms, archetype guides) are server-rendered per locale — both languages are pre-built, so there's no flash of the wrong language while the page loads.
+Chapa's interface is available in English and Spanish. A language picker (globe icon, next to the theme toggle in the nav bar) saves your preference in a cookie. Your locale is resolved in that order — the `chapa-locale` cookie first, then your browser's `Accept-Language` header — so a Spanish visitor gets Spanish. English is the fallback only when a request carries no locale signal at all, which is the normal case for an embedded badge in a README. The main content pages (landing, about, privacy, terms, archetype guides) are server-rendered per locale — both languages are pre-built, so there's no flash of the wrong language while the page loads.
 
 ### Admin Dashboard (`/admin`)
 
@@ -134,6 +146,7 @@ chapa/
 │   │   ├── admin/         # Admin dashboard (protected)
 │   │   ├── u/[handle]/    # Share page + badge.svg route
 │   │   ├── studio/        # Creator Studio
+│   │   ├── settings/      # Account settings (connections, insights import, identity)
 │   │   └── verify/        # Badge verification landing
 │   ├── components/        # React components (terminal UI, badge, dashboard, nav, tooltips)
 │   └── lib/               # Business logic
@@ -152,6 +165,7 @@ chapa/
 │       ├── profile/       # Profile materialisation and orchestration
 │       ├── render/        # React-to-SVG badge renderer
 │       ├── verification/  # HMAC-SHA256 badge signing
+│       ├── webmcp/        # Agent-facing tool adapter, shared tools, route/tool map
 │       ├── effects/       # Visual effects library
 │       └── email/         # Resend integration + campaigns
 ├── packages/
