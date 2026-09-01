@@ -1,3 +1,6 @@
+import { captureServerEvent } from "@/lib/analytics/server-errors";
+import { classifyAgentUserAgent } from "@/lib/analytics/agent-ua";
+
 const LLMS_TXT = `# Chapa — Developer Impact Badge
 
 > https://chapa.thecreativetoken.com
@@ -80,7 +83,16 @@ Software developers, open source contributors, and engineering teams who want to
 - Twitter/X: @chapabadge
 `;
 
-export function GET(): Response {
+export function GET(request: Request): Response {
+  const ua = request.headers.get("user-agent");
+  const agentClass = classifyAgentUserAgent(ua);
+  if (agentClass) {
+    void captureServerEvent("agent_surface_fetch", {
+      surface: "llms.txt",
+      agentClass,
+      ua: (ua ?? "").slice(0, 200),
+    });
+  }
   return new Response(LLMS_TXT, {
     status: 200,
     headers: {

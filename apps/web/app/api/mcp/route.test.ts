@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   enabled: vi.fn(async () => true),
   rateLimit: vi.fn(async () => ({ allowed: true, current: 1, limit: 60 })),
   getClientIp: vi.fn(() => "1.2.3.4"),
+  captureServerEvent: vi.fn(),
   execute: vi.fn(async (input: unknown) => JSON.stringify({ echoed: input })),
 }));
 
@@ -15,41 +16,49 @@ vi.mock("@/lib/http/client-ip", () => ({
   NO_TRUSTED_IP: "unknown",
 }));
 vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerEvent: mocks.captureServerEvent,
   withErrorCapture: (_route: string, handler: unknown) => handler,
 }));
-vi.mock("@/lib/webmcp/server-tools", () => ({
-  SERVER_MCP_TOOLS: [
-    "get_site_capabilities",
-    "find_profile",
-    "get_impact_profile",
-    "get_impact_history",
-    "verify_badge",
-    "explain_verification",
-    "explain_dimension",
-    "compare_profiles",
-    "get_embed_snippet",
-  ].map((name, index) => ({
-    name,
-    description: `Read tool ${index}`,
-    inputSchema: {
-      type: "object",
-      properties: index === 0 ? {} : { handle: { type: "string" } },
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: true, untrustedContentHint: index > 0 },
-    execute: mocks.execute,
-  })),
-}));
+vi.mock("@/lib/webmcp/server-tools", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/lib/webmcp/server-tools")
+  >();
+  return {
+    ...actual,
+    SERVER_MCP_TOOLS: [
+      "get_site_capabilities",
+      "find_profile",
+      "get_impact_profile",
+      "get_impact_history",
+      "verify_badge",
+      "explain_verification",
+      "explain_dimension",
+      "compare_profiles",
+      "get_embed_snippet",
+    ].map((name, index) => ({
+      name,
+      description: `Read tool ${index}`,
+      inputSchema: {
+        type: "object",
+        properties: index === 0 ? {} : { handle: { type: "string" } },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, untrustedContentHint: index > 0 },
+      execute: mocks.execute,
+    })),
+  };
+});
 
 import { DELETE, GET, POST } from "./route";
 
-function request(body: unknown) {
+function request(body: unknown, userAgent = "modelcontextprotocol-mcp-client/2.0") {
   return new NextRequest("http://localhost:3001/api/mcp", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
       "x-vercel-forwarded-for": "1.2.3.4",
+      "user-agent": userAgent,
     },
     body: JSON.stringify(body),
   });
@@ -159,6 +168,55 @@ describe("/api/mcp", () => {
       echoed: { handle: "octocat" },
     });
     expect(mocks.execute).toHaveBeenCalledWith({ handle: "octocat" });
+    expect(mocks.captureServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
+      tool: "find_profile",
+      outcome: "ok",
+      durationMs: expect.any(Number),
+      agentClass: "mcp-client",
+    });
+  });
+
+  it("classifies recovery strings as invalid input", async () => {
+    mocks.execute.mockResolvedValueOnce(
+      "Invalid input for find_profile: handle must be a public GitHub handle.",
+    );
+
+    const response = await POST(request({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "find_profile", arguments: { handle: "-bad" } },
+    }, "ClaudeBot/1.0"));
+
+    expect(response.status).toBe(200);
+    expect(mocks.captureServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
+      tool: "find_profile",
+      outcome: "invalid_input",
+      durationMs: expect.any(Number),
+      agentClass: "anthropic",
+    });
+  });
+
+  it("preserves thrown tool errors and emits an error outcome", async () => {
+    mocks.execute.mockRejectedValueOnce(new Error("tool exploded"));
+
+    const response = await POST(request({
+      jsonrpc: "2.0",
+      id: 4,
+      method: "tools/call",
+      params: { name: "find_profile", arguments: { handle: "octocat" } },
+    }, "PerplexityBot/1.0"));
+    const body = await jsonRpc(response);
+
+    expect(JSON.stringify(body)).toContain(
+      "find_profile is unavailable right now. Please try again later.",
+    );
+    expect(mocks.captureServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
+      tool: "find_profile",
+      outcome: "error",
+      durationMs: expect.any(Number),
+      agentClass: "perplexity",
+    });
   });
 
   it("returns explanatory JSON 405 responses for GET and DELETE", async () => {

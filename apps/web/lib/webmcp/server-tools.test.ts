@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   dbGetToolInsights: vi.fn(),
   getSnapshots: vi.fn(),
   getVerificationRecord: vi.fn(),
+  captureServerEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
@@ -35,7 +36,15 @@ vi.mock("@/lib/i18n/server", () => ({
   getServerT: () => (key: string) => key,
 }));
 
-import { SERVER_MCP_TOOLS } from "./server-tools";
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerEvent: mocks.captureServerEvent,
+}));
+
+import {
+  SERVER_MCP_TOOLS,
+  executeServerMcpTool,
+  type ServerMcpTool,
+} from "./server-tools";
 
 function tool(name: string) {
   const found = SERVER_MCP_TOOLS.find((candidate) => candidate.name === name);
@@ -241,5 +250,29 @@ describe("remote MCP server tools", () => {
     await expect(
       tool("verify_badge").execute({ hash: "a".repeat(32) }),
     ).resolves.toContain("No verification record");
+  });
+
+  it("preserves the recovery string and emits error telemetry when a tool throws", async () => {
+    const rejectingTool: ServerMcpTool = {
+      name: "rejecting_tool",
+      description: "Reject for the instrumentation test.",
+      inputSchema: { type: "object" },
+      annotations: { readOnlyHint: true },
+      execute: async () => {
+        throw new Error("tool exploded");
+      },
+    };
+
+    await expect(
+      executeServerMcpTool(rejectingTool, {}, "anthropic"),
+    ).resolves.toBe(
+      "rejecting_tool is unavailable right now. Please try again later.",
+    );
+    expect(mocks.captureServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
+      tool: "rejecting_tool",
+      outcome: "error",
+      durationMs: expect.any(Number),
+      agentClass: "anthropic",
+    });
   });
 });
