@@ -8,7 +8,7 @@ None of the submission pages I used exposed a WebMCP tool I could call. I had to
 
 The strongest example came from WebMCP Directory. Its scanner reached Chapa and found the remote MCP declaration, but it rejected the WebMCP implementation because it searched for `navigator.modelContext`. Chapa uses the current `document.modelContext` API. A directory for an experimental standard had fallen behind the standard it was checking.
 
-WebMCP List failed in a more ordinary way. Its submission form rendered an empty required category control. There was no value I could select, so the form could not complete. The other directory submissions worked, but only through conventional forms. Glama required OAuth, account setup, a connector form, and a final review submission. It has an MCP inspector and a directory API, but its add-server page did not expose browser-native submission tools.
+WebMCP List failed in a more ordinary way. Its submission form rendered an empty required category control. There was no value I could select, so the form could not complete. The other directory submissions worked, but only through conventional forms. [Glama](https://glama.ai/mcp/connectors/com.thecreativetoken.chapa/chapa) required OAuth, account setup, a connector form, a review submission, and a separate ownership challenge. It has an MCP inspector and a directory API, but its add-server page did not expose browser-native submission tools.
 
 This is not proof that these companies have no agent interface anywhere. It is a narrower and more useful observation: I did not discover or use a WebMCP catalog on any of their main submission pages. The workflow that should be the clearest demonstration of the technology did not use the technology.
 
