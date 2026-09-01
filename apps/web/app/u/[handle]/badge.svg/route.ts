@@ -27,6 +27,7 @@ import {
   readBadgeSvgCacheWithStatus,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
+import { badgeEdgeCacheTag } from "@/lib/cache/edge-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
@@ -75,13 +76,6 @@ const AVATAR_RACE_DEADLINE_MS = 1000;
 // brand-new handle with no stale key falls through to a plain, unbounded
 // await so a legitimate cold GitHub fetch is never cut off artificially.
 const BADGE_MATERIALIZE_DEADLINE_MS = 2200;
-// A degraded response — short-lived so a real render (from the background
-// continuation below, or a subsequent request) replaces it quickly rather
-// than being treated as a normal 24h-cacheable badge.
-const DEADLINE_FALLBACK_HEADERS = {
-  "Content-Type": "image/svg+xml",
-  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
-};
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
 type BadgeRenderResult = {
   svg: string;
@@ -99,16 +93,38 @@ type BadgeRenderResult = {
 // the same handle in the same JS event-loop cycle.
 const inflightBadgeRenders = new Map<string, Promise<BadgeRenderResult>>();
 
-const CACHE_HEADERS = {
-  "Content-Type": "image/svg+xml",
-  "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400",
-  // Badge SVG is designed to be embedded in READMEs, iframes, etc.
-  // These headers are set explicitly on the Response object to override the
-  // catch-all frame-ancestors 'none' + X-Frame-Options DENY from next.config.ts,
-  // which Next.js merges into all matching routes (see issue #270).
-  "Content-Security-Policy": "frame-ancestors *",
-  "X-Frame-Options": "ALLOWALL",
-};
+// #1191 hotfix (v2.29.2) — split client vs. edge cache policy. Vercel honours
+// `Vercel-CDN-Cache-Control` over `Cache-Control` for its own edge and strips
+// both `Vercel-*` headers before the response leaves the edge, so the edge
+// policy below is invisible to the client. `Cache-Control` is what browsers
+// and GitHub's image proxy (camo) actually see; previously it carried the
+// same s-maxage the edge used, but Vercel strips s-maxage from Cache-Control
+// before the client sees it, so those clients were caching heuristically with
+// no real signal. `Vercel-Cache-Tag` is the per-handle tag
+// `invalidateBadgeSvgCacheForHandle` (lib/render/badge-svg-cache.ts) purges
+// from the edge — the layer a Redis delete alone never reached, which is why
+// a Studio save could leave a stale badge on the README for up to a day.
+const BADGE_EDGE_POLICY = "public, s-maxage=21600, stale-while-revalidate=86400";
+const BADGE_CLIENT_POLICY = "public, max-age=300";
+
+function badgeCacheHeaders(
+  handle: string,
+  edgePolicy: string = BADGE_EDGE_POLICY,
+  clientPolicy: string = BADGE_CLIENT_POLICY,
+) {
+  return {
+    "Content-Type": "image/svg+xml",
+    "Cache-Control": clientPolicy,
+    "Vercel-CDN-Cache-Control": edgePolicy,
+    "Vercel-Cache-Tag": badgeEdgeCacheTag(handle),
+    // Badge SVG is designed to be embedded in READMEs, iframes, etc.
+    // These headers are set explicitly on the Response object to override the
+    // catch-all frame-ancestors 'none' + X-Frame-Options DENY from next.config.ts,
+    // which Next.js merges into all matching routes (see issue #270).
+    "Content-Security-Policy": "frame-ancestors *",
+    "X-Frame-Options": "ALLOWALL",
+  };
+}
 
 // #1181 (UX-H3) — the badge is a public, cacheable, credential-less image
 // endpoint (README <img> embeds carry no cookies), so locale is resolved
@@ -470,7 +486,7 @@ export async function GET(
   const cacheReadStart = Date.now();
   const primaryCacheRead = await readBadgeSvgCacheWithStatus(svgCacheKey);
   if (primaryCacheRead.svg) {
-    return badgeSvgResponse(primaryCacheRead.svg, CACHE_HEADERS, startedAt, [
+    return badgeSvgResponse(primaryCacheRead.svg, badgeCacheHeaders(handle), startedAt, [
       { name: "cache", desc: "hit", durMs: Date.now() - cacheReadStart },
     ]);
   }
@@ -559,7 +575,7 @@ export async function GET(
       if (staleSvg) {
         const sharedResult = {
           svg: staleSvg,
-          headers: CACHE_HEADERS,
+          headers: badgeCacheHeaders(handle),
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
@@ -572,7 +588,7 @@ export async function GET(
       if (lockedSvg) {
         const sharedResult = {
           svg: lockedSvg,
-          headers: CACHE_HEADERS,
+          headers: badgeCacheHeaders(handle),
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
@@ -617,7 +633,15 @@ export async function GET(
 
         const sharedResult = {
           svg: staleSvgForDeadlineFallback,
-          headers: DEADLINE_FALLBACK_HEADERS,
+          // A degraded response — short-lived so a real render (from the
+          // background continuation below, or a subsequent request) replaces
+          // it quickly rather than being treated as a normal 24h-cacheable
+          // badge.
+          headers: badgeCacheHeaders(
+            handle,
+            "public, s-maxage=60, stale-while-revalidate=300",
+            "public, max-age=60",
+          ),
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
 
@@ -645,10 +669,11 @@ export async function GET(
     if (!materialized) {
       const fallbackResult = {
         svg: localizedFallbackSvg(handle, locale, "badge.loadError"),
-        headers: {
-          "Content-Type": "image/svg+xml",
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-        },
+        headers: badgeCacheHeaders(
+          handle,
+          "public, s-maxage=300, stale-while-revalidate=600",
+          "public, max-age=60",
+        ),
       } satisfies BadgeRenderResult;
       deferred.resolve(fallbackResult);
       return badgeSvgResponse(fallbackResult.svg, fallbackResult.headers, startedAt, [
@@ -691,7 +716,7 @@ export async function GET(
         });
     });
 
-    const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
+    const successResult = { svg, headers: badgeCacheHeaders(handle) } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return badgeSvgResponse(successResult.svg, successResult.headers, startedAt, [
       ...cacheTimeoutMetric,

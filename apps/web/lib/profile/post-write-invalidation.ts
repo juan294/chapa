@@ -2,8 +2,7 @@ import { cacheDel } from "@/lib/cache/redis";
 import { buildCraftKey } from "@/lib/cache/craft-cache";
 import { buildSnapshotKey } from "@/lib/cache/snapshot-cache";
 import { invalidateHistoryCache } from "@/lib/history/history";
-import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
-import { SUPPORTED_LOCALES } from "@/lib/i18n/types";
+import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
 
 type ProfileReadModelInvalidationOptions = {
@@ -43,14 +42,12 @@ export async function invalidateProfileReadModels(
   if (options.badgeSvg) {
     // #1190 — the rendered badge is cached per locale, so clearing only the
     // default slot leaves every other locale serving pre-write data until the
-    // 24h+jitter TTL rolls over. There are two locales; delete both rather
-    // than reasoning about which one a given visitor will ask for.
-    const today = toDateString(new Date());
-    for (const locale of SUPPORTED_LOCALES) {
-      await runInvalidationStep(() =>
-        cacheDel(buildBadgeSvgCacheKey(normalizedHandle, today, locale)),
-      );
-    }
+    // 24h+jitter TTL rolls over. #1191 hotfix (v2.29.2) — delegates to the
+    // shared helper, which also purges the Vercel edge tag; Redis alone left
+    // the edge serving a pre-write badge for up to a day.
+    await runInvalidationStep(async () => {
+      await invalidateBadgeSvgCacheForHandle(normalizedHandle, toDateString(new Date()));
+    });
   }
 
   if (options.snapshot) {

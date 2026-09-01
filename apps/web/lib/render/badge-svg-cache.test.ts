@@ -8,6 +8,11 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheDel: vi.fn(),
 }));
 
+vi.mock("@/lib/cache/edge-cache", () => ({
+  purgeEdgeCacheTag: vi.fn(),
+  badgeEdgeCacheTag: (handle: string) => `badge-${handle.toLowerCase()}`,
+}));
+
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
   BADGE_RENDER_VARIANT,
@@ -20,9 +25,11 @@ import {
   writeBadgeSvgCache,
 } from "./badge-svg-cache";
 import * as redis from "@/lib/cache/redis";
+import * as edgeCache from "@/lib/cache/edge-cache";
 
 const cacheGet = vi.mocked(redis.cacheGet);
 const cacheSet = vi.mocked(redis.cacheSet);
+const purgeEdgeCacheTag = vi.mocked(edgeCache.purgeEdgeCacheTag);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -279,6 +286,10 @@ describe("badge-svg-cache", () => {
 // has to invalidate explicitly. Two triggers do: platform link/unlink (#856)
 // and saving a Studio config (#1191). Both go through this one helper.
 describe("invalidateBadgeSvgCacheForHandle (#1191)", () => {
+  beforeEach(() => {
+    purgeEdgeCacheTag.mockResolvedValue("purged");
+  });
+
   it("deletes one entry per supported locale", async () => {
     const { cacheDel } = await import("@/lib/cache/redis");
     vi.mocked(cacheDel).mockClear();
@@ -304,5 +315,39 @@ describe("invalidateBadgeSvgCacheForHandle (#1191)", () => {
       expect(key).toContain("mixedcase");
       expect(key).not.toContain("MixedCase");
     }
+  });
+
+  it("purges the edge tag for the handle exactly once", async () => {
+    await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
+
+    expect(purgeEdgeCacheTag).toHaveBeenCalledTimes(1);
+    expect(purgeEdgeCacheTag).toHaveBeenCalledWith("badge-octocat");
+  });
+
+  it("returns { redis: true, edge: 'purged' } when both layers succeed", async () => {
+    purgeEdgeCacheTag.mockResolvedValue("purged");
+
+    const result = await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
+
+    expect(result).toEqual({ redis: true, edge: "purged" });
+  });
+
+  it("returns { redis: true, edge: 'failed' } when the edge purge fails", async () => {
+    purgeEdgeCacheTag.mockResolvedValue("failed");
+
+    const result = await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
+
+    expect(result).toEqual({ redis: true, edge: "failed" });
+  });
+
+  it("returns { redis: false, ... } when a Redis delete rejects, and still purges the edge", async () => {
+    const { cacheDel } = await import("@/lib/cache/redis");
+    vi.mocked(cacheDel).mockRejectedValueOnce(new Error("redis down"));
+    purgeEdgeCacheTag.mockResolvedValue("purged");
+
+    const result = await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
+
+    expect(result).toEqual({ redis: false, edge: "purged" });
+    expect(purgeEdgeCacheTag).toHaveBeenCalledWith("badge-octocat");
   });
 });

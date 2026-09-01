@@ -8,6 +8,11 @@ import { cacheDel, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/types";
+import {
+  badgeEdgeCacheTag,
+  purgeEdgeCacheTag,
+  type EdgePurgeOutcome,
+} from "@/lib/cache/edge-cache";
 
 /**
  * #1014 — this deadline was previously 250ms, which under Redis tail latency
@@ -69,7 +74,7 @@ export function handleCacheJitterSeconds(handle: string): number {
 /**
  * @param locale - #1181 (UX-H3) — an es-rendered and en-rendered badge for the
  *   same handle/day must never share a cache slot. Defaults to DEFAULT_LOCALE
- *   ('es') so callers outside this issue's ownership that still pass only
+ *   ('en') so callers outside this issue's ownership that still pass only
  *   (handle, date) — the share page, warm-cache cron, platform-oauth
  *   invalidation, post-write-invalidation — keep compiling and land on the
  *   same slot the badge.svg route uses for an unqualified (no `?lang=`)
@@ -180,24 +185,45 @@ export async function writeBadgeSvgCache(
   );
 }
 
+export interface BadgeInvalidationResult {
+  /** True unless a Redis delete threw outside `cacheDel`'s own error swallow. */
+  redis: boolean;
+  edge: EdgePurgeOutcome;
+}
+
 /**
- * Drop every locale's rendered badge for a handle, for today.
+ * Drop every locale's rendered badge for a handle, for today, in BOTH cache
+ * layers (hotfix v2.29.2).
  *
  * The badge cache key carries handle/variant/date/locale but nothing about the
  * inputs, so anything that changes what the badge should look like has to say
- * so explicitly. Two things do: linking or unlinking a platform (#856), and
- * saving a Studio configuration (#1191).
+ * so explicitly. Three things do: linking or unlinking a platform (#856),
+ * saving a Studio configuration (#1191), and any of the five
+ * `invalidateProfileReadModels` callers that pass `badgeSvg: true` (refresh,
+ * recalculate, insights, supplemental, bulk-recalculate — via
+ * `lib/profile/post-write-invalidation.ts`).
  *
  * Every locale is cleared because there is one entry per locale (#1190) and the
- * caller has no idea which ones exist.
+ * caller has no idea which ones exist. Clearing Redis alone left a Studio save
+ * invisible on Vercel's edge (and therefore on the README) for up to a day
+ * (#1191 hotfix, v2.29.2): the edge caches the badge response per URL/PoP for
+ * 6h+swr independently of this key, so the per-handle `Vercel-Cache-Tag` the
+ * badge route sets is purged here too, via `purgeEdgeCacheTag`.
  */
 export async function invalidateBadgeSvgCacheForHandle(
   handle: string,
   date: string,
-): Promise<void> {
-  await Promise.all(
-    SUPPORTED_LOCALES.map((locale) =>
-      cacheDel(buildBadgeSvgCacheKey(handle, date, locale)),
+): Promise<BadgeInvalidationResult> {
+  const [redisSettled, edge] = await Promise.all([
+    Promise.allSettled(
+      SUPPORTED_LOCALES.map((locale) =>
+        cacheDel(buildBadgeSvgCacheKey(handle, date, locale)),
+      ),
     ),
-  );
+    purgeEdgeCacheTag(badgeEdgeCacheTag(handle)),
+  ]);
+  return {
+    redis: redisSettled.every((result) => result.status === "fulfilled"),
+    edge,
+  };
 }

@@ -69,10 +69,14 @@ test.describe("Integration — Badge SVG endpoint (/u/:handle/badge.svg)", () =>
     const response = await request.get(`/u/${HANDLE}/badge.svg`);
 
     if (response.ok()) {
+      // #1191 hotfix (v2.29.2) — the client-facing Cache-Control is now a
+      // short, explicit max-age; the long-lived s-maxage/stale-while-revalidate
+      // policy lives in Vercel-CDN-Cache-Control, which Vercel strips before
+      // the response leaves the edge and is not observable against the local
+      // webServer (see phase 1 of the hotfix plan).
       const cacheControl = response.headers()["cache-control"] ?? "";
       expect(cacheControl).toContain("public");
-      expect(cacheControl).toContain("s-maxage");
-      expect(cacheControl).toContain("stale-while-revalidate");
+      expect(cacheControl).toContain("max-age");
     }
   });
 

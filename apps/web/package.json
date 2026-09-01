@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "^2.112.4",
     "@upstash/redis": "^1.38.3",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "^3.9.5",
     "@vercel/speed-insights": "^2.0.0",
     "canvas-confetti": "^1.9.4",
     "mcp-handler": "2.1.1",

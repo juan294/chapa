@@ -29,10 +29,15 @@ test.describe("Badge endpoint — /u/:handle/badge.svg", () => {
     // Must be 200 — a 500 means an unhandled crash that bypassed the fallback.
     expect(response.status()).toBe(200);
 
-    // On a full success the route sets long-lived public cache headers.
+    // #1191 hotfix (v2.29.2) — the client-facing Cache-Control is now a short,
+    // explicit max-age (the long-lived s-maxage policy lives in
+    // Vercel-CDN-Cache-Control instead, which Vercel strips before the
+    // response leaves the edge — not observable here against the local
+    // webServer, and deliberately not asserted in E2E; see phase 1 of the
+    // hotfix plan).
     const cacheControl = response.headers()["cache-control"] ?? "";
     expect(cacheControl).toContain("public");
-    expect(cacheControl).toContain("s-maxage");
+    expect(cacheControl).toContain("max-age");
   });
 
   test("syntactically invalid handle returns 400 with SVG body", async ({

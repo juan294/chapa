@@ -201,6 +201,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     expect(res.status).toBe(400);
     expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBeNull();
   });
 
   it("passes the session token into public materialization when available", async () => {
@@ -402,9 +403,11 @@ describe("GET /u/[handle]/badge.svg", () => {
     const res = await GET(req, ctx);
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toBe(
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
       "public, s-maxage=300, stale-while-revalidate=600",
     );
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
   });
 
   it("captures and returns a 500 fallback when rendering throws", async () => {
@@ -638,6 +641,20 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });
 
+    it("#1191 hotfix (v2.29.2): a cache-hit response carries the split cache headers and per-handle edge tag", async () => {
+      const CACHED_SVG = '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>';
+      mockCacheGet.mockResolvedValue(CACHED_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+        "public, s-maxage=21600, stale-while-revalidate=86400",
+      );
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+    });
+
     it("PE-M1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
       // SVG cache hit — rate limiter must NOT be called (it's deferred to the miss branch)
       const CACHED_SVG = '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>';
@@ -672,6 +689,19 @@ describe("GET /u/[handle]/badge.svg", () => {
         FAKE_SVG,
         expect.toSatisfy((ttl: number) => ttl >= 86400 && ttl <= 86400 + 7200),
       );
+    });
+
+    it("#1191 hotfix (v2.29.2): a fresh-render response carries the split cache headers and per-handle edge tag", async () => {
+      mockCacheGet.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+        "public, s-maxage=21600, stale-while-revalidate=86400",
+      );
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
     });
 
     it("acquires and releases a versioned render lock on cold-cache renders", async () => {
@@ -977,13 +1007,15 @@ describe("GET /u/[handle]/badge.svg", () => {
 
         expect(res.status).toBe(200);
         expect(await res.text()).toBe(STALE_SVG);
-        // A short s-maxage — this is a degraded response, not the normal
-        // 24h-cacheable badge.
-        const cacheControl = res.headers.get("Cache-Control");
-        expect(cacheControl).toMatch(/s-maxage=\d+/);
-        expect(cacheControl).not.toBe(
+        // A short edge s-maxage — this is a degraded response, not the normal
+        // 24h-cacheable badge. The client sees only the split max-age policy.
+        expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+        const edgeControl = res.headers.get("Vercel-CDN-Cache-Control");
+        expect(edgeControl).toMatch(/s-maxage=\d+/);
+        expect(edgeControl).not.toBe(
           "public, s-maxage=21600, stale-while-revalidate=86400",
         );
+        expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
         // The full render pipeline has not run yet — we returned before
         // materialize settled.
         expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
