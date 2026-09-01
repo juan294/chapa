@@ -50,6 +50,15 @@ describe("GET /llms-full.txt", () => {
     expect(text).toContain("Creator Studio");
   });
 
+  it("lists all seven Creator Studio badge categories", async () => {
+    const res = getLlmsFullTxt();
+    const text = await res.text();
+
+    expect(text).toContain(
+      "Creator Studio**: Visual customization tool at /studio with 7 categories (background, card style, border, score effect, heatmap animation, tier treatment, color palette), every one of which renders in the embeddable badge.",
+    );
+  });
+
   it("limits cryptographic claims to badges marked Verified metrics", async () => {
     const res = getLlmsFullTxt();
     const text = await res.text();

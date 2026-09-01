@@ -1,6 +1,6 @@
 # WebMCP in Chapa
 
-Chapa exposes 16 browser-native WebMCP page/tool registrations across 15 distinct names; `explain_dimension` is shared by Studio and public profiles. They let an agent work on the same page state that a person can see. Studio mutations use the existing command system. Public profile and verification tools are read-only.
+Chapa exposes 17 browser-native WebMCP page/tool registrations across 16 distinct names; `explain_dimension` is shared by Studio and public profiles. They let an agent work on the same page state that a person can see. Studio mutations use the existing command system. Public profile and verification tools are read-only.
 
 Public tools that can return GitHub-controlled names or fetched public content also set `untrustedContentHint: true`. Verification records are projected to their public shape and never expose the internal confidence value.
 
@@ -46,6 +46,7 @@ These tools receive the same server-computed public data as the rendered page. V
 | `verify_badge` | `EMPTY` | yes | If the page has a verification hash, fetches `/api/verify/[hash]` and returns status, record, and `verifyUrl`. Otherwise it reports that the profile has no verification record. |
 | `explain_dimension` | `DIMENSION` | yes | Uses the same shared explanation tool as Studio. It operates on the current public page data. |
 | `compare_profiles` | `COMPARE` | yes | Validates the other public GitHub handle, fetches `/api/profile/[other_handle]`, and returns the two public profiles with numeric score and dimension differences. The differences are other profile minus the on-page profile. Missing and rate-limited profiles get friendly messages. |
+| `get_embed_snippet` | `EMPTY` | yes | Returns the page's canonical Markdown and HTML embed snippets for the live badge. |
 
 ### Verification page: `/verify/[hash]`
 
@@ -55,6 +56,45 @@ These tools are present only when the page found a verification record.
 | --- | --- | --- | --- |
 | `get_verification_record` | `EMPTY` | yes | Serializes the hash and the verification record already displayed on the page. It makes no request. |
 | `explain_verification` | `EMPTY` | yes | Explains the HMAC-SHA256 process, what the record proves, what it does not prove, record expiry, and whether the displayed code is current or legacy format. |
+
+## Design methodology
+
+Chapa follows the framework in Chrome's [Build your user's agentic workflows with WebMCP tools](https://developer.chrome.com/docs/ai/webmcp/build-tools) article, published on 2026-08-26. The framework defines the user goal and initial state, then role-plays the conversation to find the required tools and recovery paths. The [WebMCP demo script](webmcp-demo-script.md) is Chapa's role-play artifact.
+
+### Creator Studio
+
+**User goal:** Co-design the badge and propose a save that the human confirms.
+
+**Initial state:** Open authenticated `/studio`, or open `/studio?demo=1` with seeded fixtures. `studio_enabled` and `webmcp_enabled` must be on. Demo mode also requires `studio_demo_enabled`.
+
+**Role-play:** [Studio co-design, visible changes, human-gated save](webmcp-demo-script.md#020-130--studio-co-design-visible-changes-human-gated-save).
+
+### Public profile
+
+**User goal:** Read, compare, verify, and embed a public developer credential.
+
+**Initial state:** Open any `/u/:handle` page with computed stats. Visitor payloads are redacted on the server before they enter the client tree.
+
+**Role-play:** [Read the public claim, then close the trust loop](webmcp-demo-script.md#130-220--read-the-public-claim-then-close-the-trust-loop).
+
+### Verification page
+
+**User goal:** Confirm what a verification code proves and what it does not prove.
+
+**Initial state:** Open `/verify/:hash` with a found verification record.
+
+**Role-play:** [Verify the known badge code](webmcp-demo-script.md#148-205--verify-the-known-badge-code).
+
+### Failure and recovery
+
+| Error class | Example tool | Response the agent receives |
+| --- | --- | --- |
+| Wrong state / missing prerequisite | `save_badge_config` with nothing dirty | `No unsaved changes. The current configuration is already saved.` |
+| Invalid parameters | `apply_badge_style` with a malformed token | `Invalid input for apply_badge_style: category and value must be single non-empty tokens; call list_style_options for valid categories and values.` |
+| Unexpected upstream data | `compare_profiles` when the other handle has no snapshot | `No public impact profile was found for @<handle>. A profile is generated on first visit: ask the user to open https://chapa.thecreativetoken.com/u/<handle> once, then retry this comparison.` |
+| Business-rule violation | `save_badge_config` in any state | The save API is never called by the agent. Only the on-page human confirmation can continue. |
+
+The new `apply_badge_style` invalid-input response names `list_style_options` as the next call. Wrong-state save responses explain why no action is needed or name `preview_badge` as the next tool. The new `compare_profiles` 404 response gives the profile-generation URL and tells the agent to retry.
 
 ## Three drivers, one Studio state
 
@@ -98,7 +138,7 @@ document.modelContext.registerTool(tool, {
 controller.abort();
 ```
 
-The complete tool array is memoized. A catalog-definition change causes the effect to abort the previous registrations and register the current tools. State-only changes keep registrations stable while calls resolve the latest execute implementation. Registration failures and missing or malformed browser support do not break the page. Tool calls emit `webmcp_tool_called`; execution failures emit a bounded `client_error` event and still reject to the caller.
+The complete tool array is memoized. A catalog-definition change causes the effect to abort the previous registrations and register the current tools. State-only changes keep registrations stable while calls resolve the latest execute implementation. Registration failures and missing or malformed browser support do not break the page. Tool calls emit `webmcp_tool_called` once at settle time with `outcome: ok | invalid_input | error` and `durationMs`. Thrown errors also emit a bounded `client_error` event and still reject to the caller.
 
 Three feature flags control exposure:
 
@@ -122,7 +162,7 @@ The deployment must have `studio_enabled`, `studio_demo_enabled`, and `webmcp_en
 
 Demo mode is session-free and uses fixed local fixtures. Configuration changes remain in the current page. Even after human confirmation, demo mode makes no `PUT /api/studio/config` request and changes no real profile.
 
-For the public trust flow, open a real `/u/[handle]` page, call `get_impact_profile`, then call `verify_badge`. Follow the returned `verifyUrl` to use `get_verification_record` and `explain_verification` on the verification page.
+For the public trust flow, open a real `/u/[handle]` page, call `get_impact_profile`, then call `verify_badge` and `get_embed_snippet`. Confirm that the returned Markdown matches the on-page embed snippet. Follow the returned `verifyUrl` to use `get_verification_record` and `explain_verification` on the verification page.
 
 ## Chrome 151 setup
 

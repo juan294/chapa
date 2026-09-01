@@ -24,6 +24,8 @@ Registration uses the current `document.modelContext.registerTool(tool, { signal
 
 See the [WebMCP tool catalog and judge guide](docs/webmcp.md) and the [under-three-minute demo script and submission checklist](docs/webmcp-demo-script.md).
 
+The catalog's [Design methodology](docs/webmcp.md#design-methodology) documents each user goal, initial state, role-play, and recovery path.
+
 Runtime status, 2026-08-27: a preview-only `chapa_hello` spike passed native registration, discovery, and execution in flagged Chrome 151. The completed tool catalog still needs final production verification after release and flag enablement. The ChatGPT in-app client was unavailable for the spike, so this README does not claim ChatGPT runtime validation.
 
 ### Prior work and submission-period work
@@ -79,7 +81,7 @@ Public profile page with full score breakdown, interactive radar chart, dimensio
 
 ### Creator Studio (`/studio`)
 
-Terminal-first Studio design playground with 9 visual effect categories, live preview, and saved Studio configuration. Requires GitHub login. Saved Studio settings do not change the public SVG badge or share page.
+Terminal-first Studio design playground with seven visual categories, live preview, and saved Studio configuration. Requires GitHub login. A saved Studio configuration changes the public SVG badge and share page and invalidates the badge cache.
 
 ### CLI Tool (`chapa-cli`)
 
