@@ -43,7 +43,18 @@ vi.mock("@/lib/webmcp/server-tools", async (importOriginal) => {
         properties: index === 0 ? {} : { handle: { type: "string" } },
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: true, untrustedContentHint: index > 0 },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: [
+          "get_impact_profile",
+          "get_impact_history",
+          "verify_badge",
+          "explain_dimension",
+          "compare_profiles",
+        ].includes(name),
+        untrustedContentHint: index > 0,
+      },
       execute: mocks.execute,
     })),
   };
@@ -145,11 +156,21 @@ describe("/api/mcp", () => {
     expect(result.tools[0]).toEqual(expect.objectContaining({
       name: "get_site_capabilities",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
-      annotations: { readOnlyHint: true, untrustedContentHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+        untrustedContentHint: false,
+      },
     }));
     expect(result.tools[2]).toEqual(expect.objectContaining({
       name: "get_impact_profile",
-      annotations: { readOnlyHint: true, untrustedContentHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: true,
+        untrustedContentHint: true,
+      },
     }));
   });
 

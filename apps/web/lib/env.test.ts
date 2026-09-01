@@ -4,6 +4,7 @@ import {
   getBaseUrl,
   getAdminHandles,
   getMcpServerEnabledEnv,
+  getOpenaiAppsChallengeToken,
   getVercelGitCommitSha,
   getWarmCachePriorityHandles,
 } from "./env";
@@ -104,6 +105,22 @@ describe("getMcpServerEnabledEnv", () => {
   it("does not expose an empty fallback value", () => {
     vi.stubEnv("MCP_SERVER_ENABLED", "  ");
     expect(getMcpServerEnabledEnv()).toBeUndefined();
+  });
+});
+
+describe("getOpenaiAppsChallengeToken", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("reads and trims the server-only challenge token", () => {
+    vi.stubEnv("OPENAI_APPS_CHALLENGE_TOKEN", " challenge-token \n");
+    expect(getOpenaiAppsChallengeToken()).toBe("challenge-token");
+  });
+
+  it("does not expose an empty token", () => {
+    vi.stubEnv("OPENAI_APPS_CHALLENGE_TOKEN", "  ");
+    expect(getOpenaiAppsChallengeToken()).toBeUndefined();
   });
 });
 

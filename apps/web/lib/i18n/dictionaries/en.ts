@@ -696,7 +696,7 @@ export const en: Translations = {
       metadataOgTitle: 'Privacy Policy — Chapa',
       h1Before: 'Privacy ',
       h1Highlight: 'Policy',
-      lastUpdated: 'Last updated: August 2026',
+      lastUpdated: 'Last updated: September 2026',
       sections: [
         {
           heading: '1. Information We Collect',
@@ -704,11 +704,11 @@ export const en: Translations = {
         },
         {
           heading: '2. How We Use Your Information',
-          body: 'We use your development activity data to compute your Developer Impact Profile, generate your badge, and provide related history and verification features. We cache data to reduce API calls. We do not sell your data. We use service providers for hosting, storage, email delivery, and analytics only to operate Chapa.',
+          body: 'We use your development activity data to compute your Developer Impact Profile, generate your badge, and provide related history and verification features. We cache data to reduce API calls. We do not sell your data. We use Vercel for hosting and analytics, Upstash Redis and Supabase for storage, Resend for email delivery, and PostHog for analytics only to operate Chapa.',
         },
         {
           heading: '3. Data Storage',
-          body: 'Session data is stored in an encrypted HTTP-only cookie in your browser. Upstash Redis stores temporary caches and service-coordination records with expiration times that vary by record type. Supabase stores durable account records, linked-platform credentials, supplemental activity, saved badge configuration, verification records, and historical Developer Impact snapshots. These durable records are not deleted when a Redis cache entry expires.',
+          body: 'Session data is stored in an encrypted HTTP-only cookie in your browser. Upstash Redis stores temporary caches and service-coordination records with expiration times that vary by record type. Supabase stores durable account records, linked-platform credentials, supplemental activity, saved badge configuration, verification records, historical Developer Impact snapshots, and CLI merge telemetry. Verification records expire after 30 days. Historical snapshots are eligible for cleanup after 365 days, and CLI merge telemetry after 90 days. Account-scoped records, including linked-platform credentials, supplemental activity, and saved badge configuration, remain while needed to provide Chapa or until you request deletion. Durable records are not deleted merely because a Redis cache entry expires.',
         },
         {
           heading: '4. Analytics',

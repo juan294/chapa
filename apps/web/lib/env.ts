@@ -267,6 +267,11 @@ export function getMcpServerEnabledEnv(): string | undefined {
   return readTrimmed("MCP_SERVER_ENABLED");
 }
 
+/** OpenAI plugin domain-verification token (server-side only). */
+export function getOpenaiAppsChallengeToken(): string | undefined {
+  return readTrimmed("OPENAI_APPS_CHALLENGE_TOKEN");
+}
+
 /** Raw `NEXT_PUBLIC_STUDIO_ENABLED` value — `"true"` when Creator Studio is on. */
 export function getStudioEnabledEnv(): string | undefined {
   return clean(process.env.NEXT_PUBLIC_STUDIO_ENABLED);
