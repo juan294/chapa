@@ -1,4 +1,4 @@
-export function softwareApplicationJsonLd(baseUrl: string): object {
+export function softwareApplicationJsonLd(baseUrl: string) {
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",

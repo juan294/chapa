@@ -4,12 +4,7 @@ import { softwareApplicationJsonLd } from "./structured-data";
 
 describe("softwareApplicationJsonLd", () => {
   it("publishes both handle-based view actions as EntryPoint URL templates", () => {
-    const jsonLd = softwareApplicationJsonLd("https://example.com") as {
-      "@type": string;
-      potentialAction: Array<{
-        target: { "@type": string; urlTemplate: string };
-      }>;
-    };
+    const jsonLd = softwareApplicationJsonLd("https://example.com");
 
     expect(jsonLd["@type"]).toBe("SoftwareApplication");
     expect(jsonLd.potentialAction).toHaveLength(2);
