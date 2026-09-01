@@ -1,9 +1,10 @@
 import type { DimensionScores } from "@chapa/shared";
 import type { AgentClass } from "@/lib/analytics/agent-ua";
-import { captureServerEvent } from "@/lib/analytics/server-errors";
+import { scheduleServerEvent } from "@/lib/analytics/schedule-server-event";
+import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { getSnapshots } from "@/lib/history/history";
+import { redactSnapshotForVisitor } from "@/lib/history/public-snapshot";
 import { computeTrend } from "@/lib/history/trend";
 import { getServerT } from "@/lib/i18n/server";
 import type { LanguageContextValue } from "@/lib/i18n";
@@ -12,11 +13,11 @@ import { redactImpactForVisitor } from "@/lib/profile/public-profile";
 import { isValidHandle } from "@/lib/validation";
 import { getVerificationRecord } from "@/lib/verification/store";
 import { toPublicVerificationRecord } from "@/lib/verification/types";
+import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
 import {
   COMPARE_PROFILES_SERVER_INPUT_SCHEMA,
   EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA,
   FIND_PROFILE_INPUT_SCHEMA,
-  HASH_PATTERN,
   PRODUCTION_BASE_URL,
   SITE_CAPABILITIES,
   VERIFICATION_EXPLANATION,
@@ -114,24 +115,33 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
   const snapshot = await getCachedLatestSnapshot(handle);
   if (!snapshot) return null;
 
-  const craftResult = snapshot.craft == null
-    ? await dbGetToolInsights(handle)
-    : null;
-  const craftScore = snapshot.craft ?? craftResult?.craftScore;
-
   let displayScore: number | null = null;
   let displayTier: string | null = null;
+  let craftResult = null;
+  let materializedAvailable = false;
   try {
     const materialized = await materializeDisplayProfile(handle, {
       readOnly: true,
     });
     if (materialized) {
+      materializedAvailable = true;
       displayScore = materialized.displayImpact.adjustedComposite;
       displayTier = materialized.displayImpact.tier;
+      if (snapshot.craft == null) {
+        craftResult = materialized.craftResult;
+      }
     }
   } catch {
     // Match /api/profile: the snapshot remains useful if fresh materialization fails.
   }
+  if (snapshot.craft == null && !materializedAvailable) {
+    try {
+      craftResult = await getCachedCraftScore(handle);
+    } catch {
+      // The persisted snapshot remains useful if the optional craft cache fails.
+    }
+  }
+  const craftScore = snapshot.craft ?? craftResult?.craftScore;
 
   const dimensions: DimensionScores = {
     delivery: snapshot.delivery,
@@ -162,14 +172,6 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
   };
 }
 
-function captureMcpToolEvent(properties: Record<string, unknown>): void {
-  try {
-    void captureServerEvent("mcp_tool_called", properties);
-  } catch {
-    // Instrumentation must never change tool behavior.
-  }
-}
-
 export async function executeServerMcpTool(
   tool: ServerMcpTool,
   inputs: unknown,
@@ -178,7 +180,7 @@ export async function executeServerMcpTool(
   const start = performance.now();
   try {
     const text = await tool.execute(inputs);
-    captureMcpToolEvent({
+    scheduleServerEvent("mcp_tool_called", {
       tool: tool.name,
       outcome: text.startsWith(WEBMCP_INVALID_INPUT_PREFIX)
         ? "invalid_input"
@@ -188,7 +190,7 @@ export async function executeServerMcpTool(
     });
     return text;
   } catch {
-    captureMcpToolEvent({
+    scheduleServerEvent("mcp_tool_called", {
       tool: tool.name,
       outcome: "error",
       durationMs: Math.round(performance.now() - start),
@@ -272,11 +274,7 @@ const getImpactHistory: ServerMcpTool = {
       return invalidInput("get_impact_history", "handle must be a public GitHub handle");
     }
     const snapshots = await getSnapshots(handle);
-    const publicSnapshots = snapshots.map((snapshot) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { confidence: _confidence, confidencePenalties: _penalties, ...publicSnapshot } = snapshot;
-      return publicSnapshot;
-    });
+    const publicSnapshots = snapshots.map(redactSnapshotForVisitor);
     return JSON.stringify({
       handle,
       snapshots: publicSnapshots,
@@ -294,7 +292,7 @@ const verifyBadge: ServerMcpTool = {
     const validationError = validateInputKeys("verify_badge", inputs, ["hash"]);
     if (validationError) return validationError;
     const hash = readString(inputs, "hash");
-    if (!HASH_PATTERN.test(hash)) {
+    if (!VERIFICATION_HASH_PATTERN.test(hash)) {
       return invalidInput(
         "verify_badge",
         "hash must be an 8, 16, or 32 character lowercase hexadecimal verification code",

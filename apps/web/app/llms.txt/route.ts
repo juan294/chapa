@@ -1,5 +1,4 @@
-import { captureServerEvent } from "@/lib/analytics/server-errors";
-import { classifyAgentUserAgent } from "@/lib/analytics/agent-ua";
+import { scheduleAgentSurfaceFetch } from "@/lib/analytics/schedule-server-event";
 
 const LLMS_TXT = `# Chapa — Developer Impact Badge
 
@@ -73,7 +72,7 @@ Software developers, open source contributors, and engineering teams who want to
 
 - Only public data from linked platforms is accessed (no private repos).
 - Scores are cached for 24 hours, then recomputed.
-- No personal data is sold or shared with third parties.
+- No personal data is sold. Processing providers are Vercel, Upstash Redis, Supabase, Resend, and PostHog; details and purposes: https://chapa.thecreativetoken.com/privacy
 - Privacy policy: https://chapa.thecreativetoken.com/privacy
 
 ## Contact
@@ -84,15 +83,7 @@ Software developers, open source contributors, and engineering teams who want to
 `;
 
 export function GET(request: Request): Response {
-  const ua = request.headers.get("user-agent");
-  const agentClass = classifyAgentUserAgent(ua);
-  if (agentClass) {
-    void captureServerEvent("agent_surface_fetch", {
-      surface: "llms.txt",
-      agentClass,
-      ua: (ua ?? "").slice(0, 200),
-    });
-  }
+  scheduleAgentSurfaceFetch(request, "llms.txt");
   return new Response(LLMS_TXT, {
     status: 200,
     headers: {

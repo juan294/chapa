@@ -5,9 +5,13 @@ import {
 } from "@chapa/shared";
 import {
   CURRENT_VERIFICATION_HASH_HEX_LENGTH,
+  VERIFICATION_HASH_PATTERN,
   VERIFICATION_RECORD_TTL_DAYS,
 } from "@/lib/verification/constants";
-import { sanitizeFreeTextForAgent } from "./shared-tools";
+import {
+  EXPLAIN_DIMENSION_INPUT_SCHEMA,
+  sanitizeFreeTextForAgent,
+} from "./shared-tools";
 import { SITE_TOOL_MAP } from "./site-tool-map";
 
 export const PRODUCTION_BASE_URL = "https://chapa.thecreativetoken.com";
@@ -33,32 +37,33 @@ export const COMPARE_PROFILES_INPUT_SCHEMA = {
 export const COMPARE_PROFILES_SERVER_INPUT_SCHEMA = {
   type: "object",
   properties: {
-    handle: { type: "string" },
-    other_handle: { type: "string" },
+    ...FIND_PROFILE_INPUT_SCHEMA.properties,
+    ...COMPARE_PROFILES_INPUT_SCHEMA.properties,
   },
-  required: ["handle", "other_handle"],
+  required: [
+    ...FIND_PROFILE_INPUT_SCHEMA.required,
+    ...COMPARE_PROFILES_INPUT_SCHEMA.required,
+  ],
   additionalProperties: false,
 };
 
 export const EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA = {
   type: "object",
   properties: {
-    handle: { type: "string" },
-    dimension: {
-      type: "string",
-      enum: [...DIMENSION_KEYS],
-    },
+    ...FIND_PROFILE_INPUT_SCHEMA.properties,
+    ...EXPLAIN_DIMENSION_INPUT_SCHEMA.properties,
   },
-  required: ["handle", "dimension"],
+  required: [
+    ...FIND_PROFILE_INPUT_SCHEMA.required,
+    ...EXPLAIN_DIMENSION_INPUT_SCHEMA.required,
+  ],
   additionalProperties: false,
 };
-
-export const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
 export const VERIFY_BADGE_SERVER_INPUT_SCHEMA = {
   type: "object",
   properties: {
-    hash: { type: "string", pattern: HASH_PATTERN.source },
+    hash: { type: "string", pattern: VERIFICATION_HASH_PATTERN.source },
   },
   required: ["hash"],
   additionalProperties: false,

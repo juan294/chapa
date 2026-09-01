@@ -1,9 +1,11 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 
-const captureServerEvent = vi.hoisted(() => vi.fn());
+const scheduleAgentSurfaceFetch = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/analytics/server-errors", () => ({ captureServerEvent }));
+vi.mock("@/lib/analytics/schedule-server-event", () => ({
+  scheduleAgentSurfaceFetch,
+}));
 
 import { GET as getLlmsTxt } from "./route";
 
@@ -94,19 +96,16 @@ describe("GET /llms.txt", () => {
     );
   });
 
-  it("captures classified agent traffic", () => {
-    const ua = "GPTBot/1.2 (+https://openai.com/gptbot)";
-    getLlmsTxt(request(ua));
-
-    expect(captureServerEvent).toHaveBeenCalledWith("agent_surface_fetch", {
-      surface: "llms.txt",
-      agentClass: "openai",
-      ua,
-    });
+  it("describes named processing providers without claiming data is not shared", async () => {
+    const text = await getLlmsTxt(request()).text();
+    expect(text).toContain("No personal data is sold.");
+    expect(text).toContain("https://chapa.thecreativetoken.com/privacy");
+    expect(text).not.toContain("sold or shared with third parties");
   });
 
-  it("does not capture normal browser traffic", () => {
-    getLlmsTxt(request("Mozilla/5.0 Chrome/128.0.0.0 Safari/537.36"));
-    expect(captureServerEvent).not.toHaveBeenCalled();
+  it("delegates agent-surface scheduling", () => {
+    const req = request("GPTBot/1.2 (+https://openai.com/gptbot)");
+    getLlmsTxt(req);
+    expect(scheduleAgentSurfaceFetch).toHaveBeenCalledWith(req, "llms.txt");
   });
 });

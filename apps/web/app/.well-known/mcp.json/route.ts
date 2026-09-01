@@ -1,5 +1,4 @@
-import { captureServerEvent } from "@/lib/analytics/server-errors";
-import { classifyAgentUserAgent } from "@/lib/analytics/agent-ua";
+import { scheduleAgentSurfaceFetch } from "@/lib/analytics/schedule-server-event";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 
 const BODY = JSON.stringify(
@@ -19,15 +18,7 @@ const BODY = JSON.stringify(
 );
 
 export function GET(request: Request): Response {
-  const ua = request.headers.get("user-agent");
-  const agentClass = classifyAgentUserAgent(ua);
-  if (agentClass) {
-    void captureServerEvent("agent_surface_fetch", {
-      surface: ".well-known/mcp.json",
-      agentClass,
-      ua: (ua ?? "").slice(0, 200),
-    });
-  }
+  scheduleAgentSurfaceFetch(request, ".well-known/mcp.json");
   return new Response(BODY, {
     status: 200,
     headers: {

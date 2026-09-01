@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 
-const captureServerEvent = vi.hoisted(() => vi.fn());
+const scheduleAgentSurfaceFetch = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/analytics/server-errors", () => ({ captureServerEvent }));
+vi.mock("@/lib/analytics/schedule-server-event", () => ({
+  scheduleAgentSurfaceFetch,
+}));
 
 import { GET as getMcpDescriptor } from "./route";
 
@@ -36,19 +38,12 @@ describe("GET /.well-known/mcp.json", () => {
     }
   });
 
-  it("captures classified agent traffic", () => {
-    const ua = "GPTBot/1.2 (+https://openai.com/gptbot)";
-    getMcpDescriptor(request(ua));
-
-    expect(captureServerEvent).toHaveBeenCalledWith("agent_surface_fetch", {
-      surface: ".well-known/mcp.json",
-      agentClass: "openai",
-      ua,
-    });
-  });
-
-  it("does not capture normal browser traffic", () => {
-    getMcpDescriptor(request("Mozilla/5.0 Chrome/128.0.0.0 Safari/537.36"));
-    expect(captureServerEvent).not.toHaveBeenCalled();
+  it("delegates agent-surface scheduling", () => {
+    const req = request("GPTBot/1.2 (+https://openai.com/gptbot)");
+    getMcpDescriptor(req);
+    expect(scheduleAgentSurfaceFetch).toHaveBeenCalledWith(
+      req,
+      ".well-known/mcp.json",
+    );
   });
 });

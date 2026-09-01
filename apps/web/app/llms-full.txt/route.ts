@@ -1,5 +1,4 @@
-import { captureServerEvent } from "@/lib/analytics/server-errors";
-import { classifyAgentUserAgent } from "@/lib/analytics/agent-ua";
+import { scheduleAgentSurfaceFetch } from "@/lib/analytics/schedule-server-event";
 
 const LLMS_FULL_TXT = `# Chapa — Developer Impact Badge (Full Documentation)
 
@@ -136,7 +135,7 @@ Built with Next.js (App Router), TypeScript, Tailwind CSS, Upstash Redis for cac
 
 - Only public data from linked platforms is analyzed. No private repository access.
 - Scores cached 24 hours, then recomputed from fresh data.
-- No personal data sold or shared with third parties.
+- No personal data is sold. Processing providers are Vercel, Upstash Redis, Supabase, Resend, and PostHog; details and purposes: https://chapa.thecreativetoken.com/privacy
 - Full privacy policy: https://chapa.thecreativetoken.com/privacy
 - Terms of service: https://chapa.thecreativetoken.com/terms
 
@@ -152,15 +151,7 @@ developer metrics, multi-platform developer badge, developer impact score, GitHu
 `;
 
 export function GET(request: Request): Response {
-  const ua = request.headers.get("user-agent");
-  const agentClass = classifyAgentUserAgent(ua);
-  if (agentClass) {
-    void captureServerEvent("agent_surface_fetch", {
-      surface: "llms-full.txt",
-      agentClass,
-      ua: (ua ?? "").slice(0, 200),
-    });
-  }
+  scheduleAgentSurfaceFetch(request, "llms-full.txt");
   return new Response(LLMS_FULL_TXT, {
     status: 200,
     headers: {

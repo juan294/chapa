@@ -19,8 +19,7 @@ import { isWebmcpEnabled } from "@/lib/feature-flags";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { VerifyPageWebMcpTools } from "./VerifyPageWebMcpTools";
-
-const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
+import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +42,7 @@ export async function generateMetadata({
   const locale = await getServerLocale(lang);
   const t = getServerT(locale);
   return {
-    title: HASH_PATTERN.test(hash)
+    title: VERIFICATION_HASH_PATTERN.test(hash)
       ? `${t('verify.title') as string} ${hash}`
       : t('verifyDetail.invalidHashTitle') as string,
     description: t('verify.description') as string,
@@ -62,7 +61,7 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   // off that page.
   const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
 
-  if (!HASH_PATTERN.test(hash)) {
+  if (!VERIFICATION_HASH_PATTERN.test(hash)) {
     return (
       <VerifyLocaleBoundary
         locale={locale}

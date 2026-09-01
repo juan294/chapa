@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   enabled: vi.fn(async () => true),
   rateLimit: vi.fn(async () => ({ allowed: true, current: 1, limit: 60 })),
   getClientIp: vi.fn(() => "1.2.3.4"),
-  captureServerEvent: vi.fn(),
+  scheduleServerEvent: vi.fn(),
   execute: vi.fn(async (input: unknown) => JSON.stringify({ echoed: input })),
 }));
 
@@ -16,8 +16,10 @@ vi.mock("@/lib/http/client-ip", () => ({
   NO_TRUSTED_IP: "unknown",
 }));
 vi.mock("@/lib/analytics/server-errors", () => ({
-  captureServerEvent: mocks.captureServerEvent,
   withErrorCapture: (_route: string, handler: unknown) => handler,
+}));
+vi.mock("@/lib/analytics/schedule-server-event", () => ({
+  scheduleServerEvent: mocks.scheduleServerEvent,
 }));
 vi.mock("@/lib/webmcp/server-tools", async (importOriginal) => {
   const actual = await importOriginal<
@@ -183,7 +185,7 @@ describe("/api/mcp", () => {
       echoed: { handle: "octocat" },
     });
     expect(mocks.execute).toHaveBeenCalledWith({ handle: "octocat" });
-    expect(mocks.captureServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
+    expect(mocks.scheduleServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
       tool: "find_profile",
       outcome: "ok",
       durationMs: expect.any(Number),
@@ -204,7 +206,7 @@ describe("/api/mcp", () => {
     }, "ClaudeBot/1.0"));
 
     expect(response.status).toBe(200);
-    expect(mocks.captureServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
+    expect(mocks.scheduleServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
       tool: "find_profile",
       outcome: "invalid_input",
       durationMs: expect.any(Number),
@@ -226,7 +228,7 @@ describe("/api/mcp", () => {
     expect(JSON.stringify(body)).toContain(
       "find_profile is unavailable right now. Please try again later.",
     );
-    expect(mocks.captureServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
+    expect(mocks.scheduleServerEvent).toHaveBeenCalledWith("mcp_tool_called", {
       tool: "find_profile",
       outcome: "error",
       durationMs: expect.any(Number),

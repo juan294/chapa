@@ -8,6 +8,7 @@ import {
   redactSnapshotDiffForVisitor,
 } from "@/lib/history/diff";
 import { computeTrend } from "@/lib/history/trend";
+import { redactSnapshotForVisitor } from "@/lib/history/public-snapshot";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 type Params = { params: Promise<{ handle: string }> };
@@ -80,13 +81,7 @@ export const GET = withErrorCapture("/api/history/[handle]", async (request: Nex
   // Fetch snapshots
   const snapshots = await getSnapshots(handle, from, to);
 
-  // Strip internal-only fields (confidence is internal; penalty flags could
-  // be perceived as accusatory if discovered by end-users).
-  const publicSnapshots = snapshots.map((s) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { confidence, confidencePenalties, ...publicSnapshot } = s;
-    return publicSnapshot;
-  });
+  const publicSnapshots = snapshots.map(redactSnapshotForVisitor);
 
   // Build response
   const response: Record<string, unknown> = { handle };
