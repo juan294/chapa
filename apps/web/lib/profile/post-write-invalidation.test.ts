@@ -4,13 +4,13 @@ import { invalidateProfileReadModels } from "./post-write-invalidation";
 const {
   mockCacheDel,
   mockBuildCraftKey,
-  mockBuildBadgeSvgCacheKey,
+  mockInvalidateBadgeSvgCacheForHandle,
   mockBuildSnapshotKey,
   mockInvalidateHistoryCache,
 } = vi.hoisted(() => ({
   mockCacheDel: vi.fn(),
   mockBuildCraftKey: vi.fn(),
-  mockBuildBadgeSvgCacheKey: vi.fn(),
+  mockInvalidateBadgeSvgCacheForHandle: vi.fn(),
   mockBuildSnapshotKey: vi.fn(),
   mockInvalidateHistoryCache: vi.fn(),
 }));
@@ -24,7 +24,8 @@ vi.mock("@/lib/cache/craft-cache", () => ({
 }));
 
 vi.mock("@/lib/render/badge-svg-cache", () => ({
-  buildBadgeSvgCacheKey: (...args: unknown[]) => mockBuildBadgeSvgCacheKey(...args),
+  invalidateBadgeSvgCacheForHandle: (...args: unknown[]) =>
+    mockInvalidateBadgeSvgCacheForHandle(...args),
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
@@ -40,10 +41,10 @@ describe("invalidateProfileReadModels", () => {
     vi.clearAllMocks();
     mockCacheDel.mockResolvedValue(undefined);
     mockBuildCraftKey.mockImplementation((handle: string) => `craft:${handle}`);
-    mockBuildBadgeSvgCacheKey.mockImplementation(
-      (handle: string, date: string, locale: string) =>
-        `badge:${handle}:${date}:${locale}`,
-    );
+    mockInvalidateBadgeSvgCacheForHandle.mockResolvedValue({
+      redis: true,
+      edge: "purged",
+    });
     mockBuildSnapshotKey.mockImplementation((handle: string) => `snapshot:${handle}`);
     mockInvalidateHistoryCache.mockResolvedValue(undefined);
   });
@@ -53,6 +54,10 @@ describe("invalidateProfileReadModels", () => {
 
     mockCacheDel.mockImplementation(async (key: string) => {
       steps.push(key);
+    });
+    mockInvalidateBadgeSvgCacheForHandle.mockImplementation(async (handle: string) => {
+      steps.push(`badge:${handle}`);
+      return { redis: true, edge: "purged" };
     });
     mockInvalidateHistoryCache.mockImplementation(async (handle: string) => {
       steps.push(`history:${handle}`);
@@ -66,13 +71,13 @@ describe("invalidateProfileReadModels", () => {
       history: true,
     });
 
-    // #1190 — the badge artifact is cached per locale, so this step now
-    // deletes one key per supported locale, in order, before moving on.
+    // #1191 hotfix (v2.29.2) — the badgeSvg step now delegates to the shared
+    // invalidateBadgeSvgCacheForHandle helper (both Redis locales + edge tag)
+    // instead of enumerating per-locale cacheDel calls itself.
     expect(steps).toEqual([
       "stats:v2:merged:mixedcase",
       "craft:mixedcase",
-      expect.stringMatching(/^badge:mixedcase:\d{4}-\d{2}-\d{2}:en$/),
-      expect.stringMatching(/^badge:mixedcase:\d{4}-\d{2}-\d{2}:es$/),
+      "badge:mixedcase",
       "snapshot:mixedcase",
       "history:mixedcase",
     ]);
@@ -83,7 +88,7 @@ describe("invalidateProfileReadModels", () => {
 
     expect(mockCacheDel).not.toHaveBeenCalled();
     expect(mockBuildCraftKey).not.toHaveBeenCalled();
-    expect(mockBuildBadgeSvgCacheKey).not.toHaveBeenCalled();
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
     expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
     expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
   });
@@ -94,33 +99,25 @@ describe("invalidateProfileReadModels", () => {
     expect(mockCacheDel).toHaveBeenCalledTimes(1);
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:solo");
     expect(mockBuildCraftKey).not.toHaveBeenCalled();
-    expect(mockBuildBadgeSvgCacheKey).not.toHaveBeenCalled();
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
     expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
     expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
   });
 
-  it("invalidates the same-day badge SVG artifact when badgeSvg=true", async () => {
+  it("calls invalidateBadgeSvgCacheForHandle(handle, today) once when badgeSvg=true", async () => {
     await invalidateProfileReadModels("Solo", { badgeSvg: true });
 
-    // #1190 — one entry per locale; clearing only the default left the other
-    // locale serving pre-write data until the TTL rolled over.
-    expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
+    expect(mockInvalidateBadgeSvgCacheForHandle).toHaveBeenCalledTimes(1);
+    expect(mockInvalidateBadgeSvgCacheForHandle).toHaveBeenCalledWith(
       "solo",
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      "en",
     );
-    expect(mockBuildBadgeSvgCacheKey).toHaveBeenCalledWith(
-      "solo",
-      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      "es",
-    );
-    expect(mockCacheDel).toHaveBeenCalledTimes(2);
-    expect(mockCacheDel).toHaveBeenCalledWith(
-      expect.stringMatching(/^badge:solo:\d{4}-\d{2}-\d{2}:en$/),
-    );
-    expect(mockCacheDel).toHaveBeenCalledWith(
-      expect.stringMatching(/^badge:solo:\d{4}-\d{2}-\d{2}:es$/),
-    );
+  });
+
+  it("never calls invalidateBadgeSvgCacheForHandle when badgeSvg=false", async () => {
+    await invalidateProfileReadModels("Solo", { badgeSvg: false });
+
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
   });
 
   it("only invalidates the snapshot read model when snapshot=true", async () => {
@@ -130,7 +127,7 @@ describe("invalidateProfileReadModels", () => {
     expect(mockCacheDel).toHaveBeenCalledTimes(1);
     expect(mockCacheDel).toHaveBeenCalledWith("snapshot:solo");
     expect(mockBuildCraftKey).not.toHaveBeenCalled();
-    expect(mockBuildBadgeSvgCacheKey).not.toHaveBeenCalled();
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
     expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
   });
 
@@ -140,7 +137,7 @@ describe("invalidateProfileReadModels", () => {
     expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("solo");
     expect(mockCacheDel).not.toHaveBeenCalled();
     expect(mockBuildCraftKey).not.toHaveBeenCalled();
-    expect(mockBuildBadgeSvgCacheKey).not.toHaveBeenCalled();
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
     expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
   });
 
@@ -159,6 +156,19 @@ describe("invalidateProfileReadModels", () => {
 
     expect(mockCacheDel).toHaveBeenNthCalledWith(1, "stats:v2:merged:testuser");
     expect(mockCacheDel).toHaveBeenNthCalledWith(2, "craft:testuser");
+    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("testuser");
+  });
+
+  it("continues invalidating later read models when the badge invalidation throws", async () => {
+    mockInvalidateBadgeSvgCacheForHandle.mockRejectedValueOnce(new Error("edge down"));
+
+    await expect(
+      invalidateProfileReadModels("TestUser", {
+        badgeSvg: true,
+        history: true,
+      }),
+    ).resolves.toBeUndefined();
+
     expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("testuser");
   });
 });

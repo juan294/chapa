@@ -99,6 +99,25 @@ test.describe("full impact journey", () => {
         await page.goto("/", { waitUntil: "domcontentloaded" });
         const saveResult = await saveStudioConfigInBrowser(page, savedConfig);
         expect(saveResult.status).toBe(200);
+        // #1191 hotfix (v2.29.2) — the save now awaits invalidation of both
+        // cache layers before responding and reports the outcome. This fixture
+        // seeds a synthetic handle that does not exist on GitHub, so a live
+        // badge re-render always falls back to the "could not load data" SVG
+        // (`json.data.user` is null for an unknown login regardless of token —
+        // see lib/github/queries.ts) — the config-marker content itself can't
+        // be asserted through this fixture. What IS provable end-to-end,
+        // through the real server rather than a unit mock, is that the field
+        // exists and is boolean-typed, and that the badge route survives a
+        // real invalidation pass (Redis delete attempts against the dummy
+        // Upstash config in this suite's env, plus the edge-purge call, which
+        // reports "skipped" outside Vercel) without erroring.
+        expect(typeof saveResult.body?.badgeRefreshed).toBe("boolean");
+
+        const afterSave = await page.request.get(
+          `/u/${shape.handle}/badge.svg?after-save=${Date.now()}`,
+        );
+        expect(afterSave.status()).toBe(200);
+        expect(afterSave.headers()["content-type"] ?? "").toContain("image/svg+xml");
 
         const share = await page.goto(`/u/${shape.handle}`, {
           waitUntil: "domcontentloaded",
@@ -273,7 +292,7 @@ test.describe("full impact journey", () => {
 async function saveStudioConfigInBrowser(
   page: Page,
   config: Record<string, unknown>,
-): Promise<{ status: number | "offline" }> {
+): Promise<{ status: number | "offline"; body?: { badgeRefreshed?: boolean } }> {
   return page.evaluate(
     async ({ config: nextConfig, storageKey }) => {
       try {
@@ -282,7 +301,8 @@ async function saveStudioConfigInBrowser(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(nextConfig),
         });
-        return { status: response.status };
+        const body = await response.json().catch(() => undefined);
+        return { status: response.status, body };
       } catch {
         window.localStorage.setItem(storageKey, JSON.stringify(nextConfig));
         return { status: "offline" as const };

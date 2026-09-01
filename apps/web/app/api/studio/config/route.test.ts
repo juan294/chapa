@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 
@@ -13,6 +13,7 @@ const {
   mockRateLimit,
   mockDbUpsertStudioConfig,
   mockLoadStudioConfig,
+  mockInvalidateBadgeSvgCacheForHandle,
 } =
   vi.hoisted(() => ({
     mockGetOptionalRequestSession: vi.fn(),
@@ -21,6 +22,7 @@ const {
     mockRateLimit: vi.fn(),
     mockDbUpsertStudioConfig: vi.fn(),
     mockLoadStudioConfig: vi.fn(),
+    mockInvalidateBadgeSvgCacheForHandle: vi.fn(),
   }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -40,6 +42,12 @@ vi.mock("@/lib/cache/redis", () => ({
 vi.mock("@/lib/db/studio", () => ({
   dbUpsertStudioConfig: mockDbUpsertStudioConfig,
   loadStudioConfig: mockLoadStudioConfig,
+}));
+
+vi.mock("@/lib/render/badge-svg-cache", () => ({
+  invalidateBadgeSvgCacheForHandle: mockInvalidateBadgeSvgCacheForHandle,
+  isBadgeCacheRefreshed: (result: { redis: boolean; edge: string }) =>
+    result.redis && result.edge !== "failed",
 }));
 
 // Re-export real validation functions through the mock to avoid alias resolution issues
@@ -169,6 +177,10 @@ describe("PUT /api/studio/config", () => {
     mockRequireRequestSession.mockReturnValue({ session: SESSION });
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockDbUpsertStudioConfig.mockResolvedValue({ ok: true });
+    mockInvalidateBadgeSvgCacheForHandle.mockResolvedValue({
+      redis: true,
+      edge: "purged",
+    });
   });
 
   it("returns 401 when no session", async () => {
@@ -188,6 +200,7 @@ describe("PUT /api/studio/config", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toMatch(/invalid/i);
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
   });
 
   it("returns 400 for non-JSON body", async () => {
@@ -199,6 +212,7 @@ describe("PUT /api/studio/config", () => {
 
     const res = await PUT(req);
     expect(res.status).toBe(400);
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
   });
 
   it("returns 429 when rate limited", async () => {
@@ -206,6 +220,7 @@ describe("PUT /api/studio/config", () => {
 
     const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
     expect(res.status).toBe(429);
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
   });
 
   it("commits directly to Supabase with no Redis mirror (BE-L1 remediation)", async () => {
@@ -219,7 +234,7 @@ describe("PUT /api/studio/config", () => {
     const res = await PUT(makePutRequest(config, "session=abc"));
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true });
+    expect(await res.json()).toEqual({ success: true, badgeRefreshed: true });
     expect(mockDbUpsertStudioConfig).toHaveBeenCalledWith("juan294", config);
   });
 
@@ -302,6 +317,7 @@ describe("PUT /api/studio/config", () => {
       success: false,
       error: "Invalid badge config",
     });
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
   });
 
   it("returns 503 with Retry-After when Supabase is unavailable", async () => {
@@ -318,6 +334,7 @@ describe("PUT /api/studio/config", () => {
       success: false,
       error: "Storage temporarily unavailable",
     });
+    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
   });
 
   it("returns 500 when Supabase fails unexpectedly", async () => {
@@ -340,5 +357,97 @@ describe("PUT /api/studio/config", () => {
     await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
 
     expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:config:juan294", 30, 3600);
+  });
+
+  // hotfix v2.29.2 — the save now awaits the shared cache invalidation (both
+  // Redis and the Vercel edge) instead of firing it after the response, and
+  // reports the outcome to the client as `badgeRefreshed`.
+  describe("badge cache invalidation (#1191 hotfix, v2.29.2)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-01T12:00:00Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("calls invalidateBadgeSvgCacheForHandle with the lowercased login and today's date", async () => {
+      await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
+
+      expect(mockInvalidateBadgeSvgCacheForHandle).toHaveBeenCalledTimes(1);
+      expect(mockInvalidateBadgeSvgCacheForHandle).toHaveBeenCalledWith(
+        "juan294",
+        "2026-09-01",
+      );
+    });
+
+    it("awaits the invalidation before sending the response, and only calls it after the durable write", async () => {
+      const order: string[] = [];
+      mockDbUpsertStudioConfig.mockImplementation(async () => {
+        order.push("db-write");
+        return { ok: true };
+      });
+
+      let resolveInvalidation!: (value: { redis: boolean; edge: string }) => void;
+      const deferredInvalidation = new Promise<{ redis: boolean; edge: string }>(
+        (resolve) => {
+          resolveInvalidation = resolve;
+        },
+      );
+      mockInvalidateBadgeSvgCacheForHandle.mockImplementation(async () => {
+        order.push("invalidation-called");
+        return deferredInvalidation;
+      });
+
+      let resolved = false;
+      const responsePromise = PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc")).then(
+        (res) => {
+          resolved = true;
+          return res;
+        },
+      );
+
+      // Flush microtasks so the DB write and the invalidation call both run,
+      // without letting the still-pending invalidation promise resolve.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(order).toEqual(["db-write", "invalidation-called"]);
+      expect(resolved).toBe(false);
+
+      resolveInvalidation({ redis: true, edge: "purged" });
+      const res = await responsePromise;
+
+      expect(resolved).toBe(true);
+      expect(res.status).toBe(200);
+    });
+
+    it.each([
+      [{ redis: true, edge: "purged" as const }, true],
+      [{ redis: true, edge: "skipped" as const }, true],
+      [{ redis: true, edge: "failed" as const }, false],
+      [{ redis: false, edge: "purged" as const }, false],
+    ])(
+      "maps invalidation result %o to badgeRefreshed=%s",
+      async (invalidationResult, expectedBadgeRefreshed) => {
+        mockInvalidateBadgeSvgCacheForHandle.mockResolvedValue(invalidationResult);
+
+        const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({
+          success: true,
+          badgeRefreshed: expectedBadgeRefreshed,
+        });
+      },
+    );
+
+    it("still returns 200 with badgeRefreshed: false when the invalidation call throws", async () => {
+      mockInvalidateBadgeSvgCacheForHandle.mockRejectedValue(new Error("edge down"));
+
+      const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true, badgeRefreshed: false });
+    });
   });
 });
