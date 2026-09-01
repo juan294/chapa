@@ -1,12 +1,16 @@
 import type { StandardSchemaWithJSON, ToolAnnotations } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "mcp-handler";
 import { NextResponse, type NextRequest } from "next/server";
+import { classifyAgentUserAgent } from "@/lib/analytics/agent-ua";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { rateLimit } from "@/lib/cache/redis";
 import { isMcpServerEnabled } from "@/lib/feature-flags";
 import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import { WEBMCP_INVALID_INPUT_PREFIX } from "@/lib/webmcp/errors";
-import { SERVER_MCP_TOOLS } from "@/lib/webmcp/server-tools";
+import {
+  SERVER_MCP_TOOLS,
+  executeServerMcpTool,
+} from "@/lib/webmcp/server-tools";
 import packageJson from "@/package.json";
 
 function rawJsonSchema(
@@ -42,8 +46,11 @@ const mcpHandler = createMcpHandler(
           // currently lists only the core MCP annotation keys.
           annotations: tool.annotations as ToolAnnotations,
         },
-        async (inputs) => {
-          const text = await tool.execute(inputs);
+        async (inputs, context) => {
+          const agentClass = classifyAgentUserAgent(
+            context.http?.req?.headers.get("user-agent") ?? null,
+          );
+          const text = await executeServerMcpTool(tool, inputs, agentClass);
           return {
             content: [{ type: "text", text }],
             ...(text.startsWith(WEBMCP_INVALID_INPUT_PREFIX) && {

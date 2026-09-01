@@ -1,4 +1,6 @@
 import type { DimensionScores } from "@chapa/shared";
+import type { AgentClass } from "@/lib/analytics/agent-ua";
+import { captureServerEvent } from "@/lib/analytics/server-errors";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { getSnapshots } from "@/lib/history/history";
@@ -21,7 +23,7 @@ import {
   VERIFY_BADGE_SERVER_INPUT_SCHEMA,
   compareDimensions,
 } from "./catalog";
-import { invalidInput } from "./errors";
+import { invalidInput, WEBMCP_INVALID_INPUT_PREFIX } from "./errors";
 import {
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_ANNOTATIONS,
@@ -144,14 +146,39 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
   };
 }
 
-async function executeSafely(
-  tool: string,
-  operation: () => string | Promise<string>,
-): Promise<string> {
+function captureMcpToolEvent(properties: Record<string, unknown>): void {
   try {
-    return await operation();
+    void captureServerEvent("mcp_tool_called", properties);
   } catch {
-    return unavailable(tool);
+    // Instrumentation must never change tool behavior.
+  }
+}
+
+export async function executeServerMcpTool(
+  tool: ServerMcpTool,
+  inputs: unknown,
+  agentClass: AgentClass,
+): Promise<string> {
+  const start = performance.now();
+  try {
+    const text = await tool.execute(inputs);
+    captureMcpToolEvent({
+      tool: tool.name,
+      outcome: text.startsWith(WEBMCP_INVALID_INPUT_PREFIX)
+        ? "invalid_input"
+        : "ok",
+      durationMs: Math.round(performance.now() - start),
+      agentClass,
+    });
+    return text;
+  } catch {
+    captureMcpToolEvent({
+      tool: tool.name,
+      outcome: "error",
+      durationMs: Math.round(performance.now() - start),
+      agentClass,
+    });
+    return unavailable(tool.name);
   }
 }
 
@@ -211,10 +238,8 @@ const getImpactProfile: ServerMcpTool = {
     if (!handle) {
       return invalidInput("get_impact_profile", "handle must be a public GitHub handle");
     }
-    return executeSafely("get_impact_profile", async () => {
-      const profile = await loadPublicProfile(handle);
-      return profile ? JSON.stringify(profile) : missingProfile(handle);
-    });
+    const profile = await loadPublicProfile(handle);
+    return profile ? JSON.stringify(profile) : missingProfile(handle);
   },
 };
 
@@ -230,18 +255,16 @@ const getImpactHistory: ServerMcpTool = {
     if (!handle) {
       return invalidInput("get_impact_history", "handle must be a public GitHub handle");
     }
-    return executeSafely("get_impact_history", async () => {
-      const snapshots = await getSnapshots(handle);
-      const publicSnapshots = snapshots.map((snapshot) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { confidence: _confidence, confidencePenalties: _penalties, ...publicSnapshot } = snapshot;
-        return publicSnapshot;
-      });
-      return JSON.stringify({
-        handle,
-        snapshots: publicSnapshots,
-        trend: computeTrend(snapshots),
-      });
+    const snapshots = await getSnapshots(handle);
+    const publicSnapshots = snapshots.map((snapshot) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { confidence: _confidence, confidencePenalties: _penalties, ...publicSnapshot } = snapshot;
+      return publicSnapshot;
+    });
+    return JSON.stringify({
+      handle,
+      snapshots: publicSnapshots,
+      trend: computeTrend(snapshots),
     });
   },
 };
@@ -261,20 +284,18 @@ const verifyBadge: ServerMcpTool = {
         "hash must be an 8, 16, or 32 character lowercase hexadecimal verification code",
       );
     }
-    return executeSafely("verify_badge", async () => {
-      const record = await getVerificationRecord(hash);
-      if (!record) return `No verification record was found for hash ${hash}.`;
-      const publicRecord = toPublicVerificationRecord(record);
-      return JSON.stringify({
-        status: "verified",
-        hash,
-        record: {
-          ...publicRecord,
-          displayName: sanitizeFreeTextForAgent(publicRecord.displayName),
-        },
-        verifyUrl: `${PRODUCTION_BASE_URL}/verify/${hash}`,
-        badgeUrl: `${PRODUCTION_BASE_URL}/u/${encodeURIComponent(record.handle)}/badge.svg`,
-      });
+    const record = await getVerificationRecord(hash);
+    if (!record) return `No verification record was found for hash ${hash}.`;
+    const publicRecord = toPublicVerificationRecord(record);
+    return JSON.stringify({
+      status: "verified",
+      hash,
+      record: {
+        ...publicRecord,
+        displayName: sanitizeFreeTextForAgent(publicRecord.displayName),
+      },
+      verifyUrl: `${PRODUCTION_BASE_URL}/verify/${hash}`,
+      badgeUrl: `${PRODUCTION_BASE_URL}/u/${encodeURIComponent(record.handle)}/badge.svg`,
     });
   },
 };
@@ -311,21 +332,19 @@ const explainDimension: ServerMcpTool = {
     if (!dimensionKey) {
       return invalidInput("explain_dimension", "dimension must be a known dimension");
     }
-    return executeSafely("explain_dimension", async () => {
-      const materialized = await materializeDisplayProfile(handle, { readOnly: true });
-      if (!materialized) return missingProfile(handle);
-      const browserTwin = createExplainDimensionTool({
-        impact: redactImpactForVisitor(materialized.displayImpact),
-        stats: materialized.stats,
-        craftResult: materialized.craftResult,
-        t: getServerT("en") as LanguageContextValue["t"],
-        annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
-      });
-      return browserTwin.execute(
-        { dimension: dimensionKey },
-        { signal: new AbortController().signal },
-      );
+    const materialized = await materializeDisplayProfile(handle, { readOnly: true });
+    if (!materialized) return missingProfile(handle);
+    const browserTwin = createExplainDimensionTool({
+      impact: redactImpactForVisitor(materialized.displayImpact),
+      stats: materialized.stats,
+      craftResult: materialized.craftResult,
+      t: getServerT("en") as LanguageContextValue["t"],
+      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
     });
+    return browserTwin.execute(
+      { dimension: dimensionKey },
+      { signal: new AbortController().signal },
+    );
   },
 };
 
@@ -348,36 +367,34 @@ const compareProfiles: ServerMcpTool = {
     if (!otherHandle) {
       return invalidInput("compare_profiles", "other_handle must be a public GitHub handle");
     }
-    return executeSafely("compare_profiles", async () => {
-      const [current, other] = await Promise.all([
-        loadPublicProfile(handle),
-        loadPublicProfile(otherHandle),
-      ]);
-      if (!current) return missingProfile(handle);
-      if (!other) return missingProfile(otherHandle);
-      const currentScore = current.displayScore ?? current.adjustedComposite;
-      const otherScore = other.displayScore ?? other.adjustedComposite;
-      return JSON.stringify({
-        current: {
-          handle,
-          score: currentScore,
-          tier: current.displayTier ?? current.tier,
-          dimensions: current.dimensions,
-        },
-        other: {
-          handle: otherHandle,
-          score: otherScore,
-          tier: other.displayTier ?? other.tier,
-          dimensions: other.dimensions,
-        },
-        differences: {
-          score: otherScore - currentScore,
-          dimensions: compareDimensions(
-            current.dimensions,
-            Object.fromEntries(Object.entries(other.dimensions)),
-          ),
-        },
-      });
+    const [current, other] = await Promise.all([
+      loadPublicProfile(handle),
+      loadPublicProfile(otherHandle),
+    ]);
+    if (!current) return missingProfile(handle);
+    if (!other) return missingProfile(otherHandle);
+    const currentScore = current.displayScore ?? current.adjustedComposite;
+    const otherScore = other.displayScore ?? other.adjustedComposite;
+    return JSON.stringify({
+      current: {
+        handle,
+        score: currentScore,
+        tier: current.displayTier ?? current.tier,
+        dimensions: current.dimensions,
+      },
+      other: {
+        handle: otherHandle,
+        score: otherScore,
+        tier: other.displayTier ?? other.tier,
+        dimensions: other.dimensions,
+      },
+      differences: {
+        score: otherScore - currentScore,
+        dimensions: compareDimensions(
+          current.dimensions,
+          Object.fromEntries(Object.entries(other.dimensions)),
+        ),
+      },
     });
   },
 };

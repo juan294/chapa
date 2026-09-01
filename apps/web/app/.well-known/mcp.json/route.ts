@@ -1,3 +1,5 @@
+import { captureServerEvent } from "@/lib/analytics/server-errors";
+import { classifyAgentUserAgent } from "@/lib/analytics/agent-ua";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 
 const BODY = JSON.stringify(
@@ -16,7 +18,16 @@ const BODY = JSON.stringify(
   2,
 );
 
-export function GET(): Response {
+export function GET(request: Request): Response {
+  const ua = request.headers.get("user-agent");
+  const agentClass = classifyAgentUserAgent(ua);
+  if (agentClass) {
+    void captureServerEvent("agent_surface_fetch", {
+      surface: ".well-known/mcp.json",
+      agentClass,
+      ua: (ua ?? "").slice(0, 200),
+    });
+  }
   return new Response(BODY, {
     status: 200,
     headers: {
