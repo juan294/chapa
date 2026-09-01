@@ -984,7 +984,16 @@ describe("StudioClient render", () => {
       const { trackEvent } = await import("@/lib/analytics/posthog");
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")
-        .mockResolvedValue(new Response("{}", { status: 200 }));
+        // #1253 — resolve on a real timer rather than instantly. This holds the
+        // race window open deterministically, so a future revert to a bare
+        // (non-waitFor) aria-busy assertion fails every run instead of flaking
+        // on slower CI runners, which is how this bug reached a release.
+        .mockImplementation(
+          () =>
+            new Promise<Response>((resolve) =>
+              setTimeout(() => resolve(new Response("{}", { status: 200 })), 15),
+            ),
+        );
 
       const { executeCommand } = await import(
         "@/components/terminal/command-registry"
@@ -1025,8 +1034,16 @@ describe("StudioClient render", () => {
         expect.objectContaining({ config: defaultConfig }),
       );
 
+      // #1253 — this assertion must wait on its OWN condition. The waitFor
+      // above gates on the terminal line count, which "initial 2 + input +
+      // result" can satisfy before the save promise resolves, so the preview
+      // pane is still aria-busy="true" at that moment. Sampling it once raced
+      // and failed a required check during the v2.28.0 release. The sibling
+      // test above (the "Saving..." case) already uses this pattern.
       const previewPane = screen.getByTestId("badge-preview").closest("[aria-busy]");
-      expect(previewPane?.getAttribute("aria-busy")).toBe("false");
+      await waitFor(() => {
+        expect(previewPane?.getAttribute("aria-busy")).toBe("false");
+      });
 
       fetchSpy.mockRestore();
     });
