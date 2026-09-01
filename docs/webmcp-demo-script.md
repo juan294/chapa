@@ -4,7 +4,7 @@ Target duration: 2 minutes 50 seconds. Do not exceed 3 minutes.
 
 ## Recording setup
 
-- [x] Use the production URL only after Juan authorizes the production release and flag changes. Both are done: v2.29.0 is live (`abccbad5`) and the flags are enabled.
+- [x] Use the production URL only after Juan authorizes the production release and flag changes. Both are done: v2.29.1 includes the current discovery surfaces and the flags are enabled.
 - [x] Use Chrome with `chrome://flags/#enable-webmcp-testing` enabled, then relaunch Chrome. A preview-only `chapa_hello` spike passed native registration, discovery, and execution in flagged Chrome 151 on 2026-08-27. The production preflight passed on 2026-09-01 with 19 registrations across 18 distinct names.
 - [ ] Do not claim ChatGPT compatibility. The ChatGPT in-app browser has not been tested because no browser binding was available during the runtime spike.
 - [ ] Open the WebMCP-capable agent or tool inspector beside the page so the agent, page, live preview, and terminal are visible on one screen.

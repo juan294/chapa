@@ -292,7 +292,7 @@ Shipping the runtime tools did not make Chapa easy to find. I added four static 
 
 I also shipped a stateless [Streamable HTTP MCP endpoint](https://chapa.thecreativetoken.com/api/mcp) for clients that do not control a browser tab. It exposes nine public, read-only tools and calls the same application libraries as Chapa's public routes. Studio mutation tools stay browser-only because their value comes from shared, visible page state and the human confirmation gate.
 
-The endpoint is active in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.juan294/chapa) as `io.github.juan294/chapa` version `2.29.0`, and the [Glama connector listing](https://glama.ai/mcp/connectors/com.thecreativetoken.chapa/chapa) is live. I also submitted Chapa to WebMCP and `llms.txt` directories and to MCP Servers. Some directory reviews were still pending when I finished this article. One WebMCP scanner rejected the site because it looked for an older browser API signature instead of the current `document.modelContext` API. That result was useful: directory compatibility is another contract, and it can lag the runtime specification.
+The endpoint is active in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.juan294/chapa) as `io.github.juan294/chapa` version `2.29.1`, and the [Glama connector listing](https://glama.ai/mcp/connectors/com.thecreativetoken.chapa/chapa) is live. I also submitted Chapa to WebMCP and `llms.txt` directories and to MCP Servers. Some directory reviews were still pending when I finished this article. One WebMCP scanner rejected the site because it looked for an older browser API signature instead of the current `document.modelContext` API. That result was useful: directory compatibility is another contract, and it can lag the runtime specification.
 
 ### The evidence, and its limits
 
@@ -302,7 +302,7 @@ Verified: a hello-world tool passed **native registration, discovery, and execut
 
 Verified: the full browser catalog is implemented and tested, with each tool host carrying its own render test. The remote endpoint has a separate transport contract matrix and a parity assertion that keeps its nine tool names tied to the browser catalog.
 
-Verified: the browser code has shipped in every release since v2.24.0. The static discovery surfaces, telemetry, and remote MCP endpoint are live in v2.29.0. The production endpoint identifies itself as Chapa v2.29.0 and lists all nine read-only tools.
+Verified: the browser code has shipped in every release since v2.24.0. The static discovery surfaces, telemetry, and remote MCP endpoint first shipped in v2.29.0. The current production endpoint identifies itself as Chapa v2.29.1 and lists all nine read-only tools.
 
 One more practical note if you are planning a demo. Chrome's WebMCP origin trial runs from Chrome 149 to 156 and ends **17 November 2026**. Without a trial token, your visitors need to enable the flag themselves. With a token, unflagged Chrome works. Decide which of those your audience is before you record anything.
 

@@ -7,7 +7,7 @@
     "url": "https://github.com/juan294/chapa",
     "source": "github"
   },
-  "version": "2.29.0",
+  "version": "2.29.1",
   "remotes": [
     {
       "type": "streamable-http",
