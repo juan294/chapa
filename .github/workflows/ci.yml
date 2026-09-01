@@ -387,7 +387,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
@@ -492,7 +492,7 @@ jobs:
       - name: Cache Playwright browsers
         id: deployment-playwright-cache
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
