@@ -3,6 +3,8 @@
 Applies on top of the parent plan's Phase 4 docs output. Same writing
 rules: no em-dashes, short plain sentences, no emojis.
 
+Status: Complete.
+
 ## Files
 
 - `docs/webmcp.md`
@@ -46,13 +48,13 @@ rules: no em-dashes, short plain sentences, no emojis.
 
 Automated:
 
-- `pnpm run test` still green.
-- `rg -n '17 browser-native|16 distinct' docs/webmcp.md` returns nothing.
+- [x] `pnpm run test` still green.
+- [x] `rg -n '17 browser-native|16 distinct' docs/webmcp.md` returns nothing.
 
 Manual:
 
-- The counts and names in `docs/webmcp.md` match `SITE_TOOL_MAP` exactly
+- [x] The counts and names in `docs/webmcp.md` match `SITE_TOOL_MAP` exactly
   (copy from the merged Phase 1, do not re-type).
-- The output of
+- [x] The output of
   `rg -o 'TODO_[A-Z_]+' docs/webmcp-demo-script.md | sort | uniq -c` is
   identical before and after this phase.

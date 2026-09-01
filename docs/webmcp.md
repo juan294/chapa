@@ -1,6 +1,6 @@
 # WebMCP in Chapa
 
-Chapa exposes 17 browser-native WebMCP page/tool registrations across 16 distinct names; `explain_dimension` is shared by Studio and public profiles. They let an agent work on the same page state that a person can see. Studio mutations use the existing command system. Public profile and verification tools are read-only.
+Chapa exposes 19 browser-native WebMCP page/tool registrations across 18 distinct names; `explain_dimension` is shared by Studio and public profiles. They let an agent work on the same page state that a person can see. Studio mutations use the existing command system. Landing, public profile, and verification tools are read-only.
 
 Public tools that can return GitHub-controlled names or fetched public content also set `untrustedContentHint: true`. Verification records are projected to their public shape and never expose the internal confidence value.
 
@@ -16,10 +16,20 @@ The catalog uses these exact JSON Schema objects:
 - `SIMULATION`: `{"type":"object","properties":{"dimensions":{"type":"object","properties":{"delivery":{"type":"number","minimum":0,"maximum":100},"quality":{"type":"number","minimum":0,"maximum":100},"consistency":{"type":"number","minimum":0,"maximum":100},"breadth":{"type":"number","minimum":0,"maximum":100},"craft":{"type":"number","minimum":0,"maximum":100}},"additionalProperties":false}},"required":["dimensions"],"additionalProperties":false}`
 - `DIMENSION`: `{"type":"object","properties":{"dimension":{"type":"string","enum":["delivery","quality","consistency","breadth","craft"]}},"required":["dimension"],"additionalProperties":false}`
 - `COMPARE`: `{"type":"object","properties":{"other_handle":{"type":"string"}},"required":["other_handle"],"additionalProperties":false}`
+- `HANDLE`: `{"type":"object","properties":{"handle":{"type":"string"}},"required":["handle"],"additionalProperties":false}`
 
 `readOnlyHint: no` means the annotation is omitted because the tool changes page state or opens a human action gate.
 
 ## Tool catalog
+
+### Landing page: `/`
+
+These tools orient and navigate only. They fetch no data and do not wrap the public REST API.
+
+| Tool | Input | `readOnlyHint` | Behavior |
+| --- | --- | --- | --- |
+| `get_site_capabilities` | `EMPTY` | yes | Describes Chapa and returns the exact page-scoped tool map, canonical entry points, and human-action boundaries. |
+| `find_profile` | `HANDLE` | yes | Validates a public GitHub handle and returns its canonical share-page and badge URLs plus navigation notes. It makes no request. |
 
 ### Creator Studio: `/studio` and `/studio?demo=1`
 
@@ -60,6 +70,14 @@ These tools are present only when the page found a verification record.
 ## Design methodology
 
 Chapa follows the framework in Chrome's [Build your user's agentic workflows with WebMCP tools](https://developer.chrome.com/docs/ai/webmcp/build-tools) article, published on 2026-08-26. The framework defines the user goal and initial state, then role-plays the conversation to find the required tools and recovery paths. The [WebMCP demo script](webmcp-demo-script.md) is Chapa's role-play artifact.
+
+### Landing page
+
+**User goal:** Discover what Chapa is and which page-scoped tools exist, then navigate to the right page.
+
+**Initial state:** Open `/` as any visitor with no authentication. `webmcp_enabled` must be on. The landing catalog is the site's front-door tool map.
+
+**Role-play:** [Discover the site from the landing page](webmcp-demo-script.md#judge-instructions).
 
 ### Creator Studio
 
@@ -151,6 +169,8 @@ Browsers without `document.modelContext` get the normal Chapa interface with no 
 ## Judge demo
 
 The deployment must have `studio_enabled`, `studio_demo_enabled`, and `webmcp_enabled` enabled before this sequence.
+
+An agent can start from the landing page, call `get_site_capabilities`, and follow its `demoStudio` entry point to the demo Studio.
 
 1. Complete the Chrome setup below and open `/studio?demo=1` while logged out.
 2. Confirm that the page shows the persistent `DEMO` marker and the seeded Bertram Gilfoyle profile.

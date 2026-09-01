@@ -1,7 +1,7 @@
 # WebMCP Landing Discovery Tools (addendum)
 
 Date: 2026-09-01
-Status: Ready for implementation. No unresolved questions.
+Status: Complete. Local implementation and verification passed.
 Parent plan: `2026-09-01-webmcp-agentic-workflows-enhancements.md` (in
 implementation in a separate session when this addendum was decided; that
 plan's files and phases are deliberately untouched).
@@ -72,11 +72,11 @@ Phase files:
 
 Automated:
 
-- `pnpm run test && pnpm run typecheck && pnpm run lint &&
+- [x] `pnpm run test && pnpm run typecheck && pnpm run lint &&
   pnpm run check:circular` green, including the new
   `site-tool-map.test.ts` drift guard and
   `LandingWebMcpTools.render.test.tsx`.
-- `static-generation.test.ts` and `DynamicRouteShell.boundary.test.ts`
+- [x] `static-generation.test.ts` and `DynamicRouteShell.boundary.test.ts`
   unchanged and green (proves the landing page stayed static).
 
 Manual (Juan-gated, outside this plan):
