@@ -377,16 +377,23 @@ export function StudioClient({
         trackStudioEvent("config_saved", { config: configToSave });
         const hasNewerChanges = configRevisionRef.current !== revision;
         setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
+        // hotfix v2.29.2 — an older server during a rolling deploy omits
+        // `badgeRefreshed` from the body; treat that as refreshed rather than
+        // showing a deferred warning for a save that actually succeeded.
+        const payload: { badgeRefreshed?: boolean } = await res
+          .json()
+          .catch(() => ({}));
+        const badgeRefreshed = payload.badgeRefreshed !== false;
+        const key = hasNewerChanges
+          ? "studio.save.changedDuringSave"
+          : badgeRefreshed
+            ? "studio.save.success"
+            : "studio.save.successDeferred";
         setLines((prev) => [
           ...prev,
           makeLine(
-            hasNewerChanges ? "warning" : "success",
-            translation(
-              t,
-              hasNewerChanges
-                ? "studio.save.changedDuringSave"
-                : "studio.save.success",
-            ),
+            hasNewerChanges || !badgeRefreshed ? "warning" : "success",
+            translation(t, key),
           ),
         ]);
       } else {

@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
 import {
   getOptionalRequestSession,
   getSessionSecret,
@@ -144,14 +143,22 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
     );
   }
 
-  // #1191 — the badge cache key carries handle/variant/date/locale but nothing
-  // about the config, so a save has to say explicitly that the rendered badge
-  // is now wrong. Fire-and-forget: a failed invalidation leaves a stale badge
-  // until the day rolls over, which is the same self-healing risk the platform
-  // link/unlink path already accepts, and is not worth failing a save over.
-  fireAndForget(() =>
-    invalidateBadgeSvgCacheForHandle(normalizedLogin, toDateString(new Date())),
-  );
+  // #1191 / hotfix v2.29.2 — the badge cache key carries handle/variant/date/
+  // locale but nothing about the config, so a save has to clear the rendered
+  // badge explicitly, in BOTH layers (Redis at the origin, the Vercel edge by
+  // tag). Awaited, like every sibling write path: launched with fireAndForget
+  // it ran after the response, which on Vercel means "maybe". The save itself
+  // is never failed over it — the client is told instead.
+  let badgeRefreshed = false;
+  try {
+    const invalidation = await invalidateBadgeSvgCacheForHandle(
+      normalizedLogin,
+      toDateString(new Date()),
+    );
+    badgeRefreshed = invalidation.redis && invalidation.edge !== "failed";
+  } catch (error) {
+    console.error("[studio] badge invalidation threw:", error);
+  }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, badgeRefreshed });
 });

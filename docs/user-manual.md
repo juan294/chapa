@@ -271,7 +271,7 @@ studio > /preset maximum
 studio > /save
 ```
 
-Persists your badge configuration server-side. The saved configuration is restored when you return to Creator Studio; it does not change the public SVG badge.
+Persists your badge configuration server-side and refreshes your public SVG badge and share page. The saved configuration is restored when you return to Creator Studio.
 
 ### Check Current Settings
 
@@ -676,7 +676,7 @@ Use this checklist to verify every feature works.
 
 ### 5. Studio — Save, Reset, Embed, Share
 
-- [ ] Type `/save` — see "Saving..." then "Preview configuration saved. Your public badge and share page are unchanged."
+- [ ] Type `/save` — see "Saving..." then "Configuration saved. Your public badge and share page now show it."
 - [ ] Type `/reset` — see "Configuration reset to defaults." + preview resets
 - [ ] Type `/embed` — see Markdown and HTML embed snippets with your handle
 - [ ] Type `/share` — see direct link and badge SVG URL with your handle
