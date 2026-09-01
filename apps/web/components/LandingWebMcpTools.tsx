@@ -4,27 +4,20 @@ import { useMemo } from "react";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { isValidHandle } from "@/lib/validation";
 import {
+  FIND_PROFILE_INPUT_SCHEMA,
+  PRODUCTION_BASE_URL,
+  SITE_CAPABILITIES,
+} from "@/lib/webmcp/catalog";
+import {
   isWebMcpRecord,
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_ANNOTATIONS,
 } from "@/lib/webmcp/shared-tools";
-import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 import {
   invalidInput,
   useModelContextTools,
   type WebMcpTool,
 } from "@/lib/webmcp/use-model-context-tools";
-
-const PRODUCTION_BASE_URL = "https://chapa.thecreativetoken.com";
-
-const FIND_PROFILE_INPUT_SCHEMA = {
-  type: "object",
-  properties: {
-    handle: { type: "string" },
-  },
-  required: ["handle"],
-  additionalProperties: false,
-};
 
 export function LandingWebMcpTools() {
   const { webmcpEnabled } = useClientFeatureFlags();
@@ -38,22 +31,7 @@ export function LandingWebMcpTools() {
           "Describe Chapa and list the WebMCP tools each page registers.",
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
-        execute: () => JSON.stringify({
-          whatIsChapa:
-            "Chapa turns developer activity into a live, verifiable Impact Profile and embeddable badge that summarizes delivery, quality, consistency, breadth, and optional craft.",
-          toolMap: SITE_TOOL_MAP,
-          entryPoints: {
-            demoStudio: `${PRODUCTION_BASE_URL}/studio?demo=1`,
-            profile: `${PRODUCTION_BASE_URL}/u/<handle>`,
-            scoringMethodology: `${PRODUCTION_BASE_URL}/about/scoring`,
-            llmsTxt: `${PRODUCTION_BASE_URL}/llms.txt`,
-          },
-          boundaries: [
-            "Login uses GitHub OAuth and only a human can complete it.",
-            "Configuration saves are proposed by agents and confirmed by a human on-page.",
-            "Tools register per page; navigate to a route to use its tools.",
-          ],
-        }),
+        execute: () => JSON.stringify(SITE_CAPABILITIES),
       },
       {
         name: "find_profile",
