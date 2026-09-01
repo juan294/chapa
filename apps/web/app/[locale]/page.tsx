@@ -7,6 +7,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
+import { LandingWebMcpTools } from "@/components/LandingWebMcpTools";
 
 // #982 / #1023 (FE-H1) — the landing page is statically generated for BOTH
 // locales (see app/[locale]/layout.tsx's generateStaticParams), so it stays
@@ -62,6 +63,7 @@ export default async function Home({ params }: HomeProps) {
         dictionary={locale === DEFAULT_LOCALE ? undefined : locale === "es" ? es : en}
       >
         <LangSync />
+        <LandingWebMcpTools />
         <LandingContent demoBadgeSvg={demoBadgeSvg} demoImpact={DEMO_IMPACT} t={t} />
       </LanguageProvider>
     </>
