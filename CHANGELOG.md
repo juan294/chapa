@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.29.2] - 2026-09-01
+
+### Fixed
+
+- **A saved Studio configuration now reaches the badge people embed.** The
+  save awaited the database write but launched the badge-cache invalidation
+  after the response, and nothing cleared Vercel's edge cache at all, so the
+  README kept showing the previous badge for up to a day. Every badge response
+  now carries a per-handle cache tag, the shared invalidation purges that tag
+  alongside the Redis keys, the Studio save waits for it, and the success line
+  says what actually happened instead of "your public badge is unchanged".
+  Browsers and GitHub's image proxy are told to recheck every five minutes.
+
 ## [2.29.1] - 2026-09-01
 
 ### Added

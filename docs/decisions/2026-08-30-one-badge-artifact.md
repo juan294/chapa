@@ -133,6 +133,14 @@ The accepted risk is the same one link/unlink already carries: an invalidation
 that fails leaves a stale badge until the day rolls over. That is self-healing
 and cheap, where a database read on every badge request is neither.
 
+> **Correction (2026-09-01, v2.29.2).** "Stale until the day rolls over"
+> described only the Redis layer. The badge is also cached by Vercel's edge
+> for six hours (plus a 24-hour stale-while-revalidate window) per URL and
+> PoP, and a Redis delete does not reach it, so a save was invisible on the
+> README for up to a day. The invalidation now purges a per-handle edge tag
+> as well, and the Studio save awaits it. See
+> `2026-09-01-badge-edge-cache-purge.md`.
+
 The verification seal is unaffected and should stay that way: it covers
 `stats + impact + date`, never the rendering. The seal attests that the numbers
 are real, not that the badge is pretty. Styling changes must not invalidate it.

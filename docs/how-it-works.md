@@ -219,7 +219,7 @@ When multiple platforms are connected, stats are merged automatically (see [Mult
 **Public mode (no login):**
 - Anyone can visit `/u/{handle}` or embed `/u/{handle}/badge.svg`
 - Uses the server `GITHUB_TOKEN`; contribution counts may include private-repo activity visible to that token, but never repository names or code
-- Primary stats are cached for 6 hours with a 7-day last-known-good fallback; badge responses use a 6-hour CDN cache
+- Primary stats are cached for 6 hours with a 7-day last-known-good fallback; badge responses use a 6-hour CDN cache, purged by a per-handle tag whenever that handle's badge is invalidated (e.g. a Studio save), so a change doesn't wait out the full TTL (v2.29.2)
 
 **Verified mode (OAuth login):**
 - User authenticates with GitHub OAuth (`read:user user:email` scopes)

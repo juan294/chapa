@@ -150,11 +150,17 @@ vi.mock("./useStudioCommands", () => ({
 }));
 
 vi.mock("@/components/terminal/TerminalOutput", () => ({
-  TerminalOutput: ({ lines }: { lines: Array<{ id: string; text: string }> }) => (
+  TerminalOutput: ({
+    lines,
+  }: {
+    lines: Array<{ id: string; text: string; type?: string }>;
+  }) => (
     <div data-testid="terminal-output" role="log">
       {lines.length} lines
       {lines.map((line) => (
-        <span key={line.id}>{line.text}</span>
+        <span key={line.id} data-line-type={line.type}>
+          {line.text}
+        </span>
       ))}
     </div>
   ),
@@ -1184,8 +1190,27 @@ describe("StudioClient render", () => {
       expect(save.hasAttribute("disabled")).toBe(true);
       resolveSave(new Response("{}", { status: 200 }));
       await screen.findByText(
-        "Preview configuration saved. Your public badge and share page are unchanged.",
+        "Configuration saved. Your public badge and share page now show it.",
       );
+    });
+
+    it("shows the deferred success line with a warning tone when badgeRefreshed is false", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ success: true, badgeRefreshed: false }), {
+          status: 200,
+        }),
+      );
+
+      render(
+        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+      );
+      fireEvent.click(screen.getByTestId("studio-save"));
+
+      const line = await screen.findByText(
+        "Configuration saved. Your public badge may take a few hours to update.",
+      );
+      expect(line.getAttribute("data-line-type")).toBe("warning");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it("prevents overlapping saves from repeated /save commands", async () => {
@@ -1214,7 +1239,7 @@ describe("StudioClient render", () => {
       expect(screen.getByText("A save is already in progress.")).toBeDefined();
       resolveSave(new Response("{}", { status: 200 }));
       await screen.findByText(
-        "Preview configuration saved. Your public badge and share page are unchanged.",
+        "Configuration saved. Your public badge and share page now show it.",
       );
     });
 
