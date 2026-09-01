@@ -30,6 +30,7 @@ The following actions remain separate and require explicit user authorization:
 | MCP server URL | `https://chapa.thecreativetoken.com/api/mcp` |
 | Domain challenge URL | `https://chapa.thecreativetoken.com/.well-known/openai-apps-challenge` |
 | Website | `https://chapa.thecreativetoken.com` |
+| Support URL | `https://chapa.thecreativetoken.com/about` |
 | Support contact | `support@chapa.thecreativetoken.com` |
 | Privacy policy | `https://chapa.thecreativetoken.com/privacy` |
 | Terms of service | `https://chapa.thecreativetoken.com/terms` |
@@ -53,20 +54,28 @@ Initial release notes:
 
 > Initial Chapa plugin submission with nine public, read-only MCP tools. No login or demo credentials are required. Tool results exclude private confidence and penalty data, and content derived from public profiles is treated as untrusted.
 
+### Starter prompts
+
+- What is my Chapa impact score? My GitHub handle is juan294.
+- Compare juan294 with octocat.
+- Is this badge verified? Hash: 84567a48984e0c2e287acb78d1404a57.
+- How is the Delivery dimension calculated for juan294?
+- Give me the README embed for juan294.
+
 ## Tool and annotation audit
 
-All nine tools use `readOnlyHint: true` and `destructiveHint: false`. The five tools that read Chapa's public profile or verification services use `openWorldHint: true`. The four tools that only return static information or construct URLs and embed text use `openWorldHint: false`.
+All nine tools use `readOnlyHint: true`, `destructiveHint: false`, and `openWorldHint: false`. They return existing public Chapa data or compute static results without changing Chapa, a connected account, or another external system.
 
 | Tool | readOnlyHint | destructiveHint | openWorldHint | Reason |
 | --- | --- | --- | --- | --- |
 | `get_site_capabilities` | true | false | false | Returns static Chapa capability metadata. |
 | `find_profile` | true | false | false | Constructs public profile and badge URLs from a handle. |
-| `get_impact_profile` | true | false | true | Reads a public impact profile from Chapa's services. |
-| `get_impact_history` | true | false | true | Reads public historical snapshots from Chapa's datastore. |
-| `verify_badge` | true | false | true | Reads a public verification record. |
+| `get_impact_profile` | true | false | false | Reads a public impact profile without changing it. |
+| `get_impact_history` | true | false | false | Reads public historical snapshots without changing them. |
+| `verify_badge` | true | false | false | Reads a public verification record without changing it. |
 | `explain_verification` | true | false | false | Returns static verification documentation. |
-| `explain_dimension` | true | false | true | Reads an existing public profile and computes an explanation without persistence. |
-| `compare_profiles` | true | false | true | Reads two existing public profiles and computes differences without persistence. |
+| `explain_dimension` | true | false | false | Reads an existing public profile and computes an explanation without persistence. |
+| `compare_profiles` | true | false | false | Reads two existing public profiles and computes differences without persistence. |
 | `get_embed_snippet` | true | false | false | Constructs Markdown and HTML strings from a handle. |
 
 Operational `mcp_tool_called` telemetry records tool usage and outcome for service monitoring. It does not change the user-requested action, user data, profile data, or public internet state. Public-profile content keeps the separate `untrustedContentHint` trust classification.
@@ -171,7 +180,7 @@ These steps are operational gates, not part of the local implementation commit.
 
 1. The user verifies the submitting individual or organization in the OpenAI Platform dashboard. A non-owner submitter must have **Apps Management: Write** permission; an organization owner already has that permission.
 2. After release authorization and deployment, open the OpenAI Platform plugin flow and choose **Create plugin**, **With MCP**, and **Universal MCP URL**.
-3. Enter the identity and listing values from this document, including `https://chapa.thecreativetoken.com/api/mcp`, then let the portal scan all nine tools.
+3. Enter the identity and listing values from this document, including the MCP server URL, the public support URL `https://chapa.thecreativetoken.com/about`, and all five starter prompts. Then let the portal scan all nine tools.
 4. Copy the portal-issued domain challenge token. With separate production-environment authorization, the agent sets its exact value as `OPENAI_APPS_CHALLENGE_TOKEN` in Vercel production through the Vercel CLI and redeploys the authorized candidate.
 5. Verify that `https://chapa.thecreativetoken.com/.well-known/openai-apps-challenge` returns HTTP 200, `cache-control: no-store`, and only the exact token as plain text. Never paste the secret token into this tracked document.
 6. Run all five positive and three negative tests above against the production MCP server. Record any current fixture refresh in the portal before submission.

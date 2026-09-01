@@ -46,13 +46,7 @@ vi.mock("@/lib/webmcp/server-tools", async (importOriginal) => {
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
-        openWorldHint: [
-          "get_impact_profile",
-          "get_impact_history",
-          "verify_badge",
-          "explain_dimension",
-          "compare_profiles",
-        ].includes(name),
+        openWorldHint: false,
         untrustedContentHint: index > 0,
       },
       execute: mocks.execute,
@@ -168,7 +162,7 @@ describe("/api/mcp", () => {
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
-        openWorldHint: true,
+        openWorldHint: false,
         untrustedContentHint: true,
       },
     }));

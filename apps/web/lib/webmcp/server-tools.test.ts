@@ -134,19 +134,12 @@ describe("remote MCP server tools", () => {
     ]);
     expect(SERVER_MCP_TOOLS).toHaveLength(9);
     const browserNames = new Set<string>(SITE_TOOL_MAP.flatMap((entry) => entry.tools));
-    const openWorldTools = new Set([
-      "get_impact_profile",
-      "get_impact_history",
-      "verify_badge",
-      "explain_dimension",
-      "compare_profiles",
-    ]);
     for (const definition of SERVER_MCP_TOOLS) {
       expect(browserNames.has(definition.name)).toBe(true);
       expect(definition.annotations).toEqual(expect.objectContaining({
         readOnlyHint: true,
         destructiveHint: false,
-        openWorldHint: openWorldTools.has(definition.name),
+        openWorldHint: false,
       }));
       expect(Boolean(definition.annotations.untrustedContentHint)).toBe(
         untrustedTools.has(definition.name),

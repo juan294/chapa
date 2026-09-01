@@ -41,7 +41,7 @@ export interface ServerMcpTool {
   annotations: WebMcpToolAnnotations & {
     readOnlyHint: true;
     destructiveHint: false;
-    openWorldHint: boolean;
+    openWorldHint: false;
   };
   execute(inputs: unknown): Promise<string>;
 }
@@ -56,11 +56,6 @@ const MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS = {
   ...WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   destructiveHint: false,
   openWorldHint: false,
-} as const;
-
-const MCP_READ_ONLY_EXTERNAL_UNTRUSTED_ANNOTATIONS = {
-  ...MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
-  openWorldHint: true,
 } as const;
 
 interface PublicProfilePayload {
@@ -251,7 +246,7 @@ const getImpactProfile: ServerMcpTool = {
   name: "get_impact_profile",
   description: "Return the latest public impact profile for a GitHub handle.",
   inputSchema: FIND_PROFILE_INPUT_SCHEMA,
-  annotations: MCP_READ_ONLY_EXTERNAL_UNTRUSTED_ANNOTATIONS,
+  annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("get_impact_profile", inputs, ["handle"]);
     if (validationError) return validationError;
@@ -268,7 +263,7 @@ const getImpactHistory: ServerMcpTool = {
   name: "get_impact_history",
   description: "Return public impact snapshots and trend for a GitHub handle.",
   inputSchema: FIND_PROFILE_INPUT_SCHEMA,
-  annotations: MCP_READ_ONLY_EXTERNAL_UNTRUSTED_ANNOTATIONS,
+  annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("get_impact_history", inputs, ["handle"]);
     if (validationError) return validationError;
@@ -294,7 +289,7 @@ const verifyBadge: ServerMcpTool = {
   name: "verify_badge",
   description: "Look up the public verification record for a Chapa badge hash.",
   inputSchema: VERIFY_BADGE_SERVER_INPUT_SCHEMA,
-  annotations: MCP_READ_ONLY_EXTERNAL_UNTRUSTED_ANNOTATIONS,
+  annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("verify_badge", inputs, ["hash"]);
     if (validationError) return validationError;
@@ -336,7 +331,7 @@ const explainDimension: ServerMcpTool = {
   name: "explain_dimension",
   description: "Explain one impact dimension for a public profile.",
   inputSchema: EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA,
-  annotations: MCP_READ_ONLY_EXTERNAL_UNTRUSTED_ANNOTATIONS,
+  annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("explain_dimension", inputs, [
       "handle",
@@ -373,7 +368,7 @@ const compareProfiles: ServerMcpTool = {
   name: "compare_profiles",
   description: "Compare two public Chapa impact profiles.",
   inputSchema: COMPARE_PROFILES_SERVER_INPUT_SCHEMA,
-  annotations: MCP_READ_ONLY_EXTERNAL_UNTRUSTED_ANNOTATIONS,
+  annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("compare_profiles", inputs, [
       "handle",
