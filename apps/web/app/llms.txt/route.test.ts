@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 import { GET as getLlmsTxt } from "./route";
 
 describe("GET /llms.txt", () => {
@@ -46,6 +47,20 @@ describe("GET /llms.txt", () => {
     expect(text).toContain("/u/{handle}/badge.svg");
     expect(text).toContain("/about/scoring");
     expect(text).toContain("/llms-full.txt");
+  });
+
+  it("lists every registered WebMCP tool", async () => {
+    const text = await getLlmsTxt().text();
+
+    for (const entry of SITE_TOOL_MAP) {
+      for (const tool of entry.tools) {
+        expect(text).toContain(tool);
+      }
+    }
+  });
+
+  it("mentions WebMCP by name", async () => {
+    expect(await getLlmsTxt().text()).toContain("WebMCP");
   });
 
   it("limits cryptographic claims to badges marked Verified metrics", async () => {

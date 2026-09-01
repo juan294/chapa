@@ -58,6 +58,45 @@ Each archetype has a dedicated guide page at /archetypes/{type} explaining the t
 - **Archetype Label**: Primary archetype classification.
 - **Creator Studio**: Visual customization tool at /studio with 7 categories (background, card style, border, score effect, heatmap animation, tier treatment, color palette), every one of which renders in the embeddable badge.
 
+## Agent Tools (WebMCP)
+
+Chapa registers browser-native WebMCP tools through \`document.modelContext\`. Tool registration happens when client JavaScript loads on the named page. A preview hello-world registration was verified in flagged Google Chrome 151; the completed catalog still needs final production verification. ChatGPT compatibility has not been tested.
+
+### Landing page: \`/\`
+
+- \`get_site_capabilities\` (read-only): Describes Chapa, its page-scoped tool map, entry points, and human-action boundaries.
+- \`find_profile\` (read-only): Validates a public GitHub handle and returns canonical share-page and badge URLs without making a request.
+
+### Creator Studio: \`/studio\` and \`/studio?demo=1\`
+
+Demo mode at \`/studio?demo=1\` needs no login and uses fixed local data. Tools can change visible page state, but saving always requires a human click on the confirmation control.
+
+- \`list_style_options\` (read-only): Returns every style category, option, preset, and the current badge configuration.
+- \`apply_badge_style\` (changes page state): Runs the visible \`/set <category> <value>\` command and returns the resulting configuration.
+- \`apply_preset\` (changes page state): Runs the visible \`/preset <name>\` command and returns the resulting configuration.
+- \`preview_badge\` (read-only): Returns the current configuration, public badge SVG URL, and save status.
+- \`reset_badge_config\` (changes page state): Runs the visible \`/reset\` command and returns the reset configuration.
+- \`save_badge_config\` (human-gated): Opens an on-page save proposal but never calls the save API itself.
+- \`simulate_score\` (read-only): Calculates a score from supplied dimensions without saving data.
+- \`suggest_improvements\` (read-only): Returns grounded improvement suggestions from the current impact profile.
+- \`explain_dimension\` (read-only): Returns the selected score, formula, tip, and normalized submetrics.
+
+### Public profile: \`/u/{handle}\`
+
+- \`get_impact_profile\` (read-only): Returns the redacted public impact, key stats, verification summary, trend, diff, and freshness.
+- \`get_impact_history\` (read-only): Fetches public snapshots and trend data with friendly missing-data and rate-limit messages.
+- \`verify_badge\` (read-only): Returns the public verification record and verification URL when the profile has a hash.
+- \`explain_dimension\` (read-only): Explains a dimension using the current public page data.
+- \`compare_profiles\` (read-only): Compares the on-page profile with another public profile and returns score and dimension differences.
+- \`get_embed_snippet\` (read-only): Returns canonical Markdown and HTML snippets for the live badge.
+
+### Verification page: \`/verify/{hash}\`
+
+- \`get_verification_record\` (read-only): Returns the hash and public verification record already displayed on the page.
+- \`explain_verification\` (read-only): Explains what HMAC-SHA256 verification proves, what it does not prove, expiry, and code format.
+
+Machine-readable catalog: https://chapa.thecreativetoken.com/.well-known/mcp.json
+
 ## API Endpoints
 
 ### Public (no auth required)
