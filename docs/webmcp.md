@@ -77,7 +77,7 @@ Chapa follows the framework in Chrome's [Build your user's agentic workflows wit
 
 **Initial state:** Open `/` as any visitor with no authentication. `webmcp_enabled` must be on. The landing catalog is the site's front-door tool map.
 
-**Role-play:** [Discover the site from the landing page](webmcp-demo-script.md#judge-instructions).
+**Role-play:** [The agent finds its own way in](webmcp-demo-script.md#000-022--the-agent-finds-its-own-way-in).
 
 ### Creator Studio
 
@@ -85,7 +85,7 @@ Chapa follows the framework in Chrome's [Build your user's agentic workflows wit
 
 **Initial state:** Open authenticated `/studio`, or open `/studio?demo=1` with seeded fixtures. `studio_enabled` and `webmcp_enabled` must be on. Demo mode also requires `studio_demo_enabled`.
 
-**Role-play:** [Studio co-design, visible changes, human-gated save](webmcp-demo-script.md#020-130--studio-co-design-visible-changes-human-gated-save).
+**Role-play:** [Studio co-design, visible changes, human-gated save](webmcp-demo-script.md#022-130--studio-co-design-visible-changes-human-gated-save).
 
 ### Public profile
 

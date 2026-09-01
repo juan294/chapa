@@ -9,6 +9,7 @@ Target duration: 2 minutes 50 seconds. Do not exceed 3 minutes.
 - [ ] Do not claim ChatGPT compatibility. The ChatGPT in-app browser has not been tested because no browser binding was available during the runtime spike.
 - [ ] Open the WebMCP-capable agent or tool inspector beside the page so the agent, page, live preview, and terminal are visible on one screen.
 - [ ] Prepare these tabs:
+  - `TODO_LIVE_URL/` — the landing page, where the recording starts
   - `TODO_LIVE_URL/studio?demo=1`
   - `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`
   - `TODO_LIVE_URL/verify/TODO_VALID_HASH`
@@ -20,19 +21,50 @@ Target duration: 2 minutes 50 seconds. Do not exceed 3 minutes.
 
 ## Script
 
-### 0:00-0:20 — Your badge, your agent, one screen
+### 0:00-0:22 — The agent finds its own way in
+
+Start on the landing page, not in the Studio. The agent should discover where
+to go rather than be handed a URL, because that is the claim this segment
+makes. It also matches judge step 2.
 
 **On screen**
 
-Show `TODO_LIVE_URL/studio?demo=1`, the persistent `DEMO` marker, the badge preview, the terminal, and the agent or tool inspector together.
+Show `TODO_LIVE_URL/` with the agent or tool inspector beside it.
+
+**Type or say to the agent**
+
+> What can I do on this site, and where is TODO_PUBLIC_HANDLE's badge?
+
+**Expected agent calls**
+
+1. `get_site_capabilities`
+2. `find_profile` with `{ "handle": "TODO_PUBLIC_HANDLE" }`
+
+**On screen**
+
+1. Show the returned tool map: four routes, each with the tools it carries.
+2. Point to the `boundaries` field, which states that login is human-only and
+   saves are human-confirmed, before any tool has been called.
+3. Show `find_profile` returning the share and badge URLs. Keep this tab; the
+   1:30 segment opens the URL the agent just resolved.
+4. Follow the `demoStudio` entry point into `/studio?demo=1`.
 
 **Say**
 
-> Chapa is a developer credential that a person and agent design on one screen. Agent actions appear in the terminal and badge. This session-free demo uses fixed fixtures and cannot write production data.
+> Chapa is a developer credential that a person and agent design on one screen.
+> The agent starts at the front door, reads which tools live on which page, and
+> routes itself. It is told the boundaries up front. Now it follows its own
+> entry point into the demo Studio, which uses fixed fixtures and cannot write
+> production data.
 
-### 0:20-1:30 — Studio co-design, visible changes, human-gated save
+**On screen, on arrival**
 
-**0:20-0:32 — Give the agent the design goal**
+Show the persistent `DEMO` marker, the badge preview, and the terminal together
+with the inspector.
+
+### 0:22-1:30 — Studio co-design, visible changes, human-gated save
+
+**0:22-0:32 — Give the agent the design goal**
 
 **Type or say to the agent**
 
@@ -101,7 +133,8 @@ Show the second re-render. Point to the terminal line that records the same acti
 
 **1:30-1:48 — Read the public profile**
 
-Open `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`.
+Open the share URL `find_profile` returned at 0:00, not a typed address. The
+callback is the point: the agent resolved this URL itself in the first segment.
 
 **Type or say to the agent**
 
@@ -152,6 +185,8 @@ Show the not-found result for the altered code.
 Show this compact architecture card or the matching source files:
 
 ```text
+landing: get_site_capabilities --> tool map + boundaries --> agent routes itself
+
 Quick Controls ----\
 Typed terminal -----+--> one command registry --> live Studio state --> visible re-render
 WebMCP agent -------/
@@ -164,7 +199,11 @@ demo saves: local only
 
 **Say**
 
-> One command registry has three drivers: clicks, terminal commands, and WebMCP. Real Studio tools inherit the human session. Agent saves require human confirmation; demo saves stay local. Public read tools close the trust story.
+> The landing page hands an agent a map of the site and the boundaries it must
+> respect, so it routes itself instead of guessing. From there, one command
+> registry has three drivers: clicks, terminal commands, and WebMCP. Real Studio
+> tools inherit the human session. Agent saves require human confirmation; demo
+> saves stay local. Public read tools close the trust story.
 
 Stop recording by 2:50. Keep ten seconds of safety margin under the three-minute limit.
 
