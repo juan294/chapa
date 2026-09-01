@@ -1,16 +1,32 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
+
+const scheduleAgentSurfaceFetch = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/analytics/schedule-server-event", () => ({
+  scheduleAgentSurfaceFetch,
+}));
+
 import { GET as getLlmsFullTxt } from "./route";
 
+function request(userAgent?: string): Request {
+  return new Request("http://localhost:3001/llms-full.txt", {
+    headers: userAgent ? { "user-agent": userAgent } : undefined,
+  });
+}
+
 describe("GET /llms-full.txt", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("returns text/plain with correct cache headers", () => {
-    const res = getLlmsFullTxt();
+    const res = getLlmsFullTxt(request());
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(res.headers.get("cache-control")).toContain("s-maxage=86400");
   });
 
   it("is substantially longer than basic llms.txt", async () => {
-    const res = getLlmsFullTxt();
+    const res = getLlmsFullTxt(request());
     const text = await res.text();
 
     // llms-full.txt should be significantly more detailed
@@ -18,7 +34,7 @@ describe("GET /llms-full.txt", () => {
   });
 
   it("contains detailed scoring methodology", async () => {
-    const res = getLlmsFullTxt();
+    const res = getLlmsFullTxt(request());
     const text = await res.text();
 
     expect(text).toContain("Delivery");
@@ -29,7 +45,7 @@ describe("GET /llms-full.txt", () => {
   });
 
   it("contains archetype descriptions", async () => {
-    const res = getLlmsFullTxt();
+    const res = getLlmsFullTxt(request());
     const text = await res.text();
 
     expect(text).toContain("Builder");
@@ -41,7 +57,7 @@ describe("GET /llms-full.txt", () => {
   });
 
   it("contains API and embedding documentation", async () => {
-    const res = getLlmsFullTxt();
+    const res = getLlmsFullTxt(request());
     const text = await res.text();
 
     expect(text).toContain("badge.svg");
@@ -50,8 +66,29 @@ describe("GET /llms-full.txt", () => {
     expect(text).toContain("Creator Studio");
   });
 
+  it("lists every registered WebMCP tool", async () => {
+    const text = await getLlmsFullTxt(request()).text();
+
+    for (const entry of SITE_TOOL_MAP) {
+      for (const tool of entry.tools) {
+        expect(text).toContain(tool);
+      }
+    }
+  });
+
+  it("mentions WebMCP by name", async () => {
+    expect(await getLlmsFullTxt(request()).text()).toContain("WebMCP");
+  });
+
+  it("advertises the remote Streamable HTTP MCP endpoint", async () => {
+    const text = await getLlmsFullTxt(request()).text();
+    expect(text).toContain("https://chapa.thecreativetoken.com/api/mcp");
+    expect(text).toContain("Streamable HTTP");
+    expect(text).toContain("same 9 public read-only tools");
+  });
+
   it("lists all seven Creator Studio badge categories", async () => {
-    const res = getLlmsFullTxt();
+    const res = getLlmsFullTxt(request());
     const text = await res.text();
 
     expect(text).toContain(
@@ -60,7 +97,7 @@ describe("GET /llms-full.txt", () => {
   });
 
   it("limits cryptographic claims to badges marked Verified metrics", async () => {
-    const res = getLlmsFullTxt();
+    const res = getLlmsFullTxt(request());
     const text = await res.text();
 
     expect(text).toContain('Badges marked "Verified metrics"');
@@ -68,5 +105,18 @@ describe("GET /llms-full.txt", () => {
     expect(text).not.toContain(
       "Each badge includes a cryptographic verification hash",
     );
+  });
+
+  it("describes named processing providers without claiming data is not shared", async () => {
+    const text = await getLlmsFullTxt(request()).text();
+    expect(text).toContain("No personal data is sold.");
+    expect(text).toContain("https://chapa.thecreativetoken.com/privacy");
+    expect(text).not.toContain("sold or shared with third parties");
+  });
+
+  it("delegates agent-surface scheduling", () => {
+    const req = request("GPTBot/1.2 (+https://openai.com/gptbot)");
+    getLlmsFullTxt(req);
+    expect(scheduleAgentSurfaceFetch).toHaveBeenCalledWith(req, "llms-full.txt");
   });
 });

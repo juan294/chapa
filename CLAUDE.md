@@ -478,6 +478,8 @@ GITLAB_CLIENT_SECRET=            # GitLab OAuth app secret (optional — server-
 NEXT_PUBLIC_GITLAB_ENABLED=      # Set to "true" to enable GitLab link/unlink in User Menu (optional, disabled by default)
 
 NEXT_PUBLIC_WEBMCP_ENABLED=      # Set to "true" to register Chapa's WebMCP tools into a visitor's document.modelContext (optional, disabled by default)
+MCP_SERVER_ENABLED=             # Server-only fallback for the remote MCP endpoint (optional, disabled by default)
+OPENAI_APPS_CHALLENGE_TOKEN=    # OpenAI plugin domain-verification token (server-side only, set before submission)
 
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
 ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)

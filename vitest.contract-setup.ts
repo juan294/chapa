@@ -50,6 +50,7 @@ vi.mock("@/lib/feature-flags", () => ({
   isGitlabEnabled: vi.fn(async () => true),
   isInsightsEnabled: vi.fn(async () => true),
   isExperimentsEnabled: vi.fn(async () => true),
+  isMcpServerEnabled: vi.fn(async () => true),
   isAgentEnabled: vi.fn(async () => false),
   isStudioEnabledSync: vi.fn(() => true),
   isBitbucketEnabledSync: vi.fn(() => true),

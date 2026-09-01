@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.29.0] - 2026-09-01
+
+### Added
+
+- **Agents can discover Chapa without executing client JavaScript.** The
+  landing page, `llms.txt`, `llms-full.txt`, and `.well-known/mcp.json`
+  publish the tested WebMCP catalog. Search engines also receive
+  `potentialAction` structured data for profile discovery and badge
+  verification. (#1256, #1257)
+- **Remote MCP clients can use nine public, read-only Chapa tools.** The new
+  stateless Streamable HTTP endpoint at `/api/mcp` shares schemas and product
+  libraries with the browser tools, rejects mutation requests, preserves
+  untrusted-content annotations, redacts internal confidence data, and has an
+  independent disabled-by-default feature flag. (#1259)
+- **The OpenAI plugin submission pack is ready for production review.** It
+  includes the domain challenge route, complete listing copy, tool-annotation
+  assertions, privacy and retention disclosures, starter prompts, and five
+  positive plus three negative reviewer tests. (#1260)
+- **Server analytics now distinguish agent traffic.** Static agent surfaces
+  emit classified fetch events, and remote MCP calls report tool, outcome,
+  duration, and agent class without retaining the raw user-agent string.
+  Events run after the response within the Next.js request lifetime. (#1262)
+
+### Changed
+
+- **The WebMCP catalog now has a server-safe core.** Shared schemas, payloads,
+  validation errors, verification rules, and public snapshot redaction no
+  longer depend on the client registration adapter. Boundary and drift tests
+  keep browser, static, and remote tool surfaces aligned. (#1259)
+
+### Dependencies
+
+- `@modelcontextprotocol/server`: 2.0.0
+- `mcp-handler`: 2.1.1
+
 ## [2.28.0] - 2026-09-01
 
 ### Added

@@ -194,6 +194,19 @@ function findScriptElement(
   return null;
 }
 
+function parseJsonLdScript(node: unknown): Record<string, unknown> {
+  const scriptEl = findScriptElement(node, "application/ld+json");
+  const html = scriptEl?.props.dangerouslySetInnerHTML?.__html;
+  expect(html).toBeTruthy();
+
+  return JSON.parse(
+    html!
+      .replace(/\\u003c/g, "<")
+      .replace(/\\u003e/g, ">")
+      .replace(/\\u0026/g, "&"),
+  ) as Record<string, unknown>;
+}
+
 function findElementByType(
   node: unknown,
   type: unknown,
@@ -556,19 +569,7 @@ describe("Phase 4d — Share page i18n", () => {
     // not a source-text pattern match.
     it("excludes confidence data from the rendered JSON-LD script (privacy boundary)", async () => {
       const result = await SharePageContent({ handle: "testuser" });
-
-      const scriptEl = findScriptElement(result, "application/ld+json");
-      expect(scriptEl).not.toBeNull();
-
-      const html = scriptEl!.props.dangerouslySetInnerHTML?.__html;
-      expect(html).toBeTruthy();
-
-      // renderJsonLd unicode-escapes <, >, & — undo that so JSON.parse works.
-      const unescaped = html!
-        .replace(/\\u003c/g, "<")
-        .replace(/\\u003e/g, ">")
-        .replace(/\\u0026/g, "&");
-      const parsed = JSON.parse(unescaped) as Record<string, unknown>;
+      const parsed = parseJsonLdScript(result);
 
       expect(parsed).not.toHaveProperty("confidence");
       expect(parsed).not.toHaveProperty("confidenceReasons");
@@ -576,6 +577,26 @@ describe("Phase 4d — Share page i18n", () => {
       // Belt-and-suspenders: no field anywhere in the payload should mention
       // confidence in its key or value.
       expect(JSON.stringify(parsed).toLowerCase()).not.toContain("confidence");
+    });
+
+    it("publishes a concrete badge verification action in JSON-LD", async () => {
+      const result = await SharePageContent({ handle: "testuser" });
+      const parsed = parseJsonLdScript(result);
+
+      expect(parsed.potentialAction).toEqual({
+        "@type": "ViewAction",
+        name: "Verify this badge's data integrity",
+        target: "https://chapa.thecreativetoken.com/verify/abc12345",
+      });
+    });
+
+    it("omits the badge verification action when no verification exists", async () => {
+      mockGetPublicProfileVerification.mockReturnValue(null);
+
+      const result = await SharePageContent({ handle: "testuser" });
+      const parsed = parseJsonLdScript(result);
+
+      expect(parsed).not.toHaveProperty("potentialAction");
     });
   });
 

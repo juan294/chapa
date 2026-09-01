@@ -358,6 +358,15 @@ export async function SharePageContent({
           description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier).`,
         }
       : {}),
+    ...(verification?.hash
+      ? {
+          potentialAction: {
+            "@type": "ViewAction",
+            name: "Verify this badge's data integrity",
+            target: `${BASE_URL}/verify/${verification.hash}`,
+          },
+        }
+      : {}),
   };
 
   const badgeLabelId = `share-badge-label-${handle}`;

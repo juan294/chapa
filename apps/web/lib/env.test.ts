@@ -3,6 +3,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   getBaseUrl,
   getAdminHandles,
+  getMcpServerEnabledEnv,
+  getOpenaiAppsChallengeToken,
   getVercelGitCommitSha,
   getWarmCachePriorityHandles,
 } from "./env";
@@ -87,6 +89,38 @@ describe("getAdminHandles", () => {
   it("returns empty array when ADMIN_HANDLES is not set", () => {
     vi.stubEnv("ADMIN_HANDLES", undefined);
     expect(getAdminHandles()).toEqual([]);
+  });
+});
+
+describe("getMcpServerEnabledEnv", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("reads and trims the server-only MCP flag", () => {
+    vi.stubEnv("MCP_SERVER_ENABLED", " true \n");
+    expect(getMcpServerEnabledEnv()).toBe("true");
+  });
+
+  it("does not expose an empty fallback value", () => {
+    vi.stubEnv("MCP_SERVER_ENABLED", "  ");
+    expect(getMcpServerEnabledEnv()).toBeUndefined();
+  });
+});
+
+describe("getOpenaiAppsChallengeToken", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("reads and trims the server-only challenge token", () => {
+    vi.stubEnv("OPENAI_APPS_CHALLENGE_TOKEN", " challenge-token \n");
+    expect(getOpenaiAppsChallengeToken()).toBe("challenge-token");
+  });
+
+  it("does not expose an empty token", () => {
+    vi.stubEnv("OPENAI_APPS_CHALLENGE_TOKEN", "  ");
+    expect(getOpenaiAppsChallengeToken()).toBeUndefined();
   });
 });
 

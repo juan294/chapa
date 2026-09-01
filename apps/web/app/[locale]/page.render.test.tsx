@@ -7,6 +7,7 @@ import { LangSync } from "@/lib/i18n/lang-sync";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 
 // page.tsx computes the demo badge SVG at module scope, resolves the
 // [locale] route param, and calls the REAL getServerT(locale) — this is the
@@ -180,6 +181,19 @@ describe("Home page render (en)", () => {
     expect(screen.getByText("dimensions")).toBeDefined();
   });
 
+  it("renders the static WebMCP tool catalog", async () => {
+    const { container } = await renderHome();
+    const section = container.querySelector("#agent-tools");
+
+    expect(section).not.toBeNull();
+    expect(section?.textContent).toContain("WebMCP");
+    for (const entry of SITE_TOOL_MAP) {
+      for (const tool of entry.tools) {
+        expect(section?.textContent).toContain(tool);
+      }
+    }
+  });
+
   it("renders error banner when error param present in the URL", async () => {
     window.history.pushState({}, "", "/?error=access_denied");
     await renderHome();
@@ -247,6 +261,7 @@ describe("Home page render (es) — locale-segmented RSC, no client re-render", 
     // Spanish dict: landing.hero.highlight = 'decodificado' (mirrors the
     // English 'decoded' key exercised above).
     expect(screen.getByText("decodificado")).toBeDefined();
+    expect(screen.getByText("Herramientas para agentes")).toBeDefined();
   });
 
   it("renders the navbar for the es render too", async () => {

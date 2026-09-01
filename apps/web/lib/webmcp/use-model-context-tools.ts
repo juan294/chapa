@@ -3,33 +3,16 @@
 import { useEffect, useRef } from "react";
 import { messageFromReason } from "@/lib/analytics/error-message";
 import { trackEvent } from "@/lib/analytics/posthog";
+import { WEBMCP_INVALID_INPUT_PREFIX } from "./errors";
+import type { WebMcpTool } from "./shared-tools";
 
-export interface WebMcpToolAnnotations {
-  readOnlyHint?: boolean;
-  untrustedContentHint?: boolean;
-}
-
-export interface WebMcpExecutionContext {
-  signal: AbortSignal;
-}
-
-export interface WebMcpTool {
-  name: string;
-  title?: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  annotations?: WebMcpToolAnnotations;
-  execute(
-    inputs: Record<string, unknown>,
-    context: WebMcpExecutionContext,
-  ): string | Promise<string>;
-}
-
-export const WEBMCP_INVALID_INPUT_PREFIX = "Invalid input for ";
-
-export function invalidInput(tool: string, message: string): string {
-  return `${WEBMCP_INVALID_INPUT_PREFIX}${tool}: ${message}.`;
-}
+export {
+  invalidInput,
+  WEBMCP_INVALID_INPUT_PREFIX,
+} from "./errors";
+export type {
+  WebMcpTool,
+} from "./shared-tools";
 
 function captureToolEvent(event: string, properties: Record<string, unknown>): void {
   try {

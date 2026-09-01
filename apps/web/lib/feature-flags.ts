@@ -16,6 +16,7 @@ import { dbGetFeatureFlag } from "./db/feature-flags";
 import { withTimeout } from "./async/with-timeout";
 import {
   getExperimentsEnabledEnv,
+  getMcpServerEnabledEnv,
 } from "@/lib/env";
 import {
   isStudioEnabledSync,
@@ -148,6 +149,14 @@ export async function isWebmcpEnabled(): Promise<boolean> {
     "webmcp_enabled",
     isWebmcpEnabledSync() ? "true" : undefined,
   );
+}
+
+/**
+ * Check whether the stateless remote MCP endpoint is enabled.
+ * This server-only flag is independent from browser-side WebMCP registration.
+ */
+export async function isMcpServerEnabled(): Promise<boolean> {
+  return checkFlag("mcp_server_enabled", getMcpServerEnabledEnv());
 }
 
 /**

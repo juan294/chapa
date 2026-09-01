@@ -1,3 +1,5 @@
+import { scheduleAgentSurfaceFetch } from "@/lib/analytics/schedule-server-event";
+
 const LLMS_TXT = `# Chapa — Developer Impact Badge
 
 > https://chapa.thecreativetoken.com
@@ -27,6 +29,21 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 - \`GET /api/history/{handle}\` — Score history, trend analysis, and snapshot diffs. Public, rate-limited.
 - \`GET /studio\` — Creator Studio for badge visual customization.
 
+## Agent Tools (WebMCP)
+
+Chapa registers browser-native WebMCP tools through \`document.modelContext\` on 4 pages. An agent driving a WebMCP-capable browser can operate the site directly. There are 18 distinct tools across these pages:
+
+- \`/\`: \`get_site_capabilities\`, \`find_profile\`
+- \`/studio\` and \`/studio?demo=1\` (no login in demo mode): \`list_style_options\`, \`apply_badge_style\`, \`apply_preset\`, \`preview_badge\`, \`reset_badge_config\`, \`save_badge_config\`, \`simulate_score\`, \`suggest_improvements\`, \`explain_dimension\`
+- \`/u/{handle}\`: \`get_impact_profile\`, \`get_impact_history\`, \`verify_badge\`, \`explain_dimension\`, \`compare_profiles\`, \`get_embed_snippet\`
+- \`/verify/{hash}\`: \`get_verification_record\`, \`explain_verification\`
+
+Tool registration happens at page load in client JavaScript. Full catalog: https://chapa.thecreativetoken.com/llms-full.txt
+
+Machine-readable catalog: https://chapa.thecreativetoken.com/.well-known/mcp.json
+
+Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless Streamable HTTP with the same 9 public read-only tools as their WebMCP twins.
+
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com
@@ -55,7 +72,7 @@ Software developers, open source contributors, and engineering teams who want to
 
 - Only public data from linked platforms is accessed (no private repos).
 - Scores are cached for 24 hours, then recomputed.
-- No personal data is sold or shared with third parties.
+- No personal data is sold. Processing providers are Vercel, Upstash Redis, Supabase, Resend, and PostHog; details and purposes: https://chapa.thecreativetoken.com/privacy
 - Privacy policy: https://chapa.thecreativetoken.com/privacy
 
 ## Contact
@@ -65,7 +82,8 @@ Software developers, open source contributors, and engineering teams who want to
 - Twitter/X: @chapabadge
 `;
 
-export function GET(): Response {
+export function GET(request: Request): Response {
+  scheduleAgentSurfaceFetch(request, "llms.txt");
   return new Response(LLMS_TXT, {
     status: 200,
     headers: {

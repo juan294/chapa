@@ -5,10 +5,10 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { getBaseUrl } from "@/lib/env";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { toPublicVerificationRecord } from "@/lib/verification/types";
+import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
 
 // Legacy pre-v2 payload hashes remain valid through this 90-day deprecation window.
 export const LEGACY_PRE_V2_DEADLINE = "2026-07-19";
-const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
 export const GET = withErrorCapture("/api/verify/[hash]", async (
   request: NextRequest,
@@ -18,7 +18,7 @@ export const GET = withErrorCapture("/api/verify/[hash]", async (
 
   // Validate hash format. Legacy 32-char pre-v2 hashes remain accepted until
   // LEGACY_PRE_V2_DEADLINE, after which the regex can be tightened in follow-up work.
-  if (!HASH_PATTERN.test(hash)) {
+  if (!VERIFICATION_HASH_PATTERN.test(hash)) {
     return NextResponse.json(
       { error: "Invalid hash format. Expected 8, 16, or 32 hex characters." },
       { status: 400, headers: { "Access-Control-Allow-Origin": "*" } },

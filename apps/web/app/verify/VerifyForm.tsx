@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTranslation } from "@/lib/i18n";
-
-const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
+import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
 
 export function VerifyForm() {
   const router = useRouter();
@@ -15,7 +14,7 @@ export function VerifyForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = hash.trim().toLowerCase();
-    if (!HASH_PATTERN.test(trimmed)) {
+    if (!VERIFICATION_HASH_PATTERN.test(trimmed)) {
       setError(t('verifyForm.invalidHash') as string);
       return;
     }

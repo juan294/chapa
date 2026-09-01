@@ -107,11 +107,13 @@ export const es: Translations = {
       explain: '{count} pasos · ~1 min',
       score: 'compuesta {score} · {tier}',
       enterprise: 'emu · opcional',
+      agentTools: 'exit 0 · {tools} herramientas · {pages} páginas',
     },
     sections: {
       features: 'Funciones',
       howItWorks: 'Cómo funciona',
       enterprise: 'Empresa',
+      agentTools: 'Herramientas para agentes',
     },
     features: [
       {
@@ -188,6 +190,10 @@ export const es: Translations = {
       howToUseTextAfter: 'y sigue los pasos. Tarda menos de un minuto.',
       noEmu: '¿SIN EMU?',
       noEmuText: 'No pasa nada: tu actividad pública de desarrollo es suficiente. La CLI es opcional.',
+    },
+    agentTools: {
+      intro: 'Este sitio habla WebMCP. Abre una página de la lista en un navegador compatible con WebMCP para usar sus herramientas.',
+      boundary: 'Las herramientas de solo lectura consultan datos públicos. Las herramientas de Creator Studio pueden cambiar el estado visible de la página, pero guardar siempre espera el clic de una persona.',
     },
     stats: [
       { value: '7', label: 'arquetipos' },
@@ -679,7 +685,7 @@ export const es: Translations = {
       metadataOgTitle: 'Política de privacidad — Chapa',
       h1Before: 'Política de ',
       h1Highlight: 'privacidad',
-      lastUpdated: 'Última actualización: agosto de 2026',
+      lastUpdated: 'Última actualización: septiembre de 2026',
       sections: [
         {
           heading: '1. Información que recopilamos',
@@ -687,11 +693,11 @@ export const es: Translations = {
         },
         {
           heading: '2. Cómo usamos tu información',
-          body: 'Usamos tus datos de actividad de desarrollo para calcular tu Perfil de Impacto de Desarrollador, generar tu Chapa y ofrecer las funciones relacionadas de historial y verificación. Almacenamos datos en caché para reducir las llamadas a las API. No vendemos tus datos. Usamos proveedores de alojamiento, almacenamiento, envío de correo y analítica solo para operar Chapa.',
+          body: 'Usamos tus datos de actividad de desarrollo para calcular tu Perfil de Impacto de Desarrollador, generar tu Chapa y ofrecer las funciones relacionadas de historial y verificación. Almacenamos datos en caché para reducir las llamadas a las API. No vendemos tus datos. Usamos Vercel para alojamiento y analítica, Upstash Redis y Supabase para almacenamiento, Resend para el envío de correo y PostHog para analítica solo con el fin de operar Chapa.',
         },
         {
           heading: '3. Almacenamiento de datos',
-          body: 'Los datos de sesión se almacenan en una cookie cifrada HTTP-only en tu navegador. Upstash Redis almacena cachés temporales y registros de coordinación del servicio con plazos de expiración que varían según el tipo de registro. Supabase almacena registros duraderos de cuenta, credenciales de plataformas vinculadas, actividad suplementaria, configuración guardada de la Chapa, registros de verificación e instantáneas históricas del Impacto de Desarrollador. Estos registros duraderos no se eliminan cuando expira una entrada de caché de Redis.',
+          body: 'Los datos de sesión se almacenan en una cookie cifrada HTTP-only en tu navegador. Upstash Redis almacena cachés temporales y registros de coordinación del servicio con plazos de expiración que varían según el tipo de registro. Supabase almacena registros duraderos de cuenta, credenciales de plataformas vinculadas, actividad suplementaria, configuración guardada de la Chapa, registros de verificación, instantáneas históricas del Impacto de Desarrollador y telemetría de fusiones de la CLI. Los registros de verificación caducan a los 30 días. Las instantáneas históricas pueden eliminarse después de 365 días y la telemetría de fusiones de la CLI después de 90 días. Los registros vinculados a la cuenta, incluidas las credenciales de plataformas vinculadas, la actividad suplementaria y la configuración guardada de la Chapa, se conservan mientras sean necesarios para ofrecer Chapa o hasta que solicites su eliminación. Los registros duraderos no se eliminan solo porque caduque una entrada de caché de Redis.',
         },
         {
           heading: '4. Analítica',

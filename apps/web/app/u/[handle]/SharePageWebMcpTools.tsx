@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import {
-  DIMENSION_KEYS,
   type ClientImpactV6Result,
   type CraftResult,
   type StatsData,
@@ -13,9 +12,13 @@ import type { TrendSummary } from "@/lib/history/trend";
 import { useTranslation } from "@/lib/i18n";
 import { isValidHandle } from "@/lib/validation";
 import {
+  COMPARE_PROFILES_INPUT_SCHEMA,
+  compareDimensions,
+  publicStats,
+} from "@/lib/webmcp/catalog";
+import {
   createExplainDimensionTool,
   isWebMcpRecord,
-  sanitizeFreeTextForAgent,
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
 } from "@/lib/webmcp/shared-tools";
@@ -42,15 +45,6 @@ interface SharePageWebMcpToolsProps {
   embedHtml: string;
 }
 
-const COMPARE_PROFILES_INPUT_SCHEMA = {
-  type: "object",
-  properties: {
-    other_handle: { type: "string" },
-  },
-  required: ["other_handle"],
-  additionalProperties: false,
-};
-
 async function readJson(response: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await response.json();
@@ -58,40 +52,6 @@ async function readJson(response: Response): Promise<Record<string, unknown> | n
   } catch {
     return null;
   }
-}
-
-function publicStats(stats: StatsData) {
-  return {
-    // Projection for the WebMCP tool boundary only -- bounded and neutralised
-    // before crossing into a visitor's agent context. The SVG and share-page
-    // HTML render paths consume `stats.displayName` directly and are
-    // untouched by this projection (#1171 / SE-M2).
-    displayName: sanitizeFreeTextForAgent(stats.displayName),
-    commitsTotal: stats.commitsTotal,
-    activeDays: stats.activeDays,
-    prsMergedCount: stats.prsMergedCount,
-    reviewsSubmittedCount: stats.reviewsSubmittedCount,
-    issuesClosedCount: stats.issuesClosedCount,
-    reposContributed: stats.reposContributed,
-    totalStars: stats.totalStars,
-    totalForks: stats.totalForks,
-    totalWatchers: stats.totalWatchers,
-  };
-}
-
-function compareDimensions(
-  current: ClientImpactV6Result["dimensions"],
-  other: Record<string, unknown>,
-): Partial<Record<(typeof DIMENSION_KEYS)[number], number>> {
-  const differences: Partial<Record<(typeof DIMENSION_KEYS)[number], number>> = {};
-  for (const key of DIMENSION_KEYS) {
-    const currentScore = current[key];
-    const otherScore = other[key];
-    if (typeof currentScore === "number" && typeof otherScore === "number") {
-      differences[key] = otherScore - currentScore;
-    }
-  }
-  return differences;
 }
 
 export function SharePageWebMcpTools({
