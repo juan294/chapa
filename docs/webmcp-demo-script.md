@@ -136,6 +136,17 @@ Show the second re-render. Point to the terminal line that records the same acti
 Open the share URL `find_profile` returned at 0:00, not a typed address. The
 callback is the point: the agent resolved this URL itself in the first segment.
 
+**Let the page finish painting before you ask the agent anything.** The share
+page registers its tools noticeably later than the Studio does, because it is
+a heavier page and the tool host mounts after hydration. Measured against
+production on 2026-09-01: `/studio?demo=1` had all 9 tools at 0ms, while
+`/u/:handle` still reported **zero** tools 8.7 seconds after navigation and
+then registered all 6 once hydration completed. An agent queried too early
+sees an empty tool list, which reads as broken on camera.
+
+Wait for the score, badge, and breakdown to be fully visible, then continue.
+This costs about two seconds and is already inside this segment's budget.
+
 **Type or say to the agent**
 
 > Read this profile, then verify its badge.
@@ -229,7 +240,7 @@ Stop recording by 2:50. Keep ten seconds of safety margin under the three-minute
 4. Use the Model Context Tool Inspector or another WebMCP-capable client to discover the Studio tools.
 5. Call `list_style_options`, `apply_preset`, and `apply_badge_style`. Confirm that each action appears in the terminal and re-renders the badge.
 6. Call `save_badge_config`. Confirm that no save occurs until a human clicks **Confirm save**, then confirm that demo mode reports `(demo) configuration not persisted`.
-7. Open `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`. Call `get_impact_profile`, then `verify_badge`.
+7. Open `TODO_LIVE_URL/u/TODO_PUBLIC_HANDLE`. **Let the page finish loading before you list tools.** This page registers its six tools after hydration, later than the Studio does, so a tool list requested immediately on navigation can come back empty. Wait for the score and badge to be visible, then call `get_impact_profile`, then `verify_badge`.
 8. Call `get_embed_snippet`. Confirm that the returned Markdown matches the on-page embed snippet.
 9. Open the verification URL returned by `verify_badge` in step 7. Change one hex character to confirm that an unknown code has no stored verification record.
 10. ChatGPT in-app browser support is **untested**, not known to fail. Use the tested Chrome setup for judging.
