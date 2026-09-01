@@ -1,12 +1,13 @@
 {
-  "lastSyncCommit": "2229ac2c3e0830e333dfec5b25033311b7d4dd0a",
+  "lastSyncCommit": "a423402540808c92292e0d7a6b4af80304594902",
   "lastSyncDate": "2026-09-01",
-  "blueprintVersion": "v1.28.2",
+  "blueprintVersion": "v1.29.0",
   "agentsTemplateSynced": true,
   "rulesSynced": [
     "rpi-details.md",
     "push-accountability.md",
-    "testing.md"
+    "testing.md",
+    "webmcp.md"
   ],
   "rulesCustom": []
 }
