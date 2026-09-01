@@ -253,7 +253,7 @@ describe("useStudioWebMcpTools", () => {
       currentConfig: BadgeConfig;
     };
 
-    expect(payload.categories).toHaveLength(6);
+    expect(payload.categories).toHaveLength(7);
     expect(payload.categories[0]).toMatchObject({
       key: "background",
       alias: "bg",

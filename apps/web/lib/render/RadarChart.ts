@@ -1,5 +1,5 @@
 import type { DimensionScores } from "@chapa/shared";
-import { WARM_AMBER } from "./theme";
+import { WARM_AMBER, type BadgeTheme } from "./theme";
 
 /**
  * Locale-resolved label strings for the radar chart. Optional so existing
@@ -52,8 +52,9 @@ export function renderRadarChart(
   cy: number,
   radius: number,
   labels: RadarChartLabels = DEFAULT_RADAR_LABELS,
+  theme: BadgeTheme = WARM_AMBER,
 ): string {
-  const t = WARM_AMBER;
+  const t = theme;
 
   const hasCraft = dimensions.craft != null;
 

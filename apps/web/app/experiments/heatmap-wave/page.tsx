@@ -47,7 +47,7 @@ export default function HeatmapWavePage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight text-text-primary sm:text-4xl md:text-5xl">
           Heatmap Wave Animation
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-text-secondary">
+        <p className="mt-4 text-lg leading-relaxed text-text-secondary">
           Five cell-reveal patterns for the contribution heatmap. Each cell
           scales and fades in with a computed delay, creating a wave, ripple,
           scatter, cascade, or waterfall effect.

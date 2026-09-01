@@ -190,7 +190,7 @@ export default function GradientBorderExperiment() {
               Animated Gradient{" "}
               <span className="text-amber">Border</span>
             </h1>
-            <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-2xl">
+            <p className="text-text-secondary text-base sm:text-lg leading-relaxed">
               A warm amber gradient slowly rotates around the badge card edge.
               Three variations demonstrate different border thicknesses and
               effects. Uses CSS <code className="font-heading text-amber/70 text-sm">@property</code> for

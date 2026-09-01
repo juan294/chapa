@@ -522,7 +522,7 @@ export default function HexmapExperimentPage() {
         <h1 className="font-heading text-3xl font-bold tracking-tight text-text-primary sm:text-4xl md:text-5xl">
           Hexagonal Heatmap
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-text-secondary">
+        <p className="mt-4 text-lg leading-relaxed text-text-secondary">
           Honeycomb-shaped activity heatmap with per-day dimension coloring.
           Three variations: single dominant color, dual-dimension blend, and
           radial glow on dark.

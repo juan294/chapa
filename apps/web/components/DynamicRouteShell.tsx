@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n/types";
 import type { NavLinkItem } from "@/components/NavbarShell";
 import { DEFAULT_LOCALE, LanguageProvider } from "@/lib/i18n";
-import { DocumentLocaleScript } from "@/lib/i18n/document-locale-script";
+import { DocumentLocaleMarker } from "@/lib/i18n/document-locale";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { Navbar } from "@/components/Navbar";
@@ -25,7 +25,7 @@ interface DynamicRouteShellProps {
  * The root layout is static: it cannot read cookies or headers, so it pins the
  * locale at `DEFAULT_LOCALE` (#861, which is what keeps ISR alive) and sources
  * no session. Every dynamic route therefore needs three separate corrections —
- * the server `Navbar` for session, `DocumentLocaleScript` for the `<html lang>`
+ * the server `Navbar` for session, `DocumentLocaleMarker` for the `<html lang>`
  * attribute, and a nested `LanguageProvider` for the real dictionary.
  *
  * Choosing those three by hand, per page, is what this fixes. Before it, the
@@ -50,7 +50,7 @@ export function DynamicRouteShell({
 }: DynamicRouteShellProps) {
   return (
     <>
-      <DocumentLocaleScript locale={locale} />
+      <DocumentLocaleMarker locale={locale} />
       <LanguageProvider
         initialLocale={locale}
         // #1071 — the root layout's LanguageProvider already serializes the

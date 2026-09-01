@@ -126,11 +126,13 @@ describe("SettingsClient", () => {
 
   // Unlinking drops a platform's activity out of the impact score, so it stays
   // behind the same confirm dialog the menu used.
-  // The row button and the dialog's confirm button share the label "Unlink",
-  // so both are scoped rather than matched by text across the whole page.
+  // The row button is named after its platform (#1238); the dialog's confirm
+  // button is the one that reads plain "Unlink".
   function openUnlinkDialog() {
     const row = screen.getByTestId("settings-connection-bitbucket");
-    fireEvent.click(within(row).getByRole("button", { name: "Unlink" }));
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Unlink Bitbucket account" }),
+    );
     return screen.getByRole("alertdialog");
   }
 
@@ -168,6 +170,37 @@ describe("SettingsClient", () => {
     mocks.insightsEnabled.mockReturnValue(false);
     renderSettings();
     expect(screen.queryByTestId("settings-insights")).toBeNull();
+  });
+
+  // #1238 — the menu carried per-platform aria labels for these controls and
+  // /settings did not, so the three unlink buttons all announced as plain
+  // "Unlink" and the file input had no accessible name at all. The dictionary
+  // keys already existed; only the call sites were missing.
+  it("names each unlink button after its own platform", () => {
+    mocks.connections.mockReturnValue([
+      connection("bitbucket", { status: { linked: true, remoteLogin: "octo-bb" } }),
+      connection("codeberg", { status: { linked: true, remoteLogin: "octo-cb" } }),
+      connection("gitlab", { status: { linked: true, remoteLogin: "octo-gl" } }),
+    ]);
+    renderSettings();
+
+    for (const name of [
+      "Unlink Bitbucket account",
+      "Unlink Codeberg account",
+      "Unlink GitLab account",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+  });
+
+  it("gives the insights file input an accessible name", () => {
+    renderSettings();
+    const input = screen
+      .getByTestId("settings-insights")
+      .querySelector('input[type="file"]');
+    expect(input?.getAttribute("aria-label")).toBe(
+      "Select Claude Code insights HTML report",
+    );
   });
 
   it("disables the import during its cooldown and says when it returns", () => {

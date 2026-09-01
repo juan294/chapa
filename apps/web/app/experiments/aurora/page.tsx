@@ -188,7 +188,7 @@ export default function AuroraExperimentPage() {
             <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary tracking-tight mb-3">
               Aurora Borealis <span className="text-amber">Background</span>
             </h1>
-            <p className="text-text-secondary text-lg leading-relaxed max-w-2xl font-body">
+            <p className="text-text-secondary text-lg leading-relaxed font-body">
               Large, slowly drifting amber glow blobs creating a living,
               atmospheric backdrop behind the badge card.
             </p>

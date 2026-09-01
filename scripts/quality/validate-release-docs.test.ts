@@ -25,6 +25,9 @@ function compliantPlaybook(): string {
   return [
     "# Release",
     "Fix candidateTreeDigest.",
+    "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"",
+    "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"",
+    "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"",
     "Create or reuse the release PR.",
     "gh pr checks --required --watch --fail-fast",
     "pending migrations check (release PR) is a required check.",
@@ -112,6 +115,31 @@ describe("validateReleaseDocs", () => {
 
     expect(validateReleaseDocs(root)).toContain(
       ".claude/commands/release.md: must delegate to docs/release/release-playbook.md",
+    );
+  });
+
+  it("rejects the ancestry-only preflight that fails after a merge promotion", () => {
+    const root = compliantRoot();
+    write(
+      root,
+      "docs/release/release-playbook.md",
+      compliantPlaybook()
+        .replace(
+          "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"\n",
+          "",
+        )
+        .replace(
+          "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"\n",
+          "git merge-base --is-ancestor origin/main origin/develop\n",
+        )
+        .replace(
+          "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"\n",
+          "",
+        ),
+    );
+
+    expect(validateReleaseDocs(root)).toContain(
+      "docs/release/release-playbook.md: preflight must prove the prospective main tree equals the develop tree",
     );
   });
 
@@ -276,6 +304,16 @@ describe("repository release procedure", () => {
     ]) {
       expect(playbook).toContain(required);
     }
+    for (const required of [
+      "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"",
+      "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"",
+      "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"",
+    ]) {
+      expect(playbook).toContain(required);
+    }
+    expect(playbook).not.toContain(
+      "git merge-base --is-ancestor origin/main origin/develop",
+    );
   });
 
   it("binds the release baseline and rollback target to production identity", () => {

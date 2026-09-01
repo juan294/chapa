@@ -261,6 +261,17 @@ export type BadgeBorder = "solid-amber" | "gradient-rotating" | "none";
 export type BadgeScoreEffect = "standard" | "gold-shimmer" | "gold-leaf" | "chrome" | "embossed" | "neon-amber" | "holographic";
 export type BadgeHeatmapAnimation = "fade-in" | "diagonal" | "ripple" | "scatter" | "cascade" | "waterfall";
 export type BadgeTierTreatment = "standard" | "enhanced";
+/**
+ * Badge colour direction (#1242). Each palette carries an accent ramp AND its
+ * own ground, so an option reads as "accent on ground". `jade` is the default
+ * and holds exactly the values the badge shipped with, so an existing badge
+ * does not move when this lands.
+ *
+ * Note for future readers: `amber` here is a warm gold. It is unrelated to the
+ * app's `--color-amber` CSS token, which is (confusingly) jade green — see the
+ * naming note in docs/design-system.md.
+ */
+export type BadgePalette = "jade" | "indigo" | "amber" | "crimson" | "mono";
 
 /**
  * User-authored badge visual configuration.
@@ -281,6 +292,7 @@ export interface BadgeConfig {
   scoreEffect: BadgeScoreEffect;
   heatmapAnimation: BadgeHeatmapAnimation;
   tierTreatment: BadgeTierTreatment;
+  colorPalette: BadgePalette;
 }
 
 /**
@@ -306,6 +318,7 @@ export const BADGE_CONFIG_OPTIONS = {
   scoreEffect: ["standard", "gold-shimmer", "gold-leaf", "chrome", "embossed", "neon-amber", "holographic"] as const,
   heatmapAnimation: ["fade-in", "diagonal", "ripple", "scatter", "cascade", "waterfall"] as const,
   tierTreatment: ["standard", "enhanced"] as const,
+  colorPalette: ["jade", "indigo", "amber", "crimson", "mono"] as const,
 } as const;
 
 /** Default config — all fields set to their first (most basic) option */
@@ -316,6 +329,7 @@ export const DEFAULT_BADGE_CONFIG: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
+  colorPalette: "jade",
 };
 
 // ---------------------------------------------------------------------------

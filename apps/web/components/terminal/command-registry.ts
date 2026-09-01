@@ -60,6 +60,7 @@ export const CATEGORY_ALIASES = {
   score: "scoreEffect",
   heatmap: "heatmapAnimation",
   tier: "tierTreatment",
+  palette: "colorPalette",
 } as const satisfies Readonly<Record<string, string>>;
 
 type CategoryAlias = keyof typeof CATEGORY_ALIASES;

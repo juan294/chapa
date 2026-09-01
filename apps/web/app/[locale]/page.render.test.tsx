@@ -134,20 +134,35 @@ describe("Home page render (en)", () => {
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
   });
 
-  it("emits an early document-language assignment for the selected route", async () => {
-    const { container } = await renderHome();
-    const script = container.querySelector(
-      'script[data-chapa-document-locale="en"]',
-    );
-    expect(script?.textContent).toBe('document.documentElement.lang="en";');
-  });
-
   it("renders feature cards", async () => {
     await renderHome();
     // English dict: landing.features[0].title = 'MULTI-DIMENSIONAL'
     expect(screen.getByText("MULTI-DIMENSIONAL")).toBeDefined();
     // English dict: landing.features[2].title = 'VERIFIED METRICS'
     expect(screen.getByText("VERIFIED METRICS")).toBeDefined();
+  });
+
+  // Hero bullets get a leading jade marker (not the brand-accent amber, since
+  // it must stay distinguishable from the H1's amber highlight) plus bolded
+  // keywords parsed out of **word** markers in the dictionary string — the
+  // markup itself carries no raw asterisks once rendered.
+  it("renders each hero bullet with a jade marker and bolded keywords, no raw markdown", async () => {
+    const { container } = await renderHome();
+    const markers = Array.from(
+      container.querySelectorAll('[aria-hidden="true"]'),
+    ).filter((el) => el.textContent === "▸");
+    // English dict: landing.hero.bullets has 3 entries
+    expect(markers).toHaveLength(3);
+    for (const marker of markers) {
+      expect(marker.className).toContain("text-terminal-green");
+      expect(marker.className).not.toContain("text-amber");
+    }
+
+    // English dict: landing.hero.bullets[0] bolds "whole story"
+    const bold = screen.getByText("whole story");
+    expect(bold.tagName).toBe("STRONG");
+
+    expect(container.textContent).not.toContain("**");
   });
 
   it("renders how-it-works steps", async () => {

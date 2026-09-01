@@ -62,21 +62,15 @@ const flagCache = new Map<string, { value: boolean; expiresAt: number }>();
 // Map's 5-minute TTL below (the ONLY bound on a warm serverless instance
 // that never observes `revalidateTag`) and by `revalidateTag` on every
 // admin flag mutation (`apps/web/app/api/admin/feature-flags/route.ts`).
-// #1203 — the rejection is deliberately NOT caught in here. It used to be
-// (`.catch(() => null)`), which made a timeout indistinguishable from "no such
-// row" AND stored that `null` in the data cache for the full hour, baking it
-// into statically prerendered output. `checkFlag` then fell back to the env
-// var, so one 500ms blip disabled a flag whose DB row said `true` until the
-// next revalidation. Letting it reject leaves nothing cached (Next does not
-// store a rejected promise), so the next request retries; `checkFlag` handles
-// the degraded case per-request.
+// Keep the 500ms request deadline OUTSIDE this data-cache producer. A slow
+// successful lookup should keep running and warm the cache after the current
+// request falls back. If the timeout rejects inside `unstable_cache`, Next.js
+// reports it as a cache revalidation error even though `checkFlag` handles the
+// degraded request. The outer timeout also preserves #1203's rule: its env
+// fallback is never passed into `unstable_cache`, so a transient deadline does
+// not become a cached negative for the full revalidation window.
 const fetchFlagFromDbCached = unstable_cache(
-  (key: string) =>
-    withTimeout(
-      dbGetFeatureFlag(key),
-      FLAG_DB_TIMEOUT_MS,
-      `featureFlag:${key}`,
-    ),
+  (key: string) => dbGetFeatureFlag(key),
   ["feature-flag-v1"],
   { revalidate: 3600, tags: [FEATURE_FLAG_CACHE_TAG] },
 );
@@ -90,7 +84,11 @@ async function checkFlag(
 
   let flag: Awaited<ReturnType<typeof fetchFlagFromDbCached>>;
   try {
-    flag = await fetchFlagFromDbCached(dbKey);
+    flag = await withTimeout(
+      fetchFlagFromDbCached(dbKey),
+      FLAG_DB_TIMEOUT_MS,
+      `featureFlag:${dbKey}`,
+    );
   } catch {
     // The lookup failed (timeout or DB error). Degrade to the env var for THIS
     // request only and cache nothing, so the next call retries and can still

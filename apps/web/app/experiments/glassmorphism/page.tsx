@@ -61,7 +61,7 @@ export default function GlassmorphismExperimentPage() {
           <h1 className="font-heading text-3xl font-bold tracking-tight text-text-primary sm:text-4xl md:text-5xl">
             Dark Glassmorphism
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-text-secondary leading-relaxed">
+          <p className="mt-4 text-text-secondary leading-relaxed">
             Frosted glass containers with warm amber tint on a rich background.
             The key insight: glassmorphism only works when there is something
             colorful behind the glass. Toggle the background blobs off to see
@@ -126,7 +126,7 @@ export default function GlassmorphismExperimentPage() {
           <h2 className="font-heading mb-8 text-2xl font-bold tracking-tight text-text-primary">
             Stacked Glass Panels
           </h2>
-          <p className="mb-8 max-w-xl text-text-secondary leading-relaxed">
+          <p className="mb-8 text-text-secondary leading-relaxed">
             Multiple glass layers create a sense of depth. The lightest panel sits
             furthest back, the heaviest sits on top. Each layer picks up blur
             from the layers below it.
@@ -204,7 +204,7 @@ export default function GlassmorphismExperimentPage() {
           <h2 className="font-heading mb-8 text-2xl font-bold tracking-tight text-text-primary">
             Impact Breakdown
           </h2>
-          <p className="mb-8 max-w-xl text-text-secondary leading-relaxed">
+          <p className="mb-8 text-text-secondary leading-relaxed">
             Testing data density inside glass containers. Each stat category
             lives in its own glass card, demonstrating that progress bars, text,
             and numbers remain readable through the frosted effect.

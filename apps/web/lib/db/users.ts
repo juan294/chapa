@@ -129,6 +129,53 @@ export async function dbUpsertUser(
   }
 }
 
+interface UserProfileFields {
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}
+
+/**
+ * Refresh a registered user's display name and avatar. UPDATE only — never
+ * inserts.
+ *
+ * This is the badge/share-page path, and it must not be able to create a row.
+ * `/u/:handle` and `/u/:handle/badge.svg` accept any handle on earth, so the
+ * upsert that used to live here quietly registered people who had never
+ * visited Chapa (Guido van Rossum and Linus Torvalds among them), after which
+ * the warm-cache cron adopted them and recomputed their profile daily
+ * (#1239). Registration is the OAuth callback's job alone.
+ *
+ * A handle with no row simply matches nothing, which is the intended no-op.
+ */
+export async function dbUpdateUserProfile(
+  handle: string,
+  fields: UserProfileFields,
+): Promise<void> {
+  if (!isValidHandle(handle)) return;
+
+  const row: Record<string, string | null> = {};
+  if (fields.displayName !== undefined) row.display_name = fields.displayName;
+  if (fields.avatarUrl !== undefined) row.avatar_url = fields.avatarUrl;
+  if (Object.keys(row).length === 0) return;
+
+  const db = getSupabase();
+  if (!db) return;
+
+  try {
+    const { error } = await db
+      .from("users")
+      .update(row)
+      .eq("handle", handle.toLowerCase());
+
+    if (error) throw error;
+  } catch (error) {
+    console.error(
+      "[db] dbUpdateUserProfile failed:",
+      (error as Error).message,
+    );
+  }
+}
+
 /**
  * Get registered users, ordered by registration date (newest first).
  *

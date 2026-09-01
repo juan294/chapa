@@ -244,7 +244,7 @@ export function SharePageOwnerContent({
             <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2 text-balance">
               {t('shareVisitor.title') as string}
             </h2>
-            <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto text-pretty">
+            <p className="text-sm text-text-secondary leading-relaxed mb-6 text-pretty">
               {t('shareVisitor.description') as string}
             </p>
             <Link

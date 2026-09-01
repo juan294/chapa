@@ -22,7 +22,7 @@ describe("effects/defaults", () => {
       }
     });
 
-    it("each preset config has all 6 badge config keys", () => {
+    it("each preset config has every badge config key", () => {
       const requiredKeys = [
         "background",
         "cardStyle",
@@ -30,6 +30,7 @@ describe("effects/defaults", () => {
         "scoreEffect",
         "heatmapAnimation",
         "tierTreatment",
+        "colorPalette",
       ];
       for (const preset of STUDIO_PRESETS) {
         expect(Object.keys(preset.config).sort()).toEqual(

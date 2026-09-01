@@ -48,6 +48,7 @@ export function isValidEmuHandle(handle: string): boolean {
 
 import {
   BADGE_CONFIG_OPTIONS,
+  DEFAULT_BADGE_CONFIG,
   RETIRED_BADGE_CONFIG_KEYS,
   type BadgeConfig,
 } from "@chapa/shared";
@@ -80,6 +81,64 @@ export function stripRetiredBadgeConfigKeys(value: unknown): unknown {
       ([key]) => !retired.includes(key),
     ),
   );
+}
+
+/**
+ * Rename persisted BadgeConfig fields whose public name changed.
+ *
+ * `palette` shipped briefly in #1242 before the category was renamed to
+ * `colorPalette` in #1245. A config saved during that window otherwise keeps
+ * the old key, receives a default `colorPalette`, and fails exact-key
+ * validation because both fields are present.
+ *
+ * This migration is read-only and narrow: the current key wins when both are
+ * present, the known legacy alias is removed, and every unrelated field is
+ * preserved so the validator can still reject unknown input.
+ */
+export function renameLegacyBadgeConfigKeys(value: unknown): unknown {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const stored = value as Record<string, unknown>;
+  const renamed: Record<string, unknown> = { ...stored };
+  if (Object.hasOwn(stored, "palette")) {
+    if (!Object.hasOwn(stored, "colorPalette")) {
+      renamed.colorPalette = stored.palette;
+    }
+    delete renamed.palette;
+  }
+  return renamed;
+}
+
+/**
+ * Fill in `BadgeConfig` fields a stored row predates (#1242).
+ *
+ * The mirror of {@link stripRetiredBadgeConfigKeys}, and needed for the same
+ * reason. `isValidBadgeConfig` requires an exact key set, so the moment a new
+ * category ships, every config saved before it is missing a key and validates
+ * as invalid — handing the owner back the default badge instead of the one they
+ * saved. `colorPalette` was the first category added since that validator
+ * existed, and it would have silently reset every stored Studio config.
+ *
+ * Only known-missing keys are defaulted. An unknown or extra field still
+ * survives into the validator and still fails there, so this widens the read
+ * path without weakening the write path.
+ *
+ * Pure: returns a new object and never mutates its input. Anything that is not
+ * a plain object passes through unchanged for the validator to reject.
+ */
+export function withDefaultBadgeConfigKeys(value: unknown): unknown {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const stored = value as Record<string, unknown>;
+  const filled: Record<string, unknown> = { ...stored };
+  for (const key of BADGE_CONFIG_KEYS) {
+    if (!(key in stored)) filled[key] = DEFAULT_BADGE_CONFIG[key];
+  }
+  return filled;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import { renderBadgeBranding } from "./BadgeBranding";
-import { accentTint } from "./theme";
+import { WARM_AMBER } from "./theme";
 
 describe("renderBadgeBranding", () => {
   it("preserves the exact SVG bytes after metadata extraction", () => {
@@ -121,7 +121,7 @@ describe("renderBadgeBranding", () => {
   it("renders grouped pill container around logos", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github", "bitbucket"]);
     // Pill is a rounded rect with purple tint
-    expect(svg).toContain(`fill="${accentTint(0.08)}"`);
-    expect(svg).toContain(`stroke="${accentTint(0.15)}"`);
+    expect(svg).toContain(`fill="${WARM_AMBER.tint(0.08)}"`);
+    expect(svg).toContain(`stroke="${WARM_AMBER.tint(0.15)}"`);
   });
 });
