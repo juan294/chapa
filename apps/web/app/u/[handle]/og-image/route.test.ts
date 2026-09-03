@@ -163,7 +163,7 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(200);
     expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v3:testuser:2026-02-14:en");
+    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v4:testuser:2026-02-14:en");
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
@@ -216,7 +216,7 @@ describe("GET /u/[handle]/og-image", () => {
       },
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "og-image:v3:testuser:2026-02-14:en",
+      "og-image:v4:testuser:2026-02-14:en",
       {
         version: "2026-02-14-r7",
         pngBase64: FAKE_PNG_BASE64,
@@ -235,7 +235,7 @@ describe("GET /u/[handle]/og-image", () => {
     const res = await GET(req, ctx);
 
     expect(mockCacheGet).toHaveBeenCalledWith(
-      "og-image:v3:mixedcase:2026-02-14:en",
+      "og-image:v4:mixedcase:2026-02-14:en",
     );
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-mixedcase");
   });
@@ -383,7 +383,7 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockCacheSet).toHaveBeenCalledOnce();
     expect(mockCacheDel).toHaveBeenCalledWith(
-      "og-image:v3:testuser:2026-02-14:en",
+      "og-image:v4:testuser:2026-02-14:en",
     );
     expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");

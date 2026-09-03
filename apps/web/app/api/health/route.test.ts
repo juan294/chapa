@@ -9,6 +9,19 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSet: vi.fn(),
 }));
 
+vi.mock("@/lib/render/font-files", () => ({
+  getMissingFontFiles: vi.fn(() => []),
+}));
+
+vi.mock("@/lib/render/raster-probe", () => ({
+  probeRasterizer: vi.fn(async () => ({
+    status: "ok",
+    glyphPixels: 900,
+    fonts: [],
+    platform: "test-arch",
+  })),
+}));
+
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: () => "127.0.0.1",
 }));
@@ -43,6 +56,8 @@ vi.stubGlobal("fetch", mockFetch);
 import { GET } from "./route";
 import { cacheGetCronLastRun, pingRedis, rateLimit, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
+import { getMissingFontFiles } from "@/lib/render/font-files";
+import { probeRasterizer } from "@/lib/render/raster-probe";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { captureOperationalAlert } from "@/lib/analytics/server-errors";
@@ -89,6 +104,11 @@ describe("GET /api/health", () => {
     expect(body.status).toBe("ok");
     expect(body.dependencies.redis).toBe("ok");
     expect(body.dependencies.supabase).toBe("ok");
+    // #1275 — the rasterizer's bundled fonts resolve in this checkout.
+    expect(body.dependencies.fonts).toBe("ok");
+    expect(body.dependencies.missingFonts).toBeUndefined();
+    expect(body.dependencies.rasterizer).toBe("ok");
+    expect(body.dependencies.rasterizerProbe).toBeUndefined();
     expect(body.timestamp).toBeDefined();
     expect(body.version).toBeUndefined();
   });
@@ -116,9 +136,85 @@ describe("GET /api/health", () => {
           github: "skipped",
           cronHeartbeats: expect.any(Object),
           alertWebhook: "skipped",
+          fonts: "ok",
+          rasterizer: "ok",
         },
       },
     });
+  });
+
+  // #1275 — a missing rasterizer font is reported and alerted at P2 without
+  // flipping the health status: a text-less social card is a defect to fix,
+  // not an outage, and the deployment smoke asserts a 200.
+  it("reports missing rasterizer fonts, alerts at P2, and stays 'ok' (#1275)", async () => {
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+    vi.mocked(getMissingFontFiles).mockReturnValueOnce(["JetBrainsMono-Bold.ttf"]);
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("ok");
+    expect(body.dependencies.fonts).toBe("missing");
+    expect(body.dependencies.missingFonts).toEqual(["JetBrainsMono-Bold.ttf"]);
+    expect(captureOperationalAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signal: "og_rasterizer_unhealthy",
+        severity: "P2",
+        route: "/api/health",
+        properties: expect.objectContaining({ missingFonts: ["JetBrainsMono-Bold.ttf"] }),
+      }),
+    );
+  });
+
+  // #1275 — the fonts can all be present and resvg can still draw nothing
+  // (the fix's own preview deployment did exactly that). The probe renders a
+  // sample in the deployed function and is what the alert really keys on.
+  it("reports a rasterizer that draws no glyphs and alerts at P2, without flipping status (#1275)", async () => {
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+    vi.mocked(probeRasterizer).mockResolvedValueOnce({
+      status: "no_glyphs",
+      glyphPixels: 0,
+      fonts: [],
+      platform: "linux-x64",
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.dependencies.fonts).toBe("ok");
+    expect(body.dependencies.rasterizer).toBe("no_glyphs");
+    expect(captureOperationalAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signal: "og_rasterizer_unhealthy",
+        properties: expect.objectContaining({
+          rasterProbe: expect.objectContaining({ status: "no_glyphs", glyphPixels: 0 }),
+        }),
+      }),
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "[health] OG rasterizer unhealthy",
+      expect.stringContaining("no_glyphs"),
+    );
+    consoleError.mockRestore();
+  });
+
+  it("reports rasterizer 'error' when the probe throws, without failing health (#1275)", async () => {
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+    vi.mocked(probeRasterizer).mockRejectedValueOnce(new Error("native binding missing"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.dependencies.rasterizer).toBe("error");
+    expect(body.dependencies.rasterizerProbe).toBeUndefined();
   });
 
   it("returns 200 with 'skipped' when Redis env vars are not configured (#634)", async () => {

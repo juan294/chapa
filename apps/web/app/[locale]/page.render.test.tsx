@@ -194,6 +194,19 @@ describe("Home page render (en)", () => {
     }
   });
 
+  // #1261 — the catalog is a claim; the transcript is the proof. The landing
+  // page links the production run of an agent driving the tools end to end.
+  it("links the agent-tested production transcript from the tool catalog", async () => {
+    const { container } = await renderHome();
+    const link = container.querySelector(
+      '#agent-tools a[href$="/docs/webmcp-demo-transcript.md"]',
+    );
+
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toContain("noopener");
+  });
+
   it("renders error banner when error param present in the URL", async () => {
     window.history.pushState({}, "", "/?error=access_denied");
     await renderHome();

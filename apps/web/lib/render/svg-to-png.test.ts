@@ -21,7 +21,14 @@ vi.mock("@resvg/resvg-js", () => ({
   renderAsync: mockRenderAsync,
 }));
 
-import { svgToPng, stripSvgAnimations, getFontPaths, getFontBuffers } from "./svg-to-png";
+const { mockCaptureServerError } = vi.hoisted(() => ({
+  mockCaptureServerError: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerError: mockCaptureServerError,
+}));
+
+import { svgToPng, stripSvgAnimations, getFontPaths, getResvgFontOptions } from "./svg-to-png";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -208,7 +215,7 @@ describe("svgToPng", () => {
     );
   });
 
-  it("passes font configuration to renderAsync using pre-loaded buffers when available (PE-L3)", async () => {
+  it("passes the four font FILE paths to renderAsync, never buffers (#1275)", async () => {
     await svgToPng(MINIMAL_SVG);
     const opts = mockRenderAsync.mock.calls[0]![1] as Record<string, unknown>;
     const font = opts.font as {
@@ -216,43 +223,22 @@ describe("svgToPng", () => {
       fontBuffers?: Buffer[];
       fontFiles?: string[];
     };
-    expect(font).toBeDefined();
     expect(font.loadSystemFonts).toBe(false);
-    // When font buffers were loaded at module scope (PE-L3), the route uses
-    // fontBuffers. If loading failed (test sandbox without fonts), it falls
-    // back to fontFiles. Either way, exactly one of the two must be present.
-    const useBuffers = getFontBuffers() !== undefined;
-    if (useBuffers) {
-      expect(font.fontBuffers).toBeInstanceOf(Array);
-      expect(font.fontBuffers!.length).toBe(4);
-      expect(font.fontFiles).toBeUndefined();
-    } else {
-      expect(font.fontFiles).toBeInstanceOf(Array);
-      expect(font.fontFiles!.length).toBe(4);
-      expect(font.fontBuffers).toBeUndefined();
-    }
+    expect(font.fontFiles).toEqual(getFontPaths());
+    expect(font.fontFiles).toHaveLength(4);
+    expect(font.fontBuffers).toBeUndefined();
   });
 
-  it("fonts are read at most once across multiple svgToPng calls (PE-L3)", async () => {
-    // Call svgToPng three times and verify renderAsync is invoked with the
-    // same font config each time — no per-call disk reads (verified by
-    // stability of the font option object, not by mocking readFileSync
-    // which is pre-module).
+  it("resolves the font paths once and reuses them across calls", async () => {
     await svgToPng(MINIMAL_SVG);
     await svgToPng(MINIMAL_SVG);
     await svgToPng(MINIMAL_SVG);
-    const useBuffers = getFontBuffers() !== undefined;
-    for (const call of mockRenderAsync.mock.calls) {
-      const font = (call[1] as Record<string, unknown>).font as {
-        fontBuffers?: Buffer[];
-        fontFiles?: string[];
-      };
-      if (useBuffers) {
-        expect(font.fontBuffers).toBe(getFontBuffers()); // same reference
-      } else {
-        expect(font.fontFiles).toBeDefined();
-      }
-    }
+    const files = mockRenderAsync.mock.calls.map(
+      (c) => (c[1] as { font: { fontFiles: string[] } }).font.fontFiles,
+    );
+    expect(files[0]).toBe(files[1]);
+    expect(files[1]).toBe(files[2]);
+    expect(getResvgFontOptions().fontFiles).toBe(getResvgFontOptions().fontFiles);
   });
 
   it("strips animations before passing SVG to renderAsync", async () => {
@@ -356,34 +342,60 @@ describe("svgToPng — non-blocking rasterization (#1090)", () => {
 // Tests: font buffer load failure fallback (module-scope try/catch branch)
 // ---------------------------------------------------------------------------
 
-describe("svgToPng — font buffer load failure fallback", () => {
-  it("falls back to fontFiles when readFileSync throws at module load", async () => {
+describe("svgToPng — missing font files (#1275)", () => {
+  const MISSING_FS = () => ({
+    // Every candidate looks like a 4-byte stub, so no font validates.
+    statSync: vi.fn(() => ({ size: 4 })),
+    openSync: vi.fn(() => 3),
+    readSync: vi.fn(() => 4),
+    closeSync: vi.fn(),
+    readFileSync: vi.fn(() => Buffer.alloc(0)),
+  });
+
+  it("still renders, passes the first candidate paths, and captures the failure exactly once", async () => {
     vi.resetModules();
-    vi.doMock("node:fs", () => ({
-      readFileSync: vi.fn(() => {
-        throw new Error("ENOENT: font file missing");
-      }),
-    }));
+    mockCaptureServerError.mockClear();
+    vi.doMock("node:fs", MISSING_FS);
 
     const mod = await import("./svg-to-png");
     const { renderAsync: freshRenderAsync } = await import("@resvg/resvg-js");
     const freshMockRenderAsync = vi.mocked(freshRenderAsync);
     freshMockRenderAsync.mockResolvedValue({ asPng: () => FAKE_PNG } as never);
-
-    expect(mod.getFontBuffers()).toBeUndefined();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const result = await mod.svgToPng(MINIMAL_SVG);
-    expect(result).toBeInstanceOf(Uint8Array);
-    const font = freshMockRenderAsync.mock.calls.at(-1)![1]!.font as {
-      loadSystemFonts: boolean;
-      fontBuffers?: Buffer[];
-      fontFiles?: string[];
-    };
-    expect(font.fontBuffers).toBeUndefined();
-    expect(font.fontFiles).toBeInstanceOf(Array);
-    expect(font.fontFiles!.length).toBe(4);
+    await mod.svgToPng(MINIMAL_SVG);
 
+    expect(result).toBeInstanceOf(Uint8Array);
+    const opts = freshMockRenderAsync.mock.calls.at(-1)![1] as {
+      font: { loadSystemFonts: boolean; fontFiles?: string[]; fontBuffers?: Buffer[] };
+      logLevel?: string;
+    };
+    expect(opts.font.loadSystemFonts).toBe(false);
+    expect(opts.font.fontFiles).toHaveLength(4);
+    expect(opts.font.fontBuffers).toBeUndefined();
+    expect(opts.logLevel).toBe("warn");
+
+    expect(mockCaptureServerError).toHaveBeenCalledTimes(1);
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "lib/render/svg-to-png",
+        statusCode: 500,
+        error: expect.objectContaining({ message: expect.stringContaining("Bundled fonts not found") }),
+      }),
+    );
+    expect(consoleError).toHaveBeenCalledTimes(1);
+
+    consoleError.mockRestore();
     vi.doUnmock("node:fs");
     vi.resetModules();
+  });
+
+  it("does not capture anything when the fonts resolved", async () => {
+    mockCaptureServerError.mockClear();
+    await svgToPng(MINIMAL_SVG);
+    expect(mockCaptureServerError).not.toHaveBeenCalled();
+    const opts = mockRenderAsync.mock.calls.at(-1)![1] as { logLevel?: string };
+    expect(opts.logLevel).toBe("warn");
   });
 });
