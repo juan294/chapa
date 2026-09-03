@@ -9,27 +9,26 @@
  * because the fonts can be present, valid, loaded, and still not reach the
  * glyph rasterizer.
  *
- * The probe also renders the same sample through alternative resvg entry
- * points and font sources (sync vs async, buffers vs files vs directory),
- * so a host where the production path fails reports which path works. The
- * fix's preview deployment on linux-x64 had all four fonts present and
- * valid, buffers loaded, and zero glyphs; the variants are how that gets
- * diagnosed from a health response instead of a redeploy per guess.
+ * When the production path draws nothing, the probe also renders the same
+ * sample through alternative resvg entry points and font sources, so the
+ * health response says which path works on this host instead of costing a
+ * redeploy per guess. That is how #1275 was diagnosed: on linux-x64 the
+ * `fontBuffers` variants drew 0 glyph pixels and every file-based variant
+ * drew 1118, which is why production passes files.
  *
  * The probe is cheap (a 160x60 canvas) and runs inside `/api/health`, so the
  * answer comes from the deployed function, not from a developer machine.
  */
+import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { Resvg, renderAsync, type ResvgRenderOptions } from "@resvg/resvg-js";
-import { getFontBuffers, getResvgFontOptions } from "./svg-to-png";
+import { getResvgFontOptions } from "./svg-to-png";
 import { resolveFontFiles } from "./font-files";
 
 export interface RasterProbe {
   status: "ok" | "no_glyphs";
   /** Bright pixels found in the sample through the production path. */
   glyphPixels: number;
-  /** Whether resvg received pre-loaded buffers or file paths. */
-  fontSource: "buffers" | "files";
   fonts: Array<{ name: string; found: boolean; bytes: number; path: string }>;
   platform: string;
   /** Glyph pixels per alternative render path; only computed when the production path drew nothing. */
@@ -55,9 +54,9 @@ export function countBrightPixels(pixels: Uint8Array, width: number, height: num
   return count;
 }
 
-// resvg-js 2.6.2 accepts `fontBuffers` at runtime (since 2.5.0) but its
-// type definitions do not declare it, which is also why the production
-// path's use of it never failed a typecheck.
+// `fontBuffers` is accepted at runtime by some resvg-js 2.6.2 binaries and
+// ignored by the linux-x64 one; it is absent from the type definitions.
+// It stays here only as a diagnostic variant.
 type FontOptions = NonNullable<ResvgRenderOptions["font"]> & { fontBuffers?: Buffer[] };
 
 async function glyphsAsync(font: FontOptions): Promise<number> {
@@ -88,23 +87,19 @@ async function tryVariant(run: () => number | Promise<number>): Promise<number |
 
 /**
  * Alternative render paths, run only when the production path drew nothing.
- * Each answers one question about the host: does the sync entry point draw
- * (async task marshalling), do file paths draw (buffer marshalling), does a
- * font directory draw (fontdb file loading), does a default family help
- * (family-name matching).
+ * Each answers one question about the host: does the sync entry point draw,
+ * does a font directory draw (fontdb directory loading), do in-memory
+ * buffers draw (the path that fails on linux-x64), and are there any
+ * system fonts at all.
  */
 async function probeVariants(): Promise<Record<string, number | string>> {
-  const resolved = resolveFontFiles();
-  const files = resolved.map((r) => r.path);
+  const files = resolveFontFiles().map((r) => r.path);
   const dirs = [...new Set(files.map((f) => dirname(f)))];
-  const buffers = getFontBuffers();
   const out: Record<string, number | string> = {};
-  if (buffers) out.syncBuffers = await tryVariant(() => glyphsSync({ loadSystemFonts: false, fontBuffers: buffers }));
-  out.asyncFiles = await tryVariant(() => glyphsAsync({ loadSystemFonts: false, fontFiles: files }));
   out.syncFiles = await tryVariant(() => glyphsSync({ loadSystemFonts: false, fontFiles: files }));
   out.asyncDirs = await tryVariant(() => glyphsAsync({ loadSystemFonts: false, fontDirs: dirs }));
-  out.asyncFilesDefaultFamily = await tryVariant(() =>
-    glyphsAsync({ loadSystemFonts: false, fontFiles: files, defaultFontFamily: "JetBrains Mono" }),
+  out.asyncBuffers = await tryVariant(() =>
+    glyphsAsync({ loadSystemFonts: false, fontBuffers: files.map((f) => readFileSync(f)) }),
   );
   out.asyncSystemFonts = await tryVariant(() => glyphsAsync({ loadSystemFonts: true }));
   return out;
@@ -115,7 +110,6 @@ export async function probeRasterizer(): Promise<RasterProbe> {
   const probe: RasterProbe = {
     status: glyphPixels >= MIN_GLYPH_PIXELS ? "ok" : "no_glyphs",
     glyphPixels,
-    fontSource: getFontBuffers() ? "buffers" : "files",
     fonts: resolveFontFiles().map(({ name, found, bytes, path }) => ({ name, found, bytes, path })),
     platform: `${process.platform}-${process.arch}`,
   };

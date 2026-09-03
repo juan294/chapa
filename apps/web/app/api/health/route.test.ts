@@ -17,7 +17,6 @@ vi.mock("@/lib/render/raster-probe", () => ({
   probeRasterizer: vi.fn(async () => ({
     status: "ok",
     glyphPixels: 900,
-    fontSource: "buffers",
     fonts: [],
     platform: "test-arch",
   })),
@@ -178,7 +177,6 @@ describe("GET /api/health", () => {
     vi.mocked(probeRasterizer).mockResolvedValueOnce({
       status: "no_glyphs",
       glyphPixels: 0,
-      fontSource: "buffers",
       fonts: [],
       platform: "linux-x64",
     });

@@ -9,7 +9,7 @@ import { DEMO_IMPACT, DEMO_STATS } from "./demoData";
  * #1275 — real-resvg regression tests.
  *
  * The unit suite mocks `@resvg/resvg-js`, so it could never notice that the
- * fonts resvg was handed did not exist. From v2.8.0 to v2.29.4 every
+ * fonts resvg was handed did not reach it. From v2.11.0 to v2.29.4 every
  * production OG image shipped without a single glyph and nothing failed.
  * These tests rasterize for real and count pixels, so "no text" is a red
  * test rather than an invisible social card.
@@ -75,11 +75,13 @@ describe("svgToPng fonts — glyphs actually rasterize (#1275)", () => {
     expect(lit).toBe(0);
   });
 
-  it("loads the four bundled fonts as buffers rather than paths", () => {
-    const options = getResvgFontOptions();
+  // Files, never buffers: the linux-x64 resvg-js binary ignores fontBuffers
+  // (measured in the deployed function: 0 glyph pixels vs 1118 with files).
+  it("hands resvg the four validated font FILES and never buffers", () => {
+    const options = getResvgFontOptions() as Record<string, unknown>;
     expect(options.loadSystemFonts).toBe(false);
-    expect(options.fontBuffers).toBeDefined();
-    expect(options.fontBuffers).toHaveLength(4);
+    expect(options.fontFiles).toHaveLength(4);
+    expect(options.fontBuffers).toBeUndefined();
   });
 });
 
@@ -108,7 +110,7 @@ describe("OG badge — the score number is visible in the rasterized badge (#127
     expect(lit).toBeGreaterThan(100);
   });
 
-  it("has none of them when fonts are missing (what production shipped from v2.8.0 to v2.29.4)", async () => {
+  it("has none of them when fonts are missing (what production shipped from v2.11.0 to v2.29.4)", async () => {
     const lit = await brightPixels(svg, NO_FONTS, region);
     expect(lit).toBe(0);
   });

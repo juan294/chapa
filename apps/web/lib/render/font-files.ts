@@ -7,14 +7,16 @@
  *
  * #1275 — why this module exists on its own, and why it is shaped this way.
  *
- * From v2.8.0 to v2.29.4 every production OG image rendered with NO text:
- * no name, score, labels or footer. `getFontPaths()` resolved the four files
- * with `new URL(\`./fonts/${name}\`, import.meta.url)`. Turbopack cannot
- * statically resolve a template literal, so it compiled the whole expression
- * to ONE traced asset (Plus Jakarta Sans Regular) and, in the deployed
- * function, even that path did not open. The module-scope read failed
- * silently, the `fontFiles` fallback pointed at the same dead paths, and
- * resvg drops every `<text>` node it has no font for, without logging.
+ * Two defects stacked, and production OG images shipped with NO text (no
+ * name, score, labels or footer) from v2.11.0 to v2.29.4. First, from the
+ * 2026-04-27 release: `getFontPaths()` resolved the four files with
+ * `new URL(\`./fonts/${name}\`, import.meta.url)`, and Turbopack, unable to
+ * resolve a template literal, compiled the expression to ONE traced asset
+ * (Plus Jakarta Sans Regular), so every family fell back to that one face.
+ * Second, from v2.11.0: the fonts were passed to resvg as `fontBuffers`,
+ * which the linux-x64 resvg-js binary ignores (see `svg-to-png.ts`), so
+ * nothing rendered at all. resvg drops every `<text>` node it has no font
+ * for, without logging, and no test rasterized for real.
  *
  * Three rules follow:
  *

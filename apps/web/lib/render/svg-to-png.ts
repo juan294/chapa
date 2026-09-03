@@ -6,72 +6,51 @@
  */
 
 import { renderAsync } from "@resvg/resvg-js";
-import { readFileSync } from "node:fs";
 import { captureServerError } from "@/lib/analytics/server-errors";
-import { getFontPaths, resolveFontFiles } from "./font-files";
+import { resolveFontFiles } from "./font-files";
 
 export { getFontPaths } from "./font-files";
 
 /**
- * PE-L3: Font buffers read once at module scope.
+ * Font paths resolved once at module scope and handed to resvg as FILES.
  *
- * resvg-js accepts pre-loaded `fontBuffers` (Buffer[]) in addition to
- * `fontFiles` (string[]). Loading the four TTF files at module initialisation
- * time means each cold-start pays the disk read once, not on every
- * OG-image cache miss. The buffers are reused across all calls to `svgToPng`.
+ * #1275 — never as buffers. From v2.11.0 (2026-06-19, the font-buffer-reuse
+ * change) to v2.29.4 the fonts were read into memory once and passed as
+ * `fontBuffers`. The resvg-js 2.6.2 binary for linux-x64, which is what a
+ * Vercel function runs, silently ignores that option: measured inside the
+ * function, `fontBuffers` drew 0 glyph pixels and `fontFiles` with the same
+ * four files drew 1118, sync and async alike. The darwin-arm64 binary
+ * honours it, which is why every local render and every mocked test
+ * passed while every production OG image shipped without text. The option
+ * is absent from the package's own type definitions; it only typechecked
+ * because it was never written as an object literal.
  *
- * #1275 — a failed read is recorded, not just swallowed. The previous
- * version fell back to `fontFiles` pointing at the same paths that had just
- * failed to open, and resvg then rasterized every OG image with no text at
- * all, for five months, without a single log line. `svgToPng` now reports
- * the failure through `captureServerError` (once per instance) and asks resvg
- * to log missing-font warnings, so a font regression is observable in
- * PostHog and in the function logs. The module still loads without fonts so
- * a unit-test sandbox can exercise the rest of the pipeline.
+ * A missing font is recorded, not swallowed: `svgToPng` reports it through
+ * `captureServerError` (once per instance) and resvg logs missing-font
+ * warnings, so a font regression is observable in PostHog and in the
+ * function logs. The module still loads without fonts so a unit-test
+ * sandbox can exercise the rest of the pipeline.
  */
-let _fontBuffers: Buffer[] | undefined;
-let _fontLoadError: Error | undefined;
-try {
-  const resolved = resolveFontFiles();
-  const missing = resolved.filter((r) => !r.found);
-  if (missing.length > 0) {
-    throw new Error(
-      `Bundled fonts not found: ${missing
-        .map((r) => `${r.name} (tried ${r.tried.join(", ")})`)
-        .join("; ")}`,
-    );
-  }
-  _fontBuffers = resolved.map((r) => readFileSync(r.path));
-} catch (e) {
-  _fontBuffers = undefined;
-  _fontLoadError = e instanceof Error ? e : new Error(String(e));
-}
+const _fontResolution = resolveFontFiles();
+const _fontPaths: string[] = _fontResolution.map((r) => r.path);
+const _missingFonts = _fontResolution.filter((r) => !r.found);
+const _fontLoadError: Error | undefined =
+  _missingFonts.length > 0
+    ? new Error(
+        `Bundled fonts not found: ${_missingFonts
+          .map((r) => `${r.name} (tried ${r.tried.join(", ")})`)
+          .join("; ")}`,
+      )
+    : undefined;
 
 /**
- * Return the cached font buffers for use with resvg's `fontBuffers` option.
- * Returns `undefined` if the fonts could not be read at module load time.
+ * The `font` option handed to resvg: the four validated file paths, system
+ * fonts never consulted, so the badge renders identically on every host.
  *
- * @internal exported for tests only
+ * @internal exported for the raster probe and the real-resvg tests
  */
-export function getFontBuffers(): Buffer[] | undefined {
-  return _fontBuffers;
-}
-
-/**
- * The `font` option handed to resvg: pre-loaded buffers when the module-scope
- * read succeeded, otherwise file paths (which resvg opens itself). System
- * fonts are never consulted, so the badge renders identically on every host.
- *
- * @internal exported for the real-resvg raster tests
- */
-export function getResvgFontOptions(): {
-  loadSystemFonts: false;
-  fontBuffers?: Buffer[];
-  fontFiles?: string[];
-} {
-  return _fontBuffers
-    ? { loadSystemFonts: false, fontBuffers: _fontBuffers }
-    : { loadSystemFonts: false, fontFiles: getFontPaths() };
+export function getResvgFontOptions(): { loadSystemFonts: false; fontFiles: string[] } {
+  return { loadSystemFonts: false, fontFiles: _fontPaths };
 }
 
 let _fontFailureReported = false;
@@ -159,11 +138,8 @@ export function stripSvgAnimations(svg: string): string {
  *
  * Loads bundled TTF fonts (Plus Jakarta Sans, JetBrains Mono) so text
  * renders correctly in serverless environments where these fonts are
- * not installed (e.g. Vercel).
- *
- * PE-L3: Font buffers are read once at module scope and reused across
- * all renders, eliminating repeated disk reads per OG-image cache miss.
- * Falls back to `fontFiles` paths if buffer loading failed at startup.
+ * not installed (e.g. Vercel). Passed as file paths on purpose; see the
+ * note on `_fontPaths` above (#1275).
  *
  * PE-M5 (#1090): Uses resvg-js's `renderAsync`, a genuinely async native
  * binding (offloaded to libuv's threadpool by the underlying napi-rs
