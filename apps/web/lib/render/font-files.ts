@@ -20,11 +20,13 @@
  *
  * 1. One STATIC `new URL("<literal>", import.meta.url)` per file. That is the
  *    form bundlers rewrite into a traced asset; there is no loop over names.
- * 2. More than one candidate per file. The bundler asset is tried first, then
- *    the source path under `process.cwd()` for both a root-directory deploy
- *    (`apps/web` is the Vercel root) and a monorepo-root process. The
+ * 2. More than one candidate per file. The verbatim source copies come
+ *    first, under `process.cwd()` for both a root-directory deploy
+ *    (`apps/web` is the Vercel root) and a monorepo-root process; the
  *    `outputFileTracingIncludes` entries in `next.config.ts` are what keep
- *    the source copies inside the function bundle.
+ *    them inside the function bundle. The bundler's own asset copy is the
+ *    last resort, for a host without tracing includes: it is a derived
+ *    file, and a derived file is one more thing that can be wrong.
  * 3. Missing is a state, not an exception. `resolveFontFiles()` reports what
  *    was tried and what was found, so `svgToPng` can capture an error and
  *    `/api/health` can report it, instead of a silent fallback.
@@ -118,9 +120,9 @@ function assetPath(url: URL): string | undefined {
 function candidatePaths(name: FontFileName): string[] {
   const cwd = process.cwd();
   const candidates = [
-    assetPath(FONT_ASSET_URLS[name]),
     join(/* turbopackIgnore: true */ cwd, "lib", "render", "fonts", name),
     join(/* turbopackIgnore: true */ cwd, "apps", "web", "lib", "render", "fonts", name),
+    assetPath(FONT_ASSET_URLS[name]),
   ];
   return candidates.filter((p): p is string => p !== undefined);
 }

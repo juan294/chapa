@@ -71,10 +71,12 @@ describe("font-files", () => {
     vi.resetModules();
   });
 
-  it("tries the bundler asset first and both cwd-anchored source paths after it", () => {
+  it("tries both cwd-anchored source paths before the bundler asset", () => {
     for (const r of resolveFontFiles()) {
       expect(r.tried.length).toBeGreaterThanOrEqual(3);
-      expect(r.tried[0]).toContain("/lib/render/fonts/");
+      expect(r.tried[0]).toBe(`${process.cwd()}/lib/render/fonts/${r.name}`);
+      expect(r.tried[1]).toBe(`${process.cwd()}/apps/web/lib/render/fonts/${r.name}`);
+      expect(r.tried[2]).toContain("/lib/render/fonts/");
       expect(r.tried).toContain(
         `${process.cwd()}/lib/render/fonts/${r.name}`,
       );
