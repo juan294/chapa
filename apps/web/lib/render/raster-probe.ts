@@ -21,7 +21,7 @@ export interface RasterProbe {
   glyphPixels: number;
   /** Whether resvg received pre-loaded buffers or file paths. */
   fontSource: "buffers" | "files";
-  fonts: Array<{ name: string; found: boolean; path: string }>;
+  fonts: Array<{ name: string; found: boolean; bytes: number; path: string }>;
   platform: string;
 }
 
@@ -55,7 +55,7 @@ export async function probeRasterizer(): Promise<RasterProbe> {
     status: glyphPixels >= MIN_GLYPH_PIXELS ? "ok" : "no_glyphs",
     glyphPixels,
     fontSource: getFontBuffers() ? "buffers" : "files",
-    fonts: resolveFontFiles().map(({ name, found, path }) => ({ name, found, path })),
+    fonts: resolveFontFiles().map(({ name, found, bytes, path }) => ({ name, found, bytes, path })),
     platform: `${process.platform}-${process.arch}`,
   };
 }

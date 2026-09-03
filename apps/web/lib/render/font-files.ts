@@ -28,8 +28,13 @@
  * 3. Missing is a state, not an exception. `resolveFontFiles()` reports what
  *    was tried and what was found, so `svgToPng` can capture an error and
  *    `/api/health` can report it, instead of a silent fallback.
+ * 4. A candidate is validated, not just stat'ed. The fix's first preview
+ *    found all four bundler assets on disk and still drew no glyph: a file
+ *    that exists is not yet a font. A candidate counts only if it is larger
+ *    than a stub and starts with a TrueType/OpenType signature, and the
+ *    resolution records its byte size so the health probe can show it.
  */
-import { existsSync } from "node:fs";
+import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -64,11 +69,42 @@ const FONT_ASSET_URLS: Record<FontFileName, URL> = {
 
 export interface FontFileResolution {
   name: FontFileName;
-  /** The path to read. The first candidate that exists, else the first candidate. */
+  /** The path to read. The first candidate that validates, else the first candidate. */
   path: string;
   found: boolean;
+  /** Byte size of `path`, 0 when it could not be read. */
+  bytes: number;
   /** Every candidate that was checked, in order. Kept for diagnostics. */
   tried: string[];
+}
+
+/** Smaller than this cannot be a real font; the smallest bundled file is 63 KB. */
+const MIN_FONT_BYTES = 1024;
+
+/** sfnt signatures: TrueType (0x00010000 or 'true'), CFF OpenType ('OTTO'), collection ('ttcf'). */
+const SFNT_SIGNATURES = new Set(["00010000", "74727565", "4f54544f", "74746366"]);
+
+interface CandidateProbe {
+  valid: boolean;
+  bytes: number;
+}
+
+function probeCandidate(path: string): CandidateProbe {
+  try {
+    const bytes = statSync(path).size;
+    if (bytes < MIN_FONT_BYTES) return { valid: false, bytes };
+    const fd = openSync(path, "r");
+    try {
+      const head = Buffer.alloc(4);
+      const read = readSync(fd, head, 0, 4, 0);
+      const valid = read === 4 && SFNT_SIGNATURES.has(head.toString("hex"));
+      return { valid, bytes };
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return { valid: false, bytes: 0 };
+  }
 }
 
 function assetPath(url: URL): string | undefined {
@@ -89,14 +125,6 @@ function candidatePaths(name: FontFileName): string[] {
   return candidates.filter((p): p is string => p !== undefined);
 }
 
-function exists(path: string): boolean {
-  try {
-    return existsSync(path);
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Resolve every bundled font to a readable path, or record that none of its
  * candidates exist. Pure apart from the filesystem probe; cheap enough to
@@ -105,13 +133,11 @@ function exists(path: string): boolean {
 export function resolveFontFiles(): FontFileResolution[] {
   return FONT_FILES.map((name) => {
     const tried = candidatePaths(name);
-    const hit = tried.find(exists);
-    return {
-      name,
-      path: hit ?? tried[0]!,
-      found: hit !== undefined,
-      tried,
-    };
+    for (const path of tried) {
+      const probe = probeCandidate(path);
+      if (probe.valid) return { name, path, found: true, bytes: probe.bytes, tried };
+    }
+    return { name, path: tried[0]!, found: false, bytes: probeCandidate(tried[0]!).bytes, tried };
   });
 }
 
@@ -120,7 +146,7 @@ export function getFontPaths(): string[] {
   return resolveFontFiles().map((r) => r.path);
 }
 
-/** Names of the fonts that could not be found under any candidate path. */
+/** Names of the fonts with no valid file under any candidate path. */
 export function getMissingFontFiles(): FontFileName[] {
   return resolveFontFiles()
     .filter((r) => !r.found)

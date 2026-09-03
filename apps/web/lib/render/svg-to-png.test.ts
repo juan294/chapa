@@ -367,7 +367,14 @@ describe("svgToPng — font buffer load failure fallback", () => {
   it("falls back to fontFiles when readFileSync throws at module load", async () => {
     vi.resetModules();
     vi.doMock("node:fs", () => ({
-      existsSync: vi.fn(() => true),
+      // The resolver validates a candidate by size and sfnt header.
+      statSync: vi.fn(() => ({ size: 70_000 })),
+      openSync: vi.fn(() => 3),
+      readSync: vi.fn((_fd: number, buf: Buffer) => {
+        buf.set([0x00, 0x01, 0x00, 0x00]);
+        return 4;
+      }),
+      closeSync: vi.fn(),
       readFileSync: vi.fn(() => {
         throw new Error("ENOENT: font file missing");
       }),
@@ -401,7 +408,14 @@ describe("svgToPng — font buffer load failure fallback", () => {
     vi.resetModules();
     mockCaptureServerError.mockClear();
     vi.doMock("node:fs", () => ({
-      existsSync: vi.fn(() => true),
+      // The resolver validates a candidate by size and sfnt header.
+      statSync: vi.fn(() => ({ size: 70_000 })),
+      openSync: vi.fn(() => 3),
+      readSync: vi.fn((_fd: number, buf: Buffer) => {
+        buf.set([0x00, 0x01, 0x00, 0x00]);
+        return 4;
+      }),
+      closeSync: vi.fn(),
       readFileSync: vi.fn(() => {
         throw new Error("ENOENT: font file missing");
       }),

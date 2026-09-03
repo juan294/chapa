@@ -11,7 +11,7 @@ describe("probeRasterizer", () => {
     expect(probe.glyphPixels).toBeGreaterThanOrEqual(MIN_GLYPH_PIXELS);
     expect(probe.fontSource).toBe("buffers");
     expect(probe.fonts).toHaveLength(4);
-    expect(probe.fonts.every((f) => f.found)).toBe(true);
+    expect(probe.fonts.every((f) => f.found && f.bytes > 60_000)).toBe(true);
     expect(probe.platform).toMatch(/^[a-z]+-[a-z0-9]+$/);
   });
 });
