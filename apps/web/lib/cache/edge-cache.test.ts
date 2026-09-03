@@ -15,7 +15,12 @@ vi.mock("@/lib/analytics/server-errors", () => ({
 import { dangerouslyDeleteByTag } from "@vercel/functions";
 import { getVercelEnv } from "@/lib/env";
 import { captureServerEvent } from "@/lib/analytics/server-errors";
-import { badgeEdgeCacheTag, purgeEdgeCacheTag, EDGE_PURGE_DEADLINE_MS } from "./edge-cache";
+import {
+  badgeEdgeCacheTag,
+  ogImageEdgeCacheTag,
+  purgeEdgeCacheTag,
+  EDGE_PURGE_DEADLINE_MS,
+} from "./edge-cache";
 
 const deleteByTag = vi.mocked(dangerouslyDeleteByTag);
 const vercelEnv = vi.mocked(getVercelEnv);
@@ -29,6 +34,13 @@ describe("badgeEdgeCacheTag", () => {
   it("lowercases the handle the same way buildBadgeSvgCacheKey does", () => {
     expect(badgeEdgeCacheTag("MixedCase")).toBe("badge-mixedcase");
     expect(badgeEdgeCacheTag("octocat")).toBe("badge-octocat");
+  });
+});
+
+describe("ogImageEdgeCacheTag", () => {
+  it("lowercases the handle so every URL casing shares one purge tag", () => {
+    expect(ogImageEdgeCacheTag("MixedCase")).toBe("og-mixedcase");
+    expect(ogImageEdgeCacheTag("octocat")).toBe("og-octocat");
   });
 });
 

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.29.4] - 2026-09-03
+
+### Fixed
+
+- **Saved Studio changes now invalidate both badge and social-preview images.**
+  Badge rendering uses one shared variant identifier, cache publication is
+  fenced by the saved configuration revision, and invalidation reports the
+  real cache-deletion outcome so an older in-flight render cannot replace the
+  latest profile image. (#1266, #1267)
+- **Deferred request work now has one documented lifetime rule.** Route work
+  that must survive the response uses `after()`, required work is awaited, and
+  best-effort work uses the explicit `fireAndForget()` helper. (#1268)
+
 ## [2.29.3] - 2026-09-03
 
 ### Fixed

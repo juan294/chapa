@@ -1,16 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { resolveBadgeConfig } from "@/lib/render/badge-config";
+import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import { DEFAULT_LOCALE, isSupportedLocale } from "@/lib/i18n/types";
 import type { Locale } from "@/lib/i18n/types";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
 import { svgToPng } from "@/lib/render/svg-to-png";
-import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheDel, cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { ogImageEdgeCacheTag } from "@/lib/cache/edge-cache";
+import {
+  buildOgImageCacheKey,
+  buildOgImageCacheVersion,
+} from "@/lib/render/badge-svg-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import {
@@ -20,6 +24,39 @@ import {
 
 const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000;
+const OG_EDGE_POLICY = "public, s-maxage=21600, stale-while-revalidate=86400";
+const OG_CLIENT_POLICY = "public, max-age=300";
+
+type OgImageCacheEntry = {
+  version: string;
+  pngBase64: string;
+};
+
+function isOgImageCacheEntry(value: unknown): value is OgImageCacheEntry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Partial<OgImageCacheEntry>).version === "string" &&
+    typeof (value as Partial<OgImageCacheEntry>).pngBase64 === "string"
+  );
+}
+
+function ogImageCacheHeaders(handle: string) {
+  return {
+    "Content-Type": "image/png",
+    "Cache-Control": OG_CLIENT_POLICY,
+    "Vercel-CDN-Cache-Control": OG_EDGE_POLICY,
+    "Vercel-Cache-Tag": ogImageEdgeCacheTag(handle),
+  };
+}
+
+function ogImageNoStoreHeaders() {
+  return {
+    "Content-Type": "image/png",
+    "Cache-Control": "private, no-store, max-age=0",
+    "Vercel-CDN-Cache-Control": "no-store",
+  };
+}
 
 /**
  * GET /u/:handle/og-image
@@ -49,20 +86,29 @@ export async function GET(
   const lang = request.nextUrl.searchParams.get("lang");
   const locale: Locale = isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
   const badgeLocale = resolveBadgeLocale(locale);
-  const ogCacheKey = `og-image:v3:${handle}:${today}:${locale}`;
+  const ogCacheKey = buildOgImageCacheKey(handle, today, locale);
+  const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+  const expectedVersion = configSnapshot.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision)
+    : null;
+  const requestedVersion = request.nextUrl.searchParams.get("v");
+  const publicationVersion =
+    expectedVersion !== null && requestedVersion === expectedVersion
+      ? expectedVersion
+      : null;
 
   // PE-L1: Cache-first — serve warm-cache PNG without the rate-limit round-trip.
   // Rate limiting is deferred to the cache-MISS branch (expensive path only).
   try {
-    const cachedBase64 = await cacheGet<string>(ogCacheKey);
-    if (cachedBase64) {
-      const pngBuffer = Buffer.from(cachedBase64, "base64");
+    const cached = await cacheGet<unknown>(ogCacheKey);
+    if (
+      publicationVersion !== null &&
+      isOgImageCacheEntry(cached) &&
+      cached.version === publicationVersion
+    ) {
+      const pngBuffer = Buffer.from(cached.pngBase64, "base64");
       return new NextResponse(pngBuffer, {
-        headers: {
-          "Content-Type": "image/png",
-          "Cache-Control":
-            "public, s-maxage=21600, stale-while-revalidate=86400",
-        },
+        headers: ogImageCacheHeaders(handle),
       });
     }
   } catch {
@@ -96,7 +142,7 @@ export async function GET(
 
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
-      config: await resolveBadgeConfig(handle),
+      config: configSnapshot.config,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
       // Rasterized to PNG below — SMIL <animate> never runs during rasterization,
@@ -113,37 +159,55 @@ export async function GET(
       "svgToPng",
     );
 
-    // Cache the PNG as base64 for 48h (fire-and-forget — don't block response).
-    // #1094 (PE-L3): cacheSet never throws — it swallows Redis errors and
-    // resolves `false` on failure (e.g. an oversized base64 PNG rejected by
-    // Upstash's per-value size limit). A resolved-false outcome was
-    // previously discarded silently, permanently degrading the handle to an
-    // OG-image cache miss with no observability. Surface it via
-    // captureServerError without ever affecting the already-sent response.
-    fireAndForget(
-      async () => {
-        const cached = await cacheSet(
-          ogCacheKey,
-          Buffer.from(png).toString("base64"),
-          OG_CACHE_TTL,
-        );
-        if (!cached) {
-          void captureServerError({
-            route: `/u/${handle}/og-image`,
-            statusCode: 200,
-            error: new Error(`Failed to cache OG image PNG for handle: ${handle}`),
-          });
-        }
-      },
-      () => undefined,
-    );
+    if (publicationVersion === null) {
+      return new NextResponse(Buffer.from(png), {
+        headers: ogImageNoStoreHeaders(),
+      });
+    }
+
+    // This write is awaited because its revision fence is part of correctness:
+    // detaching it would let a pre-save render publish after the save purge.
+    // cacheSet normally resolves false instead of throwing, but keep the catch
+    // defensive so cache degradation never breaks image delivery.
+    let cached = false;
+    try {
+      cached = await cacheSet(
+        ogCacheKey,
+        {
+          version: publicationVersion,
+          pngBase64: Buffer.from(png).toString("base64"),
+        } satisfies OgImageCacheEntry,
+        OG_CACHE_TTL,
+      );
+    } catch {
+      cached = false;
+    }
+    if (!cached) {
+      void captureServerError({
+        route: `/u/${handle}/og-image`,
+        statusCode: 200,
+        error: new Error(`Failed to cache OG image PNG for handle: ${handle}`),
+      });
+    }
+
+    // Publish first, then perform the final revision read. This ordering makes
+    // every save fall on one side of the fence: a save before this read is
+    // detected and the just-written value is deleted; a save after it purges a
+    // value that already exists. The revision in both the Redis payload and
+    // metadata URL prevents stale values/responses from poisoning the new URL.
+    const currentConfigSnapshot = await resolveBadgeConfigSnapshot(handle);
+    const currentVersion = currentConfigSnapshot.cacheable
+      ? buildOgImageCacheVersion(today, currentConfigSnapshot.revision)
+      : null;
+    if (currentVersion !== publicationVersion) {
+      if (cached) await cacheDel(ogCacheKey);
+      return new NextResponse(Buffer.from(png), {
+        headers: ogImageNoStoreHeaders(),
+      });
+    }
 
     return new NextResponse(Buffer.from(png), {
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control":
-          "public, s-maxage=21600, stale-while-revalidate=86400",
-      },
+      headers: ogImageCacheHeaders(handle),
     });
   } catch (e) {
     if (e instanceof TimeoutError) {

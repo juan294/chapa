@@ -8,8 +8,10 @@ import { cacheDel, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/types";
+import { BADGE_RENDER_VARIANT } from "@/lib/render/badge-render-variant";
 import {
   badgeEdgeCacheTag,
+  ogImageEdgeCacheTag,
   purgeEdgeCacheTag,
   type EdgePurgeOutcome,
 } from "@/lib/cache/edge-cache";
@@ -23,7 +25,7 @@ import {
  * and response construction that follow a successful read.
  */
 const CACHE_DEADLINE_MS = 500;
-export const BADGE_RENDER_VARIANT = "jade-v1";
+export { BADGE_RENDER_VARIANT };
 
 /**
  * Base TTL for badge SVG cache entries.
@@ -87,6 +89,29 @@ export function buildBadgeSvgCacheKey(
   locale: Locale = DEFAULT_LOCALE,
 ): string {
   return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${date}:${locale}`;
+}
+
+/**
+ * Build the Redis key for the PNG rendered by `/u/:handle/og-image`.
+ *
+ * Kept beside the SVG key because Studio and profile writes must invalidate
+ * both rendered representations together. Normalizing the handle ensures a
+ * request and a write use the same slot regardless of URL/login casing.
+ */
+export function buildOgImageCacheKey(
+  handle: string,
+  date: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return `og-image:v3:${handle.toLowerCase()}:${date}:${locale}`;
+}
+
+/** Version shared by the OG metadata URL and its revision-fenced Redis value. */
+export function buildOgImageCacheVersion(
+  date: string,
+  revision: number | null,
+): string {
+  return `${date}-${revision === null ? "default" : `r${revision}`}`;
 }
 
 export function buildBadgeSvgRenderLockKey(
@@ -204,8 +229,8 @@ export function isBadgeCacheRefreshed(result: BadgeInvalidationResult): boolean 
 }
 
 /**
- * Drop every locale's rendered badge for a handle, for today, in BOTH cache
- * layers (hotfix v2.29.2).
+ * Drop every locale's rendered SVG and OG image for a handle, for today, in
+ * both cache layers.
  *
  * The badge cache key carries handle/variant/date/locale but nothing about the
  * inputs, so anything that changes what the badge should look like has to say
@@ -226,16 +251,25 @@ export async function invalidateBadgeSvgCacheForHandle(
   handle: string,
   date: string,
 ): Promise<BadgeInvalidationResult> {
-  const [redisSettled, edge] = await Promise.all([
-    Promise.allSettled(
-      SUPPORTED_LOCALES.map((locale) =>
+  const [redisOutcomes, edgeOutcomes] = await Promise.all([
+    Promise.all(
+      SUPPORTED_LOCALES.flatMap((locale) => [
         cacheDel(buildBadgeSvgCacheKey(handle, date, locale)),
-      ),
+        cacheDel(buildOgImageCacheKey(handle, date, locale)),
+      ]),
     ),
-    purgeEdgeCacheTag(badgeEdgeCacheTag(handle)),
+    Promise.all([
+      purgeEdgeCacheTag(badgeEdgeCacheTag(handle)),
+      purgeEdgeCacheTag(ogImageEdgeCacheTag(handle)),
+    ]),
   ]);
+  const edge: EdgePurgeOutcome = edgeOutcomes.includes("failed")
+    ? "failed"
+    : edgeOutcomes.includes("purged")
+      ? "purged"
+      : "skipped";
   return {
-    redis: redisSettled.every((result) => result.status === "fulfilled"),
+    redis: redisOutcomes.every(Boolean),
     edge,
   };
 }

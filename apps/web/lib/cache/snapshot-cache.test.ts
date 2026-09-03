@@ -178,13 +178,13 @@ describe("updateSnapshotCache", () => {
 
 describe("invalidateSnapshotCache", () => {
   it("deletes the snapshot cache key", async () => {
-    vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
+    vi.mocked(cacheDel).mockResolvedValueOnce(true);
     await invalidateSnapshotCache("testuser");
     expect(cacheDel).toHaveBeenCalledWith(`snapshot:${CACHE_VERSION}:latest:testuser`);
   });
 
   it("lowercases handle", async () => {
-    vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
+    vi.mocked(cacheDel).mockResolvedValueOnce(true);
     await invalidateSnapshotCache("TestUser");
     expect(cacheDel).toHaveBeenCalledWith(`snapshot:${CACHE_VERSION}:latest:testuser`);
   });

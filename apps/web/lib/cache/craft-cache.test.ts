@@ -192,13 +192,13 @@ describe("updateCraftCache", () => {
 
 describe("invalidateCraftCache", () => {
   it("deletes the craft cache key", async () => {
-    vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
+    vi.mocked(cacheDel).mockResolvedValueOnce(true);
     await invalidateCraftCache("testuser");
     expect(cacheDel).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:testuser`);
   });
 
   it("lowercases handle", async () => {
-    vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
+    vi.mocked(cacheDel).mockResolvedValueOnce(true);
     await invalidateCraftCache("TestUser");
     expect(cacheDel).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:testuser`);
   });

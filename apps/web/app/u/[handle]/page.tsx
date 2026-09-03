@@ -11,10 +11,14 @@ import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { resolveBadgeConfig } from "@/lib/render/badge-config";
+import {
+  resolveBadgeConfig,
+  resolveBadgeConfigSnapshot,
+} from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
+  buildOgImageCacheVersion,
   readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
@@ -81,9 +85,15 @@ export async function generateMetadata({
   const t = getServerT(locale);
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
-  // Daily cache buster forces social platforms to re-fetch the OG image
+  // The date and durable Studio revision make each rendered configuration a
+  // distinct CDN URL. This prevents an in-flight pre-save response from
+  // refilling the URL advertised after that save.
   const today = toDateString(new Date());
-  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${today}`;
+  const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+  const ogVersion = configSnapshot.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision)
+    : `${today}-uncached`;
+  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${ogVersion}`;
   return {
     title: `@${interpolate(t("sharePage.metadataTitle") as string, { handle })}`,
     description: interpolate(t("sharePage.metadataDescription") as string, { handle }),

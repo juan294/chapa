@@ -10,9 +10,11 @@ const {
   mockSvgToPng,
   mockCacheGet,
   mockCacheSet,
+  mockCacheDel,
   mockRateLimit,
   mockGetClientIp,
   mockCaptureServerError,
+  mockResolveBadgeConfigSnapshot,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -22,9 +24,11 @@ const {
   mockSvgToPng: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockResolveBadgeConfigSnapshot: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -52,6 +56,7 @@ vi.mock("@/lib/render/svg-to-png", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  cacheDel: (...args: unknown[]) => mockCacheDel(...args),
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
 }));
 
@@ -61,6 +66,11 @@ vi.mock("@/lib/http/client-ip", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
+}));
+
+vi.mock("@/lib/render/badge-config", () => ({
+  resolveBadgeConfigSnapshot: (...args: unknown[]) =>
+    mockResolveBadgeConfigSnapshot(...args),
 }));
 
 import { GET } from "./route";
@@ -100,11 +110,15 @@ const FAKE_MATERIALIZED = {
 function makeRequest(
   handle: string,
   lang?: string,
+  version: string | null = "2026-02-14-r7",
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
-  const query = lang ? `?lang=${lang}` : "";
+  const query = new URLSearchParams();
+  if (lang) query.set("lang", lang);
+  if (version) query.set("v", version);
+  const queryString = query.size > 0 ? `?${query.toString()}` : "";
   return [
     new NextRequest(
-      `https://chapa.thecreativetoken.com/u/${handle}/og-image${query}`,
+      `https://chapa.thecreativetoken.com/u/${handle}/og-image${queryString}`,
     ),
     { params: Promise.resolve({ handle }) },
   ];
@@ -124,8 +138,14 @@ describe("GET /u/[handle]/og-image", () => {
     mockSvgToPng.mockReturnValue(FAKE_PNG);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockResolveBadgeConfigSnapshot.mockResolvedValue({
+      config: { border: "solid" },
+      revision: 7,
+      cacheable: true,
+    });
   });
 
   afterEach(() => {
@@ -133,7 +153,10 @@ describe("GET /u/[handle]/og-image", () => {
   });
 
   it("returns the cached png when Redis already has the image", async () => {
-    mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
+    mockCacheGet.mockResolvedValue({
+      version: "2026-02-14-r7",
+      pngBase64: FAKE_PNG_BASE64,
+    });
 
     const [req, ctx] = makeRequest("testuser");
     const res = await GET(req, ctx);
@@ -141,11 +164,19 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
     expect(mockCacheGet).toHaveBeenCalledWith("og-image:v3:testuser:2026-02-14:en");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+      "public, s-maxage=21600, stale-while-revalidate=86400",
+    );
   });
 
   it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
     // Cache hit — rate limiter must NOT be called (deferred to miss branch only)
-    mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
+    mockCacheGet.mockResolvedValue({
+      version: "2026-02-14-r7",
+      pngBase64: FAKE_PNG_BASE64,
+    });
 
     const [req, ctx] = makeRequest("testuser");
     const res = await GET(req, ctx);
@@ -186,9 +217,27 @@ describe("GET /u/[handle]/og-image", () => {
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
       "og-image:v3:testuser:2026-02-14:en",
-      FAKE_PNG_BASE64,
+      {
+        version: "2026-02-14-r7",
+        pngBase64: FAKE_PNG_BASE64,
+      },
       172800,
     );
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+      "public, s-maxage=21600, stale-while-revalidate=86400",
+    );
+  });
+
+  it("normalizes the handle in the Redis key and edge tag", async () => {
+    const [req, ctx] = makeRequest("MixedCase");
+    const res = await GET(req, ctx);
+
+    expect(mockCacheGet).toHaveBeenCalledWith(
+      "og-image:v3:mixedcase:2026-02-14:en",
+    );
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-mixedcase");
   });
 
   // #760 — the SVG is rasterized to PNG, where SMIL <animate> does not run.
@@ -282,7 +331,7 @@ describe("GET /u/[handle]/og-image", () => {
     );
   });
 
-  it("returns the rendered PNG even when caching it rejects (fire-and-forget)", async () => {
+  it("returns the rendered PNG even when caching it rejects", async () => {
     mockCacheSet.mockRejectedValue(new Error("redis down"));
 
     const [req, ctx] = makeRequest("testuser");
@@ -290,9 +339,6 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/png");
-    // give the fire-and-forget rejection a tick to settle so the onError
-    // handler runs and is observed by coverage instrumentation
-    await vi.advanceTimersByTimeAsync(0);
   });
 
   // #1094 (PE-L3): cacheSet never throws — it swallows Redis errors internally
@@ -310,15 +356,52 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/png");
 
-    // let the fire-and-forget cacheSet + observability call settle
-    await vi.advanceTimersByTimeAsync(0);
-
     expect(mockCaptureServerError).toHaveBeenCalledWith(
       expect.objectContaining({
         route: "/u/testuser/og-image",
         error: expect.any(Error),
       }),
     );
+  });
+
+  it("deletes and does not edge-publish a PNG when the Studio config changes after its Redis write", async () => {
+    mockResolveBadgeConfigSnapshot
+      .mockResolvedValueOnce({
+        config: { border: "solid" },
+        revision: 7,
+        cacheable: true,
+      })
+      .mockResolvedValueOnce({
+        config: { border: "none" },
+        revision: 8,
+        cacheable: true,
+      });
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(mockCacheSet).toHaveBeenCalledOnce();
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "og-image:v3:testuser:2026-02-14:en",
+    );
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBeNull();
+  });
+
+  it("does not use or publish cache entries without the revisioned metadata URL", async () => {
+    mockCacheGet.mockResolvedValue({
+      version: "2026-02-14-r7",
+      pngBase64: FAKE_PNG_BASE64,
+    });
+
+    const [req, ctx] = makeRequest("testuser", undefined, null);
+    const res = await GET(req, ctx);
+
+    expect(mockMaterializePublicProfile).toHaveBeenCalledOnce();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
   });
 
   it("rate-limits to 30 requests per IP per 60 seconds", async () => {
@@ -361,8 +444,14 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     mockSvgToPng.mockReturnValue(FAKE_PNG);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockResolveBadgeConfigSnapshot.mockResolvedValue({
+      config: { border: "solid" },
+      revision: 7,
+      cacheable: true,
+    });
   });
 
   afterEach(() => {
@@ -383,8 +472,14 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     mockSvgToPng.mockReturnValue(FAKE_PNG);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockResolveBadgeConfigSnapshot.mockResolvedValue({
+      config: { border: "solid" },
+      revision: 7,
+      cacheable: true,
+    });
 
     const [es, esCtx] = makeRequest("testuser", "es");
     await GET(es, esCtx);
@@ -414,4 +509,3 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     expect(key).toContain("en");
   });
 });
-

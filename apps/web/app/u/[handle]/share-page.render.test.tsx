@@ -26,6 +26,7 @@ const {
   mockGetOptionalServerSessionFromHeaders,
   mockSharePageWebMcpToolsComponent,
   mockIsWebmcpEnabled,
+  mockResolveBadgeConfigSnapshot,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -45,7 +46,17 @@ const {
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
   mockSharePageWebMcpToolsComponent: vi.fn(),
   mockIsWebmcpEnabled: vi.fn(),
+  mockResolveBadgeConfigSnapshot: vi.fn(),
 }));
+
+vi.mock("@/lib/render/badge-config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/render/badge-config")>();
+  return {
+    ...actual,
+    resolveBadgeConfigSnapshot: (...args: unknown[]) =>
+      mockResolveBadgeConfigSnapshot(...args),
+  };
+});
 
 vi.mock("next/headers", () => ({
   headers: (...args: unknown[]) => mockHeaders(...args),
@@ -116,6 +127,8 @@ vi.mock("@/lib/i18n/server", async () => {
 
 vi.mock("@/lib/render/badge-svg-cache", () => ({
   buildBadgeSvgCacheKey: (h: string, d: string) => `badge:${h}:${d}`,
+  buildOgImageCacheVersion: (date: string, revision: number | null) =>
+    `${date}-${revision === null ? "default" : `r${revision}`}`,
   readBadgeSvgCache: (...args: unknown[]) => mockReadBadgeSvgCache(...args),
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
 }));
@@ -280,6 +293,11 @@ beforeEach(() => {
   mockGetServerLocale.mockResolvedValue("en");
   mockReadBadgeSvgCache.mockResolvedValue(null);
   mockWriteBadgeSvgCache.mockResolvedValue(undefined);
+  mockResolveBadgeConfigSnapshot.mockResolvedValue({
+    config: { border: "solid" },
+    revision: 7,
+    cacheable: true,
+  });
   mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
   mockHeaders.mockResolvedValue({ get: () => null });
   mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);

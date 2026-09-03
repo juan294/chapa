@@ -88,11 +88,12 @@ import { loadConfig, type Config } from "./lib/env";
 // Zero-dependency, alias-free modules — safe to import directly under tsx.
 // `apps/web/lib/render/badge-svg-cache.ts` itself is NOT imported here: it
 // pulls in `@/lib/cache/redis` etc. via Next.js `@/` path aliases that tsx
-// cannot resolve when this script runs standalone outside the Next build, so
-// its `BADGE_RENDER_VARIANT` constant and key format are duplicated below
-// instead (same convention `heal-poisoned-stats.ts` uses for the other keys).
+// cannot resolve when this script runs standalone outside the Next build.
+// Its dependency-free render-variant module is shared directly instead, so a
+// future variant bump cannot leave this script deleting stale cache keys.
 import { CACHE_VERSION } from "../apps/web/lib/cache/version";
 import { SUPPORTED_LOCALES, type Locale } from "../apps/web/lib/i18n/types";
+import { BADGE_RENDER_VARIANT } from "../apps/web/lib/render/badge-render-variant";
 
 export type { Config };
 
@@ -180,8 +181,7 @@ export function dirtyStatsKey(handle: string): string {
 /** Matches `DIRTY_STATS_TTL` in `apps/web/lib/cache/dirty-stats.ts:14`. */
 export const DIRTY_STATS_TTL_SECONDS = 3600;
 
-/** Matches `BADGE_RENDER_VARIANT` in `apps/web/lib/render/badge-svg-cache.ts:20`. */
-export const BADGE_RENDER_VARIANT = "warm-amber-v3";
+export { BADGE_RENDER_VARIANT };
 
 /**
  * Matches `buildBadgeSvgCacheKey()` in
