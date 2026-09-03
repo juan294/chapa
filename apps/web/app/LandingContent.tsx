@@ -23,6 +23,11 @@ const DIMENSION_STYLES = [
   { key: "craft", bar: "bg-dimension-craft" },
 ] as const;
 
+// #1261 — the production run recorded on 2026-09-01 (Chrome 151, flagged),
+// linked as the "agent-tested" proof beside the static catalog.
+const WEBMCP_TRANSCRIPT_URL =
+  "https://github.com/juan294/chapa/blob/main/docs/webmcp-demo-transcript.md";
+
 const SITE_TOOL_COUNT = new Set(
   SITE_TOOL_MAP.flatMap((entry) => entry.tools),
 ).size;
@@ -464,6 +469,18 @@ export function LandingContent({
             </div>
             <p className="mt-5 text-sm leading-relaxed text-pretty text-text-secondary">
               {agentTools.boundary}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-pretty text-text-secondary">
+              {agentTools.transcriptBefore}{" "}
+              <a
+                href={WEBMCP_TRANSCRIPT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-text underline underline-offset-4 transition-colors hover:text-amber-light"
+              >
+                {agentTools.transcriptLink}
+              </a>{" "}
+              {agentTools.transcriptAfter}
             </p>
           </section>
         </div>

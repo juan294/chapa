@@ -185,7 +185,7 @@ Calling it opens a confirmation control on the page. It never touches the save A
 
 This was not a security requirement handed to me. It came from thinking about what the tool boundary means. Everything before the save is reversible and visible: change a color, watch it, change it back. The save writes the Studio configuration to the database, so it becomes the starting point when you come back. The reversible steps are a fine place for autonomy. The durable write is not.
 
-To be accurate about what that write currently reaches: it persists the Studio preview configuration, and it does not yet alter the public SVG badge. The public renderer does not consume that configuration today. Closing that split is its own piece of work, recorded in an architecture decision record, and it does not change the gating argument. A durable write is a durable write, and the moment it does drive the embedded badge, the gate is already in the right place.
+To be accurate about what that write reaches: when I first shipped the tools, the save persisted only the Studio preview configuration, and the public SVG renderer did not consume it. That split is closed now. There is one badge implementation, the saved configuration drives the embedded SVG, the share page and the social preview image, and a save invalidates every cached copy of them. The gating argument never depended on which it was. A durable write is a durable write, and now that it does drive the badge people embed in their READMEs, the gate is already in the right place.
 
 Concretely: an agent can redesign your entire badge in twelve tool calls, and you can undo all of it by refreshing the page. It cannot make one of those changes permanent without you.
 
@@ -292,7 +292,7 @@ Shipping the runtime tools did not make Chapa easy to find. I added four static 
 
 I also shipped a stateless [Streamable HTTP MCP endpoint](https://chapa.thecreativetoken.com/api/mcp) for clients that do not control a browser tab. It exposes nine public, read-only tools and calls the same application libraries as Chapa's public routes. Studio mutation tools stay browser-only because their value comes from shared, visible page state and the human confirmation gate.
 
-The endpoint is active in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.juan294/chapa) as `io.github.juan294/chapa` version `2.29.1`, and the [Glama connector listing](https://glama.ai/mcp/connectors/com.thecreativetoken.chapa/chapa) is live. I also submitted Chapa to WebMCP and `llms.txt` directories and to MCP Servers. Some directory reviews were still pending when I finished this article. One WebMCP scanner rejected the site because it looked for an older browser API signature instead of the current `document.modelContext` API. That result was useful: directory compatibility is another contract, and it can lag the runtime specification.
+The endpoint is active in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.juan294/chapa) as `io.github.juan294/chapa` (registry record version `2.29.0`), and the [Glama connector listing](https://glama.ai/mcp/connectors/com.thecreativetoken.chapa/chapa) is live. I also submitted Chapa to WebMCP and `llms.txt` directories and to MCP Servers. Some directory reviews were still pending when I finished this article. One WebMCP scanner rejected the site because it looked for an older browser API signature instead of the current `document.modelContext` API. That result was useful: directory compatibility is another contract, and it can lag the runtime specification.
 
 ### The evidence, and its limits
 
@@ -302,7 +302,9 @@ Verified: a hello-world tool passed **native registration, discovery, and execut
 
 Verified: the full browser catalog is implemented and tested, with each tool host carrying its own render test. The remote endpoint has a separate transport contract matrix and a parity assertion that keeps its nine tool names tied to the browser catalog.
 
-Verified: the browser code has shipped in every release since v2.24.0. The static discovery surfaces, telemetry, and remote MCP endpoint first shipped in v2.29.0. The current production endpoint identifies itself as Chapa v2.29.1 and lists all nine read-only tools.
+Verified: the browser code has shipped in every release since v2.24.0. The static discovery surfaces, telemetry, and remote MCP endpoint first shipped in v2.29.0. The current production endpoint identifies itself as Chapa v2.29.4 and lists all nine read-only tools.
+
+Verified: an agent drove the full catalog end to end on production on 2026-09-01, in Chrome 151 with the WebMCP flag: landing discovery, the demo Studio, the human save boundary, a public profile, and its verification record, including the altered-hash negative case. The [cleaned transcript](https://github.com/juan294/chapa/blob/main/docs/webmcp-demo-transcript.md) preserves every tool name, argument, route, boundary, and visible page effect. It is linked from Chapa's landing page as the agent-tested proof, because a tool catalog is a claim and a transcript is evidence.
 
 One more practical note if you are planning a demo. Chrome's WebMCP origin trial runs from Chrome 149 to 156 and ends **17 November 2026**. Without a trial token, your visitors need to enable the flag themselves. With a token, unflagged Chrome works. Decide which of those your audience is before you record anything.
 
