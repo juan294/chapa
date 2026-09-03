@@ -194,6 +194,9 @@ export const es: Translations = {
     agentTools: {
       intro: 'Este sitio habla WebMCP. Abre una página de la lista en un navegador compatible con WebMCP para usar sus herramientas.',
       boundary: 'Las herramientas de solo lectura consultan datos públicos. Las herramientas de Creator Studio pueden cambiar el estado visible de la página, pero guardar siempre espera el clic de una persona.',
+      transcriptBefore: 'Probado con un agente en producción el 2026-09-01:',
+      transcriptLink: 'lee la transcripción completa de llamadas a herramientas',
+      transcriptAfter: 'de un agente recorriendo las cuatro superficies de principio a fin.',
     },
     stats: [
       { value: '7', label: 'arquetipos' },

@@ -200,6 +200,9 @@ export const en: Translations = {
     agentTools: {
       intro: 'This site speaks WebMCP. Open a page below in a WebMCP-capable browser to use its tools.',
       boundary: 'Read-only tools inspect public data. Creator Studio tools can change visible page state, but saving always waits for a human click.',
+      transcriptBefore: 'Agent-tested in production on 2026-09-01:',
+      transcriptLink: 'read the full tool-call transcript',
+      transcriptAfter: 'of an agent driving all four surfaces end to end.',
     },
     stats: [
       { value: '7', label: 'archetypes' },
