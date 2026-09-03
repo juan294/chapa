@@ -1,11 +1,11 @@
 /**
- * Vercel edge-cache purge for badge SVG responses (hotfix v2.29.2).
+ * Vercel edge-cache purge for rendered badge responses.
  *
- * The badge route tags every cacheable response with `badge-<handle>`
- * (`badgeEdgeCacheTag`) via the `Vercel-Cache-Tag` response header. This module
- * purges that tag from Vercel's edge — the layer a Redis `cacheDel` never
- * reaches — so a Studio save (or any other invalidation trigger) actually
- * changes what the next viewer sees, not just what origin serves.
+ * The SVG and OG routes tag every cacheable response with their per-handle
+ * tag via `Vercel-Cache-Tag`. This module purges those tags from Vercel's edge
+ * — the layer a Redis `cacheDel` never reaches — so a Studio save (or any
+ * other invalidation trigger) changes what the next viewer sees, not just
+ * what origin serves.
  *
  * Foreground revalidation (`dangerouslyDeleteByTag`, not the eventually-
  * consistent `invalidateByTag`) is deliberate: one tag maps to one handle's
@@ -24,6 +24,11 @@ export const EDGE_PURGE_DEADLINE_MS = 1_500;
 /** One tag per handle. Lowercased the same way buildBadgeSvgCacheKey lowercases. */
 export function badgeEdgeCacheTag(handle: string): string {
   return `badge-${handle.toLowerCase()}`;
+}
+
+/** One OG-image tag per handle, matching the normalized Redis cache key. */
+export function ogImageEdgeCacheTag(handle: string): string {
+  return `og-${handle.toLowerCase()}`;
 }
 
 /**

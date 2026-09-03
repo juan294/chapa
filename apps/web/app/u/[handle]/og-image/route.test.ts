@@ -141,6 +141,11 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
     expect(mockCacheGet).toHaveBeenCalledWith("og-image:v3:testuser:2026-02-14:en");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+      "public, s-maxage=21600, stale-while-revalidate=86400",
+    );
   });
 
   it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
@@ -189,6 +194,21 @@ describe("GET /u/[handle]/og-image", () => {
       FAKE_PNG_BASE64,
       172800,
     );
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+      "public, s-maxage=21600, stale-while-revalidate=86400",
+    );
+  });
+
+  it("normalizes the handle in the Redis key and edge tag", async () => {
+    const [req, ctx] = makeRequest("MixedCase");
+    const res = await GET(req, ctx);
+
+    expect(mockCacheGet).toHaveBeenCalledWith(
+      "og-image:v3:mixedcase:2026-02-14:en",
+    );
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-mixedcase");
   });
 
   // #760 — the SVG is rasterized to PNG, where SMIL <animate> does not run.
@@ -414,4 +434,3 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     expect(key).toContain("en");
   });
 });
-

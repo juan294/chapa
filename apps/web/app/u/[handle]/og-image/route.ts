@@ -8,6 +8,8 @@ import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
 import { svgToPng } from "@/lib/render/svg-to-png";
 import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { ogImageEdgeCacheTag } from "@/lib/cache/edge-cache";
+import { buildOgImageCacheKey } from "@/lib/render/badge-svg-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
@@ -20,6 +22,17 @@ import {
 
 const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000;
+const OG_EDGE_POLICY = "public, s-maxage=21600, stale-while-revalidate=86400";
+const OG_CLIENT_POLICY = "public, max-age=300";
+
+function ogImageCacheHeaders(handle: string) {
+  return {
+    "Content-Type": "image/png",
+    "Cache-Control": OG_CLIENT_POLICY,
+    "Vercel-CDN-Cache-Control": OG_EDGE_POLICY,
+    "Vercel-Cache-Tag": ogImageEdgeCacheTag(handle),
+  };
+}
 
 /**
  * GET /u/:handle/og-image
@@ -49,7 +62,7 @@ export async function GET(
   const lang = request.nextUrl.searchParams.get("lang");
   const locale: Locale = isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
   const badgeLocale = resolveBadgeLocale(locale);
-  const ogCacheKey = `og-image:v3:${handle}:${today}:${locale}`;
+  const ogCacheKey = buildOgImageCacheKey(handle, today, locale);
 
   // PE-L1: Cache-first — serve warm-cache PNG without the rate-limit round-trip.
   // Rate limiting is deferred to the cache-MISS branch (expensive path only).
@@ -58,11 +71,7 @@ export async function GET(
     if (cachedBase64) {
       const pngBuffer = Buffer.from(cachedBase64, "base64");
       return new NextResponse(pngBuffer, {
-        headers: {
-          "Content-Type": "image/png",
-          "Cache-Control":
-            "public, s-maxage=21600, stale-while-revalidate=86400",
-        },
+        headers: ogImageCacheHeaders(handle),
       });
     }
   } catch {
@@ -139,11 +148,7 @@ export async function GET(
     );
 
     return new NextResponse(Buffer.from(png), {
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control":
-          "public, s-maxage=21600, stale-while-revalidate=86400",
-      },
+      headers: ogImageCacheHeaders(handle),
     });
   } catch (e) {
     if (e instanceof TimeoutError) {
