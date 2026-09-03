@@ -24,7 +24,7 @@ Registration uses the current `document.modelContext.registerTool(tool, { signal
 
 See the [WebMCP tool catalog and judge guide](docs/webmcp.md) and the [under-three-minute demo script and submission checklist](docs/webmcp-demo-script.md).
 
-The write-up [WebMCP, Explained. And What Happened When I Shipped It](docs/webmcp-explained-and-how-i-shipped-it.md) covers the design framework, the tested tool-map contract, and the rules that came out of shipping it. The [production demo transcript](docs/webmcp-demo-transcript.md) (2026-09-01, Chrome 151 with the WebMCP flag) records an agent driving all four surfaces end to end, and is linked from the landing page as the agent-tested proof. A companion note, [The WebMCP directories made me use a mouse](docs/webmcp-directories-are-not-webmcp-ready.md), records what the directory submissions taught.
+The write-up [WebMCP, Explained. And What Happened When I Shipped It](docs/webmcp-explained-and-how-i-shipped-it.md) (published on [X](https://x.com/JuanG294/status/2094005233990893844), LinkedIn and Medium) covers the design framework, the tested tool-map contract, and the rules that came out of shipping it. The [production demo transcript](docs/webmcp-demo-transcript.md) (2026-09-01, Chrome 151 with the WebMCP flag) records an agent driving all four surfaces end to end, and is linked from the landing page as the agent-tested proof. A companion note, [The WebMCP directories made me use a mouse](docs/webmcp-directories-are-not-webmcp-ready.md), records what the directory submissions taught.
 
 The catalog's [Design methodology](docs/webmcp.md#design-methodology) documents each user goal, initial state, role-play, and recovery path.
 
