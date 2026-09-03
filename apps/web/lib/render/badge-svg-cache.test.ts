@@ -32,10 +32,12 @@ import * as edgeCache from "@/lib/cache/edge-cache";
 
 const cacheGet = vi.mocked(redis.cacheGet);
 const cacheSet = vi.mocked(redis.cacheSet);
+const cacheDel = vi.mocked(redis.cacheDel);
 const purgeEdgeCacheTag = vi.mocked(edgeCache.purgeEdgeCacheTag);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  cacheDel.mockResolvedValue(true);
 });
 
 describe("badge-svg-cache", () => {
@@ -293,12 +295,11 @@ describe("invalidateBadgeSvgCacheForHandle (#1191, #1266)", () => {
   });
 
   it("deletes the SVG and OG image entries for every supported locale", async () => {
-    const { cacheDel } = await import("@/lib/cache/redis");
-    vi.mocked(cacheDel).mockClear();
+    cacheDel.mockClear();
 
     await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
 
-    const deleted = vi.mocked(cacheDel).mock.calls.map(([key]) => key);
+    const deleted = cacheDel.mock.calls.map(([key]) => key);
     expect(deleted).toHaveLength(SUPPORTED_LOCALES.length * 2);
     for (const locale of SUPPORTED_LOCALES) {
       expect(deleted).toContain(
@@ -356,9 +357,8 @@ describe("invalidateBadgeSvgCacheForHandle (#1191, #1266)", () => {
     expect(result).toEqual({ redis: true, edge: "failed" });
   });
 
-  it("returns { redis: false, ... } when a Redis delete rejects, and still purges the edge", async () => {
-    const { cacheDel } = await import("@/lib/cache/redis");
-    vi.mocked(cacheDel).mockRejectedValueOnce(new Error("redis down"));
+  it("returns { redis: false, ... } when a Redis delete fails, and still purges the edge", async () => {
+    cacheDel.mockResolvedValueOnce(false);
     purgeEdgeCacheTag.mockResolvedValue("purged");
 
     const result = await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");

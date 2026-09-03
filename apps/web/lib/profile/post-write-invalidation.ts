@@ -13,7 +13,7 @@ type ProfileReadModelInvalidationOptions = {
   history?: boolean;
 };
 
-async function runInvalidationStep(step: () => Promise<void>): Promise<void> {
+async function runInvalidationStep(step: () => Promise<unknown>): Promise<void> {
   try {
     await step();
   } catch {

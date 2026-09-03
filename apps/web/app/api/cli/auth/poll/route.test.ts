@@ -65,7 +65,7 @@ beforeEach(() => {
   vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
   vi.mocked(cacheSet).mockResolvedValue(true);
   vi.mocked(cacheMergeJson).mockResolvedValue(true);
-  vi.mocked(cacheDel).mockResolvedValue(undefined);
+  vi.mocked(cacheDel).mockResolvedValue(true);
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
 });
 
@@ -274,7 +274,7 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
     vi.mocked(cacheSet).mockResolvedValue(true);
     vi.mocked(cacheMergeJson).mockResolvedValue(true);
-    vi.mocked(cacheDel).mockResolvedValue(undefined);
+    vi.mocked(cacheDel).mockResolvedValue(true);
   });
 
   it("returns pending + device_code on first poll (session not found in Redis)", async () => {

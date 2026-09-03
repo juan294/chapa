@@ -9,11 +9,11 @@ paths:
 
 Choose the scheduling primitive from the promise made by the response:
 
-- Use plain `await` when the response depends on the outcome. Durable writes,
-  cache invalidations triggered by a user-visible save/refresh/link/unlink, and
-  any work the response reports as completed belong here. If failure is
-  recoverable, await it and return an honest result such as `persisted: false`
-  or `badgeRefreshed: false`.
+- Use plain `await` when the response promises the outcome. Durable writes or
+  cache invalidations reported as completed by a user-visible
+  save/refresh/link/unlink belong here. If failure is recoverable, await it and
+  return an honest result such as `persisted: false` or
+  `badgeRefreshed: false`.
 - Use Next.js `after()` when work may start after the response but still must
   finish. Register it before returning and return/await the complete promise
   from its callback. Deferred durable work must capture or log failures; do not

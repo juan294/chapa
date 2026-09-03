@@ -142,16 +142,19 @@ return 1
 
 /**
  * Delete a cached key.
- * Silently no-ops if Redis is unavailable.
+ * Returns `true` when the key is absent/deleted (including when no cache layer
+ * is configured), and `false` only when a configured Redis deletion fails.
  */
-export async function cacheDel(key: string): Promise<void> {
+export async function cacheDel(key: string): Promise<boolean> {
   const redis = getRedis();
-  if (!redis) return;
+  if (!redis) return true;
 
   try {
     await redis.del(key);
+    return true;
   } catch (error) {
     console.error("[cache] cacheDel failed:", (error as Error).message);
+    return false;
   }
 }
 

@@ -8,7 +8,7 @@ vi.mock("@/lib/db/studio", () => ({
   dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args),
 }));
 
-import { resolveBadgeConfig } from "./badge-config";
+import { resolveBadgeConfig, resolveBadgeConfigSnapshot } from "./badge-config";
 
 const CUSTOM = { ...DEFAULT_BADGE_CONFIG, border: "none" as const };
 
@@ -29,7 +29,7 @@ describe("resolveBadgeConfig (#1191)", () => {
     await expect(resolveBadgeConfig("octocat")).resolves.toEqual(CUSTOM);
   });
 
-  it.each(["missing", "unavailable"] as const)(
+  it.each(["not_found", "unavailable"] as const)(
     "falls back to the default when the read reports %s",
     async (status) => {
       mockDbGetStudioConfig.mockResolvedValue({ status });
@@ -47,6 +47,43 @@ describe("resolveBadgeConfig (#1191)", () => {
       DEFAULT_BADGE_CONFIG,
     );
   });
+
+  it("exposes the database revision for cache-write fencing", async () => {
+    mockDbGetStudioConfig.mockResolvedValue({
+      status: "found",
+      config: CUSTOM,
+      revision: 7,
+    });
+
+    await expect(resolveBadgeConfigSnapshot("octocat")).resolves.toEqual({
+      config: CUSTOM,
+      revision: 7,
+      cacheable: true,
+    });
+  });
+
+  it("treats a confirmed missing config as a stable default revision", async () => {
+    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
+
+    await expect(resolveBadgeConfigSnapshot("octocat")).resolves.toEqual({
+      config: DEFAULT_BADGE_CONFIG,
+      revision: null,
+      cacheable: true,
+    });
+  });
+
+  it.each(["unavailable", "invalid"] as const)(
+    "disables cache publication when the revision is %s",
+    async (status) => {
+      mockDbGetStudioConfig.mockResolvedValue({ status });
+
+      await expect(resolveBadgeConfigSnapshot("octocat")).resolves.toEqual({
+        config: DEFAULT_BADGE_CONFIG,
+        revision: null,
+        cacheable: false,
+      });
+    },
+  );
 });
 
 describe("every badge render site resolves config the same way (#1191)", () => {

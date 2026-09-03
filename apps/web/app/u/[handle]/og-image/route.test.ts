@@ -13,6 +13,7 @@ const {
   mockRateLimit,
   mockGetClientIp,
   mockCaptureServerError,
+  mockResolveBadgeConfigSnapshot,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -25,6 +26,7 @@ const {
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockResolveBadgeConfigSnapshot: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -61,6 +63,11 @@ vi.mock("@/lib/http/client-ip", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
+}));
+
+vi.mock("@/lib/render/badge-config", () => ({
+  resolveBadgeConfigSnapshot: (...args: unknown[]) =>
+    mockResolveBadgeConfigSnapshot(...args),
 }));
 
 import { GET } from "./route";
@@ -126,6 +133,11 @@ describe("GET /u/[handle]/og-image", () => {
     mockCacheSet.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockResolveBadgeConfigSnapshot.mockResolvedValue({
+      config: { border: "solid" },
+      revision: 7,
+      cacheable: true,
+    });
   });
 
   afterEach(() => {
@@ -302,7 +314,7 @@ describe("GET /u/[handle]/og-image", () => {
     );
   });
 
-  it("returns the rendered PNG even when caching it rejects (fire-and-forget)", async () => {
+  it("returns the rendered PNG even when caching it rejects", async () => {
     mockCacheSet.mockRejectedValue(new Error("redis down"));
 
     const [req, ctx] = makeRequest("testuser");
@@ -310,9 +322,6 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/png");
-    // give the fire-and-forget rejection a tick to settle so the onError
-    // handler runs and is observed by coverage instrumentation
-    await vi.advanceTimersByTimeAsync(0);
   });
 
   // #1094 (PE-L3): cacheSet never throws — it swallows Redis errors internally
@@ -330,15 +339,35 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/png");
 
-    // let the fire-and-forget cacheSet + observability call settle
-    await vi.advanceTimersByTimeAsync(0);
-
     expect(mockCaptureServerError).toHaveBeenCalledWith(
       expect.objectContaining({
         route: "/u/testuser/og-image",
         error: expect.any(Error),
       }),
     );
+  });
+
+  it("does not publish a PNG when the Studio config revision changes during rendering", async () => {
+    mockResolveBadgeConfigSnapshot
+      .mockResolvedValueOnce({
+        config: { border: "solid" },
+        revision: 7,
+        cacheable: true,
+      })
+      .mockResolvedValueOnce({
+        config: { border: "none" },
+        revision: 8,
+        cacheable: true,
+      });
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBeNull();
   });
 
   it("rate-limits to 30 requests per IP per 60 seconds", async () => {
@@ -383,6 +412,11 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     mockCacheSet.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockResolveBadgeConfigSnapshot.mockResolvedValue({
+      config: { border: "solid" },
+      revision: 7,
+      cacheable: true,
+    });
   });
 
   afterEach(() => {
@@ -405,6 +439,11 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     mockCacheSet.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockResolveBadgeConfigSnapshot.mockResolvedValue({
+      config: { border: "solid" },
+      revision: 7,
+      cacheable: true,
+    });
 
     const [es, esCtx] = makeRequest("testuser", "es");
     await GET(es, esCtx);

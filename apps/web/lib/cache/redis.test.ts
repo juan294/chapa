@@ -224,7 +224,7 @@ describe("cacheDel", () => {
   it("deletes a key from Redis", async () => {
     mockDel.mockResolvedValueOnce(1);
 
-    await cacheDel("impact:test-user");
+    await expect(cacheDel("impact:test-user")).resolves.toBe(true);
 
     expect(mockDel).toHaveBeenCalledWith("impact:test-user");
   });
@@ -232,7 +232,7 @@ describe("cacheDel", () => {
   it("does not throw when Redis is down (graceful degradation)", async () => {
     mockDel.mockRejectedValueOnce(new Error("Connection refused"));
 
-    await expect(cacheDel("impact:test-user")).resolves.toBeUndefined();
+    await expect(cacheDel("impact:test-user")).resolves.toBe(false);
   });
 });
 
@@ -265,12 +265,12 @@ describe("missing env vars (no-op fallback)", () => {
     expect(mockSet).not.toHaveBeenCalled();
   });
 
-  it("cacheDel is a no-op when env vars are missing", async () => {
+  it("cacheDel succeeds as a no-op when env vars are missing", async () => {
     _resetClient();
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
 
-    await cacheDel("anything");
+    await expect(cacheDel("anything")).resolves.toBe(true);
 
     expect(mockDel).not.toHaveBeenCalled();
   });

@@ -243,8 +243,8 @@ export async function invalidateBadgeSvgCacheForHandle(
   handle: string,
   date: string,
 ): Promise<BadgeInvalidationResult> {
-  const [redisSettled, edgeOutcomes] = await Promise.all([
-    Promise.allSettled(
+  const [redisOutcomes, edgeOutcomes] = await Promise.all([
+    Promise.all(
       SUPPORTED_LOCALES.flatMap((locale) => [
         cacheDel(buildBadgeSvgCacheKey(handle, date, locale)),
         cacheDel(buildOgImageCacheKey(handle, date, locale)),
@@ -261,7 +261,7 @@ export async function invalidateBadgeSvgCacheForHandle(
       ? "purged"
       : "skipped";
   return {
-    redis: redisSettled.every((result) => result.status === "fulfilled"),
+    redis: redisOutcomes.every(Boolean),
     edge,
   };
 }

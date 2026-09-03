@@ -2,6 +2,14 @@ import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { dbGetStudioConfig } from "@/lib/db/studio";
 
+export type ResolvedBadgeConfigSnapshot = {
+  config: BadgeConfig;
+  /** `null` identifies the stable absence of a persisted config. */
+  revision: number | null;
+  /** False when storage could not provide a revision suitable for fencing. */
+  cacheable: boolean;
+};
+
 /**
  * Resolve the badge configuration for a handle (#1191).
  *
@@ -22,11 +30,23 @@ import { dbGetStudioConfig } from "@/lib/db/studio";
  * the warmest path in the product. Freshness comes from invalidation instead —
  * see `invalidateBadgeSvgCacheForHandle`.
  */
-export async function resolveBadgeConfig(handle: string): Promise<BadgeConfig> {
+export async function resolveBadgeConfigSnapshot(
+  handle: string,
+): Promise<ResolvedBadgeConfigSnapshot> {
   try {
     const result = await dbGetStudioConfig(handle);
-    return result.status === "found" ? result.config : DEFAULT_BADGE_CONFIG;
+    if (result.status === "found") {
+      return { config: result.config, revision: result.revision, cacheable: true };
+    }
+    if (result.status === "not_found") {
+      return { config: DEFAULT_BADGE_CONFIG, revision: null, cacheable: true };
+    }
+    return { config: DEFAULT_BADGE_CONFIG, revision: null, cacheable: false };
   } catch {
-    return DEFAULT_BADGE_CONFIG;
+    return { config: DEFAULT_BADGE_CONFIG, revision: null, cacheable: false };
   }
+}
+
+export async function resolveBadgeConfig(handle: string): Promise<BadgeConfig> {
+  return (await resolveBadgeConfigSnapshot(handle)).config;
 }

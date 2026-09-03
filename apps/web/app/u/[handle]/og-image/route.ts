@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { resolveBadgeConfig } from "@/lib/render/badge-config";
+import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import { DEFAULT_LOCALE, isSupportedLocale } from "@/lib/i18n/types";
 import type { Locale } from "@/lib/i18n/types";
@@ -12,7 +12,6 @@ import { ogImageEdgeCacheTag } from "@/lib/cache/edge-cache";
 import { buildOgImageCacheKey } from "@/lib/render/badge-svg-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
-import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import {
@@ -31,6 +30,14 @@ function ogImageCacheHeaders(handle: string) {
     "Cache-Control": OG_CLIENT_POLICY,
     "Vercel-CDN-Cache-Control": OG_EDGE_POLICY,
     "Vercel-Cache-Tag": ogImageEdgeCacheTag(handle),
+  };
+}
+
+function ogImageNoStoreHeaders() {
+  return {
+    "Content-Type": "image/png",
+    "Cache-Control": "private, no-store, max-age=0",
+    "Vercel-CDN-Cache-Control": "no-store",
   };
 }
 
@@ -103,9 +110,14 @@ export async function GET(
 
     const verification = getPublicProfileVerification(materialized);
 
+    // Capture the persisted config revision that produced this image. We
+    // verify it again immediately before publication so a Studio save that
+    // overlaps this expensive render cannot repopulate Redis or the edge with
+    // the pre-save PNG after invalidation has completed.
+    const configSnapshot = await resolveBadgeConfigSnapshot(handle);
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
-      config: await resolveBadgeConfig(handle),
+      config: configSnapshot.config,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
       // Rasterized to PNG below — SMIL <animate> never runs during rasterization,
@@ -122,30 +134,39 @@ export async function GET(
       "svgToPng",
     );
 
-    // Cache the PNG as base64 for 48h (fire-and-forget — don't block response).
-    // #1094 (PE-L3): cacheSet never throws — it swallows Redis errors and
-    // resolves `false` on failure (e.g. an oversized base64 PNG rejected by
-    // Upstash's per-value size limit). A resolved-false outcome was
-    // previously discarded silently, permanently degrading the handle to an
-    // OG-image cache miss with no observability. Surface it via
-    // captureServerError without ever affecting the already-sent response.
-    fireAndForget(
-      async () => {
-        const cached = await cacheSet(
-          ogCacheKey,
-          Buffer.from(png).toString("base64"),
-          OG_CACHE_TTL,
-        );
-        if (!cached) {
-          void captureServerError({
-            route: `/u/${handle}/og-image`,
-            statusCode: 200,
-            error: new Error(`Failed to cache OG image PNG for handle: ${handle}`),
-          });
-        }
-      },
-      () => undefined,
-    );
+    const currentConfigSnapshot = await resolveBadgeConfigSnapshot(handle);
+    const revisionIsStable =
+      configSnapshot.cacheable &&
+      currentConfigSnapshot.cacheable &&
+      configSnapshot.revision === currentConfigSnapshot.revision;
+
+    if (!revisionIsStable) {
+      return new NextResponse(Buffer.from(png), {
+        headers: ogImageNoStoreHeaders(),
+      });
+    }
+
+    // This write is awaited because its revision fence is part of correctness:
+    // detaching it would let a pre-save render publish after the save purge.
+    // cacheSet normally resolves false instead of throwing, but keep the catch
+    // defensive so cache degradation never breaks image delivery.
+    let cached = false;
+    try {
+      cached = await cacheSet(
+        ogCacheKey,
+        Buffer.from(png).toString("base64"),
+        OG_CACHE_TTL,
+      );
+    } catch {
+      cached = false;
+    }
+    if (!cached) {
+      void captureServerError({
+        route: `/u/${handle}/og-image`,
+        statusCode: 200,
+        error: new Error(`Failed to cache OG image PNG for handle: ${handle}`),
+      });
+    }
 
     return new NextResponse(Buffer.from(png), {
       headers: ogImageCacheHeaders(handle),
