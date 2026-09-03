@@ -8,6 +8,7 @@ import { cacheDel, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/lib/i18n/types";
+import { BADGE_RENDER_VARIANT } from "@/lib/render/badge-render-variant";
 import {
   badgeEdgeCacheTag,
   purgeEdgeCacheTag,
@@ -23,7 +24,7 @@ import {
  * and response construction that follow a successful read.
  */
 const CACHE_DEADLINE_MS = 500;
-export const BADGE_RENDER_VARIANT = "jade-v1";
+export { BADGE_RENDER_VARIANT };
 
 /**
  * Base TTL for badge SVG cache entries.
