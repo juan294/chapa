@@ -7,6 +7,7 @@ import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
 import { pingSupabase } from "@/lib/db/supabase";
 import { captureOperationalAlert, withErrorCapture } from "@/lib/analytics/server-errors";
+import { getMissingFontFiles } from "@/lib/render/font-files";
 
 /** Shape returned for a successful GitHub probe. */
 interface GitHubRateLimit {
@@ -216,6 +217,14 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
   const session = getOptionalRequestSession(request);
   const isAdmin = session ? isAdminHandle(session.login) : false;
 
+  // #1275 — the OG rasterizer's fonts. From v2.8.0 to v2.29.4 the deployed
+  // function could not open them and every social card shipped with no
+  // text, with nothing to say so. Reported here and alerted at P2; it does
+  // not flip the health status, because a text-less social card is a defect
+  // to fix, not an outage to page for, and the deployment smoke asserts 200.
+  const missingFonts = getMissingFontFiles();
+  const fontsStatus: "ok" | "missing" = missingFonts.length === 0 ? "ok" : "missing";
+
   // "skipped" is acceptable in preview/dev where optional integrations degrade
   // gracefully. In production, skipped core dependencies indicate missing
   // runtime configuration and must fail health so smoke/monitoring can catch it.
@@ -245,10 +254,22 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     cronHeartbeats,
     ...(githubQuotaLow && { githubQuotaLow: true }),
     alertWebhook: getChapaAlertWebhookUrl() ? "configured" : "skipped",
+    fonts: fontsStatus,
+    ...(missingFonts.length > 0 && { missingFonts }),
     ...(isAdmin && githubResult.rateLimit && {
       githubRateLimit: githubResult.rateLimit,
     }),
   };
+
+  if (fontsStatus === "missing") {
+    void captureOperationalAlert({
+      signal: "og_fonts_missing",
+      severity: "P2",
+      summary: "Bundled badge fonts are missing; OG images render without text",
+      route: "/api/health",
+      properties: { missingFonts },
+    });
+  }
 
   if (status === "degraded") {
     void captureOperationalAlert({

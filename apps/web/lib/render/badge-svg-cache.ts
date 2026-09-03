@@ -103,7 +103,9 @@ export function buildOgImageCacheKey(
   date: string,
   locale: Locale = DEFAULT_LOCALE,
 ): string {
-  return `og-image:v3:${handle.toLowerCase()}:${date}:${locale}`;
+  // v4: #1275 — every v3 value was rendered without text; a new prefix
+  // guarantees none of them is served after the fix deploys.
+  return `og-image:v4:${handle.toLowerCase()}:${date}:${locale}`;
 }
 
 /** Version shared by the OG metadata URL and its revision-fenced Redis value. */

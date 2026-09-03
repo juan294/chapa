@@ -9,6 +9,10 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSet: vi.fn(),
 }));
 
+vi.mock("@/lib/render/font-files", () => ({
+  getMissingFontFiles: vi.fn(() => []),
+}));
+
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: () => "127.0.0.1",
 }));
@@ -43,6 +47,7 @@ vi.stubGlobal("fetch", mockFetch);
 import { GET } from "./route";
 import { cacheGetCronLastRun, pingRedis, rateLimit, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
+import { getMissingFontFiles } from "@/lib/render/font-files";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { captureOperationalAlert } from "@/lib/analytics/server-errors";
@@ -89,6 +94,9 @@ describe("GET /api/health", () => {
     expect(body.status).toBe("ok");
     expect(body.dependencies.redis).toBe("ok");
     expect(body.dependencies.supabase).toBe("ok");
+    // #1275 — the rasterizer's bundled fonts resolve in this checkout.
+    expect(body.dependencies.fonts).toBe("ok");
+    expect(body.dependencies.missingFonts).toBeUndefined();
     expect(body.timestamp).toBeDefined();
     expect(body.version).toBeUndefined();
   });
@@ -116,8 +124,33 @@ describe("GET /api/health", () => {
           github: "skipped",
           cronHeartbeats: expect.any(Object),
           alertWebhook: "skipped",
+          fonts: "ok",
         },
       },
+    });
+  });
+
+  // #1275 — a missing rasterizer font is reported and alerted at P2 without
+  // flipping the health status: a text-less social card is a defect to fix,
+  // not an outage, and the deployment smoke asserts a 200.
+  it("reports missing rasterizer fonts, alerts at P2, and stays 'ok' (#1275)", async () => {
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+    vi.mocked(getMissingFontFiles).mockReturnValueOnce(["JetBrainsMono-Bold.ttf"]);
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("ok");
+    expect(body.dependencies.fonts).toBe("missing");
+    expect(body.dependencies.missingFonts).toEqual(["JetBrainsMono-Bold.ttf"]);
+    expect(captureOperationalAlert).toHaveBeenCalledWith({
+      signal: "og_fonts_missing",
+      severity: "P2",
+      summary: "Bundled badge fonts are missing; OG images render without text",
+      route: "/api/health",
+      properties: { missingFonts: ["JetBrainsMono-Bold.ttf"] },
     });
   });
 

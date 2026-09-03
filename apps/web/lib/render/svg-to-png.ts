@@ -7,31 +7,10 @@
 
 import { renderAsync } from "@resvg/resvg-js";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { captureServerError } from "@/lib/analytics/server-errors";
+import { getFontPaths, resolveFontFiles } from "./font-files";
 
-/**
- * Font files co-located with the render module for server-side SVG rendering.
- *
- * These TTF files are ONLY used server-side by resvg (SVG-to-PNG conversion)
- * and are intentionally NOT in `public/` to avoid exposing them to browsers.
- * Browser fonts are loaded via `next/font/google` in layout.tsx.
- */
-const FONT_FILES = [
-  "PlusJakartaSans-Regular.ttf",
-  "PlusJakartaSans-SemiBold.ttf",
-  "JetBrainsMono-Regular.ttf",
-  "JetBrainsMono-Bold.ttf",
-];
-
-/**
- * Resolve absolute paths to the bundled TTF font files.
- *
- * Keep this module-relative so Next/NFT can statically trace only the
- * `fonts/` directory instead of the entire workspace.
- */
-export function getFontPaths(): string[] {
-  return FONT_FILES.map((f) => fileURLToPath(new URL(`./fonts/${f}`, import.meta.url)));
-}
+export { getFontPaths } from "./font-files";
 
 /**
  * PE-L3: Font buffers read once at module scope.
@@ -41,15 +20,31 @@ export function getFontPaths(): string[] {
  * time means each cold-start pays the disk read once, not on every
  * OG-image cache miss. The buffers are reused across all calls to `svgToPng`.
  *
- * Falls back to `undefined` if any read fails so the module still loads in
- * environments where the font files are absent (e.g. unit-test sandboxes);
- * `svgToPng` falls back to `fontFiles` paths in that case.
+ * #1275 — a failed read is recorded, not just swallowed. The previous
+ * version fell back to `fontFiles` pointing at the same paths that had just
+ * failed to open, and resvg then rasterized every OG image with no text at
+ * all, for five months, without a single log line. `svgToPng` now reports
+ * the failure through `captureServerError` (once per instance) and asks resvg
+ * to log missing-font warnings, so a font regression is observable in
+ * PostHog and in the function logs. The module still loads without fonts so
+ * a unit-test sandbox can exercise the rest of the pipeline.
  */
 let _fontBuffers: Buffer[] | undefined;
+let _fontLoadError: Error | undefined;
 try {
-  _fontBuffers = getFontPaths().map((p) => readFileSync(p));
-} catch {
+  const resolved = resolveFontFiles();
+  const missing = resolved.filter((r) => !r.found);
+  if (missing.length > 0) {
+    throw new Error(
+      `Bundled fonts not found: ${missing
+        .map((r) => `${r.name} (tried ${r.tried.join(", ")})`)
+        .join("; ")}`,
+    );
+  }
+  _fontBuffers = resolved.map((r) => readFileSync(r.path));
+} catch (e) {
   _fontBuffers = undefined;
+  _fontLoadError = e instanceof Error ? e : new Error(String(e));
 }
 
 /**
@@ -60,6 +55,36 @@ try {
  */
 export function getFontBuffers(): Buffer[] | undefined {
   return _fontBuffers;
+}
+
+/**
+ * The `font` option handed to resvg: pre-loaded buffers when the module-scope
+ * read succeeded, otherwise file paths (which resvg opens itself). System
+ * fonts are never consulted, so the badge renders identically on every host.
+ *
+ * @internal exported for the real-resvg raster tests
+ */
+export function getResvgFontOptions(): {
+  loadSystemFonts: false;
+  fontBuffers?: Buffer[];
+  fontFiles?: string[];
+} {
+  return _fontBuffers
+    ? { loadSystemFonts: false, fontBuffers: _fontBuffers }
+    : { loadSystemFonts: false, fontFiles: getFontPaths() };
+}
+
+let _fontFailureReported = false;
+
+function reportFontFailureOnce(): void {
+  if (_fontFailureReported || _fontLoadError === undefined) return;
+  _fontFailureReported = true;
+  console.error("[svg-to-png] bundled fonts unavailable; text will not rasterize:", _fontLoadError.message);
+  void captureServerError({
+    route: "lib/render/svg-to-png",
+    statusCode: 500,
+    error: _fontLoadError,
+  });
 }
 
 /**
@@ -157,12 +182,13 @@ export function stripSvgAnimations(svg: string): string {
  */
 export async function svgToPng(svg: string, width = 1200): Promise<Uint8Array> {
   const staticSvg = stripSvgAnimations(svg);
-  const fontConfig = _fontBuffers
-    ? { loadSystemFonts: false, fontBuffers: _fontBuffers }
-    : { loadSystemFonts: false, fontFiles: getFontPaths() };
+  reportFontFailureOnce();
   const rendered = await renderAsync(staticSvg, {
     fitTo: { mode: "width", value: width },
-    font: fontConfig,
+    font: getResvgFontOptions(),
+    // #1275 — resvg drops text it has no font for. "warn" makes that visible
+    // in the function logs instead of a silently empty social card.
+    logLevel: "warn",
   });
   return rendered.asPng();
 }

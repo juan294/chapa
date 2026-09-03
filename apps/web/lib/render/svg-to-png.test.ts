@@ -21,6 +21,13 @@ vi.mock("@resvg/resvg-js", () => ({
   renderAsync: mockRenderAsync,
 }));
 
+const { mockCaptureServerError } = vi.hoisted(() => ({
+  mockCaptureServerError: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerError: mockCaptureServerError,
+}));
+
 import { svgToPng, stripSvgAnimations, getFontPaths, getFontBuffers } from "./svg-to-png";
 
 // ---------------------------------------------------------------------------
@@ -360,6 +367,7 @@ describe("svgToPng — font buffer load failure fallback", () => {
   it("falls back to fontFiles when readFileSync throws at module load", async () => {
     vi.resetModules();
     vi.doMock("node:fs", () => ({
+      existsSync: vi.fn(() => true),
       readFileSync: vi.fn(() => {
         throw new Error("ENOENT: font file missing");
       }),
@@ -385,5 +393,51 @@ describe("svgToPng — font buffer load failure fallback", () => {
 
     vi.doUnmock("node:fs");
     vi.resetModules();
+  });
+
+  // #1275 — the failure used to be silent. It is now captured once per
+  // module instance, with the underlying read error, and never more than once.
+  it("captures the font load failure once, and asks resvg to log font warnings", async () => {
+    vi.resetModules();
+    mockCaptureServerError.mockClear();
+    vi.doMock("node:fs", () => ({
+      existsSync: vi.fn(() => true),
+      readFileSync: vi.fn(() => {
+        throw new Error("ENOENT: font file missing");
+      }),
+    }));
+
+    const mod = await import("./svg-to-png");
+    const { renderAsync: freshRenderAsync } = await import("@resvg/resvg-js");
+    const freshMockRenderAsync = vi.mocked(freshRenderAsync);
+    freshMockRenderAsync.mockResolvedValue({ asPng: () => FAKE_PNG } as never);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await mod.svgToPng(MINIMAL_SVG);
+    await mod.svgToPng(MINIMAL_SVG);
+
+    expect(mockCaptureServerError).toHaveBeenCalledTimes(1);
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "lib/render/svg-to-png",
+        statusCode: 500,
+        error: expect.objectContaining({ message: expect.stringContaining("ENOENT") }),
+      }),
+    );
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    const opts = freshMockRenderAsync.mock.calls.at(-1)![1] as { logLevel?: string };
+    expect(opts.logLevel).toBe("warn");
+
+    consoleError.mockRestore();
+    vi.doUnmock("node:fs");
+    vi.resetModules();
+  });
+
+  it("does not capture anything when the fonts loaded", async () => {
+    mockCaptureServerError.mockClear();
+    await svgToPng(MINIMAL_SVG);
+    expect(mockCaptureServerError).not.toHaveBeenCalled();
+    const opts = mockRenderAsync.mock.calls.at(-1)![1] as { logLevel?: string };
+    expect(opts.logLevel).toBe("warn");
   });
 });
