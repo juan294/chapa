@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.29.5] - 2026-09-03
+
+### Fixed
+
+- **Social-preview images render text again.** Every OG image
+  (`/u/:handle/og-image`) had shipped without a name, score, labels, wordmark
+  or footer since v2.11.0. Two defects stacked: Turbopack collapsed the
+  dynamic font path into a single asset, and the resvg-js Linux binary
+  ignores the `fontBuffers` option the renderer relied on (measured inside
+  the deployed function: 0 glyph pixels with buffers, 1118 with the same
+  fonts passed as files). Fonts now reach resvg as validated file paths,
+  a missing font is captured instead of swallowed, and the OG cache key
+  moved to `v4` so no text-less image is served after this release. (#1275)
+
+### Added
+
+- **`/api/health` now proves the rasterizer can draw.** It reports `fonts`
+  and `rasterizer`; the latter renders a two-word sample inside the
+  deployed function and counts glyph pixels, raising a P2
+  `og_rasterizer_unhealthy` alert when nothing is drawn. Health status is
+  unaffected. (#1275)
+
+### Documentation
+
+- The landing page links the 2026-09-01 production WebMCP transcript as
+  agent-tested proof, and the README links the published agent-operability
+  write-up and transcript. The write-up's stale claims about Studio saves
+  and version numbers were corrected. (#1261)
+- Decision record `docs/decisions/2026-09-03-og-fonts-as-files.md`.
+
 ## [2.29.4] - 2026-09-03
 
 ### Fixed
