@@ -1,9 +1,12 @@
 import { execFileSync } from "node:child_process";
 import {
   expect,
+  test,
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
+import { hasRenderedText, verifyHashFromHtml } from "./probe-html";
 
 export const smokeProfilePath = "/u/octocat?__chapa_smoke=1";
 export const smokeBadgePath = "/u/octocat/badge.svg?__chapa_smoke=1";
@@ -16,7 +19,6 @@ export const smokeBadgePath = "/u/octocat/badge.svg?__chapa_smoke=1";
 // preview happens to be under test.
 const PRODUCTION_ORIGIN = "https://chapa.thecreativetoken.com";
 
-const VERIFY_HASH_PATTERN = /\/verify\/([0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})/;
 
 export async function assertCoreDependencies(
   request: APIRequestContext,
@@ -102,31 +104,56 @@ export async function assertRollbackReadiness(
  * links to /verify/{hash}, and that page must render the verified success
  * state (not the not-found or invalid-hash states).
  */
+/**
+ * Keep the response body when an assertion on it fails, so a transient
+ * (the share page once rendered without its verify link about a minute
+ * after a deployment went live, #1279) is diagnosable from the artifact
+ * instead of lost with the run.
+ */
+async function withBodyAttachment<T>(
+  name: string,
+  body: string,
+  assertions: () => T,
+): Promise<T> {
+  try {
+    return assertions();
+  } catch (error) {
+    // Written to the test's output directory as well as attached, so the
+    // body survives a plain `--reporter=list` run, not only an HTML report.
+    const path = test.info().outputPath(name);
+    await writeFile(path, body);
+    await test.info().attach(name, { path, contentType: "text/html" });
+    throw error;
+  }
+}
+
 export async function assertShareVerification(
   request: APIRequestContext,
 ): Promise<void> {
   const response = await request.get(`${smokeProfilePath}&lang=en`);
   expect(response.status()).toBe(200);
   const body = await response.text();
-  expect(body).toContain("Embed this badge");
-
-  const match = VERIFY_HASH_PATTERN.exec(body);
-  expect(match, "share page did not render a /verify/{hash} link").not.toBeNull();
-  const hash = match![1];
+  const hash = await withBodyAttachment("share-page.html", body, () => {
+    expect(body).toContain("Embed this badge");
+    // #1279 — the previous pattern tried the 8-character alternative first
+    // and verified the first 8 characters of a 32-character hash.
+    const hash = verifyHashFromHtml(body);
+    expect(hash, "share page did not render a /verify/{hash} link").not.toBeNull();
+    return hash!;
+  });
 
   const verifyResponse = await request.get(`/verify/${hash}?lang=en`);
   expect(verifyResponse.status()).toBe(200);
   const verifyBody = await verifyResponse.text();
-  expect(verifyBody).toContain("Badge verified");
-  expect(verifyBody).not.toContain("Invalid hash");
-  expect(verifyBody).not.toContain("Not found");
+  // #1279 — rendered state, not document substrings: the page also ships
+  // its translation dictionary, which names every state it can render.
+  await withBodyAttachment("verify-page.html", verifyBody, () => {
+    expect(hasRenderedText(verifyBody, "Badge verified"), "verify page did not render the verified state").toBe(true);
+    expect(hasRenderedText(verifyBody, "Invalid hash"), "verify page rendered the invalid-hash callout").toBe(false);
+    expect(hasRenderedText(verifyBody, "Not found"), "verify page rendered the not-found callout").toBe(false);
+  });
 }
 
-/**
- * #1190 — the share page must render correctly in both supported locales.
- * Two plain HTTP requests, matching the release checklist's manual "switch
- * Spanish to English and back" step.
- */
 export async function assertLocales(request: APIRequestContext): Promise<void> {
   // #1217 replaced the sr-only, localized h1 with a visible one carrying the
   // profile identity, which reads the same in both locales. The badge's
