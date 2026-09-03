@@ -29,7 +29,7 @@ These tools orient and navigate only. They fetch no data and do not wrap the pub
 | Tool | Input | `readOnlyHint` | Behavior |
 | --- | --- | --- | --- |
 | `get_site_capabilities` | `EMPTY` | yes | Describes Chapa and returns the exact page-scoped tool map, canonical entry points, and human-action boundaries. |
-| `find_profile` | `HANDLE` | yes | Validates a public GitHub handle and returns its canonical share-page and badge URLs plus navigation notes. It makes no request. |
+| `find_profile` | `HANDLE` | yes | Validates a public GitHub handle and returns its canonical share-page and badge URLs plus navigation notes. It makes no request and does not claim the handle has a persisted public Chapa profile; public profile tools require the owner to have signed in. |
 
 ### Creator Studio: `/studio` and `/studio?demo=1`
 
@@ -55,7 +55,7 @@ These tools receive the same server-computed public data as the rendered page. V
 | `get_impact_history` | `EMPTY` | yes | Fetches `/api/history/[handle]?include=snapshots,trend` with the tool cancellation signal. It returns friendly messages for missing or rate-limited data. |
 | `verify_badge` | `EMPTY` | yes | If the page has a verification hash, fetches `/api/verify/[hash]` and returns status, record, and `verifyUrl`. Otherwise it reports that the profile has no verification record. |
 | `explain_dimension` | `DIMENSION` | yes | Uses the same shared explanation tool as Studio. It operates on the current public page data. |
-| `compare_profiles` | `COMPARE` | yes | Validates the other public GitHub handle, fetches `/api/profile/[other_handle]`, and returns the two public profiles with numeric score and dimension differences. The differences are other profile minus the on-page profile. Missing and rate-limited profiles get friendly messages. |
+| `compare_profiles` | `COMPARE` | yes | Validates the other GitHub handle, fetches `/api/profile/[other_handle]`, and compares it when an existing public Chapa profile is available. The differences are other profile minus the on-page profile. A missing profile explains that its owner must sign in to Chapa; rate-limited profiles get a retry-later message. |
 | `get_embed_snippet` | `EMPTY` | yes | Returns the page's canonical Markdown and HTML embed snippets for the live badge. |
 
 ### Verification page: `/verify/[hash]`
@@ -127,10 +127,10 @@ Chapa follows the framework in Chrome's [Build your user's agentic workflows wit
 | --- | --- | --- |
 | Wrong state / missing prerequisite | `save_badge_config` with nothing dirty | `No unsaved changes. The current configuration is already saved.` |
 | Invalid parameters | `apply_badge_style` with a malformed token | `Invalid input for apply_badge_style: category and value must be single non-empty tokens; call list_style_options for valid categories and values.` |
-| Unexpected upstream data | `compare_profiles` when the other handle has no snapshot | `No public impact profile was found for @<handle>. A profile is generated on first visit: ask the user to open https://chapa.thecreativetoken.com/u/<handle> once, then retry this comparison.` |
+| Missing prerequisite | `compare_profiles` when the other handle has no public Chapa profile | `No public Chapa impact profile exists for @<handle>. Its owner must sign in to Chapa before this handle can be compared.` |
 | Business-rule violation | `save_badge_config` in any state | The save API is never called by the agent. Only the on-page human confirmation can continue. |
 
-The new `apply_badge_style` invalid-input response names `list_style_options` as the next call. Wrong-state save responses explain why no action is needed or name `preview_badge` as the next tool. The new `compare_profiles` 404 response gives the profile-generation URL and tells the agent to retry.
+The `apply_badge_style` invalid-input response names `list_style_options` as the next call. Wrong-state save responses explain why no action is needed or name `preview_badge` as the next tool. The `compare_profiles` 404 response explains that only the profile owner can satisfy the missing sign-in prerequisite; opening a public share or badge URL does not create a persisted public profile.
 
 ## Three drivers, one Studio state
 

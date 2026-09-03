@@ -161,6 +161,12 @@ describe("remote MCP server tools", () => {
     expect(profile.sharePageUrl).toBe(
       "https://chapa.thecreativetoken.com/u/octocat",
     );
+    expect(profile.notes).toContain(
+      "Share and badge URLs can render public GitHub activity, but public profile tools require the handle's owner to have signed in to Chapa.",
+    );
+    expect(profile.notes).not.toContain(
+      "The profile is generated on first visit if it does not exist yet.",
+    );
   });
 
   it.each([
@@ -245,11 +251,25 @@ describe("remote MCP server tools", () => {
     }
   });
 
-  it("returns actionable missing-record messages", async () => {
+  it("explains that missing public profiles require owner sign-in", async () => {
     mocks.getCachedLatestSnapshot.mockResolvedValueOnce(null);
     await expect(
       tool("get_impact_profile").execute({ handle: "missing-user" }),
-    ).resolves.toContain("open https://chapa.thecreativetoken.com/u/missing-user");
+    ).resolves.toBe(
+      "No public Chapa impact profile exists for @missing-user. Its owner must sign in to Chapa before public profile tools can use this handle.",
+    );
+
+    mocks.getCachedLatestSnapshot
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce(null);
+    await expect(
+      tool("compare_profiles").execute({
+        handle: "octocat",
+        other_handle: "missing-user",
+      }),
+    ).resolves.toBe(
+      "No public Chapa impact profile exists for @missing-user. Its owner must sign in to Chapa before public profile tools can use this handle.",
+    );
 
     mocks.getVerificationRecord.mockResolvedValueOnce(null);
     await expect(

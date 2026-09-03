@@ -19,6 +19,7 @@ import {
   EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA,
   FIND_PROFILE_INPUT_SCHEMA,
   PRODUCTION_BASE_URL,
+  PUBLIC_PROFILE_SIGN_IN_NOTE,
   SITE_CAPABILITIES,
   VERIFICATION_EXPLANATION,
   VERIFY_BADGE_SERVER_INPUT_SCHEMA,
@@ -104,7 +105,7 @@ function validateInputKeys(
 }
 
 function missingProfile(handle: string): string {
-  return `No public impact profile was found for @${handle}. Ask the user to open ${PRODUCTION_BASE_URL}/u/${encodeURIComponent(handle)} once, then retry.`;
+  return `No public Chapa impact profile exists for @${handle}. Its owner must sign in to Chapa before public profile tools can use this handle.`;
 }
 
 function unavailable(tool: string): string {
@@ -237,7 +238,7 @@ const findProfile: ServerMcpTool = {
       sharePageUrl: `${PRODUCTION_BASE_URL}/u/${encodedHandle}`,
       badgeSvgUrl: `${PRODUCTION_BASE_URL}/u/${encodedHandle}/badge.svg`,
       notes: [
-        "The profile is generated on first visit if it does not exist yet.",
+        PUBLIC_PROFILE_SIGN_IN_NOTE,
         "The remote endpoint exposes the public read-only profile tools without browser page state.",
       ],
     });
