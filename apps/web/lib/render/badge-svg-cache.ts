@@ -106,6 +106,14 @@ export function buildOgImageCacheKey(
   return `og-image:v3:${handle.toLowerCase()}:${date}:${locale}`;
 }
 
+/** Version shared by the OG metadata URL and its revision-fenced Redis value. */
+export function buildOgImageCacheVersion(
+  date: string,
+  revision: number | null,
+): string {
+  return `${date}-${revision === null ? "default" : `r${revision}`}`;
+}
+
 export function buildBadgeSvgRenderLockKey(
   handle: string,
   date: string,

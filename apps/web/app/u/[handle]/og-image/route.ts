@@ -7,9 +7,12 @@ import type { Locale } from "@/lib/i18n/types";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
 import { svgToPng } from "@/lib/render/svg-to-png";
-import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheDel, cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 import { ogImageEdgeCacheTag } from "@/lib/cache/edge-cache";
-import { buildOgImageCacheKey } from "@/lib/render/badge-svg-cache";
+import {
+  buildOgImageCacheKey,
+  buildOgImageCacheVersion,
+} from "@/lib/render/badge-svg-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
@@ -23,6 +26,20 @@ const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000;
 const OG_EDGE_POLICY = "public, s-maxage=21600, stale-while-revalidate=86400";
 const OG_CLIENT_POLICY = "public, max-age=300";
+
+type OgImageCacheEntry = {
+  version: string;
+  pngBase64: string;
+};
+
+function isOgImageCacheEntry(value: unknown): value is OgImageCacheEntry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as Partial<OgImageCacheEntry>).version === "string" &&
+    typeof (value as Partial<OgImageCacheEntry>).pngBase64 === "string"
+  );
+}
 
 function ogImageCacheHeaders(handle: string) {
   return {
@@ -70,13 +87,26 @@ export async function GET(
   const locale: Locale = isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
   const badgeLocale = resolveBadgeLocale(locale);
   const ogCacheKey = buildOgImageCacheKey(handle, today, locale);
+  const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+  const expectedVersion = configSnapshot.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision)
+    : null;
+  const requestedVersion = request.nextUrl.searchParams.get("v");
+  const publicationVersion =
+    expectedVersion !== null && requestedVersion === expectedVersion
+      ? expectedVersion
+      : null;
 
   // PE-L1: Cache-first — serve warm-cache PNG without the rate-limit round-trip.
   // Rate limiting is deferred to the cache-MISS branch (expensive path only).
   try {
-    const cachedBase64 = await cacheGet<string>(ogCacheKey);
-    if (cachedBase64) {
-      const pngBuffer = Buffer.from(cachedBase64, "base64");
+    const cached = await cacheGet<unknown>(ogCacheKey);
+    if (
+      publicationVersion !== null &&
+      isOgImageCacheEntry(cached) &&
+      cached.version === publicationVersion
+    ) {
+      const pngBuffer = Buffer.from(cached.pngBase64, "base64");
       return new NextResponse(pngBuffer, {
         headers: ogImageCacheHeaders(handle),
       });
@@ -110,11 +140,6 @@ export async function GET(
 
     const verification = getPublicProfileVerification(materialized);
 
-    // Capture the persisted config revision that produced this image. We
-    // verify it again immediately before publication so a Studio save that
-    // overlaps this expensive render cannot repopulate Redis or the edge with
-    // the pre-save PNG after invalidation has completed.
-    const configSnapshot = await resolveBadgeConfigSnapshot(handle);
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
       config: configSnapshot.config,
@@ -134,13 +159,7 @@ export async function GET(
       "svgToPng",
     );
 
-    const currentConfigSnapshot = await resolveBadgeConfigSnapshot(handle);
-    const revisionIsStable =
-      configSnapshot.cacheable &&
-      currentConfigSnapshot.cacheable &&
-      configSnapshot.revision === currentConfigSnapshot.revision;
-
-    if (!revisionIsStable) {
+    if (publicationVersion === null) {
       return new NextResponse(Buffer.from(png), {
         headers: ogImageNoStoreHeaders(),
       });
@@ -154,7 +173,10 @@ export async function GET(
     try {
       cached = await cacheSet(
         ogCacheKey,
-        Buffer.from(png).toString("base64"),
+        {
+          version: publicationVersion,
+          pngBase64: Buffer.from(png).toString("base64"),
+        } satisfies OgImageCacheEntry,
         OG_CACHE_TTL,
       );
     } catch {
@@ -165,6 +187,22 @@ export async function GET(
         route: `/u/${handle}/og-image`,
         statusCode: 200,
         error: new Error(`Failed to cache OG image PNG for handle: ${handle}`),
+      });
+    }
+
+    // Publish first, then perform the final revision read. This ordering makes
+    // every save fall on one side of the fence: a save before this read is
+    // detected and the just-written value is deleted; a save after it purges a
+    // value that already exists. The revision in both the Redis payload and
+    // metadata URL prevents stale values/responses from poisoning the new URL.
+    const currentConfigSnapshot = await resolveBadgeConfigSnapshot(handle);
+    const currentVersion = currentConfigSnapshot.cacheable
+      ? buildOgImageCacheVersion(today, currentConfigSnapshot.revision)
+      : null;
+    if (currentVersion !== publicationVersion) {
+      if (cached) await cacheDel(ogCacheKey);
+      return new NextResponse(Buffer.from(png), {
+        headers: ogImageNoStoreHeaders(),
       });
     }
 

@@ -18,6 +18,7 @@ import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
   BADGE_RENDER_VARIANT,
   buildOgImageCacheKey,
+  buildOgImageCacheVersion,
   buildBadgeSvgCacheKey,
   buildBadgeSvgRenderLockKey,
   handleCacheJitterSeconds,
@@ -76,6 +77,13 @@ describe("badge-svg-cache", () => {
       const a = buildBadgeSvgCacheKey("OCTOCAT", "2026-05-01");
       const b = buildBadgeSvgCacheKey("octocat", "2026-05-01");
       expect(a).toBe(b);
+    });
+
+    it("versions OG image publication by date and Studio revision", () => {
+      expect(buildOgImageCacheVersion("2026-05-01", 42)).toBe("2026-05-01-r42");
+      expect(buildOgImageCacheVersion("2026-05-01", null)).toBe(
+        "2026-05-01-default",
+      );
     });
 
     it("uses the same identity for the cross-instance render lock, including locale", () => {

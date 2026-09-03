@@ -18,6 +18,7 @@ const {
   mockWriteBadgeSvgCache,
   mockCaptureServerError,
   mockCacheGet,
+  mockResolveBadgeConfigSnapshot,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -36,7 +37,17 @@ const {
   mockWriteBadgeSvgCache: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockCacheGet: vi.fn(),
+  mockResolveBadgeConfigSnapshot: vi.fn(),
 }));
+
+vi.mock("@/lib/render/badge-config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/render/badge-config")>();
+  return {
+    ...actual,
+    resolveBadgeConfigSnapshot: (...args: unknown[]) =>
+      mockResolveBadgeConfigSnapshot(...args),
+  };
+});
 
 vi.mock("@/lib/profile/public-profile", () => ({
   materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
@@ -262,6 +273,11 @@ describe("SharePage /u/[handle]", () => {
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockWriteBadgeSvgCache.mockResolvedValue(true);
     mockCacheGet.mockResolvedValue(null);
+    mockResolveBadgeConfigSnapshot.mockResolvedValue({
+      config: { border: "solid" },
+      revision: 7,
+      cacheable: true,
+    });
     mockGetServerLocale.mockResolvedValue("en");
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
     mockHeaders.mockResolvedValue({ get: () => null });
@@ -289,7 +305,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(metadata.openGraph?.images).toEqual([
       {
-        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=2026-04-17",
+        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=2026-04-17-r7",
         width: 1200,
         height: 630,
         alt: "Chapa de testuser",

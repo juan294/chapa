@@ -10,6 +10,7 @@ const {
   mockSvgToPng,
   mockCacheGet,
   mockCacheSet,
+  mockCacheDel,
   mockRateLimit,
   mockGetClientIp,
   mockCaptureServerError,
@@ -23,6 +24,7 @@ const {
   mockSvgToPng: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockCaptureServerError: vi.fn(),
@@ -54,6 +56,7 @@ vi.mock("@/lib/render/svg-to-png", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  cacheDel: (...args: unknown[]) => mockCacheDel(...args),
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
 }));
 
@@ -107,11 +110,15 @@ const FAKE_MATERIALIZED = {
 function makeRequest(
   handle: string,
   lang?: string,
+  version: string | null = "2026-02-14-r7",
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
-  const query = lang ? `?lang=${lang}` : "";
+  const query = new URLSearchParams();
+  if (lang) query.set("lang", lang);
+  if (version) query.set("v", version);
+  const queryString = query.size > 0 ? `?${query.toString()}` : "";
   return [
     new NextRequest(
-      `https://chapa.thecreativetoken.com/u/${handle}/og-image${query}`,
+      `https://chapa.thecreativetoken.com/u/${handle}/og-image${queryString}`,
     ),
     { params: Promise.resolve({ handle }) },
   ];
@@ -131,6 +138,7 @@ describe("GET /u/[handle]/og-image", () => {
     mockSvgToPng.mockReturnValue(FAKE_PNG);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
     mockResolveBadgeConfigSnapshot.mockResolvedValue({
@@ -145,7 +153,10 @@ describe("GET /u/[handle]/og-image", () => {
   });
 
   it("returns the cached png when Redis already has the image", async () => {
-    mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
+    mockCacheGet.mockResolvedValue({
+      version: "2026-02-14-r7",
+      pngBase64: FAKE_PNG_BASE64,
+    });
 
     const [req, ctx] = makeRequest("testuser");
     const res = await GET(req, ctx);
@@ -162,7 +173,10 @@ describe("GET /u/[handle]/og-image", () => {
 
   it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
     // Cache hit — rate limiter must NOT be called (deferred to miss branch only)
-    mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
+    mockCacheGet.mockResolvedValue({
+      version: "2026-02-14-r7",
+      pngBase64: FAKE_PNG_BASE64,
+    });
 
     const [req, ctx] = makeRequest("testuser");
     const res = await GET(req, ctx);
@@ -203,7 +217,10 @@ describe("GET /u/[handle]/og-image", () => {
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
       "og-image:v3:testuser:2026-02-14:en",
-      FAKE_PNG_BASE64,
+      {
+        version: "2026-02-14-r7",
+        pngBase64: FAKE_PNG_BASE64,
+      },
       172800,
     );
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
@@ -347,7 +364,7 @@ describe("GET /u/[handle]/og-image", () => {
     );
   });
 
-  it("does not publish a PNG when the Studio config revision changes during rendering", async () => {
+  it("deletes and does not edge-publish a PNG when the Studio config changes after its Redis write", async () => {
     mockResolveBadgeConfigSnapshot
       .mockResolvedValueOnce({
         config: { border: "solid" },
@@ -364,10 +381,27 @@ describe("GET /u/[handle]/og-image", () => {
     const res = await GET(req, ctx);
 
     expect(res.status).toBe(200);
-    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockCacheSet).toHaveBeenCalledOnce();
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      "og-image:v3:testuser:2026-02-14:en",
+    );
     expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
     expect(res.headers.get("Vercel-Cache-Tag")).toBeNull();
+  });
+
+  it("does not use or publish cache entries without the revisioned metadata URL", async () => {
+    mockCacheGet.mockResolvedValue({
+      version: "2026-02-14-r7",
+      pngBase64: FAKE_PNG_BASE64,
+    });
+
+    const [req, ctx] = makeRequest("testuser", undefined, null);
+    const res = await GET(req, ctx);
+
+    expect(mockMaterializePublicProfile).toHaveBeenCalledOnce();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
   });
 
   it("rate-limits to 30 requests per IP per 60 seconds", async () => {
@@ -410,6 +444,7 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     mockSvgToPng.mockReturnValue(FAKE_PNG);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
     mockResolveBadgeConfigSnapshot.mockResolvedValue({
@@ -437,6 +472,7 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
     mockSvgToPng.mockReturnValue(FAKE_PNG);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
     mockGetClientIp.mockReturnValue("127.0.0.1");
     mockResolveBadgeConfigSnapshot.mockResolvedValue({
