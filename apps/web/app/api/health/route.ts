@@ -7,6 +7,9 @@ import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
 import { pingSupabase } from "@/lib/db/supabase";
 import { captureOperationalAlert, withErrorCapture } from "@/lib/analytics/server-errors";
+import { getMissingFontFiles } from "@/lib/render/font-files";
+import { probeRasterizer, type RasterProbe } from "@/lib/render/raster-probe";
+import { withTimeout } from "@/lib/async/with-timeout";
 
 /** Shape returned for a successful GitHub probe. */
 interface GitHubRateLimit {
@@ -197,6 +200,18 @@ async function getCronHeartbeatStatuses(): Promise<
  * Health check endpoint for monitoring.
  * Rate limited: 30 requests per IP per 60 seconds.
  */
+const RASTER_PROBE_TIMEOUT_MS = 2_000;
+
+type RasterProbeResult = RasterProbe | { status: "error"; error: string };
+
+async function runRasterProbe(): Promise<RasterProbeResult> {
+  try {
+    return await withTimeout(probeRasterizer(), RASTER_PROBE_TIMEOUT_MS, "rasterProbe");
+  } catch (e) {
+    return { status: "error", error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export const GET = withErrorCapture("/api/health", async (request: NextRequest) => {
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:health:${ip}`, 30, 60);
@@ -207,14 +222,27 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     );
   }
 
-  const [redisStatus, supabaseStatus, githubResult, cronHeartbeats] = await Promise.all([
+  const [redisStatus, supabaseStatus, githubResult, cronHeartbeats, rasterProbe] = await Promise.all([
     pingRedis(),
     pingSupabase(),
     cachedPingGitHub(),
     getCronHeartbeatStatuses(),
+    runRasterProbe(),
   ]);
   const session = getOptionalRequestSession(request);
   const isAdmin = session ? isAdminHandle(session.login) : false;
+
+  // #1275 — the OG rasterizer's fonts. From v2.11.0 to v2.29.4 the deployed
+  // function could not draw with them and every social card shipped with no
+  // text, with nothing to say so. Reported here and alerted at P2; it does
+  // not flip the health status, because a text-less social card is a defect
+  // to fix, not an outage to page for, and the deployment smoke asserts 200.
+  const missingFonts = getMissingFontFiles();
+  const fontsStatus: "ok" | "missing" = missingFonts.length === 0 ? "ok" : "missing";
+  // The file check says the fonts are there; the probe says whether resvg
+  // actually drew a glyph with them. Both are reported: the preview
+  // deployment for #1275 had `fonts: ok` and still rendered no text.
+  const rasterizerStatus = rasterProbe.status;
 
   // "skipped" is acceptable in preview/dev where optional integrations degrade
   // gracefully. In production, skipped core dependencies indicate missing
@@ -245,10 +273,27 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     cronHeartbeats,
     ...(githubQuotaLow && { githubQuotaLow: true }),
     alertWebhook: getChapaAlertWebhookUrl() ? "configured" : "skipped",
+    fonts: fontsStatus,
+    ...(missingFonts.length > 0 && { missingFonts }),
+    rasterizer: rasterizerStatus,
+    ...(isAdmin && rasterProbe.status !== "error" && { rasterizerProbe: rasterProbe }),
     ...(isAdmin && githubResult.rateLimit && {
       githubRateLimit: githubResult.rateLimit,
     }),
   };
+
+  if (fontsStatus === "missing" || rasterizerStatus !== "ok") {
+    // Details go to the function log as well, so a probe failure can be
+    // read without an admin session.
+    console.error("[health] OG rasterizer unhealthy", JSON.stringify({ missingFonts, rasterProbe }));
+    void captureOperationalAlert({
+      signal: "og_rasterizer_unhealthy",
+      severity: "P2",
+      summary: "OG rasterizer cannot draw text; social cards ship without name or score",
+      route: "/api/health",
+      properties: { missingFonts, rasterProbe },
+    });
+  }
 
   if (status === "degraded") {
     void captureOperationalAlert({

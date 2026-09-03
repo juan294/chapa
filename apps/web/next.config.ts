@@ -99,6 +99,9 @@ const nextConfig: NextConfig = {
     "/og-image": ["./lib/render/fonts/**/*.ttf"],
     "/u/[handle]/og-image": ["./lib/render/fonts/**/*.ttf"],
     "/u/[handle]/badge.svg": ["./lib/render/fonts/**/*.ttf"],
+    // #1275 — /api/health reports whether the rasterizer's fonts resolve, so
+    // its function needs the same files the OG routes get.
+    "/api/health": ["./lib/render/fonts/**/*.ttf"],
   },
   images: {
     remotePatterns: [
