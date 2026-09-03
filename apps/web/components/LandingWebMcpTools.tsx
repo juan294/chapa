@@ -6,6 +6,7 @@ import { isValidHandle } from "@/lib/validation";
 import {
   FIND_PROFILE_INPUT_SCHEMA,
   PRODUCTION_BASE_URL,
+  PUBLIC_PROFILE_SIGN_IN_NOTE,
   SITE_CAPABILITIES,
 } from "@/lib/webmcp/catalog";
 import {
@@ -58,7 +59,7 @@ export function LandingWebMcpTools() {
             badgeSvgUrl:
               `${PRODUCTION_BASE_URL}/u/${encodedHandle}/badge.svg`,
             notes: [
-              "The profile is generated on first visit if it does not exist yet.",
+              PUBLIC_PROFILE_SIGN_IN_NOTE,
               "Opening the share page registers six more tools, including get_impact_profile and get_embed_snippet.",
             ],
           });

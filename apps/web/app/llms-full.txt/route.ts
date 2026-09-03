@@ -67,7 +67,7 @@ Chapa registers browser-native WebMCP tools through \`document.modelContext\`. T
 ### Landing page: \`/\`
 
 - \`get_site_capabilities\` (read-only): Describes Chapa, its page-scoped tool map, entry points, and human-action boundaries.
-- \`find_profile\` (read-only): Validates a public GitHub handle and returns canonical share-page and badge URLs without making a request.
+- \`find_profile\` (read-only): Validates a public GitHub handle and returns canonical share-page and badge URLs without making a request; public profile tools require the owner to have signed in.
 
 ### Creator Studio: \`/studio\` and \`/studio?demo=1\`
 
@@ -89,7 +89,7 @@ Demo mode at \`/studio?demo=1\` needs no login and uses fixed local data. Tools 
 - \`get_impact_history\` (read-only): Fetches public snapshots and trend data with friendly missing-data and rate-limit messages.
 - \`verify_badge\` (read-only): Returns the public verification record and verification URL when the profile has a hash.
 - \`explain_dimension\` (read-only): Explains a dimension using the current public page data.
-- \`compare_profiles\` (read-only): Compares the on-page profile with another public profile and returns score and dimension differences.
+- \`compare_profiles\` (read-only): Compares the on-page profile with another existing public Chapa profile and returns score and dimension differences.
 - \`get_embed_snippet\` (read-only): Returns canonical Markdown and HTML snippets for the live badge.
 
 ### Verification page: \`/verify/{hash}\`

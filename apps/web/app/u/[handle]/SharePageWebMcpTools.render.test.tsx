@@ -149,6 +149,9 @@ describe("SharePageWebMcpTools", () => {
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
       annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
     });
+    expect(getTool("compare_profiles").description).toBe(
+      "Compare this impact profile with another existing public Chapa profile, identified by GitHub handle.",
+    );
     expect(mocks.createExplainDimensionTool).toHaveBeenCalledOnce();
   });
 
@@ -348,7 +351,7 @@ describe("SharePageWebMcpTools", () => {
     expect(fetch).toHaveBeenCalledWith("/api/profile/other-user", { signal });
   });
 
-  it("guides the agent to generate a missing comparison profile and retry", async () => {
+  it("explains that a missing comparison profile requires owner sign-in", async () => {
     respondWith({ error: "request failed" }, 404);
     const { getTool } = renderHost();
 
@@ -356,10 +359,11 @@ describe("SharePageWebMcpTools", () => {
       other_handle: "other-user",
     });
 
-    expect(output).toContain(
-      "https://chapa.thecreativetoken.com/u/other-user",
+    expect(output).toBe(
+      "No public Chapa impact profile exists for @other-user. Its owner must sign in to Chapa before this handle can be compared.",
     );
-    expect(output).toContain("retry this comparison");
+    expect(output).not.toContain("first visit");
+    expect(output).not.toContain("retry");
   });
 
   it("returns a friendly compare response when rate limited", async () => {

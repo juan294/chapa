@@ -57,7 +57,7 @@ Initial release notes:
 ### Starter prompts
 
 - What is my Chapa impact score? My GitHub handle is juan294.
-- Compare juan294 with octocat.
+- Compare juan294 with frivas.
 - Is this badge verified? Hash: 84567a48984e0c2e287acb78d1404a57.
 - How is the Delivery dimension calculated for juan294?
 - Give me the README embed for juan294.
@@ -110,12 +110,12 @@ Run these tests against the production MCP server after the endpoint and challen
 
 ### Positive 2: profile comparison
 
-- Prompt: **Compare juan294 with octocat.**
+- Prompt: **Compare juan294 with frivas.**
 - Expected tool: `compare_profiles`
-- Tool input: `{"handle":"juan294","other_handle":"octocat"}`
+- Tool input: `{"handle":"juan294","other_handle":"frivas"}`
 - Expected behavior: The assistant compares the two public profiles and explains the score and dimension differences.
 - Expected result shape: JSON with `current`, `other`, and `differences`; both profile objects contain `handle`, `score`, `tier`, and `dimensions`; `differences` contains `score` and `dimensions`.
-- Fixtures: `https://chapa.thecreativetoken.com/u/juan294` and `https://chapa.thecreativetoken.com/u/octocat`
+- Fixtures: `https://chapa.thecreativetoken.com/u/juan294` and `https://chapa.thecreativetoken.com/u/frivas`
 - Pass condition: The tool succeeds and the assistant identifies which profile leads overall and on relevant dimensions without exposing confidence data.
 
 ### Positive 3: badge verification
@@ -163,9 +163,9 @@ Run these tests against the production MCP server after the endpoint and challen
 - Prompt: **What is the Chapa impact score for chapa-no-profile-1260?**
 - Expected tool: `get_impact_profile`
 - Tool input: `{"handle":"chapa-no-profile-1260"}`
-- Expected fallback: The tool returns the friendly `No public impact profile was found` message and directs the user to open `https://chapa.thecreativetoken.com/u/chapa-no-profile-1260` once before retrying.
+- Expected fallback: The tool reports that no public Chapa impact profile exists and explains that the handle's owner must sign in before public profile tools can use it.
 - Reason: The handle is syntactically valid, but Chapa has no stored public profile data for it.
-- Pass condition: The assistant reports that there is no profile yet and gives the recovery URL. It does not invent a score.
+- Pass condition: The assistant reports that there is no profile, identifies owner sign-in as the missing prerequisite, and does not invent a score or claim that opening the public URL will create one.
 
 ### Negative 3: mutation request
 

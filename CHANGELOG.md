@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.29.3] - 2026-09-03
+
+### Fixed
+
+- **Profile comparisons now give agents a truthful recovery path.** When a
+  requested handle has no public Chapa profile, browser and remote MCP tools
+  now explain that the profile owner must sign in before the comparison can
+  succeed. The tool catalog also limits comparisons to existing public Chapa
+  profiles instead of promising that any public GitHub handle is comparable.
+
 ## [2.29.2] - 2026-09-01
 
 ### Fixed

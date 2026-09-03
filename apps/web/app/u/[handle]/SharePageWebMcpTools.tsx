@@ -162,7 +162,8 @@ export function SharePageWebMcpTools({
 
     const compareProfiles: WebMcpTool = {
       name: "compare_profiles",
-      description: "Compare this impact profile with another public GitHub handle.",
+      description:
+        "Compare this impact profile with another existing public Chapa profile, identified by GitHub handle.",
       inputSchema: COMPARE_PROFILES_INPUT_SCHEMA,
       annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: async (inputs, { signal }) => {
@@ -181,7 +182,7 @@ export function SharePageWebMcpTools({
           { signal },
         );
         if (response.status === 404) {
-          return `No public impact profile was found for @${otherHandle}. A profile is generated on first visit: ask the user to open https://chapa.thecreativetoken.com/u/${otherHandle} once, then retry this comparison.`;
+          return `No public Chapa impact profile exists for @${otherHandle}. Its owner must sign in to Chapa before this handle can be compared.`;
         }
         if (response.status === 429) {
           return "Profile comparison is temporarily rate limited. Please try again later.";

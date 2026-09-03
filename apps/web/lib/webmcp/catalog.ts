@@ -16,6 +16,9 @@ import { SITE_TOOL_MAP } from "./site-tool-map";
 
 export const PRODUCTION_BASE_URL = "https://chapa.thecreativetoken.com";
 
+export const PUBLIC_PROFILE_SIGN_IN_NOTE =
+  "Share and badge URLs can render public GitHub activity, but public profile tools require the handle's owner to have signed in to Chapa.";
+
 export const FIND_PROFILE_INPUT_SCHEMA = {
   type: "object",
   properties: {

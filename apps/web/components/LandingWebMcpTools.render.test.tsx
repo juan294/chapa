@@ -128,7 +128,10 @@ describe("LandingWebMcpTools", () => {
       badgeSvgUrl:
         "https://chapa.thecreativetoken.com/u/developer/badge.svg",
     });
-    expect(result.notes.join(" ")).toMatch(/generated on first visit/i);
+    expect(result.notes).toContain(
+      "Share and badge URLs can render public GitHub activity, but public profile tools require the handle's owner to have signed in to Chapa.",
+    );
+    expect(result.notes.join(" ")).not.toMatch(/generated on first visit/i);
     expect(result.notes.join(" ")).toMatch(/share page registers six more tools/i);
   });
 });
