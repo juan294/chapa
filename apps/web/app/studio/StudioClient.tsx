@@ -76,9 +76,22 @@ type Translate = LanguageContextValue["t"];
  * The 50%/100% frames are flex children of a horizontally scrolling viewport,
  * so they need `shrink-0`: without it flexbox quietly shrinks them back to the
  * container width and the zoom appears to do nothing.
+ *
+ * Fit is bounded by height as well as width on a wide viewport, so the badge,
+ * the controls and the save row share the screen without the page scrolling.
+ * The badge is 1200x630, so its width is 1.9x the height it can have, and
+ * that height is the viewport minus what surrounds it: the nav (57px), the
+ * stage's own chrome (header, padding, config line: ~205px) and the tools
+ * band's floor (`lg:min-h-[18rem]`, 288px). The 360px floor keeps it legible
+ * on a very short window at the cost of a little page scroll.
  */
 const ZOOM_OPTIONS = [
-  { id: "fit", labelKey: "studio.zoom.fit", frameClass: "w-[min(720px,100%)]" },
+  {
+    id: "fit",
+    labelKey: "studio.zoom.fit",
+    frameClass:
+      "w-[min(720px,100%)] lg:w-[clamp(360px,calc((100dvh-560px)*1.9),min(720px,100%))]",
+  },
   {
     id: "half",
     labelKey: "studio.zoom.half",
@@ -648,7 +661,17 @@ export function StudioClient({
     ZOOM_OPTIONS[0]!.frameClass;
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+    // The badge must stay on screen while the user works. On a wide viewport
+    // the studio is exactly the viewport below the nav (`pt-[57px]` in
+    // page.tsx): the stage keeps its natural height at the top and the tools
+    // band takes the rest, with each column scrolling on its own. The page
+    // itself only scrolls when the stage alone is taller than the viewport
+    // (100% zoom, a short window), because the band keeps a floor height
+    // rather than collapsing. Narrow viewports keep the flowing layout.
+    <div
+      data-testid="studio-root"
+      className="flex min-h-[calc(100dvh-57px)] flex-col lg:h-[calc(100dvh-57px)]"
+    >
       <h1 className="sr-only">{t("studio.title") as string}</h1>
 
       {/* #1241 — the stage owns the full width. The badge is a fixed 1200x630
@@ -658,7 +681,7 @@ export function StudioClient({
       <section
         data-testid="studio-stage"
         aria-busy={saving}
-        className="@container border-b border-stroke px-3 py-4 sm:px-6 sm:py-6"
+        className="@container shrink-0 border-b border-stroke px-3 py-4 sm:px-6 sm:py-6"
       >
         <h2 className="sr-only">{t("studio.stage.title") as string}</h2>
 
@@ -794,9 +817,12 @@ export function StudioClient({
           instead of being stranded at the bottom of the page. */}
       <div
         data-testid="studio-tools"
-        className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] items-stretch"
+        className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] items-stretch lg:min-h-[18rem]"
       >
-        <div className="@container flex min-w-0 flex-col border-r border-b border-stroke">
+        <div
+          data-testid="studio-controls-column"
+          className="@container flex min-w-0 flex-col border-r border-b border-stroke lg:min-h-0 lg:overflow-y-auto"
+        >
           {/* The page's only accessible name is the sr-only <h1> above; this
               repeats it visually and is hidden from assistive tech to avoid a
               double announcement. The subhead is new descriptive copy. */}
@@ -826,7 +852,7 @@ export function StudioClient({
 
         <div
           data-testid="studio-session"
-          className="@container flex min-w-0 flex-col border-b border-stroke bg-card"
+          className="@container flex min-w-0 flex-col border-b border-stroke bg-card lg:min-h-0"
         >
           <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1">
             <span className="font-heading text-[10px] tracking-[0.14em] text-terminal-dim">
@@ -842,7 +868,15 @@ export function StudioClient({
             </button>
           </div>
 
-          <div className="min-h-36 flex-1 overflow-y-auto">
+          {/* The log scrolls inside this box and never grows the page: on a
+              wide viewport it takes whatever height the column leaves after
+              the prompt and the save row, on a narrow one it is capped at half
+              the viewport. `TerminalOutput` scrolls this box to the latest
+              line, not the window. */}
+          <div
+            data-testid="studio-session-log"
+            className="min-h-24 max-h-[50dvh] flex-1 overflow-y-auto lg:max-h-none"
+          >
             <TerminalOutput lines={localizedLines} />
           </div>
 

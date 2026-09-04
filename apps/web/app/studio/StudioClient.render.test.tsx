@@ -428,6 +428,61 @@ describe("StudioClient render", () => {
       // than a viewport breakpoint, so one layout serves desktop and 390px.
       expect(tools.className).toContain("minmax(min(100%,460px),1fr)");
     });
+
+    it("keeps the badge on screen: the studio fills the viewport on a wide screen and the columns scroll on their own", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      // Applying an effect used to grow the session log, grow the page, and
+      // push the badge above the fold, so every change needed a scroll up to
+      // see it. The root is exactly the viewport below the nav on `lg`, the
+      // stage never shrinks, and the band under it is what gives.
+      const root = screen.getByTestId("studio-root");
+      expect(root.className).toContain("lg:h-[calc(100dvh-57px)]");
+      expect(screen.getByTestId("studio-stage").className).toContain(
+        "shrink-0",
+      );
+      const tools = screen.getByTestId("studio-tools");
+      expect(tools.className).toContain("flex-1");
+      // A floor, not `min-h-0`: a stage taller than the viewport (100% zoom)
+      // must overflow the page rather than crush the tools to nothing.
+      expect(tools.className).toContain("lg:min-h-[18rem]");
+      // Fit is bounded by height too on a wide viewport: the badge gives way
+      // before the controls and the save row fall below the fold.
+      expect(screen.getByTestId("studio-badge-frame").className).toContain(
+        "lg:w-[clamp(360px,calc((100dvh-560px)*1.9),min(720px,100%))]",
+      );
+      // Each column scrolls inside the band. `min-h-0` is what lets a flex or
+      // grid child shrink below its content in the first place.
+      const controls = screen.getByTestId("studio-controls-column");
+      expect(controls.className).toContain("lg:min-h-0");
+      expect(controls.className).toContain("lg:overflow-y-auto");
+      expect(screen.getByTestId("studio-session").className).toContain(
+        "lg:min-h-0",
+      );
+      expect(screen.getByTestId("studio-session").className).not.toContain(
+        "overflow-y-auto",
+      );
+    });
+
+    it("caps the session log on a narrow screen so it cannot grow the page", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      const log = screen.getByTestId("studio-session-log");
+      expect(log.className).toContain("overflow-y-auto");
+      expect(log.className).toContain("max-h-[50dvh]");
+      expect(log.className).toContain("lg:max-h-none");
+      expect(log.contains(screen.getByTestId("terminal-output"))).toBe(true);
+    });
   });
 
   describe("preview pane", () => {
@@ -1998,10 +2053,9 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
     expect(screen.getByTestId("studio-prompt-row").className).toContain(
       "mt-auto",
     );
-    // The log is the flexible region now — it grows with the column instead of
-    // being a bounded strip above a sticky cluster.
-    const log = screen.getByTestId("terminal-output")
-      .parentElement as HTMLElement;
+    // The log is the flexible region: it takes the column's spare height and
+    // scrolls inside it, so it never grows the column or the page.
+    const log = screen.getByTestId("studio-session-log");
     expect(log.className).toContain("flex-1");
     expect(log.className).toContain("overflow-y-auto");
   });

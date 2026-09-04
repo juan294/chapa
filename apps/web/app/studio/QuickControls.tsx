@@ -159,8 +159,9 @@ export function QuickControls({
         {/* Categories */}
         {/* #1243 — no height cap. The 256px window suited #1216's narrow
             sticky column beside a 50%-width preview; in the v3 tools column it
-            was a small scroller above a large void. The list flows and the
-            column scrolls with the page. */}
+            was a small scroller above a large void. The list flows; the column
+            around it scrolls (on its own on a wide viewport, with the page on a
+            narrow one) so the badge stage above stays put. */}
         <div data-testid="qc-categories">
           {STUDIO_CATEGORIES.map((category) => {
               const alias = CATEGORY_KEY_TO_ALIAS[category.key] ?? category.key;
