@@ -950,11 +950,16 @@ Uses SMIL `<animate>` elements (not CSS):
 
 Rendered at 1200×630 from demo data (`DEMO_STATS` / `DEMO_IMPACT` in `apps/web/lib/render/demoData.ts`) using the production `renderBadgeSvg()` + `svgToPng()` pipeline.
 
-To regenerate after visual changes:
+To regenerate after visual changes, then commit the result:
 
 ```bash
-pnpm run test -- --run scripts/generate-badge-reference.test.ts
+pnpm run generate:badge-reference
 ```
+
+The test suite validates the same pipeline in a temporary directory and never
+rewrites this file (#1277). The bytes depend on the host's resvg binary and
+font resolution, so this asset documents the design; it is not evidence of
+what production renders (see `docs/decisions/2026-09-03-og-fonts-as-files.md`).
 
 ---
 
