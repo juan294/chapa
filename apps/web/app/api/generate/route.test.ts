@@ -126,7 +126,7 @@ describe("POST /api/generate", () => {
     expect(mockGetStats).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when GitHub API fails", async () => {
+  it("returns 502 when both the session-token and server-token fetches fail", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue(null);
 
@@ -134,6 +134,42 @@ describe("POST /api/generate", () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toContain("Failed to fetch");
+    expect(mockGetStats).toHaveBeenCalledTimes(2);
+    expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
+    expect(mockGetStats).toHaveBeenNthCalledWith(2, "juan294");
+  });
+
+  // #1282/#1283 — a first-time handle has no baseline, so a session-token
+  // fetch that times out or is rejected by the integrity guard (private-only
+  // PR history under a token with no `repo` scope) returns null. Retrying
+  // with the SAME token cannot succeed; the tokenless call authenticates as
+  // the repo-scoped server GITHUB_TOKEN and can.
+  it("falls back to a tokenless (server-token) fetch when the session-token fetch returns null", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    const fakeStats = { handle: "juan294", commitsTotal: 7 } as unknown as StatsData;
+    mockGetStats.mockResolvedValueOnce(null).mockResolvedValueOnce(fakeStats);
+    mockComputeImpact.mockReturnValue({ archetype: "Emerging" } as unknown as ImpactV6Result);
+
+    const res = await POST(makeRequest("chapa_session=abc"));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true, handle: "juan294" });
+    expect(mockGetStats).toHaveBeenCalledTimes(2);
+    expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
+    // Exactly one argument: an explicit `undefined` token would be a
+    // different call shape and is not what getStats' scope classifier expects.
+    expect(mockGetStats.mock.calls[1]).toEqual(["juan294"]);
+    expect(mockComputeImpact).toHaveBeenCalledWith(fakeStats);
+  });
+
+  it("does not fall back when the session-token fetch succeeds", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
+    mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
+
+    await POST(makeRequest("chapa_session=abc"));
+
+    expect(mockGetStats).toHaveBeenCalledTimes(1);
   });
 
   it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {

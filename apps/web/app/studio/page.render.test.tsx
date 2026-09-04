@@ -360,7 +360,38 @@ describe("StudioPage render", () => {
     await expect(StudioPage()).rejects.toThrow(
       "Unable to load Studio profile for octocat",
     );
+    // #1282/#1283 — the session-token attempt, then the tokenless server-
+    // token attempt; only when both fail does the page throw.
+    expect(mocks.materializeDisplayProfile).toHaveBeenCalledTimes(2);
+    expect(mocks.materializeDisplayProfile).toHaveBeenNthCalledWith(1, "octocat", {
+      token: "gho_token",
+    });
+    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat"]);
     expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
+  });
+
+  // #1282/#1283 — a first-time owner has no baseline, so a session-token
+  // fetch that is rejected by the integrity guard or times out returns null.
+  // The page retries once as the server GITHUB_TOKEN instead of throwing.
+  it("falls back to a tokenless server-token profile load when the session-token load returns null", async () => {
+    const fallbackStats = { ...stats, commitsTotal: 7 };
+    mocks.materializeDisplayProfile
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        stats: fallbackStats,
+        craftResult,
+        displayImpact: { compositeScore: 80 },
+        statsComplete: true,
+      });
+    const { default: StudioPage } = await import("./page");
+
+    render(await StudioPage());
+
+    const client = screen.getByTestId("studio-client");
+    expect(client.getAttribute("data-handle")).toBe("octocat");
+    expect(client.getAttribute("data-commits")).toBe("7");
+    expect(mocks.materializeDisplayProfile).toHaveBeenCalledTimes(2);
+    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat"]);
   });
 
   it("fails open to the default config when persisted storage is unavailable", async () => {

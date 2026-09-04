@@ -228,9 +228,16 @@ describe("GeneratingProgress", () => {
     });
     expect(screen.queryByRole("alert")).toBeNull();
 
-    // Advance past the ~45s timeout ceiling.
+    // Still pinned just short of the ceiling — 60s since #1283, which made
+    // room for two sequential server-side fetch attempts.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(40_000);
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Advance past the 60s timeout ceiling.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
     });
 
     expect(screen.getByRole("alert")).toBeDefined();

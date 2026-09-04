@@ -90,7 +90,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
 - GET|PUT `/api/studio/config` Load/save Studio preview configuration
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
-- POST `/api/generate` Generate badge for authenticated user
+- POST `/api/generate` Generate badge for authenticated user (#1282/#1283 — fetches with the session token first, then retries once tokenless, i.e. as the `repo`-scoped server `GITHUB_TOKEN`, when that returns null; a first-time handle has no baseline, so a scope-blinded rejection or a GraphQL timeout otherwise became a 502 that "Try again" could never recover from. `/studio` applies the same fallback)
 - POST `/api/recalculate` Recalculate impact scores
 - POST `/api/insights` Submit tool insights data
 - GET `/api/cli/auth/poll` CLI device auth polling (RFC 8628-style: first poll issues + returns a `device_code`; subsequent polls from the CLI should echo it to bind the session to the initiating device; legacy CLIs that omit it still work)

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **First-time signups no longer get stuck on a 502 they cannot retry out
+  of.** `POST /api/generate` fetches with the user's OAuth token, which has
+  no `repo` scope. For an account whose recent pull requests are all in
+  private repos, GitHub reports a positive PR count with an empty sample, the
+  integrity guard rightly rejects it, and a brand-new handle has no
+  last-known-good to fall back on, so the generating page said "try again"
+  and every retry failed the same way. Two signups on 2026-09-04 never got a
+  badge. The route now retries once as the server `GITHUB_TOKEN`, which is
+  private-inclusive and already ranks above a session fetch in the cache
+  scope rules. (#1282)
+- **A single GitHub GraphQL timeout on first generation is retried instead
+  of surfacing as an error.** The same server-token fallback covers the cold
+  365-day query exceeding its 15s budget once (#1283), and `/studio` uses the
+  same fallback instead of throwing "Unable to load Studio profile" for a
+  first-time owner. The generating page's client-side ceiling rises from
+  45s to 60s so two sequential fetch attempts cannot be cut off by a false
+  timeout.
+
 ## [2.29.5] - 2026-09-03
 
 ### Fixed

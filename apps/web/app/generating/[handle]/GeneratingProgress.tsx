@@ -12,7 +12,11 @@ const REDIRECT_DELAY_MS = 800;
 // Generous ceiling: a false timeout (user sees "failed" on a slow-but-working
 // request) is worse than a longer worst-case wait. Cold-cache generations
 // with large contribution histories are routinely multi-second. (#1108)
-const GENERATE_TIMEOUT_MS = 45_000;
+// #1283 — /api/generate now makes up to two sequential GitHub attempts
+// (session token, then server token), each bounded by getStats' 30s inflight
+// cap, so the ceiling sits above the realistic two-attempt worst case (a 15s
+// GraphQL timeout followed by a full second fetch) rather than inside it.
+const GENERATE_TIMEOUT_MS = 60_000;
 // After this long with no response, reassure the user the wait is normal
 // progress rather than a freeze. (#1108)
 const SLOW_NOTICE_DELAY_MS = 5_000;

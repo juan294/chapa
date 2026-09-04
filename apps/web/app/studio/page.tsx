@@ -116,10 +116,18 @@ export default async function StudioPage(
   }
 
   // Fetch the live owner display projection and saved config in parallel.
-  const [materialized, savedConfigResult] = await Promise.all([
+  const [sessionMaterialized, savedConfigResult] = await Promise.all([
     materializeDisplayProfile(session.login, { token }),
     loadStudioConfig(session.login),
   ]);
+
+  // #1282/#1283 — same fallback as /api/generate: a first-time owner has no
+  // baseline, so a session-token fetch that times out or is rejected by the
+  // integrity guard used to surface here as a 500 ("Unable to load Studio
+  // profile"). Retry once as the server GITHUB_TOKEN, which is private-
+  // inclusive and classified `authenticated`, before giving up.
+  const materialized =
+    sessionMaterialized ?? (await materializeDisplayProfile(session.login));
 
   if (!materialized) {
     throw new Error(`Unable to load Studio profile for ${session.login}`);
