@@ -23,6 +23,7 @@
     "check:vulnerabilities": "tsx scripts/check-vulnerabilities.ts",
     "check:pending-migrations": "tsx scripts/check-pending-migrations.ts",
     "check:vercel-config": "tsx scripts/check-vercel-config.ts",
+    "generate:badge-reference": "tsx --tsconfig apps/web/tsconfig.json scripts/generate-badge-reference.ts",
     "release:verify-identity": "tsx scripts/quality/verify-deployment-identity.ts",
     "release:write-result": "tsx scripts/quality/release-result.ts",
     "release:validate-docs": "tsx scripts/quality/validate-release-docs.ts",
