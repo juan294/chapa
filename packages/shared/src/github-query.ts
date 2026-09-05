@@ -1,5 +1,6 @@
 /**
- * GitHub GraphQL query for fetching a user's contribution data over 365 days.
+ * Legacy v6 GraphQL response contract. New scoring consumes fetchGitHubEvidence
+ * (apps/web/lib/github/evidence.ts), never these historical scalar proxies.
  *
  * Variables:
  * - $login: String! — GitHub username
@@ -8,8 +9,8 @@
  * - $historySince: GitTimestamp! — Start of window (commit history)
  * - $historyUntil: GitTimestamp! — End of window (commit history)
  * - $mergedPrSearch: String! — `author:<login> is:pr is:merged created:<since>..<until>`,
- *   used by the top-level `search` field for an authoritative merged-PR count
- *   that isn't capped/scoped the way `pullRequestContributions` is.
+ *   used by the top-level `search` field for a legacy token-visible count.
+ *   This is not an independent authoritative completeness cross-check.
  *
  * Note: DateTime and GitTimestamp are different GraphQL types but accept
  * the same ISO 8601 strings. They must be declared as separate variables.

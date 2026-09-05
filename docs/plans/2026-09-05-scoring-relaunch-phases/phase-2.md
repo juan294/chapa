@@ -33,16 +33,16 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] An unresolved issue opening earns zero closed-issue credit; another actor closing an issue is not the subject's closure.
-- [ ] Teammate commits cannot change subject repository depth or concentration; observed external contributions are included.
-- [ ] A PR opened before the window and merged inside it is included; review time is independent of PR merge time.
-- [ ] 101st PR and provider search ceilings are processed through pagination/partitioning or reported partial, never presented as complete.
-- [ ] Missing/null/restricted nodes and mid-page errors preserve unknown coverage; mixed contribution types do not become commits.
+- [x] An unresolved issue opening earns zero closed-issue credit; another actor closing an issue is not the subject's closure.
+- [x] Teammate commits cannot change subject repository depth or concentration; observed external contributions are included.
+- [x] A PR opened before the window and merged inside it is included; review time is independent of PR merge time.
+- [x] 101st PR and provider search ceilings are processed through pagination/partitioning or reported partial, never presented as complete.
+- [x] Missing/null/restricted nodes and mid-page errors preserve unknown coverage; mixed contribution types do not become commits.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## Sequential local verification
@@ -50,3 +50,7 @@ Manual/domain acceptance:
 Run the owned adjacent tests using `pnpm exec vitest run <explicit-owned-test-paths>`; record the exact paths in the implementation report. At phase integration run sequentially: `pnpm run typecheck`, `pnpm run lint`, `pnpm run test`, and `pnpm run build`. For schema/write changes also run `pnpm run validate:migrations`, `pnpm run check:write-registration` and `pnpm run test:contract:local` against disposable local Supabase before build. Scoring changes additionally run `pnpm run test:coverage`; import changes run `pnpm run check:circular`. Do not run checks concurrently.
 
 Final readiness also requires repository license/vulnerability and SVG/PNG/browser verification. No hosted CI or preview is a test environment. Missing prerequisites, failed checks and policy contradictions return to their owner before completion.
+
+## Implementation validation
+
+Verified on 2026-09-05; see [the S02/S06 validation report](../../research/2026-09-05-scoring-v7-phases-2-6-validation.md). V7 runtime routing remains the mandatory S15 dependency; core eligibility and bounds remain S09.

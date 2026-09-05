@@ -68,3 +68,5 @@ export {
 export * from "./scoring-window";
 export * from "./scoring-evidence";
 export { createCoreScoringInputs } from "./stats-schema";
+
+export * from "./scoring-aggregation-v7";

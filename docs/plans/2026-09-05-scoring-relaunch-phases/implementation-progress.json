@@ -27,7 +27,8 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phases-2-6-validation.md"
     },
     {
       "id": "S03",
@@ -38,7 +39,7 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "in-progress"
     },
     {
       "id": "S04",
@@ -71,7 +72,8 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phases-2-6-validation.md"
     },
     {
       "id": "S07",
@@ -704,6 +706,18 @@
       "path": "/Users/juan/code/chapa-scoring-implementation",
       "branch": "feature/scoring-relaunch",
       "purpose": "scoring integration",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-github",
+      "branch": "feature/scoring-v7-github",
+      "purpose": "S02 GitHub adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-gitlab",
+      "branch": "feature/scoring-v7-gitlab",
+      "purpose": "S03 GitLab adapter",
       "cleanupStatus": "active"
     }
   ]

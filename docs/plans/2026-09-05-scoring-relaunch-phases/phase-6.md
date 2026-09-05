@@ -34,17 +34,17 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] Pooled median of [1,1,1] and [2,100,100] is 1.5 hours.
-- [ ] Pooling measured 3/3, unmeasured 30, measured 0/3 is 0.5 for every order/parenthesization.
-- [ ] Duplicate source/event uploads are idempotent; same canonical repo across accounts counts once.
-- [ ] Micro/docs rates pool observations rather than taking maxima.
-- [ ] Sparse and dense calendars of identical events have identical results; daily spread does not imply a ten-minute burst.
-- [ ] Docs-only is unknown for partial/empty file lists; supported complete documentation changes receive evidence credit.
+- [x] Pooled median of [1,1,1] and [2,100,100] is 1.5 hours.
+- [x] Pooling measured 3/3, unmeasured 30, measured 0/3 is 0.5 for every order/parenthesization.
+- [x] Duplicate source/event uploads are idempotent; same canonical repo across accounts counts once.
+- [x] Micro/docs rates pool observations rather than taking maxima.
+- [x] Sparse and dense calendars of identical events have identical results; daily spread does not imply a ten-minute burst.
+- [x] Docs-only is unknown for partial/empty file lists; supported complete documentation changes receive evidence credit.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## Sequential local verification
@@ -52,3 +52,7 @@ Manual/domain acceptance:
 Run the owned adjacent tests using `pnpm exec vitest run <explicit-owned-test-paths>`; record the exact paths in the implementation report. At phase integration run sequentially: `pnpm run typecheck`, `pnpm run lint`, `pnpm run test`, and `pnpm run build`. For schema/write changes also run `pnpm run validate:migrations`, `pnpm run check:write-registration` and `pnpm run test:contract:local` against disposable local Supabase before build. Scoring changes additionally run `pnpm run test:coverage`; import changes run `pnpm run check:circular`. Do not run checks concurrently.
 
 Final readiness also requires repository license/vulnerability and SVG/PNG/browser verification. No hosted CI or preview is a test environment. Missing prerequisites, failed checks and policy contradictions return to their owner before completion.
+
+## Implementation validation
+
+Verified on 2026-09-05; see [the S02/S06 validation report](../../research/2026-09-05-scoring-v7-phases-2-6-validation.md). V7 runtime routing remains the mandatory S15 dependency; core eligibility and bounds remain S09.

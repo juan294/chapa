@@ -5,6 +5,10 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { fetchContributionData } from "./queries";
 import { assessRawFetchIntegrity } from "./stats-integrity";
 
+// v7 consumers receive dated evidence; fetchStats below remains the explicit v6 reader.
+export { fetchGitHubEvidence } from "./evidence";
+export type { GitHubEvidenceOptions, GitHubEvidenceResult } from "./evidence";
+
 // ---------------------------------------------------------------------------
 // fetchStats — main aggregation function
 // ---------------------------------------------------------------------------
