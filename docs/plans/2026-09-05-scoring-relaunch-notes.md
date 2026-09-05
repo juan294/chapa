@@ -1,0 +1,7 @@
+# Notes for `2026-09-05-scoring-relaunch`
+
+## Deviations
+
+- **S01 administrative database deletion dependency:** Plan said the existing `scripts/delete-user.ts` would be extended in S14. Found the repository's exhaustive handle-column test rejects any new user-bearing schema until deletion discovery and cleanup handle it. Chose to bring the v7 database cleanup RPC, deletion inventory and its script integration into S01, with real database and script regressions. Why: the foundation must preserve working account deletion and pass existing gates; masking the schema check would leave private data behind. S14 retains the remaining receipt verification, cache revocation and retention integration.
+- **S01 persistence mapping ownership:** Plan listed shared contracts and additive schema; found that separate handwritten SQL fixtures missed required shared assessment revision/provenance fields. Added `apps/web/lib/db/scoring-v7-contract.ts` as the explicit private persistence projection and proved the actual shared claim/assessment shapes round-trip through local PostgREST. Later ledger workers reuse these mappings.
+- **S01 coverage scope:** The old coverage exclusion called `stats-schema.ts` a type-only module, but it now validates core inputs at runtime. Removed that exclusion and restricted shared-package coverage to `src/**`, so a local build cannot dilute coverage by adding duplicate generated `dist` files. Existing thresholds are unchanged.

@@ -14,6 +14,13 @@ import {
 // run() — exercised against a fake `fetch` (no real network/Redis/Supabase).
 // ---------------------------------------------------------------------------
 
+vi.mock("./lib/env", () => ({
+  loadConfig: () => ({
+    redisUrl: "https://fake-redis.upstash.io", redisToken: "fake-redis-token",
+    supaUrl: "https://fake-project.supabase.co", supaKey: "fake-service-role-key",
+  }),
+}));
+
 const REDIS_URL = "https://fake-redis.upstash.io";
 const SUPA_URL = "https://fake-project.supabase.co";
 
@@ -22,6 +29,8 @@ interface FakeFetchOptions {
   supaCounts?: Record<string, number>;
   /** Table name whose DELETE request should fail (simulates a mid-loop error). */
   supaDeleteFailTable?: string;
+  scoringRpcFails?: boolean;
+  scoringRpcLeavesRows?: boolean;
   /** Successive SCAN pages: cursor to return alongside a batch of keys. */
   scanPages?: Array<{ cursor: string; keys: string[] }>;
 }
@@ -29,6 +38,7 @@ interface FakeFetchOptions {
 interface RecordedCall {
   url: string;
   method: string;
+  body?: BodyInit | null;
 }
 
 function tableFromUrl(url: string): string {
@@ -40,11 +50,12 @@ function tableFromUrl(url: string): string {
 function makeFakeFetch(opts: FakeFetchOptions) {
   const calls: RecordedCall[] = [];
   let scanCallIndex = 0;
+  let scoringDeleted = false;
   const scanPages = opts.scanPages ?? [{ cursor: "0", keys: [] }];
 
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
-    calls.push({ url, method });
+    calls.push({ url, method, body: init?.body });
 
     if (url.startsWith(`${REDIS_URL}/SCAN/`)) {
       const page = scanPages[scanCallIndex] ?? { cursor: "0", keys: [] };
@@ -66,10 +77,18 @@ function makeFakeFetch(opts: FakeFetchOptions) {
       } as unknown as Response;
     }
 
+    if (url === `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user` && method === "POST") {
+      scoringDeleted = !opts.scoringRpcFails && !opts.scoringRpcLeavesRows;
+      return {
+        ok: !opts.scoringRpcFails, status: opts.scoringRpcFails ? 500 : 204,
+        text: async () => opts.scoringRpcFails ? "simulated RPC failure" : "",
+      } as Response;
+    }
+
     if (url.startsWith(SUPA_URL)) {
       const table = tableFromUrl(url);
       if (method === "HEAD") {
-        const count = opts.supaCounts?.[table] ?? 0;
+        const count = scoringDeleted && table.startsWith("scoring_v7_") ? 0 : opts.supaCounts?.[table] ?? 0;
         return {
           ok: true,
           status: 200,
@@ -107,18 +126,12 @@ function makeFakeFetch(opts: FakeFetchOptions) {
 }
 
 describe("run", () => {
-  const originalEnv = { ...process.env };
-
   beforeEach(() => {
-    process.env.UPSTASH_REDIS_REST_URL = REDIS_URL;
-    process.env.UPSTASH_REDIS_REST_TOKEN = "fake-redis-token";
-    process.env.SUPABASE_URL = SUPA_URL;
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "fake-service-role-key";
     vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -131,7 +144,11 @@ describe("run", () => {
 
     await run(["octocat"]);
 
-    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+    expect(calls.some((c) => c.method === "DELETE" || c.method === "POST")).toBe(false);
+    expect(calls.filter((c) => c.method === "HEAD").map((c) => {
+      const url = new URL(c.url);
+      return `${tableFromUrl(c.url)}.${[...url.searchParams.keys()][0]}`;
+    }).sort()).toEqual(SUPABASE_TABLES.map(({ table, column }) => `${table}.${column}`).sort());
     expect(calls.some((c) => c.url.includes(`${REDIS_URL}/DEL/`))).toBe(
       false,
     );
@@ -191,6 +208,36 @@ describe("run", () => {
     for (const table of untouched) {
       expect(logged.some((line) => line.includes(table))).toBe(false);
     }
+  });
+
+  it("deletes v7 atomically once before legacy deletes, never table by table", async () => {
+    const { fetchMock, calls } = makeFakeFetch({
+      supaCounts: Object.fromEntries(SUPABASE_TABLES.map(({ table }) => [table, 1])),
+      scanPages: [{ cursor: "0", keys: ["stats:v2:merged:octocat"] }],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await run(["OctoCat", "--delete"]);
+    const rpcCalls = calls.filter((c) => c.method === "POST");
+    expect(rpcCalls).toEqual([{ url: `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user`, method: "POST", body: JSON.stringify({ p_handle: "octocat" }) }]);
+    expect(calls[0]).toEqual(rpcCalls[0]);
+    expect(calls.filter((c) => c.method === "DELETE").every((c) => !c.url.includes("/scoring_v7_"))).toBe(true);
+    expect(calls.some((c) => c.method === "DELETE" && c.url.includes("/users?"))).toBe(true);
+    expect(calls.some((c) => c.url.includes(`${REDIS_URL}/DEL/`))).toBe(true);
+  });
+
+  it("aborts before any later deletion if atomic v7 cleanup fails", async () => {
+    const { fetchMock, calls } = makeFakeFetch({ scoringRpcFails: true, supaCounts: { users: 1 } });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(run(["octocat", "--delete"])).rejects.toThrow(/scoring_v7_delete_user: 500/);
+    expect(calls).toEqual([{ url: `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user`, method: "POST", body: JSON.stringify({ p_handle: "octocat" }) }]);
+  });
+
+  it("does not report success or bypass the RPC if v7 rows remain", async () => {
+    const { fetchMock, calls } = makeFakeFetch({ scoringRpcLeavesRows: true, supaCounts: { scoring_v7_assessments: 1 } });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(run(["octocat", "--delete"])).rejects.toThrow(/left rows in scoring_v7_assessments.owner_handle/);
+    expect(calls.some((c) => c.method === "DELETE" && c.url.includes("/scoring_v7_"))).toBe(false);
+    expect(calls.some((c) => c.url.includes(`${REDIS_URL}/DEL/`))).toBe(false);
   });
 
   it("SCAN pagination follows a non-\"0\" cursor to completion", async () => {
@@ -393,6 +440,18 @@ describe("SUPABASE_TABLES", () => {
       "merge_operations.source_handle",
       "merge_operations.target_handle",
       "metrics_snapshots.handle",
+      "scoring_v7_assessments.evaluator_handle",
+      "scoring_v7_assessments.owner_handle",
+      "scoring_v7_evidence.owner_handle",
+      "scoring_v7_evidence_references.owner_handle",
+      "scoring_v7_raw_artifacts.owner_handle",
+      "scoring_v7_receipts.owner_handle",
+      "scoring_v7_reviewer_grants.owner_handle",
+      "scoring_v7_reviewer_grants.reviewer_handle",
+      "scoring_v7_source_observations.owner_handle",
+      "scoring_v7_sources.owner_handle",
+      "scoring_v7_subjects.owner_handle",
+      "scoring_v7_trend_anchors.owner_handle",
       "studio_configs.handle",
       "supplemental_stats.source_handle",
       "supplemental_stats.target_handle",
