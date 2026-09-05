@@ -87,7 +87,8 @@
         "S01",
         "S06"
       ],
-      "implementationStatus": "in-progress"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-8-supplemental-validation.md"
     },
     {
       "id": "S08",
@@ -156,7 +157,7 @@
         "S10",
         "S11"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "in-progress"
     },
     {
       "id": "S13",

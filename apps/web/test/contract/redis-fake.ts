@@ -14,7 +14,7 @@ type CacheSetOptions = number | { ex?: number } | undefined;
 
 const store = new Map<string, StoredValue>();
 const hllStore = new Map<string, Set<string>>();
-type FaultableOperation = "cacheSet" | "cacheMergeJson";
+type FaultableOperation = "cacheSet" | "cacheMergeJson" | "cacheDel";
 const failNextOperations = new Set<FaultableOperation>();
 
 function consumeFailure(operation: FaultableOperation): boolean {
@@ -108,6 +108,7 @@ async function cacheMergeJson<T extends object>(
 }
 
 async function cacheDel(key: string): Promise<boolean> {
+  if (consumeFailure("cacheDel")) return false;
   store.delete(key);
   hllStore.delete(key);
   return true;

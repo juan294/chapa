@@ -32,17 +32,17 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] An event exiting the window removes its exact contribution, denominator observation and repo-depth effect.
-- [ ] Redis-hit and DB-fallback produce identical aged results.
-- [ ] Changing uploadedAt without changing event dates cannot revive old work.
-- [ ] Identity mismatch/source=primary cannot fabricate double-counted evidence.
-- [ ] Real local Supabase failure matrix preserves durable-first publication and honest cacheRefreshed semantics.
-- [ ] Legacy upload response explains eligibility and current coverage without silent deletion.
+- [x] An event exiting the window removes its exact contribution, denominator observation and repo-depth effect.
+- [x] Redis-hit and DB-fallback produce identical aged results.
+- [x] Changing uploadedAt without changing event dates cannot revive old work.
+- [x] Identity mismatch/source=primary cannot fabricate double-counted evidence.
+- [x] Real local Supabase failure matrix preserves durable-first publication and honest cacheRefreshed semantics.
+- [x] Legacy upload response explains eligibility and current coverage without silent deletion.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## S08: Replace productivity-based corruption guards with source-coverage integrity
