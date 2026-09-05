@@ -62,7 +62,8 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-5-validation.md"
     },
     {
       "id": "S06",
@@ -125,7 +126,7 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "in-progress"
     },
     {
       "id": "S11",
@@ -731,6 +732,18 @@
       "path": "/Users/juan/code/chapa-scoring-bitbucket",
       "branch": "feature/scoring-v7-bitbucket",
       "purpose": "S04 Bitbucket adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-codeberg",
+      "branch": "feature/scoring-v7-codeberg",
+      "purpose": "S05 Codeberg adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-craft",
+      "branch": "feature/scoring-v7-craft",
+      "purpose": "S10 optional Craft",
       "cleanupStatus": "active"
     }
   ]

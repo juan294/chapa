@@ -1,3 +1,4 @@
+/** Legacy v6 source shapes below; v7 uses evidence.ts normalized contracts. */
 /** Heatmap entry from GET /api/v1/users/{username}/heatmap */
 export interface CodebergHeatmapEntry {
   timestamp: number; // Unix epoch seconds

@@ -33,16 +33,16 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] An MR-only event never increments authored commits.
-- [ ] Review and closure attribution/date fixtures pass independently of merge date.
-- [ ] The 51st repository is traversed or explicitly partial.
-- [ ] Old work ages out using event timestamps.
-- [ ] Equivalent normalized events yield provider-independent aggregates.
+- [x] An MR-only event never increments authored commits.
+- [x] Review and closure attribution/date fixtures pass independently of merge date.
+- [x] The 51st repository is traversed or explicitly partial.
+- [x] Old work ages out using event timestamps.
+- [x] Equivalent normalized events yield provider-independent aggregates.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## Sequential local verification

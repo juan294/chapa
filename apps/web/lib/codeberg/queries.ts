@@ -21,7 +21,7 @@ interface UserProfile {
   avatarUrl: string;
 }
 
-/** Fetch all Codeberg contribution data for a user */
+/** Legacy v6 aggregate collection. Never substitute these totals for v7 events. */
 export async function fetchCodebergContributionData(
   username: string,
   accessToken: string,
