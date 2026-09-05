@@ -1,7 +1,7 @@
 # Chapa SEO, Analytics, and Search Operations Plan
 
 **Date:** 2026-07-28
-**Status:** Planned
+**Status:** Superseded by `docs/plans/2026-09-05-seo-discoverability-relaunch.md` (never implemented)
 **Research:** `docs/research/2026-07-28-seo-and-analytics-current-state.md`
 **Reference blueprint:** `/Users/juan/code/spoken-letter/docs/plans/2026-07-27-seo-starter-guide-action-plan.md`
 **Integration branch:** `develop`
