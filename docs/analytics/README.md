@@ -2,10 +2,10 @@
 
 > ## Resume here (written 2026-09-05)
 >
-> **Situation.** The SEO plan (`docs/plans/2026-09-05-seo-discoverability-relaunch.md`) is approved with option A (one canonical URL per page). Phase 0, the vendor setup, is finished: every vendor object below exists and is configured. Nothing in this repo has been committed for it yet, because the WebMCP hackathon freeze forbids commits and deploys until judging ends on **2026-09-21 17:00 PT** (2026-09-22 02:00 Madrid). This file, the plan, and the July plan's "Superseded" line are all uncommitted local changes; `git status` shows them.
+> **Situation.** The SEO plan (`docs/plans/2026-09-05-seo-discoverability-relaunch.md`) is approved with option A (one canonical URL per page). Phase 0, the vendor setup, is finished: every vendor object below exists and is configured. These docs are committed on the local branch `docs/seo-phase-0` (not pushed), because the WebMCP hackathon freeze forbids pushes and deploys until judging ends on **2026-09-21 17:00 PT** (2026-09-22 02:00 Madrid).
 >
 > **First thing to do after the freeze lifts:**
-> 1. `git status` and commit these docs on a `docs/seo-phase-0` branch (this file, the plan, the superseded July plan). PR into `develop`.
+> 1. Check out `docs/seo-phase-0`, rebase it on the latest `develop`, push the branch and open a PR into `develop`.
 > 2. Check the three things that were still settling on 2026-09-05: Search Console sitemap status (should have moved from `Couldn't fetch` to `Success` with 49 URLs), the two indexing requests (`/archetypes/builder`, `/u/juan294`), and Bing's sitemap (`Processing` → processed).
 > 3. Start Phases 1, 3 and 5 of the plan. They are independent of each other and of the redesign, and they can run in parallel worktrees. Phase 1 includes the one defect Bing already found: the root meta description in `apps/web/app/layout.tsx` is ~200 characters and must be ≤160.
 > 4. Phases 2 and 4 wait for scoring-relaunch phase 13 (issue #1312), because they describe the scoring formula.
