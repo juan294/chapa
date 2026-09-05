@@ -170,7 +170,8 @@
       "dependencies": [
         "S12"
       ],
-      "implementationStatus": "in-progress"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-11-history-validation.md"
     },
     {
       "id": "S14",
@@ -774,6 +775,12 @@
       "path": "/Users/juan/code/chapa-scoring-history",
       "branch": "feature/scoring-v7-history",
       "purpose": "S13 immutable history and trend",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-verification",
+      "branch": "feature/scoring-v7-verification",
+      "purpose": "S14 complete issuance verification and revocation",
       "cleanupStatus": "active"
     }
   ]

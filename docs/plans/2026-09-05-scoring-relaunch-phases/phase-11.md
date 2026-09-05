@@ -73,17 +73,17 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] Constant raw70/prior60 converges toward70 without sticking at67; internal fractional state survives DB/cache round trips.
-- [ ] Repeated same-day reads and same-input writes cannot move trend.
-- [ ] Same-day input revision uses the same prior-day anchor; missing dates use the documented elapsed-time rule.
-- [ ] Different policy versions reset/segment trend rather than blending v6 and v7.
-- [ ] Local migrations cover existing rows, RLS, duplicate writes, receipt revision selection and failure semantics.
-- [ ] Public headline, archival raw score and trend series are distinguishable and carry receipt IDs.
+- [x] Constant raw70/prior60 converges toward70 without sticking at67; internal fractional state survives DB/cache round trips.
+- [x] Repeated same-day reads and same-input writes cannot move trend.
+- [x] Same-day input revision uses the same prior-day anchor; missing dates use the documented elapsed-time rule.
+- [x] Different policy versions reset/segment trend rather than blending v6 and v7.
+- [x] Local migrations cover existing rows, RLS, duplicate writes, receipt revision selection and failure semantics.
+- [x] Public headline, archival raw score and trend series are distinguishable and carry receipt IDs.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## S14: Verify the complete issued receipt without overstating authenticity

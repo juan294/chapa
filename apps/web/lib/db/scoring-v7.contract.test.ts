@@ -12,6 +12,13 @@ const stranger = "contract-scoring-v7-stranger";
 const db = () => getServiceClient();
 const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
 
+/** Foundation fixtures exercise storage invariants, not S12 arithmetic. */
+function boundReceiptRow(row: { id: string | undefined; owner_handle: string; policy_version: string; reference_time: string; revision: number; public_receipt: object; supersedes_id?: string; canonical_receipt: string }) {
+  const payload = { ...row.public_receipt, schemaVersion: "v7", policyVersion: row.policy_version, revisionId: row.id, receiptId: row.supersedes_id ?? row.id,
+    revision: row.revision, supersedesRevisionId: row.supersedes_id ?? null, action: row.revision === 1 ? "create" : "correct", recordedAt: row.reference_time, window: { referenceTime: row.reference_time } };
+  return { ...row, issued_at: row.reference_time, public_receipt: payload, canonical_receipt: JSON.stringify(payload) };
+}
+
 function sql(statement: string): string {
   if (!project) throw new Error("Missing local Supabase project identity");
   return execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", statement], { encoding: "utf8" }).trim();
@@ -106,7 +113,7 @@ describe("v7 scoring database foundation (real local contract)", () => {
       const ids = [randomUUID(), randomUUID()];
       for (let index = 0; index < 2; index++) {
         const payload = { core: { composite: { kind: "point", value: 60 + 10 * index } } };
-        expect((await db().from("scoring_v7_receipts").insert({ id: ids[index], owner_handle: handle, policy_version: "v7", reference_time: `2026-09-0${index + 3}T12:00:00Z`, revision: 1, canonical_receipt: JSON.stringify(payload), public_receipt: payload })).error).toBeNull();
+        expect((await db().from("scoring_v7_receipts").insert(boundReceiptRow({ id: ids[index], owner_handle: handle, policy_version: "v7", reference_time: `2026-09-0${index + 3}T12:00:00Z`, revision: 1, canonical_receipt: JSON.stringify(payload), public_receipt: payload }))).error).toBeNull();
       }
       const first = { owner_handle: handle, policy_version: "v7", date: "2026-09-03", receipt_id: ids[0], value: 60, raw_value: 60 };
       expect((await db().from("scoring_v7_trend_anchors").insert({ ...first, previous_date: "2026-09-02" })).error).not.toBeNull();
@@ -127,14 +134,14 @@ describe("v7 scoring database foundation (real local contract)", () => {
     const id = randomUUID();
     const payload = { schemaVersion: 7, core: { composite: { kind: "point", value: 69.999, displayValue: 70 } }, craft: { status: "not_observed" } };
     const receipt = { id, owner_handle: owner, policy_version: "v7", reference_time: "2026-09-05T12:00:00Z", revision: 1, canonical_receipt: JSON.stringify(payload), public_receipt: payload };
-    expect((await db().from("scoring_v7_receipts").insert(receipt)).error).toBeNull();
+    expect((await db().from("scoring_v7_receipts").insert(boundReceiptRow(receipt))).error).toBeNull();
     for (const changed of [
       { id: randomUUID(), revision: 99, supersedes_id: id },
       { id: randomUUID(), revision: 2, supersedes_id: id, policy_version: "other-policy" },
       { id: randomUUID(), revision: 2, supersedes_id: id, reference_time: "2026-09-04T12:00:00Z" },
-    ]) expect((await db().from("scoring_v7_receipts").insert({ ...receipt, ...changed })).error).not.toBeNull();
+    ]) expect((await db().from("scoring_v7_receipts").insert(boundReceiptRow({ ...receipt, ...changed }))).error).not.toBeNull();
     const cycle = randomUUID();
-    expect((await db().from("scoring_v7_receipts").insert({ ...receipt, id: cycle, revision: 2, supersedes_id: cycle })).error).not.toBeNull();
+    expect((await db().from("scoring_v7_receipts").insert(boundReceiptRow({ ...receipt, id: cycle, revision: 2, supersedes_id: cycle }))).error).not.toBeNull();
     expect((await db().from("scoring_v7_receipts").update({ public_receipt: {} }).eq("id", id)).error).not.toBeNull();
     expect((await db().from("scoring_v7_verification").insert({ receipt_id: id, signature: "a".repeat(64), key_version: "test" })).error).toBeNull();
     expect((await db().from("scoring_v7_trend_anchors").insert({ owner_handle: owner, policy_version: "v7", date: "2026-09-05", receipt_id: id, value: 69.999, raw_value: 69.999 })).error).toBeNull();
@@ -143,7 +150,7 @@ describe("v7 scoring database foundation (real local contract)", () => {
     expect((await db().from("scoring_v7_receipts").select("id").eq("id", id)).data).toEqual([]);
     expect((await db().from("scoring_v7_verification").select("receipt_id").eq("receipt_id", id)).data).toEqual([]);
     expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner })).error).toBeNull();
-    expect((await db().from("scoring_v7_receipts").insert(receipt)).error).not.toBeNull();
+    expect((await db().from("scoring_v7_receipts").insert(boundReceiptRow(receipt))).error).not.toBeNull();
     expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull();
     const tombstone = await db().from("scoring_v7_revocations").select("*").eq("receipt_id", id).single();
     expect(tombstone.error).toBeNull();

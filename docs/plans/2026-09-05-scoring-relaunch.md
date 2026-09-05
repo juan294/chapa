@@ -1,7 +1,7 @@
 # Chapa scoring relaunch implementation plan
 
 Date:2026-09-05
-Status: Approved for implementation of all phases on 2026-09-05; phases 1, 2, 3, 5, 6, 7, 9 and 10 verified; S07 supplemental evidence verified; S08 source integrity pending; S12 receipts verified; S13 history in progress; phase 4 supported code verified with issue-API amendment pending; all remaining tasks remain required before relaunch.
+Status: Approved for implementation of all phases on 2026-09-05; phases 1, 2, 3, 5, 6, 7, 9 and 10 verified; S07 supplemental evidence verified; S08 source integrity pending; S12 receipts and S13 history verified; S14 verification pending; phase 4 supported code verified with issue-API amendment pending; all remaining tasks remain required before relaunch.
 Source baseline: develop @ c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d (three local commits ahead of origin/develop at initial inspection).
 Audit: [Mathematics and validity audit](../research/2026-09-05-scoring-mathematics-and-validity-audit.md).
 Normative policy: [v7 implementation policy](2026-09-05-scoring-relaunch-phases/policy.md).
