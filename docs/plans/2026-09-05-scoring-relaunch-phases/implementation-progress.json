@@ -51,7 +51,8 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "supported-adapter-reviewed-pending-scope-amendment-and-integration-gates"
+      "implementationStatus": "supported-adapter-verified-pending-scope-amendment",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-4-supported-validation.md"
     },
     {
       "id": "S05",

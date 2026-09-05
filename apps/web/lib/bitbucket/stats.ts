@@ -2,13 +2,16 @@ import { fetchBitbucketContributionData } from "./queries";
 import { buildStatsFromBitbucket } from "./stats-aggregation";
 import type { StatsData } from "@chapa/shared";
 
+export { fetchBitbucketEvidence } from "./evidence";
+export type { BitbucketEvidenceOptions, BitbucketEvidenceProgress, BitbucketEvidenceResult } from "./evidence";
+
 /** User profile info passed from the OAuth token store */
 interface UserProfile {
   displayName: string;
   avatarUrl: string;
 }
 
-/** Fetch and transform Bitbucket data into StatsData */
+/** Legacy v6 scalar reader. v7 consumers must use fetchBitbucketEvidence. */
 export async function fetchBitbucketStats(
   username: string,
   accessToken: string,

@@ -5,6 +5,8 @@ Prerequisites: phase 1.
 Policy authority: [policy.md](policy.md). Parent: [scoring relaunch](../2026-09-05-scoring-relaunch.md).
 This phase is mandatory before relaunch. Stop after verified completion unless the user authorizes continuation. All implementation/review agents for this work must use GPT-6 Astra.
 
+Supported adapter code is locally verified; S04 remains open pending the [issue-API amendment](../../decisions/2026-09-05-bitbucket-issue-api-retirement.md) and its remaining acceptance evidence. See the [supported-code validation report](../../research/2026-09-05-scoring-v7-phase-4-supported-validation.md).
+
 ## S04: Correct Bitbucket attribution, event dates and nested pagination
 
 GitHub: [#1299](https://github.com/juan294/chapa/issues/1299).
