@@ -34,17 +34,17 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] Same engineering evidence with AI/manual provenance, tool choice or report disclosure gives bit-identical core outputs.
-- [ ] The two-to-three-review counterexample cannot drop because of profile classification; additional valid review evidence is monotone.
-- [ ] All dimension weights total exactly one and endpoints are attainable under the declared input model.
-- [ ] One-line useful fixes and deletions do not lose eligibility solely due to size; same-project/day splitting and duplicate references do not multiply Delivery units; cross-day/project manipulation is separately measured in S18.
-- [ ] Missing evidence widens the disclosed range without changing the denominator or substituting zero quality.
-- [ ] Policy constants are labeled design choices; archetypes describe evidence shape, not certified seniority.
+- [x] Same engineering evidence with AI/manual provenance, tool choice or report disclosure gives bit-identical core outputs.
+- [x] The two-to-three-review counterexample cannot drop because of profile classification; additional valid review evidence is monotone.
+- [x] All dimension weights total exactly one and endpoints are attainable under the declared input model.
+- [x] One-line useful fixes and deletions do not lose eligibility solely due to size; same-project/day splitting and duplicate references do not multiply Delivery units; cross-day/project manipulation is separately measured in S18.
+- [x] Missing evidence widens the disclosed range without changing the denominator or substituting zero quality.
+- [x] Policy constants are labeled design choices; archetypes describe evidence shape, not certified seniority.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## Sequential local verification
