@@ -19,7 +19,7 @@ const HEALTH_DOT: Record<string, string> = {
 
 export function AgentCard({ agent, isRunning, onRun, onStop }: AgentCardProps) {
   return (
-    <div className="rounded-xl border border-stroke bg-card p-4 space-y-3">
+    <div className="rounded-[3px] border border-stroke bg-card p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -36,7 +36,7 @@ export function AgentCard({ agent, isRunning, onRun, onStop }: AgentCardProps) {
         {isRunning ? (
           <button
             onClick={() => onStop(agent.key)}
-            className="rounded-md border border-terminal-red/20 px-2 py-1 text-xs font-heading text-terminal-red hover:bg-terminal-red/10 transition-colors"
+            className="min-h-11 rounded-[3px] border border-terminal-red px-2 py-1 text-xs font-heading text-terminal-red hover:bg-terminal-red/10 transition-colors"
             aria-label={`Stop ${agent.label}`}
           >
             Stop
@@ -45,7 +45,7 @@ export function AgentCard({ agent, isRunning, onRun, onStop }: AgentCardProps) {
           <button
             onClick={() => onRun(agent.key)}
             disabled={!agent.enabled}
-            className="rounded-md border border-stroke px-2 py-1 text-xs font-heading text-text-secondary hover:border-amber/20 hover:text-amber transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="min-h-11 rounded-[3px] border border-text-primary px-2 py-1 text-xs font-heading text-text-secondary hover:border-text-primary hover:text-amber-text transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label={`Run ${agent.label}`}
           >
             <svg

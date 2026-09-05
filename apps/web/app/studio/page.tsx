@@ -72,7 +72,7 @@ async function renderStudio(clientProps: StudioClientProps) {
       ]}
     >
       <main id="main-content" className="min-h-screen bg-bg">
-        <div className="pt-[57px]">
+        <div className="pt-[69px]">
           <KeyboardShortcutsListener />
           <StudioClient
             key={clientProps.demo ? "demo" : "live"}

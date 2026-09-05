@@ -16,6 +16,7 @@ interface LiteYouTubeEmbedProps {
  */
 export function LiteYouTubeEmbed({ videoId, title }: LiteYouTubeEmbedProps) {
   const [activated, setActivated] = useState(false);
+  const [failedThumbnailVideoId, setFailedThumbnailVideoId] = useState<string | null>(null);
 
   const thumbnailUrl = videoId
     ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
@@ -40,16 +41,23 @@ export function LiteYouTubeEmbed({ videoId, title }: LiteYouTubeEmbedProps) {
           onClick={() => setActivated(true)}
           className="group relative h-full w-full cursor-pointer"
         >
-          {thumbnailUrl ? (
+          {thumbnailUrl && failedThumbnailVideoId !== videoId ? (
             /* eslint-disable-next-line @next/next/no-img-element -- external YouTube thumbnail, shown briefly before iframe loads */
             <img
+              ref={(image) => {
+                // A cached failure can precede hydration's error listener.
+                if (image?.complete && image.naturalWidth === 0) setFailedThumbnailVideoId(videoId);
+              }}
               src={thumbnailUrl}
               alt={title}
               width={480}
               height={270}
               className="h-full w-full object-cover"
               loading="lazy"
+              onError={() => setFailedThumbnailVideoId(videoId)}
             />
+          ) : thumbnailUrl ? (
+            <div aria-hidden="true" className="h-full w-full bg-purple-tint" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-forest">
               <span className="font-heading text-sm text-forest-dim">

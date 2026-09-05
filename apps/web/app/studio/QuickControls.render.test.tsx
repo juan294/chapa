@@ -418,11 +418,8 @@ describe("QuickControls — v2 controls column (#1216)", () => {
     );
     fireEvent.click(screen.getByText("Background"));
 
-    // The raw fill token `text-amber` measures 2.75:1 against the light
-    // ground. The label uses `text-amber-text` instead (#1243) — the
-    // theme-aware, text-safe counterpart at 5.28:1 light and 11.94:1 dark —
-    // which is what makes the handoff's accent-coloured selected label
-    // (#1245) affordable at all.
+    // Selected labels use the theme-aware text-safe accent, alongside
+    // the semantic pressed state and visible border.
     const selected = screen.getByRole("button", { name: /Solid Dark/ });
     expect(selected.getAttribute("aria-pressed")).toBe("true");
     expect(selected.className).toContain("border-amber");
@@ -524,9 +521,7 @@ describe("QuickControls — v3 fidelity (#1243)", () => {
 
   it("renders the current value in an accent that clears AA on the column ground", () => {
     render_();
-    // `text-amber` measures 2.75:1 on the light ground. `--color-amber-text` is
-    // the theme-aware, text-safe counterpart (5.28:1 light, 11.94:1 dark), the
-    // same shape as --color-complement-text.
+    // The current value uses the theme-aware text-safe accent.
     const value = screen.getByTestId("qc-value-background");
     expect(value.className).toContain("text-amber-text");
     expect(value.className).not.toContain("text-terminal-dim");

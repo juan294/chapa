@@ -162,7 +162,7 @@ export function BadgeToolbar({
   }, [handle, t]);
 
   const btnClass =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg min-h-[44px] min-w-[44px] px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] focus-visible:text-text-primary focus-visible:bg-amber/[0.06] transition-colors";
+    "inline-flex items-center justify-center gap-1.5 rounded-[3px] min-h-[44px] min-w-[44px] px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] focus-visible:text-text-primary focus-visible:bg-amber/[0.06] transition-colors";
 
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -234,7 +234,7 @@ export function BadgeToolbar({
 
         {showShare && (
           <div
-            className={`absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-xl bg-card shadow-card p-1.5 z-20 ${shareExiting ? "animate-fade-out-up" : "animate-terminal-fade-in"}`}
+            className={`absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-[3px] border border-stroke-strong bg-card shadow-card p-1.5 z-20 ${shareExiting ? "animate-fade-out-up" : "animate-terminal-fade-in"}`}
             role="menu"
             aria-label={t('aria.shareOptions') as string}
           >
@@ -248,7 +248,7 @@ export function BadgeToolbar({
               target="_blank"
               rel="noopener noreferrer"
               role="menuitem"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
+              className="flex min-h-[44px] items-center gap-2.5 rounded-[3px] px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
             >
               {t('badgeToolbar.postOn') as string}
               <svg
@@ -270,7 +270,7 @@ export function BadgeToolbar({
               target="_blank"
               rel="noopener noreferrer"
               role="menuitem"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
+              className="flex min-h-[44px] items-center gap-2.5 rounded-[3px] px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
             >
               {t('badgeToolbar.shareOn') as string}
               <svg
@@ -292,7 +292,7 @@ export function BadgeToolbar({
               target="_blank"
               rel="noopener noreferrer"
               role="menuitem"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
+              className="flex min-h-[44px] items-center gap-2.5 rounded-[3px] px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
             >
               {t('badgeToolbar.postOn') as string}
               <svg
@@ -308,7 +308,7 @@ export function BadgeToolbar({
             <button
               onClick={handleCopyLink}
               role="menuitem"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors w-full"
+              className="flex min-h-[44px] items-center gap-2.5 rounded-[3px] px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors w-full"
             >
               {copyLinkStatus === "copied" ? t('badgeToolbar.copied') as string : t('badgeToolbar.copyLink') as string}
               <svg

@@ -26,7 +26,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
   const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: user.handle });
   return (
     <tr
-      className={`transition-colors hover:bg-amber/[0.03] ${user.lastSnapshotDate === null ? "opacity-60" : ""}`}
+      className="transition-colors hover:bg-amber/[0.03]"
     >
       {/* Developer */}
       <td className="px-3 py-2.5">
@@ -44,12 +44,12 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
               onError={() => onImgError(user.handle)}
             />
           ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber/10 text-xs font-semibold text-amber">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber/10 text-xs font-semibold text-amber-text">
               {user.handle.charAt(0).toUpperCase()}
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate font-heading text-sm text-text-primary group-hover:text-amber transition-colors">
+            <p className="truncate font-heading text-sm text-text-primary group-hover:text-amber-text transition-colors">
               {user.handle}
             </p>
             {user.lastSnapshotDate === null ? (
@@ -70,7 +70,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
             {user.archetype}
           </span>
         ) : (
-          <span className="text-xs text-text-secondary/50">&mdash;</span>
+          <span className="text-xs text-text-secondary">&mdash;</span>
         )}
       </td>
 
@@ -81,7 +81,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
             {user.tier}
           </span>
         ) : (
-          <span className="text-xs text-text-secondary/50">&mdash;</span>
+          <span className="text-xs text-text-secondary">&mdash;</span>
         )}
       </td>
 
@@ -92,7 +92,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
             {user.adjustedComposite}
           </span>
         ) : (
-          <span className="text-xs text-text-secondary/50">&mdash;</span>
+          <span className="text-xs text-text-secondary">&mdash;</span>
         )}
       </td>
 
@@ -103,7 +103,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
             {user.rawScore}
           </span>
         ) : (
-          <span className="text-xs text-text-secondary/50">&mdash;</span>
+          <span className="text-xs text-text-secondary">&mdash;</span>
         )}
       </td>
 
@@ -120,7 +120,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
               aria-label="Confidence score"
             >
               <div
-                className="h-full rounded-full bg-amber/60"
+                className="h-full rounded-full bg-amber-text"
                 style={{ width: `${user.confidence}%` }}
               />
             </div>
@@ -129,7 +129,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
             </span>
           </div>
         ) : (
-          <span className="text-xs text-text-secondary/50">&mdash;</span>
+          <span className="text-xs text-text-secondary">&mdash;</span>
         )}
       </td>
 
@@ -161,7 +161,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
           href={`/u/${user.handle}/badge.svg`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center rounded-md p-1 text-text-secondary hover:text-amber hover:bg-amber/[0.06] transition-colors"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[3px] p-1 text-text-secondary hover:text-amber-text hover:bg-amber/[0.06] transition-colors"
           aria-label={`View badge SVG for ${user.handle}`}
           title="View badge SVG"
         >
@@ -217,7 +217,8 @@ export function AdminUserTable({
             <AdminSortableHeader field="activeDays" label="Days" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
             <AdminSortableHeader field="totalStars" label="Stars" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
             <AdminSortableHeader field="lastSnapshotDate" label="Updated" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
-            <AdminHeaderCell className="w-10">
+            {/* Keep the absolute sr-only label inside the table's scroll area. */}
+            <AdminHeaderCell className="relative w-10">
               <span className="sr-only">Actions</span>
             </AdminHeaderCell>
           </tr>

@@ -10,7 +10,7 @@ export default async function NotFound() {
       id="main-content"
       className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center"
     >
-      <h1 className="font-heading text-6xl font-bold text-amber">404</h1>
+      <h1 className="font-heading text-6xl font-bold text-amber-text">404</h1>
       <p className="mt-4 text-lg text-text-primary">{t('notFound.title') as string}</p>
       <p className="mt-2 text-sm text-text-secondary">
         {t('notFound.description') as string}
@@ -20,13 +20,13 @@ export default async function NotFound() {
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         <Link
           href="/"
-          className="inline-flex min-h-[44px] items-center rounded-lg border border-amber/20 bg-amber/10 px-6 font-heading text-sm font-medium text-amber transition-colors hover:bg-amber/20"
+          className="inline-flex min-h-[44px] items-center rounded-[3px] border border-action bg-action px-6 font-heading text-sm font-medium text-action-text transition-colors hover:bg-action-hover"
         >
           {t('notFound.cta') as string}
         </Link>
         <Link
           href="/verify"
-          className="inline-flex min-h-[44px] items-center rounded-lg border border-stroke px-6 font-heading text-sm font-medium text-text-secondary transition-colors hover:border-complement hover:text-complement-text"
+          className="inline-flex min-h-[44px] items-center rounded-[3px] border border-complement-text px-6 font-heading text-sm font-medium text-complement-text transition-colors hover:bg-purple-tint focus-visible:outline-complement-text!"
         >
           {t('notFound.ctaVerify') as string}
         </Link>

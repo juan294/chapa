@@ -81,7 +81,7 @@ type Translate = LanguageContextValue["t"];
  * Fit is bounded by height as well as width on a wide viewport, so the badge,
  * the controls and the save row share the screen without the page scrolling.
  * The badge is 1200x630, so its width is 1.9x the height it can have, and
- * that height is the viewport minus what surrounds it: the nav (57px), the
+ * that height is the viewport minus what surrounds it: the nav (69px), the
  * stage's own chrome (header, padding, config line: ~205px) and the tools
  * band's floor (`lg:min-h-[18rem]`, 288px). The 360px floor keeps it legible
  * on a very short window at the cost of a little page scroll.
@@ -647,7 +647,7 @@ export function StudioClient({
 
   return (
     // The badge must stay on screen while the user works. On a wide viewport
-    // the studio is exactly the viewport below the nav (`pt-[57px]` in
+    // the studio is exactly the viewport below the nav (`pt-[69px]` in
     // page.tsx): the stage keeps its natural height at the top and the tools
     // band takes the rest, with each column scrolling on its own. The page
     // itself only scrolls when the stage alone is taller than the viewport
@@ -655,7 +655,7 @@ export function StudioClient({
     // rather than collapsing. Narrow viewports keep the flowing layout.
     <div
       data-testid="studio-root"
-      className="flex min-h-[calc(100dvh-57px)] flex-col lg:h-[calc(100dvh-57px)]"
+      className="flex min-h-[calc(100dvh-69px)] flex-col lg:h-[calc(100dvh-69px)]"
     >
       <h1 className="sr-only">{t("studio.title") as string}</h1>
 
@@ -673,7 +673,7 @@ export function StudioClient({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-heading text-sm whitespace-nowrap text-text-primary">
-              <span className="select-none text-amber">%</span>{" "}
+              <span className="select-none text-amber-text">%</span>{" "}
               {t("studio.stage.command") as string}
             </span>
             {/* The section-header rule keeps meta on one line, but this meta
@@ -685,7 +685,7 @@ export function StudioClient({
             </span>
             {demo && (
               <span
-                className="font-heading text-xs font-bold tracking-[0.2em] text-amber"
+                className="font-heading text-xs font-bold tracking-[0.2em] text-amber-text"
                 data-testid="studio-demo-marker"
               >
                 {t("studio.demoMarker") as string}
@@ -698,7 +698,7 @@ export function StudioClient({
             <div
               role="group"
               aria-label={t("studio.zoom.groupLabel") as string}
-              className="inline-flex gap-0.5 rounded-lg border border-stroke-strong bg-bg p-0.5"
+              className="inline-flex gap-0.5 rounded-[3px] border border-stroke-strong bg-bg p-0.5"
             >
               {ZOOM_OPTIONS.map((option) => {
                 const selected = option.id === zoom;
@@ -709,7 +709,7 @@ export function StudioClient({
                     data-testid={`studio-zoom-${option.id}`}
                     aria-pressed={selected}
                     onClick={() => setZoom(option.id)}
-                    className={`min-h-[36px] rounded-md px-3 font-heading text-[11.5px] transition-colors ${
+                    className={`min-h-[44px] rounded-[3px] px-3 font-heading text-[11.5px] transition-colors ${
                       selected
                         ? "bg-amber/10 font-bold text-amber-text"
                         : "text-text-secondary hover:text-text-primary"
@@ -722,11 +722,11 @@ export function StudioClient({
             </div>
 
             <span
-              className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 font-heading text-xs ${
+              className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-[3px] border px-3 font-heading text-xs ${
                 saveState.status === "error"
                   ? "border-terminal-red/40 bg-terminal-red/10 text-terminal-red"
                   : saveState.status === "saving"
-                    ? "animate-terminal-fade-in border-amber/40 bg-amber/10 text-amber"
+                    ? "animate-terminal-fade-in border-amber/40 bg-amber/10 text-amber-text"
                     : saveState.status === "dirty"
                       ? "border-terminal-yellow/40 bg-terminal-yellow/10 text-terminal-yellow"
                       : "border-terminal-green/40 bg-terminal-green/10 text-terminal-green"
@@ -743,7 +743,7 @@ export function StudioClient({
 
         {/* The badge is server-rendered and always dark, so its stage is one of
             the fixed-ground surfaces: forest tokens, not theme-aware ones. */}
-        <div className="bg-grid-forest flex flex-col items-center gap-4 rounded-2xl border border-forest-line bg-forest p-4 sm:p-6">
+        <div className="bg-grid-forest flex flex-col items-center gap-4 rounded-[3px] border border-forest-line bg-forest p-4 sm:p-6">
           <div
             data-testid="studio-stage-viewport"
             className="flex max-w-full overflow-x-auto [justify-content:safe_center]"
@@ -781,7 +781,7 @@ export function StudioClient({
               type="button"
               data-testid="studio-copy-config"
               onClick={() => void handleCopyConfig()}
-              className="min-h-[36px] rounded-lg border border-forest-line px-3 font-heading text-[11px] whitespace-nowrap text-forest-dim transition-colors hover:border-forest-text/40 hover:text-forest-text"
+              className="min-h-[44px] rounded-[3px] border border-forest-dim px-3 font-heading text-[11px] whitespace-nowrap text-forest-dim transition-colors hover:border-forest-text hover:text-forest-text focus-visible:outline-forest-text!"
             >
               {copied
                 ? `✓ ${t("studio.copyConfig.copied") as string}`
@@ -840,14 +840,14 @@ export function StudioClient({
           className="@container flex min-w-0 flex-col border-b border-stroke bg-card lg:min-h-0"
         >
           <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1">
-            <span className="font-heading text-[10px] tracking-[0.14em] text-terminal-dim">
+            <span className="font-heading text-[11px] tracking-[0.14em] text-terminal-dim">
               {t("studio.session") as string}
             </span>
             <button
               type="button"
               data-testid="studio-clear-session"
               onClick={() => handleQuickCommand("/clear")}
-              className="min-h-[36px] rounded-lg border border-stroke px-2.5 font-heading text-[11px] text-text-secondary transition-colors hover:border-amber/30 hover:text-text-primary"
+              className="min-h-[44px] rounded-[3px] border border-stroke-strong px-2.5 font-heading text-[11px] text-text-secondary transition-colors hover:border-amber-text hover:text-text-primary"
             >
               {t("studio.clearSession") as string}
             </button>
@@ -900,7 +900,7 @@ export function StudioClient({
               data-testid="studio-save"
               onClick={() => handleQuickCommand("/save")}
               disabled={saving}
-              className="min-h-[46px] flex-1 rounded-lg bg-amber-dark font-heading text-sm font-bold text-white transition-colors hover:bg-amber disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[46px] flex-1 rounded-[3px] bg-action font-heading text-sm font-bold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               /save
             </button>
@@ -908,7 +908,7 @@ export function StudioClient({
               type="button"
               data-testid="studio-reset"
               onClick={() => handleQuickCommand("/reset")}
-              className="min-h-[46px] rounded-lg border border-stroke px-4 font-heading text-sm text-text-secondary transition-colors hover:border-amber/30 hover:text-text-primary"
+              className="min-h-[46px] rounded-[3px] border border-stroke-strong px-4 font-heading text-sm text-text-secondary transition-colors hover:border-amber-text hover:text-text-primary"
             >
               /reset
             </button>
@@ -929,7 +929,7 @@ export function StudioClient({
                   data-testid="agent-save-confirm"
                   onClick={handleAgentSaveConfirm}
                   disabled={saving}
-                  className="min-h-[44px] flex-1 rounded-lg bg-amber-dark px-3 font-heading text-xs font-bold text-white transition-colors hover:bg-amber disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-[44px] flex-1 rounded-[3px] bg-action px-3 font-heading text-xs font-bold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("studio.agentSave.confirm") as string}
                 </button>
@@ -937,7 +937,7 @@ export function StudioClient({
                   type="button"
                   data-testid="agent-save-dismiss"
                   onClick={handleAgentSaveDismiss}
-                  className="min-h-[44px] rounded-lg border border-stroke px-3 font-heading text-xs text-text-secondary transition-colors hover:border-amber/30 hover:text-text-primary"
+                  className="min-h-[44px] rounded-[3px] border border-stroke-strong px-3 font-heading text-xs text-text-secondary transition-colors hover:border-amber-text hover:text-text-primary"
                 >
                   {t("studio.agentSave.dismiss") as string}
                 </button>

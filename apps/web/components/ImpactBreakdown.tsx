@@ -137,7 +137,7 @@ export function DataSources({ stats, handle, isOwner = false }: DataSourcesProps
           const href = isLinked
             ? (urlBuilder && username ? urlBuilder(username) : null)
             : (PLATFORM_CONNECT_PATHS[platform] ?? null);
-          const sharedClass = "inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 animate-fade-in-up transition-colors";
+          const sharedClass = "inline-flex min-h-[44px] items-center gap-2 rounded-[3px] border border-stroke bg-card px-3 animate-fade-in-up transition-colors";
           const inner = (
             <>
               <svg
@@ -175,7 +175,7 @@ export function DataSources({ stats, handle, isOwner = false }: DataSourcesProps
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className={`${sharedClass} hover:border-amber/30 hover:text-amber`}
+              className={`${sharedClass} hover:border-amber/30 hover:text-amber-text`}
               style={{ animationDelay: `${280 + i * 80}ms` }}
             >
               {inner}
@@ -198,7 +198,7 @@ export function DataSources({ stats, handle, isOwner = false }: DataSourcesProps
             flag does not carry. Shown to visitors too, because it explains
             where the numbers came from. */}
         {stats.hasSupplementalData && (
-          <span className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 animate-fade-in-up">
+          <span className="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] border border-stroke bg-card px-3 animate-fade-in-up">
             <svg
               width="16"
               height="16"

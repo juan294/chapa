@@ -28,7 +28,7 @@ export default async function GeneratingLoading() {
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="flex items-center gap-3 rounded-lg border border-stroke bg-card/50 px-4 py-3"
+              className="flex items-center gap-3 rounded-[3px] border border-stroke bg-card/50 px-4 py-3"
             >
               <span className="h-5 w-5 flex-shrink-0 animate-pulse rounded-full bg-amber/10" />
               <span

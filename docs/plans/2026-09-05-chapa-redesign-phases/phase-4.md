@@ -50,12 +50,12 @@ Use the route matrix in the rubric to document every surface. Token inheritance 
 
 ## Automated success criteria
 
-- [ ] Studio preview still equals real renderer output for config/locale; zoom never enters save JSON; save/reset/dirty/error/history behavior remains covered.
-- [ ] Localized Ice option and existing palette labels/descriptions/swatches remain coherent; existing saved colors survive.
-- [ ] Share visitor payload still redacts confidence; owner actions, verification links, clipboard/download and terminal hint work.
-- [ ] Settings/admin/verify/content/transitional render tests pass; no feature/auth guards are removed to obtain screenshots.
-- [ ] Icon and real OG raster tests pass with complete glyphs; no dependency/font-loader regressions.
-- [ ] Parent gate commands pass sequentially.
+- [x] Studio preview still equals real renderer output for config/locale; zoom never enters save JSON; save/reset/dirty/error/history behavior remains covered.
+- [x] Localized Ice option and existing palette labels/descriptions/swatches remain coherent; existing saved colors survive.
+- [x] Share visitor payload still redacts confidence; owner actions, verification links, clipboard/download and terminal hint work.
+- [x] Settings/admin/verify/content/transitional render tests pass; no feature/auth guards are removed to obtain screenshots.
+- [x] Icon and real OG raster tests pass with complete glyphs; no dependency/font-loader regressions.
+- [x] Parent gate commands pass sequentially.
 
 Focused checks:
 
@@ -73,9 +73,9 @@ Authenticated browser evidence uses local fixtures only. Create the reusable `ap
 
 ## Manual visual success criteria
 
-- [ ] Studio EN/ES × light/dark × desktop/mobile matrix passes, including expanded/collapsed controls, long command/config text, zoom and save-error state.
-- [ ] Share/profile, verify, About/scoring/archetype, legal, settings/admin, loading/error/empty states form one coherent product.
-- [ ] Dense product controls remain legible; content pages do not inherit oversized hero typography.
-- [ ] Favicons/icons/manifest/default social card match the new brand; both website themes still frame the independently dark badge correctly.
+- [x] Studio EN/ES × light/dark × desktop/mobile matrix passes, including expanded/collapsed controls, long command/config text, zoom and save-error state.
+- [x] Share/profile, verify, About/scoring/archetype, legal, settings/admin, loading/error/empty states form one coherent product.
+- [x] Dense product controls remain legible; content pages do not inherit oversized hero typography.
+- [x] Favicons/icons/manifest/default social card match the new brand; both website themes still frame the independently dark badge correctly.
 
 Stop after presenting surface coverage and remaining integration evidence.

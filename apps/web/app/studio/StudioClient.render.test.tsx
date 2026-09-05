@@ -436,7 +436,7 @@ describe("StudioClient render", () => {
       // see it. The root is exactly the viewport below the nav on `lg`, the
       // stage never shrinks, and the band under it is what gives.
       const root = screen.getByTestId("studio-root");
-      expect(root.className).toContain("lg:h-[calc(100dvh-57px)]");
+      expect(root.className).toContain("lg:h-[calc(100dvh-69px)]");
       expect(screen.getByTestId("studio-stage").className).toContain(
         "shrink-0",
       );
@@ -1922,12 +1922,12 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
       />,
     );
 
-  it("renders the save state as a status pill in the stage header", () => {
+  it("renders the save state as a restrained status label in the stage header", () => {
     renderStudio();
     const pill = document.querySelector("[data-save-state]") as HTMLElement;
     expect(pill).not.toBeNull();
     expect(pill.tagName).toBe("SPAN");
-    expect(pill.className).toContain("rounded-full");
+    expect(pill.className).toContain("rounded-[3px]");
     expect(pill.getAttribute("role")).toBe("status");
     expect(screen.getByTestId("studio-stage").contains(pill)).toBe(true);
   });

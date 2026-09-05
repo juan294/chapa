@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
+import { InlineBadgeSvg } from "@/components/badge/InlineBadgeSvg";
 import { isValidHandle } from "@/lib/validation";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -434,14 +435,14 @@ export async function SharePageContent({
 
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
-          <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
+          <div className="rounded-[3px] border border-stroke bg-card p-4">
             <div
               role="img"
               aria-labelledby={badgeLabelId}
-              className="w-full rounded-xl overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:block"
+              className="w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:block"
             >
               {inlineSvg ? (
-                <div dangerouslySetInnerHTML={{ __html: inlineSvg }} />
+                <InlineBadgeSvg svg={inlineSvg} />
               ) : (
                 /* Fallback: if SVG render failed, load via <img> with skeleton */
                 <div className="relative">
@@ -454,7 +455,7 @@ export async function SharePageContent({
                     width={1200}
                     height={630}
                     fetchPriority="high"
-                    className="w-full rounded-xl relative"
+                    className="w-full relative"
                   />
                 </div>
               )}

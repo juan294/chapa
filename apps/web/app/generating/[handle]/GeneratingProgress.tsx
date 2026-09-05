@@ -220,7 +220,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
                 key={label}
                 data-step={i}
                 data-status={status}
-                className={`flex items-center gap-3 rounded-lg border px-4 py-3 font-heading text-sm transition-all duration-300 ${
+                className={`flex items-center gap-3 rounded-[3px] border px-4 py-3 font-heading text-sm transition-all duration-300 ${
                   status === "done"
                     ? "border-terminal-green/20 bg-terminal-green/[0.06]"
                     : status === "active"
@@ -302,7 +302,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
         {/* Error message */}
         {errorKind && (
-          <div role="alert" className="mt-6 animate-terminal-fade-in motion-reduce:animate-none rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
+          <div role="alert" className="mt-6 animate-terminal-fade-in motion-reduce:animate-none rounded-[3px] border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
             <p className="font-heading text-sm text-terminal-red">
               {errorConfig[errorKind].message}
             </p>

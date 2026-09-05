@@ -44,7 +44,7 @@ export function VerifyForm() {
           spellCheck={false}
           aria-invalid={!!error}
           aria-describedby={error ? "hash-input-error" : undefined}
-          className="w-full rounded-lg border border-stroke bg-card px-4 py-3 font-heading text-lg tracking-widest text-text-primary placeholder:text-text-secondary/30 focus:border-complement/40 focus-visible:outline-none focus:ring-1 focus:ring-complement/50 transition-colors"
+          className="w-full rounded-[3px] border border-text-primary bg-card px-4 py-3 font-heading text-lg tracking-widest text-text-primary placeholder:text-text-secondary focus:border-complement-text focus-visible:outline-complement-text! transition-colors"
         />
         {error && (
           <p id="hash-input-error" role="alert" className="mt-2 text-sm text-terminal-red">{error}</p>
@@ -53,10 +53,7 @@ export function VerifyForm() {
 
       <button
         type="submit"
-        // White text on a solid bg-complement fill measures 2.54:1, below AA.
-        // bg-complement-dark is the darker step of the same ramp (~5.49:1),
-        // and hover moves to the base rather than to the lighter step.
-        className="group inline-flex min-h-[46px] items-center gap-2.5 rounded-lg bg-complement-dark px-6 text-sm font-semibold text-white transition-all hover:bg-complement hover:shadow-xl hover:shadow-complement/25"
+        className="group inline-flex min-h-[46px] items-center gap-2.5 rounded-[3px] border border-complement-text bg-card px-6 font-heading text-sm font-semibold text-complement-text transition-colors hover:bg-purple-tint focus-visible:outline-complement-text!"
       >
         {t('verifyForm.submit') as string}
         <svg

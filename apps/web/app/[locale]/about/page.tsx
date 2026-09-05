@@ -78,13 +78,13 @@ export default async function AboutPage({
             </h2>
             <p>
               {t('about.index.archetypesBodyBefore') as string}
-              <Link href="/archetypes/builder" className="font-semibold text-text-primary underline decoration-archetype-builder decoration-2 underline-offset-4 hover:text-archetype-builder transition-colors">Builder</Link>,{" "}
-              <Link href="/archetypes/guardian" className="font-semibold text-text-primary underline decoration-archetype-guardian decoration-2 underline-offset-4 hover:text-archetype-guardian transition-colors">Quality Champion</Link>,{" "}
-              <Link href="/archetypes/marathoner" className="font-semibold text-text-primary underline decoration-archetype-marathoner decoration-2 underline-offset-4 hover:text-archetype-marathoner transition-colors">Marathoner</Link>,{" "}
-              <Link href="/archetypes/polymath" className="font-semibold text-text-primary underline decoration-archetype-polymath decoration-2 underline-offset-4 hover:text-archetype-polymath transition-colors">Polymath</Link>,{" "}
-              <Link href="/archetypes/artificer" className="font-semibold text-text-primary underline decoration-archetype-artificer decoration-2 underline-offset-4 hover:text-archetype-artificer transition-colors">Artificer</Link>,{" "}
-              <Link href="/archetypes/balanced" className="font-semibold text-text-primary underline decoration-archetype-balanced decoration-2 underline-offset-4 hover:text-archetype-balanced transition-colors">Balanced</Link>, {t('common.orConnector') as string}{" "}
-              <Link href="/archetypes/emerging" className="font-semibold text-text-primary underline decoration-archetype-emerging decoration-2 underline-offset-4 hover:text-archetype-emerging transition-colors">Emerging</Link>
+              <Link href="/archetypes/builder" className="font-semibold text-text-primary underline decoration-archetype-builder decoration-2 underline-offset-4 hover:text-archetype-builder-text transition-colors">Builder</Link>,{" "}
+              <Link href="/archetypes/guardian" className="font-semibold text-text-primary underline decoration-archetype-guardian decoration-2 underline-offset-4 hover:text-archetype-guardian-text transition-colors">Quality Champion</Link>,{" "}
+              <Link href="/archetypes/marathoner" className="font-semibold text-text-primary underline decoration-archetype-marathoner decoration-2 underline-offset-4 hover:text-archetype-marathoner-text transition-colors">Marathoner</Link>,{" "}
+              <Link href="/archetypes/polymath" className="font-semibold text-text-primary underline decoration-archetype-polymath decoration-2 underline-offset-4 hover:text-archetype-polymath-text transition-colors">Polymath</Link>,{" "}
+              <Link href="/archetypes/artificer" className="font-semibold text-text-primary underline decoration-archetype-artificer decoration-2 underline-offset-4 hover:text-archetype-artificer-text transition-colors">Artificer</Link>,{" "}
+              <Link href="/archetypes/balanced" className="font-semibold text-text-primary underline decoration-archetype-balanced decoration-2 underline-offset-4 hover:text-archetype-balanced-text transition-colors">Balanced</Link>, {t('common.orConnector') as string}{" "}
+              <Link href="/archetypes/emerging" className="font-semibold text-text-primary underline decoration-archetype-emerging decoration-2 underline-offset-4 hover:text-archetype-emerging-text transition-colors">Emerging</Link>
               {t('about.index.archetypesBodyAfter') as string}
             </p>
 
@@ -95,14 +95,14 @@ export default async function AboutPage({
               {t('about.index.privacyBody') as string}{" "}
               <Link
                 href="/about/scoring"
-                className="text-text-primary underline decoration-amber decoration-2 underline-offset-4 hover:text-amber transition-colors"
+                className="text-text-primary underline decoration-amber decoration-2 underline-offset-4 hover:text-amber-text transition-colors"
               >
                 {t('about.index.scoringLinkLabel') as string}
               </Link>
               {t('about.index.privacyBodyMiddle') as string}
               <Link
                 href="/about/verification"
-                className="text-text-primary underline decoration-amber decoration-2 underline-offset-4 hover:text-amber transition-colors"
+                className="text-text-primary underline decoration-amber decoration-2 underline-offset-4 hover:text-amber-text transition-colors"
               >
                 {t('about.index.verificationLinkLabel') as string}
               </Link>
@@ -116,7 +116,7 @@ export default async function AboutPage({
               {t('about.index.contactBody') as string}
               <a
                 href={`mailto:${t('about.index.contactEmail') as string}`}
-                className="text-text-primary underline decoration-amber decoration-2 underline-offset-4 hover:text-amber transition-colors"
+                className="text-text-primary underline decoration-amber decoration-2 underline-offset-4 hover:text-amber-text transition-colors"
               >
                 {t('about.index.contactEmail') as string}
               </a>

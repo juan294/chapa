@@ -87,7 +87,7 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
           return (
             <div
               key={item.key}
-              className="rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up"
+              className="rounded-[3px] border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up"
               style={{ animationDelay: `${2200 + i * 60}ms` }}
             >
               <div className="font-heading text-2xl font-bold text-text-primary">

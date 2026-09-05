@@ -42,7 +42,7 @@ export function VerifyInputPageClient() {
 
           {/* #1218 — the idle state says so, instead of leaving an unexplained
               empty page under the input. */}
-          <div className="mt-8 rounded-xl border border-stroke bg-card p-5">
+          <div className="mt-8 rounded-[3px] border border-stroke bg-card p-5">
             <span className="font-heading text-xs tracking-wider text-terminal-dim uppercase">
               {t('verify.awaitingHash') as string}
             </span>
@@ -53,7 +53,7 @@ export function VerifyInputPageClient() {
 
           {/* The honest limitation, kept on the page rather than buried in the
               explainer. Copy is the existing about.verification wording. */}
-          <div className="mt-4 rounded-xl border border-stroke bg-card p-5">
+          <div className="mt-4 rounded-[3px] border border-stroke bg-card p-5">
             <h2 className="font-heading text-sm font-semibold text-text-primary">
               {t('about.verification.limitNotTamperProofHeading') as string}
             </h2>

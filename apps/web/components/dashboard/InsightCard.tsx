@@ -200,20 +200,21 @@ function ArrowUpIcon({ size = 18 }: { size?: number }) {
 // ---------------------------------------------------------------------------
 
 const ARCHETYPE_COLOR_MAP: Record<string, string> = {
-  Builder: "var(--color-archetype-builder)",
-  "Quality Champion": "var(--color-archetype-guardian)",
-  Marathoner: "var(--color-archetype-marathoner)",
-  Polymath: "var(--color-archetype-polymath)",
-  Balanced: "var(--color-archetype-balanced)",
-  Emerging: "var(--color-archetype-emerging)",
-  Artificer: "var(--color-archetype-artificer)",
+  Builder: "builder",
+  "Quality Champion": "guardian",
+  Marathoner: "marathoner",
+  Polymath: "polymath",
+  Balanced: "balanced",
+  Emerging: "emerging",
+  Artificer: "artificer",
 };
 
-function resolveArchetypeColor(archetypeName?: string): string {
-  if (archetypeName) {
-    return ARCHETYPE_COLOR_MAP[archetypeName] ?? "var(--color-amber)";
-  }
-  return "var(--color-amber)";
+function resolveArchetypeColors(archetypeName?: string) {
+  const archetype = archetypeName ? ARCHETYPE_COLOR_MAP[archetypeName] : undefined;
+  return {
+    tint: archetype ? `var(--color-archetype-${archetype})` : "var(--color-amber)",
+    foreground: archetype ? `var(--color-archetype-${archetype}-text)` : "var(--color-amber-text)",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +278,7 @@ function TrendCard({ insight, animationDelay = 0 }: InsightCardProps) {
             className="absolute inset-0 opacity-15 rounded-[3px]"
             style={{ backgroundColor: accentColor }}
           />
-          <div style={{ color: accentColor }}>
+          <div style={{ color: dimColor ? "var(--color-text-primary)" : accentColor }}>
             {isUp ? <TrendingUpIcon /> : <TrendingDownIcon />}
           </div>
         </div>
@@ -390,7 +391,7 @@ function CoachingTipCard({ insight, animationDelay = 0 }: InsightCardProps) {
 
 /** Archetype — identity card with colored icon and headline */
 function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
-  const archetypeColor = resolveArchetypeColor(insight.archetypeName);
+  const archetypeColors = resolveArchetypeColors(insight.archetypeName);
 
   return (
     <div
@@ -405,16 +406,16 @@ function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
         >
           <div
             className="absolute inset-0 opacity-15 rounded-[3px]"
-            style={{ backgroundColor: archetypeColor }}
+            style={{ backgroundColor: archetypeColors.tint }}
           />
-          <div style={{ color: archetypeColor }}>
+          <div style={{ color: archetypeColors.foreground }}>
             <TargetIcon size={18} />
           </div>
         </div>
         <div className="min-w-0">
           <p
             className="font-heading text-sm font-bold"
-            style={{ color: archetypeColor }}
+            style={{ color: archetypeColors.foreground }}
           >
             {insight.headline}
           </p>

@@ -51,7 +51,7 @@ export function ImpactDashboard({
   return (
     <div className="space-y-12">
       <div className="animate-fade-in-up">
-        <p className="font-heading text-xl text-amber tracking-tight">
+        <p className="font-heading text-xl text-amber-text tracking-tight">
           {impact.archetype}
         </p>
         <div className="border-t border-stroke my-4" />

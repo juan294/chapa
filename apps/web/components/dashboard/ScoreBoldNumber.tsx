@@ -66,13 +66,13 @@ export function ScoreBoldNumber({ impact, className = "" }: HeroScoreProps) {
           )}
 
           <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-heading font-semibold uppercase tracking-wider ${tierPillClasses(impact.tier)}`}
+            className={`inline-flex items-center rounded-[3px] border px-3 py-1 text-xs font-heading font-semibold uppercase tracking-wider ${tierPillClasses(impact.tier)}`}
           >
             {impact.tier}
           </span>
         </div>
 
-        <p className="font-heading text-xl text-amber tracking-tight mt-2">
+        <p className="font-heading text-xl text-amber-text tracking-tight mt-2">
           {impact.archetype}
         </p>
 

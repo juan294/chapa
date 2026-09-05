@@ -23,8 +23,7 @@ interface SharePageHeaderProps {
  * pill, so the three things a visitor came for are readable before the badge
  * finishes painting.
  *
- * The verification pill stays in the slate-blue complement family, never jade:
- * cryptographic trust is a different signal from a brand action. It uses
+ * Verification stays in the slate-blue complement family. It uses
  * `text-complement-text`, the text-safe token, rather than the raw fill value.
  */
 export function SharePageHeader({
@@ -38,14 +37,14 @@ export function SharePageHeader({
 
   return (
     <header className="@container mb-8">
-      <div className="font-heading text-sm whitespace-nowrap text-text-secondary">
-        <span className="select-none text-amber">%</span> chapa profile @
+      <div className="font-heading text-sm [overflow-wrap:anywhere] text-text-secondary">
+        <span className="select-none text-amber-text">%</span> chapa profile @
         {handle}
       </div>
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">
-          <h1 className="font-heading text-[clamp(1.75rem,5cqi,2.75rem)] leading-tight tracking-tight text-balance">
+          <h1 className="font-heading text-[clamp(1.75rem,5cqi,2.75rem)] leading-tight tracking-tight text-balance [overflow-wrap:anywhere]">
             {displayLabel}
           </h1>
           <p className="mt-2 text-sm text-pretty text-text-secondary">
@@ -56,7 +55,7 @@ export function SharePageHeader({
         {score !== null && (
           <div className="flex items-end gap-4">
             <div className="text-right">
-              <div className="font-heading text-[clamp(2.75rem,7cqi,4.75rem)] leading-none tabular-nums tracking-tight text-amber">
+              <div className="font-heading text-[clamp(2.75rem,7cqi,4.75rem)] leading-none tabular-nums tracking-tight text-amber-text">
                 {score}
               </div>
               <div className="font-heading text-xs text-terminal-dim">
@@ -65,14 +64,14 @@ export function SharePageHeader({
             </div>
             <div className="flex flex-col items-start gap-2">
               {tier && (
-                <span className="rounded-full border border-amber/40 bg-amber/10 px-3 py-1 font-heading text-xs tracking-wider text-amber uppercase">
+                <span className="rounded-[3px] border border-amber-text bg-amber/10 px-3 py-1 font-heading text-xs tracking-wider text-amber-text uppercase">
                   {tier}
                 </span>
               )}
               {verificationHash && (
                 <Link
                   href={`/verify/${verificationHash}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-complement px-3 py-1 font-heading text-xs whitespace-nowrap text-complement-text transition-colors hover:text-complement-text-hover"
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[3px] border border-complement px-3 py-1 font-heading text-xs whitespace-nowrap text-complement-text transition-colors hover:text-complement-text-hover"
                 >
                   <span aria-hidden="true">&#9679;</span>
                   {t("badge.metricsVerified") as string}

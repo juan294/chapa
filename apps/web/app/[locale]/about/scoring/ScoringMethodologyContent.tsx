@@ -201,7 +201,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               </strong>
               {t('about.scoring.normalizationBodySuffix') as string}
             </p>
-            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
+            <div className="my-4 rounded-[3px] border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
               {t('about.scoring.normalizationFormula') as string}
             </div>
             <p>
@@ -337,7 +337,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             <p>
               {t('about.scoring.compositeIntro') as string}
             </p>
-            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary space-y-1">
+            <div className="my-4 rounded-[3px] border border-stroke bg-card p-4 font-heading text-sm text-text-primary space-y-1">
               <p>{t('about.scoring.compositeFormula1') as string}</p>
               <p>
                 {t('about.scoring.compositeFormula2') as string}
@@ -392,7 +392,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               </strong>
               {t('about.scoring.smoothingIntro1Suffix') as string}
             </p>
-            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
+            <div className="my-4 rounded-[3px] border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
               {t('about.scoring.smoothingFormula') as string}
             </div>
             <p>
@@ -426,7 +426,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* CTA                                                         */}
             {/* ---------------------------------------------------------- */}
-            <div className="mt-16 rounded-xl border border-stroke bg-card p-6 sm:p-8">
+            <div className="mt-16 rounded-[3px] border border-stroke bg-card p-6 sm:p-8">
               <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight mb-3">
                 {t('about.scoring.ctaHeading') as string}
               </h2>
@@ -438,13 +438,13 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
                   href="https://x.com/juang294"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[3px] bg-action px-6 py-3 font-heading text-sm font-semibold text-action-text hover:bg-action-hover transition-colors"
                 >
                   {t('about.scoring.ctaTwitter') as string}
                 </a>
                 <a
                   href="mailto:support@chapa.thecreativetoken.com"
-                  className="inline-flex items-center justify-center rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-all"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[3px] border border-text-primary px-6 py-3 text-sm font-medium text-text-secondary hover:border-text-primary hover:text-text-primary transition-all"
                 >
                   {t('about.scoring.ctaEmail') as string}
                 </a>

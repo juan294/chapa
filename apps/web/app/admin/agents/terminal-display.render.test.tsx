@@ -70,9 +70,9 @@ describe("TerminalDisplay", () => {
       <TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />,
     );
     const root = container.firstElementChild;
-    expect(root?.className).toContain("rounded-xl");
-    expect(root?.className).toContain("border-stroke");
-    expect(root?.className).toContain("bg-card");
+    expect(root?.className).toContain("rounded-[3px]");
+    expect(root?.className).toContain("border-forest-line");
+    expect(root?.className).toContain("bg-forest");
 
     const logArea = screen.getByText("Waiting for output...").parentElement;
     expect(logArea?.className).toContain("max-h-80");
@@ -200,13 +200,13 @@ describe("TerminalDisplay", () => {
     );
     const dots = container.querySelectorAll(".rounded-full");
     expect(dots.length).toBe(3);
-    expect(dots[0]?.className).toContain("bg-terminal-red/60");
-    expect(dots[1]?.className).toContain("bg-terminal-yellow/60");
-    expect(dots[2]?.className).toContain("bg-terminal-green/60");
+    expect(dots[0]?.className).toContain("bg-forest-err");
+    expect(dots[1]?.className).toContain("bg-forest-warn");
+    expect(dots[2]?.className).toContain("bg-forest-ok");
     vi.unstubAllGlobals();
   });
 
-  it("uses text-amber for the running status", () => {
+  it("uses text-forest-warn for the running status", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -216,7 +216,7 @@ describe("TerminalDisplay", () => {
       }),
     );
     render(<TerminalDisplay agentKey="test-agent" onClose={vi.fn()} />);
-    expect(screen.getByText("running").className).toContain("text-amber");
+    expect(screen.getByText("running").className).toContain("text-forest-warn");
     vi.unstubAllGlobals();
   });
 
@@ -306,7 +306,7 @@ describe("TerminalDisplay", () => {
   });
 
   describe("status color classes", () => {
-    it("shows text-terminal-green for completed status", async () => {
+    it("shows text-forest-ok for completed status", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({
@@ -329,11 +329,11 @@ describe("TerminalDisplay", () => {
       });
 
       const statusEl = screen.getByText("completed");
-      expect(statusEl.className).toContain("text-terminal-green");
+      expect(statusEl.className).toContain("text-forest-ok");
       vi.unstubAllGlobals();
     });
 
-    it("shows text-terminal-red for failed status", async () => {
+    it("shows text-forest-err for failed status", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({
@@ -356,13 +356,13 @@ describe("TerminalDisplay", () => {
       });
 
       const statusEl = screen.getByText("failed");
-      expect(statusEl.className).toContain("text-terminal-red");
+      expect(statusEl.className).toContain("text-forest-err");
       vi.unstubAllGlobals();
     });
   });
 
   describe("stream type rendering", () => {
-    it("renders stderr lines with text-terminal-red class", async () => {
+    it("renders stderr lines with text-forest-err class", async () => {
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue({
@@ -387,11 +387,11 @@ describe("TerminalDisplay", () => {
       });
 
       const errorLine = screen.getByText("Error occurred");
-      expect(errorLine.className).toContain("text-terminal-red");
+      expect(errorLine.className).toContain("text-forest-err");
       vi.unstubAllGlobals();
     });
 
-    it("renders stdout lines with text-text-primary and a formatted timestamp", async () => {
+    it("renders stdout lines with text-forest-text and a formatted timestamp", async () => {
       const timestamp = new Date("2026-03-24T10:30:00Z").toISOString();
       vi.stubGlobal(
         "fetch",
@@ -415,7 +415,7 @@ describe("TerminalDisplay", () => {
       });
 
       const line = screen.getByText("Build succeeded");
-      expect(line.className).toContain("text-text-primary");
+      expect(line.className).toContain("text-forest-text");
       expect(
         screen.getByText(new Date(timestamp).toLocaleTimeString()),
       ).toBeDefined();

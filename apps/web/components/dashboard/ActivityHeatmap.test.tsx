@@ -687,7 +687,7 @@ describe("ActivityHeatmap", () => {
         />,
       );
 
-      const table = container.querySelector("table.sr-only");
+      const table = container.querySelector(".sr-only table");
       expect(table).not.toBeNull();
 
       const rows = table!.querySelectorAll("tbody tr");

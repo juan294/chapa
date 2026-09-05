@@ -131,6 +131,16 @@ html[lang="en"] [data-document-locale="es"] {
   --color-archetype-emerging: oklch(.62 .14 50);
   --color-archetype-artificer: oklch(.62 .14 75);
 
+  /* Guide headings and small signal labels need stronger contrast than charts.
+     Preserve the raw identification colors above; text keeps each same hue. */
+  --color-archetype-builder-text: light-dark(oklch(.48 .12 163), oklch(.78 .12 163));
+  --color-archetype-guardian-text: light-dark(oklch(.48 .12 330), oklch(.78 .12 330));
+  --color-archetype-marathoner-text: light-dark(oklch(.48 .12 145), oklch(.78 .12 145));
+  --color-archetype-polymath-text: light-dark(oklch(.48 .12 110), oklch(.78 .12 110));
+  --color-archetype-balanced-text: light-dark(oklch(.48 .12 240), oklch(.78 .12 240));
+  --color-archetype-emerging-text: light-dark(oklch(.48 .12 50), oklch(.78 .12 50));
+  --color-archetype-artificer-text: light-dark(oklch(.48 .12 75), oklch(.78 .12 75));
+
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
   --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
   --font-body: var(--font-manrope), system-ui, sans-serif;

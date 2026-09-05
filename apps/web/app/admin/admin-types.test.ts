@@ -7,6 +7,7 @@ import {
   TIER_COLOR,
 } from "./admin-types";
 import type { AdminUser, PaginatedResponse } from "./admin-types";
+import { compositeColor, contrastRatio, themedTokenValue } from "@/lib/test-helpers/css-tokens";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -183,8 +184,9 @@ describe("TIER_ORDER", () => {
 });
 
 describe("ARCHETYPE_COLOR", () => {
-  it("maps all 6 archetypes to color classes", () => {
+  it("maps all 7 archetypes to color classes", () => {
     expect(Object.keys(ARCHETYPE_COLOR).sort()).toEqual([
+      "Artificer",
       "Balanced",
       "Builder",
       "Emerging",
@@ -199,10 +201,34 @@ describe("ARCHETYPE_COLOR", () => {
       expect(color).toMatch(/^text-/);
     }
   });
+
+  it("keeps every small archetype label readable on the actual table surface", () => {
+    for (const color of Object.values(ARCHETYPE_COLOR)) {
+      expect(color).toMatch(/^text-archetype-\w+-text$/);
+      const token = themedTokenValue(`--color-${color.slice(5)}`);
+      const card = themedTokenValue("--color-card");
+      for (const theme of ["light", "dark"] as const) {
+        expect(contrastRatio(token[theme], card[theme])).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
 });
 
 describe("TIER_COLOR", () => {
   it("maps all 4 tiers to color classes", () => {
     expect(Object.keys(TIER_COLOR).sort()).toEqual(["Elite", "Emerging", "High", "Solid"]);
+  });
+
+  it("uses text-safe Elite color on both plain and tinted table surfaces", () => {
+    expect(TIER_COLOR.Elite).toBe("text-amber-text");
+    expect(tierBadgeClasses("Elite").split(" ")).toContain("text-amber-text");
+    const text = themedTokenValue("--color-amber-text");
+    const amber = themedTokenValue("--color-amber");
+    const card = themedTokenValue("--color-card");
+    for (const theme of ["light", "dark"] as const) {
+      expect(contrastRatio(text[theme], card[theme])).toBeGreaterThanOrEqual(4.5);
+      const tinted = compositeColor(amber[theme], card[theme], 0.1);
+      expect(contrastRatio(text[theme], tinted)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

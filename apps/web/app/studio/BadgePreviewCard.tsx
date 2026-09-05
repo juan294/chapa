@@ -6,6 +6,7 @@ import type { PublicVerificationCode } from "@/lib/profile/public-profile";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { useTranslation } from "@/lib/i18n";
+import { InlineBadgeSvg } from "@/components/badge/InlineBadgeSvg";
 
 export type PreviewVerification = PublicVerificationCode;
 
@@ -72,13 +73,13 @@ function BadgePreviewCardInner({
   );
 
   return (
-    <div
+    <InlineBadgeSvg
       data-testid="badge-preview"
       // The badge is a fixed 1200x630 document with a viewBox, so overriding
       // the root element's own width/height is what makes it scale to the
       // Studio column instead of overflowing it.
-      className="relative w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full [&>svg]:rounded-2xl"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      className="relative w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+      svg={svg}
     />
   );
 }

@@ -132,3 +132,22 @@ describe("ArchetypePageContent is a server component (#1195)", () => {
     expect(files.filter((f) => f.startsWith("ArchetypePageClient"))).toEqual([]);
   });
 });
+
+// The same accent paints large headings and 14px signal labels. Measure the
+// token actually selected by the rendered guide, not the raw chart color.
+describe("archetype guide text contrast", () => {
+  it.each(ARCHETYPE_KEYS)("%s uses text-safe colors on both themes", async archetypeKey => {
+    const { ArchetypePageContent } = await import("./ArchetypePageContent");
+    const { getServerT } = await import("@/lib/i18n/server");
+    const { themedTokenValue, contrastRatio, LIGHT_SURFACES, DARK_SURFACES } = await import("@/lib/test-helpers/css-tokens");
+    const { container } = render(<ArchetypePageContent archetypeKey={archetypeKey} badgeSvg="<svg/>" t={getServerT("en")} />);
+    const accents = [...container.querySelectorAll('span[class*="text-archetype-"]')];
+    expect(accents.length).toBeGreaterThan(2);
+    for (const accent of accents) expect(accent.classList.contains(`text-archetype-${archetypeKey}-text`)).toBe(true);
+    const { light, dark } = themedTokenValue(`--color-archetype-${archetypeKey}-text`);
+    for (const surface of LIGHT_SURFACES) expect(contrastRatio(light, surface)).toBeGreaterThanOrEqual(4.5);
+    for (const surface of DARK_SURFACES) expect(contrastRatio(dark, surface)).toBeGreaterThanOrEqual(4.5);
+    // The original raw palette remains available for chart/badge identification.
+    expect(themedTokenValue(`--color-archetype-${archetypeKey}`).light).toMatch(/^oklch\(\.62 \.14 \d+\)$/);
+  });
+});

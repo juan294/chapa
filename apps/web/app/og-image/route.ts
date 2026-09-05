@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { WARM_AMBER } from "@/lib/render/theme";
 import { svgToPng } from "@/lib/render/svg-to-png";
 
 /**
@@ -30,18 +29,18 @@ function renderOgSvg(): string {
   const W = 1200;
   const H = 630;
 
-  const bg = "#0C0D14";
-  const accent = WARM_AMBER.accent;
-  const textPrimary = "#E6EDF3";
-  const textSecondary = "#6B6F7B";
+  const bg = "#0C141B";
+  const accent = "#ED4930";
+  const textPrimary = "#F1EEE7";
+  const textSecondary = "#ABBAC3";
 
-  // Heatmap colors — 5 intensity levels of the accent purple
+  // Static ice heatmap; application branding is independent of badge configuration.
   const heatmapColors = [
-    WARM_AMBER.tint(0.06),
-    WARM_AMBER.tint(0.18),
-    WARM_AMBER.tint(0.35),
-    WARM_AMBER.tint(0.55),
-    WARM_AMBER.tint(0.8),
+    "#14222D",
+    "#263C4A",
+    "#466372",
+    "#7899AA",
+    "#BAD9E8",
   ];
 
   // Wider heatmap grid: 7 rows x 52 cols (one year of weeks)
@@ -109,6 +108,6 @@ function renderOgSvg(): string {
   ${heatmapSvg}
 
   <!-- URL — bottom center -->
-  <text x="${W / 2}" y="${H - 40}" fill="${textSecondary}" font-family="Plus Jakarta Sans, sans-serif" font-size="14" font-weight="400" text-anchor="middle" opacity="0.6">chapa.thecreativetoken.com</text>
+  <text x="${W / 2}" y="${H - 40}" fill="${textSecondary}" font-family="Plus Jakarta Sans, sans-serif" font-size="14" font-weight="400" text-anchor="middle">chapa.thecreativetoken.com</text>
 </svg>`;
 }

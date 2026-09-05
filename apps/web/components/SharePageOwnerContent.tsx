@@ -50,7 +50,7 @@ function EmptyImpactState({ handle }: { handle: string }) {
 
   return (
     <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
-      <div className="rounded-2xl border border-stroke bg-card p-8 space-y-4">
+      <div className="rounded-[3px] border border-stroke bg-card p-8 space-y-4">
         <p className="text-text-secondary text-sm">
           {t('shareOwner.emptyState') as string}
         </p>
@@ -61,7 +61,7 @@ function EmptyImpactState({ handle }: { handle: string }) {
             disabled={status === "loading" || status === "success"}
             aria-busy={status === "loading"}
             aria-label={status === "loading" ? (t('shareOwner.ariaBusy') as string) : undefined}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white transition-all motion-reduce:transition-none hover:bg-amber-light disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-all motion-reduce:transition-none hover:bg-action-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === "loading"
               ? t('shareOwner.regenerating') as string
@@ -189,7 +189,7 @@ export function SharePageOwnerContent({
         </h2>
 
         {/* Markdown snippet */}
-        <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+        <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
@@ -203,17 +203,17 @@ export function SharePageOwnerContent({
           </div>
           <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <p className="text-text-primary/80 whitespace-nowrap">
-              <span className="text-amber">{`![${embedAltText}](`}</span>
+              <span className="text-amber-text">{`![${embedAltText}](`}</span>
               <span className="text-text-secondary">
                 {badgeUrl}
               </span>
-              <span className="text-amber">{")"}</span>
+              <span className="text-amber-text">{")"}</span>
             </p>
           </div>
         </div>
 
         {/* HTML snippet */}
-        <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+        <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
@@ -227,16 +227,16 @@ export function SharePageOwnerContent({
           </div>
           <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <p className="text-text-primary/80 whitespace-nowrap">
-              <span className="text-amber">{"<img "}</span>
+              <span className="text-amber-text">{"<img "}</span>
               <span className="text-text-secondary">{"src="}</span>
-              <span className="text-amber/70">{`"${badgeUrl}"`}</span>
+              <span className="text-amber-text">{`"${badgeUrl}"`}</span>
               <span className="text-text-secondary">{" alt="}</span>
-              <span className="text-amber/70">{`"${embedAltText}"`}</span>
+              <span className="text-amber-text">{`"${embedAltText}"`}</span>
               <span className="text-text-secondary">{" width="}</span>
-              <span className="text-amber/70">{'"600"'}</span>
+              <span className="text-amber-text">{'"600"'}</span>
               <span className="text-text-secondary">{" height="}</span>
-              <span className="text-amber/70">{'"315"'}</span>
-              <span className="text-amber">{" />"}</span>
+              <span className="text-amber-text">{'"315"'}</span>
+              <span className="text-amber-text">{" />"}</span>
             </p>
           </div>
         </div>
@@ -244,7 +244,7 @@ export function SharePageOwnerContent({
 
       {isVisitor && (
         <section className="mt-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:560ms]">
-          <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
+          <div className="rounded-[3px] border border-stroke bg-card p-6 sm:p-8 text-center">
             <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2 text-balance">
               {t('shareVisitor.title') as string}
             </h2>
@@ -253,7 +253,7 @@ export function SharePageOwnerContent({
             </p>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all motion-reduce:transition-none"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] bg-action pl-6 pr-5 py-3 text-sm font-semibold text-action-text hover:bg-action-hover transition-all motion-reduce:transition-none"
             >
               {t('shareVisitor.cta') as string}
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -30,13 +30,13 @@ export default function SharePageError({
       <div className="mt-8 flex items-center gap-4">
         <button
           onClick={reset}
-          className="rounded-lg border border-terminal-red/30 bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/20"
+          className="inline-flex min-h-[44px] items-center rounded-[3px] border border-terminal-red/30 bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/20"
         >
           {t('errors.tryAgain') as string}
         </button>
         <Link
           href="/"
-          className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-terminal-red/30 hover:text-text-primary"
+          className="inline-flex min-h-[44px] items-center rounded-[3px] border border-stroke-strong px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-terminal-red/30 hover:text-text-primary"
         >
           {t('errors.goHome') as string}
         </Link>

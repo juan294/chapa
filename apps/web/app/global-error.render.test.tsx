@@ -40,9 +40,9 @@ describe("GlobalError render", () => {
     const css = style?.textContent ?? "";
     expect(css).toContain("prefers-color-scheme: dark");
     // Light-mode background (design-system --color-bg light value)
-    expect(css).toContain("#FFFFFF");
+    expect(css).toContain("#F4F0E7");
     // Dark-mode background (design-system --color-bg dark value)
-    expect(css).toContain("#08170F");
+    expect(css).toContain("#141719");
   });
 
   it("marks each language's text with its own lang attribute instead of a blanket lang=\"en\"", () => {
@@ -56,28 +56,29 @@ describe("GlobalError render", () => {
     expect(english.getAttribute("lang")).toBe("en");
   });
 
-  it("uses the design-system dark text-secondary token (#8BA398, 6.83:1 on #08170F) for dark-mode subtext, not the under-contrast #6B6F7B (3.67:1)", () => {
-    // #1187 (UX-L3): the dark secondary value previously didn't match the
-    // design-system --color-text-secondary dark token and fell below the
-    // 4.5:1 body-text contrast minimum against the #08170F dark background.
+  it("uses the approved secondary text pair in its independent light and dark CSS", () => {
     const reset = vi.fn();
     render(<GlobalError error={new Error("test") as Error & { digest?: string }} reset={reset} />);
-    const style = document.head.querySelector("style");
-    const css = style?.textContent ?? "";
-    expect(css).toContain("#8BA398");
-    expect(css).not.toContain("#6B6F7B");
-    // Light-mode secondary value tracks the design-system --color-text-secondary
-    // light value, which the Jade palette moved from #6B7280 to #55665E (#1206).
-    expect(css).toContain("#55665E");
+    const css = document.head.querySelector("style")?.textContent ?? "";
+    expect(css).toContain(".global-error-subtext { color: #64625E; }");
+    expect(css).toContain(".global-error-subtext { color: #B3B9B9; }");
   });
 
-  it("colors the Go home link with the same corrected dark text-secondary token", () => {
-    // jsdom normalizes inline hex colors to rgb() in the serialized style
-    // attribute: #8BA398 -> rgb(139, 163, 152); #6B6F7B -> rgb(107, 111, 123).
+  it("pairs retry and home colors with readable hover and focus states in both themes", () => {
     const reset = vi.fn();
     render(<GlobalError error={new Error("test") as Error & { digest?: string }} reset={reset} />);
     const link = screen.getByText(/Go home/).closest("a");
-    expect(link?.getAttribute("style")).toContain("rgb(139, 163, 152)");
-    expect(link?.getAttribute("style")).not.toContain("rgb(107, 111, 123)");
+    const retry = screen.getByText(/Try again/).closest("button");
+    const css = document.head.querySelector("style")?.textContent ?? "";
+    expect(link?.className).toBe("global-error-home");
+    expect(retry?.className).toBe("global-error-retry");
+    expect(css).toContain(".global-error-home { color: #1B1B19; }");
+    expect(css).toContain(".global-error-home { color: #EEEAE1; }");
+    expect(css).toContain("background-color: #1B1B19; color: #F4F0E7");
+    expect(css).toContain("background-color: #FF795F; color: #17191A");
+    expect(css).toContain(".global-error-retry:hover { background-color: #AA2D1A; }");
+    expect(css).toContain(".global-error-retry:hover { background-color: #FF9D88; }");
+    expect(css).toContain("outline: 2px solid #AA2D1A");
+    expect(css).toContain("outline-color: #FF927D");
   });
 });

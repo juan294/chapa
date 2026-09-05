@@ -159,7 +159,7 @@ function VerifiedCard({
       description={t('verifyDetail.verifiedDescription') as string}
     >
       {/* Hash display */}
-      <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
+      <div className="mb-6 rounded-[3px] border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.verificationCode') as string}</p>
         <p className="break-all font-heading text-lg tracking-widest text-complement-text">
           {hash}
@@ -218,7 +218,7 @@ function VerifiedCard({
           ).map(([key, value]) => (
             <div
               key={key}
-              className="rounded-lg border border-stroke bg-bg px-3 py-2"
+              className="rounded-[3px] border border-stroke bg-bg px-3 py-2"
             >
               <p className="text-xs capitalize text-text-secondary">{key}</p>
               <p className="font-heading text-sm font-bold text-text-primary">
@@ -235,19 +235,19 @@ function VerifiedCard({
           {t('verifyDetail.keyMetrics') as string}
         </h2>
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
+          <div className="rounded-[3px] border border-stroke bg-bg px-3 py-2 text-center">
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.commitsTotal}
             </p>
             <p className="text-xs text-text-secondary">{t('verifyDetail.commits') as string}</p>
           </div>
-          <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
+          <div className="rounded-[3px] border border-stroke bg-bg px-3 py-2 text-center">
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.prsMergedCount}
             </p>
             <p className="text-xs text-text-secondary">{t('verifyDetail.prsMerged') as string}</p>
           </div>
-          <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
+          <div className="rounded-[3px] border border-stroke bg-bg px-3 py-2 text-center">
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.reviewsSubmittedCount}
             </p>
@@ -280,7 +280,7 @@ function NotFoundCard({ hash, t }: { hash: string; t: TFunc }) {
       titleAs="h1"
       description={t('verifyDetail.notFoundDescription') as string}
     >
-      <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
+      <div className="rounded-[3px] border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.hashLabel') as string}</p>
         <p className="break-all font-heading text-lg tracking-widest text-text-secondary">
           {hash}
@@ -301,7 +301,7 @@ function InvalidHashCard({ hash, t }: { hash: string; t: TFunc }) {
       titleAs="h1"
       description={t('verifyDetail.invalidHashDescription') as string}
     >
-      <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
+      <div className="rounded-[3px] border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.provided') as string}</p>
         <p className="break-all font-heading text-sm text-terminal-red">{hash}</p>
       </div>

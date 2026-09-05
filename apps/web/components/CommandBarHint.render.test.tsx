@@ -49,6 +49,14 @@ describe("CommandBarHint — progressive disclosure", () => {
     expect(chip.getAttribute("aria-label")).toBeTruthy();
   });
 
+  it("keeps the command entry touch-sized and uses the shared visible focus outline", () => {
+    render(<CommandBarHint />);
+    const chip = screen.getByTestId("command-bar-hint");
+    expect(chip.className).toContain("min-h-[44px]");
+    expect(chip.className).not.toContain("focus-visible:outline-none");
+    expect(chip.className).not.toContain("focus-visible:ring-amber/40");
+  });
+
   it("summons the command bar when the hint chip is clicked, and hides the chip", () => {
     render(<CommandBarHint />);
     fireEvent.click(screen.getByTestId("command-bar-hint"));
@@ -63,6 +71,15 @@ describe("CommandBarHint — progressive disclosure", () => {
       fireEvent.keyDown(document, { key: "/" });
     });
     expect(screen.getByTestId("global-command-bar")).toBeDefined();
+  });
+
+  it.each(["metaKey", "ctrlKey"])("summons and focuses the command bar with %s+K before first mount", (modifier) => {
+    render(<CommandBarHint />);
+    fireEvent.keyDown(document, { key: "k", [modifier]: true });
+    expect(screen.queryByTestId("command-bar-hint")).toBeNull();
+    expect(screen.getByTestId("global-command-bar")).toBeDefined();
+    act(() => vi.advanceTimersByTime(50));
+    expect(document.activeElement?.id).toBe("terminal-command-input");
   });
 
   // Regression: focus routing after summon relies on the stable

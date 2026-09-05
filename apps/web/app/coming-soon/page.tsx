@@ -34,7 +34,7 @@ export default async function ComingSoonPage({ searchParams }: Props) {
           {/* Logo */}
           <h1 className="font-heading text-4xl font-bold tracking-tight text-text-primary">
             {t('comingSoon.brand') as string}
-            <span className="animate-cursor-blink text-amber">_</span>
+            <span className="animate-cursor-blink text-amber-text">_</span>
           </h1>
 
           {/* Terminal prompt */}
@@ -42,7 +42,7 @@ export default async function ComingSoonPage({ searchParams }: Props) {
             <p className="text-text-secondary">
               {t('comingSoon.terminalCommand') as string}
             </p>
-            <p className="mt-2 text-amber">{t('comingSoon.message') as string}</p>
+            <p className="mt-2 text-amber-text">{t('comingSoon.message') as string}</p>
           </div>
 
           {/* Tagline */}

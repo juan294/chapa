@@ -41,3 +41,8 @@ Plan: `2026-09-05-chapa-redesign`.
   The same combined-effect review found verification/sample coral below 4.5:1;
   the existing right strip now uses an opaque palette ground behind its text.
   Archetype pills already had opaque grounds and pass all six palettes.
+
+- Phase 4: the plan retained semantic archetype hues. Actual small text on
+  paper/card surfaces measured below 4.5:1. Added seven paired `-text` roles
+  for guide/admin/link text, retaining existing decorative colors and badge
+  palettes. Elite text uses the existing `amber-text` role.

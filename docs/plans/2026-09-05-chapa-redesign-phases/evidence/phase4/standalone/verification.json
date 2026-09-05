@@ -1,0 +1,282 @@
+[
+  {
+    "surface": "loading",
+    "theme": "light",
+    "width": 1440,
+    "file": "root-loading-en-light-1440.png",
+    "unexpected": [],
+    "lang": "en",
+    "scrollWidth": 1440,
+    "scrollHeight": 1000,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+    "bodyColor": "rgb(244, 240, 231)",
+    "fonts": [
+      {
+        "family": "JetBrains Mono",
+        "weight": "400"
+      },
+      {
+        "family": "Manrope",
+        "weight": "400"
+      }
+    ],
+    "buttons": []
+  },
+  {
+    "surface": "loading",
+    "theme": "light",
+    "width": 390,
+    "file": "root-loading-en-light-390.png",
+    "unexpected": [],
+    "lang": "en",
+    "scrollWidth": 390,
+    "scrollHeight": 1000,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+    "bodyColor": "rgb(244, 240, 231)",
+    "fonts": [
+      {
+        "family": "JetBrains Mono",
+        "weight": "400"
+      },
+      {
+        "family": "Manrope",
+        "weight": "400"
+      }
+    ],
+    "buttons": []
+  },
+  {
+    "surface": "loading",
+    "theme": "dark",
+    "width": 1440,
+    "file": "root-loading-en-dark-1440.png",
+    "unexpected": [],
+    "lang": "en",
+    "scrollWidth": 1440,
+    "scrollHeight": 1000,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+    "bodyColor": "rgb(20, 23, 25)",
+    "fonts": [
+      {
+        "family": "JetBrains Mono",
+        "weight": "400"
+      },
+      {
+        "family": "Manrope",
+        "weight": "400"
+      }
+    ],
+    "buttons": []
+  },
+  {
+    "surface": "loading",
+    "theme": "dark",
+    "width": 390,
+    "file": "root-loading-en-dark-390.png",
+    "unexpected": [],
+    "lang": "en",
+    "scrollWidth": 390,
+    "scrollHeight": 1000,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
+    "bodyColor": "rgb(20, 23, 25)",
+    "fonts": [
+      {
+        "family": "JetBrains Mono",
+        "weight": "400"
+      },
+      {
+        "family": "Manrope",
+        "weight": "400"
+      }
+    ],
+    "buttons": []
+  },
+  {
+    "surface": "global-error",
+    "theme": "light",
+    "width": 1440,
+    "file": "global-error-bilingual-light-1440.png",
+    "unexpected": [],
+    "lang": "es",
+    "scrollWidth": 1440,
+    "scrollHeight": 1048,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", \"Courier New\", monospace",
+    "bodyColor": "rgb(244, 240, 231)",
+    "fonts": [],
+    "buttons": [
+      {
+        "text": "Intentar de nuevo / Try again",
+        "rect": {
+          "x": 497.5,
+          "y": 562,
+          "width": 220.71875,
+          "height": 44,
+          "top": 562,
+          "right": 718.21875,
+          "bottom": 606,
+          "left": 497.5
+        }
+      },
+      {
+        "text": "Volver al inicio / Go home",
+        "rect": {
+          "x": 734.21875,
+          "y": 562,
+          "width": 208.28125,
+          "height": 44,
+          "top": 562,
+          "right": 942.5,
+          "bottom": 606,
+          "left": 734.21875
+        }
+      }
+    ]
+  },
+  {
+    "surface": "global-error",
+    "theme": "light",
+    "width": 390,
+    "file": "global-error-bilingual-light-390.png",
+    "unexpected": [],
+    "lang": "es",
+    "scrollWidth": 390,
+    "scrollHeight": 1048,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", \"Courier New\", monospace",
+    "bodyColor": "rgb(244, 240, 231)",
+    "fonts": [],
+    "buttons": [
+      {
+        "text": "Intentar de nuevo / Try again",
+        "rect": {
+          "x": 84.640625,
+          "y": 581.5,
+          "width": 220.71875,
+          "height": 44,
+          "top": 581.5,
+          "right": 305.359375,
+          "bottom": 625.5,
+          "left": 84.640625
+        }
+      },
+      {
+        "text": "Volver al inicio / Go home",
+        "rect": {
+          "x": 90.859375,
+          "y": 641.5,
+          "width": 208.28125,
+          "height": 44,
+          "top": 641.5,
+          "right": 299.140625,
+          "bottom": 685.5,
+          "left": 90.859375
+        }
+      }
+    ]
+  },
+  {
+    "surface": "global-error",
+    "theme": "dark",
+    "width": 1440,
+    "file": "global-error-bilingual-dark-1440.png",
+    "unexpected": [],
+    "lang": "es",
+    "scrollWidth": 1440,
+    "scrollHeight": 1048,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", \"Courier New\", monospace",
+    "bodyColor": "rgb(20, 23, 25)",
+    "fonts": [],
+    "buttons": [
+      {
+        "text": "Intentar de nuevo / Try again",
+        "rect": {
+          "x": 497.5,
+          "y": 562,
+          "width": 220.71875,
+          "height": 44,
+          "top": 562,
+          "right": 718.21875,
+          "bottom": 606,
+          "left": 497.5
+        }
+      },
+      {
+        "text": "Volver al inicio / Go home",
+        "rect": {
+          "x": 734.21875,
+          "y": 562,
+          "width": 208.28125,
+          "height": 44,
+          "top": 562,
+          "right": 942.5,
+          "bottom": 606,
+          "left": 734.21875
+        }
+      }
+    ]
+  },
+  {
+    "surface": "global-error",
+    "theme": "dark",
+    "width": 390,
+    "file": "global-error-bilingual-dark-390.png",
+    "unexpected": [],
+    "lang": "es",
+    "scrollWidth": 390,
+    "scrollHeight": 1048,
+    "fontStatus": "loaded",
+    "jetbrainsLoaded": true,
+    "manropeLoaded": true,
+    "visibleFont": "\"JetBrains Mono\", \"Courier New\", monospace",
+    "bodyColor": "rgb(20, 23, 25)",
+    "fonts": [],
+    "buttons": [
+      {
+        "text": "Intentar de nuevo / Try again",
+        "rect": {
+          "x": 84.640625,
+          "y": 581.5,
+          "width": 220.71875,
+          "height": 44,
+          "top": 581.5,
+          "right": 305.359375,
+          "bottom": 625.5,
+          "left": 84.640625
+        }
+      },
+      {
+        "text": "Volver al inicio / Go home",
+        "rect": {
+          "x": 90.859375,
+          "y": 641.5,
+          "width": 208.28125,
+          "height": 44,
+          "top": 641.5,
+          "right": 299.140625,
+          "bottom": 685.5,
+          "left": 90.859375
+        }
+      }
+    ]
+  }
+]

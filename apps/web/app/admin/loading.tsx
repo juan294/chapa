@@ -10,7 +10,7 @@ export default function AdminLoading() {
       {/* Header skeleton */}
       <div className="mb-8">
         <div className="h-8 w-56 animate-pulse rounded bg-amber/10" />
-        <div className="mt-2 h-4 w-72 animate-pulse rounded bg-amber/[0.06]" />
+        <div className="mt-2 h-4 w-72 max-w-full animate-pulse rounded bg-amber/[0.06]" />
       </div>
 
       {/* Stats cards skeleton */}
@@ -18,7 +18,7 @@ export default function AdminLoading() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-xl border border-stroke bg-card p-6"
+            className="rounded-[3px] border border-stroke bg-card p-6"
           >
             <div className="mb-3 h-3 w-20 animate-pulse rounded bg-amber/[0.06]" />
             <div className="h-7 w-16 animate-pulse rounded bg-amber/10" />
@@ -28,11 +28,11 @@ export default function AdminLoading() {
 
       {/* Search bar skeleton */}
       <div className="mb-6">
-        <div className="h-10 w-full max-w-sm animate-pulse rounded-lg bg-amber/[0.06]" />
+        <div className="h-10 w-full max-w-sm animate-pulse rounded-[3px] bg-amber/[0.06]" />
       </div>
 
       {/* Table skeleton */}
-      <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+      <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
         {/* Table header */}
         <div className="flex gap-4 border-b border-stroke px-6 py-3">
           {Array.from({ length: 5 }).map((_, i) => (

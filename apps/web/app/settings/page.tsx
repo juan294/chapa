@@ -45,7 +45,7 @@ export default async function SettingsPage() {
       ]}
     >
       <main id="main-content" className="min-h-screen bg-bg">
-        <div className="pt-[57px]">
+        <div className="pt-[69px]">
           <SettingsClient
             login={session.login}
             name={session.name ?? null}

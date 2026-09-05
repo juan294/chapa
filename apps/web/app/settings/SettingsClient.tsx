@@ -152,7 +152,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
         description={t("settings.identityDescription") as string}
       >
         <div
-          className="flex items-center gap-4 rounded-xl border border-stroke bg-card p-4"
+          className="flex flex-wrap items-center gap-4 rounded-[3px] border border-stroke bg-card p-4"
           data-testid="settings-identity"
         >
           {avatarUrl && !imgError ? (
@@ -165,7 +165,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
               onError={() => setImgError(true)}
             />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber/10 font-semibold text-amber">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber/10 font-semibold text-amber-text">
               {login.charAt(0).toUpperCase()}
             </div>
           )}
@@ -178,7 +178,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
           <button
             type="button"
             onClick={handleSignOut}
-            className="min-h-[44px] rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary"
+            className="min-h-[44px] rounded-[3px] border border-text-primary px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-text-primary hover:text-text-primary"
           >
             {t("userMenu.signOut") as string}
           </button>
@@ -193,7 +193,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
       >
         {visibleConnections.length === 0 ? (
           <p
-            className="rounded-xl border border-stroke bg-card p-4 text-sm text-text-secondary"
+            className="rounded-[3px] border border-stroke bg-card p-4 text-sm text-text-secondary"
             data-testid="settings-no-connections"
           >
             {t("settings.connectionsUnavailable") as string}
@@ -207,7 +207,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
                 <li
                   key={platform}
                   data-testid={`settings-connection-${platform}`}
-                  className="flex items-center gap-3 rounded-xl border border-stroke bg-card p-4"
+                  className="flex flex-wrap items-center gap-3 rounded-[3px] border border-stroke bg-card p-4"
                 >
                   <Icon className="h-5 w-5 shrink-0 text-text-secondary" />
                   <div className="min-w-0 flex-1">
@@ -240,14 +240,14 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
                       // Three rows render this button with the same visible
                       // label, so the accessible name has to name the platform.
                       aria-label={t(UNLINK_ARIA_KEYS[platform]) as string}
-                      className="min-h-[44px] rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary transition-colors hover:border-terminal-red/40 hover:text-terminal-red disabled:opacity-50"
+                      className="min-h-[44px] rounded-[3px] border border-text-primary px-4 py-2 text-sm text-text-secondary transition-colors hover:border-terminal-red hover:text-terminal-red disabled:opacity-50"
                     >
                       {t("userMenu.unlinkBtn") as string}
                     </button>
                   ) : (
                     <a
                       href={`/api/auth/${platform}/connect`}
-                      className="flex min-h-[44px] items-center rounded-lg bg-amber-dark px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber"
+                      className="flex min-h-[44px] items-center rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-colors hover:bg-action-hover"
                     >
                       {t(LINK_KEYS[platform]) as string}
                     </a>
@@ -259,7 +259,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
         )}
         {unlinkError && (
           <p
-            className="mt-3 rounded-lg border border-terminal-red/30 bg-terminal-red/10 p-3 text-sm text-terminal-red"
+            className="mt-3 rounded-[3px] border border-terminal-red/30 bg-terminal-red/10 p-3 text-sm text-terminal-red"
             role="alert"
           >
             {unlinkError}
@@ -275,7 +275,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
           description={t("settings.insightsDescription") as string}
         >
           <div
-            className="rounded-xl border border-stroke bg-card p-4"
+            className="rounded-[3px] border border-stroke bg-card p-4"
             data-testid="settings-insights"
           >
             <input
@@ -295,7 +295,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
               onClick={() => fileRef.current?.click()}
               disabled={insights.cooldownActive}
               title={insights.cooldownTooltip}
-              className="min-h-[44px] rounded-lg bg-amber-dark px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[44px] rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("userMenu.importInsights") as string}
             </button>
