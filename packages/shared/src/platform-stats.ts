@@ -1,3 +1,4 @@
+/** Legacy v6 scalar adapter. v7 consumers use normalized dated event evidence. */
 import type { HeatmapDay, StatsData } from "./types";
 import { normalizeStats } from "./stats-aggregation";
 import { computePrWeight } from "./scoring";

@@ -6,7 +6,7 @@ export interface HeatmapDay {
   count: number;
 }
 
-/** Aggregated GitHub stats over the last 365 days */
+/** Legacy v6 aggregates. v7 dated evidence and replay contracts live in scoring-evidence.ts. */
 export interface StatsData {
   handle: string;
   displayName?: string; // GitHub profile name (e.g. "Juan García"), undefined if unset

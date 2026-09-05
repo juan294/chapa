@@ -1,0 +1,750 @@
+{
+  "date": "2026-09-05",
+  "repo": "juan294/chapa",
+  "baseline": "c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d",
+  "status": "implementation-in-progress-code-freeze",
+  "epic": {
+    "number": 1295,
+    "url": "https://github.com/juan294/chapa/issues/1295"
+  },
+  "tasks": [
+    {
+      "id": "S01",
+      "phase": 1,
+      "number": 1296,
+      "url": "https://github.com/juan294/chapa/issues/1296",
+      "title": "Freeze the v7 scoring policy and versioned evidence contracts",
+      "dependencies": [],
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-1-validation.md"
+    },
+    {
+      "id": "S02",
+      "phase": 2,
+      "number": 1297,
+      "url": "https://github.com/juan294/chapa/issues/1297",
+      "title": "Collect correctly attributed GitHub events across the scoring window",
+      "dependencies": [
+        "S01"
+      ],
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phases-2-6-validation.md"
+    },
+    {
+      "id": "S03",
+      "phase": 3,
+      "number": 1298,
+      "url": "https://github.com/juan294/chapa/issues/1298",
+      "title": "Correct GitLab event semantics, date filters and partial-data handling",
+      "dependencies": [
+        "S01"
+      ],
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-3-validation.md"
+    },
+    {
+      "id": "S04",
+      "phase": 4,
+      "number": 1299,
+      "url": "https://github.com/juan294/chapa/issues/1299",
+      "title": "Correct Bitbucket attribution, event dates and nested pagination",
+      "dependencies": [
+        "S01"
+      ],
+      "implementationStatus": "supported-adapter-reviewed-pending-scope-amendment-and-integration-gates"
+    },
+    {
+      "id": "S05",
+      "phase": 5,
+      "number": 1300,
+      "url": "https://github.com/juan294/chapa/issues/1300",
+      "title": "Correct Codeberg activity units, contributed-repository discovery and event windows",
+      "dependencies": [
+        "S01"
+      ],
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-5-validation.md"
+    },
+    {
+      "id": "S06",
+      "phase": 6,
+      "number": 1301,
+      "url": "https://github.com/juan294/chapa/issues/1301",
+      "title": "Aggregate event evidence with correct pooled ratios, medians and deduplication",
+      "dependencies": [
+        "S01"
+      ],
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phases-2-6-validation.md"
+    },
+    {
+      "id": "S07",
+      "phase": 8,
+      "number": 1302,
+      "url": "https://github.com/juan294/chapa/issues/1302",
+      "title": "Age supplemental evidence correctly and migrate the upload contract",
+      "dependencies": [
+        "S01",
+        "S06"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S08",
+      "phase": 8,
+      "number": 1303,
+      "url": "https://github.com/juan294/chapa/issues/1303",
+      "title": "Replace productivity-based corruption guards with source-coverage integrity",
+      "dependencies": [
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S09",
+      "phase": 9,
+      "number": 1304,
+      "url": "https://github.com/juan294/chapa/issues/1304",
+      "title": "Implement the fixed core scoring policy and AI-neutral fairness invariants",
+      "dependencies": [
+        "S01",
+        "S06"
+      ],
+      "implementationStatus": "in-progress"
+    },
+    {
+      "id": "S10",
+      "phase": 7,
+      "number": 1305,
+      "url": "https://github.com/juan294/chapa/issues/1305",
+      "title": "Make Craft an optional evidence-based AI engineering profile",
+      "dependencies": [
+        "S01"
+      ],
+      "implementationStatus": "in-progress"
+    },
+    {
+      "id": "S11",
+      "phase": 10,
+      "number": 1306,
+      "url": "https://github.com/juan294/chapa/issues/1306",
+      "title": "Implement attributable outcome and engineering-practice evidence",
+      "dependencies": [
+        "S01",
+        "S06"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S12",
+      "phase": 11,
+      "number": 1307,
+      "url": "https://github.com/juan294/chapa/issues/1307",
+      "title": "Provide immutable score receipts and an independent offline calculator",
+      "dependencies": [
+        "S01",
+        "S06",
+        "S09",
+        "S10",
+        "S11"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S13",
+      "phase": 11,
+      "number": 1308,
+      "url": "https://github.com/juan294/chapa/issues/1308",
+      "title": "Persist replayable snapshots and correct trend smoothing",
+      "dependencies": [
+        "S12"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S14",
+      "phase": 11,
+      "number": 1309,
+      "url": "https://github.com/juan294/chapa/issues/1309",
+      "title": "Verify the complete issued receipt without overstating authenticity",
+      "dependencies": [
+        "S12",
+        "S13"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S15",
+      "phase": 12,
+      "number": 1310,
+      "url": "https://github.com/juan294/chapa/issues/1310",
+      "title": "Materialize one scoring receipt across APIs, badges and simulations",
+      "dependencies": [
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S13",
+        "S14"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S16",
+      "phase": 13,
+      "number": 1311,
+      "url": "https://github.com/juan294/chapa/issues/1311",
+      "title": "Render the fixed core, separate Craft and exact evidence explanations",
+      "dependencies": [
+        "S15"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S17",
+      "phase": 13,
+      "number": 1312,
+      "url": "https://github.com/juan294/chapa/issues/1312",
+      "title": "Publish accurate bilingual methodology, claims and worked examples",
+      "dependencies": [
+        "S12",
+        "S14",
+        "S15",
+        "S16"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S18",
+      "phase": 14,
+      "number": 1313,
+      "url": "https://github.com/juan294/chapa/issues/1313",
+      "title": "Validate mathematical invariants, fairness and outcome evidence before relaunch",
+      "dependencies": [
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13",
+        "S14",
+        "S15",
+        "S16",
+        "S17"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S19",
+      "phase": 15,
+      "number": 1314,
+      "url": "https://github.com/juan294/chapa/issues/1314",
+      "title": "Rehearse version migration, cache transition and transparent score changes locally",
+      "dependencies": [
+        "S18"
+      ],
+      "implementationStatus": "pending"
+    },
+    {
+      "id": "S20",
+      "phase": 15,
+      "number": 1315,
+      "url": "https://github.com/juan294/chapa/issues/1315",
+      "title": "Close every scoring relaunch requirement and prepare the release handoff",
+      "dependencies": [
+        "S19"
+      ],
+      "implementationStatus": "pending"
+    }
+  ],
+  "coverage": [
+    {
+      "id": "F01",
+      "title": "Contribution events mislabeled as commits",
+      "tasks": [
+        "S02",
+        "S03",
+        "S05"
+      ]
+    },
+    {
+      "id": "F02",
+      "title": "Opened/repository-wide issues mislabeled as personal closures",
+      "tasks": [
+        "S02",
+        "S04"
+      ]
+    },
+    {
+      "id": "F03",
+      "title": "Teammate history credited as personal work",
+      "tasks": [
+        "S02"
+      ]
+    },
+    {
+      "id": "F04",
+      "title": "External contributed repositories omitted",
+      "tasks": [
+        "S02",
+        "S05"
+      ]
+    },
+    {
+      "id": "F05",
+      "title": "Daily events substituted for ten-minute commit bursts",
+      "tasks": [
+        "S06"
+      ]
+    },
+    {
+      "id": "F06",
+      "title": "Breadth weights total95%, unequal scale",
+      "tasks": [
+        "S09"
+      ]
+    },
+    {
+      "id": "F07",
+      "title": "Docs-only scoring signal never collected",
+      "tasks": [
+        "S06"
+      ]
+    },
+    {
+      "id": "F08",
+      "title": "Mean of medians is not pooled median",
+      "tasks": [
+        "S06"
+      ]
+    },
+    {
+      "id": "F09",
+      "title": "Quality ratios weighted by wrong population",
+      "tasks": [
+        "S06"
+      ]
+    },
+    {
+      "id": "F10",
+      "title": "Missing measurements and merge order change ratios",
+      "tasks": [
+        "S06"
+      ]
+    },
+    {
+      "id": "F11",
+      "title": "Maximum source ratios mislabeled as pooled ratios",
+      "tasks": [
+        "S06"
+      ]
+    },
+    {
+      "id": "F12",
+      "title": "Concentration merges incompatible units",
+      "tasks": [
+        "S06"
+      ]
+    },
+    {
+      "id": "F13",
+      "title": "Cross-source event/repository overlaps double counted",
+      "tasks": [
+        "S06",
+        "S07"
+      ]
+    },
+    {
+      "id": "F14",
+      "title": "GitHub merge window uses creation time",
+      "tasks": [
+        "S02"
+      ]
+    },
+    {
+      "id": "F15",
+      "title": "Linked-provider event windows and timestamps inconsistent",
+      "tasks": [
+        "S03",
+        "S04",
+        "S05"
+      ]
+    },
+    {
+      "id": "F16",
+      "title": "Supplemental annual totals never age out",
+      "tasks": [
+        "S07",
+        "S19"
+      ]
+    },
+    {
+      "id": "F17",
+      "title": "Craft reports never age out/latest upload overwrites evidence",
+      "tasks": [
+        "S10",
+        "S19"
+      ]
+    },
+    {
+      "id": "F18",
+      "title": "Legitimate direct-push/issue-only/empty profiles treated as corrupt",
+      "tasks": [
+        "S08",
+        "S15"
+      ]
+    },
+    {
+      "id": "F19",
+      "title": "Final annual PR expiring to zero rejected",
+      "tasks": [
+        "S08"
+      ]
+    },
+    {
+      "id": "F20",
+      "title": "Mixed-state sampled PRs falsely prove corruption",
+      "tasks": [
+        "S08"
+      ]
+    },
+    {
+      "id": "F21",
+      "title": "Server token assumed universally private-inclusive",
+      "tasks": [
+        "S08"
+      ]
+    },
+    {
+      "id": "F22",
+      "title": "Hard caps/samples treated as complete annual observations",
+      "tasks": [
+        "S02",
+        "S03",
+        "S05"
+      ]
+    },
+    {
+      "id": "F23",
+      "title": "Provider failures/diff errors become valid partials/zeros",
+      "tasks": [
+        "S03",
+        "S04",
+        "S08"
+      ]
+    },
+    {
+      "id": "F24",
+      "title": "Missing response time earns maximum credit",
+      "tasks": [
+        "S10"
+      ]
+    },
+    {
+      "id": "F25",
+      "title": "Accepted overflow produces NaN/out-of-domain arithmetic",
+      "tasks": [
+        "S10"
+      ]
+    },
+    {
+      "id": "F26",
+      "title": "Rounded EMA stalls; same-day feedback and missing-day policy",
+      "tasks": [
+        "S13",
+        "S19"
+      ]
+    },
+    {
+      "id": "F27",
+      "title": "Ambient clocks prevent historical determinism",
+      "tasks": [
+        "S01",
+        "S12",
+        "S15"
+      ]
+    },
+    {
+      "id": "F28",
+      "title": "Published normalization examples wrong",
+      "tasks": [
+        "S17"
+      ]
+    },
+    {
+      "id": "F29",
+      "title": "Quality displayed breakdown omits actual formula path",
+      "tasks": [
+        "S16",
+        "S17"
+      ]
+    },
+    {
+      "id": "F30",
+      "title": "LOC-never-scored claim false",
+      "tasks": [
+        "S17"
+      ]
+    },
+    {
+      "id": "F31",
+      "title": "Headline smoothing and convergence claims false",
+      "tasks": [
+        "S17"
+      ]
+    },
+    {
+      "id": "F32",
+      "title": "Solo Quality Champion eligibility copy conflicts with code",
+      "tasks": [
+        "S16",
+        "S17"
+      ]
+    },
+    {
+      "id": "F33",
+      "title": "Solo/review-ratio denominator creates score cliff",
+      "tasks": [
+        "S01",
+        "S09",
+        "S18"
+      ]
+    },
+    {
+      "id": "F34",
+      "title": "Optional Craft disclosure changes core scale and can lower score",
+      "tasks": [
+        "S01",
+        "S09",
+        "S15",
+        "S16",
+        "S18"
+      ]
+    },
+    {
+      "id": "F35",
+      "title": "PR splitting and tiny-useful-change/LOC incentives",
+      "tasks": [
+        "S09",
+        "S18"
+      ]
+    },
+    {
+      "id": "F36",
+      "title": "Missing attributable outcomes, quality, design, mentoring and maintenance",
+      "tasks": [
+        "S11",
+        "S18"
+      ]
+    },
+    {
+      "id": "F37",
+      "title": "Craft volume/tool-style rewards overclaim mastery and quality",
+      "tasks": [
+        "S10",
+        "S17",
+        "S18"
+      ]
+    },
+    {
+      "id": "F38",
+      "title": "Craft excellence/Artificer with zero observed effectiveness",
+      "tasks": [
+        "S10",
+        "S18"
+      ]
+    },
+    {
+      "id": "F39",
+      "title": "Entropy evenness misrepresented as tool breadth/mastery",
+      "tasks": [
+        "S10",
+        "S18"
+      ]
+    },
+    {
+      "id": "F40",
+      "title": "Confidence heuristic confuses evidence coverage with ability/probability",
+      "tasks": [
+        "S01",
+        "S09",
+        "S17",
+        "S18"
+      ]
+    },
+    {
+      "id": "F41",
+      "title": "Self-report authentication confused with truth/attestation",
+      "tasks": [
+        "S10",
+        "S11",
+        "S18"
+      ]
+    },
+    {
+      "id": "F42",
+      "title": "Tiny samples/classification uncertainty treated as reliable rates",
+      "tasks": [
+        "S10",
+        "S11",
+        "S18"
+      ]
+    },
+    {
+      "id": "F43",
+      "title": "Unknown outcome labels/unclassified sessions/likely-satisfied semantics",
+      "tasks": [
+        "S10",
+        "S18"
+      ]
+    },
+    {
+      "id": "F44",
+      "title": "Unsupported percentile calibration and research-derived claims",
+      "tasks": [
+        "S17",
+        "S18"
+      ]
+    },
+    {
+      "id": "F45",
+      "title": "Snapshots/export lack versioned complete replay inputs",
+      "tasks": [
+        "S12",
+        "S13",
+        "S14",
+        "S15",
+        "S19"
+      ]
+    },
+    {
+      "id": "F46",
+      "title": "Signed Craft lost in persisted verification record",
+      "tasks": [
+        "S14",
+        "S19"
+      ]
+    },
+    {
+      "id": "F47",
+      "title": "HMAC/valid link overstated as source truth or SVG tamper detection",
+      "tasks": [
+        "S14",
+        "S17"
+      ]
+    },
+    {
+      "id": "F48",
+      "title": "API mixes fresh score/stored dimensions; consumer/simulation drift",
+      "tasks": [
+        "S12",
+        "S13",
+        "S15",
+        "S16",
+        "S19"
+      ]
+    },
+    {
+      "id": "F49",
+      "title": "Sparse/dense heatmaps change consistency",
+      "tasks": [
+        "S06",
+        "S18"
+      ]
+    },
+    {
+      "id": "F50",
+      "title": "Tenure/role/private-work availability conflated with ability",
+      "tasks": [
+        "S01",
+        "S09",
+        "S17",
+        "S18"
+      ]
+    },
+    {
+      "id": "F51",
+      "title": "Metadata presence/empty approvals/irrelevant CI are weak quality evidence",
+      "tasks": [
+        "S09",
+        "S11",
+        "S18"
+      ]
+    },
+    {
+      "id": "F52",
+      "title": "Lifetime owner popularity mistaken for individual annual influence",
+      "tasks": [
+        "S06",
+        "S09",
+        "S11",
+        "S18"
+      ]
+    },
+    {
+      "id": "F53",
+      "title": "Subdimension weight/rounding declarations and absent-vs-zero ambiguity",
+      "tasks": [
+        "S10",
+        "S12",
+        "S16",
+        "S17"
+      ]
+    }
+  ],
+  "worktrees": [
+    {
+      "path": "/Users/juan/code/chapa-scoring-implementation",
+      "branch": "feature/scoring-relaunch",
+      "purpose": "scoring integration",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-github",
+      "branch": "feature/scoring-v7-github",
+      "purpose": "S02 GitHub adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-gitlab",
+      "branch": "feature/scoring-v7-gitlab",
+      "purpose": "S03 GitLab adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-engine",
+      "branch": "feature/scoring-v7-engine",
+      "purpose": "S09 core engine",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-bitbucket",
+      "branch": "feature/scoring-v7-bitbucket",
+      "purpose": "S04 Bitbucket adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-codeberg",
+      "branch": "feature/scoring-v7-codeberg",
+      "purpose": "S05 Codeberg adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-craft",
+      "branch": "feature/scoring-v7-craft",
+      "purpose": "S10 optional Craft",
+      "cleanupStatus": "active"
+    }
+  ]
+}

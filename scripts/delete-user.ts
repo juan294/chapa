@@ -42,7 +42,7 @@ import { loadConfig, type Config } from "./lib/env";
  * here, because the script's verify pass only re-checks the tables it knows
  * about — an omission reports a clean deletion while leaving rows behind.
  */
-export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string }> =
+export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; deletion?: "scoring_v7_rpc" }> =
   [
     { table: "users", column: "handle" },
     { table: "metrics_snapshots", column: "handle" },
@@ -55,6 +55,19 @@ export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string }> =
     { table: "merge_operations", column: "source_handle" },
     { table: "tool_insights", column: "handle" },
     { table: "campaign_sends", column: "handle" },
+    // Enumerate for discovery; only the atomic RPC may delete v7 data.
+    { table: "scoring_v7_subjects", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_sources", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_source_observations", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_reviewer_grants", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_reviewer_grants", column: "reviewer_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_evidence_references", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_evidence", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_assessments", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_assessments", column: "evaluator_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_raw_artifacts", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_receipts", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_v7_trend_anchors", column: "owner_handle", deletion: "scoring_v7_rpc" },
   ];
 
 export interface Args {
@@ -189,6 +202,22 @@ async function supaDelete(
   }
 }
 
+/** Preserve issued-receipt revocations and cross-owner reviewer cleanup atomically. */
+async function deleteScoringV7User(cfg: Config, handle: string): Promise<void> {
+  const res = await fetch(`${cfg.supaUrl}/rest/v1/rpc/scoring_v7_delete_user`, {
+    method: "POST",
+    headers: {
+      apikey: cfg.supaKey,
+      Authorization: `Bearer ${cfg.supaKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_handle: handle }),
+  });
+  if (!res.ok) {
+    throw new Error(`scoring_v7_delete_user: ${res.status} ${await res.text()}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -203,12 +232,20 @@ export async function run(rawArgs: string[]): Promise<void> {
 
   // --- Supabase ---
   console.log("--- Supabase ---");
+  if (doDelete) {
+    // Fail before legacy/Redis destruction if tombstone-preserving cleanup fails.
+    await deleteScoringV7User(cfg, handle);
+    console.log("  v7 scoring data withdrawn atomically; receipt revocations retained.");
+  }
   let totalRows = 0;
-  for (const { table, column } of SUPABASE_TABLES) {
+  for (const { table, column, deletion } of SUPABASE_TABLES) {
     const count = await supaCount(cfg, table, column, handle);
     totalRows += count;
     console.log(`  ${table.padEnd(22)} ${column}=${handle}: ${count} row(s)`);
-    if (doDelete && count > 0) {
+    if (doDelete && deletion === "scoring_v7_rpc" && count > 0) {
+      throw new Error(`scoring_v7_delete_user left rows in ${table}.${column}`);
+    }
+    if (doDelete && deletion !== "scoring_v7_rpc" && count > 0) {
       const deleted = await supaDelete(cfg, table, column, handle);
       console.log(`      -> DELETED ${deleted} row(s)`);
     }
