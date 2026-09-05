@@ -115,7 +115,8 @@
         "S01",
         "S06"
       ],
-      "implementationStatus": "in-progress"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-9-validation.md"
     },
     {
       "id": "S10",

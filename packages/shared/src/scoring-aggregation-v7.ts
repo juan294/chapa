@@ -29,6 +29,8 @@ export interface EngineeringAggregation {
   readonly events: readonly NormalizedEngineeringEvent[];
   readonly assessments: EngineeringEvidenceInput["assessments"];
   readonly acceptedWork: readonly AcceptedWorkObservation[];
+  /** Verified canonical acceptance selections, including selections outside this window. */
+  readonly acceptanceSelections: readonly { readonly workItemId: string; readonly acceptedEventId: string }[];
   readonly excludedEvents: readonly { readonly eventId: string; readonly reason: EvidenceReasonCode }[];
   readonly limitations: readonly EvidenceReasonCode[];
   /** All observed events, explicitly diagnostic. S09 builds the qualifying core calendar. */
@@ -294,7 +296,9 @@ export function aggregateEngineeringEvidence(raw: EngineeringEvidenceInput): Eng
     schemaVersion: "v7", window: input.window, scope: input.scope, events,
     assessments: input.assessments.filter(assessment => scoringInstant(assessment.recordedAt) <= scoringInstant(input.window.referenceTime) && scoringInstant(assessment.assessedAt) <= scoringInstant(input.window.referenceTime))
       .map(assessment => ({ ...assessment, workItemId: workAliases.get(assessment.workItemId) ?? assessment.workItemId })),
-    acceptedWork: unique(acceptedWork), excludedEvents: unique(excludedEvents), limitations: [...limitations].sort(),
+    acceptedWork: unique(acceptedWork),
+    acceptanceSelections: [...selectedAcceptance].map(([workItemId, acceptedEventId]) => ({ workItemId, acceptedEventId })),
+    excludedEvents: unique(excludedEvents), limitations: [...limitations].sort(),
     observedEventCalendar: [...calendar].map(([date, count]) => ({ date, count })),
     diagnostics: {
       descriptionRate: ratio(prs.map(event => event.measurements.hasDescription)),
