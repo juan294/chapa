@@ -89,7 +89,7 @@ export async function generateMetadata({
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
   const ogVersion = configSnapshot.cacheable
     ? buildOgImageCacheVersion(today, configSnapshot.revision)
-    : `${today}-uncached`;
+    : `${buildOgImageCacheVersion(today, null)}-uncached`;
   const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${ogVersion}`;
   return {
     title: `@${interpolate(t("sharePage.metadataTitle") as string, { handle })}`,

@@ -13,6 +13,7 @@ import {
   renderTierTreatment,
 } from "./badge-effects";
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
+import { BADGE_RENDER_VARIANT } from "./badge-render-variant";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 
 /**
@@ -22,9 +23,12 @@ import { VERIFICATION_CORAL } from "../badge-visual-metadata";
  * function: the caller (the badge.svg route) resolves these via `getServerT`
  * and passes plain strings in. Existing callers that omit `strings` entirely
  * (share page, og-image route, warm-cache cron, demo/archetype pages) keep
- * producing byte-identical English output.
+ * producing English output for the current render version.
  */
 export interface BadgeI18nStrings {
+  activityHeading?: string;
+  heatmapCaption?: string;
+  impactHeading?: string;
   metricsSimulated?: string;
   metricsVerified?: string;
   metricsPublic?: string;
@@ -56,8 +60,8 @@ interface BadgeOptions {
   strings?: BadgeI18nStrings;
   /**
    * Creator Studio's visual configuration (#1191). Omitted means
-   * `DEFAULT_BADGE_CONFIG`, which renders byte-identically to the pre-#1191
-   * badge — no existing cached badge or embedded README image moves.
+   * `DEFAULT_BADGE_CONFIG`, the current Ice default. Existing saved palettes
+   * retain their colors within the globally versioned layout.
    *
    * Passed IN rather than read from a store: `renderBadgeSvg` must stay pure,
    * because that purity is what makes the SVG cacheable per handle/day/locale
@@ -90,13 +94,17 @@ export function renderBadgeSvg(
   const hasVerification = Boolean(verificationHash && verificationDate);
   // #1242 — the palette is resolved from the config, not a module singleton,
   // so a Studio palette reaches the artifact people embed rather than only the
-  // preview. `jade` (the default) resolves to the values the badge already
-  // shipped, so an omitted or default config renders byte-identically.
+  // preview. Explicit saved palettes retain their original color values.
   const t = badgeTheme(config.colorPalette);
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
     ? escapeXml(stats.displayName)
     : `@${safeHandle}`;
+  // Keep the full identity readable inside the header before the wordmark.
+  // JetBrains Mono advances about 0.6em per glyph; only long names are fitted.
+  const nameFit = Array.from(stats.displayName || `@${stats.handle}`).length * 32 * 0.6 > 820
+    ? ' textLength="820" lengthAdjust="spacingAndGlyphs"'
+    : "";
   const tierColor = getTierColor(impact.tier, t);
   const archetypeColor = getArchetypeColor(impact.archetype);
 
@@ -132,7 +140,7 @@ export function renderBadgeSvg(
   const avatarR = 30;
 
   // ── Archetype + repo metrics pill row (above heatmap, left-aligned) ─
-  const metaRowY = 160;
+  const metaRowY = 173;
   const reposStr = formatCompact(stats.reposContributed ?? 0);
   const watchStr = formatCompact(stats.totalWatchers ?? 0);
   const forkStr = formatCompact(stats.totalForks ?? 0);
@@ -140,7 +148,7 @@ export function renderBadgeSvg(
 
   // Pill dimensions
   const pillH = 34;
-  const pillR = 17;
+  const pillR = 3;
   const pillGap = 8;
   const dotGap = 6; // extra space for · separator between pills
   // Archetype pill: icon(20) + gap(6) + text
@@ -161,11 +169,11 @@ export function renderBadgeSvg(
   // ── Two-column body ─────────────────────────────────────────
   // Left column: heatmap (44px cells + 5px gap = 49px per cell)
   const heatmapX = PAD;
-  const heatmapY = 190; // shifted down 30px for meta row
+  const heatmapY = 246;
   const heatmapCells = buildHeatmapCells(
     stats.heatmapData,
-    heatmapX,
-    heatmapY,
+    0,
+    0,
     config.heatmapAnimation,
     t,
   );
@@ -177,8 +185,8 @@ export function renderBadgeSvg(
 
   // Radar chart centered in the right column
   const radarCX = profileColX + profileColW / 2;
-  const radarCY = 275;
-  const radarR = 85;
+  const radarCY = 310;
+  const radarR = 68;
   const radarLabels: RadarChartLabels = {
     delivery: strings.radarLabels?.delivery ?? "Delivery",
     quality: strings.radarLabels?.quality ?? "Quality",
@@ -191,12 +199,14 @@ export function renderBadgeSvg(
 
   // ── Hero score ring (right column, below radar) ───────────
   const scoreStr = String(impact.adjustedComposite);
+  // Keep three digits inside the opaque score backing and its ring stroke.
+  const scoreFontSize = scoreStr.length > 2 ? 48 : 52;
   // #1181 — pre-resolved translated tier label; falls back to the raw tier
   // value (English) for callers that don't pass `strings.tierLabel`. Always
   // escaped below since `impact.tier`/a caller-supplied string both flow
   // into SVG text content.
   const tierLabel = strings.tierLabel ?? impact.tier;
-  const ringCY = 460;
+  const ringCY = 466;
   const ringR = 46;
   const ringCircumference = 2 * Math.PI * ringR; // ≈289.03
   const ringOffset = ringCircumference * (1 - impact.adjustedComposite / 100);
@@ -257,7 +267,7 @@ export function renderBadgeSvg(
     ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`
     : "";
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"${a11yAttrs}>${a11yMarkup}
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" data-badge-design="${BADGE_RENDER_VARIANT}"${a11yAttrs}>${a11yMarkup}
   <defs>
     <style>
       @keyframes pulse-glow {
@@ -290,6 +300,13 @@ export function renderBadgeSvg(
   ${cardStyleEffect.markup}` : ""}${borderEffect.markup ? `
   ${borderEffect.markup}` : ""}
 
+  <!-- Editorial frame and locale-resolved section labels. -->
+  <line x1="60" y1="134" x2="1120" y2="134" stroke="${t.stroke}"/>
+  <line x1="681" y1="211" x2="681" y2="540" stroke="${t.stroke}"/>
+  <text x="60" y="230" font-family="'JetBrains Mono', monospace" font-size="14" fill="${t.textSecondary}" letter-spacing="1">${escapeXml(strings.activityHeading ?? "01 / ACTIVITY")}</text>
+  <text x="604" y="230" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="12" fill="${t.textSecondary}">${escapeXml(strings.heatmapCaption ?? "13 WEEKS × 7 DAYS")}</text>
+  <text x="719" y="230" font-family="'JetBrains Mono', monospace" font-size="14" fill="${t.textSecondary}" letter-spacing="1">${escapeXml(strings.impactHeading ?? "02 / IMPACT")}</text>
+
   <!-- ─── Header row ─────────────────────────────────────── -->
   <!-- Avatar (circular clip) -->
   <defs>
@@ -304,20 +321,20 @@ export function renderBadgeSvg(
   </g>`}
 
   <!-- Handle -->
-  <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
+  <text data-element="name" x="${PAD + 72}" y="${headerY - 6}" font-family="'JetBrains Mono', monospace" font-size="32" font-weight="700" fill="${t.textPrimary}"${nameFit}>${headerName}</text>
   <!-- Verified icon (shield + checkmark) appears only with a real seal. -->
   ${hasVerification ? `<g transform="translate(${PAD + 72}, ${headerY + 6})" opacity="0.4">
     <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${VERIFICATION_CORAL}" transform="scale(0.7)"/>
   </g>` : ""}
-  <text x="${PAD + 72 + (hasVerification ? 20 : 0)}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">${metricsLabel}</text>
+  <text x="${PAD + 72 + (hasVerification ? 20 : 0)}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">${escapeXml(metricsLabel)}</text>
 
   <!-- Chapa_ logo (top-right) -->
   <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="22" fill="${t.textSecondary}" opacity="0.7" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">_</tspan></text>
 
   <!-- ─── Archetype + metric pills row (above heatmap) ────── -->
   <!-- Archetype pill with code-brackets icon -->
-  <g transform="translate(${heatmapX}, ${metaRowY - pillH / 2})">
-    <rect width="${archetypePillWidth}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.1)}" stroke="${t.tint(0.25)}" stroke-width="1"/>
+  <g data-element="archetype" transform="translate(${heatmapX}, ${metaRowY - pillH / 2})">
+    <rect width="${archetypePillWidth}" height="${pillH}" rx="${pillR}" fill="${t.bg}" stroke="${t.tint(0.25)}" stroke-width="1"/>
     <g transform="translate(14, 8)">
       <path d="M8 2L3 8.5L8 15" fill="none" stroke="${archetypeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M14 2L19 8.5L14 15" fill="none" stroke="${archetypeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -327,7 +344,7 @@ export function renderBadgeSvg(
   <!-- · separator -->
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Repos pill -->
-  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
+  <g data-element="repos" transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
     <rect width="${reposPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <g transform="translate(12, 9)" opacity="0.7">
       <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3zm6 0v10M2 8h12" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -337,7 +354,7 @@ export function renderBadgeSvg(
   <!-- · separator -->
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Watch pill -->
-  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
+  <g data-element="watchers" transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
     <rect width="${watchPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <g transform="translate(12, 9)">
       <path d="M1 7.5C1 7.5 3.5 2.5 8 2.5S15 7.5 15 7.5S12.5 12.5 8 12.5S1 7.5 1 7.5Z" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
@@ -348,7 +365,7 @@ export function renderBadgeSvg(
   <!-- · separator -->
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Fork pill -->
-  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
+  <g data-element="forks" transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
     <rect width="${forkPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <g transform="translate(12, 9)" opacity="0.7">
       <path d="M6 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM6 11a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM14 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM4 5v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V5" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="scale(0.95)"/>
@@ -358,7 +375,7 @@ export function renderBadgeSvg(
   <!-- · separator -->
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Star pill -->
-  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
+  <g data-element="stars" transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
     <rect width="${starPillW}" height="${pillH}" rx="${pillR}" fill="${t.tint(0.06)}" stroke="${t.tint(0.15)}" stroke-width="1"/>
     <text x="12" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}"><tspan fill="${t.accent}">\u2605</tspan> ${starLabel}</text>
   </g>
@@ -366,20 +383,21 @@ export function renderBadgeSvg(
   <!-- ─── Two-column body ────────────────────────────────── -->
 
   <!-- Left: heatmap -->
-  ${heatmapSvg}
+  <g data-element="activity" transform="translate(${heatmapX} ${heatmapY}) scale(0.86)">${heatmapSvg}</g>
 
   <!-- Right: radar chart -->
-  ${radarSvg}
+  <g data-element="dimensions">${radarSvg}</g>
 
   <!-- ─── Hero composite score ring (right column) ────────── -->
-  <!-- Ring track (background) -->
-  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${t.tint(0.1)}" stroke-width="4"/>
+  <!-- Opaque score backing keeps every paint legible above background/card effects. -->
+  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="${t.bg}" stroke="${t.tint(0.1)}" stroke-width="4"/>
   <!-- Ring arc (foreground, tier-colored, animates from 0 to score) -->
-  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})" style="animation: ring-draw 1.2s ease-out 0.5s both"/>
-  <!-- Score number (centered inside ring) -->
-  <text class="badge-score-pulse" x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${scoreEffect.fill}"${scoreEffect.attrs} text-anchor="middle" dominant-baseline="central">${scoreStr}</text>
+  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})" ${disableAnimation ? "" : 'style="animation: ring-draw 1.2s ease-out 0.5s both"'}/>
+  <!-- Keep custom score paints opaque: fading their dark gradient stops
+       would put large text below 3:1. Standard text retains its subtle pulse. -->
+  <text data-element="score"${disableAnimation || config.scoreEffect !== "standard" ? "" : ' class="badge-score-pulse"'} x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="${scoreFontSize}" font-weight="700" fill="${scoreEffect.fill}"${scoreEffect.attrs} text-anchor="middle" dominant-baseline="central">${scoreStr}</text>
   <!-- Tier label (always visible below ring) -->
-  <text x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${escapeXml(tierLabel)}</text>${tierEffect.markup ? `
+  <text data-element="tier" x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${escapeXml(tierLabel)}</text>${tierEffect.markup ? `
   ${tierEffect.markup}` : ""}
 
   <!-- ─── Footer ─────────────────────────────────────────── -->
@@ -387,9 +405,9 @@ export function renderBadgeSvg(
   <line x1="${PAD}" y1="${footerDividerY}" x2="${W - PAD}" y2="${footerDividerY}" stroke="${t.stroke}" stroke-width="1"/>
 
   <!-- Branding: left = GitHub, right = domain -->
-  ${brandingSvg}
+  <g data-element="platforms">${brandingSvg}</g>
 
   <!-- Verification seal (right edge) -->
-  ${verificationSvg}
+  <g data-element="verification">${verificationSvg ? `<rect x="1145" y="30" width="45" height="570" fill="${t.bg}"/>${verificationSvg}` : ""}</g>
 </svg>`;
 }

@@ -54,7 +54,7 @@ describe("badge-svg-cache", () => {
       const key = buildBadgeSvgCacheKey("Octocat", "2026-05-01");
       // #1225 bumped this from "warm-amber-v3": converging the badge onto the
       // Jade palette changed the rendered bytes, so every cached SVG must miss.
-      expect(BADGE_RENDER_VARIANT).toBe("jade-v1");
+      expect(BADGE_RENDER_VARIANT).toBe("ice-terminal-v2");
       expect(key).toBe(
         `badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:${DEFAULT_LOCALE}`,
       );
@@ -79,10 +79,19 @@ describe("badge-svg-cache", () => {
       expect(a).toBe(b);
     });
 
+    it("versions and locale-separates OG Redis slots with the renderer", () => {
+      expect(buildOgImageCacheKey("Octocat", "2026-05-01", "es")).toBe(
+        "og-image:v5:octocat:ice-terminal-v2:2026-05-01:es",
+      );
+      expect(buildOgImageCacheKey("Octocat", "2026-05-01", "en")).not.toBe(
+        buildOgImageCacheKey("Octocat", "2026-05-01", "es"),
+      );
+    });
+
     it("versions OG image publication by date and Studio revision", () => {
-      expect(buildOgImageCacheVersion("2026-05-01", 42)).toBe("2026-05-01-r42");
+      expect(buildOgImageCacheVersion("2026-05-01", 42)).toBe("ice-terminal-v2-2026-05-01-r42");
       expect(buildOgImageCacheVersion("2026-05-01", null)).toBe(
-        "2026-05-01-default",
+        "ice-terminal-v2-2026-05-01-default",
       );
     });
 

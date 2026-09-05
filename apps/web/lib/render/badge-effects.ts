@@ -50,9 +50,8 @@ const BORDER_GRADIENT_ID = "badge-border-gradient";
 /**
  * The badge's outer border.
  *
- * `solid-amber` is the default and MUST emit byte-identical markup to the
- * pre-#1191 renderer, so no existing cached badge or embedded README image
- * moves when this ships.
+ * `solid-amber` retains its saved identifier; the current version uses the
+ * Ice Terminal three-pixel frame radius for every palette.
  */
 export function renderBorderEffect(
   border: BadgeConfig["border"],
@@ -61,7 +60,7 @@ export function renderBorderEffect(
   const { width, height, theme, disableAnimation } = ctx;
   const stroke = theme.stroke;
   const rect = (paint: string) =>
-    `<rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="19" fill="none" stroke="${paint}" stroke-width="2"/>`;
+    `<rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="3" fill="none" stroke="${paint}" stroke-width="2"/>`;
 
   switch (border) {
     case "none":
@@ -99,14 +98,14 @@ const AURORA_GRADIENT_ID = "badge-bg-aurora";
 /**
  * The badge's background plate.
  *
- * `solid` is the default and emits the pre-#1191 rect verbatim.
+ * `solid` is the default four-pixel-radius plate for the versioned layout.
  */
 export function renderBackgroundEffect(
   background: BadgeConfig["background"],
   ctx: BadgeEffectContext & { fill: string },
 ): BadgeEffectFragment {
   const { width, height, fill, disableAnimation } = ctx;
-  const plate = `<rect width="${width}" height="${height}" rx="20" fill="${fill}"/>`;
+  const plate = `<rect width="${width}" height="${height}" rx="4" fill="${fill}"/>`;
 
   switch (background) {
     case "aurora": {
@@ -123,7 +122,7 @@ export function renderBackgroundEffect(
       ${drift}
     </linearGradient>`,
         markup: `${plate}
-  <rect width="${width}" height="${height}" rx="20" fill="url(#${AURORA_GRADIENT_ID})"/>`,
+  <rect width="${width}" height="${height}" rx="4" fill="url(#${AURORA_GRADIENT_ID})"/>`,
       };
     }
 
@@ -192,9 +191,10 @@ export function renderScoreEffect(
       };
 
     case "gold-leaf":
+      // Dark copper endpoint lifted for 3:1 large-text contrast on Ice.
       return {
         defs: gradient(
-          `<stop offset="0%" stop-color="#A16207"/><stop offset="45%" stop-color="#FCD34D"/><stop offset="100%" stop-color="#78350F"/>`,
+          `<stop offset="0%" stop-color="#A16207"/><stop offset="45%" stop-color="#FCD34D"/><stop offset="100%" stop-color="#9A5A16"/>`,
           false,
         ),
         markup: "",
@@ -281,17 +281,10 @@ export function renderTierTreatment(
 const CARD_GRADIENT_ID = "badge-card-sheen";
 
 /**
- * The card surface treatment — the one category that crosses only PARTIALLY.
- *
- * Studio's glass looks are built from `backdrop-filter: blur()`, which composites
- * against whatever sits behind the element. SVG has no equivalent: `feGaussianBlur`
- * blurs the source graphic, not the backdrop, and the badge is an opaque plate
- * with nothing behind it to sample. So these are approximations — a sheen
- * gradient per look — and they will NOT match the DOM preview pixel for pixel.
- *
- * That is a documented limitation of the "one artifact" work rather than a bug
- * to fix (docs/decisions/2026-08-30-one-badge-artifact.md). `flat` is the
- * default and adds nothing, so the default badge is untouched.
+ * The card surface treatment: a deterministic sheen per saved style.
+ * Studio and embedded SVGs use this same builder. An SVG has no backdrop
+ * filter, so each glass treatment paints its own translucent gradient over
+ * the opaque plate. The flat treatment adds nothing.
  */
 export function renderCardStyleEffect(
   cardStyle: BadgeConfig["cardStyle"],
@@ -313,6 +306,6 @@ export function renderCardStyleEffect(
     defs: `<linearGradient id="${CARD_GRADIENT_ID}" x1="0" y1="0" x2="0.6" y2="1">
       ${stops}
     </linearGradient>`,
-    markup: `<rect width="${width}" height="${height}" rx="20" fill="url(#${CARD_GRADIENT_ID})"/>`,
+    markup: `<rect width="${width}" height="${height}" rx="4" fill="url(#${CARD_GRADIENT_ID})"/>`,
   };
 }

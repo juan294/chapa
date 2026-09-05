@@ -87,10 +87,10 @@ describe("key builders", () => {
 
   it("builds the locale-scoped badge SVG cache key", () => {
     expect(badgeSvgCacheKey("juan294", "2026-08-28", "es")).toBe(
-      "badge:v2:juan294:jade-v1:2026-08-28:es",
+      "badge:v2:juan294:ice-terminal-v2:2026-08-28:es",
     );
     expect(badgeSvgCacheKey("juan294", "2026-08-28", "en")).toBe(
-      "badge:v2:juan294:jade-v1:2026-08-28:en",
+      "badge:v2:juan294:ice-terminal-v2:2026-08-28:en",
     );
   });
 
@@ -115,8 +115,8 @@ describe("computeFootprint", () => {
       mergedKey: "stats:v2:merged:juan294",
       snapshotKey: "snapshot:v2:latest:juan294",
       badgeKeys: [
-        "badge:v2:juan294:jade-v1:2026-08-28:en",
-        "badge:v2:juan294:jade-v1:2026-08-28:es",
+        "badge:v2:juan294:ice-terminal-v2:2026-08-28:en",
+        "badge:v2:juan294:ice-terminal-v2:2026-08-28:es",
       ],
       dirtyKey: "stats:dirty:juan294",
       dirtyTtlSeconds: 3600,
@@ -295,8 +295,8 @@ describe("recalculateHandle — apply mode (apply: true)", () => {
       [
         "stats:v2:merged:juan294",
         "snapshot:v2:latest:juan294",
-        "badge:v2:juan294:jade-v1:2026-08-28:en",
-        "badge:v2:juan294:jade-v1:2026-08-28:es",
+        "badge:v2:juan294:ice-terminal-v2:2026-08-28:en",
+        "badge:v2:juan294:ice-terminal-v2:2026-08-28:es",
       ].sort(),
     );
 

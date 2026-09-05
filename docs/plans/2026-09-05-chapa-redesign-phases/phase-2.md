@@ -65,14 +65,14 @@ For the rotated landing wrapper, rotate SVG and hotspot layer together; use each
 
 ## Automated success criteria
 
-- [ ] New/default Ice, explicit saved Jade/other palettes, old missing-palette rows and legacy `palette` alias produce the intended config without input mutation.
-- [ ] Schema remains seven keys; invalid/extra fields rejected; Studio options, `/set palette ice`, summaries, presets and WebMCP all recognize the additive palette.
-- [ ] Every existing badge effect/palette/data/escaping/motion test passes under the new explicit version; all six palettes render.
-- [ ] Source-level forbidden CSS variables/bare tint literals and same-input determinism guards remain.
-- [ ] English/Spanish new headings and tier strings reach actual SVG on landing and Studio; locale cache separation remains.
-- [ ] SVG+OG cache keys and metadata version include variant; revision fencing/invalidation tests pass.
-- [ ] Real PNG glyph-pixel tests still detect name/score text, using stable score marker; 1200px and 600px exports are complete.
-- [ ] Overlay tests preserve all 11 descriptions and interaction behavior; parent gate commands pass.
+- [x] New/default Ice, explicit saved Jade/other palettes, old missing-palette rows and legacy `palette` alias produce the intended config without input mutation.
+- [x] Schema remains seven keys; invalid/extra fields rejected; Studio options, `/set palette ice`, summaries, presets and WebMCP all recognize the additive palette.
+- [x] Every existing badge effect/palette/data/escaping/motion test passes under the new explicit version; all six palettes render.
+- [x] Source-level forbidden CSS variables/bare tint literals and same-input determinism guards remain.
+- [x] English/Spanish new headings and tier strings reach actual SVG on landing and Studio; locale cache separation remains.
+- [x] SVG+OG cache keys and metadata version include variant; revision fencing/invalidation tests pass.
+- [x] Real PNG glyph-pixel tests still detect name/score text, using stable score marker; 1200px and 600px exports are complete.
+- [x] Overlay tests preserve all 11 descriptions and interaction behavior; parent gate commands pass.
 
 Focused commands (sequential):
 
@@ -84,10 +84,12 @@ pnpm run generate:badge-reference
 
 ## Manual visual success criteria
 
-- [ ] Approved clean identity header, square metric treatment, divided data layout and readable footer match the reference.
-- [ ] All archetypes, 4/5 axes, Craft=0, empty data, long/missing names, verification/sample, platforms and effect options remain complete.
-- [ ] Ice on both page themes; explicit Jade remains Jade. Inspect all palette archetype/verification contrasts on actual pill grounds.
-- [ ] Inline and `<img>`/PNG paths remain complete at 1200px and 600px; rotated overlay targets and tooltip positions match the artifact.
-- [ ] Version record, current SVG hashes and regenerated reference image are reviewed together.
+- [x] Approved clean identity header, square metric treatment, divided data layout and readable footer match the reference.
+- [x] All archetypes, 4/5 axes, Craft=0, empty data, long/missing names, verification/sample, platforms and effect options remain complete.
+- [x] Ice on both page themes; explicit Jade remains Jade. Inspect all palette archetype/verification contrasts on actual pill grounds.
+- [x] Inline and `<img>`/PNG paths remain complete at 1200px and 600px; rotated overlay targets and tooltip positions match the artifact.
+- [x] Version record, current SVG hashes and regenerated reference image are reviewed together.
 
 Stop after presenting badge/version/compatibility evidence. Phase 3 introduces the separate Elite landing fixture.
+
+Implementation evidence: [Phase 2 report](evidence/phase2/report.md).

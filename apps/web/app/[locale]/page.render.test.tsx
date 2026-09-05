@@ -9,7 +9,7 @@ import { en } from "@/lib/i18n/dictionaries/en";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 
-// page.tsx computes the demo badge SVG at module scope, resolves the
+// page.tsx computes the demo badge SVG per locale, resolves the
 // [locale] route param, and calls the REAL getServerT(locale) — this is the
 // #1023 (FE-H1) fix: the landing page is now a genuine per-locale RSC, so
 // this test exercises the actual English dictionary rather than mocking
@@ -283,5 +283,21 @@ describe("Home page render (es) — locale-segmented RSC, no client re-render", 
     expect(navbar.dataset.locale).toBe("es");
     expect(navbar.textContent).toBe("Funciones");
     await waitFor(() => expect(document.documentElement.lang).toBe("es"));
+  });
+});
+
+
+describe("landing badge locale", () => {
+  it.each([
+    ["en", "01 / ACTIVITY", "02 / IMPACT", "13 WEEKS × 7 DAYS"],
+    ["es", "01 / ACTIVIDAD", "02 / IMPACTO", "13 SEMANAS × 7 DÍAS"],
+  ] as const)("passes real %s translations into the landing SVG", async (locale, activityHeading, impactHeading, heatmapCaption) => {
+    const { renderBadgeSvg } = await import("@/lib/render/BadgeSvg");
+    vi.mocked(renderBadgeSvg).mockClear();
+    await renderHome(locale);
+    expect(renderBadgeSvg).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+      demoMode: true,
+      strings: expect.objectContaining({ activityHeading, impactHeading, heatmapCaption }),
+    }));
   });
 });

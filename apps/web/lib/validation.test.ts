@@ -821,3 +821,19 @@ describe("stripRetiredBadgeConfigKeys", () => {
     expect(isValidBadgeConfig(stripped)).toBe(false);
   });
 });
+
+
+describe("Ice palette persistence compatibility", () => {
+  it("accepts Ice on the strict write path", () => {
+    expect(isValidBadgeConfig({ ...DEFAULT_BADGE_CONFIG, colorPalette: "ice" })).toBe(true);
+  });
+
+  it("keeps a missing historical palette Jade while new configs use Ice", () => {
+    const legacy = Object.fromEntries(Object.entries(DEFAULT_BADGE_CONFIG).filter(([key]) => key !== "colorPalette"));
+    const frozen = Object.freeze(legacy);
+    const normalized = withDefaultBadgeConfigKeys(frozen);
+    expect(normalized).toEqual({ ...legacy, colorPalette: "jade" });
+    expect(frozen).not.toHaveProperty("colorPalette");
+    expect(DEFAULT_BADGE_CONFIG.colorPalette).toBe("ice");
+  });
+});

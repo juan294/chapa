@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   WARM_AMBER,
+  badgeTheme,
   getArchetypeColor,
   getHeatmapColor,
   getTierColor,
@@ -56,8 +57,8 @@ describe("getTierColor", () => {
 
   it("preserves the Jade badge independently of the redesigned app accent", () => {
     // App presentation changes first; the renderer remains versioned separately.
-    expect(getTierColor("Elite")).toBe("#1BD093");
-    expect(getTierColor("High")).toBe("#65E7B0");
+    expect(getTierColor("Elite", badgeTheme("jade"))).toBe("#1BD093");
+    expect(getTierColor("High", badgeTheme("jade"))).toBe("#65E7B0");
     expect(themedTokenValue("--color-amber").dark).toBe("#ff795f");
     expect(themedTokenValue("--color-amber-light").dark).toBe("#ff9d88");
   });
@@ -98,10 +99,10 @@ describe("theme.ts brand-alignment invariant comment (#1168 UX-L2)", () => {
     expect(themedTokenValue("--color-text-primary").dark).toBe("#eeeae1");
     expect(themedTokenValue("--color-text-secondary").dark).toBe("#b3b9b9");
 
-    expect(WARM_AMBER.bg).toBe("#0C0D14");
-    expect(WARM_AMBER.card).toBe("#13141E");
-    expect(WARM_AMBER.textPrimary).toBe("#E6EDF3");
-    expect(WARM_AMBER.textSecondary).toBe("#9AA4B2");
+    expect(badgeTheme("jade").bg).toBe("#0C0D14");
+    expect(badgeTheme("jade").card).toBe("#13141E");
+    expect(badgeTheme("jade").textPrimary).toBe("#E6EDF3");
+    expect(badgeTheme("jade").textSecondary).toBe("#9AA4B2");
 
     expect(WARM_AMBER.bg).not.toBe("#141719");
     expect(WARM_AMBER.card).not.toBe("#202528");

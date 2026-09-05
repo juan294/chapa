@@ -237,7 +237,7 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("Builder");
       // Archetype pill should appear before the heatmap rects in SVG order
       const archetypeIdx = svg.indexOf("Builder");
-      const firstHeatmapRect = svg.indexOf('rx="4"');
+      const firstHeatmapRect = svg.indexOf('data-element="activity"');
       expect(archetypeIdx).toBeLessThan(firstHeatmapRect);
     });
 
@@ -314,7 +314,7 @@ describe("renderBadgeSvg", () => {
     it("metric pills have individual rect backgrounds", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       // At least 5 pill rects: 1 archetype + 4 metrics (Repos, Watch, Fork, Star)
-      const pillRects = svg.match(/rx="17"/g);
+      const pillRects = svg.match(/rx="3"/g);
       expect(pillRects).not.toBeNull();
       expect(pillRects!.length).toBeGreaterThanOrEqual(5);
     });

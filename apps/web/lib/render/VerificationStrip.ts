@@ -38,7 +38,7 @@ export function renderVerificationStrip(
        after that shrink. The <a> wrapper is inert in an <img> embed but is a
        working affordance on the share page's inline-SVG path \u2014 never remove it. -->
   <a href="${verifyUrl}" target="_blank">
-    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="0.9" text-anchor="middle" letter-spacing="2" style="cursor:pointer">${verifiedLabel} \u00B7 ${safeHash} \u00B7 ${safeDate}</text>
+    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="1" text-anchor="middle" letter-spacing="2" style="cursor:pointer">${escapeXml(verifiedLabel)} \u00B7 ${safeHash} \u00B7 ${safeDate}</text>
   </a>
 </g>`;
 }
@@ -62,6 +62,6 @@ export function renderDemoVerificationStrip(
   return `<g aria-label="Sample badge indicator">
   <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${VERIFICATION_CORAL}" stroke-width="1" opacity="0.15"/>
   <!-- #1168 UX-H4: same legibility fix as the real strip (14px/0.9 opacity). -->
-  <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="0.9" text-anchor="middle" letter-spacing="2">${sampleDisclosure}</text>
+  <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="1" text-anchor="middle" letter-spacing="2">${escapeXml(sampleDisclosure)}</text>
 </g>`;
 }

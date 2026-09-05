@@ -103,9 +103,8 @@ export function buildOgImageCacheKey(
   date: string,
   locale: Locale = DEFAULT_LOCALE,
 ): string {
-  // v4: #1275 — every v3 value was rendered without text; a new prefix
-  // guarantees none of them is served after the fix deploys.
-  return `og-image:v4:${handle.toLowerCase()}:${date}:${locale}`;
+  // A layout version changes PNG bytes just as it changes the inline SVG.
+  return `og-image:v5:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${date}:${locale}`;
 }
 
 /** Version shared by the OG metadata URL and its revision-fenced Redis value. */
@@ -113,7 +112,7 @@ export function buildOgImageCacheVersion(
   date: string,
   revision: number | null,
 ): string {
-  return `${date}-${revision === null ? "default" : `r${revision}`}`;
+  return `${BADGE_RENDER_VARIANT}-${date}-${revision === null ? "default" : `r${revision}`}`;
 }
 
 export function buildBadgeSvgRenderLockKey(

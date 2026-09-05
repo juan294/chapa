@@ -26,6 +26,9 @@ describe("resolveBadgeLocale", () => {
     expect(strings.metricsVerified).toBe("Métricas verificadas");
     expect(strings.metricsPublic).toBe("Métricas públicas");
     expect(strings.metricsSimulated).toBe("Métricas simuladas");
+    expect(strings.activityHeading).toBe("01 / ACTIVIDAD");
+    expect(strings.heatmapCaption).toBe("13 SEMANAS × 7 DÍAS");
+    expect(strings.impactHeading).toBe("02 / IMPACTO");
     expect(strings.radarLabels).toEqual({
       delivery: "Entrega",
       quality: "Calidad",
@@ -47,6 +50,9 @@ describe("resolveBadgeLocale", () => {
     expect(strings.metricsVerified).toBe("Verified metrics");
     expect(strings.metricsPublic).toBe("Public metrics");
     expect(strings.metricsSimulated).toBe("Simulated metrics");
+    expect(strings.activityHeading).toBe("01 / ACTIVITY");
+    expect(strings.heatmapCaption).toBe("13 WEEKS × 7 DAYS");
+    expect(strings.impactHeading).toBe("02 / IMPACT");
     expect(strings.radarLabels).toEqual({
       delivery: "Delivery",
       quality: "Quality",

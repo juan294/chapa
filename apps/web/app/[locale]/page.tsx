@@ -1,4 +1,5 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingContent } from "../LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
@@ -37,14 +38,14 @@ export async function generateMetadata({ params }: HomeProps): Promise<Metadata>
   };
 }
 
-const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
-  includeBranding: true,
-  demoMode: true,
-});
-
 export default async function Home({ params }: HomeProps) {
   const { locale } = await params;
   const t = getServerT(locale);
+  const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    includeBranding: true,
+    demoMode: true,
+    strings: buildBadgeI18nStrings(t, DEMO_IMPACT.tier),
+  });
   return (
     <>
       <LanguageProvider

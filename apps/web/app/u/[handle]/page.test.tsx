@@ -305,7 +305,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(metadata.openGraph?.images).toEqual([
       {
-        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=2026-04-17-r7",
+        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=ice-terminal-v2-2026-04-17-r7",
         width: 1200,
         height: 630,
         alt: "Chapa de testuser",

@@ -92,9 +92,9 @@ describe("OG badge — the score number is visible in the rasterized badge (#127
   });
 
   // Locate the score text from the SVG itself rather than hard-coding the
-  // layout: `<text class="badge-score-pulse" x=".." y="..">82</text>`.
+  // layout: a stable data-element marker, including static output..
   const match = svg.match(
-    /<text class="badge-score-pulse" x="([\d.]+)" y="([\d.]+)"/,
+    /<text data-element="score"[^>]*x="([\d.]+)" y="([\d.]+)"/,
   );
   const cx = Number(match?.[1]);
   const cy = Number(match?.[2]);
@@ -114,4 +114,52 @@ describe("OG badge — the score number is visible in the rasterized badge (#127
     const lit = await brightPixels(svg, NO_FONTS, region);
     expect(lit).toBe(0);
   });
+});
+
+
+describe("Ice Terminal complete raster at embed sizes", () => {
+  it("keeps the maximum score glyphs inside the opaque ring interior", async () => {
+    const svg = renderBadgeSvg(DEMO_STATS, { ...DEMO_IMPACT, adjustedComposite: 100 }, { disableAnimation: true });
+    const painted = await renderAsync(svg, { font: getResvgFontOptions() });
+    const missing = await renderAsync(svg, { font: NO_FONTS });
+    const paintedPixels = painted.pixels;
+    const missingPixels = missing.pixels;
+    let glyphPixels = 0;
+    for (let y = 414; y < 518; y++) {
+      for (let x = 875; x < 985; x++) {
+        const at = (y * painted.width + x) * 4;
+        if (paintedPixels[at] !== missingPixels[at] || paintedPixels[at + 1] !== missingPixels[at + 1] || paintedPixels[at + 2] !== missingPixels[at + 2]) {
+          glyphPixels++;
+          // r46 minus half of the 4px ring stroke leaves an opaque r44 interior.
+          expect(Math.hypot(x + 0.5 - 930, y + 0.5 - 466)).toBeLessThan(44);
+        }
+      }
+    }
+    expect(glyphPixels).toBeGreaterThan(100);
+  });
+
+  for (const width of [1200, 600]) {
+    it(`paints name and score glyphs at ${width}px with a real missing-font negative control`, async () => {
+      const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, { demoMode: true, disableAnimation: true });
+      const withFonts = await renderAsync(svg, { fitTo: { mode: "width", value: width }, font: getResvgFontOptions() });
+      const withoutFonts = await renderAsync(svg, { fitTo: { mode: "width", value: width }, font: NO_FONTS });
+      // resvg's native pixels getter copies the buffer. Read it once per image,
+      // not once per pixel in the crop scan (tens of thousands of full copies).
+      const paintedPixels = withFonts.pixels;
+      const missingFontPixels = withoutFonts.pixels;
+      expect(withFonts.width).toBe(width);
+      expect(withFonts.height).toBe(width * 630 / 1200);
+      for (const [x0, y0, x1, y1] of [[132, 42, 800, 78], [900, 444, 960, 488]]) {
+        let changed = 0;
+        const scale = width / 1200;
+        for (let y = Math.floor(y0! * scale); y < Math.floor(y1! * scale); y++) {
+          for (let x = Math.floor(x0! * scale); x < Math.floor(x1! * scale); x++) {
+            const at = (y * width + x) * 4;
+            if (paintedPixels[at] !== missingFontPixels[at]) changed++;
+          }
+        }
+        expect(changed).toBeGreaterThan(40);
+      }
+    });
+  }
 });

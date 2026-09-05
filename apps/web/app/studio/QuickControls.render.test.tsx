@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QuickControls } from "./QuickControls";
-import type { BadgeConfig } from "@chapa/shared";
+import { DEFAULT_BADGE_CONFIG, type BadgeConfig } from "@chapa/shared";
 import { LanguageProvider } from "@/lib/i18n";
 import { es } from "@/lib/i18n/dictionaries/es";
 
@@ -21,7 +21,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         scoreEffect: "standard",
         heatmapAnimation: "fade-in",
         tierTreatment: "standard",
-        colorPalette: "jade",
+        colorPalette: "ice",
       },
     },
     {
@@ -42,15 +42,7 @@ vi.mock("@/lib/effects/defaults", () => ({
 
 afterEach(cleanup);
 
-const baseConfig: BadgeConfig = {
-  background: "solid",
-  cardStyle: "flat",
-  border: "solid-amber",
-  scoreEffect: "standard",
-  heatmapAnimation: "fade-in",
-  tierTreatment: "standard",
-  colorPalette: "jade",
-};
+const baseConfig: BadgeConfig = { ...DEFAULT_BADGE_CONFIG };
 
 describe("QuickControls", () => {
   it("shows expand button when not visible", () => {

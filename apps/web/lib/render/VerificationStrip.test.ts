@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import {
   renderDemoVerificationStrip,
@@ -9,19 +8,9 @@ describe("renderVerificationStrip", () => {
   const hash = "abc12345";
   const date = "2025-06-15";
 
-  it("preserves the exact real and sample SVG bytes after metadata extraction", () => {
-    // #1168 UX-H4 — these digests intentionally changed: font-size 11→14 and
-    // opacity 0.50→0.9 (plus font-weight 500) on both strips for legibility.
-    // This snapshot pins the new bytes; it is not a behavioral invariant.
-    const digest = (svg: string) =>
-      createHash("sha256").update(svg).digest("hex");
-
-    expect(digest(renderVerificationStrip(hash, date))).toBe(
-      "bfe965ab3e196818e577a2db1f9f81e41153aa075fcaac5632c39d69564d4c5e",
-    );
-    expect(digest(renderDemoVerificationStrip())).toBe(
-      "f7d9fee55bb35bc930540d6978358f731ccd904f6630a544c19773da9a435745",
-    );
+  it("uses fully opaque verification and sample text without changing the coral", () => {
+    expect(renderVerificationStrip(hash, date)).toContain('opacity="1" text-anchor="middle"');
+    expect(renderDemoVerificationStrip()).toContain('opacity="1" text-anchor="middle"');
   });
 
   it("returns an SVG <g> element", () => {

@@ -110,7 +110,7 @@ const FAKE_MATERIALIZED = {
 function makeRequest(
   handle: string,
   lang?: string,
-  version: string | null = "2026-02-14-r7",
+  version: string | null = "ice-terminal-v2-2026-02-14-r7",
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
   const query = new URLSearchParams();
   if (lang) query.set("lang", lang);
@@ -154,7 +154,7 @@ describe("GET /u/[handle]/og-image", () => {
 
   it("returns the cached png when Redis already has the image", async () => {
     mockCacheGet.mockResolvedValue({
-      version: "2026-02-14-r7",
+      version: "ice-terminal-v2-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 
@@ -163,7 +163,7 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(200);
     expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v4:testuser:2026-02-14:en");
+    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v5:testuser:ice-terminal-v2:2026-02-14:en");
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
@@ -174,7 +174,7 @@ describe("GET /u/[handle]/og-image", () => {
   it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
     // Cache hit — rate limiter must NOT be called (deferred to miss branch only)
     mockCacheGet.mockResolvedValue({
-      version: "2026-02-14-r7",
+      version: "ice-terminal-v2-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 
@@ -216,9 +216,9 @@ describe("GET /u/[handle]/og-image", () => {
       },
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "og-image:v4:testuser:2026-02-14:en",
+      "og-image:v5:testuser:ice-terminal-v2:2026-02-14:en",
       {
-        version: "2026-02-14-r7",
+        version: "ice-terminal-v2-2026-02-14-r7",
         pngBase64: FAKE_PNG_BASE64,
       },
       172800,
@@ -235,7 +235,7 @@ describe("GET /u/[handle]/og-image", () => {
     const res = await GET(req, ctx);
 
     expect(mockCacheGet).toHaveBeenCalledWith(
-      "og-image:v4:mixedcase:2026-02-14:en",
+      "og-image:v5:mixedcase:ice-terminal-v2:2026-02-14:en",
     );
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-mixedcase");
   });
@@ -383,7 +383,7 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockCacheSet).toHaveBeenCalledOnce();
     expect(mockCacheDel).toHaveBeenCalledWith(
-      "og-image:v4:testuser:2026-02-14:en",
+      "og-image:v5:testuser:ice-terminal-v2:2026-02-14:en",
     );
     expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
@@ -392,7 +392,7 @@ describe("GET /u/[handle]/og-image", () => {
 
   it("does not use or publish cache entries without the revisioned metadata URL", async () => {
     mockCacheGet.mockResolvedValue({
-      version: "2026-02-14-r7",
+      version: "ice-terminal-v2-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 

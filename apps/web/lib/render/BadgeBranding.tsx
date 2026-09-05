@@ -43,7 +43,7 @@ export function renderBadgeBranding(
   const logosSvg = sorted
     .map((platform, i) => {
       const logoX = x + pillPadX + i * (logoSize + logoGap);
-      return `<g transform="translate(${logoX}, ${y})"><path d="${BADGE_PLATFORM_LOGOS[platform]}" fill="#9AA4B2" opacity="0.8" transform="scale(${scale})"/></g>`;
+      return `<g transform="translate(${logoX}, ${y})"><path d="${BADGE_PLATFORM_LOGOS[platform]}" fill="${theme.textSecondary}" opacity="1" transform="scale(${scale})"/></g>`;
     })
     .join("\n    ");
 
@@ -52,6 +52,6 @@ export function renderBadgeBranding(
   return `
     ${pillSvg}
     ${logosSvg}
-    <text x="${textStartX}" y="${y + 14}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2"><tspan opacity="0.5">Forged from </tspan><tspan opacity="0.9">purpose</tspan><tspan opacity="0.5">. Driven by </tspan><tspan opacity="0.9">curiosity</tspan><tspan opacity="0.5">.</tspan></text>
-    <text x="${rightX}" y="${y + 14}" font-family="'JetBrains Mono', monospace" font-size="17" fill="#9AA4B2" opacity="0.8" text-anchor="end">chapa.thecreativetoken.com</text>`;
+    <text x="${textStartX}" y="${y + 14}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${theme.textSecondary}"><tspan opacity="0.85">Forged from </tspan><tspan opacity="0.9">purpose</tspan><tspan opacity="0.85">. Driven by </tspan><tspan opacity="0.9">curiosity</tspan><tspan opacity="0.85">.</tspan></text>
+    <text x="${rightX}" y="${y + 14}" font-family="'JetBrains Mono', monospace" font-size="17" fill="${theme.textSecondary}" opacity="1" text-anchor="end">chapa.thecreativetoken.com</text>`;
 }

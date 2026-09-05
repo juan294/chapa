@@ -67,6 +67,12 @@ function makeRunCommand() {
           action: { type: "set", category: "background", value: "aurora" },
         };
       }
+      if (input === "/set palette ice") {
+        return {
+          lines: [line("colorPalette → ice")],
+          action: { type: "set", category: "colorPalette", value: "ice" },
+        };
+      }
       if (input === "/preset premium") {
         return {
           lines: [line("Applied preset: Premium")],
@@ -168,6 +174,17 @@ describe("useStudioWebMcpTools", () => {
     expect(result.current).toBe(first);
   });
 
+  it("applies Ice through the palette alias without saving or mutating the saved config", async () => {
+    const { getTool, runCommand, proposeSave, config } = setup({
+      config: { ...DEFAULT_BADGE_CONFIG, colorPalette: "jade" },
+    });
+    const response = await execute(getTool("apply_badge_style"), { category: "palette", value: "ice" });
+    expect(runCommand).toHaveBeenCalledWith("/set palette ice");
+    expect(readCommandConfig(response).colorPalette).toBe("ice");
+    expect(config.colorPalette).toBe("jade");
+    expect(proposeSave).not.toHaveBeenCalled();
+  });
+
   it("does not build the catalog while the WebMCP kill-switch is off", () => {
     const { tools } = setup({ enabled: false });
 
@@ -261,6 +278,9 @@ describe("useStudioWebMcpTools", () => {
     };
 
     expect(payload.categories).toHaveLength(7);
+    expect(payload.categories.find((category) => category.key === "colorPalette")?.options).toEqual(
+      expect.arrayContaining([expect.objectContaining({ value: "ice", label: "Ice Terminal" })]),
+    );
     expect(payload.categories[0]).toMatchObject({
       key: "background",
       alias: "bg",

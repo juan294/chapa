@@ -1,3 +1,4 @@
+import { escapeXml } from "./escape";
 import type { DimensionScores } from "@chapa/shared";
 import { WARM_AMBER, type BadgeTheme } from "./theme";
 
@@ -119,7 +120,7 @@ export function renderRadarChart(
       if (cosA > 0.3) { anchor = "start"; dx = 4; }
       else if (cosA < -0.3) { anchor = "end"; dx = -4; }
       const dy = sinA < -0.3 ? -4 : sinA > 0.3 ? 14 : 4;
-      return `<text x="${x + dx}" y="${y + dy}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="${anchor}">${a.label}</text>`;
+      return `<text${a.key === "craft" ? ' data-element="craft"' : ""} x="${x + dx}" y="${y + dy}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="${anchor}">${escapeXml(a.label)}</text>`;
     })
     .join("\n    ");
 
@@ -128,7 +129,7 @@ export function renderRadarChart(
     ${ringSvg}
     ${axisLines}
     <circle cx="${cx}" cy="${cy}" r="3" fill="${t.textSecondary}" opacity="0.6" data-role="radar-empty-marker"/>
-    <text x="${cx}" y="${cy + 18}" font-family="'JetBrains Mono', monospace" font-size="10" fill="${t.textSecondary}" text-anchor="middle" opacity="0.7">${labels.noData}</text>
+    <text x="${cx}" y="${cy + 18}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${t.textSecondary}" text-anchor="middle" opacity="1">${escapeXml(labels.noData)}</text>
     ${labelSvg}
   </g>`;
   }

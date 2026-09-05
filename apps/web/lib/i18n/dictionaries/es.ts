@@ -424,6 +424,9 @@ export const es: Translations = {
     github: 'GITHUB',
   },
   badge: {
+    activityHeading: '01 / ACTIVIDAD',
+    heatmapCaption: '13 SEMANAS × 7 DÍAS',
+    impactHeading: '02 / IMPACTO',
     metricsSimulated: 'Métricas simuladas',
     metricsVerified: 'Métricas verificadas',
     metricsPublic: 'Métricas públicas',
@@ -1145,7 +1148,7 @@ export const es: Translations = {
       scoreEffect: { label: 'Efecto de puntuación', options: { standard: 'Estándar', 'gold-shimmer': 'Brillo dorado', 'gold-leaf': 'Pan de oro', chrome: 'Cromo', embossed: 'Relieve', 'neon-amber': 'Neón ámbar', holographic: 'Holográfico' }, descriptions: { standard: 'Puntuación en texto plano', 'gold-shimmer': 'Degradado dorado brillante', 'gold-leaf': 'Textura de pan de oro metálico', chrome: 'Reflejo de cromo pulido', embossed: 'Texto en relieve', 'neon-amber': 'Ámbar de neón brillante', holographic: 'Cambio holográfico de arcoíris' } },
       heatmapAnimation: { label: 'Animación del mapa de calor', options: { 'fade-in': 'Barrido de columnas', diagonal: 'Onda diagonal', ripple: 'Onda central', scatter: 'Dispersión aleatoria', cascade: 'Cascada de columnas', waterfall: 'Cascada de filas' }, descriptions: { 'fade-in': 'Barrido rápido de columnas de izquierda a derecha', diagonal: 'De arriba a la izquierda hacia abajo a la derecha', ripple: 'Expansión desde el centro', scatter: 'Orden de aparición aleatorio', cascade: 'Revelado lento columna por columna', waterfall: 'Revelado fila por fila' } },
       tierTreatment: { label: 'Tratamiento del nivel', options: { standard: 'Estándar', enhanced: 'Mejorado' }, descriptions: { standard: 'Píldora de nivel simple', enhanced: 'Puntos brillantes para niveles altos' } },
-      colorPalette: { label: 'Paleta de color', options: { jade: 'Jade', indigo: 'Noche índigo', amber: 'Forja ámbar', crimson: 'Carmesí', mono: 'Monocromo' }, descriptions: { jade: 'Predeterminada de Chapa', indigo: 'Azul violeta sobre azul marino profundo', amber: 'Oro cálido sobre carbón', crimson: 'Rosa sobre burdeos', mono: 'Grises neutros' } },
+      colorPalette: { label: 'Paleta de color', options: { ice: 'Ice Terminal', jade: 'Jade', indigo: 'Noche índigo', amber: 'Forja ámbar', crimson: 'Carmesí', mono: 'Monocromo' }, descriptions: { ice: 'Azul hielo sobre tinta; predeterminada de Chapa', jade: 'Verde jade sobre carbón', indigo: 'Azul violeta sobre azul marino profundo', amber: 'Oro cálido sobre carbón', crimson: 'Rosa sobre burdeos', mono: 'Grises neutros' } },
     },
     commands: {
       setDescription: 'Cambiar un campo de configuración de la Chapa',

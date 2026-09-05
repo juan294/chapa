@@ -260,6 +260,7 @@ vi.mock("@/components/KeyboardShortcutsListener", () => ({
 }));
 
 import { parseRetryAfterSeconds, StudioClient } from "./StudioClient";
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import type {
   BadgeConfig,
   CraftResult,
@@ -269,15 +270,7 @@ import type {
 
 // ---------- Test fixtures ----------
 
-const defaultConfig: BadgeConfig = {
-  background: "solid",
-  cardStyle: "flat",
-  border: "solid-amber",
-  scoreEffect: "standard",
-  heatmapAnimation: "fade-in",
-  tierTreatment: "standard",
-  colorPalette: "jade",
-};
+const defaultConfig: BadgeConfig = { ...DEFAULT_BADGE_CONFIG };
 
 const stats: StatsData = {
   handle: "testuser",

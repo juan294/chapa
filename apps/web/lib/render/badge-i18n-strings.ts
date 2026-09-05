@@ -28,6 +28,9 @@ export function buildBadgeI18nStrings(
   tier: string,
 ): BadgeI18nStrings {
   return {
+    activityHeading: t("badge.activityHeading") as string,
+    heatmapCaption: t("badge.heatmapCaption") as string,
+    impactHeading: t("badge.impactHeading") as string,
     metricsSimulated: t("badge.metricsSimulated") as string,
     metricsVerified: t("badge.metricsVerified") as string,
     metricsPublic: t("badge.metricsPublic") as string,

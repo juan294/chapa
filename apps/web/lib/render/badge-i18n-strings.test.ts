@@ -13,6 +13,9 @@ describe("buildBadgeI18nStrings", () => {
 
   it("resolves every literal the badge renders", () => {
     expect(buildBadgeI18nStrings(echo, "Solid")).toEqual({
+      activityHeading: "badge.activityHeading",
+      heatmapCaption: "badge.heatmapCaption",
+      impactHeading: "badge.impactHeading",
       metricsSimulated: "badge.metricsSimulated",
       metricsVerified: "badge.metricsVerified",
       metricsPublic: "badge.metricsPublic",

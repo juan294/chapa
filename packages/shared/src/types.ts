@@ -263,15 +263,15 @@ export type BadgeHeatmapAnimation = "fade-in" | "diagonal" | "ripple" | "scatter
 export type BadgeTierTreatment = "standard" | "enhanced";
 /**
  * Badge colour direction (#1242). Each palette carries an accent ramp AND its
- * own ground, so an option reads as "accent on ground". `jade` is the default
- * and holds exactly the values the badge shipped with, so an existing badge
- * does not move when this lands.
+ * own ground, so an option reads as "accent on ground". Ice is the new/reset
+ * default. Existing palettes retain their colors, and stored configurations
+ * that predate this field normalize to Jade on read.
  *
  * Note for future readers: `amber` here is a warm gold. It is unrelated to the
- * app's `--color-amber` CSS token, which is (confusingly) jade green — see the
- * naming note in docs/design-system.md.
+ * app's `--color-amber` CSS token, now vermilion — see the naming note in
+ * docs/design-system.md.
  */
-export type BadgePalette = "jade" | "indigo" | "amber" | "crimson" | "mono";
+export type BadgePalette = "ice" | "jade" | "indigo" | "amber" | "crimson" | "mono";
 
 /**
  * User-authored badge visual configuration.
@@ -318,7 +318,7 @@ export const BADGE_CONFIG_OPTIONS = {
   scoreEffect: ["standard", "gold-shimmer", "gold-leaf", "chrome", "embossed", "neon-amber", "holographic"] as const,
   heatmapAnimation: ["fade-in", "diagonal", "ripple", "scatter", "cascade", "waterfall"] as const,
   tierTreatment: ["standard", "enhanced"] as const,
-  colorPalette: ["jade", "indigo", "amber", "crimson", "mono"] as const,
+  colorPalette: ["ice", "jade", "indigo", "amber", "crimson", "mono"] as const,
 } as const;
 
 /** Default config — all fields set to their first (most basic) option */
@@ -329,7 +329,7 @@ export const DEFAULT_BADGE_CONFIG: BadgeConfig = {
   scoreEffect: "standard",
   heatmapAnimation: "fade-in",
   tierTreatment: "standard",
-  colorPalette: "jade",
+  colorPalette: "ice",
 };
 
 // ---------------------------------------------------------------------------

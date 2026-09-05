@@ -25,7 +25,7 @@ describe("BadgeOverlay", () => {
   it("renders all 11 hotspot regions", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
     expect(hotspots.length).toBe(11);
   });
@@ -38,7 +38,7 @@ describe("BadgeOverlay", () => {
   it("hotspots are not focusable via Tab (#1116)", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
     expect(hotspots.length).toBe(11);
     for (const hotspot of hotspots) {
@@ -49,16 +49,16 @@ describe("BadgeOverlay", () => {
 
   it("hotspots have aria-label", () => {
     render(<BadgeOverlay />);
-    expect(screen.getByLabelText("archetype info")).toBeDefined();
-    expect(screen.getByLabelText("heatmap info")).toBeDefined();
-    expect(screen.getByLabelText("radar info")).toBeDefined();
-    expect(screen.getByLabelText("score info")).toBeDefined();
-    expect(screen.getByLabelText("tier info")).toBeDefined();
+    expect(screen.getByLabelText("ARCHETYPE — More information")).toBeDefined();
+    expect(screen.getByLabelText("HEATMAP — More information")).toBeDefined();
+    expect(screen.getByLabelText("RADAR — More information")).toBeDefined();
+    expect(screen.getByLabelText("SCORE — More information")).toBeDefined();
+    expect(screen.getByLabelText("TIER — More information")).toBeDefined();
   });
 
   it("shows leader line on hotspot hover", () => {
     const { container } = render(<BadgeOverlay />);
-    const archetype = screen.getByLabelText("archetype info");
+    const archetype = screen.getByLabelText("ARCHETYPE — More information");
     fireEvent.mouseEnter(archetype);
     // After hover, SVG should contain a path element
     const svg = container.querySelector("#leader-lines-svg");
@@ -68,7 +68,7 @@ describe("BadgeOverlay", () => {
 
   it("hides leader line on mouse leave", () => {
     const { container } = render(<BadgeOverlay />);
-    const archetype = screen.getByLabelText("archetype info");
+    const archetype = screen.getByLabelText("ARCHETYPE — More information");
     fireEvent.mouseEnter(archetype);
     fireEvent.mouseLeave(archetype);
     const svg = container.querySelector("#leader-lines-svg");
@@ -81,7 +81,7 @@ describe("BadgeOverlay", () => {
   // mechanism (see "shows leader line on hotspot hover" above).
   it("does not show leader line on focus — hotspot is no longer focusable (#1116)", () => {
     const { container } = render(<BadgeOverlay />);
-    const archetype = screen.getByLabelText("archetype info");
+    const archetype = screen.getByLabelText("ARCHETYPE — More information");
     fireEvent.focus(archetype);
     const svg = container.querySelector("#leader-lines-svg");
     expect(svg?.querySelector("path")).toBeNull();
@@ -132,7 +132,7 @@ describe("BadgeOverlay", () => {
   it("all 11 hotspots have non-empty sr-only descriptions reachable without any interaction (#1116)", () => {
     const { container } = render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
     expect(hotspots.length).toBe(11);
     for (const hotspot of hotspots) {

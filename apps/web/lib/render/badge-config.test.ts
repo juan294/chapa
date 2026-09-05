@@ -20,6 +20,16 @@ const CUSTOM = { ...DEFAULT_BADGE_CONFIG, border: "none" as const };
 describe("resolveBadgeConfig (#1191)", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it.each(["ice", "jade", "indigo", "amber", "crimson", "mono"] as const)(
+    "preserves the explicit saved %s palette and revision", async (colorPalette) => {
+      const config = { ...CUSTOM, colorPalette };
+      mockDbGetStudioConfig.mockResolvedValue({ status: "found", config, revision: 7 });
+      await expect(resolveBadgeConfigSnapshot("octocat")).resolves.toEqual({
+        config, revision: 7, cacheable: true,
+      });
+    },
+  );
+
   it("returns the saved config when there is one", async () => {
     mockDbGetStudioConfig.mockResolvedValue({
       status: "found",

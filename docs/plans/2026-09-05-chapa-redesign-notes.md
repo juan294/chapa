@@ -27,3 +27,17 @@ Plan: `2026-09-05-chapa-redesign`.
   Next loaders and raster TTFs, remove the provisional duplicate browser TTFs.
   Why: compiled/browser evidence satisfies the contract without 671 KB of
   duplicate font assets.
+
+- Phase 2: the plan retained every score treatment. Review found Gold Leaf's
+  darkest stop and the shared opacity pulse reduced large score contrast below
+  3:1 on the badge grounds. Changed only the darkest Gold Leaf stop from
+  `#78350F` to `#9A5A16` and kept custom score paints fully opaque. Standard
+  retains its pulse; gradient animations remain. Six palette regressions cover
+  the darkest displayed score paints against their base grounds.
+  Combined Aurora/Crystal surfaces still reduced contrast, so the existing ring
+  track now fills with the palette's opaque ground. Actual font-isolated raster
+  inspection found a 100 score pixel crossing the ring at 52px; three-digit
+  scores use 48px, with all other scores retaining 52px.
+  The same combined-effect review found verification/sample coral below 4.5:1;
+  the existing right strip now uses an opaque palette ground behind its text.
+  Archetype pills already had opaque grounds and pass all six palettes.
