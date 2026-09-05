@@ -35,52 +35,43 @@ describe("durable supplemental v2 publication", () => {
     await expect(dbStoreSupplementalEvidenceV2("bob", value, reference)).rejects.toThrow();
   });
 });
-describe("manifest-fenced supplemental cache", () => {
-  it("requires an authorized current manifest even for a cache hit", async () => {
+describe("fresh supplemental reads with retired cache cleanup", () => {
+  it("requires an authorized current manifest and never consumes a private Redis copy", async () => {
     mocks.cacheGet.mockResolvedValue({ owner: "alice", manifest, records: [record] });
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
     await expect(readSupplementalEvidenceV2("alice", window)).rejects.toThrow();
     expect(mocks.cacheGet).not.toHaveBeenCalled();
+    expect(mocks.cacheSet).not.toHaveBeenCalled();
+    expect(mocks.cacheDel).toHaveBeenCalledWith("supplemental:v7:alice");
   });
-  it("produces identical aged evidence on Redis hit and durable fallback", async () => {
-    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [record], error: null });
-    const cold = await readSupplementalEvidenceV2("alice", window);
-    const cached = mocks.cacheSet.mock.calls[0]?.[1];
-    mocks.rpc.mockResolvedValue({ data: manifest, error: null }); mocks.cacheGet.mockResolvedValue(cached);
-    const hot = await readSupplementalEvidenceV2("alice", window);
-    expect(hot).toEqual(cold);
-    expect(mocks.rpc).toHaveBeenCalledTimes(3);
-    expect(mocks.cacheGet).toHaveBeenCalledWith("supplemental:v7:alice");
-  });
-  it.each([
-    { owner: "bob", manifest, records: [record] },
-    { owner: "alice", manifest: [], records: [] },
-    { owner: "alice", manifest, records: [] },
-  ])("rejects stale, cross-owner or incomplete cached manifests %j", async cached => {
-    mocks.cacheGet.mockResolvedValue(cached);
-    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [record], error: null });
+  it("reads committed records and checks the final manifest without caching private content", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [record], error: null }).mockResolvedValueOnce({ data: manifest, error: null });
     const result = await readSupplementalEvidenceV2("alice", window);
     expect(result.evidence.scope.sources).toHaveLength(1);
-    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(result.cacheRefreshed).toBe(true);
+    expect(mocks.rpc).toHaveBeenCalledTimes(3);
+    expect(mocks.cacheGet).not.toHaveBeenCalled(); expect(mocks.cacheSet).not.toHaveBeenCalled();
   });
-  it("does not return a false empty profile when committed payloads disappear or fail", async () => {
-    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [], error: null });
-    await expect(readSupplementalEvidenceV2("alice", window)).rejects.toThrow();
+  it("cannot return records withdrawn while a durable read was in flight", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [record], error: null }).mockResolvedValueOnce({ data: [], error: null });
+    await expect(readSupplementalEvidenceV2("alice", window)).rejects.toThrow("changed during read");
     expect(mocks.cacheSet).not.toHaveBeenCalled();
   });
-  it("reports failed cache publication without losing the committed evidence", async () => {
-    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [record], error: null });
-    mocks.cacheSet.mockResolvedValue(false); mocks.cacheDel.mockResolvedValue(false);
+  it("does not return false empty evidence when committed payloads disappear", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [], error: null });
+    await expect(readSupplementalEvidenceV2("alice", window)).rejects.toThrow();
+  });
+  it("reports failed retired-key cleanup explicitly while retaining authorized evidence", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: manifest, error: null }).mockResolvedValueOnce({ data: [record], error: null }).mockResolvedValueOnce({ data: manifest, error: null });
+    mocks.cacheDel.mockResolvedValue(false);
     const result = await readSupplementalEvidenceV2("alice", window);
     expect(result.cacheRefreshed).toBe(false);
     expect(result.evidence.scope.sources).toHaveLength(1);
   });
-  it("an empty current manifest cannot serve evidence withdrawn from the database", async () => {
-    mocks.cacheGet.mockResolvedValue({ owner: "alice", manifest, records: [record] });
+  it("empty manifests expose no withdrawn evidence", async () => {
     mocks.rpc.mockResolvedValue({ data: [], error: null });
     const result = await readSupplementalEvidenceV2("alice", window);
-    expect(result.evidence.events).toEqual([]);
-    expect(result.evidence.scope.sources).toEqual([]);
+    expect(result.evidence.events).toEqual([]); expect(result.evidence.scope.sources).toEqual([]);
   });
 });
 

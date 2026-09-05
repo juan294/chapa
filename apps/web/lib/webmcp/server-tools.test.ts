@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getCachedCraftScore: vi.fn(),
   getSnapshots: vi.fn(),
   getVerificationRecord: vi.fn(),
+  getReceiptVerificationV7: vi.fn(),
   scheduleServerEvent: vi.fn(),
 }));
 
@@ -30,6 +31,7 @@ vi.mock("@/lib/history/history", () => ({
 
 vi.mock("@/lib/verification/store", () => ({
   getVerificationRecord: mocks.getVerificationRecord,
+  getReceiptVerificationV7: mocks.getReceiptVerificationV7,
 }));
 
 vi.mock("@/lib/i18n/server", () => ({
@@ -347,4 +349,13 @@ describe("remote MCP server tools", () => {
       agentClass: "anthropic",
     });
   });
+});
+
+
+it("looks up v7 revocation through the current consent gate without legacy projection", async () => {
+  const token = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
+  mocks.getReceiptVerificationV7.mockResolvedValue({ version: "v7", status: "revoked", signatureAuthenticated: false });
+  const result = JSON.parse(await tool("verify_badge").execute({ hash: token }));
+  expect(result).toEqual({ version: "v7", status: "revoked", signatureAuthenticated: false });
+  expect(mocks.getReceiptVerificationV7).toHaveBeenCalledWith(token);
 });

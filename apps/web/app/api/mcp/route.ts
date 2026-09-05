@@ -67,7 +67,7 @@ const mcpHandler = createMcpHandler(
   },
 );
 
-export const POST = withErrorCapture("/api/mcp", async (request: NextRequest) => {
+const dispatchPost = withErrorCapture("/api/mcp", async (request: NextRequest) => {
   if (!(await isMcpServerEnabled())) {
     return NextResponse.json(
       {
@@ -92,13 +92,28 @@ export const POST = withErrorCapture("/api/mcp", async (request: NextRequest) =>
   return mcpHandler(request);
 });
 
+/** Receipt consent is checked per request; neither JSON nor SSE may be stored. */
+export async function POST(request: NextRequest): Promise<Response> {
+  try {
+    const response = await dispatchPost(request);
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "no-store");
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  } catch {
+    return NextResponse.json(
+      { error: "MCP is unavailable. Please try again later." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+}
+
 function methodNotAllowed(): Response {
   return NextResponse.json(
     {
       error: "This stateless MCP endpoint accepts POST requests only.",
       hint: "Send MCP Streamable HTTP JSON-RPC requests with POST /api/mcp.",
     },
-    { status: 405, headers: { Allow: "POST" } },
+    { status: 405, headers: { Allow: "POST", "Cache-Control": "no-store" } },
   );
 }
 

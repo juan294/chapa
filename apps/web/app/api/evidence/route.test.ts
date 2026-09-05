@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), write: vi.fn(), read: vi.fn(), artifact: vi.fn(), limit: vi.fn(), invalidate: vi.fn(), del: vi.fn(), capture: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), write: vi.fn(), read: vi.fn(), artifact: vi.fn(), limit: vi.fn(), invalidate: vi.fn(), del: vi.fn(), capture: vi.fn(), withdraw: vi.fn() }));
+vi.mock("@/lib/verification/cleanup", () => ({ withdrawReceiptPublicationV7: mocks.withdraw }));
 vi.mock("@/lib/auth/resolve-request-auth", () => ({ resolveRequestAuth: mocks.auth }));
 vi.mock("@/lib/cache/redis", () => ({ rateLimitStrict: mocks.limit, cacheDel: mocks.del }));
 vi.mock("@/lib/profile/post-write-invalidation", () => ({ invalidateProfileReadModels: mocks.invalidate }));
@@ -8,7 +9,7 @@ vi.mock("@/lib/db/engineering-evidence", async importOriginal => ({ ...await imp
 vi.mock("@/lib/analytics/server-errors", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/analytics/server-errors")>(), captureServerError: mocks.capture }));
 import { POST, GET } from "./route";
 import { LedgerStorageError } from "@/lib/db/engineering-evidence";
-beforeEach(() => { vi.clearAllMocks(); mocks.limit.mockResolvedValue({ allowed: true }); mocks.auth.mockResolvedValue({ handle: "owner" }); mocks.write.mockResolvedValue({ success: true }); mocks.read.mockResolvedValue({ ownerId: "owner", claims: [] }); mocks.invalidate.mockResolvedValue(undefined); mocks.del.mockResolvedValue(undefined); });
+beforeEach(() => { vi.clearAllMocks(); mocks.limit.mockResolvedValue({ allowed: true }); mocks.auth.mockResolvedValue({ handle: "owner" }); mocks.write.mockResolvedValue({ success: true }); mocks.read.mockResolvedValue({ ownerId: "owner", claims: [] }); mocks.invalidate.mockResolvedValue(undefined); mocks.del.mockResolvedValue(true); mocks.withdraw.mockResolvedValue({ success: true, withdrawn: true, cleanup: { complete: true } }); });
 const request = (body: unknown) => new NextRequest("http://localhost/api/evidence", { method: "POST", body: JSON.stringify(body) });
 describe("private evidence route boundary", () => {
   it("requires authentication and applies a limit before authentication", async () => {
@@ -24,7 +25,8 @@ describe("private evidence route boundary", () => {
   it("invalidates the supplemental private cache on withdrawal and returns no-store", async () => {
     const response = await POST(request({ action: "withdraw", owner: "owner", publicationAcknowledged: true }));
     expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(mocks.del).toHaveBeenCalledWith("supplemental:v7:owner");
+    expect(mocks.withdraw).toHaveBeenCalledWith("owner", "owner", true);
+    expect(mocks.write).not.toHaveBeenCalled();
   });
   it("rejects oversized and undeclared trusted properties", async () => {
     expect((await POST(request({ action: "withdraw", owner: "owner", publicationAcknowledged: true, authorization: "forged" }))).status).toBe(400);
@@ -34,7 +36,7 @@ describe("private evidence route boundary", () => {
   it("maps denied reads and revision conflicts without leaking database details", async () => {
     mocks.read.mockRejectedValue(new LedgerStorageError("42501"));
     expect((await GET(new NextRequest("http://localhost/api/evidence?owner=other"))).status).toBe(403);
-    mocks.write.mockRejectedValue(new LedgerStorageError("40001"));
+    mocks.withdraw.mockRejectedValue(new LedgerStorageError("40001"));
     expect((await POST(request({ action: "withdraw", owner: "owner", publicationAcknowledged: true }))).status).toBe(409);
   });
   it("serves a single authorized raw body as JSON without fetching its locator", async () => {
@@ -62,4 +64,23 @@ it("captures only a fixed error for unexpected private failures in both handlers
     expect(call.error.stack).not.toContain(privateDetail);
     expect(call.error.cause).toBeUndefined();
   }
+});
+
+it("routes consent-off through atomic withdrawal and reports partial cache cleanup", async () => {
+  mocks.withdraw.mockResolvedValue({ success: false, withdrawn: true, cleanup: { complete: false } });
+  const response = await POST(request({ action: "consent", owner: "owner", enabled: false, publicationAcknowledged: true }));
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({ withdrawn: true, cleanup: { complete: false } });
+  expect(mocks.withdraw).toHaveBeenCalledWith("owner", "owner", true);
+  expect(mocks.write).not.toHaveBeenCalled();
+});
+
+it("returns accepted/pending for an empty withdrawal retry without inviting targeted retry", async () => {
+  mocks.withdraw.mockResolvedValue({ success: false, withdrawn: true, cleanup: { complete: false, status: "pending" } });
+  const response = await POST(request({ action: "withdraw", owner: "owner", publicationAcknowledged: true }));
+  expect(response.status).toBe(202);
+  expect(response.headers.get("cache-control")).toBe("private, no-store");
+  const body = await response.json();
+  expect(body).toMatchObject({ withdrawn: true, cleanup: { complete: false, status: "pending" } });
+  expect(JSON.stringify(body)).not.toContain("Retry cleanup");
 });

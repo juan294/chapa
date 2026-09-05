@@ -1,12 +1,11 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { scoringInstant, type ScoringWindow } from "@chapa/shared";
-import { cacheDel, cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheDel } from "@/lib/cache/redis";
 import { SupplementalEvidenceConflict, ageSupplementalEvidence, parseSupplementalEvidenceV2, type StoredSupplementalEvidenceV2 } from "@/lib/platform/evidence-aging";
 import { getSupabase } from "./supabase";
 
 interface ManifestEntry { readonly uploadId: string; readonly uploadedAt: string }
-interface CachedPortfolio { readonly owner: string; readonly manifest: readonly ManifestEntry[]; readonly records: readonly StoredSupplementalEvidenceV2[] }
 const MAX_UPLOADS_PER_READ = 1000;
 function storage() {
   const db = getSupabase();
@@ -52,29 +51,25 @@ export async function dbStoreSupplementalEvidenceV2(owner: string, value: unknow
   return record(data, lower);
 }
 
-/** Private source projection for server scoring. Public routes must emit only receipt allowlists. */
+/** Private records stay in authorized durable storage; the retired Redis copy is removed. */
 export async function readSupplementalEvidenceV2(owner: string, window: ScoringWindow) {
   const lower = owner.toLowerCase(), key = `supplemental:v7:${lower}`;
-  const { data, error } = await storage().rpc("scoring_v7_supplemental_manifest", {
-    p_owner: lower, p_actor: lower, p_reference: window.referenceTime, p_limit: MAX_UPLOADS_PER_READ + 1,
-  });
-  if (error) throw new Error("Supplemental evidence manifest read failed");
-  const current = manifest(data);
-  const cached = await cacheGet<CachedPortfolio>(key).catch(() => null);
-  let stored: readonly StoredSupplementalEvidenceV2[] | null = null;
-  if (cached?.owner === lower && canonical(cached.manifest) === canonical(current)) {
-    try { stored = records(cached.records, lower, current); } catch { /* Durable rows repair malformed or stale cache payloads. */ }
-  }
-  let cacheRefreshed = stored !== null;
-  if (!stored) {
-    const result = current.length ? await storage().rpc("scoring_v7_read_supplemental", {
-      p_owner: lower, p_actor: lower, p_upload_ids: current.map(item => item.uploadId), p_reference: window.referenceTime,
-    }) : { data: [], error: null };
-    if (result.error) throw new Error("Supplemental evidence payload read failed");
-    stored = records(result.data, lower, current);
-    const published = await cacheSet(key, { owner: lower, manifest: current, records: stored }, 86400).catch(() => false);
-    cacheRefreshed = published || await cacheDel(key).catch(() => false);
-  }
-  // Aging is applied after either source path; the cache never contains a frozen annual score.
+  const readManifest = async () => {
+    const { data, error } = await storage().rpc("scoring_v7_supplemental_manifest", {
+      p_owner: lower, p_actor: lower, p_reference: window.referenceTime, p_limit: MAX_UPLOADS_PER_READ + 1,
+    });
+    if (error) throw new Error("Supplemental evidence manifest read failed");
+    return manifest(data);
+  };
+  // Also attempted on every withdrawal retry and by the retired-namespace cron sweep.
+  const cacheRefreshed = await cacheDel(key).catch(() => false);
+  const current = await readManifest();
+  const result = current.length ? await storage().rpc("scoring_v7_read_supplemental", {
+    p_owner: lower, p_actor: lower, p_upload_ids: current.map(item => item.uploadId), p_reference: window.referenceTime,
+  }) : { data: [], error: null };
+  if (result.error) throw new Error("Supplemental evidence payload read failed");
+  const stored = records(result.data, lower, current);
+  const final = await readManifest();
+  if (canonical(final) !== canonical(current)) throw new Error("Supplemental evidence changed during read");
   return { evidence: ageSupplementalEvidence(stored, lower, window), cacheRefreshed };
 }

@@ -5,7 +5,8 @@ import {
 } from "@chapa/shared";
 import {
   CURRENT_VERIFICATION_HASH_HEX_LENGTH,
-  VERIFICATION_HASH_PATTERN,
+  VERIFICATION_CODE_PATTERN,
+  parseVerificationTokenV7,
   VERIFICATION_RECORD_TTL_DAYS,
 } from "@/lib/verification/constants";
 import {
@@ -66,7 +67,7 @@ export const EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA = {
 export const VERIFY_BADGE_SERVER_INPUT_SCHEMA = {
   type: "object",
   properties: {
-    hash: { type: "string", pattern: VERIFICATION_HASH_PATTERN.source },
+    hash: { type: "string", pattern: VERIFICATION_CODE_PATTERN.source },
   },
   required: ["hash"],
   additionalProperties: false,
@@ -128,7 +129,7 @@ export function compareDimensions(
 export const VERIFICATION_EXPLANATION = {
   algorithm: "HMAC-SHA256",
   howItWorks:
-    `Current Chapa badges use a deterministic payload from the badge profile fields, sign it with a server-held secret key, and use the first ${CURRENT_VERIFICATION_HASH_HEX_LENGTH} hexadecimal characters (128 bits) as the verification code.`,
+    `Legacy Chapa badges used a deterministic payload from the badge profile fields, sign it with a server-held secret key, and use the first ${CURRENT_VERIFICATION_HASH_HEX_LENGTH} hexadecimal characters (128 bits) as the verification code.`,
   proves: [
     "Only Chapa can issue the hash for the original signed payload because only the Chapa server knows the signing secret.",
     "Changing any field in that original payload would produce a different hash.",
@@ -137,13 +138,20 @@ export const VERIFICATION_EXPLANATION = {
   doesNotProve: [
     "This lookup does not recompute the HMAC from an SVG, and the stored record does not expose every signed payload field for manual comparison.",
     "It does not independently prove that the underlying platform data is accurate; Chapa trusts its platform data sources.",
-    "It does not prevent someone from editing an SVG file; it makes changes to signed fields detectable.",
-    `It is not a blockchain or permanent public ledger; verification records expire after ${VERIFICATION_RECORD_TTL_DAYS} days.`,
+    "It does not prevent someone from editing an SVG file; an unchanged original link still returns the original record.",
+    `Legacy verification records expire after ${VERIFICATION_RECORD_TTL_DAYS} days; complete historical signed inputs are unavailable for v7 replay.`,
   ],
 } as const;
 
+export const RECEIPT_VERIFICATION_EXPLANATION = {
+  algorithm: "HMAC-SHA256",
+  howItWorks: "V7 signs the complete canonical receipt with a server-held secret key. Its token contains the immutable revision UUID and full 256-bit HMAC.",
+  proves: ["Recorded issuance, authentication with the available key, and arithmetic replay are separate states.", "An authenticated signature binds the original canonical receipt, including optional Craft and the scoring reference."],
+  doesNotProve: ["This lookup does not inspect an SVG or authenticate the identity displayed in an edited badge.", "A signature does not independently prove source evidence, software quality or causal impact.", "A revoked revision has no retrievable receipt; its tombstone does not authenticate a supplied signature.", "Withdrawal removes public access, but independent prior downloads cannot be recalled."],
+} as const;
+
 export function verificationCodeFormat(hash: string): string {
-  return hash.length === CURRENT_VERIFICATION_HASH_HEX_LENGTH
-    ? `Current ${CURRENT_VERIFICATION_HASH_HEX_LENGTH}-character verification code.`
-    : `Verified legacy ${hash.length}-character verification code.`;
+  return parseVerificationTokenV7(hash)
+    ? "V7 receipt revision and full 256-bit HMAC."
+    : `Legacy ${hash.length}-character verification code; lookup does not replay the complete signed payload.`;
 }

@@ -43,7 +43,9 @@ describe("POST /api/evidence complete local workflow", () => {
     expect(privateRead.status).toBe(200);
     expect((await write(owner, { action: "grant", owner, reviewer, enabled: false })).status).toBe(200);
     expect((await invokeJson(GET, { method: "GET", path: `/api/evidence?owner=${owner}`, bearer: makeCliBearer(reviewer) })).status).toBe(403);
-    expect((await write(owner, { action: "withdraw", owner, publicationAcknowledged: true })).status).toBe(200);
+    const withdrawal = await write(owner, { action: "withdraw", owner, publicationAcknowledged: true });
+    expect(withdrawal.status).toBe(202);
+    expect(bodyAsRecord(withdrawal)).toMatchObject({ withdrawn: true, success: false, cleanup: { complete: false, status: "pending" } });
     for (const table of ["scoring_v7_evidence", "scoring_v7_assessments", "scoring_v7_evidence_references", "scoring_v7_raw_artifacts"]) {
       expect((await getServiceClient().from(table).select("owner_handle").eq("owner_handle", owner)).data).toEqual([]);
     }

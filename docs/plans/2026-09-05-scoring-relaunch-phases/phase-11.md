@@ -116,17 +116,17 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] Changing any signed dimension, range, Craft presence, policy or date fails submitted-payload comparison.
-- [ ] The original Craft dimension survives DB write/read and API presentation.
-- [ ] A valid original URL on an edited badge verifies only the original receipt and exposes comparison instructions, never claims to inspect the SVG.
-- [ ] Historical v6 records remain labeled legacy; no key/secret becomes public.
-- [ ] Private evidence cannot leak through public receipt, verification, API, RSC or cache paths.
-- [ ] Owner consent withdrawal removes public access and private backing data as specified, leaves only a content-free revocation tombstone, and never claims a revoked receipt is currently verified.
+- [x] Changing any signed dimension, range, Craft presence, policy or date fails submitted-payload comparison.
+- [x] The original Craft dimension survives DB write/read and API presentation.
+- [x] A valid original URL on an edited badge verifies only the original receipt and exposes comparison instructions, never claims to inspect the SVG.
+- [x] Historical v6 records remain labeled legacy; no key/secret becomes public.
+- [x] Private evidence cannot leak through public receipt, verification, API, RSC or cache paths.
+- [x] Owner consent withdrawal removes public access and private backing data as specified, leaves only a content-free revocation tombstone, and never claims a revoked receipt is currently verified.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## Sequential local verification

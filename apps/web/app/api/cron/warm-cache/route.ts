@@ -1,3 +1,4 @@
+import { sweepRevokedReceiptCachesV7, sweepRetiredSupplementalCachesV7 } from "@/lib/verification/cleanup";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
 import { getWarmCachePriorityHandles } from "@/lib/env";
@@ -359,6 +360,21 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     // Non-critical — don't fail the cron response
   }
 
+  let revokedReceiptCaches: Awaited<ReturnType<typeof sweepRevokedReceiptCachesV7>> | null = null;
+  try {
+    revokedReceiptCaches = await sweepRevokedReceiptCachesV7();
+  } catch {
+    console.error("[RETENTION_FAILURE] Receipt cache sweep failed");
+    void captureServerError({ error: new Error("Receipt cache sweep failed"), route: "/api/cron/warm-cache", statusCode: 503 });
+  }
+
+  let retiredSupplementalCaches: Awaited<ReturnType<typeof sweepRetiredSupplementalCachesV7>> | null = null;
+  try {
+    retiredSupplementalCaches = await sweepRetiredSupplementalCachesV7();
+  } catch {
+    console.error("[RETENTION_FAILURE] Retired supplemental cache sweep failed");
+    void captureServerError({ error: new Error("Retired supplemental cache sweep failed"), route: "/api/cron/warm-cache", statusCode: 503 });
+  }
   let expiredCraftRawDeleted: number | null = null;
   try {
     expiredCraftRawDeleted = await dbPurgeExpiredCraftRawV7();
@@ -397,6 +413,8 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       expiredMergeOpsDeleted,
       expiredSnapshotsDeleted,
       expiredCraftRawDeleted,
+      revokedReceiptCaches,
+      retiredSupplementalCaches,
       processedCount,
       processedSample: toWarm.slice(0, Math.min(completedCount, 10)),
       timedOut,

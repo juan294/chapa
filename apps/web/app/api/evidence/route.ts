@@ -1,9 +1,10 @@
+import { withdrawReceiptPublicationV7 } from "@/lib/verification/cleanup";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { type NextRequest, NextResponse } from "next/server";
 import { createScoringWindow } from "@chapa/shared";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { assertHandleOwnership } from "@/lib/auth/assert-handle-ownership";
-import { cacheDel, rateLimitStrict } from "@/lib/cache/redis";
+import { rateLimitStrict } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { MAX_EVIDENCE_BYTES, parseLedgerCommand } from "@/lib/evidence/validation";
 import { dbReadEngineeringArtifact, dbReadEngineeringEvidence, dbWriteEngineeringEvidence, LedgerStorageError } from "@/lib/db/engineering-evidence";
@@ -57,11 +58,18 @@ async function postEvidence(request: NextRequest) {
     if (denied) return denied;
   }
   try {
-    const result = await dbWriteEngineeringEvidence(auth.handle, command, referenceTime);
+    const withdrawing = command.action === "withdraw" || (command.action === "consent" && !command.enabled);
+    const result = withdrawing
+      ? await withdrawReceiptPublicationV7(command.owner, auth.handle, true)
+      : await dbWriteEngineeringEvidence(auth.handle, command, referenceTime);
     await invalidateProfileReadModels(command.owner, { stats: true, craft: true, snapshot: true, history: true, badgeSvg: true });
-    if (command.action === "withdraw" || (command.action === "consent" && !command.enabled)) {
-      // S07 validates its private cached manifest against current authorized DB state as a second gate.
-      await cacheDel(`supplemental:v7:${command.owner}`);
+    // Revocation is already committed. Empty retries cannot re-identify erased
+    // owner/revision links, so they await the recurring content-free sweep.
+    if (withdrawing && result.success === false) {
+      const cleanup = result.cleanup as { status?: string };
+      return cleanup.status === "pending"
+        ? json({ ...result, message: "Publication withdrawn; receipt cache cleanup remains unconfirmed pending the background sweep." }, 202)
+        : json({ ...result, error: "Publication withdrawn; cache cleanup failed. Background sweeps will retry known revoked and retired cache entries." }, 503);
     }
     return json(result);
   } catch (error) { return failure(error); }

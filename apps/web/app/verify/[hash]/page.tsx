@@ -1,4 +1,4 @@
-import { getVerificationRecord } from "@/lib/verification/store";
+import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
 import {
   toPublicVerificationRecord,
   type VerificationRecord,
@@ -19,7 +19,9 @@ import { isWebmcpEnabled } from "@/lib/feature-flags";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { VerifyPageWebMcpTools } from "./VerifyPageWebMcpTools";
-import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
+import { VERIFICATION_CODE_PATTERN, parseVerificationTokenV7 } from "@/lib/verification/constants";
+
+import { ReceiptCard } from "./ReceiptCard";
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +44,7 @@ export async function generateMetadata({
   const locale = await getServerLocale(lang);
   const t = getServerT(locale);
   return {
-    title: VERIFICATION_HASH_PATTERN.test(hash)
+    title: VERIFICATION_CODE_PATTERN.test(hash)
       ? `${t('verify.title') as string} ${hash}`
       : t('verifyDetail.invalidHashTitle') as string,
     description: t('verify.description') as string,
@@ -61,7 +63,7 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   // off that page.
   const innerNavLinks = tArray<{ label: string; href: string }>(t, "nav.innerLinks");
 
-  if (!VERIFICATION_HASH_PATTERN.test(hash)) {
+  if (!VERIFICATION_CODE_PATTERN.test(hash)) {
     return (
       <VerifyLocaleBoundary
         locale={locale}
@@ -71,6 +73,21 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
       >
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
           <InvalidHashCard hash={hash} t={t} />
+        </main>
+      </VerifyLocaleBoundary>
+    );
+  }
+
+  if (parseVerificationTokenV7(hash)) {
+    let result;
+    try { result = await getReceiptVerificationV7(hash); }
+    catch { result = "unavailable" as const; }
+    const webmcpEnabled = await isWebmcpEnabled();
+    return (
+      <VerifyLocaleBoundary locale={locale} navLinks={innerNavLinks} queryLang={lang} t={t}>
+        <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
+          <ReceiptCard token={hash} result={result} t={t} />
+          {webmcpEnabled && result && result !== "unavailable" && <VerifyPageWebMcpTools hash={hash} version="v7" />}
         </main>
       </VerifyLocaleBoundary>
     );

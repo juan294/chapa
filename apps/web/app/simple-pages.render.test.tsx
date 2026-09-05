@@ -135,24 +135,24 @@ describe("VerifyInputPage render", () => {
     expect(meta.robots).toEqual({ index: false, follow: true });
   });
 
-  it("dictionary copy explains hash format, where to find it, and the verified-vs-public claim limit (EN and ES)", async () => {
+  it("explains versioned lookup formats and the limits of an original link in both locales", async () => {
     const { en } = await import("@/lib/i18n/dictionaries/en");
     const { es } = await import("@/lib/i18n/dictionaries/es");
     const enContent = JSON.stringify(en.verify);
     const esContent = JSON.stringify(es.verify);
 
+    expect(enContent).toContain("v7 receipt token");
     expect(enContent).toContain("8, 16, or 32-character");
-    expect(enContent).toContain("right edge");
-    expect(enContent).toContain("badge marked Verified metrics");
-    expect(enContent).toContain(
-      "Badges marked Public metrics do not claim cryptographic verification",
-    );
+    expect(enContent).toContain("original verification link");
+    expect(enContent).toContain("recorded issuance, signature authentication and arithmetic replay");
+    expect(enContent).toContain("does not inspect an edited SVG");
     expect(enContent).not.toContain("from any Chapa badge");
 
-    expect(esContent).toContain("Métricas verificadas");
-    expect(esContent).toContain(
-      "Métricas públicas» no afirman tener verificación criptográfica",
-    );
+    expect(esContent).toContain("recibo v7");
+    expect(esContent).toContain("8, 16 o 32 caracteres");
+    expect(esContent).toContain("enlace de verificación original");
+    expect(esContent).toContain("emisión registrada, autenticación de firma y reproducción aritmética");
+    expect(esContent).toContain("no inspecciona un SVG editado");
   });
 });
 

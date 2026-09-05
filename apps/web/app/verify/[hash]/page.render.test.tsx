@@ -4,6 +4,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 
 vi.mock("@/lib/verification/store", () => ({
   getVerificationRecord: vi.fn(),
+  getReceiptVerificationV7: vi.fn(),
 }));
 
 const featureFlagMocks = vi.hoisted(() => ({
@@ -25,7 +26,7 @@ vi.mock("./VerifyPageWebMcpTools", () => ({
     <span
       data-testid="verify-page-webmcp-tools"
       data-hash={hash}
-      data-handle={record.handle}
+      data-handle={record?.handle}
     />
   ),
 }));
@@ -113,7 +114,8 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import { getVerificationRecord } from "@/lib/verification/store";
+import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
+import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
 import { getServerLocale } from "@/lib/i18n/server";
 import VerifyPage, { generateMetadata } from "./page";
 
@@ -215,7 +217,7 @@ describe("VerifyPage", () => {
       // English: verifyDetail.invalidHashDescription
       expect(
         screen.getByText(
-          "The verification hash must be 8, 16, or 32 hexadecimal characters.",
+          "Use a complete v7 receipt token or an 8, 16, or 32-character legacy hexadecimal code.",
         ),
       ).toBeDefined();
       expect(screen.getByText("zzzzzzzz")).toBeDefined();
@@ -281,7 +283,7 @@ describe("VerifyPage", () => {
       render(jsx);
 
       // English: verifyDetail.verifiedTitle = 'Badge verified'
-      expect(screen.getByText("Badge verified")).toBeDefined();
+      expect(screen.getByText("Legacy verification record")).toBeDefined();
       expect(screen.getByText("@testuser")).toBeDefined();
       expect(screen.getByText("Test User")).toBeDefined();
       const webMcpHost = screen.getByTestId("verify-page-webmcp-tools");
@@ -302,7 +304,7 @@ describe("VerifyPage", () => {
       render(jsx);
 
       expect(screen.queryByTestId("verify-page-webmcp-tools")).toBeNull();
-      expect(screen.getByText("Badge verified")).toBeDefined();
+      expect(screen.getByText("Legacy verification record")).toBeDefined();
     });
 
     it("displays impact score and tier", async () => {
@@ -447,5 +449,37 @@ describe("VerifyPage", () => {
       );
       expect(screen.getByTestId("navbar-link-/verify").textContent).toBe("Verify");
     });
+  });
+});
+
+
+describe("v7 receipt verification page", () => {
+  const token = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
+  const props = { params: Promise.resolve({ hash: token }), searchParams: Promise.resolve({}) };
+  it("shows separate issuance, signature and arithmetic claims with the actual reference", async () => {
+    const envelope = await receiptFixtureV7();
+    vi.mocked(getReceiptVerificationV7).mockResolvedValue({ version: "v7", status: "current", revisionId: envelope.receipt.revisionId, issuanceRecorded: true, signatureAuthenticated: true, keyVersion: "v7-1", arithmetic: "offline_replay_available", sourceEvidence: "not_verified", envelope });
+    render(await VerifyPage(props));
+    expect(screen.getByRole("heading", { name: "Score receipt" })).toBeDefined();
+    expect(screen.getByText("Signature authenticated")).toBeDefined();
+    expect(screen.getByText("2026-09-01T12:00:00.000Z")).toBeDefined();
+    expect(screen.getByText("Craft was not included")).toBeDefined();
+    expect(screen.getByText(/does not inspect an SVG/i)).toBeDefined();
+    expect(screen.queryByText("Badge verified")).toBeNull();
+    expect(screen.getByRole("link", { name: "Open receipt JSON" }).getAttribute("href")).toBe(`/api/verify/${token}`);
+  });
+  it("does not show score content or verification success for a revoked receipt", async () => {
+    vi.mocked(getReceiptVerificationV7).mockResolvedValue({ version: "v7", status: "revoked", revisionId: "11111111-1111-4111-8111-111111111111", signatureAuthenticated: false });
+    render(await VerifyPage(props));
+    expect(screen.getByRole("heading", { name: "Receipt revoked" })).toBeDefined();
+    expect(screen.queryByText("Signature authenticated")).toBeNull();
+    expect(screen.queryByText("Core score")).toBeNull();
+    expect(screen.queryByText("Open receipt JSON")).toBeNull();
+  });
+  it("distinguishes unavailable storage from a missing receipt without exposing the error", async () => {
+    vi.mocked(getReceiptVerificationV7).mockRejectedValue(new Error("private evidence body"));
+    render(await VerifyPage(props));
+    expect(screen.getByRole("heading", { name: "Verification unavailable" })).toBeDefined();
+    expect(screen.queryByText(/private evidence body/)).toBeNull();
   });
 });

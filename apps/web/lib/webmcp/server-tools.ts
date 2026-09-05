@@ -11,9 +11,9 @@ import type { LanguageContextValue } from "@/lib/i18n";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { redactImpactForVisitor } from "@/lib/profile/public-profile";
 import { isValidHandle } from "@/lib/validation";
-import { getVerificationRecord } from "@/lib/verification/store";
+import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
 import { toPublicVerificationRecord } from "@/lib/verification/types";
-import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
+import { VERIFICATION_CODE_PATTERN, parseVerificationTokenV7 } from "@/lib/verification/constants";
 import {
   COMPARE_PROFILES_SERVER_INPUT_SCHEMA,
   EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA,
@@ -22,6 +22,7 @@ import {
   PUBLIC_PROFILE_SIGN_IN_NOTE,
   SITE_CAPABILITIES,
   VERIFICATION_EXPLANATION,
+  RECEIPT_VERIFICATION_EXPLANATION,
   VERIFY_BADGE_SERVER_INPUT_SCHEMA,
   compareDimensions,
 } from "./catalog";
@@ -293,17 +294,24 @@ const verifyBadge: ServerMcpTool = {
     const validationError = validateInputKeys("verify_badge", inputs, ["hash"]);
     if (validationError) return validationError;
     const hash = readString(inputs, "hash");
-    if (!VERIFICATION_HASH_PATTERN.test(hash)) {
+    if (!VERIFICATION_CODE_PATTERN.test(hash)) {
       return invalidInput(
         "verify_badge",
-        "hash must be an 8, 16, or 32 character lowercase hexadecimal verification code",
+        "hash must be a complete v7 receipt token or an 8, 16, or 32 character lowercase legacy code",
       );
+    }
+    if (parseVerificationTokenV7(hash)) {
+      try {
+        const receipt = await getReceiptVerificationV7(hash);
+        return JSON.stringify(receipt ?? { version: "v7", status: "not_found" });
+      } catch { return JSON.stringify({ error: "Verification is unavailable. Retry later; no verification success is claimed." }); }
     }
     const record = await getVerificationRecord(hash);
     if (!record) return `No verification record was found for hash ${hash}.`;
     const publicRecord = toPublicVerificationRecord(record);
     return JSON.stringify({
-      status: "verified",
+      version: "v6",
+      status: "legacy_record",
       hash,
       record: {
         ...publicRecord,
@@ -322,7 +330,7 @@ const explainVerification: ServerMcpTool = {
   annotations: MCP_READ_ONLY_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("explain_verification", inputs, []);
-    return validationError ?? JSON.stringify(VERIFICATION_EXPLANATION);
+    return validationError ?? JSON.stringify({ algorithm: "HMAC-SHA256", v7: RECEIPT_VERIFICATION_EXPLANATION, legacy: VERIFICATION_EXPLANATION });
   },
 };
 

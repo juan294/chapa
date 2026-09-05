@@ -6,6 +6,7 @@ import {
   parseArgs,
   normalizeHandle,
   redisScanPattern,
+  classifyRedisOwnership,
   SUPABASE_TABLES,
   run,
 } from "./delete-user";
@@ -30,6 +31,9 @@ interface FakeFetchOptions {
   /** Table name whose DELETE request should fail (simulates a mid-loop error). */
   supaDeleteFailTable?: string;
   scoringRpcFails?: boolean;
+  receiptIds?: string[];
+  redisDeleteFails?: boolean;
+  redisKeys?: Set<string>;
   scoringRpcLeavesRows?: boolean;
   /** Successive SCAN pages: cursor to return alongside a batch of keys. */
   scanPages?: Array<{ cursor: string; keys: string[] }>;
@@ -69,19 +73,21 @@ function makeFakeFetch(opts: FakeFetchOptions) {
     }
 
     if (url.startsWith(`${REDIS_URL}/DEL/`)) {
+      if (!opts.redisDeleteFails) opts.redisKeys?.delete(decodeURIComponent(url.slice(`${REDIS_URL}/DEL/`.length)));
       return {
-        ok: true,
-        status: 200,
+        ok: !opts.redisDeleteFails,
+        status: opts.redisDeleteFails ? 500 : 200,
         json: async () => ({ result: 1 }),
         text: async () => "",
       } as unknown as Response;
     }
 
-    if (url === `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user` && method === "POST") {
+    if (url === `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user_with_receipts` && method === "POST") {
       scoringDeleted = !opts.scoringRpcFails && !opts.scoringRpcLeavesRows;
       return {
         ok: !opts.scoringRpcFails, status: opts.scoringRpcFails ? 500 : 204,
         text: async () => opts.scoringRpcFails ? "simulated RPC failure" : "",
+        json: async () => opts.receiptIds ?? [],
       } as Response;
     }
 
@@ -212,13 +218,14 @@ describe("run", () => {
 
   it("deletes v7 atomically once before legacy deletes, never table by table", async () => {
     const { fetchMock, calls } = makeFakeFetch({
+      receiptIds: ["11111111-1111-4111-8111-111111111111"],
       supaCounts: Object.fromEntries(SUPABASE_TABLES.map(({ table }) => [table, 1])),
       scanPages: [{ cursor: "0", keys: ["stats:v2:merged:octocat"] }],
     });
     vi.stubGlobal("fetch", fetchMock);
     await run(["OctoCat", "--delete"]);
     const rpcCalls = calls.filter((c) => c.method === "POST");
-    expect(rpcCalls).toEqual([{ url: `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user`, method: "POST", body: JSON.stringify({ p_handle: "octocat" }) }]);
+    expect(rpcCalls).toEqual([{ url: `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user_with_receipts`, method: "POST", body: JSON.stringify({ p_handle: "octocat" }) }]);
     expect(calls[0]).toEqual(rpcCalls[0]);
     expect(calls.filter((c) => c.method === "DELETE").every((c) => !c.url.includes("/scoring_v7_"))).toBe(true);
     expect(calls.some((c) => c.method === "DELETE" && c.url.includes("/users?"))).toBe(true);
@@ -229,7 +236,7 @@ describe("run", () => {
     const { fetchMock, calls } = makeFakeFetch({ scoringRpcFails: true, supaCounts: { users: 1 } });
     vi.stubGlobal("fetch", fetchMock);
     await expect(run(["octocat", "--delete"])).rejects.toThrow(/scoring_v7_delete_user: 500/);
-    expect(calls).toEqual([{ url: `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user`, method: "POST", body: JSON.stringify({ p_handle: "octocat" }) }]);
+    expect(calls).toEqual([{ url: `${SUPA_URL}/rest/v1/rpc/scoring_v7_delete_user_with_receipts`, method: "POST", body: JSON.stringify({ p_handle: "octocat" }) }]);
   });
 
   it("does not report success or bypass the RPC if v7 rows remain", async () => {
@@ -485,4 +492,54 @@ describe("SUPABASE_TABLES", () => {
     // pass, which is the failure mode that matters most here.
     expect(handleColumnsInSchema().length).toBeGreaterThanOrEqual(11);
   });
+});
+
+describe("exact Redis deletion ownership", () => {
+  it("distinguishes matching handles from substrings and other owners' repository names", () => {
+    expect(classifyRedisOwnership("stats:v2:merged:ann", "ann")).toBe("owned");
+    expect(classifyRedisOwnership("stats:v2:merged:joann", "ann")).toBe("foreign");
+    expect(classifyRedisOwnership("badge:v2:joann:ann:2026-09-05:en", "ann")).toBe("foreign");
+    expect(classifyRedisOwnership("repo:joann:ann", "ann")).toBe("unresolved");
+    expect(classifyRedisOwnership("supplemental:v7:ann", "ann")).toBe("owned");
+  });
+  it("removes captured revision keys and refuses unrelated or unresolved matches", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const { fetchMock, calls } = makeFakeFetch({ receiptIds: [id], scanPages: [{ cursor: "0", keys: ["stats:v2:merged:ann", "stats:v2:merged:joann", "repo:joann:ann-private"] }] });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(run(["ann", "--delete"])).rejects.toThrow("Deletion incomplete: 1 unresolved");
+    const deleted = calls.filter(call => call.url.startsWith(`${REDIS_URL}/DEL/`)).map(call => decodeURIComponent(call.url));
+    expect(deleted).toEqual([`${REDIS_URL}/DEL/stats:v2:merged:ann`, `${REDIS_URL}/DEL/snapshot:v7:receipt:${id}`]);
+    expect(JSON.stringify(vi.mocked(console.log).mock.calls)).not.toContain("ann-private");
+  });
+  it("does not claim completion after cache transport failure", async () => {
+    const { fetchMock } = makeFakeFetch({ redisDeleteFails: true, scanPages: [{ cursor: "0", keys: ["stats:v2:merged:ann"] }] });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(run(["ann", "--delete"])).rejects.toThrow("1 failed cache removal");
+  });
+});
+
+it("recognizes only exact supported-provider negative cache ownership", () => {
+  for (const provider of ["github", "gitlab", "bitbucket", "codeberg"]) {
+    expect(classifyRedisOwnership(`stats:v2:${provider}:ann:neg`, "ann")).toBe("owned");
+    expect(classifyRedisOwnership(`stats:v2:${provider}:joann:neg`, "ann")).toBe("foreign");
+  }
+  for (const key of ["stats:v2:merged:ann:neg", "stats:v2:unknown:ann:neg", "stats:v2:github:ann:no", "stats:v2:github:ann:neg:extra"]) {
+    expect(classifyRedisOwnership(key, "ann")).toBe("unresolved");
+  }
+});
+
+it("reports pending on administrative retry while the first failed receipt cache key remains", async () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const retained = new Set([`snapshot:v7:receipt:${id}`]);
+  const first = makeFakeFetch({ receiptIds: [id], redisDeleteFails: true, redisKeys: retained });
+  vi.stubGlobal("fetch", first.fetchMock);
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  await expect(run(["ann", "--delete"])).rejects.toThrow("1 failed cache removal");
+  const retry = makeFakeFetch({ receiptIds: [], redisKeys: retained });
+  vi.stubGlobal("fetch", retry.fetchMock);
+  await expect(run(["ann", "--delete"])).rejects.toThrow("receipt cache cleanup pending");
+  expect(retained.size).toBe(1);
+  expect(retry.calls.some(call => call.url.includes("/DEL/"))).toBe(false);
 });

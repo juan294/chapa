@@ -1,3 +1,5 @@
+const { mockSweepReceipts } = vi.hoisted(() => ({ mockSweepReceipts: vi.fn(async () => ({ attempted: 0, deleted: 0, failed: 0, cursorSaved: true })) }));
+vi.mock("@/lib/verification/cleanup", () => ({ sweepRevokedReceiptCachesV7: mockSweepReceipts, sweepRetiredSupplementalCachesV7: mockSweepReceipts }));
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";

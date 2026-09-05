@@ -105,7 +105,7 @@
         "S06",
         "S07"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "in-progress"
     },
     {
       "id": "S09",
@@ -183,7 +183,8 @@
         "S12",
         "S13"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-11-verification-validation.md"
     },
     {
       "id": "S15",
@@ -781,6 +782,12 @@
       "path": "/Users/juan/code/chapa-scoring-verification",
       "branch": "feature/scoring-v7-verification",
       "purpose": "S14 complete issuance verification and revocation",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-integrity",
+      "branch": "feature/scoring-v7-integrity",
+      "purpose": "S08 source coverage integrity",
       "cleanupStatus": "active"
     }
   ]

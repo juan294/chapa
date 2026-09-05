@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTranslation } from "@/lib/i18n";
-import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
+import { VERIFICATION_CODE_PATTERN, VERIFICATION_CODE_MAX_LENGTH } from "@/lib/verification/constants";
 
 export function VerifyForm() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export function VerifyForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = hash.trim().toLowerCase();
-    if (!VERIFICATION_HASH_PATTERN.test(trimmed)) {
+    if (!VERIFICATION_CODE_PATTERN.test(trimmed)) {
       setError(t('verifyForm.invalidHash') as string);
       return;
     }
@@ -39,7 +39,7 @@ export function VerifyForm() {
             setError("");
           }}
           placeholder="a1b2c3d4e5f6a7b8"
-          maxLength={32}
+          maxLength={VERIFICATION_CODE_MAX_LENGTH}
           autoComplete="off"
           spellCheck={false}
           aria-invalid={!!error}
