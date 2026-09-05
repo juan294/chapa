@@ -39,6 +39,8 @@ All IDs below are public by nature (they ship in page source). Secrets never go 
 | Baseline URL inspection | done 2026-09-05, see table below |
 | Bing import | done 2026-09-05, sitemap submitted |
 | Clarity project + masking + cookies off | done 2026-09-05 |
+| GA4 ↔ Search Console link | done 2026-09-05 (property `chapa.thecreativetoken.com` ↔ stream `Chapa Web`). Search Console reports appear under GA4 Reports → Library once published. |
+| GA4 event data retention | set to 14 months on 2026-09-05 (default was 2). User data retention was already 14 months. |
 | IndexNow key | generated 2026-09-05: `7ea93889c01181a7b92927485e01e206`. Not yet hosted; Phase 5 commits `apps/web/public/7ea93889c01181a7b92927485e01e206.txt` (containing the key) and the submission script. Public by design: the protocol proves ownership by serving the key file, so it is not a secret. |
 
 ## Baseline URL inspection (Google, 2026-09-05)
