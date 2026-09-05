@@ -188,4 +188,16 @@ describe("GitHub v7 dated evidence adapter", () => {
     expect(result?.coverage.eventKinds.review).toBe("partial");
     expect(result?.coverage.reasonCodes).toContain("discovery_incomplete");
   });
+  it("keeps acceptance coverage unknown for old-authored commits that could reach default branch in-window", async () => {
+    mockApi({
+      V7MergedChanges: () => ({ search: { ...page([]), issueCount: 0 } }),
+      V7ReviewDiscovery: () => ({ user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: page([]) } } }),
+      V7Commits: () => ({ node: { defaultBranchRef: { target: { history: page([{ id: "OLD", oid: "old-sha", author: { user: actor }, authoredDate: "2020-01-01T00:00:00Z" }]) } } } }),
+      V7Issues: () => ({ node: { issues: page([]) } }),
+    });
+    const result = await fetchGitHubEvidence("alice", window, undefined, { repositoryIds: ["R1"] });
+    expect(result?.events).toEqual([]);
+    expect(result?.coverage.eventKinds.accepted_change).toBe("partial");
+    expect(result?.coverage.reasonCodes).toContain("acceptance_time_unknown");
+  });
 });

@@ -65,7 +65,7 @@ export function parseDiffStat(changes: GitlabMrChange[]): GitlabMrDiffStat {
   return { additions, deletions, changed_files: changes.length };
 }
 
-/** Fetch all GitLab contribution data for a user. */
+/** Legacy v6 aggregate collection. Never substitute these totals for v7 events. */
 export async function fetchGitlabContributionData(
   userId: number,
   username: string,

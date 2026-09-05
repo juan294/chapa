@@ -220,7 +220,7 @@ export async function fetchGitHubEvidence(
       if (!string(at(commit, "author", "user", "id"))) { reasons.add("attribution_unknown"); continue; }
       if (at(commit, "author", "user", "id") !== subjectId) continue;
       const base = event(commit, repo, "authored_commit", commit.authoredDate, string(commit.oid) ?? String(commit.id));
-      if (base) { reasons.add("acceptance_time_unknown"); addEvent({ ...base, acceptance: unknown("unavailable", "acceptance_time_unknown"), measurements: { ...base.measurements, additions: observedNumber(commit.additions), deletions: observedNumber(commit.deletions) } }); }
+      if (base) addEvent({ ...base, acceptance: unknown("unavailable", "acceptance_time_unknown"), measurements: { ...base.measurements, additions: observedNumber(commit.additions), deletions: observedNumber(commit.deletions) } });
     }
     const issues = await collect("issues", { id, since: window.startInclusive }, ["node", "issues"]);
     for (const issue of issues.nodes) {
@@ -260,8 +260,11 @@ export async function fetchGitHubEvidence(
   const operationsComplete = (ops: (keyof typeof queries)[]) => progress.filter((p) => ops.includes(p.operation)).every((p) => p.complete);
   const discoveryComplete = options.repositoryIds !== undefined;
   const unidentified = ["not_accessible", "source_error", "attribution_unknown", "pagination_incomplete"].some((reason) => reasons.has(reason as EvidenceReasonCode));
+  // Authored dates do not establish when older commits first reached default.
+  // Missing in-window authored diagnostics cannot prove absent accepted work.
+  reasons.add("acceptance_time_unknown");
   const eventKinds: SourceCoverage["eventKinds"] = {
-    accepted_change: discoveryComplete && merged.complete && !unidentified && !reasons.has("acceptance_time_unknown") ? "complete" : "partial",
+    accepted_change: "partial",
     authored_commit: discoveryComplete && !unidentified && operationsComplete(["commits"]) ? "complete" : "partial",
     review: "partial",
     issue_work: discoveryComplete && !unidentified && operationsComplete(["issues", "closures"]) ? "complete" : "partial",

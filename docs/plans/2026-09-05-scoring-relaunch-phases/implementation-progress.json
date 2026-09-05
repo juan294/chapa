@@ -39,7 +39,8 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "in-progress"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-3-validation.md"
     },
     {
       "id": "S04",
@@ -50,7 +51,7 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "supported-adapter-reviewed-pending-scope-amendment-and-integration-gates"
     },
     {
       "id": "S05",
@@ -113,7 +114,7 @@
         "S01",
         "S06"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "in-progress"
     },
     {
       "id": "S10",
@@ -718,6 +719,18 @@
       "path": "/Users/juan/code/chapa-scoring-gitlab",
       "branch": "feature/scoring-v7-gitlab",
       "purpose": "S03 GitLab adapter",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-engine",
+      "branch": "feature/scoring-v7-engine",
+      "purpose": "S09 core engine",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-bitbucket",
+      "branch": "feature/scoring-v7-bitbucket",
+      "purpose": "S04 Bitbucket adapter",
       "cleanupStatus": "active"
     }
   ]

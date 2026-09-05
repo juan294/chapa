@@ -3,7 +3,7 @@ import { computePlatformStats } from "@chapa/shared";
 import type { RawGitlabData } from "./types";
 
 /**
- * Transform raw GitLab data into a StatsData object.
+ * Legacy v6: transform raw GitLab data into a StatsData object.
  * Pure function — mirrors buildStatsFromCodeberg() for Codeberg data.
  *
  * GitLab differs from Codeberg in two source-shape ways, both already resolved
