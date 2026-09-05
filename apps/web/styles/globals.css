@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Public design-system utilities must ship before their landing consumers. */
+@source inline("font-display bg-identity-surface text-identity-text bg-closing-surface text-closing-text");
+
 /* The root layout is static in the default locale, while locale-segmented
    pages synchronize <html lang> after hydration. Keep root-level copy that
    sits outside a page locale boundary coherent with the active document. */
@@ -22,52 +25,45 @@ html[lang="en"] [data-document-locale="es"] {
 
 @theme {
   /* surfaces */
-  --color-bg: light-dark(#f7fbf8, #08170f);
-  --color-card: light-dark(#edf6f0, #0f2419);
-  --color-purple-tint: light-dark(#dff0e6, #123526);
-  --color-dark-section: light-dark(#0d2b1d, #050f0a);
-  --color-dark-card: light-dark(#123526, #0c1f15);
+  --color-bg: light-dark(#f4f0e7, #141719);
+  --color-card: light-dark(#fffdf7, #202528);
+  --color-purple-tint: light-dark(#dceaf0, #192b35);
+  --color-dark-section: light-dark(#1b1b19, #0d1215);
+  --color-dark-card: light-dark(#252521, #202528);
   /* The landing hero band. Theme aware on purpose: an always-dark hero made
      light mode a strip around a dark slab (#1215). Only the badge panel it
      frames stays dark in both themes, via --color-forest-* below. */
-  --color-hero-band: light-dark(#e9f3ec, #0b2018);
+  --color-hero-band: light-dark(#dceaf0, #192b35);
 
   /* aliases kept for the existing bg-warm-* / border-warm-stroke utilities */
-  --color-warm-bg: light-dark(#f7fbf8, #08170f);
-  --color-warm-card: light-dark(#edf6f0, #0f2419);
-  --color-warm-stroke: light-dark(#0d3b2417, #7dffbc1f);
+  --color-warm-bg: light-dark(#f4f0e7, #141719);
+  --color-warm-card: light-dark(#fffdf7, #202528);
+  --color-warm-stroke: light-dark(#24232130, #eeeae12b);
 
-  /* text — terminal-dim is AA-safe since #1212. It was #93a89d light
-     (2.41:1 on #f7fbf8) and #42574c dark, while carrying informational text:
-     step numbers, section counts, eyebrows and meta lines. */
-  --color-text-primary: light-dark(#0b2018, #dfeae4);
-  --color-text-secondary: light-dark(#33453c, #a9c0b5);
-  --color-terminal-dim: light-dark(oklch(.48 .025 160), #8ba398);
+  /* Informational text clears AA on page, card and ice stage surfaces. */
+  --color-text-primary: light-dark(#1b1b19, #eeeae1);
+  --color-text-secondary: light-dark(#64625e, #b3b9b9);
+  --color-terminal-dim: light-dark(#64625e, #b3b9b9);
 
   /* lines */
-  --color-stroke: light-dark(#0d3b2417, #7dffbc1f);
-  --color-stroke-strong: light-dark(#0d3b2426, #7dffbc2e);
-  --color-track: light-dark(#0d3b2414, #7dffbc14);
+  --color-stroke: light-dark(#24232130, #eeeae12b);
+  /* Alpha raised from the proposal to keep control boundaries above 3:1. */
+  --color-stroke-strong: light-dark(#1b1b19, #eeeae166);
+  --color-track: light-dark(#1b1b191f, #eeeae121);
 
-  /* accent (jade, hue 163) — CTAs, active states, key data only.
-     The token name is historical: it was violet, and #1206 made it green.
-     Renaming it touches every consuming utility class, so it stayed. */
-  --color-amber: light-dark(oklch(.66 .15 163), oklch(.76 .16 163));
-  --color-amber-light: light-dark(oklch(.76 .14 163), oklch(.84 .14 163));
-  --color-amber-dark: light-dark(oklch(.5 .12 165), oklch(.58 .14 165));
-  /* Accent-coloured TEXT and icon strokes (#1243). `--color-amber` is a
-     fill/tint value: it measures 2.75:1 on the light ground, below AA for any
-     text size. This is its text-safe counterpart - the light half darkens, the
-     dark half brightens, so both gain contrast against their own ground
-     (5.28:1 light, 11.94:1 dark). Same shape and same reason as
-     --color-complement-text. */
-  --color-amber-text: light-dark(oklch(.5 .12 165), oklch(.84 .14 163));
+  /* Brand fills retain the historical amber utility names. Vermilion in
+     light mode, coral in dark mode; use amber-text for readable text. */
+  --color-amber: light-dark(#ed4930, #ff795f);
+  --color-amber-light: light-dark(#f77a62, #ff9d88);
+  --color-amber-dark: light-dark(#aa2d1a, #c24e39);
+  /* Text-safe emphasis on page, card, ice stage and selected tints. */
+  --color-amber-text: light-dark(#aa2d1a, #ff927d);
 
-  /* status — success is hue 145, deliberately NOT the accent's 163. With a
-     green brand accent, an unshifted success color reads as a brand highlight. */
-  --color-terminal-green: light-dark(oklch(.55 .13 145), oklch(.8 .16 148));
-  --color-terminal-yellow: light-dark(oklch(.62 .13 78), oklch(.82 .13 85));
-  --color-terminal-red: light-dark(oklch(.55 .19 25), oklch(.72 .17 25));
+  /* Semantic status colors are distinct from brand and verification.
+     Light values darken to clear AA on the ice stage and 10% status tints. */
+  --color-terminal-green: light-dark(oklch(.46 .13 145), oklch(.8 .16 148));
+  --color-terminal-yellow: light-dark(oklch(.46 .1 78), oklch(.82 .13 85));
+  --color-terminal-red: light-dark(oklch(.49 .18 25), oklch(.76 .16 25));
 
   /* verification — slate blue, hue 225-228, never jade. #1206 moved this
      family off teal so cryptographic trust reads as distinct from the brand.
@@ -80,7 +76,7 @@ html[lang="en"] [data-document-locale="es"] {
     oklch(.7 .11 225 / .16)
   );
   --color-complement-dark: oklch(.42 .09 228);
-  --color-complement-text: light-dark(oklch(.48 .1 228), oklch(.76 .11 222));
+  --color-complement-text: light-dark(oklch(.46 .1 228), oklch(.79 .1 222));
   /* Light theme darkens on hover, dark theme brightens. Both directions
      increase contrast against their own ground, which is what makes a hover
      state a legible change rather than a contrast-neutral swap. */
@@ -89,32 +85,29 @@ html[lang="en"] [data-document-locale="es"] {
     oklch(.84 .1 220)
   );
 
-  /* always-dark band (#1211) — the hero, the badge panel and the CLI blocks
-     stay dark in BOTH themes, because the badge is a server-rendered artifact
-     and the band frames it. One value each, deliberately not light-dark().
-     forest-dim was #42574c, which measured 2.19:1 on the forest ground. */
-  --color-forest: #0b2018;
-  --color-forest-card: #0f2419;
-  --color-forest-line: #7dffbc2e;
-  --color-forest-text: #dfeae4;
-  --color-forest-dim: #8ba398;
-  --color-forest-grid: #7dffbc0a;
-  /* Status colors resolve per theme, so the light-theme values land on this
-     fixed dark ground when a forest block sits on a light page: measured
-     3.72:1 for terminal-green and 3.19:1 for terminal-red, both below AA.
-     These are the dark-theme values, pinned. Use them inside forest blocks. */
+  /* Fixed ink terminal surfaces, independent of page color-scheme. */
+  --color-forest: #1b1b19;
+  --color-forest-card: #252521;
+  --color-forest-line: #f4f0e766;
+  --color-forest-text: #f4f0e7;
+  --color-forest-dim: #c2c0b8;
+  --color-forest-grid: #f4f0e70a;
+  /* Fixed status values for terminal contexts on either page theme. */
   --color-forest-ok: oklch(.8 .16 148);
   --color-forest-warn: oklch(.82 .13 85);
   --color-forest-err: oklch(.72 .17 25);
 
-  --shadow-card: 0px 0px 0px 1px
-      light-dark(rgba(0, 0, 0, 0.06), color-mix(in oklab, oklch(.76 .16 163) 8%, transparent)),
-    0px 1px 2px -1px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.2)),
-    0px 2px 4px 0px light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.15));
-  --shadow-card-hover: 0px 0px 0px 1px
-      light-dark(rgba(0, 0, 0, 0.08), color-mix(in oklab, oklch(.76 .16 163) 12%, transparent)),
-    0px 2px 4px -1px light-dark(rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.25)),
-    0px 4px 8px 0px light-dark(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.2));
+  --shadow-card: 3px 3px 0 light-dark(#24232130, #00000066);
+  --shadow-card-hover: 5px 5px 0 light-dark(#24232130, #00000080);
+
+  /* Explicit foreground pairs for text-bearing editorial fields and actions. */
+  --color-identity-surface: light-dark(#ed4930, #3a2222);
+  --color-identity-text: light-dark(#1b1b19, #eeeae1);
+  --color-closing-surface: light-dark(#ed4930, #a92f21);
+  --color-closing-text: light-dark(#1b1b19, #f4f0e7);
+  --color-action: light-dark(#1b1b19, #ff795f);
+  --color-action-text: light-dark(#f4f0e7, #17191a);
+  --color-action-hover: light-dark(#aa2d1a, #ff9d88);
 
   /* Dimension colors — data visualization accents for the impact dimensions */
   --color-dimension-delivery: light-dark(oklch(.62 .14 145), oklch(.72 .14 145));
@@ -140,7 +133,8 @@ html[lang="en"] [data-document-locale="es"] {
 
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
   --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
-  --font-body: var(--font-plus-jakarta), system-ui, sans-serif;
+  --font-body: var(--font-manrope), system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), sans-serif;
   --font-terminal: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
@@ -237,10 +231,10 @@ html {
 @keyframes pulse-glow-amber {
   0%,
   100% {
-    box-shadow: 0 0 20px color-mix(in oklab, var(--color-amber) 10%, transparent);
+    box-shadow: 2px 2px 0 var(--color-stroke);
   }
   50% {
-    box-shadow: 0 0 40px color-mix(in oklab, var(--color-amber) 18%, transparent);
+    box-shadow: 3px 3px 0 var(--color-stroke-strong);
   }
 }
 
@@ -430,7 +424,7 @@ html {
   /* #1211 — one declaration; the hairline color follows color-scheme. */
   --grid-line: light-dark(
     rgba(0, 0, 0, 0.03),
-    color-mix(in oklab, oklch(.76 .16 163) 4%, transparent)
+    #eeeae10a
   );
   background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
@@ -450,7 +444,7 @@ html {
 /* ── Focus indicators (accessibility) ────────────────────── */
 
 *:focus-visible {
-  outline: 2px solid var(--color-amber);
+  outline: 2px solid var(--color-amber-text);
   outline-offset: 2px;
 }
 
@@ -516,14 +510,14 @@ nav [aria-current="page"],
 ::-webkit-scrollbar-thumb {
   background: light-dark(
     rgba(0, 0, 0, 0.1),
-    color-mix(in oklab, oklch(.76 .16 163) 15%, transparent)
+    #eeeae126
   );
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: light-dark(
     rgba(0, 0, 0, 0.2),
-    color-mix(in oklab, oklch(.76 .16 163) 25%, transparent)
+    #eeeae140
   );
 }
 

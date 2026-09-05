@@ -172,12 +172,12 @@ describe("NavbarShell render", () => {
   });
 
   describe("design system compliance", () => {
-    it("uses fixed positioning, dark glass background, and stroke border on <nav>", () => {
+    it("uses fixed positioning, a flat themed surface, and stroke border on <nav>", () => {
       render(<NavbarShell session={null} isAdmin={false} t={t} />);
       const nav = screen.getByRole("navigation");
       expect(nav.className).toContain("fixed top-0");
-      expect(nav.className).toContain("bg-bg/80");
-      expect(nav.className).toContain("backdrop-blur-xl");
+      expect(nav.className).toContain("bg-bg");
+      expect(nav.className).not.toContain("backdrop-blur-xl");
       expect(nav.className).toContain("border-stroke");
     });
 
@@ -186,21 +186,21 @@ describe("NavbarShell render", () => {
       expect(container.querySelector(".max-w-7xl")).not.toBeNull();
     });
 
-    it("logo cursor uses amber-dark (not amber) for WCAG AA contrast (#1043)", () => {
+    it("logo cursor uses the text-safe accent token", () => {
       const { container } = render(<NavbarShell session={null} isAdmin={false} t={t} />);
       const cursor = container.querySelector(".animate-cursor-blink");
-      expect(cursor?.className).toContain("text-amber-dark");
+      expect(cursor?.className).toContain("text-amber-text");
       expect(cursor?.className).not.toBe("text-amber animate-cursor-blink");
     });
 
-    it("login link has a 44px touch target and amber/50 prefix slash", () => {
+    it("login link has a 44px touch target and a legible prefix slash", () => {
       // #1214 raised the target from padding-derived to an explicit 44px
       // minimum, matching every other interactive control in the bar.
       render(<NavbarShell session={null} isAdmin={false} t={t} />);
       const link = screen.getByText("login").closest("a");
       expect(link?.className).toContain("min-h-[44px]");
       const prefix = link?.querySelector("span");
-      expect(prefix?.className).toContain("text-amber/50");
+      expect(prefix?.className).toContain("text-amber-text");
     });
 
     it("right controls container uses a tighter gap on mobile (gap-1 sm:gap-2, #240)", () => {

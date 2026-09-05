@@ -36,7 +36,7 @@ export function SectionHeader({
     >
       {title && <h2 className="sr-only">{title}</h2>}
       <span className="font-heading text-sm whitespace-nowrap text-text-primary">
-        <span className="select-none text-amber">%</span> {command}
+        <span className="select-none text-amber-text">%</span> {command}
       </span>
       {meta && (
         <span className="font-heading text-xs whitespace-nowrap text-terminal-dim">

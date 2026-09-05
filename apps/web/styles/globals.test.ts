@@ -203,12 +203,16 @@ describe("globals.css", () => {
       // that clears AA, so hover has nowhere to go but darker). Dark theme
       // hover moves LIGHTER. Both strictly increase contrast against their
       // own ground, which is what makes hover a legible change.
-      expect(contrastRatio(hover.light, LIGHT_SURFACES[0])).toBeGreaterThan(
-        contrastRatio(rest.light, LIGHT_SURFACES[0]),
-      );
-      expect(contrastRatio(hover.dark, DARK_SURFACES[0])).toBeGreaterThan(
-        contrastRatio(rest.dark, DARK_SURFACES[0]),
-      );
+      for (const surface of LIGHT_SURFACES) {
+        expect(contrastRatio(hover.light, surface)).toBeGreaterThan(
+          contrastRatio(rest.light, surface),
+        );
+      }
+      for (const surface of DARK_SURFACES) {
+        expect(contrastRatio(hover.dark, surface)).toBeGreaterThan(
+          contrastRatio(rest.dark, surface),
+        );
+      }
     });
   });
 

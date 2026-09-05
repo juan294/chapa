@@ -315,6 +315,8 @@ describe("GlobalCommandBar", () => {
       for (const chip of Array.from(chips)) {
         expect(chip.textContent).toMatch(/^\//);
         expect(chip.className).toContain("whitespace-nowrap");
+        // The unlayered page focus rule must not win on the fixed ink dock.
+        expect(chip.className).toContain("focus-visible:outline-forest-text!");
       }
     });
 

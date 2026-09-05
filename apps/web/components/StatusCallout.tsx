@@ -70,7 +70,7 @@ export function StatusCallout({
   return (
     <section
       role={variant === "error" ? "alert" : "status"}
-      className={`rounded-xl border p-8 ${styles.container} ${className}`}
+      className={`rounded-[3px] border p-8 ${styles.container} ${className}`}
     >
       <div className="mb-4 flex items-center gap-3">
         <div

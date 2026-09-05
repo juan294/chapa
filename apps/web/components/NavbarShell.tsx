@@ -54,12 +54,12 @@ export interface NavbarShellProps {
  */
 export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: NavbarShellProps) {
   return (
-    <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+    <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-3 sm:px-6">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2">
           <span className="font-heading text-lg tracking-tight text-text-primary">
-            Chapa<span className="text-amber-dark animate-cursor-blink">_</span>
+            Chapa<span className="text-amber-text animate-cursor-blink">_</span>
           </span>
         </Link>
 
@@ -73,7 +73,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
                 label={link.label}
                 // #1214 — 44px hit area, and a tinted pill on hover so the
                 // target is visible before it is clicked.
-                className="flex min-h-[44px] items-center rounded-lg px-3 transition-colors hover:bg-purple-tint hover:text-text-primary"
+                className="flex min-h-[44px] items-center rounded-[3px] px-3 transition-colors hover:bg-purple-tint hover:text-text-primary"
               />
             ))}
           </div>
@@ -93,7 +93,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
               <div
                 data-testid="navbar-auth-placeholder"
                 aria-hidden="true"
-                className="h-8 w-20 rounded-lg bg-track"
+                className="h-8 w-20 rounded-[3px] bg-track"
               />
             ) : session ? (
               <UserMenu
@@ -111,9 +111,9 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
               // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a
                 href="/api/auth/login"
-                className="inline-flex min-h-[44px] items-center gap-1 rounded-lg px-3 font-heading text-sm text-text-secondary transition-colors hover:bg-purple-tint hover:text-text-primary"
+                className="inline-flex min-h-[44px] items-center gap-1 rounded-[3px] px-3 font-heading text-sm text-text-secondary transition-colors hover:bg-purple-tint hover:text-text-primary"
               >
-                <span className="text-amber/50">/</span> {t('common.login') as string}
+                <span className="text-amber-text">/</span> {t('common.login') as string}
               </a>
             )}
           </div>

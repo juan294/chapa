@@ -44,7 +44,12 @@ describe("design-sync emit-tokens", () => {
   });
 
   it("carries both halves of a themed color", () => {
-    expect(output).toContain("--color-bg: light-dark(#f7fbf8, #08170f);");
+    const sourceValues = [...GLOBALS.match(/@theme\s*\{([\s\S]*?)\n\}/)![1]!.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)];
+    expect(count).toBe(sourceValues.length);
+    for (const [, token, value] of sourceValues) {
+      expect(output).toContain(`${token}: ${value!.trim()};`);
+      expect(output.match(new RegExp(`${token}:`, "g"))).toHaveLength(1);
+    }
   });
 
   it("emits the whole palette, not a stray declaration or two", () => {

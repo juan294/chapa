@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "@/lib/i18n";
+import { useInkTerminal } from "./TerminalPresentation";
 import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
 export interface TerminalInputHandle {
@@ -38,6 +39,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
   trailing,
 }, ref) {
   const { t } = useTranslation();
+  const ink = useInkTerminal();
   // `t` is a stable reference per locale (memoized in LanguageProvider), but
   // `value`/`historyIndex` state changes on every keystroke re-render this
   // component — memoize so the dictionary lookup only reruns on locale
@@ -131,11 +133,11 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
     // divider. The bar chrome around it (sticky positioning, backdrop,
     // suggestion chips) belongs to the caller, so Studio and the global
     // command bar can frame the same field differently.
-    <div className="flex min-h-[46px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 font-terminal text-base leading-6 transition-colors focus-within:border-amber sm:text-sm">
-      <span className="text-amber-text select-none shrink-0">
+    <div className={`flex min-h-[46px] items-center gap-2 rounded-[3px] border px-3 font-terminal text-base leading-6 transition-colors sm:text-sm ${ink ? "border-forest-line bg-forest-card focus-within:border-forest-text" : "border-stroke-strong bg-card focus-within:border-amber-text"}`}>
+      <span className={`select-none shrink-0 ${ink ? "text-forest-text" : "text-amber-text"}`}>
         {prompt} &gt;
       </span>
-      <div className="relative flex-1">
+      <div className="relative min-w-0 flex-1">
         <input
           ref={inputRef}
           type="text"
@@ -143,7 +145,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           id={TERMINAL_COMMAND_INPUT_ID}
-          className="terminal-input-bare w-full bg-transparent text-text-primary caret-amber placeholder:text-terminal-dim outline-none focus:ring-0 focus:outline-none border-none"
+          className={`terminal-input-bare w-full bg-transparent outline-none focus:ring-0 focus:outline-none border-none ${ink ? "text-forest-text caret-forest-text placeholder:text-forest-dim" : "text-text-primary caret-amber placeholder:text-terminal-dim"}`}
           style={{ outline: "none" }}
           placeholder={placeholder}
           aria-label={ariaLabel}

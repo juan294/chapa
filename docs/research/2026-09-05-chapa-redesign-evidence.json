@@ -1,0 +1,69 @@
+{
+  "date": "2026-09-05",
+  "phase": "research",
+  "branch": "develop",
+  "commit": "c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d",
+  "workingTreeBeforeResearch": "clean",
+  "briefSource": "User messages in this Chapa redesign session, 2026-09-05",
+  "brief": {
+    "approvedReference": "/Users/juan/code/chapa-redesign",
+    "approvedBadge": "ice-terminal-v2-proposal; remove decorative + PROFILE / handle line",
+    "productName": "Studio; temporary badge-lab is not the product name",
+    "preserve": [
+      "English and Spanish localization and picker",
+      "AuthorTypewriter signature pill",
+      "developer identity and slash-command navigation",
+      "existing design-system schema/format and code-to-Claude Design sync",
+      "live SVG elements and explicit design versioning"
+    ],
+    "heroSentence": "Turn your development activity across platforms into a profile and badge you can share.",
+    "supportingCopy": "Your work is more than a commit count.",
+    "copyRationale": "Contribution volume matters without presenting it as the whole picture.",
+    "landingSampleBadge": {
+      "requestedTier": "Elite",
+      "replaces": "High / 82",
+      "rationale": "Inspirational and aspirational sample badge",
+      "exactReplacementScoreSpecified": false,
+      "currentEliteThreshold": 85,
+      "source": "apps/web/lib/impact/utils.ts:253"
+    },
+    "studioCta": {
+      "requestedReplacement": "Open the Creator Studio",
+      "replaces": "Open the badge lab",
+      "productRoute": "/studio",
+      "localization": "English and Spanish through the existing dictionary system"
+    },
+    "phaseGates": "Full RPI cycle, starting with research; no implementation in this phase",
+    "remoteBudget": "No Vercel previews; remote CI/deployment requires separately authorized intentional actions"
+  },
+  "focusedTests": {
+    "command": "pnpm exec vitest run scripts/design-sync-emit-tokens.test.ts apps/web/styles/tokens.test.ts apps/web/components/ThemeProvider.render.test.tsx apps/web/components/ThemeToggle.test.tsx apps/web/components/NavbarShell.render.test.tsx apps/web/components/AuthorTypewriter.test.tsx apps/web/lib/i18n/dictionaries/parity.test.ts",
+    "testFilesPassed": 7,
+    "testsPassed": 150,
+    "exitCode": 0,
+    "warning": "Existing Vite configLoader:native/CommonJS compatibility notice"
+  },
+  "tokenEmitterProbe": {
+    "method": "Imported buildTokenCss and passed globals.css contents; did not execute its file-writing CLI branch",
+    "declarations": 58,
+    "hasTheme": true,
+    "containsEngineTokens": false,
+    "filesWritten": false
+  },
+  "designSyncInspection": {
+    "scope": "Repo config, entry barrel, styles, emitter, tests, previews, conventions and dated NOTES",
+    "generatedStatePresent": {
+      ".ds-sync": false,
+      "ds-bundle": false
+    },
+    "localDesignSyncSkillOrCommandFound": false,
+    "exposedSyncCapabilityFound": false,
+    "remoteStateInspected": false,
+    "syncExecuted": false
+  },
+  "remoteActions": [],
+  "researchOutputs": [
+    "docs/research/2026-09-05-chapa-redesign-design-system.md",
+    "docs/research/2026-09-05-chapa-redesign-evidence.json"
+  ]
+}

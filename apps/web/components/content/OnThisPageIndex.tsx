@@ -90,7 +90,7 @@ export function OnThisPageIndex({
       // as the whole article, leaving sticky positioning nothing to travel in.
       className="sticky top-24 hidden self-start lg:block"
     >
-      <div className="font-heading text-[10px] tracking-wider text-terminal-dim uppercase">
+      <div className="font-heading text-[11px] tracking-wider text-terminal-dim uppercase">
         {heading}
       </div>
       <ul className="mt-3 space-y-0.5 border-l border-stroke">
@@ -102,7 +102,7 @@ export function OnThisPageIndex({
                 href={`#${item.id}`}
                 onClick={() => setActiveId(item.id)}
                 aria-current={isActive ? "true" : undefined}
-                className={`-ml-px flex min-h-[36px] items-center border-l-2 py-1 pl-3 text-sm transition-colors ${
+                className={`-ml-px flex min-h-11 items-center border-l-2 py-1 pl-3 text-sm transition-colors ${
                   isActive
                     ? "border-amber font-medium text-text-primary"
                     : "border-transparent text-text-secondary hover:text-text-primary"

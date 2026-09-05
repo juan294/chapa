@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { OutputLine } from "./command-registry";
+import { useInkTerminal } from "./TerminalPresentation";
 import { useTranslation } from "@/lib/i18n";
 
 interface TerminalOutputProps {
@@ -16,6 +17,16 @@ const TYPE_STYLES: Record<string, string> = {
   system: "text-text-secondary",
   info: "text-text-primary",
   dim: "text-terminal-dim",
+};
+
+const INK_TYPE_STYLES: Record<string, string> = {
+  input: "text-forest-text",
+  success: "text-forest-ok",
+  error: "text-forest-err",
+  warning: "text-forest-warn",
+  system: "text-forest-dim",
+  info: "text-forest-text",
+  dim: "text-forest-dim",
 };
 
 const TYPE_PREFIX: Record<string, string> = {
@@ -67,6 +78,8 @@ export function scrollLogToEnd(
 
 export function TerminalOutput({ lines }: TerminalOutputProps) {
   const { t } = useTranslation();
+  const ink = useInkTerminal();
+  const typeStyles = ink ? INK_TYPE_STYLES : TYPE_STYLES;
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,9 +97,9 @@ export function TerminalOutput({ lines }: TerminalOutputProps) {
       {lines.map((line) => (
         <div
           key={line.id}
-          className={`${TYPE_STYLES[line.type] ?? "text-text-primary"} animate-terminal-fade-in whitespace-pre-wrap break-words`}
+          className={`${typeStyles[line.type] ?? typeStyles.info} animate-terminal-fade-in whitespace-pre-wrap break-words`}
         >
-          <span className="text-terminal-dim select-none">
+          <span className={`select-none ${ink ? "text-forest-dim" : "text-terminal-dim"}`}>
             {TYPE_PREFIX[line.type] ?? "  "}
           </span>
           {line.text}

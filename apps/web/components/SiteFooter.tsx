@@ -60,7 +60,7 @@ export function SiteFooter({ t, showCta = false }: SiteFooterProps) {
     <footer className="border-t border-stroke py-8">
       <div className="mx-auto max-w-7xl px-6">
         {showCta && (
-          <div className="mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-stroke bg-card px-6 py-5">
+          <div className="mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[3px] border border-stroke bg-card px-6 py-5">
             <p className="text-sm text-text-secondary">
               {t('landing.finalCta.prompt') as string}
             </p>
@@ -75,7 +75,7 @@ export function SiteFooter({ t, showCta = false }: SiteFooterProps) {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <span className="font-heading text-sm tracking-tight text-text-primary">
-              Chapa<span className="text-amber">_</span>
+              Chapa<span className="text-amber-text">_</span>
             </span>
             <span className="text-xs text-text-secondary">{tagline}</span>
           </div>
@@ -83,29 +83,29 @@ export function SiteFooter({ t, showCta = false }: SiteFooterProps) {
           <div className="flex items-center gap-3 text-text-secondary">
             <span className="text-xs">{poweredBy}</span>
             <div className="flex items-center gap-2.5">
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber transition-colors">
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber-text transition-colors">
                 <GitHubIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" aria-label="Bitbucket" title="Bitbucket" className="hover:text-amber transition-colors">
+              <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" aria-label="Bitbucket" title="Bitbucket" className="hover:text-amber-text transition-colors">
                 <BitbucketIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="hover:text-amber transition-colors">
+              <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="hover:text-amber-text transition-colors">
                 <CodebergIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://gitlab.com" target="_blank" rel="noopener noreferrer" aria-label="GitLab" title="GitLab" className="hover:text-amber transition-colors">
+              <a href="https://gitlab.com" target="_blank" rel="noopener noreferrer" aria-label="GitLab" title="GitLab" className="hover:text-amber-text transition-colors">
                 <GitlabIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber transition-colors">
+              <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber-text transition-colors">
                 <ClaudeCodeStar />
               </a>
             </div>
           </div>
 
           <div className="flex items-center gap-4 text-xs text-text-secondary">
-            <Link href="/about" className="hover:text-amber transition-colors">{about}</Link>
-            <Link href="/about/scoring" className="hover:text-amber transition-colors">{scoring}</Link>
-            <Link href="/terms" className="hover:text-amber transition-colors">{terms}</Link>
-            <Link href="/privacy" className="hover:text-amber transition-colors">{privacy}</Link>
+            <Link href="/about" className="hover:text-amber-text transition-colors">{about}</Link>
+            <Link href="/about/scoring" className="hover:text-amber-text transition-colors">{scoring}</Link>
+            <Link href="/terms" className="hover:text-amber-text transition-colors">{terms}</Link>
+            <Link href="/privacy" className="hover:text-amber-text transition-colors">{privacy}</Link>
           </div>
         </div>
 

@@ -74,7 +74,7 @@ export function MobileNav({ links }: MobileNavProps) {
     <>
       <button
         type="button"
-        className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg border border-stroke text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
+        className="md:hidden flex items-center justify-center w-11 h-11 rounded-[3px] border border-stroke text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
         aria-label={t('aria.toggleNavigation') as string}
         aria-controls="mobile-nav-panel"
         aria-expanded={open}
@@ -106,17 +106,17 @@ export function MobileNav({ links }: MobileNavProps) {
       </button>
 
       {open && (
-        <div ref={panelRef} id="mobile-nav-panel" role="navigation" aria-label={t('aria.mobileNavigation') as string} className="absolute top-full left-0 w-full border-b border-stroke bg-card md:hidden shadow-lg">
+        <div ref={panelRef} id="mobile-nav-panel" role="navigation" aria-label={t('aria.mobileNavigation') as string} className="absolute top-full left-0 w-full border-b border-stroke bg-card md:hidden shadow-card">
           <div className="flex flex-col px-6 py-4 gap-1 font-heading text-sm">
             {links.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="rounded-lg px-4 py-2.5 text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
+                className="rounded-[3px] px-4 py-2.5 text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
                 onClick={() => setOpen(false)}
                 {...(pathname === link.href ? { "aria-current": "page" as const } : {})}
               >
-                <span className="text-amber/50">/</span> {link.label.toLowerCase()}
+                <span className="text-amber-text">/</span> {link.label.toLowerCase()}
               </a>
             ))}
           </div>

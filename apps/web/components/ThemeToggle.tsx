@@ -41,7 +41,7 @@ export function ThemeToggle() {
     <button
       onClick={() => setTheme(next)}
       data-theme-mode={mode}
-      className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg text-terminal-dim transition-colors hover:text-amber"
+      className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full text-terminal-dim transition-colors hover:text-amber-text"
       aria-label={t(NEXT_MODE_LABEL[mode]) as string}
     >
       <span className={iconClass(mode === "system")}>

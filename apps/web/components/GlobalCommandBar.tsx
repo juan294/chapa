@@ -7,6 +7,7 @@ import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
 import type { TerminalInputHandle } from "@/components/terminal/TerminalInput";
+import { TerminalPresentation } from "@/components/terminal/TerminalPresentation";
 import { TerminalOutput } from "@/components/terminal/TerminalOutput";
 import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
 import {
@@ -152,19 +153,21 @@ export function GlobalCommandBar({
   }, []);
 
   return (
-    <>
+    <TerminalPresentation value="ink">
       {!skipShortcutsListener && <KeyboardShortcutsListener />}
       {/* #1214 — the bar stays inline at the bottom of the viewport rather
           than opening as a full-screen palette. The chips make the commands
           discoverable without typing `/` first, which is what the palette
           overlay was there to do. */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 px-4 py-2.5 backdrop-blur-xl">
+      {/* Reserve document space for the two-row dock, including on short pages. */}
+      <div aria-hidden="true" className="h-32 shrink-0" />
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-forest-line bg-forest px-4 py-2.5 text-forest-text md:pr-64">
         <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
           <AuthorTypewriter />
         </div>
         <div className="relative mx-auto max-w-4xl">
           {outputLines.length > 0 && (
-            <div className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card shadow-xl">
+            <div className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-[3px] border border-forest-line bg-forest-card shadow-card">
               <TerminalOutput lines={outputLines} />
             </div>
           )}
@@ -190,7 +193,7 @@ export function GlobalCommandBar({
             trailing={
               <kbd
                 aria-hidden="true"
-                className="hidden shrink-0 rounded border border-stroke-strong px-1.5 py-0.5 font-heading text-[11px] text-terminal-dim sm:block"
+                className="hidden shrink-0 rounded border border-forest-line px-1.5 py-0.5 font-heading text-[11px] text-forest-dim sm:block"
               >
                 /
               </kbd>
@@ -207,7 +210,7 @@ export function GlobalCommandBar({
                   type="button"
                   onClick={() => handleAutocompleteFill(command.name)}
                   title={command.description}
-                  className="shrink-0 rounded-full border border-stroke px-3 py-1.5 font-heading text-xs whitespace-nowrap text-text-secondary transition-colors hover:border-amber/40 hover:text-text-primary"
+                  className="min-h-11 shrink-0 rounded-[3px] border border-forest-line px-3 py-1.5 font-heading text-xs whitespace-nowrap text-forest-dim transition-colors hover:border-forest-text hover:text-forest-text focus-visible:outline-forest-text!"
                 >
                   {command.name}
                 </button>
@@ -216,6 +219,6 @@ export function GlobalCommandBar({
           )}
         </div>
       </div>
-    </>
+    </TerminalPresentation>
   );
 }

@@ -85,27 +85,22 @@ describe("LoginCtaButton", () => {
     expect(live).not.toBeNull();
   });
 
-  // ─── Contrast (#1167 / UX-H1) ───────────────────────────────────────
-  // White text on bg-amber (#8B5CF6) measures 4.06:1 — below the 4.5:1 AA
-  // floor for normal text. bg-amber-dark (#7C3AED) measures ~5.4:1. The
-  // --color-amber token itself must NOT change (used non-textually for
-  // pills/heatmap/focus rings across the app); the fix is scoped to this
-  // white-text-on-solid-fill call site only, re-anchoring the hover ramp
-  // one step darker (base amber-dark, hover amber) so hover no longer lands
-  // on amber-light (2.72:1).
-  it("uses bg-amber-dark (not bare bg-amber) as the base fill for AA contrast", () => {
+  // Action tokens keep the paired foreground readable at rest and on hover.
+  it("uses the paired action foreground and fill", () => {
     render(<LoginCtaButton label="Get your badge" pendingLabel="Connecting…" />);
     const link = screen.getByRole("link", { name: /Get your badge/ });
     const classes = link.className.split(/\s+/);
-    expect(classes).toContain("bg-amber-dark");
+    expect(classes).toContain("bg-action");
+    expect(classes).toContain("text-action-text");
     expect(classes).not.toContain("bg-amber");
   });
 
-  it("hovers to bg-amber (not bg-amber-light, 2.72:1) — one step darker than before", () => {
+  it("uses the action hover fill with the same paired foreground", () => {
     render(<LoginCtaButton label="Get your badge" pendingLabel="Connecting…" />);
     const link = screen.getByRole("link", { name: /Get your badge/ });
     const classes = link.className.split(/\s+/);
-    expect(classes).toContain("hover:bg-amber");
+    expect(classes).toContain("hover:bg-action-hover");
+    expect(classes).toContain("text-action-text");
     expect(classes).not.toContain("hover:bg-amber-light");
   });
 

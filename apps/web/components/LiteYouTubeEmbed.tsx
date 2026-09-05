@@ -24,7 +24,7 @@ export function LiteYouTubeEmbed({ videoId, title }: LiteYouTubeEmbedProps) {
   const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`;
 
   return (
-    <div className="aspect-video w-full overflow-hidden rounded-xl border border-stroke bg-card">
+    <div className="aspect-video w-full overflow-hidden rounded-[3px] border border-stroke bg-card">
       {activated ? (
         <iframe
           src={embedUrl}
@@ -51,8 +51,8 @@ export function LiteYouTubeEmbed({ videoId, title }: LiteYouTubeEmbedProps) {
               loading="lazy"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-dark-section">
-              <span className="font-heading text-sm text-text-secondary">
+            <div className="flex h-full w-full items-center justify-center bg-forest">
+              <span className="font-heading text-sm text-forest-dim">
                 Video coming soon
               </span>
             </div>
@@ -60,10 +60,10 @@ export function LiteYouTubeEmbed({ videoId, title }: LiteYouTubeEmbedProps) {
 
           {/* Play button overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors group-hover:bg-black/40">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber/90 shadow-lg shadow-amber/25 transition-transform group-hover:scale-110">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-action text-action-text shadow-card transition-transform group-hover:scale-110">
               <svg
                 viewBox="0 0 24 24"
-                fill="white"
+                fill="currentColor"
                 className="ml-1 h-7 w-7"
                 aria-hidden="true"
               >

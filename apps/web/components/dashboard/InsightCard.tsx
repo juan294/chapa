@@ -227,19 +227,16 @@ const TIER_LIST_EN = ["Emerging", "Solid", "High", "Elite"];
 // Type-specific renderers
 // ---------------------------------------------------------------------------
 
-/** Achievement — celebratory banner with green glow + shimmer */
+/** Achievement — semantic success emphasis within the shared rule system. */
 function AchievementCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="relative rounded-xl border border-terminal-green/20 bg-terminal-green/[0.04] p-5 animate-fade-in-up overflow-hidden"
+      className="relative rounded-[3px] border border-terminal-green/20 bg-terminal-green/[0.04] p-5 animate-fade-in-up overflow-hidden"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      {/* Animated shimmer sweep */}
-      <div className="absolute inset-0 animate-shimmer-sweep bg-gradient-to-r from-transparent via-terminal-green/10 to-transparent pointer-events-none" />
-
       <div className="relative flex items-center gap-4">
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-terminal-green/10 flex items-center justify-center text-terminal-green">
+        <div className="flex-shrink-0 w-10 h-10 rounded-[3px] bg-terminal-green/10 flex items-center justify-center text-terminal-green">
           <TrophyIcon size={22} />
         </div>
         <div className="min-w-0">
@@ -268,16 +265,16 @@ function TrendCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
+      className="rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
         <div
-          className="relative flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
+          className="relative flex-shrink-0 w-8 h-8 rounded-[3px] flex items-center justify-center overflow-hidden"
           data-testid="trend-icon"
         >
           <div
-            className="absolute inset-0 opacity-15 rounded-lg"
+            className="absolute inset-0 opacity-15 rounded-[3px]"
             style={{ backgroundColor: accentColor }}
           />
           <div style={{ color: accentColor }}>
@@ -306,11 +303,11 @@ function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
+      className="rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5 text-amber">
+        <div className="flex-shrink-0 mt-0.5 text-amber-text">
           <ArrowUpIcon />
         </div>
         <div className="min-w-0 flex-1">
@@ -342,12 +339,12 @@ function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
                     }`}
                   />
                   <span
-                    className={`text-[10px] font-heading leading-none ${
+                    className={`text-[11px] font-heading leading-none ${
                       i === tierInfo.currentIndex
-                        ? "text-amber font-semibold"
+                        ? "text-amber-text font-semibold"
                         : i === tierInfo.nextIndex
                           ? "text-text-secondary"
-                          : "text-text-secondary/40"
+                          : "text-terminal-dim"
                     }`}
                   >
                     {tierLabel}
@@ -371,7 +368,7 @@ function CoachingTipCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="rounded-lg border border-stroke/50 bg-card/50 px-4 py-3 animate-fade-in-up"
+      className="rounded-[3px] border border-stroke/50 bg-card/50 px-4 py-3 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
@@ -398,16 +395,16 @@ function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up overflow-hidden"
+      className="rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up overflow-hidden"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
         <div
-          className="relative flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
+          className="relative flex-shrink-0 w-8 h-8 rounded-[3px] flex items-center justify-center overflow-hidden"
           data-testid="archetype-icon"
         >
           <div
-            className="absolute inset-0 opacity-15 rounded-lg"
+            className="absolute inset-0 opacity-15 rounded-[3px]"
             style={{ backgroundColor: archetypeColor }}
           />
           <div style={{ color: archetypeColor }}>

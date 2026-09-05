@@ -54,6 +54,15 @@ describe("AuthorTypewriter", () => {
       expect(labels).toEqual(["X (Twitter)", "LinkedIn", "Medium", "GitHub"]);
     });
 
+    it("uses a fixed ink focus outline on the trigger and every social link", () => {
+      render(<AuthorTypewriter />);
+      const controls = [screen.getByRole("button"), ...screen.getAllByRole("link")];
+      for (const control of controls) {
+        // Important overrides the unlayered page focus color in globals.css.
+        expect(control.className).toContain("focus-visible:outline-forest-text!");
+      }
+    });
+
     it("decorative social icons are aria-hidden", () => {
       const { container } = render(<AuthorTypewriter />);
       const icons = container.querySelectorAll("a svg");
@@ -674,16 +683,14 @@ describe("AuthorTypewriter", () => {
   });
 
   describe("design system (UX-L2, #780)", () => {
-    it("trigger pill button (has text content) uses rounded-lg, not rounded-full", () => {
-      // The design system reserves rounded-full for icon-only/avatar buttons;
-      // text/CTA buttons must use rounded-lg.
+    it("preserves the author signature as the explicit rounded pill exception", () => {
+      // The signature keeps its recognizable pill shape through the redesign.
       const { container } = render(<AuthorTypewriter />);
       const triggerButton = container.querySelector(
         'button[aria-label^="Made by"]',
       ) as HTMLElement;
       expect(triggerButton).not.toBeNull();
-      expect(triggerButton.className).toContain("rounded-lg");
-      expect(triggerButton.className).not.toContain("rounded-full");
+      expect(triggerButton.className).toContain("rounded-full");
     });
   });
 });

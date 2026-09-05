@@ -140,10 +140,10 @@ Shared types live in: `packages/shared/src/types.ts`
 
 ## Design system (MANDATORY for UI work)
 - Full spec: @docs/design-system.md
-- Accent color: jade, `oklch(.66 .15 163)` light / `oklch(.76 .16 163)` dark (#1206, replacing violet `#8B5CF6`). Use `text-amber`, `bg-amber` — the token name is retained deliberately; see design-system.md.
+- Accent: vermilion `#ED4930` light / coral `#FF795F` dark. Historical `amber` utilities remain: `bg-amber` for fills, `text-amber-text` for readable small text. Primary actions use `bg-action text-action-text hover:bg-action-hover`.
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
-- Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
-- Light/dark theme support via `next-themes`. Light is the default; dark (`#08170f`, forest) is the signature brand look. Badge SVG always renders dark.
+- Body/UI font: **Manrope** (`font-body`). Selective expressive headings use **Barlow Condensed** (`font-display`); technical headings stay JetBrains Mono. Retain browser and bundled **Plus Jakarta Sans** for badge metrics/footer/tier.
+- System/light/dark preference uses the existing `next-themes` provider (system default). Paper light (`#F4F0E7`) and charcoal dark (`#141719`) use ice stages and neutral rules. The badge remains independently dark.
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## Badge branding
@@ -232,7 +232,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Profile materialization: `apps/web/lib/profile/*` — orchestrates stats fetch → impact compute → snapshot persistence (`materialize-profile.ts`, `orchestrated-profile.ts`, `public-profile.ts`, `snapshot-write.ts`, `post-write-invalidation.ts`, `persist-guard.ts`) for the badge, share page, refresh, and recalculate paths
 - Async utilities: `apps/web/lib/async/*` — fire-and-forget, timeout wrapping, and batch processing helpers used across cron/cache/warm-cache paths
 - Test helpers: `apps/web/lib/test-helpers/*` — shared fixtures and mocks (admin auth, platform auth, dynamic mocking) reused across the test suite
-- Design-token sync: `.design-sync/*` — `emit-tokens.mjs` plus `conventions.md`, `fonts.css`, and component previews under `.design-sync/previews/`; the tooling that keeps external design work aligned with the Jade palette (#1206). Not part of the app bundle.
+- Design-token sync: `.design-sync/*` — `emit-tokens.mjs` plus `conventions.md`, `fonts.css`, and component previews under `.design-sync/previews/`; the existing fifteen-component package and paired-token format that keeps external design work aligned with the current visual system. Not part of the app bundle.
 
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).

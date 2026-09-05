@@ -1,0 +1,24 @@
+{
+  "variant": "jade-v1",
+  "baseline": "c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d",
+  "fixtures": [
+    {
+      "name": "plain",
+      "characters": 30284,
+      "bytes": 30590,
+      "sha256": "66c85c46c97e1d53b5457e8fb1cc68a4456194102e013300669a0a4064608a70"
+    },
+    {
+      "name": "demo",
+      "characters": 30768,
+      "bytes": 31076,
+      "sha256": "efc776305828e5e98b6baf614cdca677dc05eddf6d41ce56920887ab1740600c"
+    },
+    {
+      "name": "static",
+      "characters": 21891,
+      "bytes": 22199,
+      "sha256": "35bdf419ee91e335ab8988e59d9cf5c14e50620c10109e7a135edaa3294242cf"
+    }
+  ]
+}

@@ -96,7 +96,7 @@ export function LoginCtaButton({
       aria-busy={pending}
       aria-disabled={pending}
       tabIndex={pending ? -1 : undefined}
-      className={`group inline-flex items-center gap-2.5 rounded-lg bg-amber-dark font-semibold text-white transition-all hover:bg-amber hover:shadow-xl hover:shadow-amber/25 ${styles.wrapper} ${pending ? "cursor-wait opacity-90" : ""}`}
+      className={`group inline-flex items-center gap-2.5 rounded-[3px] border border-action bg-action font-heading font-semibold text-action-text shadow-card transition-all hover:bg-action-hover hover:shadow-card-hover ${styles.wrapper} ${pending ? "cursor-wait opacity-90" : ""}`}
     >
       <span aria-live="polite" className="sr-only">
         {pending ? pendingLabel : ""}

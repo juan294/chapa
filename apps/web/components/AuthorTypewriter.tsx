@@ -181,8 +181,8 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
               : "opacity-0 translate-y-2 scale-95 pointer-events-none"
           } group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]`}
         >
-          <div className="p-3 rounded-xl bg-card/90 backdrop-blur-xl border border-stroke">
-            <p className="text-[11px] text-text-secondary font-medium whitespace-nowrap mb-2 select-none">
+          <div className="p-3 rounded-[3px] bg-forest-card border border-forest-line shadow-card">
+            <p className="text-[11px] text-forest-dim font-medium whitespace-nowrap mb-2 select-none">
               {AUTHOR_NAME}
             </p>
             <div className="flex items-center gap-2">
@@ -192,7 +192,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-1.5 rounded-lg bg-amber/10 text-text-secondary hover:text-amber hover:bg-amber/20 transition-all duration-200"
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-forest-text/5 text-forest-dim hover:text-forest-text hover:bg-forest-text/10 transition-all duration-200 focus-visible:outline-forest-text!"
                   aria-label={link.label}
                 >
                   <svg
@@ -214,7 +214,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
       {/* Trigger pill — terminal typewriter */}
       <button
         type="button"
-        className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-lg bg-amber/10 hover:bg-amber/15 backdrop-blur-sm transition-all duration-150 border border-stroke"
+        className="flex items-center h-11 min-w-[3.5rem] px-3 rounded-full bg-forest-card hover:bg-forest-text/10 transition-all duration-150 border border-forest-line focus-visible:outline-forest-text!"
         aria-label={`${t("aria.madeBy") as string} ${AUTHOR_NAME}`}
         aria-expanded={open}
         onClick={toggleOpen}
@@ -225,10 +225,10 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
           }
         }}
       >
-        <span className="text-[10px] font-heading text-text-secondary group-hover:text-text-primary transition-colors duration-300 select-none whitespace-nowrap">
+        <span className="text-[11px] font-heading text-forest-dim group-hover:text-forest-text transition-colors duration-300 select-none whitespace-nowrap">
           <span ref={textRef}>{HOME_TEXT}</span>
           <span
-            className="text-amber/40 ml-px animate-cursor-blink"
+            className="text-forest-dim ml-px animate-cursor-blink"
             aria-hidden="true"
           >
             &#9612;
