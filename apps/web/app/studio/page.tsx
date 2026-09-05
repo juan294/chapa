@@ -121,6 +121,12 @@ export default async function StudioPage(
     loadStudioConfig(session.login),
   ]);
 
+  // Unknown persisted state is not a new account. The existing error boundary
+  // offers retry without mounting an editor that could overwrite saved choices.
+  if (savedConfigResult.status === "unavailable" || savedConfigResult.status === "invalid") {
+    throw new Error(`Unable to load Studio configuration for ${session.login}`);
+  }
+
   // #1282/#1283 — same fallback as /api/generate: a first-time owner has no
   // baseline, so a session-token fetch that times out or is rejected by the
   // integrity guard used to surface here as a 500 ("Unable to load Studio

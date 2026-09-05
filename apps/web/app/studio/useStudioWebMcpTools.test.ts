@@ -8,11 +8,13 @@ import {
   type BadgeConfig,
   type CraftResult,
   type ImpactV6Result,
+  type StatsData,
 } from "@chapa/shared";
 import type { CommandResult } from "@/components/terminal/command-registry";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 import { WEBMCP_INVALID_INPUT_PREFIX } from "@/lib/webmcp/use-model-context-tools";
 import type { StudioCommandAction } from "./useStudioCommands";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { useStudioWebMcpTools } from "./useStudioWebMcpTools";
 
 vi.mock("@/lib/env", () => ({
@@ -83,6 +85,7 @@ function makeRunCommand() {
 }
 
 function setup(overrides?: {
+  stats?: StatsData;
   config?: BadgeConfig;
   impact?: ImpactV6Result;
   craftResult?: CraftResult | null;
@@ -96,7 +99,7 @@ function setup(overrides?: {
   const { result } = renderHook(() =>
     useStudioWebMcpTools({
       config,
-      stats: DEMO_STATS,
+      stats: overrides?.stats ?? { ...DEMO_STATS, heatmapData: [] },
       impact,
       craftResult: overrides?.craftResult ?? null,
       handle: "dev user",
@@ -534,5 +537,27 @@ describe("useStudioWebMcpTools", () => {
         (metric: { normalizedValue: number }) => metric.normalizedValue,
       ),
     ).toEqual([0, 0, 0]);
+  });
+});
+
+
+describe("production recency simulation", () => {
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+  it.each(["2026-09-05", "2026-01-01"])("unchanged dimensions preserve the real score for activity on %s", async (date) => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
+    const stats = { ...DEMO_STATS, heatmapData: [{ date, count: 10 }] };
+    const impact = computeImpactV6(stats);
+    const { getTool } = setup({ stats, impact });
+    const payload = JSON.parse(await execute(getTool("simulate_score"), { dimensions: impact.dimensions }));
+    expect(payload.adjusted).toBe(impact.adjustedComposite);
+    expect(payload.tier).toBe(impact.tier);
+    expect(payload.deltaVsCurrent).toBe(0);
+  });
+  it("applies recent activity before confidence across the Elite boundary", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
+    const stats = { ...DEMO_STATS, heatmapData: [{ date: "2026-09-05", count: 10 }] };
+    const { getTool } = setup({ stats, impact: { ...DEMO_IMPACT, confidence: 100 } });
+    const payload = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { delivery: 81, quality: 81, consistency: 81, breadth: 81, craft: 81 } }));
+    expect(payload).toMatchObject({ composite: 81, adjusted: 86, tier: "Elite" });
   });
 });

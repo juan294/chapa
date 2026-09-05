@@ -85,7 +85,7 @@ interface UpsertUserOpts {
 }
 
 /**
- * Register a user (upsert — idempotent).
+ * Register a user (upsert — idempotent). Returns whether the write succeeded.
  * Handles are stored lowercase for consistent lookups.
  *
  * When any profile field is provided, updates the existing row
@@ -95,15 +95,15 @@ interface UpsertUserOpts {
 export async function dbUpsertUser(
   handle: string,
   opts?: UpsertUserOpts,
-): Promise<void> {
+): Promise<boolean> {
   // The permanent users registry contains primary GitHub identities only.
   // EMU source handles can contain underscores and are stored separately as
   // supplemental data; registering one here makes warm-cache retry an account
   // the server token cannot resolve on every hourly run.
-  if (!isValidHandle(handle)) return;
+  if (!isValidHandle(handle)) return false;
 
   const db = getSupabase();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     const row: Record<string, string | null> = { handle: handle.toLowerCase() };
@@ -116,7 +116,7 @@ export async function dbUpsertUser(
       opts?.displayName !== undefined ||
       opts?.avatarUrl !== undefined;
 
-    await db
+    const { error } = await db
       .from("users")
       .upsert(row, {
         onConflict: "handle",
@@ -124,8 +124,11 @@ export async function dbUpsertUser(
         // Without extra fields, skip duplicates to preserve existing data.
         ignoreDuplicates: !hasUpdateFields,
       });
+    if (error) throw error;
+    return true;
   } catch (error) {
     console.error("[db] dbUpsertUser failed:", (error as Error).message);
+    return false;
   }
 }
 

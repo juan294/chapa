@@ -21,6 +21,7 @@ import {
   computeAdjustedScore,
   getTier,
 } from "@/lib/impact/utils";
+import { applyRecencyWeight, computeRecencyRatio } from "@/lib/impact/recency";
 import { useTranslation } from "@/lib/i18n";
 import {
   invalidInput,
@@ -266,7 +267,7 @@ export function useStudioWebMcpTools({
       },
       {
         name: "simulate_score",
-        description: "Simulate an impact score from dimension overrides without saving data.",
+        description: "Simulate an impact score from dimension overrides without saving data. Confidence, profile type, and activity timing stay fixed.",
         inputSchema: SIMULATE_SCORE_INPUT_SCHEMA,
         annotations: readOnly,
         execute: (inputs) => {
@@ -290,7 +291,8 @@ export function useStudioWebMcpTools({
             activeScores.reduce((sum, score) => sum + score, 0) /
               activeScores.length,
           );
-          const adjusted = computeAdjustedScore(composite, impact.confidence);
+          const recencyWeighted = applyRecencyWeight(composite, computeRecencyRatio(stats.heatmapData));
+          const adjusted = computeAdjustedScore(recencyWeighted, impact.confidence);
           return JSON.stringify({
             composite,
             adjusted,

@@ -1,7 +1,11 @@
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { GET } from "./route";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+
+const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
+vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
 
 const {
   mockVerifyCronSecret,
@@ -175,6 +179,7 @@ function user(handle: string) {
 describe("GET /api/cron/warm-cache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
     mockVerifyCronSecret.mockReturnValue(null);
     mockDbGetUsers.mockResolvedValue([user("alice"), user("bob")]);
     mockDbGetAllUserHandles.mockImplementation(async () =>
@@ -216,6 +221,17 @@ describe("GET /api/cron/warm-cache", () => {
   afterEach(() => {
     vi.stubEnv("GITHUB_TOKEN", undefined);
     vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", undefined);
+  });
+
+  it("#1289 skips unknown config cache publication while continuing profile warming", async () => {
+    mockDbGetStudioConfig.mockResolvedValue({status: "unavailable"});
+    const response = await GET(makeRequest());
+    expect(response.status).toBe(200);
+    expect((await response.json()).warmed).toBe(2);
+    expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    mockDbGetStudioConfig.mockResolvedValue({status: "found", config: DEFAULT_BADGE_CONFIG, revision: 2});
+    await GET(makeRequest());
+    expect(mockWriteBadgeSvgCache).toHaveBeenCalled();
   });
 
   it("returns the denied response when cron auth fails", async () => {

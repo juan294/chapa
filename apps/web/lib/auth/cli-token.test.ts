@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   generateCliToken,
   verifyCliToken,
@@ -54,6 +54,42 @@ describe("generateCliToken", () => {
 });
 
 describe("verifyCliToken", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function signedPayload(payload: Record<string, unknown>): string {
+    const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+    return `${encoded}.${createHmac("sha256", SECRET).update(encoded).digest("base64url")}`;
+  }
+
+  it("rejects an unexpired legacy ninety-day grant", () => {
+    const iat = Date.now() - 1000;
+    expect(verifyCliToken(signedPayload({ handle: "alice", type: "cli", iat,
+      exp: iat + 90 * 86400000 }), SECRET)).toBeNull();
+  });
+
+  it("allows the old issuer's small timestamp-read drift", () => {
+    const iat = Date.now() - 1000;
+    expect(verifyCliToken(signedPayload({ handle: "alice", type: "cli", iat,
+      exp: iat + 10 * 86400000 + 5 }), SECRET)).toEqual({ handle: "alice" });
+  });
+
+  it.each([
+    { iat: undefined }, { iat: "123" }, { exp: undefined }, { exp: "9999999999999" },
+    { iat: null }, { exp: null }, { iat: 1.5 }, { exp: 9999999999999.5 },
+    { iat: Date.now() + 5000, exp: Date.now() + 4000 }, { handle: 123 }, { handle: "" },
+  ])("rejects malformed signed claims %j", (overrides) => {
+    const now = Date.now();
+    expect(verifyCliToken(signedPayload({ handle: "alice", type: "cli", iat: now,
+      exp: now + 10 * 86400000, ...overrides }), SECRET)).toBeNull();
+  });
+
+  it("rejects a token exactly at expiry", () => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    expect(verifyCliToken(signedPayload({ handle: "alice", type: "cli",
+      iat: now - 1000, exp: now }), SECRET)).toBeNull();
+  });
+
   it("verifies a valid token and returns the handle", () => {
     const token = generateCliToken("juan294", SECRET);
     const result = verifyCliToken(token, SECRET);

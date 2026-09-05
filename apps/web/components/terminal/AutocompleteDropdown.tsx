@@ -130,7 +130,7 @@ export function AutocompleteDropdown({
               : "text-text-secondary hover:bg-amber/5"
           }`}
         >
-          <span className="min-w-[10ch] text-amber shrink-0">{cmd.name}</span>
+          <span className="min-w-[10ch] text-amber-text shrink-0">{cmd.name}</span>
           <span className="text-text-secondary truncate">
             {cmd.description}
           </span>

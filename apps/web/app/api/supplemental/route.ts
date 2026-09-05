@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
-import { cacheSet, rateLimitStrict } from "@/lib/cache/redis";
+import { cacheSet, cacheDel, rateLimitStrict } from "@/lib/cache/redis";
 import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
@@ -8,7 +8,7 @@ import { assertHandleOwnership } from "@/lib/auth/assert-handle-ownership";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import type { SupplementalStats } from "@chapa/shared";
-import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 
 const CACHE_TTL = 86400; // 24 hours
 const MAX_SUPPLEMENTAL_BYTES = 256 * 1024;
@@ -88,7 +88,7 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
     );
   }
 
-  // 5. Store in Redis (hot read path) AND Supabase (durable). Redis has a
+  // 5. Commit Supabase first, then publish Redis (hot read path). Redis has a
   // 24h TTL and is rebuilt from Supabase by warm-cache + by getStats() on
   // a Redis miss, so a missed CLI upload day no longer drops EMU data.
   // Supabase is the success criterion — Redis is best-effort.
@@ -99,20 +99,28 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
     uploadedAt: new Date().toISOString(),
   };
 
-  const [, dbOk] = await Promise.all([
-    cacheSet(`supplemental:${targetHandle.toLowerCase()}`, supplemental, CACHE_TTL).catch(
-      (err: unknown) => {
-        console.warn("[supplemental] Redis write failed (best-effort):", (err as Error).message);
-      },
-    ),
-    dbUpsertSupplemental(targetHandle, supplemental),
-  ]);
+  // Only committed inputs may become visible through the hot read path.
+  const dbOk = await dbUpsertSupplemental(targetHandle, supplemental);
 
   if (!dbOk) {
     return NextResponse.json(
       { success: false, error: "Failed to persist supplemental stats" },
       { status: 500 },
     );
+  }
+
+  const supplementalKey = `supplemental:${targetHandle.toLowerCase()}`;
+  const published = await cacheSet(supplementalKey, supplemental, CACHE_TTL)
+    .catch(() => false);
+  // A failed SET can leave the previous value alive. Evict it so getStats
+  // falls back to the committed row instead of composing the old upload.
+  const cacheRefreshed = published || await cacheDel(supplementalKey).catch(() => false);
+  if (!cacheRefreshed) {
+    await captureServerError({
+      route: "/api/supplemental",
+      statusCode: 200,
+      error: new Error(`Supplemental stats committed but cache refresh deferred for ${targetHandle}`),
+    });
   }
 
   // 6. Invalidate score-dependent read models and rendered badge artifact.
@@ -132,5 +140,5 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
   // inputs and the user sees the updated score without waiting for tomorrow.
   await markStatsDirty(targetHandle);
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, cacheRefreshed });
 });

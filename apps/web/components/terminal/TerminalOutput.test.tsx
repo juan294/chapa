@@ -177,7 +177,7 @@ describe("TerminalOutput", () => {
 
 describe("TerminalOutput — line type color classes", () => {
   const typeStyleMap: Array<[OutputLine["type"], string]> = [
-    ["input", "text-amber"],
+    ["input", "text-amber-text"],
     ["success", "text-terminal-green"],
     ["error", "text-terminal-red"],
     ["warning", "text-terminal-yellow"],

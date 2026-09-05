@@ -1,3 +1,4 @@
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { CACHE_VERSION } from "@/lib/cache/version";
@@ -7,6 +8,9 @@ import {
   buildBadgeSvgRenderLockKey,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
+
+const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
+vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
 
 const {
   mockMaterializePublicProfile,
@@ -166,6 +170,7 @@ function makeRequest(
 describe("GET /u/[handle]/badge.svg", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockGetOptionalRequestSession.mockReturnValue(null);
@@ -182,6 +187,61 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockCacheSet.mockResolvedValue(true);
     mockCacheSetNx.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
+  });
+
+  it.each(["unavailable", "invalid"])("#1289 renders %s config fallback without publishing it", async (status) => {
+    mockDbGetStudioConfig.mockResolvedValue({ status });
+    const response = await GET(...makeRequest("testuser"));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(FAKE_SVG);
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({config: DEFAULT_BADGE_CONFIG}));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+  });
+
+  it("#1289 recovers custom config after an unavailable read and caches confirmed absence", async () => {
+    mockDbGetStudioConfig.mockResolvedValueOnce({ status: "unavailable" });
+    await GET(...makeRequest("testuser"));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    mockAfter.mockClear();
+    const custom = {...DEFAULT_BADGE_CONFIG, border: "none"};
+    mockDbGetStudioConfig.mockResolvedValueOnce({status: "found", config: custom, revision: 7});
+    const response = await GET(...makeRequest("testuser"));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).toHaveBeenCalledTimes(1);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
+    expect(mockRenderBadgeSvg).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({config: custom}));
+    mockAfter.mockClear();
+    await GET(...makeRequest("testuser"));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("#1289 warm hits do not read config", async () => {
+    mockCacheGet.mockResolvedValue(FAKE_SVG);
+    await GET(...makeRequest("testuser"));
+    expect(mockDbGetStudioConfig).not.toHaveBeenCalled();
+  });
+
+  it("#1289 background completion does not cache an unknown config fallback", async () => {
+    vi.useFakeTimers();
+    try {
+      mockDbGetStudioConfig.mockResolvedValue({status: "unavailable"});
+      mockCacheGet.mockResolvedValueOnce(null).mockResolvedValueOnce("<svg>STALE</svg>");
+      let finish!: (value: typeof FAKE_MATERIALIZED) => void;
+      mockMaterializePublicProfile.mockReturnValue(new Promise(resolve => {finish = resolve;}));
+      const pending = GET(...makeRequest("testuser"));
+      await vi.advanceTimersByTimeAsync(2300);
+      expect(await (await pending).text()).toBe("<svg>STALE</svg>");
+      finish(FAKE_MATERIALIZED);
+      await flushAfterCallbacks();
+      expect(mockRenderBadgeSvg).toHaveBeenCalled();
+      expect(mockCacheSet).not.toHaveBeenCalled();
+      expect(mockPersistProfileSnapshot).toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
   });
 
   it("returns 429 when the badge route is rate limited", async () => {

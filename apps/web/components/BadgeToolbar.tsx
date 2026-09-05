@@ -239,6 +239,7 @@ export function BadgeToolbar({
             aria-label={t('aria.shareOptions') as string}
           >
             <a
+              aria-label={`${t("badgeToolbar.postOn")} X`}
               href={`https://x.com/intent/tweet?text=${tweetText}`}
               onClick={() => {
                 trackEvent("share_clicked", { platform: "x" });
@@ -260,6 +261,7 @@ export function BadgeToolbar({
               </svg>
             </a>
             <a
+              aria-label={`${t("badgeToolbar.shareOn")} LinkedIn`}
               href={linkedinUrl}
               onClick={() => {
                 trackEvent("share_clicked", { platform: "linkedin" });
@@ -281,6 +283,7 @@ export function BadgeToolbar({
               </svg>
             </a>
             <a
+              aria-label={`${t("badgeToolbar.postOn")} Bluesky`}
               href={blueskyUrl}
               onClick={() => {
                 trackEvent("share_clicked", { platform: "bluesky" });

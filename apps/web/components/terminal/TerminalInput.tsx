@@ -132,7 +132,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
     // suggestion chips) belongs to the caller, so Studio and the global
     // command bar can frame the same field differently.
     <div className="flex min-h-[46px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 font-terminal text-base leading-6 transition-colors focus-within:border-amber sm:text-sm">
-      <span className="text-amber select-none shrink-0">
+      <span className="text-amber-text select-none shrink-0">
         {prompt} &gt;
       </span>
       <div className="relative flex-1">

@@ -9,7 +9,7 @@ interface TerminalOutputProps {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-  input: "text-amber",
+  input: "text-amber-text",
   success: "text-terminal-green",
   error: "text-terminal-red",
   warning: "text-terminal-yellow",

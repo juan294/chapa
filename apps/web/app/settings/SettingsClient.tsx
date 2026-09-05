@@ -327,6 +327,8 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
 
       {insights.toast && (
         <Toast
+          key={insights.toast.id}
+          duration={insights.toast.type === "loading" ? 0 : undefined}
           message={insights.toast.message}
           detail={insights.toast.detail}
           type={insights.toast.type}

@@ -17,6 +17,7 @@ const MAX_INSIGHTS_FILE_BYTES = 10 * 1024 * 1024;
 const RELOAD_DELAY_MS = 2500;
 
 export interface InsightsToast {
+  id: number;
   message: string;
   detail?: string;
   type: "loading" | "success" | "error" | "info";
@@ -64,6 +65,10 @@ export function useInsightsImport(login: string): InsightsImport {
   const storageKey = `chapa_insights_last_submitted_${login}`;
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<InsightsToast | null>(null);
+  const toastIdRef = useRef(0);
+  const showToast = useCallback((notification: Omit<InsightsToast, "id">) => {
+    setToast({ ...notification, id: ++toastIdRef.current });
+  }, []);
 
   // Cooldown state is seeded with deterministic defaults (0 / null) so the
   // initial server and client renders match; the real values are populated in
@@ -110,7 +115,7 @@ export function useInsightsImport(login: string): InsightsImport {
   const importFile = useCallback(
     async (file: File) => {
       if (file.size > MAX_INSIGHTS_FILE_BYTES) {
-        setToast({
+        showToast({
           message: t("userMenu.insightsFileTooLarge") as string,
           detail: t("userMenu.insightsFileTooLargeDetail") as string,
           type: "error",
@@ -118,7 +123,7 @@ export function useInsightsImport(login: string): InsightsImport {
         return;
       }
 
-      setToast({
+      showToast({
         message: t("userMenu.insightsProcessing") as string,
         type: "loading",
       });
@@ -135,7 +140,7 @@ export function useInsightsImport(login: string): InsightsImport {
         });
         if (!uploadRes.ok) throw new Error("Upload failed");
 
-        setToast({
+        showToast({
           message: t("userMenu.insightsRecalculating") as string,
           type: "loading",
         });
@@ -155,7 +160,7 @@ export function useInsightsImport(login: string): InsightsImport {
           const craftScore =
             uploadData.craftScore?.craftScore ?? recalcData.craftScore;
           const craftTier = uploadData.craftScore?.tier ?? recalcData.craftTier;
-          setToast({
+          showToast({
             message: interpolate(t("userMenu.insightsCraftResult") as string, {
               craftScore: String(craftScore),
               craftTier: resolveCraftTierLabel(t, craftTier),
@@ -168,7 +173,7 @@ export function useInsightsImport(login: string): InsightsImport {
         } else {
           const craftScore = uploadData.craftScore?.craftScore;
           const craftTier = uploadData.craftScore?.tier;
-          setToast({
+          showToast({
             message: craftScore
               ? interpolate(t("userMenu.insightsCraftResult") as string, {
                   craftScore: String(craftScore),
@@ -185,14 +190,14 @@ export function useInsightsImport(login: string): InsightsImport {
           if (typeof window !== "undefined") window.location.reload();
         }, RELOAD_DELAY_MS);
       } catch {
-        setToast({
+        showToast({
           message: t("userMenu.insightsImportFailed") as string,
           detail: t("userMenu.insightsImportFailedDetail") as string,
           type: "error",
         });
       }
     },
-    [storageKey, t],
+    [storageKey, t, showToast],
   );
 
   return {

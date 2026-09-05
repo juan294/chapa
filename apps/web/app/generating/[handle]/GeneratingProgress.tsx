@@ -196,7 +196,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           </p>
           <h1 className="mt-2 font-heading text-lg font-bold tracking-tight text-text-primary">
             {t('generation.heading') as string}{" "}
-            <span className="text-amber">@{handle}</span>
+            <span className="text-amber-text">@{handle}</span>
           </h1>
         </div>
 
@@ -278,7 +278,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
                     status === "done"
                       ? "text-terminal-green"
                       : status === "active"
-                        ? "text-amber"
+                        ? "text-amber-text"
                         : status === "error"
                           ? "text-terminal-red"
                           : "text-terminal-dim"

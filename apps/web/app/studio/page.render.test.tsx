@@ -394,15 +394,14 @@ describe("StudioPage render", () => {
     expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat"]);
   });
 
-  it("fails open to the default config when persisted storage is unavailable", async () => {
-    mocks.loadStudioConfig.mockResolvedValue({ status: "unavailable" });
+  it.each(["unavailable", "invalid"] as const)("blocks editing when persisted config is %s", async (status) => {
+    mocks.loadStudioConfig.mockResolvedValue({ status });
     const { default: StudioPage } = await import("./page");
-
+    await expect(StudioPage()).rejects.toThrow("Unable to load Studio configuration");
+    expect(screen.queryByTestId("studio-client")).toBeNull();
+    mocks.loadStudioConfig.mockResolvedValue({ status: "not_found" });
     render(await StudioPage());
-
-    expect(
-      screen.getByTestId("studio-client").getAttribute("data-config-background"),
-    ).toBe("solid");
+    expect(screen.getByTestId("studio-client").getAttribute("data-config-background")).toBe("solid");
   });
 
   it("is configured as a force-dynamic route", async () => {

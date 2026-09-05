@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
+import { LanguageProvider } from "@/lib/i18n";
 import { StrictMode } from "react";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
 import { BadgeToolbar, stripBadgeAnimations } from "./BadgeToolbar";
@@ -82,6 +85,24 @@ afterEach(() => {
 });
 
 describe("BadgeToolbar render", () => {
+  it.each(["en", "es"] as const)("#1291 names every sharing destination in %s", (locale) => {
+    dropdownOpen = true;
+    render(
+      <LanguageProvider initialLocale={locale} dictionary={locale === "en" ? en : es}>
+        <BadgeToolbar handle="testuser" />
+      </LanguageProvider>,
+    );
+    const names = locale === "en"
+      ? ["Post on X", "Share on LinkedIn", "Post on Bluesky"]
+      : ["Publicar en X", "Compartir LinkedIn", "Publicar en Bluesky"];
+    for (const [index, host] of ["x.com", "linkedin.com", "bsky.app"].entries()) {
+      const link = screen.getByRole("menuitem", { name: names[index] });
+      expect(link.getAttribute("href")).toContain(host);
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    }
+  });
+
   describe("smoke test", () => {
     it("renders Share and Download buttons", () => {
       render(

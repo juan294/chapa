@@ -41,7 +41,7 @@ These tools orient and navigate only. They fetch no data and do not wrap the pub
 | `preview_badge` | `EMPTY` | yes | Returns the current configuration, public badge SVG URL, and save status. |
 | `reset_badge_config` | `EMPTY` | no | Runs the visible `/reset` command and returns terminal output plus the reset configuration snapshot. |
 | `save_badge_config` | `EMPTY` | no | Opens an on-page save proposal. It never calls the save API itself. Only a human click on the confirmation control can continue. |
-| `simulate_score` | `SIMULATION` | yes | Merges the supplied dimension values with the current profile, calculates composite and confidence-adjusted scores, selects the tier, and returns the delta from the current score. Solo profiles exclude Quality from the composite. It does not save data. |
+| `simulate_score` | `SIMULATION` | yes | Merges dimension overrides with the current profile, applies its existing heatmap recency weighting before confidence adjustment, selects the tier, and returns the delta from the current score. Confidence, profile type, and activity timing remain fixed. Solo profiles exclude Quality from the composite; optional Craft remains included. It does not save data. |
 | `suggest_improvements` | `EMPTY` | yes | Runs Chapa's existing insight engine against the current impact profile and returns grounded improvement suggestions. |
 | `explain_dimension` | `DIMENSION` | yes | Uses the shared score-explanation engine to return the selected score, formula, tip, and normalized submetrics. |
 

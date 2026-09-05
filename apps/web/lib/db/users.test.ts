@@ -154,6 +154,19 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("dbUpsertUser", () => {
+  it("reports and logs a resolved PostgREST error", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockUpsert.mockResolvedValue({ error: { message: "write denied", code: "42501" } });
+    await expect(dbUpsertUser("testuser")).resolves.toBe(false);
+    expect(log).toHaveBeenCalledWith("[db] dbUpsertUser failed:", "write denied");
+    log.mockRestore();
+  });
+
+  it("returns true for a committed registration", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+    await expect(dbUpsertUser("TestUser")).resolves.toBe(true);
+  });
+
   it("does not register an EMU source handle as a primary user", async () => {
     await dbUpsertUser("Juan-GonzalezPonce_avoltagh");
 
@@ -247,13 +260,13 @@ describe("dbUpsertUser", () => {
   it("does not throw when upsert fails", async () => {
     mockUpsert.mockRejectedValue(new Error("DB down"));
 
-    await expect(dbUpsertUser("testuser")).resolves.toBeUndefined();
+    await expect(dbUpsertUser("testuser")).resolves.toBe(false);
   });
 
-  it("returns void when DB is unavailable", async () => {
+  it("returns false when DB is unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
 
-    await expect(dbUpsertUser("testuser")).resolves.toBeUndefined();
+    await expect(dbUpsertUser("testuser")).resolves.toBe(false);
     expect(mockFrom).not.toHaveBeenCalled();
   });
 });

@@ -109,6 +109,21 @@ describe("GlobalCommandBar", () => {
     expect(screen.getByTestId("author-typewriter")).toBeDefined();
   });
 
+  it("allows an editor to intercept command navigation", () => {
+    const intercept = vi.fn((event: Event) => event.preventDefault());
+    window.addEventListener("chapa:app-navigation", intercept);
+    try {
+      render(<GlobalCommandBar />);
+      const input = screen.getByTestId("cmd-input");
+      fireEvent.change(input, { target: { value: "/about" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(intercept).toHaveBeenCalledOnce();
+      expect(mockPush).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("chapa:app-navigation", intercept);
+    }
+  });
+
   it("navigates on submit with navigation command", () => {
     render(<GlobalCommandBar />);
     const input = screen.getByTestId("cmd-input");

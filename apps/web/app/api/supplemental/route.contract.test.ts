@@ -9,6 +9,9 @@ import {
   seedUser,
 } from "@/test/contract/invoke";
 
+import { redisFake } from "@/test/contract/redis-fake";
+import { getStats } from "@/lib/github/client";
+
 import { POST } from "./route";
 
 const HANDLE = "contract-supplemental";
@@ -48,6 +51,34 @@ describe("POST /api/supplemental contract", () => {
 
   afterAll(async () => {
     await cleanupUser(HANDLE);
+  });
+
+  it("recomposes committed supplemental data after Redis publication fails (#1287)", async () => {
+    redisFake.__reset();
+    const oldStats = validStats();
+    const newStats = { ...oldStats, commitsTotal: 100 };
+    const oldRecord = { targetHandle: HANDLE, sourceHandle: SOURCE_HANDLE,
+      stats: oldStats, uploadedAt: new Date().toISOString() };
+    const db = getServiceClient();
+    const seeded = await db.from("supplemental_stats").upsert({ target_handle: HANDLE,
+      source_handle: SOURCE_HANDLE, stats: oldStats, uploaded_at: oldRecord.uploadedAt });
+    expect(seeded.error).toBeNull();
+    await redisFake.cacheSet(`supplemental:${HANDLE}`, oldRecord);
+    const baseline = { ...oldStats, handle: HANDLE, commitsTotal: 10 };
+    await redisFake.cacheSet(`stats:stale:v2:${HANDLE}`, baseline);
+    redisFake.__failNext("cacheSet");
+
+    const response = await invokeJson(POST, { method: "POST", path: "/api/supplemental", bearer,
+      body: { targetHandle: HANDLE, sourceHandle: SOURCE_HANDLE, stats: newStats } });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, cacheRefreshed: true });
+    const stored = await db.from("supplemental_stats").select("stats").eq("target_handle", HANDLE).single();
+    expect(stored.error).toBeNull();
+    expect(stored.data?.stats.commitsTotal).toBe(100);
+    expect(await redisFake.cacheGet(`supplemental:${HANDLE}`)).toBeNull();
+    const composed = await getStats(HANDLE, undefined, { readOnly: true });
+    expect(composed?.commitsTotal).toBe(110);
+    expect(await redisFake.cacheGet(`stats:stale:v2:${HANDLE}`)).toEqual(baseline);
   });
 
   it("runs the supplemental payload matrix with zero 5xx and persistence re-read", async () => {

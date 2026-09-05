@@ -14,6 +14,7 @@ import type {
   StatsData,
   ImpactV6Result,
 } from "@chapa/shared";
+import { useUnsavedNavigation } from "@/hooks/useUnsavedNavigation";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { BadgePreviewCard } from "./BadgePreviewCard";
@@ -115,6 +116,11 @@ const TERMINAL_HINT_LINE_ID = "studio-terminal-hint";
 // below) but a user's explicit collapse choice is still respected across visits.
 const QUICK_CONTROLS_STORAGE_KEY = "chapa:studio:quickControlsVisible";
 
+function sameConfig(left: BadgeConfig, right: BadgeConfig): boolean {
+  return (Object.keys(left) as (keyof BadgeConfig)[])
+    .every((key) => left[key] === right[key]);
+}
+
 function translation(t: Translate, key: string): string {
   return t(key) as string;
 }
@@ -200,6 +206,10 @@ export function StudioClient({
   const { webmcpEnabled } = useClientFeatureFlags();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
   const configRef = useRef(config);
+  const [persistedConfig, setPersistedConfig] = useState(initialConfig);
+  const persistedConfigRef = useRef(initialConfig);
+  const hasUnsavedChanges = !sameConfig(config, persistedConfig);
+  useUnsavedNavigation(!demo && hasUnsavedChanges);
   const [saveState, setSaveState] = useState<SaveState>({ status: "saved" });
   const [pendingAgentSave, setPendingAgentSave] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
@@ -247,7 +257,6 @@ export function StudioClient({
   }, []);
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
-  const configRevisionRef = useRef(0);
   const saveInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -312,22 +321,6 @@ export function StudioClient({
     }
   }, [trackStudioEvent]);
 
-  // FE-M3 (#1173): warn before an unsaved-changes loss. Registered/removed on
-  // the saveState.status transition (not just on mount) so the listener only
-  // exists while there's actually something to lose. Demo mode never
-  // persists by design (see handleSave above) — the guard must not fire
-  // there, or the judge-demo flow gets a spurious "leave site?" prompt on
-  // every exit even though there was never anything to save.
-  useEffect(() => {
-    if (demo || saveState.status !== "dirty") return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [demo, saveState.status]);
-
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
       const currentConfig = configRef.current;
@@ -343,9 +336,9 @@ export function StudioClient({
         }
       }
       if (changed) {
-        configRevisionRef.current += 1;
         if (!saveInFlightRef.current) {
-          setSaveState({ status: "dirty" });
+          const unsaved = !sameConfig(newConfig, persistedConfigRef.current);
+          setSaveState({ status: unsaved ? "dirty" : "saved" });
         }
       }
       configRef.current = newConfig;
@@ -364,7 +357,6 @@ export function StudioClient({
     }
 
     saveInFlightRef.current = true;
-    const revision = configRevisionRef.current;
     const configToSave = configRef.current;
     setSaveState({ status: "saving" });
     try {
@@ -388,8 +380,6 @@ export function StudioClient({
       });
       if (res.ok) {
         trackStudioEvent("config_saved", { config: configToSave });
-        const hasNewerChanges = configRevisionRef.current !== revision;
-        setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
         // hotfix v2.29.2 — an older server during a rolling deploy omits
         // `badgeRefreshed` from the body; treat that as refreshed rather than
         // showing a deferred warning for a save that actually succeeded. One
@@ -398,6 +388,12 @@ export function StudioClient({
         const payload: { badgeRefreshed?: boolean } = await res
           .json()
           .catch(() => ({}));
+        // The body may arrive after more edits. Record only what this request
+        // actually persisted, and derive status after the final await.
+        persistedConfigRef.current = configToSave;
+        setPersistedConfig(configToSave);
+        const hasNewerChanges = !sameConfig(configRef.current, configToSave);
+        setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
         const badgeRefreshed = payload.badgeRefreshed !== false;
         const status = hasNewerChanges
           ? "changedDuringSave"
@@ -463,16 +459,12 @@ export function StudioClient({
     const currentConfig = configRef.current;
     const resetConfig = getStudioCommandConfig(currentConfig, { type: "reset" });
     if (!resetConfig) return;
-    const changed = Object.keys(resetConfig).some((key) => {
-      const configKey = key as keyof BadgeConfig;
-      return currentConfig[configKey] !== resetConfig[configKey];
-    });
+    const changed = !sameConfig(currentConfig, resetConfig);
     configRef.current = resetConfig;
     setConfig(resetConfig);
     if (changed) {
-      configRevisionRef.current += 1;
       if (!saveInFlightRef.current) {
-        setSaveState({ status: "dirty" });
+        setSaveState({ status: sameConfig(resetConfig, persistedConfigRef.current) ? "saved" : "dirty" });
       }
     }
     trackStudioEvent("effect_changed", {

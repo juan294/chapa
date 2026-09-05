@@ -26,7 +26,7 @@ import {
   resolveBadgeAvatar,
 } from "@/lib/render/avatar-outcome";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { resolveBadgeConfig } from "@/lib/render/badge-config";
+import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import {
@@ -490,25 +490,30 @@ async function warmHandle(
         const verification = getPublicProfileVerification(materialized);
 
         if (avatarCachePolicy !== "skip" && verification) {
-          const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
-            avatarDataUri,
-            // #1191 — the cron writes to the same cache slot as the request
-            // path, so it must render the same config. Warming with the
-            // default would silently replace a user's configured badge.
-            config: await resolveBadgeConfig(handle),
-            verificationHash: verification.hash,
-            verificationDate: verification.date,
-            // Mirrors the request path — this SVG is served to <img> embeds,
-            // where SMIL <animate> never runs.
-            disableAnimation: true,
-            strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
-          });
-          if (avatarCachePolicy === "short") {
-            await writeBadgeSvgCache(svgCacheKey, svg, handle, {
-              ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+          const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+          // Keep profile warming successful when styling storage is unavailable;
+          // a fallback design must not overwrite the public SVG cache.
+          if (configSnapshot.cacheable) {
+            const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+              avatarDataUri,
+              // #1191 — the cron writes to the same cache slot as the request
+              // path, so it must render the same config. Warming with the
+              // default would silently replace a user's configured badge.
+              config: configSnapshot.config,
+              verificationHash: verification.hash,
+              verificationDate: verification.date,
+              // Mirrors the request path — this SVG is served to <img> embeds,
+              // where SMIL <animate> never runs.
+              disableAnimation: true,
+              strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
             });
-          } else {
-            await writeBadgeSvgCache(svgCacheKey, svg, handle);
+            if (avatarCachePolicy === "short") {
+              await writeBadgeSvgCache(svgCacheKey, svg, handle, {
+                ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+              });
+            } else {
+              await writeBadgeSvgCache(svgCacheKey, svg, handle);
+            }
           }
         }
       }

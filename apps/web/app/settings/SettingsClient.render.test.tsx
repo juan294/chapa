@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -10,6 +11,8 @@ import {
 } from "@testing-library/react";
 
 const mocks = vi.hoisted(() => ({
+  toast: vi.fn(),
+  dismissToast: vi.fn(),
   refresh: vi.fn(),
   unlink: vi.fn(),
   connections: vi.fn(),
@@ -31,8 +34,8 @@ vi.mock("@/lib/platform/use-platform-connections", () => ({
 }));
 vi.mock("@/lib/insights/use-insights-import", () => ({
   useInsightsImport: () => ({
-    toast: null,
-    dismissToast: vi.fn(),
+    toast: mocks.toast(),
+    dismissToast: mocks.dismissToast,
     cooldownActive: mocks.cooldownActive(),
     cooldownTooltip: mocks.cooldownActive() ? "Available again on Sep 13" : undefined,
     importFile: mocks.importFile,
@@ -65,6 +68,7 @@ function connection(platform: string, over: Record<string, unknown> = {}) {
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.toast.mockReturnValue(null);
   mocks.insightsEnabled.mockReturnValue(true);
   mocks.cooldownActive.mockReturnValue(false);
   mocks.connections.mockReturnValue([
@@ -213,5 +217,67 @@ describe("SettingsClient", () => {
     expect(screen.getByTestId("settings-insights").textContent).toContain(
       "Available again on Sep 13",
     );
+  });
+});
+
+
+afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+describe("#1292 insights notification lifecycle", () => {
+  const props = {login: "octocat", name: "The Octocat", avatarUrl: null};
+
+  it("keeps slow loading visible until completion and gives errors a fresh interval", async () => {
+    vi.useFakeTimers();
+    mocks.toast.mockReturnValue({id: 1, type: "loading", message: "Processing"});
+    const view = render(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(6000));
+    expect(mocks.dismissToast).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").className).not.toContain("animate-toast-out");
+    mocks.toast.mockReturnValue({id: 2, type: "loading", message: "Recalculating"});
+    view.rerender(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(6000));
+    expect(mocks.dismissToast).not.toHaveBeenCalled();
+    mocks.toast.mockReturnValue({id: 3, type: "error", message: "Import failed"});
+    view.rerender(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(3999));
+    expect(screen.getByRole("alert").className).not.toContain("animate-toast-out");
+    expect(mocks.dismissToast).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(301));
+    expect(mocks.dismissToast).toHaveBeenCalledTimes(1);
+  });
+
+  it("restarts identical results and cleans up replaced or manually dismissed notification timers", async () => {
+    vi.useFakeTimers();
+    mocks.toast.mockReturnValue({id: 1, type: "error", message: "Import failed"});
+    const view = render(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(4100));
+    expect(screen.getByRole("alert").className).toContain("animate-toast-out");
+    mocks.toast.mockReturnValue({id: 2, type: "error", message: "Import failed"});
+    view.rerender(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    expect(screen.getByRole("alert").className).not.toContain("animate-toast-out");
+    expect(mocks.dismissToast).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", {name: "Dismiss notification"}));
+    expect(mocks.dismissToast).toHaveBeenCalledTimes(1);
+    mocks.toast.mockReturnValue(null);
+    view.rerender(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(10000));
+    expect(mocks.dismissToast).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps success visible for the real 2.5-second pre-reload interval", async () => {
+    vi.useFakeTimers();
+    mocks.toast.mockReturnValue({id: 1, type: "loading", message: "Processing"});
+    const view = render(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(6000));
+    mocks.dismissToast.mockClear();
+    mocks.toast.mockReturnValue({id: 2, type: "success", message: "Score updated"});
+    view.rerender(<SettingsClient {...props} />);
+    await act(() => vi.advanceTimersByTimeAsync(2500));
+    expect(screen.getByRole("status").className).not.toContain("animate-toast-out");
+    expect(mocks.dismissToast).not.toHaveBeenCalled();
+    view.unmount();
+    await act(() => vi.advanceTimersByTimeAsync(10000));
+    expect(mocks.dismissToast).not.toHaveBeenCalled();
   });
 });

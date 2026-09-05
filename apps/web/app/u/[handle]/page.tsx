@@ -11,10 +11,7 @@ import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import {
-  resolveBadgeConfig,
-  resolveBadgeConfigSnapshot,
-} from "@/lib/render/badge-config";
+import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
@@ -245,6 +242,7 @@ export async function SharePageContent({
   // avatar fetch + render entirely.
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
+  let configCacheable = false;
   let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
 
   if (!cachedSvg && stats && impact) {
@@ -262,11 +260,13 @@ export async function SharePageContent({
       avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
       avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
     }
+    const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+    configCacheable = configSnapshot.cacheable;
     inlineSvg = renderBadgeSvg(stats, impact, {
       avatarDataUri,
       // #1191 — this render writes to the same cache slot the badge route
       // reads, so it must use the same config.
-      config: await resolveBadgeConfig(handle),
+      config: configSnapshot.config,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
       // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
@@ -297,7 +297,7 @@ export async function SharePageContent({
   // own "failed" write outcome; this outer catch covers any other error.
   if (materialized && inlineSvg && !readOnly) {
     const cacheEligible =
-      renderedFresh && !!verification && avatarCachePolicy !== "skip";
+      renderedFresh && configCacheable && !!verification && avatarCachePolicy !== "skip";
     const svgToCache = cacheEligible ? inlineSvg : null;
     // Short-TTL only when stats have no avatar URL; a resolved avatar keeps
     // the standard 24h+jitter TTL (writeBadgeSvgCache's own default).

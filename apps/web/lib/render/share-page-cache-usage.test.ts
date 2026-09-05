@@ -1,3 +1,4 @@
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 /**
  * #720 — share page must try the badge SVG cache before re-rendering.
  *
@@ -18,6 +19,9 @@
  * share-page.render.test.tsx.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
+vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
 
 const {
   mockMaterializePublicProfile,
@@ -144,6 +148,7 @@ const FAKE_MATERIALIZED = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
   mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
   mockGetPublicProfileVerification.mockReturnValue({
     hash: "abc12345",
@@ -164,6 +169,19 @@ beforeEach(() => {
 });
 
 describe("share page (#720) cache-first SVG — real behavior", () => {
+  it("#1289 leaves unknown config uncached then heals on recovery", async () => {
+    mockDbGetStudioConfig.mockResolvedValueOnce({status: "unavailable"});
+    await SharePageContent({handle: "testuser"});
+    await flushAfterCallbacks();
+    expect(mockRenderBadgeSvg).toHaveBeenCalled();
+    expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    mockAfter.mockClear();
+    mockDbGetStudioConfig.mockResolvedValue({status: "found", config: DEFAULT_BADGE_CONFIG, revision: 2});
+    await SharePageContent({handle: "testuser"});
+    await flushAfterCallbacks();
+    expect(mockWriteBadgeSvgCache).toHaveBeenCalledTimes(1);
+  });
+
   it("skips renderBadgeSvg entirely on a cache hit", async () => {
     mockReadBadgeSvgCache.mockResolvedValue(
       '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>',
@@ -173,6 +191,7 @@ describe("share page (#720) cache-first SVG — real behavior", () => {
 
     expect(mockReadBadgeSvgCache).toHaveBeenCalled();
     expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    expect(mockDbGetStudioConfig).not.toHaveBeenCalled();
 
     await flushAfterCallbacks();
     expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();

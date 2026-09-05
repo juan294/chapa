@@ -107,9 +107,10 @@ async function cacheMergeJson<T extends object>(
   return true;
 }
 
-async function cacheDel(key: string): Promise<void> {
+async function cacheDel(key: string): Promise<boolean> {
   store.delete(key);
   hllStore.delete(key);
+  return true;
 }
 
 async function cacheMGet<T>(keys: string[]): Promise<(T | null)[]> {

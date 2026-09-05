@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { WARM_AMBER } from "@/lib/render/theme";
-import { resolveBadgeConfig } from "@/lib/render/badge-config";
+import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
 import { getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
@@ -253,9 +253,10 @@ async function persistFinalizedBadgeCache(
     svgCacheKey: string;
     verification: PublicVerificationCode | null;
     avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
+    configCacheable: boolean;
   },
 ): Promise<void> {
-  if (options.readOnly || !options.verification) return;
+  if (options.readOnly || !options.verification || !options.configCacheable) return;
 
   if (options.avatarCachePolicy === "short") {
     // #1088 — short-TTL placeholder write: populates the cache (so a
@@ -298,6 +299,7 @@ async function finalizeMaterializedBadge(
   verification: PublicVerificationCode | null;
   renderMs: number;
   avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
+  configCacheable: boolean;
 }> {
   // #1080/#1088 — the avatar step has distinct outcomes, previously
   // conflated into one `avatarResolved` boolean (`avatarDataUri !==
@@ -329,12 +331,12 @@ async function finalizeMaterializedBadge(
 
   // #1191 — the owner's Studio configuration. Resolved on the RENDER path only;
   // the cache-hit path above must stay a single Redis read.
-  const config = await resolveBadgeConfig(handle);
+  const configSnapshot = await resolveBadgeConfigSnapshot(handle);
 
   const renderStart = Date.now();
   const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
     avatarDataUri,
-    config,
+    config: configSnapshot.config,
     verificationHash: verification?.hash,
     verificationDate: verification?.date,
     // This SVG is always served to <img> embeds (README badges), where SMIL
@@ -358,10 +360,17 @@ async function finalizeMaterializedBadge(
       svgCacheKey: options.svgCacheKey,
       verification,
       avatarCachePolicy,
+      configCacheable: configSnapshot.cacheable,
     });
   }
 
-  return { svg, verification, renderMs, avatarCachePolicy };
+  return {
+    svg,
+    verification,
+    renderMs,
+    avatarCachePolicy,
+    configCacheable: configSnapshot.cacheable,
+  };
 }
 
 /**
@@ -690,7 +699,7 @@ export async function GET(
     // Re-bind to a `const` now that `materialized` is known non-null — `let`
     // narrowing does not persist into the `after()` closure below.
     const profile = materialized;
-    const { svg, verification, renderMs, avatarCachePolicy } = await finalizeMaterializedBadge(
+    const { svg, verification, renderMs, avatarCachePolicy, configCacheable } = await finalizeMaterializedBadge(
       handle,
       profile,
       // #1166 (PE-H2) — the SVG cache write blocked the response for up to
@@ -710,6 +719,7 @@ export async function GET(
         svgCacheKey,
         verification,
         avatarCachePolicy,
+        configCacheable,
       })
         .then(() => runBadgeSideEffects(handle, profile, { readOnly, verification }))
         .catch((err) => {
@@ -721,7 +731,13 @@ export async function GET(
         });
     });
 
-    const successResult = { svg, headers: badgeCacheHeaders(handle) } satisfies BadgeRenderResult;
+    // Unknown styling can still render, but must never become the shared badge.
+    const successResult = {
+      svg,
+      headers: configCacheable
+        ? badgeCacheHeaders(handle)
+        : badgeCacheHeaders(handle, "no-store", "private, no-store, max-age=0"),
+    } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return badgeSvgResponse(successResult.svg, successResult.headers, startedAt, [
       ...cacheTimeoutMetric,

@@ -6,6 +6,7 @@ import { LanguageContext, type LanguageContextValue } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { resolveTranslation } from "@/lib/i18n/resolve";
+import type { CommandAction } from "@/components/terminal/command-registry";
 import {
   formatConfigCommands,
   formatConfigSummary,
@@ -2118,5 +2119,64 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
         "0 lines",
       ),
     );
+  });
+});
+
+
+describe("persisted configuration and pending response bodies", () => {
+  async function command(action: CommandAction) {
+    const { executeCommand } = await import("@/components/terminal/command-registry");
+    vi.mocked(executeCommand).mockReturnValue({ lines: [], action });
+    fireEvent.click(screen.getByTestId("studio-save"));
+  }
+  function unload() {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+  it.each([500, "transport"])("protects edits after a %s save failure", async (failure) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      if (failure === "transport") throw new Error("offline");
+      return new Response("{}", { status: failure as number });
+    });
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    await command({ type: "save" });
+    await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+    expect(unload()).toBe(true);
+  });
+  it("clears unsaved protection when edits return to the persisted config", async () => {
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    expect(unload()).toBe(true);
+    await command({ type: "set", category: "background", value: defaultConfig.background });
+    expect(unload()).toBe(false);
+  });
+  it("reset to the persisted defaults clears both dirty status and protection", async () => {
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    await command({ type: "reset" });
+    expect(screen.getByText("Preview saved")).toBeDefined();
+    expect(unload()).toBe(false);
+  });
+  it("keeps saving through body delivery and leaves body-time edits unsaved", async () => {
+    let finishBody!: (value: unknown) => void;
+    const json = vi.fn(() => new Promise((resolve) => { finishBody = resolve; }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json } as unknown as Response);
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    await command({ type: "save" });
+    await waitFor(() => expect(json).toHaveBeenCalled());
+    expect(screen.getByTestId("studio-save").hasAttribute("disabled")).toBe(true);
+    const { executeCommand } = await import("@/components/terminal/command-registry");
+    vi.mocked(executeCommand).mockReturnValue({ lines: [], action: { type: "set", category: "background", value: "gradient" } });
+    const input = screen.getByLabelText("Terminal command input");
+    fireEvent.change(input, { target: { value: "/set bg gradient" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await act(async () => { finishBody({ badgeRefreshed: false }); });
+    expect(screen.getByText("Unsaved preview changes")).toBeDefined();
+    expect(unload()).toBe(true);
+    await command({ type: "set", category: "background", value: "aurora" });
+    expect(unload()).toBe(false);
   });
 });

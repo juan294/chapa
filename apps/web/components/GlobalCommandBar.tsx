@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { navigateInApp } from "@/lib/navigation";
 import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
@@ -95,7 +96,7 @@ export function GlobalCommandBar({
         if (action.path === "/api/auth/login") {
           window.location.href = action.path;
         } else {
-          router.push(action.path);
+          navigateInApp(action.path, (href) => router.push(href));
         }
       } else if (action?.type === "custom") {
         window.dispatchEvent(
