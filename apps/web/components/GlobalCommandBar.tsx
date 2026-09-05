@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
+import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { navigateInApp } from "@/lib/navigation";
 import { AuthorTypewriter } from "@/components/AuthorTypewriter";
@@ -13,17 +14,25 @@ import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown
 import {
   executeCommand,
   createNavigationCommands,
+  makeLine,
 } from "@/components/terminal/command-registry";
-import type { OutputLine } from "@/components/terminal/command-registry";
+import type { CommandDef, CommandAction, OutputLine } from "@/components/terminal/command-registry";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { useTranslation } from "@/lib/i18n";
 import { tObject } from "@/lib/i18n/typed-accessors";
 import {
-  TERMINAL_COMMAND_INPUT_ID,
   TERMINAL_COMMAND_LISTBOX_ID,
 } from "@/lib/keyboard/shortcuts";
 
-const OUTPUT_TIMEOUT_MS = 5000;
+const HISTORY_LIMIT = 50;
+const EMPTY_COMMANDS: CommandDef[] = [];
+
+export interface GlobalCommandBarProps {
+  isAdmin?: boolean;
+  skipShortcutsListener?: boolean;
+  scopedCommands?: CommandDef[];
+  onCustomAction?: (action: Extract<CommandAction, {type: "custom"}>) => Promise<OutputLine[] | undefined>;
+}
 const CHIP_COUNT = 6;
 
 /**
@@ -33,18 +42,11 @@ const CHIP_COUNT = 6;
 export function GlobalCommandBar({
   isAdmin,
   skipShortcutsListener,
-}: {
-  isAdmin?: boolean;
-  /**
-   * Skip mounting an internal `KeyboardShortcutsListener` — set this when
-   * the caller has already mounted one as a sibling (e.g. `CommandBarHint`,
-   * #1068). Mounting it twice would publish the module store twice, and the
-   * second instance's cleanup on unmount would kill the survivor's
-   * registrations.
-   */
-  skipShortcutsListener?: boolean;
-} = {}) {
+  scopedCommands = EMPTY_COMMANDS,
+  onCustomAction,
+}: GlobalCommandBarProps = {}) {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const { studioEnabled } = useClientFeatureFlags();
   const { t } = useTranslation();
   const terminalRef = useRef<TerminalInputHandle>(null);
@@ -52,46 +54,48 @@ export function GlobalCommandBar({
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [activeSuggestionId, setActiveSuggestionId] = useState<string>();
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
-  const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
+  const outputRevision = useRef(0);
   const autocompleteExpanded = showAutocomplete && !!activeSuggestionId;
 
-  const descriptions = useMemo(() => {
-    const d = tObject<Record<string, string>>(t, "commands.descriptions");
-    return typeof d === "object" && d !== null && !Array.isArray(d) ? d : {};
-  }, [t]);
+  const descriptions = useMemo(() => tObject<Record<string, string>>(t, "commands.descriptions"), [t]);
 
-  const commands = useMemo(
-    () => createNavigationCommands({ isAdmin, studioEnabled, descriptions }),
-    [isAdmin, studioEnabled, descriptions],
-  );
-
-  // The chips are a scrolling shortcut row, not the full registry — enough to
-  // show what the bar can do without turning it into a menu.
+  const messages = useMemo(() => tObject<Record<string, string>>(t, "commands.messages"), [t]);
+  const commands = useMemo(() => {
+    const themeCommand: CommandDef = {
+      name: "/theme", description: descriptions.theme ?? "Read or change theme", usage: "/theme [light|dark|system]",
+      execute: args => {
+        const choice = args[0];
+        if (args.length > 1 || (choice && !["light", "dark", "system"].includes(choice))) return {lines: [makeLine("error", `${messages.usage} /theme [light|dark|system]`)]};
+        if (choice) setTheme(choice);
+        return {lines: [makeLine("info", (messages.themeChoice ?? "Theme: {theme}").replace("{theme}", choice ?? theme ?? "system"))]};
+      },
+    };
+    return createNavigationCommands({isAdmin, studioEnabled, descriptions, messages, additionalCommands: [themeCommand, ...scopedCommands]});
+  }, [isAdmin, studioEnabled, descriptions, messages, scopedCommands, theme, setTheme]);
   const chipCommands = useMemo(() => commands.slice(0, CHIP_COUNT), [commands]);
 
-  // Auto-clear output after timeout
   useEffect(() => {
-    if (outputLines.length === 0) return;
-    outputTimerRef.current = setTimeout(() => {
-      setOutputLines([]);
-    }, OUTPUT_TIMEOUT_MS);
-    return () => {
-      if (outputTimerRef.current) clearTimeout(outputTimerRef.current);
+    const fill = (event: Event) => {
+      const value = (event as CustomEvent<{value?: unknown}>).detail?.value;
+      if (typeof value === "string") terminalRef.current?.fill(value);
     };
-  }, [outputLines]);
+    window.addEventListener("chapa:terminal-fill", fill);
+    return () => window.removeEventListener("chapa:terminal-fill", fill);
+  }, []);
 
   const handleSubmit = useCallback(
     (input: string) => {
       setShowAutocomplete(false);
       setPartial("");
 
-      const result = executeCommand(input, commands);
+      const revision = ++outputRevision.current;
+      setHistory(previous => [...previous, input].slice(-HISTORY_LIMIT));
+      const result = executeCommand(input, commands, messages);
       const action = result.action;
 
       // Show output lines for any command that produces them
-      if (result.lines.length > 0) {
-        setOutputLines(result.lines);
-      }
+      setOutputLines(result.lines);
 
       if (action?.type === "navigate") {
         if (action.path === "/api/auth/login") {
@@ -99,22 +103,27 @@ export function GlobalCommandBar({
         } else {
           navigateInApp(action.path, (href) => router.push(href));
         }
-      } else if (action?.type === "custom") {
-        window.dispatchEvent(
-          new CustomEvent(action.event, action.detail ? { detail: action.detail } : undefined),
-        );
-        // Custom actions provide their own visual feedback (e.g., spinning
-        // refresh icon, sorted table column). Clear output immediately so
-        // the command message doesn't linger in the command bar. (#283)
+      } else if (action?.type === "clear") {
+        terminalRef.current?.clear();
         setOutputLines([]);
+      } else if (action?.type === "custom") {
+        if (onCustomAction && action.event.startsWith("chapa:landing-")) {
+          void onCustomAction(action).then(lines => {
+            if (lines && outputRevision.current === revision) setOutputLines(lines);
+          });
+        } else {
+          window.dispatchEvent(new CustomEvent(action.event, action.detail ? {detail: action.detail} : undefined));
+          setOutputLines([]);
+        }
       }
     },
-    [commands, router],
+    [commands, router, messages, onCustomAction],
   );
 
-  const handlePartialChange = useCallback((val: string) => {
+  const handlePartialChange = useCallback((val: string, suggest = true) => {
+    outputRevision.current++;
     setPartial(val);
-    setShowAutocomplete(val.startsWith("/") && val.length > 0);
+    setShowAutocomplete(suggest && val.startsWith("/") && val.length > 0);
     // Clear transient output on next keystroke
     setOutputLines([]);
   }, []);
@@ -138,18 +147,7 @@ export function GlobalCommandBar({
 
   const handleAutocompleteFill = useCallback((command: string) => {
     setShowAutocomplete(false);
-    const input = document.querySelector<HTMLInputElement>(
-      `#${TERMINAL_COMMAND_INPUT_ID}`,
-    );
-    if (input) {
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      nativeInputValueSetter?.call(input, command + " ");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.focus();
-    }
+    terminalRef.current?.fill(command + " ");
   }, []);
 
   return (
@@ -185,7 +183,9 @@ export function GlobalCommandBar({
             ref={terminalRef}
             onSubmit={handleSubmit}
             onPartialChange={handlePartialChange}
+              onHistoryChange={value => handlePartialChange(value, false)}
             prompt="chapa"
+            history={history}
             autoFocus={!!isAdmin}
             suggestionsVisible={autocompleteExpanded}
             suggestionsListboxId={TERMINAL_COMMAND_LISTBOX_ID}

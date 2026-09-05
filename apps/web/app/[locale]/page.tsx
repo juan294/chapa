@@ -1,6 +1,7 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
-import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
+import { DEMO_STATS } from "@/lib/render/demoData";
+import { LANDING_IMPACT } from "@/lib/render/landing-demo-data";
 import { LandingContent } from "../LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
@@ -41,10 +42,15 @@ export async function generateMetadata({ params }: HomeProps): Promise<Metadata>
 export default async function Home({ params }: HomeProps) {
   const { locale } = await params;
   const t = getServerT(locale);
-  const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+  const options = {
     includeBranding: true,
     demoMode: true,
-    strings: buildBadgeI18nStrings(t, DEMO_IMPACT.tier),
+    strings: buildBadgeI18nStrings(t, LANDING_IMPACT.tier),
+  };
+  const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, LANDING_IMPACT, options);
+  const readmeBadgeSvg = renderBadgeSvg(DEMO_STATS, LANDING_IMPACT, {
+    ...options,
+    disableAnimation: true,
   });
   return (
     <>
@@ -65,7 +71,7 @@ export default async function Home({ params }: HomeProps) {
       >
         <LangSync />
         <LandingWebMcpTools />
-        <LandingContent demoBadgeSvg={demoBadgeSvg} demoImpact={DEMO_IMPACT} t={t} />
+        <LandingContent demoBadgeSvg={demoBadgeSvg} readmeBadgeSvg={readmeBadgeSvg} demoImpact={LANDING_IMPACT} t={t} />
       </LanguageProvider>
     </>
   );

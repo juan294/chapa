@@ -90,13 +90,13 @@ Do not use prototype document-wide DOM scripts. Keep one shortcut listener per p
 
 ## Automated success criteria
 
-- [ ] Landing remains static/server-rendered, preserves OAuth error/query behavior, and renders both languages with exact hero/Studio copy.
-- [ ] Hero/README derive from same 92/Elite fixture with simulated/sample disclosure; shared `DEMO_IMPACT` remains High82.
-- [ ] Explorer keyboard tabs cover all seven archetypes; dimension commands open matching details; invalid arguments are handled.
-- [ ] Help/autocomplete/history/Tab/Enter/Escape, global and Studio mod+K, slash input guards, theme command/picker agreement and copy success/failure pass.
-- [ ] Signature, language picker, theme picker, old anchors, footer/enterprise content and actual tool catalog remain present.
-- [ ] No duplicate inline SVG IDs from README; actual static SVG is used.
-- [ ] Parent gate commands pass; update old copy-specific E2E expectations without deleting locale/reflow/navigation checks.
+- [x] Landing remains static/server-rendered, preserves OAuth error/query behavior, and renders both languages with exact hero/Studio copy.
+- [x] Hero/README derive from same 92/Elite fixture with simulated/sample disclosure; shared `DEMO_IMPACT` remains High82.
+- [x] Explorer keyboard tabs cover all seven archetypes; dimension commands open matching details; invalid arguments are handled.
+- [x] Help/autocomplete/history/Tab/Enter/Escape, global and Studio mod+K, slash input guards, theme command/picker agreement and copy success/failure pass.
+- [x] Signature, language picker, theme picker, old anchors, footer/enterprise content and actual tool catalog remain present.
+- [x] No duplicate inline SVG IDs from README; actual static SVG is used.
+- [x] Parent gate commands pass; update old copy-specific E2E expectations without deleting locale/reflow/navigation checks.
 
 Focused commands (include new colocated leaf/fixture tests in the full gate):
 
@@ -112,9 +112,9 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 pnpm --filter @chapa/web exec playwrig
 
 ## Manual visual success criteria
 
-- [ ] Rubric landing matrix passes EN/ES × light/dark × desktop/mobile; expressive layout, angled badge and technical shell are recognizable.
-- [ ] The hero plainly explains the product; no “badge lab” text remains in product UI.
-- [ ] Sample is readable, Elite and clearly illustrative; image/tooltips align in the rotated stage.
-- [ ] Complete keyboard-only tour works, including shell, explorer, copy, language/theme and Studio navigation; no dock occlusion or horizontal page overflow.
+- [x] Rubric landing matrix passes EN/ES × light/dark × desktop/mobile; expressive layout, angled badge and technical shell are recognizable.
+- [x] The hero plainly explains the product; no “badge lab” text remains in product UI.
+- [x] Sample is readable, Elite and clearly illustrative; image/tooltips align in the rotated stage.
+- [x] Complete keyboard-only tour works, including shell, explorer, copy, language/theme and Studio navigation; no dock occlusion or horizontal page overflow.
 
 Stop after presenting the implemented landing and interaction evidence.

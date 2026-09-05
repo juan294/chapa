@@ -475,6 +475,16 @@ nav [aria-current="page"],
 /* ── Reduced motion ─────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
+  /* Inline badge SMIL reveals do not inherit CSS animation-duration. Paint
+     their data immediately, and use the ring's complete resting attribute. */
+  svg[data-badge-design] [data-element="activity"] rect {
+    opacity: 1 !important;
+  }
+
+  svg[data-badge-design] circle[stroke-dashoffset] {
+    animation: none !important;
+  }
+
   *,
   *::before,
   *::after {

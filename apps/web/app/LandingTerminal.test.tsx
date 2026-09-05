@@ -1,21 +1,31 @@
-import { describe, it, expect } from "vitest";
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { LandingTerminal } from "./LandingTerminal";
+import type { GlobalCommandBarProps } from "@/components/GlobalCommandBar";
+import { executeCommand } from "@/components/terminal/command-registry";
 
-// LandingTerminal.tsx is a pure re-export shim (see its own comment) with no
-// logic of its own — importing both symbols and asserting reference equality
-// is a real, strictly-better check than regexing the re-export's source: it
-// would catch e.g. a re-export under the right name pointing at the wrong
-// module, which a substring match on "GlobalCommandBarLazy" would miss.
-//
-// #1104: the GlobalCommandBar behavioral assertions that used to live here
-// (reading components/GlobalCommandBar.tsx's source — the wrong file for
-// this test to be touching in the first place) are already covered by real
-// render+interaction tests in components/GlobalCommandBar.render.test.tsx.
-describe("LandingTerminal", () => {
-  it("re-exports GlobalCommandBarLazy as LandingTerminal", async () => {
-    const { LandingTerminal } = await import("./LandingTerminal");
-    const { GlobalCommandBarLazy } = await import(
-      "@/components/GlobalCommandBarLazy"
-    );
-    expect(LandingTerminal).toBe(GlobalCommandBarLazy);
+vi.mock("@/components/GlobalCommandBarLazy", () => ({
+  GlobalCommandBarLazy: ({scopedCommands = [], onCustomAction}: GlobalCommandBarProps) => <div>{scopedCommands.map(command => <button key={command.name} onClick={() => {
+    const action = executeCommand(command.name, scopedCommands).action;
+    if (action?.type === "custom") void onCustomAction?.(action).then(lines => { if (lines) document.getElementById("result")!.textContent = lines[0]!.text; });
+  }}>{command.name}</button>)}<output id="result" /></div>,
+}));
+afterEach(cleanup);
+describe("LandingTerminal scoped composition", () => {
+  it("exposes landing commands without creating a second terminal", () => {
+    render(<LandingTerminal />);
+    expect(screen.getByRole("button", {name: "/whoami"})).toBeDefined();
+    expect(screen.getByRole("button", {name: "/dimensions"})).toBeDefined();
+    expect(screen.queryByRole("button", {name: "/admin"})).toBeNull();
+  });
+  it.each([true, false])("reports actual clipboard completion %s", async copied => {
+    const listener = (event: Event) => (event as CustomEvent<{complete: (ok: boolean) => void}>).detail.complete(copied);
+    window.addEventListener("chapa:landing-copy", listener);
+    try {
+      render(<LandingTerminal />);
+      fireEvent.click(screen.getByRole("button", {name: "/copy"}));
+      await waitFor(() => expect(screen.getByRole("status").textContent).toContain(copied ? "copied" : "failed"));
+    } finally {window.removeEventListener("chapa:landing-copy", listener);}
   });
 });

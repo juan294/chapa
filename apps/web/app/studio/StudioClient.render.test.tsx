@@ -1665,7 +1665,7 @@ describe("StudioClient render", () => {
       expect(capturedShortcutHandler).not.toBeNull();
     });
 
-    it("focus-terminal shortcut focuses the terminal input", () => {
+    it("leaves terminal focus ownership to the global listener", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -1678,10 +1678,10 @@ describe("StudioClient render", () => {
       const focusSpy = vi.spyOn(input, "focus");
 
       act(() => {
-        capturedShortcutHandler?.("focus-terminal");
+        capturedShortcutHandler?.("focus-command-bar");
       });
 
-      expect(focusSpy).toHaveBeenCalled();
+      expect(focusSpy).not.toHaveBeenCalled();
     });
 
     it("toggle-quick-controls shortcut toggles quick controls visibility", () => {

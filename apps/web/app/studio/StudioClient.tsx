@@ -572,9 +572,9 @@ export function StudioClient({
     [handleSubmit],
   );
 
-  const handlePartialChange = useCallback((val: string) => {
+  const handlePartialChange = useCallback((val: string, suggest = true) => {
     setPartial(val);
-    setShowAutocomplete(val.startsWith("/") && val.length > 0);
+    setShowAutocomplete(suggest && val.startsWith("/") && val.length > 0);
   }, []);
 
   const handleAutocompleteDismiss = useCallback(() => {
@@ -614,13 +614,6 @@ export function StudioClient({
   useEffect(() => {
     return registerPageShortcuts("studio", (id: string) => {
       switch (id) {
-        case "focus-terminal": {
-          const input = document.querySelector<HTMLInputElement>(
-            `#${TERMINAL_COMMAND_INPUT_ID}`,
-          );
-          input?.focus();
-          break;
-        }
         case "cycle-preset": {
           const currentIdx = STUDIO_PRESETS.findIndex(
             (p) => p.config.background === config.background,
@@ -889,6 +882,7 @@ export function StudioClient({
             <TerminalInput
               onSubmit={handleSubmit}
               onPartialChange={handlePartialChange}
+              onHistoryChange={value => handlePartialChange(value, false)}
               history={history}
               prompt="studio"
               suggestionsVisible={autocompleteExpanded}

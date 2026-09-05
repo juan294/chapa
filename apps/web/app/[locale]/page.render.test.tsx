@@ -8,6 +8,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
+import { LANDING_SECTIONS } from "@/components/landing/landing-commands";
 
 // page.tsx computes the demo badge SVG per locale, resolves the
 // [locale] route param, and calls the REAL getServerT(locale) — this is the
@@ -17,24 +18,6 @@ import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: vi.fn(() => "<svg data-testid='demo-badge'></svg>"),
-}));
-
-vi.mock("@/lib/render/demoData", () => ({
-  DEMO_STATS: { handle: "demo" },
-  // #1215 — the landing scoring section reads the demo dimensions, composite
-  // and tier, so the stub has to carry them.
-  DEMO_IMPACT: {
-    compositeScore: 70,
-    adjustedComposite: 82,
-    tier: "High",
-    dimensions: {
-      delivery: 88,
-      quality: 72,
-      consistency: 80,
-      breadth: 65,
-      craft: 72,
-    },
-  },
 }));
 
 vi.mock("@/components/BadgeOverlay", () => ({
@@ -123,8 +106,7 @@ describe("Home page metadata", () => {
 describe("Home page render (en)", () => {
   it("renders the page with heading", async () => {
     await renderHome();
-    // English key: landing.hero.highlight = 'decoded'
-    expect(screen.getByText("decoded")).toBeDefined();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("GOOD WORKLEAVES AMARK_");
   });
 
   it("renders the navbar", async () => {
@@ -135,35 +117,37 @@ describe("Home page render (en)", () => {
     await waitFor(() => expect(document.documentElement.lang).toBe("en"));
   });
 
-  it("renders feature cards", async () => {
+  it("renders all seven archetypes as an accessible explorer", async () => {
     await renderHome();
-    // English dict: landing.features[0].title = 'MULTI-DIMENSIONAL'
-    expect(screen.getByText("MULTI-DIMENSIONAL")).toBeDefined();
-    // English dict: landing.features[2].title = 'VERIFIED METRICS'
-    expect(screen.getByText("VERIFIED METRICS")).toBeDefined();
+    expect(screen.getByRole("tablist", { name: "Developer archetypes" })).toBeDefined();
+    expect(screen.getAllByRole("tab")).toHaveLength(7);
   });
 
-  // Hero bullets get a leading jade marker (not the brand-accent amber, since
-  // it must stay distinguishable from the H1's amber highlight) plus bolded
-  // keywords parsed out of **word** markers in the dictionary string — the
-  // markup itself carries no raw asterisks once rendered.
-  it("renders each hero bullet with a jade marker and bolded keywords, no raw markdown", async () => {
+  it("renders the requested explanation, identity line and real Studio CTA", async () => {
     const { container } = await renderHome();
-    const markers = Array.from(
-      container.querySelectorAll('[aria-hidden="true"]'),
-    ).filter((el) => el.textContent === "▸");
-    // English dict: landing.hero.bullets has 3 entries
-    expect(markers).toHaveLength(3);
-    for (const marker of markers) {
-      expect(marker.className).toContain("text-terminal-green");
-      expect(marker.className).not.toContain("text-amber");
+    expect(screen.getByText("Turn your development activity across platforms into a profile and badge you can share.")).toBeDefined();
+    expect(screen.getByText("Your work is more than a commit count.")).toBeDefined();
+    for (const link of screen.getAllByRole("link", { name: /Open the Creator Studio/ })) {
+      expect(link.getAttribute("href")).toBe("/studio");
     }
-
-    // English dict: landing.hero.bullets[0] bolds "whole story"
-    const bold = screen.getByText("whole story");
-    expect(bold.tagName).toBe("STRONG");
-
     expect(container.textContent).not.toContain("**");
+  });
+
+  it("renders every command section target and the compatible badge anchor", async () => {
+    const { container } = await renderHome();
+    for (const id of new Set([...Object.values(LANDING_SECTIONS), "badge-preview"])) {
+      expect(container.querySelector(`#${id}`), id).not.toBeNull();
+    }
+  });
+
+  it("keeps the README SVG in its own image document with the same 92/Elite accessible description", async () => {
+    const { container } = await renderHome();
+    const readme = container.querySelector<HTMLImageElement>('#how-it-works img');
+    expect(readme?.getAttribute("src")).toBe(`data:image/svg+xml;charset=utf-8,${encodeURIComponent("<svg data-testid='demo-badge'></svg>")}`);
+    expect(readme?.alt).toBe("Sample Chapa badge: score 92, Elite, simulated metrics.");
+    expect(screen.getAllByRole("img", { name: readme!.alt })).toHaveLength(2);
+    expect(container.querySelectorAll("svg[data-testid='demo-badge']")).toHaveLength(1);
+    expect(screen.getByText("Curated simulated values. This example is not the computed profile of a real developer.")).toBeDefined();
   });
 
   it("renders how-it-works steps", async () => {
@@ -238,16 +222,12 @@ describe("Home page render (en)", () => {
     expect(container.querySelector("footer")).not.toBeNull();
   });
 
-  // #1167 / UX-H1 measured white text on a solid bg-complement fill at 2.54:1,
-  // below AA. #1215 made this CTA an outline button instead of a solid one, so
-  // the guard is now: it stays in the verification family, never jade, and
-  // never a solid complement fill (which would bring the 2.54:1 pairing back).
+  // Keep the verification CTA readable in its distinct trust color family.
   it("links the Verify a Badge CTA to /verify in the verification family", async () => {
     await renderHome();
     const verifyLink = screen.getByRole("link", { name: /verify a badge/i });
     expect(verifyLink.getAttribute("href")).toBe("/verify");
     const classes = verifyLink.className.split(/\s+/);
-    expect(classes).toContain("border-complement");
     expect(classes).toContain("text-complement-text");
     expect(classes).not.toContain("bg-complement");
     expect(classes).not.toContain("text-amber");
@@ -271,10 +251,10 @@ describe("Home page render (en)", () => {
 describe("Home page render (es) — locale-segmented RSC, no client re-render", () => {
   it("renders Spanish hero content directly from the initial render", async () => {
     await renderHome("es");
-    // Spanish dict: landing.hero.highlight = 'decodificado' (mirrors the
-    // English 'decoded' key exercised above).
-    expect(screen.getByText("decodificado")).toBeDefined();
-    expect(screen.getByText("Herramientas para agentes")).toBeDefined();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("EL BUEN TRABAJODEJAHUELLA_");
+    expect(screen.getByText("Convierte tu actividad de desarrollo en distintas plataformas en un perfil y una chapa que puedes compartir.")).toBeDefined();
+    expect(screen.getByText("Tu trabajo es más que un recuento de commits.")).toBeDefined();
+    expect(screen.getByText("hola, agente_")).toBeDefined();
   });
 
   it("renders the navbar for the es render too", async () => {
@@ -299,5 +279,24 @@ describe("landing badge locale", () => {
       demoMode: true,
       strings: expect.objectContaining({ activityHeading, impactHeading, heatmapCaption }),
     }));
+  });
+
+  it.each(["en", "es"] as const)("renders animated and static %s samples from the same 92/Elite inputs", async (locale) => {
+    const { renderBadgeSvg } = await import("@/lib/render/BadgeSvg");
+    vi.mocked(renderBadgeSvg).mockClear();
+    const { default: Home } = await import("./page");
+    await Home({ params: Promise.resolve({ locale }) });
+    const calls = vi.mocked(renderBadgeSvg).mock.calls;
+    expect(calls).toHaveLength(2);
+    const [hero, readme] = calls;
+    expect(hero![1]).toMatchObject({ adjustedComposite: 92, tier: "Elite", archetype: "Balanced" });
+    expect(readme![0]).toBe(hero![0]);
+    expect(readme![1]).toBe(hero![1]);
+    expect(readme![2]?.strings).toBe(hero![2]?.strings);
+    expect(hero![2]).toMatchObject({ demoMode: true, includeBranding: true });
+    expect(hero![2]?.disableAnimation).not.toBe(true);
+    expect(readme![2]).toMatchObject({ demoMode: true, includeBranding: true, disableAnimation: true });
+    expect(hero![2]).not.toHaveProperty("verificationHash");
+    expect(readme![2]).not.toHaveProperty("verificationHash");
   });
 });

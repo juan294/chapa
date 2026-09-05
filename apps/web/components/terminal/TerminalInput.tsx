@@ -8,12 +8,15 @@ import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
 export interface TerminalInputHandle {
   clear: () => void;
+  fill: (value: string) => void;
   focus: () => void;
 }
 
 interface TerminalInputProps {
   onSubmit: (command: string) => void;
   onPartialChange?: (partial: string) => void;
+  /** History recall can update the draft without reopening autocomplete. */
+  onHistoryChange?: (partial: string) => void;
   history?: string[];
   prompt?: string;
   autoFocus?: boolean;
@@ -30,6 +33,7 @@ interface TerminalInputProps {
 export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>(function TerminalInput({
   onSubmit,
   onPartialChange,
+  onHistoryChange,
   history = [],
   prompt = "chapa",
   autoFocus = false,
@@ -54,6 +58,12 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
     clear() {
       setValue("");
       setHistoryIndex(-1);
+    },
+    fill(nextValue) {
+      setValue(nextValue);
+      setHistoryIndex(-1);
+      onPartialChange?.(nextValue);
+      inputRef.current?.focus();
     },
     focus() {
       inputRef.current?.focus();
@@ -85,7 +95,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         const historyValue = history[history.length - 1 - nextIndex];
         if (historyValue) {
           setValue(historyValue);
-          onPartialChange?.(historyValue);
+          (onHistoryChange ?? onPartialChange)?.(historyValue);
         }
         return;
       }
@@ -95,7 +105,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         if (historyIndex <= 0) {
           setHistoryIndex(-1);
           setValue("");
-          onPartialChange?.("");
+          (onHistoryChange ?? onPartialChange)?.("");
           return;
         }
         const nextIndex = historyIndex - 1;
@@ -103,7 +113,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         const historyValue = history[history.length - 1 - nextIndex];
         if (historyValue) {
           setValue(historyValue);
-          onPartialChange?.(historyValue);
+          (onHistoryChange ?? onPartialChange)?.(historyValue);
         }
         return;
       }
@@ -115,7 +125,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         return;
       }
     },
-    [value, history, historyIndex, onSubmit, onPartialChange],
+    [value, history, historyIndex, onSubmit, onPartialChange, onHistoryChange],
   );
 
   const handleChange = useCallback(

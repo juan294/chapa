@@ -5,6 +5,8 @@ import React, { forwardRef, useImperativeHandle } from "react";
 import { GlobalCommandBar } from "./GlobalCommandBar";
 
 const mockPush = vi.fn();
+const mockSetTheme = vi.fn();
+vi.mock("next-themes", () => ({useTheme: () => ({theme: "dark", setTheme: mockSetTheme})}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -16,6 +18,7 @@ vi.mock("@/components/AuthorTypewriter", () => ({
 
 // Track the ref-clear calls
 const mockClear = vi.fn();
+const mockFill = vi.fn();
 
 vi.mock("@/components/terminal/TerminalInput", () => ({
   TerminalInput: forwardRef(function MockTerminalInput(
@@ -23,19 +26,22 @@ vi.mock("@/components/terminal/TerminalInput", () => ({
       onSubmit,
       onPartialChange,
       prompt,
+      history,
     }: {
       onSubmit: (cmd: string) => void;
       onPartialChange?: (val: string) => void;
       prompt?: string;
+      history?: string[];
     },
     ref: React.Ref<{ clear: () => void; focus: () => void }>,
   ) {
     useImperativeHandle(ref, () => ({
       clear: mockClear,
+      fill: mockFill,
       focus: vi.fn(),
     }));
     return (
-      <div data-testid="terminal-input">
+      <div data-testid="terminal-input" data-history={JSON.stringify(history)}>
         <input
           id="terminal-command-input"
           data-testid="cmd-input"
@@ -166,36 +172,11 @@ describe("GlobalCommandBar", () => {
   });
 
   describe("handleAutocompleteFill (lines 103-117)", () => {
-    it("fills the input element with the command via native setter and focuses it", () => {
+    it("fills through the controlled input handle", () => {
       render(<GlobalCommandBar />);
-      const input = screen.getByTestId("cmd-input");
-
-      // Type "/" to open autocomplete
-      fireEvent.change(input, { target: { value: "/" } });
-      expect(screen.getByTestId("autocomplete")).toBeDefined();
-
-      // The mock input has aria-label="Terminal command input" which handleAutocompleteFill queries
-      const nativeSetterSpy = vi.fn();
-      const origDescriptor = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      );
-      Object.defineProperty(window.HTMLInputElement.prototype, "value", {
-        ...origDescriptor,
-        set: nativeSetterSpy,
-      });
-
-      const focusSpy = vi.spyOn(input, "focus");
-
-      // Click the fill button
+      fireEvent.change(screen.getByTestId("cmd-input"), {target: {value: "/"}});
       fireEvent.click(screen.getByTestId("autocomplete-fill"));
-
-      // handleAutocompleteFill should have used nativeInputValueSetter to set value
-      expect(nativeSetterSpy).toHaveBeenCalledWith("/badge ");
-      expect(focusSpy).toHaveBeenCalled();
-
-      // Restore
-      Object.defineProperty(window.HTMLInputElement.prototype, "value", origDescriptor!);
+      expect(mockFill).toHaveBeenCalledWith("/badge ");
     });
   });
 
@@ -265,7 +246,7 @@ describe("GlobalCommandBar", () => {
   });
 
   describe("output auto-clear timeout", () => {
-    it("auto-clears output lines after OUTPUT_TIMEOUT_MS", () => {
+    it("keeps output readable until the next input", () => {
       render(<GlobalCommandBar />);
       const input = screen.getByTestId("cmd-input");
 
@@ -281,8 +262,8 @@ describe("GlobalCommandBar", () => {
         vi.advanceTimersByTime(5001);
       });
 
-      // Output should be cleared
-      expect(screen.queryByTestId("terminal-output")).toBeNull();
+      // Help remains readable without a deadline.
+      expect(screen.getByTestId("terminal-output")).toBeDefined();
     });
 
     it("clears output on next keystroke", () => {
@@ -328,9 +309,35 @@ describe("GlobalCommandBar", () => {
       const command = chip.textContent!;
       fireEvent.click(chip);
       expect(mockPush).not.toHaveBeenCalled();
-      expect(
-        (screen.getByTestId("cmd-input") as HTMLInputElement).value,
-      ).toBe(`${command} `);
+      expect(mockFill).toHaveBeenCalledWith(`${command} `);
     });
+  });
+});
+
+
+describe("theme and session history", () => {
+  it("reads provider preference and only sets valid choices", () => {
+    mockSetTheme.mockClear();
+    render(<GlobalCommandBar />);
+    const input = screen.getByTestId("cmd-input");
+    const submit = (value: string) => {fireEvent.change(input, {target: {value}}); fireEvent.keyDown(input, {key: "Enter"});};
+    submit("/theme");
+    expect(screen.getByTestId("terminal-output").textContent).toContain("dark");
+    expect(mockSetTheme).not.toHaveBeenCalled();
+    submit("/theme purple");
+    expect(mockSetTheme).not.toHaveBeenCalled();
+    submit("/theme system");
+    expect(mockSetTheme).toHaveBeenCalledWith("system");
+  });
+  it("bounds history at 50 and preserves it when clearing", () => {
+    render(<GlobalCommandBar />);
+    const input = screen.getByTestId("cmd-input");
+    for (let i = 0; i < 55; i++) {fireEvent.change(input, {target: {value: `/unknown${i}`}}); fireEvent.keyDown(input, {key: "Enter"});}
+    fireEvent.change(input, {target: {value: "/clear"}}); fireEvent.keyDown(input, {key: "Enter"});
+    const history = JSON.parse(screen.getByTestId("terminal-input").getAttribute("data-history")!);
+    expect(history).toHaveLength(50);
+    expect(history[0]).toBe("/unknown6");
+    expect(history.at(-1)).toBe("/clear");
+    expect(screen.queryByTestId("terminal-output")).toBeNull();
   });
 });
