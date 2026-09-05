@@ -10,6 +10,7 @@ import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
+import { dbPurgeExpiredCraftRawV7 } from "@/lib/db/craft-v7";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet, cacheSetNxStatus } from "@/lib/cache/redis";
 import { processInBatches } from "@/lib/async/process-in-batches";
@@ -358,6 +359,14 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     // Non-critical — don't fail the cron response
   }
 
+  let expiredCraftRawDeleted: number | null = null;
+  try {
+    expiredCraftRawDeleted = await dbPurgeExpiredCraftRawV7();
+  } catch {
+    console.error("[RETENTION_FAILURE] Craft raw artifact purge failed");
+    void captureServerError({ error: new Error("Craft raw artifact purge failed"), route: "/api/cron/warm-cache", statusCode: 503 });
+  }
+
   // Clean metrics_snapshots older than retention period (fire-and-forget safe)
   let expiredSnapshotsDeleted = 0;
   try {
@@ -387,6 +396,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       expiredVerificationsDeleted,
       expiredMergeOpsDeleted,
       expiredSnapshotsDeleted,
+      expiredCraftRawDeleted,
       processedCount,
       processedSample: toWarm.slice(0, Math.min(completedCount, 10)),
       timedOut,

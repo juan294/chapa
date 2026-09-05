@@ -1,4 +1,6 @@
 import type { InsightsUpload } from "@chapa/shared";
+import { MAX_INSIGHTS_BYTES } from "./validation";
+import { parseInsightsReportV7, type InsightsReportV7 } from "./report-v7";
 
 /**
  * Find a chart card element by its title prefix.
@@ -238,6 +240,7 @@ function mapSatisfaction(chart: Record<string, number>): {
 }
 
 /**
+ * Legacy v6 parser retained for archived/versioned consumers.
  * Parse a Claude Code /insights HTML report into structured InsightsUpload data.
  * Runs client-side only (uses DOMParser).
  * Best-effort extraction — missing fields default to 0/empty.
@@ -307,3 +310,74 @@ export {
   parseSubtitle as _parseSubtitle,
   parseLinesStat as _parseLinesStat,
 };
+
+/** Strict v7 descriptive import. Missing sections are unknown; labels are never silently discarded. */
+export function parseInsightsHtmlV7(html: string, referenceTime: string): InsightsReportV7 {
+  if (new TextEncoder().encode(html).length > MAX_INSIGHTS_BYTES) throw new RangeError("Report exceeds upload limit");
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const subtitleText = doc.querySelector(".subtitle")?.textContent ?? "";
+  const subtitleMatch = /^\s*(\S+)\s+messages\s+across\s+(\S+)\s+sessions(?:\s+\((\S+)\s+total\))?\s*\|\s*(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})\s*$/.exec(subtitleText);
+  if (!subtitleMatch) throw new RangeError("Invalid report subtitle");
+  const subtitleCount = (token: string): number => {
+    if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(token)) throw new RangeError("Invalid subtitle count");
+    const value = Number(token.replaceAll(",", ""));
+    if (!Number.isSafeInteger(value) || value < 0) throw new RangeError("Invalid subtitle count");
+    return value;
+  };
+  subtitleCount(subtitleMatch[1]!);
+  const analyzedSessions = subtitleCount(subtitleMatch[2]!);
+  const totalSessions = subtitleMatch[3] ? subtitleCount(subtitleMatch[3]) : analyzedSessions;
+  if (analyzedSessions > totalSessions) throw new RangeError("Inconsistent subtitle sessions");
+  const numeric = (raw: string): number => {
+    const clean = raw.replaceAll(",", "").replaceAll("%", "").trim();
+    if (!clean || !/^\d+(?:\.\d+)?$/.test(clean)) throw new RangeError("Invalid report number");
+    const number = Number(clean);
+    if (!Number.isFinite(number) || number > Number.MAX_SAFE_INTEGER) throw new RangeError("Invalid report number");
+    return number;
+  };
+  const chart = (title: string, normalize = false): Record<string, number> | null => {
+    const card = findChartCard(doc, title);
+    if (!card) return null;
+    const entries = [...card.querySelectorAll(".bar-row")].map(row => {
+      const label = row.querySelector(".bar-label")?.textContent?.trim();
+      if (!label) throw new RangeError("Missing classification label");
+      return [normalize ? label.toLowerCase().replaceAll(/\s+/g, "_") : label, numeric(row.querySelector(".bar-value")?.textContent ?? "")] as const;
+    });
+    if (new Set(entries.map(([label]) => label)).size !== entries.length) throw new RangeError("Duplicate classification label");
+    return Object.fromEntries(entries);
+  };
+  const responseText = findChartCard(doc, "User Response Time")?.textContent ?? "";
+  const duration = (label: string): number | null => {
+    const match = responseText.match(new RegExp(`${label}:\\s*([^\\s]+)s`));
+    return match?.[1] ? numeric(match[1]) : null;
+  };
+  const volumeEntries = [...doc.querySelectorAll(".stats-row .stat")].flatMap(stat => {
+    const label = stat.querySelector(".stat-label")?.textContent?.trim().toLowerCase();
+    const raw = stat.querySelector(".stat-value")?.textContent?.trim();
+    if (!label || !raw) throw new RangeError("Invalid volume diagnostic");
+    if (label === "lines") {
+      const match = /^\+?([\d,]+)\s*\/\s*-?([\d,]+)$/.exec(raw);
+      if (!match) throw new RangeError("Invalid line diagnostic");
+      return [["linesAdded", numeric(match[1]!)], ["linesDeleted", numeric(match[2]!)]] as [string, number][];
+    }
+    return [[label, numeric(raw)]] as [string, number][];
+  });
+  const toolUsage = chart("Top Tools Used");
+  const multiCard = findChartCard(doc, "Multi-Clauding");
+  const multi: { overlapEvents: number | null; sessionsInvolved: number | null; messagePercent: number | null } = { overlapEvents: null, sessionsInvolved: null, messagePercent: null };
+  for (const labelEl of multiCard?.querySelectorAll("div[style*='text-transform']") ?? []) {
+    const label = labelEl.textContent?.toLowerCase() ?? "";
+    const value = labelEl.previousElementSibling?.textContent;
+    if (value === undefined || value === null) continue;
+    if (label.includes("overlap")) multi.overlapEvents = numeric(value);
+    if (label.includes("sessions")) multi.sessionsInvolved = numeric(value);
+    if (label.includes("message")) multi.messagePercent = numeric(value);
+  }
+  return parseInsightsReportV7({ schemaVersion: "v7", tool: "claude-code", reportPeriod: { start: subtitleMatch[4], end: subtitleMatch[5] },
+    totalSessions,
+    outcomes: chart("Outcomes", true), satisfaction: chart("Inferred Satisfaction", true), toolUsage,
+    sessionTypes: chart("Session Types"), friction: chart("Primary Friction Types"), toolErrors: chart("Tool Errors Encountered"),
+    totalToolCalls: null, // A chart titled Top Tools is a subset, not an authoritative total.
+    responseTime: { medianSeconds: duration("Median"), averageSeconds: duration("Average") },
+    volume: volumeEntries.length ? Object.fromEntries(volumeEntries) : null, multiClauding: multiCard ? multi : null }, referenceTime);
+}

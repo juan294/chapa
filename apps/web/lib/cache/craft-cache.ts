@@ -1,3 +1,4 @@
+// Explicit legacy v6 behavior. V7 uses the separate Craft evidence/diagnostics entry points.
 /**
  * Redis cache layer for craft score (tool insights) lookups.
  *

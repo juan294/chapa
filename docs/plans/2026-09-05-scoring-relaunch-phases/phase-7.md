@@ -35,18 +35,18 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] Missing response-time fields remain unknown; deleting a report section earns no credit.
-- [ ] 1e309, overflowing finite counts, NaN, inconsistent count totals and invalid/future dates fail safely.
-- [ ] Rare-tool addition and more parallelism/lines without new engineering evidence cannot alter Craft rating.
-- [ ] Zero observed effectiveness cannot earn Artificer or an excellence claim.
-- [ ] One positive classification versus 1000 displays different sample evidence; no false probability claim.
-- [ ] Unknown outcome categories and unclassified sessions remain in coverage, including potential failure categories; no silent denominator exclusion.
-- [ ] Old or straddling aggregate reports are historical/partial rather than prorated or rejuvenated by reupload.
+- [x] Missing response-time fields remain unknown; deleting a report section earns no credit.
+- [x] 1e309, overflowing finite counts, NaN, inconsistent count totals and invalid/future dates fail safely.
+- [x] Rare-tool addition and more parallelism/lines without new engineering evidence cannot alter Craft rating.
+- [x] Zero observed effectiveness cannot earn Artificer or an excellence claim.
+- [x] One positive classification versus 1000 displays different sample evidence; no false probability claim.
+- [x] Unknown outcome categories and unclassified sessions remain in coverage, including potential failure categories; no silent denominator exclusion.
+- [x] Old or straddling aggregate reports are historical/partial rather than prorated or rejuvenated by reupload.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## Sequential local verification

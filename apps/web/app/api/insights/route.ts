@@ -8,6 +8,8 @@ import {
   isValidInsightsUpload,
   MAX_INSIGHTS_BYTES,
 } from "@/lib/insights/validation";
+import { dbStoreCraftReportV7 } from "@/lib/db/craft-v7";
+import { parseInsightsReportV7 } from "@/lib/insights/report-v7";
 import { computeCraftScore } from "@/lib/insights/scoring";
 import { dbUpsertToolInsights } from "@/lib/db/tool-insights";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
@@ -58,6 +60,25 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  // Explicit v7 branch; v6 archives/clients retain their historical contract until S15 cutover.
+  if (body && typeof body === "object" && "schemaVersion" in body) {
+    const referenceTime = new Date().toISOString();
+    let report;
+    try { report = parseInsightsReportV7(body, referenceTime); }
+    catch { return NextResponse.json({ error: "Invalid insights data" }, { status: 400 }); }
+    const limit = await rateLimitStrict(`ratelimit:insights:${auth.handle.toLowerCase()}`, 10, 86400);
+    if (!limit.allowed) return NextResponse.json({ error: "Too many uploads. Please try again later." }, { status: 429, headers: { "Retry-After": "86400" } });
+    try {
+      const stored = await dbStoreCraftReportV7(auth.handle, report, referenceTime);
+      // A descriptive report changes no engineering counts and issues no rubric verdict.
+      return NextResponse.json({ success: true, persisted: true, schemaVersion: "v7", uploadId: stored.uploadId });
+    } catch {
+      log("error", "[insights] Craft v7 persistence failed", { route: "/api/insights" });
+      void captureServerError({ error: new Error("Craft v7 persistence failed"), route: "/api/insights", statusCode: 503 });
+      return NextResponse.json({ error: "Insights storage unavailable" }, { status: 503 });
+    }
   }
 
   // Validate InsightsUpload shape

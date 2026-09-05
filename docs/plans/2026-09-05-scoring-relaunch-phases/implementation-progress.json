@@ -127,7 +127,8 @@
       "dependencies": [
         "S01"
       ],
-      "implementationStatus": "in-progress"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-7-validation.md"
     },
     {
       "id": "S11",
@@ -139,7 +140,7 @@
         "S01",
         "S06"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "in-progress"
     },
     {
       "id": "S12",
@@ -745,6 +746,18 @@
       "path": "/Users/juan/code/chapa-scoring-craft",
       "branch": "feature/scoring-v7-craft",
       "purpose": "S10 optional Craft",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-ledger",
+      "branch": "feature/scoring-v7-ledger",
+      "purpose": "S11 outcome and practice ledger",
+      "cleanupStatus": "active"
+    },
+    {
+      "path": "/Users/juan/code/chapa-scoring-supplemental",
+      "branch": "feature/scoring-v7-supplemental",
+      "purpose": "S07 supplemental evidence aging",
       "cleanupStatus": "active"
     }
   ]

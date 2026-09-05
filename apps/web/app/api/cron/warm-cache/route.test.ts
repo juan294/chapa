@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { GET } from "./route";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 
+const { mockPurgeCraft } = vi.hoisted(() => ({ mockPurgeCraft: vi.fn(async () => 0) }));
+vi.mock("@/lib/db/craft-v7", () => ({ dbPurgeExpiredCraftRawV7: mockPurgeCraft }));
+
 const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
 vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
 
@@ -217,6 +220,17 @@ describe("GET /api/cron/warm-cache", () => {
     // existing render/write assertions below keep passing unchanged.
     mockReadBadgeSvgCache.mockResolvedValue(null);
   });
+
+
+it("reports raw-retention failures without claiming deletion success", async () => {
+  mockVerifyCronSecret.mockReturnValue(null);
+  mockCacheSetNxStatus.mockResolvedValue("acquired");
+  mockPurgeCraft.mockRejectedValueOnce(new Error("private database detail"));
+  const response = await GET(new NextRequest("https://chapa.test/api/cron/warm-cache"));
+  const body = await response.json();
+  expect(body.expiredCraftRawDeleted).toBeNull();
+  expect(mockCaptureServerError).toHaveBeenCalledWith(expect.objectContaining({ error: expect.objectContaining({ message: "Craft raw artifact purge failed" }), route: "/api/cron/warm-cache" }));
+});
 
   afterEach(() => {
     vi.stubEnv("GITHUB_TOKEN", undefined);
