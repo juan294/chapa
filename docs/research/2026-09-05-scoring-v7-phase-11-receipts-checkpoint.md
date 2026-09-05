@@ -1,6 +1,6 @@
 # S12 receipt implementation checkpoint
 
-Status: implementation and review fixes drafted; independent re-review and integration gates remain outstanding. This is not a completion report.
+Historical checkpoint, superseded by the [S12 validation report](2026-09-05-scoring-v7-phase-11-receipts-validation.md). Independent re-review, simplify and integration gates subsequently passed. The details below record the earlier interruption, not current S12 status.
 
 The GPT-6 Astra implementation lives uncommitted in `/Users/juan/code/chapa-scoring-receipts`, based on `76763401`. It adds strict canonical JSON and SHA-256 receipts, complete public numeric inputs/traces, pinned policy/algorithm artifacts, opaque evidence references, independent offline arithmetic and reproduction documentation. Seven source/test/documentation paths are fingerprinted in `logs/scoring-v7/s12-review-checkpoint-manifest.json` in the integration worktree.
 

@@ -158,8 +158,8 @@
         "S10",
         "S11"
       ],
-      "implementationStatus": "implemented-pending-independent-re-review",
-      "checkpointArtifact": "docs/research/2026-09-05-scoring-v7-phase-11-receipts-checkpoint.md"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-scoring-v7-phase-11-receipts-validation.md"
     },
     {
       "id": "S13",
@@ -170,7 +170,7 @@
       "dependencies": [
         "S12"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "in-progress"
     },
     {
       "id": "S14",

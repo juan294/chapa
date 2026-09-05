@@ -32,17 +32,17 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] Receipt replay is identical a year later and in another timezone, with network disabled.
-- [ ] Production and independently coded calculator match frozen fixtures and randomized valid inputs at final precision.
-- [ ] Public receipt includes every score-affecting input while excluding private names/URLs/raw reports/tokens; owner evidence exports remain protected.
-- [ ] Craft absent versus measured zero is preserved distinctly.
-- [ ] Canonicalization fixes sorting, UTF-8, date/number encoding and negative-zero handling; invalid values rejected.
-- [ ] All archive limitations are versioned; v6 snapshots missing evidence are marked non-replayable, never reconstructed by guessing.
+- [x] Receipt replay is identical a year later and in another timezone, with network disabled.
+- [x] Production and independently coded calculator match frozen fixtures and randomized valid inputs at final precision.
+- [x] Public receipt includes every score-affecting input while excluding private names/URLs/raw reports/tokens; owner evidence exports remain protected.
+- [x] Craft absent versus measured zero is preserved distinctly.
+- [x] Canonicalization fixes sorting, UTF-8, date/number encoding and negative-zero handling; invalid values rejected.
+- [x] All archive limitations are versioned; v6 snapshots missing evidence are marked non-replayable, never reconstructed by guessing.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## S13: Persist replayable snapshots and correct trend smoothing
