@@ -1,0 +1,16 @@
+{
+  "browserTestedServerCommit": "72c376b3",
+  "finalIntegrationCommit": "87fd3258",
+  "changed": [],
+  "added": [
+    "EBJqs8w0DdCvCO8P3JlH5/_ssgManifest.js",
+    "EBJqs8w0DdCvCO8P3JlH5/_clientMiddlewareManifest.js",
+    "EBJqs8w0DdCvCO8P3JlH5/_buildManifest.js"
+  ],
+  "removed": [
+    "lWThVsr6vkG0sngHRJG4r/_ssgManifest.js",
+    "lWThVsr6vkG0sngHRJG4r/_buildManifest.js",
+    "lWThVsr6vkG0sngHRJG4r/_clientMiddlewareManifest.js"
+  ],
+  "unchangedCommonFileCount": 107
+}

@@ -1,0 +1,22 @@
+{
+  "reviewedImplementationCommit": "87fd325867db87462407d94418555a5c6bf5df3e",
+  "buildId": "EBJqs8w0DdCvCO8P3JlH5",
+  "largestJsBytes": 233200,
+  "largestJsChunk": "apps/web/.next/static/chunks/23y4utsbwradr.js",
+  "jsChunkCount": 82,
+  "staticLocaleRoots": [
+    "/en",
+    "/es"
+  ],
+  "baseline": {
+    "kind": "pre-existing baseline build observation; build provenance not reverified",
+    "sourceHead": "c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d",
+    "buildId": "v2sQzDmNeCfKrlFUN6bAN",
+    "largestJsBytes": 233200,
+    "jsChunkCount": 77,
+    "staticLocaleRoots": [
+      "/en",
+      "/es"
+    ]
+  }
+}

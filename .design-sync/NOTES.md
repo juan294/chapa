@@ -460,3 +460,80 @@ stale-read scare from the Jade sync is what the check exists for.
 The project still holds the designer's `handoff-chapa-v2/`, `templates/`,
 `screenshots/` and `uploads/` alongside the synced bundle. Passed the diff's
 empty list verbatim; all of it survived. Never hand-derive this list.
+
+## Local redesign handoff verification — 2026-09-05
+
+The redesign preserves the existing project ID, package shape/name, global name,
+CSS entry, config keys, manual prop contracts and all 15 curated exports. The
+current token manifest contains **73 design declarations, including 67 colors**;
+`--tw-*` engine variables remain in compiled CSS and are excluded from the
+separate token manifest. Historical counts above describe earlier revisions.
+
+The local final build emitted `3uag-26sduzvh.css` as the global stylesheet.
+It was identified by its semantic action token and actual `.font-display` rule,
+not by file size. Its SHA-256 is
+`82b2794362086104aef95358f152cd9a7040bf3e739b292cb0bf10058f6cb37f`.
+`apps/web/.ds-styles.css` was regenerated in the documented order:
+`fonts.css`, `safelist.css`, then that complete compiled global stylesheet.
+The assembled SHA-256 is
+`02f16eae77acb8a73c2ce8331cf949ccb2d1447d99898eddb0a7b7bf507d9bc6`.
+All **37 convention-named utilities**, including `font-display`, are present as
+actual selectors. No Tailwind runtime declarations were stripped.
+
+With the converter unavailable, the ignored `.ds-sync/local-gallery/` scaffold
+used installed Vite/React and aliased `@chapa/web` to the actual
+`apps/web/.ds-entry.tsx` and `@` to `apps/web`. It imported the existing preview
+stories without an app-provider mock. It rendered and captured **30 cases: one
+existing preview for every export in both light and dark**. ConfirmDialog uses
+its real native modal in an isolated iframe. OnThisPageIndex uses its documented
+1120px viewport and ActiveSection story; narrow contact-sheet cells would hide
+that responsive component and are not valid evidence.
+
+The gallery copied the final build's font files and 83 `@font-face` declarations
+into its local asset tree. Only its temporary offline stylesheet replaces the
+remote Google import; shipped standalone font bindings remain unchanged.
+Browser checks loaded Manrope, Barlow Condensed, JetBrains Mono and Plus Jakarta
+Sans successfully in every case. Computed `font-body`, `font-display` and
+`font-heading` resolve to Manrope, Barlow Condensed and JetBrains Mono,
+respectively. Theme backgrounds resolve to `rgb(244, 240, 231)` and
+`rgb(20, 23, 25)`. The gallery's CSP and capture-phase navigation/media guards
+prevent OAuth, third-party media and form activation; no external requests
+reached the network during verification.
+
+All 15 light/dark component pairs were visually reviewed in three contact
+sheets, with individual OnThisPageIndex captures confirming its visible active
+rail. Evidence remains ignored under `.ds-sync/local-gallery/`: `manifest.json`
+records exact token values, export names, utility names, CSS/entry/preview
+hashes; `verification.json` records browser and font results; `screenshots/`
+contains all 30 individual captures and the contact sheets. Local reproduction:
+
+```sh
+node .ds-sync/local-gallery/assemble.mjs
+pnpm exec vite --config .ds-sync/local-gallery/vite.config.mjs
+# In a second terminal, while the loopback gallery is running:
+node .ds-sync/local-gallery/verify.mjs
+node .ds-sync/local-gallery/capture-sheets.mjs
+```
+
+The final manifest, browser results and three reviewed sheets are also archived
+under `docs/plans/2026-09-05-chapa-redesign-phases/evidence/phase5/design-sync/`,
+with scope and reproduction recorded in the adjacent `phase-5-sync-report.md`.
+Generated CSS, tokens, gallery source and individual scratch captures remain
+ignored.
+
+**Converter package build, Claude Design upload and remote readback were not
+executed.** These results verify the repository-side package and local gallery,
+not end-to-end remote synchronization. When the existing converter capability
+is available, retain the documented package-build protocol, rerun the token
+emitter after converter cleanup, inspect fresh sheets despite `unchanged`
+source-key results, use exactly `upload.deletePaths`, and read back the receipt
+hashes. No remote deployment, push or cache purge occurred in this handoff.
+
+The final InsightCard foreground correction was reviewed and the gallery was
+refreshed: **34 cases** now include the original 30 plus light/dark Trend and
+Quality Champion archetype cards. The four additional captures verify retained
+hue tints and text-safe foregrounds through the actual component. All 34 PNGs,
+three sheets and current source/handoff hashes are archived with the report.
+The integrated `72c376b3` rebuild preserves the exact CSS, entry and preview
+hashes listed above. None of the 15 gallery component sources changed in that
+integration, so the refreshed captures still represent the integrated build.

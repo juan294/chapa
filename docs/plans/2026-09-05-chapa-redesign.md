@@ -1,7 +1,7 @@
 # Chapa redesign implementation plan
 
 Date: 2026-09-05  
-Phase: Implementation; Phases 1–4 complete, Phase 5 in progress.
+Phase: Complete; all five phases implemented and locally verified. See [final validation](2026-09-05-chapa-redesign-phases/phase-5-validation.md).
 Baseline: `develop` at `c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d`.  
 Research: [design system and product contracts](../research/2026-09-05-chapa-redesign-design-system.md), [measurements and user brief](../research/2026-09-05-chapa-redesign-evidence.json).
 

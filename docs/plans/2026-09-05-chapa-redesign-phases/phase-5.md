@@ -80,19 +80,19 @@ Actual Claude Design upload/readback is the final external verification step whe
 
 ## Automated success criteria
 
-- [ ] All applicable local type/lint/coverage/build/structural/security checks pass; no unresolved known failures.
-- [ ] Local contract and journey checks pass without remote service writes; browser cases are executed rather than silently skipped.
-- [ ] SVG/PNG version/cache/legacy-config/raster tests pass; current reference hashes/images are reviewed and tracked deliberately.
-- [ ] Both locale landing variants remain statically generated; responsive and keyboard tests pass on Chromium/mobile.
-- [ ] Token export exactly reflects current `@theme`, retains every historical token name, includes additive roles and excludes engine tokens.
-- [ ] Existing sync config schema/15 imports/manual props/fonts/utilities pass local checks; generated artifacts remain ignored.
-- [ ] Documentation and plan status reflect measured results and distinguish local sync verification from converter/upload/readback status.
+- [x] All applicable local type/lint/coverage/build/structural/security checks pass; no unresolved known failures.
+- [x] Local contract and journey checks pass without remote service writes; browser cases are executed rather than silently skipped.
+- [x] SVG/PNG version/cache/legacy-config/raster tests pass; current reference hashes/images are reviewed and tracked deliberately.
+- [x] Both locale landing variants remain statically generated; responsive and keyboard tests pass on Chromium/mobile.
+- [x] Token export exactly reflects current `@theme`, retains every historical token name, includes additive roles and excludes engine tokens.
+- [x] Existing sync config schema/15 imports/manual props/fonts/utilities pass local checks; generated artifacts remain ignored.
+- [x] Documentation and plan status reflect measured results and distinguish local sync verification from converter/upload/readback status.
 
 ## Manual visual success criteria
 
-- [ ] Every required rubric cell passes or remains explicitly incomplete; no unreviewed inaccessible control/overlap/translation truncation.
-- [ ] User-facing landing, Studio, badge and signature match the accepted design plus later copy/Elite/Studio corrections.
-- [ ] Standalone component gallery/contact sheets match actual code in light and dark; no fonts missing outside Next.
-- [ ] Final review includes side-by-side approved/prod-local page and real badge exports, not only implementation screenshots.
+- [x] Every required rubric cell passes or remains explicitly incomplete; no unreviewed inaccessible control/overlap/translation truncation.
+- [x] User-facing landing, Studio, badge and signature match the accepted design plus later copy/Elite/Studio corrections.
+- [x] Standalone component gallery/contact sheets match actual code in light and dark; no fonts missing outside Next.
+- [x] Final review includes side-by-side approved/prod-local page and real badge exports, not only implementation screenshots.
 
 Present the final local validation report and sync status, then stop. A later `/validate` or release workflow remains separately invoked. No push, PR, Vercel preview, production deployment or cache purge is part of this phase.

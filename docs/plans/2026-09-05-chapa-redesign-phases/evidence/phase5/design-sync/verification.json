@@ -1,0 +1,3911 @@
+{
+  "generatedAt": "2026-09-05T12:35:27.289Z",
+  "manifest": {
+    "generatedAt": "2026-09-05T12:36:23.768Z",
+    "globalChunk": "3uag-26sduzvh.css",
+    "globalCssSha256": "82b2794362086104aef95358f152cd9a7040bf3e739b292cb0bf10058f6cb37f",
+    "assembledCssSha256": "02f16eae77acb8a73c2ce8331cf949ccb2d1447d99898eddb0a7b7bf507d9bc6",
+    "offlineCssSha256": "ab0f06a05b09e6117f90b3e9372e2060b26a07febf95a1f4da8a5e0c684ff210",
+    "entrySha256": "0418d934240f1be31aafdec90f7542ed22bd64e4f139304730f018daffbbd806",
+    "exports": [
+      "BitbucketIcon",
+      "ClaudeCodeStar",
+      "CodebergIcon",
+      "ConfirmDialog",
+      "ContentPageHeader",
+      "CopyIcon",
+      "GitHubIcon",
+      "GitlabIcon",
+      "InsightCard",
+      "LiteYouTubeEmbed",
+      "LoginCtaButton",
+      "OnThisPageIndex",
+      "SectionHeader",
+      "Sparkline",
+      "StatusCallout"
+    ],
+    "utilities": [
+      "bg-bg",
+      "bg-card",
+      "bg-dark-section",
+      "text-text-primary",
+      "text-text-secondary",
+      "text-terminal-dim",
+      "bg-amber",
+      "text-amber-text",
+      "bg-action",
+      "text-action-text",
+      "hover:bg-action-hover",
+      "bg-identity-surface",
+      "text-identity-text",
+      "bg-closing-surface",
+      "text-closing-text",
+      "bg-hero-band",
+      "bg-purple-tint",
+      "border-stroke",
+      "border-stroke-strong",
+      "text-terminal-green",
+      "text-terminal-red",
+      "text-complement-text",
+      "font-heading",
+      "font-terminal",
+      "font-body",
+      "font-display",
+      "shadow-card",
+      "hover:shadow-card-hover",
+      "bg-forest",
+      "bg-forest-card",
+      "border-forest-line",
+      "text-forest-text",
+      "text-forest-dim",
+      "text-forest-ok",
+      "text-forest-warn",
+      "text-forest-err",
+      "hover:text-complement-text-hover"
+    ],
+    "tokenCount": 73,
+    "colorCount": 67,
+    "tokens": [
+      {
+        "name": "--color-bg",
+        "value": "light-dark(#f4f0e7, #141719)"
+      },
+      {
+        "name": "--color-card",
+        "value": "light-dark(#fffdf7, #202528)"
+      },
+      {
+        "name": "--color-purple-tint",
+        "value": "light-dark(#dceaf0, #192b35)"
+      },
+      {
+        "name": "--color-dark-section",
+        "value": "light-dark(#1b1b19, #0d1215)"
+      },
+      {
+        "name": "--color-dark-card",
+        "value": "light-dark(#252521, #202528)"
+      },
+      {
+        "name": "--color-hero-band",
+        "value": "light-dark(#dceaf0, #192b35)"
+      },
+      {
+        "name": "--color-warm-bg",
+        "value": "light-dark(#f4f0e7, #141719)"
+      },
+      {
+        "name": "--color-warm-card",
+        "value": "light-dark(#fffdf7, #202528)"
+      },
+      {
+        "name": "--color-warm-stroke",
+        "value": "light-dark(#24232130, #eeeae12b)"
+      },
+      {
+        "name": "--color-text-primary",
+        "value": "light-dark(#1b1b19, #eeeae1)"
+      },
+      {
+        "name": "--color-text-secondary",
+        "value": "light-dark(#64625e, #b3b9b9)"
+      },
+      {
+        "name": "--color-terminal-dim",
+        "value": "light-dark(#64625e, #b3b9b9)"
+      },
+      {
+        "name": "--color-stroke",
+        "value": "light-dark(#24232130, #eeeae12b)"
+      },
+      {
+        "name": "--color-stroke-strong",
+        "value": "light-dark(#1b1b19, #eeeae166)"
+      },
+      {
+        "name": "--color-track",
+        "value": "light-dark(#1b1b191f, #eeeae121)"
+      },
+      {
+        "name": "--color-amber",
+        "value": "light-dark(#ed4930, #ff795f)"
+      },
+      {
+        "name": "--color-amber-light",
+        "value": "light-dark(#f77a62, #ff9d88)"
+      },
+      {
+        "name": "--color-amber-dark",
+        "value": "light-dark(#aa2d1a, #c24e39)"
+      },
+      {
+        "name": "--color-amber-text",
+        "value": "light-dark(#aa2d1a, #ff927d)"
+      },
+      {
+        "name": "--color-terminal-green",
+        "value": "light-dark(oklch(.46 .13 145), oklch(.8 .16 148))"
+      },
+      {
+        "name": "--color-terminal-yellow",
+        "value": "light-dark(oklch(.46 .1 78), oklch(.82 .13 85))"
+      },
+      {
+        "name": "--color-terminal-red",
+        "value": "light-dark(oklch(.49 .18 25), oklch(.76 .16 25))"
+      },
+      {
+        "name": "--color-complement",
+        "value": "light-dark(oklch(.55 .1 225), oklch(.7 .11 225))"
+      },
+      {
+        "name": "--color-complement-light",
+        "value": "light-dark(\n    oklch(.94 .035 225),\n    oklch(.7 .11 225 / .16)\n  )"
+      },
+      {
+        "name": "--color-complement-dark",
+        "value": "oklch(.42 .09 228)"
+      },
+      {
+        "name": "--color-complement-text",
+        "value": "light-dark(oklch(.46 .1 228), oklch(.79 .1 222))"
+      },
+      {
+        "name": "--color-complement-text-hover",
+        "value": "light-dark(\n    oklch(.38 .09 228),\n    oklch(.84 .1 220)\n  )"
+      },
+      {
+        "name": "--color-forest",
+        "value": "#1b1b19"
+      },
+      {
+        "name": "--color-forest-card",
+        "value": "#252521"
+      },
+      {
+        "name": "--color-forest-line",
+        "value": "#f4f0e766"
+      },
+      {
+        "name": "--color-forest-text",
+        "value": "#f4f0e7"
+      },
+      {
+        "name": "--color-forest-dim",
+        "value": "#c2c0b8"
+      },
+      {
+        "name": "--color-forest-grid",
+        "value": "#f4f0e70a"
+      },
+      {
+        "name": "--color-forest-ok",
+        "value": "oklch(.8 .16 148)"
+      },
+      {
+        "name": "--color-forest-warn",
+        "value": "oklch(.82 .13 85)"
+      },
+      {
+        "name": "--color-forest-err",
+        "value": "oklch(.72 .17 25)"
+      },
+      {
+        "name": "--shadow-card",
+        "value": "3px 3px 0 light-dark(#24232130, #00000066)"
+      },
+      {
+        "name": "--shadow-card-hover",
+        "value": "5px 5px 0 light-dark(#24232130, #00000080)"
+      },
+      {
+        "name": "--color-identity-surface",
+        "value": "light-dark(#ed4930, #3a2222)"
+      },
+      {
+        "name": "--color-identity-text",
+        "value": "light-dark(#1b1b19, #eeeae1)"
+      },
+      {
+        "name": "--color-closing-surface",
+        "value": "light-dark(#ed4930, #a92f21)"
+      },
+      {
+        "name": "--color-closing-text",
+        "value": "light-dark(#1b1b19, #f4f0e7)"
+      },
+      {
+        "name": "--color-action",
+        "value": "light-dark(#1b1b19, #ff795f)"
+      },
+      {
+        "name": "--color-action-text",
+        "value": "light-dark(#f4f0e7, #17191a)"
+      },
+      {
+        "name": "--color-action-hover",
+        "value": "light-dark(#aa2d1a, #ff9d88)"
+      },
+      {
+        "name": "--color-dimension-delivery",
+        "value": "light-dark(oklch(.62 .14 145), oklch(.72 .14 145))"
+      },
+      {
+        "name": "--color-dimension-quality",
+        "value": "light-dark(oklch(.62 .14 50), oklch(.72 .14 50))"
+      },
+      {
+        "name": "--color-dimension-consistency",
+        "value": "light-dark(oklch(.62 .14 215), oklch(.72 .14 215))"
+      },
+      {
+        "name": "--color-dimension-breadth",
+        "value": "light-dark(oklch(.62 .14 330), oklch(.72 .14 330))"
+      },
+      {
+        "name": "--color-dimension-craft",
+        "value": "light-dark(oklch(.62 .14 95), oklch(.72 .14 95))"
+      },
+      {
+        "name": "--color-dimension-delivery-light",
+        "value": "light-dark(oklch(.75 .13 145), oklch(.8 .13 145))"
+      },
+      {
+        "name": "--color-dimension-quality-light",
+        "value": "light-dark(oklch(.75 .13 50), oklch(.8 .13 50))"
+      },
+      {
+        "name": "--color-dimension-consistency-light",
+        "value": "light-dark(oklch(.75 .13 215), oklch(.8 .13 215))"
+      },
+      {
+        "name": "--color-dimension-breadth-light",
+        "value": "light-dark(oklch(.75 .13 330), oklch(.8 .13 330))"
+      },
+      {
+        "name": "--color-dimension-craft-light",
+        "value": "light-dark(oklch(.75 .13 95), oklch(.8 .13 95))"
+      },
+      {
+        "name": "--color-archetype-builder",
+        "value": "oklch(.62 .14 163)"
+      },
+      {
+        "name": "--color-archetype-guardian",
+        "value": "oklch(.62 .14 330)"
+      },
+      {
+        "name": "--color-archetype-marathoner",
+        "value": "oklch(.62 .14 145)"
+      },
+      {
+        "name": "--color-archetype-polymath",
+        "value": "oklch(.62 .14 110)"
+      },
+      {
+        "name": "--color-archetype-balanced",
+        "value": "oklch(.62 .14 240)"
+      },
+      {
+        "name": "--color-archetype-emerging",
+        "value": "oklch(.62 .14 50)"
+      },
+      {
+        "name": "--color-archetype-artificer",
+        "value": "oklch(.62 .14 75)"
+      },
+      {
+        "name": "--color-archetype-builder-text",
+        "value": "light-dark(oklch(.48 .12 163), oklch(.78 .12 163))"
+      },
+      {
+        "name": "--color-archetype-guardian-text",
+        "value": "light-dark(oklch(.48 .12 330), oklch(.78 .12 330))"
+      },
+      {
+        "name": "--color-archetype-marathoner-text",
+        "value": "light-dark(oklch(.48 .12 145), oklch(.78 .12 145))"
+      },
+      {
+        "name": "--color-archetype-polymath-text",
+        "value": "light-dark(oklch(.48 .12 110), oklch(.78 .12 110))"
+      },
+      {
+        "name": "--color-archetype-balanced-text",
+        "value": "light-dark(oklch(.48 .12 240), oklch(.78 .12 240))"
+      },
+      {
+        "name": "--color-archetype-emerging-text",
+        "value": "light-dark(oklch(.48 .12 50), oklch(.78 .12 50))"
+      },
+      {
+        "name": "--color-archetype-artificer-text",
+        "value": "light-dark(oklch(.48 .12 75), oklch(.78 .12 75))"
+      },
+      {
+        "name": "--font-heading",
+        "value": "var(--font-jetbrains-mono), \"Courier New\", monospace"
+      },
+      {
+        "name": "--font-body",
+        "value": "var(--font-manrope), system-ui, sans-serif"
+      },
+      {
+        "name": "--font-display",
+        "value": "var(--font-barlow-condensed), sans-serif"
+      },
+      {
+        "name": "--font-terminal",
+        "value": "var(--font-jetbrains-mono), ui-monospace, monospace"
+      }
+    ],
+    "previewSha256": {
+      "BitbucketIcon": "21372bee47216f94388dcda5ab73b437be980855b413492db17eeb4d774f406e",
+      "ClaudeCodeStar": "6e69cf9f5a5f162471c5fa6f4182243f572a76d2f0c1bbed86bb7b4bbf1be2f0",
+      "CodebergIcon": "fc8582078dbfc0c55fd1b06b12cddee6dbc9867e22bf04950f4d84a5001c6654",
+      "ConfirmDialog": "07959a23d5874477aac9b46d4ae78ffa1ac5972676f4efecef9150e468f81a95",
+      "ContentPageHeader": "bd9a568b8359ed5c7b89b8a082551bfc0a5244f8f0f89b9e1ac67315d72ebce0",
+      "CopyIcon": "45326c7673892affa70aef0ec4a22e9614102b9e73be52352e79a62c7f7a709b",
+      "GitHubIcon": "d0e771bece0c778f643bd299765d0da35b3e6daf4ec22d148fec7c34bf0d9200",
+      "GitlabIcon": "604555b84c4df5485c04c5588a64e94945bb81bb6efeb8d0d03b94b1589ad77e",
+      "InsightCard": "b94eb0581d1ecef7f9325b3d15c04e6f3c6dbd67c31fd0c4904177068447435b",
+      "LiteYouTubeEmbed": "0cc73927b179d3d9c0e74deda6594f0cad6e85042e912a60e96e88dbd9eaf01f",
+      "LoginCtaButton": "de12425d888c71dd6c25440c2304157e41085c92dd4a04df5729ee14fb5bb6f5",
+      "OnThisPageIndex": "d177b9f1d25e03ae0a5c044512bf14e6c77fc17547f1ced82cec4fd6a6758675",
+      "SectionHeader": "40192d79a58adf0511082d627b827c7b9a2aad050545487be25c09731d8fa8ba",
+      "Sparkline": "acb5eb3bf9ee4ac607428bf9a76e0278ff1e7b5ec8af89a8ba75c513de4e1fa3",
+      "StatusCallout": "9140b0816cd8e24cff7f4752a5e1ec70e097fd8753baeb3cca61f4109d7fc96b"
+    },
+    "validatedIntegratedCommit": "72c376b3e200b68166b9932b117fb90af4953112",
+    "sourceFiles": {
+      "apps/web/components/StatusCallout.tsx": "65f3f02a5cbf4ec8c4f1b05a84450a9e73d4ef2caaa263d011a1fa536285fbb3",
+      "apps/web/components/ConfirmDialog.tsx": "9470acd775fb44d0fa0ebe407bd26b21897203d0e24746fc87b87b769aba41a1",
+      "apps/web/components/LoginCtaButton.tsx": "3cee0bd03de1fc95a25c825f748a36ae70e5a2cc5db1cf3f7a5b3442a20b9e84",
+      "apps/web/components/ClaudeCodeStar.tsx": "edb621f3a21cf6302a33e0686571fb1562effaa9891f7b2d9fda5dbe3f3224de",
+      "apps/web/components/LiteYouTubeEmbed.tsx": "f0f6bc35af2265211cbbc7a843b1ef78b7ef8b1096d080e53cd7fdb9a17eae5b",
+      "apps/web/components/dashboard/InsightCard.tsx": "41e55de4cd5164076338393ff909da96c2e00b4f5f79b3b51f114317f2175d07",
+      "apps/web/components/dashboard/Sparkline.tsx": "e244dd944bc7e8029259d5f94b00f5e4b0157506eb3f7329dc79c4102a05f7e0",
+      "apps/web/components/icons/GitHubIcon.tsx": "51bab83daa1ef424c7b2ecc1a5fc61c615163465ea0a0b9d62ffe54c7090a3b7",
+      "apps/web/components/icons/GitlabIcon.tsx": "b0aec5f031f38efa061ba13f5641f47b85d43da29713c2867d7053a1a4f9c2f7",
+      "apps/web/components/icons/BitbucketIcon.tsx": "4b6b5d116b914bb79be842952cccc133987dbfb1f3bd0742c6d4a71bdcb06044",
+      "apps/web/components/icons/CodebergIcon.tsx": "9798e8396d1c40d5031fcd616e387b017650d1cf64462f5230259640f4bf2c44",
+      "apps/web/components/icons/CopyIcon.tsx": "b8266eafd126c5d8b3e11dc0cd0d8404824328fd008e10af5323b0d709c9046a",
+      "apps/web/components/SectionHeader.tsx": "a1495947ce05dc0e93c9ac917b28966d49ed219847f181fd2e8cbd674ffccb9b",
+      "apps/web/components/content/ContentPageHeader.tsx": "c7ab0500123344525604259e95915516b9df43387464f9547b093e77a43de3c3",
+      "apps/web/components/content/OnThisPageIndex.tsx": "25b89419ba12d6521690ae10bb42b833f30668cc2cb1954e8b118bc81455a090"
+    },
+    "handoffFiles": {
+      ".design-sync/config.json": "273dc8c1b894e9df750b0492f2e80357dfec0253b5fcad54574deddbd0e7340b",
+      ".design-sync/conventions.md": "b842b87af2d025c7fdcab4ff7188d4d95a86cd7a5fea929fcd2c8fc4909db927",
+      ".design-sync/fonts.css": "d8813898bf023e16f67fb915d72bc55433108874dcfb41f11460e01dcadf047d",
+      ".design-sync/safelist.css": "0e915aa75e41443db072147c0ec3401db684112581cbc966366228bd06feda22",
+      "apps/web/.ds-entry.tsx": "0418d934240f1be31aafdec90f7542ed22bd64e4f139304730f018daffbbd806"
+    },
+    "reviewedContactSheets": {
+      "contact-sheet-1.png": "62a110526642e0f32c7f7b7078e3084e21021f206110a97e382d4516635b4380",
+      "contact-sheet-2.png": "722f415027c2e9f69b37458da3e9bcb751b4996347748c298f4dd88437c9157e",
+      "contact-sheet-3.png": "cb191ed0fc2d4ccc2ded7a890fe97db7199045e74cf17fc57d1f8d5a845ef634"
+    },
+    "individualCaptures": {
+      "BitbucketIcon-dark.png": "9d98dd81c3bb1e042ddd1cbce54e23ca578130a57cfe703a9de976c03ab29cc9",
+      "BitbucketIcon-light.png": "0fc1f890932483ce983fb3d02e8b271905ee9c7b00b044a2035fa1db71d8af3a",
+      "ClaudeCodeStar-dark.png": "9ba59a6cac98fa39ea0fcfac6d31fe047415ef8881c5b331ee5e225c45ffa063",
+      "ClaudeCodeStar-light.png": "719b5d615078a4b7ee34739de900cd50d848141b4f17b1d7951a22650790dfea",
+      "CodebergIcon-dark.png": "aedc9f7d578ef5384ec182ffd52819d41946ddf6bb824054b4f42e5929e6db6f",
+      "CodebergIcon-light.png": "5526ea0048e9c07bf20e93b8769dfc67f3ac7087aa36801732273b89ad13555f",
+      "ConfirmDialog-dark.png": "9f8d25c9e021a7cc24d29700fc52e7e2a23809a161b5432ece0263e65bf9995c",
+      "ConfirmDialog-light.png": "25d764fd8b7bca7b7e58be17a9b7a57f8da85e9e384d129a94b2b5164732abc0",
+      "ContentPageHeader-dark.png": "88a64f77c85d20043096dafa18960f34486625a20072494d84a294bf47558ce6",
+      "ContentPageHeader-light.png": "3689306d80101fa3e9ca494b92cd99d1d644997d0f23a5d8be72fc4f8025828c",
+      "CopyIcon-dark.png": "b9478ebdd1eb36fa5731ab1ce8e6534fe595da36212d2aa8543b3e2d1379c293",
+      "CopyIcon-light.png": "2d380c8d3e34631e0689134f6ecdd7232733672815fb79c32c5a2aedfcd9fc3b",
+      "GitHubIcon-dark.png": "a46c83321ad59492d467cec723549f379c284b23cc2b503ef86c801704804628",
+      "GitHubIcon-light.png": "6e6b05c345e607c5d4ac2c4d83b734a7f322c193baeb15391890e9875755ee82",
+      "GitlabIcon-dark.png": "92073ba55945c081c19ed23cdaacfb00d8d70c28acc43054161ba8e3283f062e",
+      "GitlabIcon-light.png": "04d12bd800c040099737c9df6f29008ee165e916f0acfcf2733b717cb44b7515",
+      "InsightCard-ArchetypeReview-dark.png": "5033c287fc18b516ec5926a77afacbb878928d2f08ee2b6abaa40d17f6ba783a",
+      "InsightCard-ArchetypeReview-light.png": "3ee468ad1a9d21b22aef8064118b28ffb97b45881ea78746c25fc6e9aa521cd9",
+      "InsightCard-Trend-dark.png": "aa24044b087201936a241080d546acfb289d1435fe08052d243839d397a6d0a1",
+      "InsightCard-Trend-light.png": "7856f223f0b125e10cd9e40a867582ba2dfc0e14004796d648b0382aaa697559",
+      "InsightCard-dark.png": "412ed921aa11068b3efe5282f49399c0e7c776a978f29597bbf354d43342ee56",
+      "InsightCard-light.png": "f11f5aff597ddff66ae5257f8ca6fb08afcaa66796c6fd76e5b22e5b19553c16",
+      "LiteYouTubeEmbed-dark.png": "b4573265193268353ac1d3e71b7e66eb1ed9c087e9501c722d11975bfd2020ea",
+      "LiteYouTubeEmbed-light.png": "f1f4d76003f1a3196fe7b907e978b5d66635993c93bab825e5639ccf3fb20eb3",
+      "LoginCtaButton-dark.png": "c8b90cd203221b37200a265f7bebfdd4b84200457b65b4d10391b49699c746e5",
+      "LoginCtaButton-light.png": "0ddb840a13bb47891b06b84eca143bda1e211254bd7f91e075bce1000bee4c0b",
+      "OnThisPageIndex-dark.png": "e6de3385ef58ea0fc8042000560b9cdfdfe4fe772e7a3a7772f45583b144e971",
+      "OnThisPageIndex-light.png": "4a630145b363951bafb5e4348ad4c95773c8d8d43cc0ebcaa542522be26d878d",
+      "SectionHeader-dark.png": "6d8f41ce2a7df43d4f6c25f836090b7532377a692f0668dc3c981ab1362d7c68",
+      "SectionHeader-light.png": "ee6adc971948dd9757ac2bc2fcc595dd0d19fab5aca9e4c2276c94a236de68ef",
+      "Sparkline-dark.png": "5d0f63135cd6150374cb6bfeb0520e6d4daf3352a08e0734c5341f1aa0ad9467",
+      "Sparkline-light.png": "5f0f5926f317dd9f6fd41d877b85770185d46a153f699f458441a863625e682e",
+      "StatusCallout-dark.png": "add819ecbd43d3dbc3be3f1557bbf041f07c2a520a5a50fa16cf2d41a6991a9b",
+      "StatusCallout-light.png": "e4671bbbeeca0e542e194e9681a765a545d2f464ce849614782cf29ee7c3a125"
+    },
+    "supplementalInsightReview": {
+      "existingStory": "Trend",
+      "additionalProps": {
+        "id": "tip-archetype",
+        "priority": 1,
+        "type": "tip",
+        "icon": "target",
+        "archetypeName": "Quality Champion",
+        "headline": "Your archetype: Quality Champion",
+        "body": "Your work emphasizes careful reviews and reliable delivery."
+      },
+      "themes": [
+        "light",
+        "dark"
+      ]
+    }
+  },
+  "results": [
+    {
+      "name": "BitbucketIcon",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "BitbucketIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "BitbucketIcon",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "BitbucketIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "ClaudeCodeStar",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "ClaudeCodeStar",
+        "story": "Mark",
+        "stories": [
+          "Mark",
+          "OnDark"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "500",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "ClaudeCodeStar",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "ClaudeCodeStar",
+        "story": "Mark",
+        "stories": [
+          "Mark",
+          "OnDark"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "500",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "CodebergIcon",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "CodebergIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "CodebergIcon",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "CodebergIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "ConfirmDialog",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "ConfirmDialog",
+        "story": "Destructive",
+        "stories": [
+          "Default",
+          "Destructive",
+          "Loading"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "ConfirmDialog",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "ConfirmDialog",
+        "story": "Destructive",
+        "stories": [
+          "Default",
+          "Destructive",
+          "Loading"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "ContentPageHeader",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "ContentPageHeader",
+        "story": "HighlightedTitle",
+        "stories": [
+          "HighlightedTitle",
+          "TitleOnly",
+          "WithIntro"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "ContentPageHeader",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "ContentPageHeader",
+        "story": "HighlightedTitle",
+        "stories": [
+          "HighlightedTitle",
+          "TitleOnly",
+          "WithIntro"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "CopyIcon",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "CopyIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "CopyIcon",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "CopyIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "GitHubIcon",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "GitHubIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "GitHubIcon",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "GitHubIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "GitlabIcon",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "GitlabIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "GitlabIcon",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "GitlabIcon",
+        "story": "Default",
+        "stories": [
+          "Default",
+          "OnAccent"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "InsightCard",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "InsightCard",
+        "story": "Achievement",
+        "stories": [
+          "Achievement",
+          "NextTier",
+          "Tip",
+          "Trend"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "InsightCard",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "InsightCard",
+        "story": "Achievement",
+        "stories": [
+          "Achievement",
+          "NextTier",
+          "Tip",
+          "Trend"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "LiteYouTubeEmbed",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "LiteYouTubeEmbed",
+        "story": "Facade",
+        "stories": [
+          "Facade"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "LiteYouTubeEmbed",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "LiteYouTubeEmbed",
+        "story": "Facade",
+        "stories": [
+          "Facade"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "LoginCtaButton",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "LoginCtaButton",
+        "story": "Large",
+        "stories": [
+          "Large",
+          "Small"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "LoginCtaButton",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "LoginCtaButton",
+        "story": "Large",
+        "stories": [
+          "Large",
+          "Small"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "OnThisPageIndex",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "OnThisPageIndex",
+        "story": "ActiveSection",
+        "stories": [
+          "ActiveSection",
+          "LongIndex",
+          "ShortIndex"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "500",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "OnThisPageIndex",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "OnThisPageIndex",
+        "story": "ActiveSection",
+        "stories": [
+          "ActiveSection",
+          "LongIndex",
+          "ShortIndex"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "500",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "SectionHeader",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "SectionHeader",
+        "story": "CommandWithResult",
+        "stories": [
+          "CommandWithResult",
+          "NoMeta",
+          "ScoreReadout",
+          "StepCount"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "SectionHeader",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "SectionHeader",
+        "story": "CommandWithResult",
+        "stories": [
+          "CommandWithResult",
+          "NoMeta",
+          "ScoreReadout",
+          "StepCount"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "Sparkline",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "Sparkline",
+        "story": "Flat",
+        "stories": [
+          "Flat",
+          "Rising",
+          "Wide"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "Sparkline",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "Sparkline",
+        "story": "Flat",
+        "stories": [
+          "Flat",
+          "Rising",
+          "Wide"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "StatusCallout",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "StatusCallout",
+        "story": "Error",
+        "stories": [
+          "Error",
+          "Success",
+          "Verification",
+          "Warning"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "StatusCallout",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "StatusCallout",
+        "story": "Error",
+        "stories": [
+          "Error",
+          "Success",
+          "Verification",
+          "Warning"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "InsightCard",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "InsightCard",
+        "story": "Trend",
+        "stories": [
+          "Achievement",
+          "NextTier",
+          "Tip",
+          "Trend"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "InsightCard",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "InsightCard",
+        "story": "Trend",
+        "stories": [
+          "Achievement",
+          "NextTier",
+          "Tip",
+          "Trend"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "InsightCard",
+      "theme": "light",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "InsightCard",
+        "story": "ArchetypeReview",
+        "stories": [
+          "Achievement",
+          "NextTier",
+          "Tip",
+          "Trend"
+        ]
+      },
+      "colorScheme": "light",
+      "bg": "rgb(244, 240, 231)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    },
+    {
+      "name": "InsightCard",
+      "theme": "dark",
+      "exports": [
+        "BitbucketIcon",
+        "ClaudeCodeStar",
+        "CodebergIcon",
+        "ConfirmDialog",
+        "ContentPageHeader",
+        "CopyIcon",
+        "GitHubIcon",
+        "GitlabIcon",
+        "InsightCard",
+        "LiteYouTubeEmbed",
+        "LoginCtaButton",
+        "OnThisPageIndex",
+        "SectionHeader",
+        "Sparkline",
+        "StatusCallout"
+      ],
+      "story": {
+        "component": "InsightCard",
+        "story": "ArchetypeReview",
+        "stories": [
+          "Achievement",
+          "NextTier",
+          "Tip",
+          "Trend"
+        ]
+      },
+      "colorScheme": "dark",
+      "bg": "rgb(20, 23, 25)",
+      "loaded": [
+        {
+          "spec": "700 18px \"Manrope\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Barlow Condensed\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"JetBrains Mono\"",
+          "count": 1,
+          "check": true
+        },
+        {
+          "spec": "700 18px \"Plus Jakarta Sans\"",
+          "count": 1,
+          "check": true
+        }
+      ],
+      "families": {
+        "display": "\"Barlow Condensed\", sans-serif",
+        "body": "Manrope, system-ui, -apple-system, sans-serif",
+        "heading": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+      },
+      "fontFaces": [
+        {
+          "family": "JetBrains Mono",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "JetBrains Mono",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Plus Jakarta Sans",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "Manrope",
+          "weight": "700",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "600",
+          "status": "loaded"
+        },
+        {
+          "family": "Barlow Condensed",
+          "weight": "700",
+          "status": "loaded"
+        }
+      ]
+    }
+  ],
+  "blocked": []
+}

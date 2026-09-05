@@ -138,7 +138,8 @@ Shared types live in: `packages/shared/src/types.ts`
 - Seven archetype colors and `VERIFICATION_CORAL` remain independent semantic colors. Existing palette values are preserved; app chrome uses the separate vermilion/coral theme. Each badge theme defines `accentRgb` once and derives translucent colors with `theme.tint(alpha)`; `badge-palette.test.ts` rejects bare accent tint literals on the render path.
 - SVG and OG keys include `BADGE_RENDER_VARIANT`. OG Redis uses `og-image:v5:<handle>:<variant>:<date>:<locale>`; metadata and PNG envelope versions include variant, date and default/Studio revision. Saving retains revision fencing and awaited all-locale SVG/OG invalidation.
 - SVG must be crisp and readable when scaled down
-- Animations must be subtle (heatmap fade-in, impact pulse)
+- Animated SVGs reveal activity and the score ring subtly; static exports and reduced-motion presentation retain complete data. See `docs/svg-design.md`.
+- Landing uses the separate immutable `LANDING_IMPACT` sample (92 / Elite / Balanced) for both the animated hero and static README SVG. Shared Studio `DEMO_IMPACT` stays 82 / High / Balanced; landing values are illustrative, not recomputed from `DEMO_STATS`.
 
 ## Design system (MANDATORY for UI work)
 - Full spec: @docs/design-system.md
@@ -146,7 +147,10 @@ Shared types live in: `packages/shared/src/types.ts`
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body/UI font: **Manrope** (`font-body`). Selective expressive headings use **Barlow Condensed** (`font-display`); technical headings stay JetBrains Mono. Retain browser and bundled **Plus Jakarta Sans** for badge metrics/footer/tier.
 - System/light/dark preference uses the existing `next-themes` provider (system default). Paper light (`#F4F0E7`) and charcoal dark (`#141719`) use ice stages and neutral rules. The badge remains independently dark.
-- All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
+- `apps/web/styles/globals.css` defines 73 Tailwind v4 `@theme` tokens: 67 colors, four font roles and two shadows. Export the actual declarations, including historical aliases. Raw archetype colors remain data accents; guide headings and small signal labels use the seven theme-aware `archetype-*-text` roles.
+- Fixed ink terminal chrome uses the scoped `forest-*` foreground/status family and full-opacity `forest-text` focus outlines. Keep it independent of page tokens; ordinary primary actions use their paired foreground in both default and hover states. Corners are restrained (usually 3px), shadows are neutral solid offsets, and the author signature retains its explicit pill shape.
+- Landing keeps its translated editorial body on the server with small interactive leaves. The fixed bottom dock reserves footer space and retains the last 50 submissions while mounted (no reload persistence). The shared keyboard listener alone owns `/` and Mod+K; landing commands extend the existing registry.
+- Studio uses the 69px navbar offset. Fit/50%/100% are preview-only zoom modes and do not change the seven-field saved configuration.
 
 ## Badge branding
 Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg, GitLab).

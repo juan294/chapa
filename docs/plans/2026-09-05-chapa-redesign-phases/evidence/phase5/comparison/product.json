@@ -1,0 +1,106 @@
+[
+  {
+    "key": "product-en-light-1440",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "light",
+    "lang": "en",
+    "heading": "GOOD WORKLEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "product-en-light-390",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "light",
+    "lang": "en",
+    "heading": "GOOD WORKLEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "product-en-dark-1440",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "dark",
+    "lang": "en",
+    "heading": "GOOD WORKLEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "product-en-dark-390",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "dark",
+    "lang": "en",
+    "heading": "GOOD WORKLEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "product-es-light-1440",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "light",
+    "lang": "es",
+    "heading": "EL BUEN TRABAJODEJAHUELLA_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "product-es-light-390",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "light",
+    "lang": "es",
+    "heading": "EL BUEN TRABAJODEJAHUELLA_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "product-es-dark-1440",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "dark",
+    "lang": "es",
+    "heading": "EL BUEN TRABAJODEJAHUELLA_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "product-es-dark-390",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "dark",
+    "lang": "es",
+    "heading": "EL BUEN TRABAJODEJAHUELLA_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  }
+]

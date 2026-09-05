@@ -14,14 +14,14 @@ Manrope is body/UI and Barlow Condensed is reserved for expressive display.
 
 - Powered by `next-themes` with `attribute="data-theme"` and `defaultTheme="system"`.
 - `ThemeProvider` wraps the app in `layout.tsx`; `ThemeToggle` lives in the nav bar and cycles three modes: system, light, dark (#1211).
-- **Every color token is ONE declaration** (#1211): `--color-bg: light-dark(#F4F0E7, #141719);` inside the `@theme` block of `globals.css`. `color-scheme` on the root element decides which half resolves - `:root` carries `color-scheme: light dark` (follow the OS), and `[data-theme="light"]` / `[data-theme="dark"]` force one. Tailwind utilities (`bg-bg`, `text-text-primary`, etc.) resolve at runtime via `var()`, unchanged.
+- **Every themed color token is ONE declaration** (#1211): `--color-bg: light-dark(#F4F0E7, #141719);` inside the `@theme` block of `globals.css`. `color-scheme` on the root element decides which half resolves - `:root` carries `color-scheme: light dark` (follow the OS), and `[data-theme="light"]` / `[data-theme="dark"]` force one. Tailwind utilities (`bg-bg`, `text-text-primary`, etc.) resolve at runtime via `var()`, unchanged.
 - The paired `:root` / `[data-theme="dark"]` custom property blocks are gone. `data-theme` now carries `color-scheme` only. Native form controls, scrollbars and focus rings follow the theme for free.
-- When adding a new color token, write one `light-dark(<light>, <dark>)` value. Do not reintroduce a second per-theme block.
+- When adding a theme-aware color token, write one `light-dark(<light>, <dark>)` value. Fixed ink terminal and raw archetype colors intentionally use one literal value in both themes. Do not reintroduce a second per-theme block.
 - No `@supports` fallback is needed or wanted. LightningCSS (Next.js 16's CSS pipeline) compiles `light-dark()` to a custom-property toggle keyed off the same `color-scheme` selectors, so all three modes work below the native floor (Chrome/Edge 123+, Safari 17.5+, Firefox 120+). See `docs/decisions/2026-08-29-light-dark-token-layer.md`.
 
 ## Colors
 
-Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-dark(<light>, <dark>)` declaration per token. Both halves are listed below.
+Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`: 73 tokens total, comprising 67 colors, four font roles and two shadows. Theme-aware colors use one `light-dark(<light>, <dark>)` declaration; fixed colors resolve identically in both themes. Both values are listed below. Token export must match the current declarations exactly, rather than assuming this count can never change.
 
 | Token | Light value | Dark value |
 | --- | --- | --- |
@@ -85,6 +85,13 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-da
 | `--color-archetype-balanced` | `oklch(.62 .14 240)` | `oklch(.62 .14 240)` |
 | `--color-archetype-emerging` | `oklch(.62 .14 50)` | `oklch(.62 .14 50)` |
 | `--color-archetype-artificer` | `oklch(.62 .14 75)` | `oklch(.62 .14 75)` |
+| `--color-archetype-builder-text` | `oklch(.48 .12 163)` | `oklch(.78 .12 163)` |
+| `--color-archetype-guardian-text` | `oklch(.48 .12 330)` | `oklch(.78 .12 330)` |
+| `--color-archetype-marathoner-text` | `oklch(.48 .12 145)` | `oklch(.78 .12 145)` |
+| `--color-archetype-polymath-text` | `oklch(.48 .12 110)` | `oklch(.78 .12 110)` |
+| `--color-archetype-balanced-text` | `oklch(.48 .12 240)` | `oklch(.78 .12 240)` |
+| `--color-archetype-emerging-text` | `oklch(.48 .12 50)` | `oklch(.78 .12 50)` |
+| `--color-archetype-artificer-text` | `oklch(.48 .12 75)` | `oklch(.78 .12 75)` |
 
 ### Color rules
 
@@ -97,8 +104,13 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-da
   with `forest-text`, `forest-dim` and fixed `forest-ok/warn/err` status roles.
   A scoped terminal presentation context chooses these classes without changing
   theme tokens globally or affecting Studio's theme-aware session controls.
+  Fixed ink controls use full-opacity `forest-text` focus outlines; page accent
+  focus colors must not leak into that independent surface.
 - Use neutral stroke/strong-stroke rules and solid offset shadows. Keep semantic
   green status and dimension/archetype colors; do not recolor data as branding.
+  Raw `archetype-*` colors identify charts; guide headings and small signal
+  labels use the corresponding `archetype-*-text` role, which preserves the hue
+  with readable light/dark values.
 - Site verification uses slate-blue complement fills and `complement-text` /
   `complement-text-hover` text. The independent SVG keeps its existing coral
   verification signal. Do not import badge coral into site verification UI.
@@ -198,21 +210,37 @@ contrast compound.
 
 - Use `max-w-7xl` for editorial composition/nav; constrain long-form prose separately.
 - Use generous section fields, asymmetric desktop composition and neutral dividers.
-- Horizontal padding: `px-6` on all containers.
+- Horizontal padding is responsive: editorial containers commonly use `px-6`; the navbar uses `px-3 sm:px-6` to retain 44px controls on narrow screens.
 - Section dividers: `border-l border-stroke` — vertical left border for terminal output blocks.
 
-## Terminal Section Pattern
+## Landing composition and shell
 
-The landing page is structured as a "terminal session" — each section is a command + output pair:
+The locale landing body is server-rendered editorial content: an asymmetric hero,
+ice badge stage, vermilion identity field, archetype and dimension exploration,
+README example, enterprise/tool/trust sections and a closing field. Technical
+command markers support this hierarchy; the whole page is not a simulated log.
+`MARK_` / `HUELLA_` stays JetBrains Mono beside selective Barlow display headings.
 
-```
-$ command-name
-  [output content with left border]
-```
+The hero uses the real animated SVG and its overlay in one tilted wrapper. The
+README uses a static SVG data URL from the same immutable `LANDING_IMPACT` fixture:
+92 / Elite / Balanced. These are curated illustrative values, not a computed
+result of `DEMO_STATS`. Shared Studio `DEMO_IMPACT` remains 82 / High / Balanced.
+Derive visible sample scores, summaries and accessible labels from the supplied
+fixture; do not hardcode a second sample or duplicate inline SVG IDs.
 
-- Command line: `font-heading text-sm`, `$` prefix in `text-terminal-dim`, command in `text-text-secondary`
-- Output block: `pl-4 border-l border-stroke`
-- Sections animate in with `animate-fade-in-up` and staggered `animation-delay`
+`ArchetypeExplorer` exposes seven keyboard tabs (arrows, Home and End).
+`DimensionExplorer` uses five native details elements, with optional Craft
+identified explicitly. Small client leaves own these interactions; they do not
+turn the translated server body into a client boundary.
+
+The persistent bottom dock is fixed ink in both page themes and reserves document
+space beneath the footer. It retains the last 50 submitted commands in React
+state while mounted; it does not persist history across reloads. Global navigation,
+`/theme [light|dark|system]`, autocomplete and history share the existing command
+registry. `KeyboardShortcutsListener` alone owns `/` and Mod+K focus routing.
+Landing adds scoped `/archetypes`, `/dimensions`, `/section`, `/embed`, `/mcp`,
+`/copy` and `/whoami` commands. Command prompts fill the same input. Copy uses the
+visible button's clipboard action and reports its actual success or failure.
 
 ## Components
 
@@ -232,19 +260,20 @@ hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-amber-text
 ### Buttons (Ghost/Outline)
 
 ```
-rounded-[3px] border border-stroke px-6 py-3 text-sm text-text-secondary
-hover:border-stroke-strong hover:text-text-primary
+min-h-11 rounded-[3px] border border-text-primary px-6 py-3 text-sm text-text-primary
+hover:bg-purple-tint focus-visible:outline-2 focus-visible:outline-amber-text
 ```
 
 ### Navigation
 
+- The navbar is 69px tall (44px controls plus 24px vertical padding and a 1px rule). Studio page, viewport calculations and loading skeleton use this same offset.
 - Fixed top, theme-aware surface: `fixed top-0 z-50 border-b border-stroke bg-bg`
 - Logo: `Chapa_` with blinking cursor (`animate-cursor-blink`)
 - Nav links keep monospace command prefixes and readable `text-text-secondary`.
   Active links use the global primary-text/weight treatment. Informational meta
   may use `terminal-dim`, measured on actual page/card/stage surfaces.
 - Login remains a text navigation action; its hover uses `text-text-primary`.
-- **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), shows `ES | EN` pill menu on click. This is a **listbox**, not a menu — a language picker is a single-select choice among options, not a set of commands. The trigger uses `aria-expanded` + `aria-haspopup="listbox"`; the container is `role="group"`; the panel is `role="listbox"` with `role="option"` items (not `role="menu"`/`role="menuitem"`). Active locale highlighted with `text-amber-text font-semibold`. Own hand-rolled behavior (not `useDropdownMenu` — see "Listbox vs. menu pattern" below): closes on outside click and on Escape, arrow-key (`ArrowUp`/`ArrowDown`/`Home`/`End`) traversal between options, and Escape **returns focus to the trigger button**. Sits between ThemeToggle and login CTA in the nav bar.
+- **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), opens the `ES` / `EN` option list on click. This is a **listbox**, not a menu — a language picker is a single-select choice among options, not a set of commands. The trigger uses `aria-expanded` + `aria-haspopup="listbox"`; the container is `role="group"`; the panel is `role="listbox"` with `role="option"` items (not `role="menu"`/`role="menuitem"`). Active locale highlighted with `text-amber-text font-semibold`. Own hand-rolled behavior (not `useDropdownMenu` — see "Listbox vs. menu pattern" below): closes on outside click and on Escape, arrow-key (`ArrowUp`/`ArrowDown`/`Home`/`End`) traversal between options, and Escape **returns focus to the trigger button**. Precedes ThemeToggle and the login/user control in the nav bar.
 
 #### Listbox vs. menu pattern
 
@@ -264,7 +293,7 @@ A component whose items are alternatives the user picks one of (language, theme,
 
 `apps/web/components/SectionHeader.tsx` (#1214). A flex row with the
 `% chapa <command>` marker on the left and a right-aligned meta readout
-(`exit 0 · 5 results`, `3 steps · ~1 min`, `composite 82 · high`), and a
+(`exit 0 · 5 results`, `3 steps · ~1 min`), and a
 `border-stroke-strong` rule underneath. Both spans are `whitespace-nowrap`:
 the pair is one line of terminal output, and the row wraps as a whole instead
 of breaking either half. Pass `title` to put the real section name in the
@@ -294,9 +323,20 @@ Every tooltip/popover must be portal-rendered to `document.body` with `position:
 ### Terminal components
 
 - **TerminalOutput**: `role="log" aria-live="polite"`, monospace, color-coded by line type
-- **TerminalInput**: `chapa >` or `studio >` prompt in amber, blinking cursor, input with placeholder
+- **TerminalInput**: `chapa >` or `studio >` prompt, native editable input and history navigation; presentation context supplies page-theme or fixed ink colors.
 - **AutocompleteDropdown**: `role="listbox"`, shows on `/` keystroke, accent color on active item
-- **QuickControls**: Collapsible panel with clickable chips that insert terminal commands
+- **QuickControls**: Seven configuration groups drive the same Studio state and commands.
+
+### Studio
+
+The ice stage contains the canonical rendered SVG. Fit, 50% and 100% change only
+preview presentation and never enter saved config. At desktop sizes the controls
+and session form the workspace below the stage; narrow layouts stack and retain
+scroll access. The saved schema remains seven fields and six palettes: Ice, Jade,
+Indigo, Amber, Crimson and Mono. New/no-row/reset configs use Ice; saved rows
+missing a palette resolve to Jade, and explicit saved palette colors stay intact.
+The current renderer is `ice-terminal-v2` for every palette, with no selectable
+historical layout. See `docs/svg-design.md` for geometry and cache versioning.
 
 ### Images
 
@@ -320,25 +360,25 @@ Terminal dots: `bg-terminal-red/60`, `bg-terminal-yellow/60`, `bg-terminal-green
 
 ## Animations
 
-Defined in `globals.css`:
+Defined in `globals.css`; availability does not imply use in every redesigned section. Reduced-motion rules disable decorative motion, show inline badge activity immediately and retain the complete score ring. Badge SVG/static export behavior is specified in `docs/svg-design.md`.
 
 | Class | Effect | Duration |
 |-------|--------|----------|
 | `animate-fade-in-up` | Fade in + slide up 30px | 0.8s ease-out |
 | `animate-cursor-blink` | Step cursor blink | 1s infinite |
 | `animate-terminal-fade-in` | Fade in + slide up 8px | 0.3s ease-out |
-| `animate-pulse-glow-amber` | Soft pulsing accent shadow | 3s infinite |
+| `animate-pulse-glow-amber` | Historical name: neutral solid offset changes from 2px to 3px | 3s infinite |
 | `animate-float-slow` | Gentle vertical float + slight rotation | 6s infinite |
 | `animate-float-medium` | Medium vertical float + counter-rotation | 7.5s infinite |
 | `animate-float-fast` | Faster vertical float + stronger rotation | 5s infinite |
 | `animate-drift` | Multi-axis drift with 4 waypoints | 8s infinite |
 | `animate-shimmer` | Horizontal shimmer gradient (left to right) | 3s linear infinite |
-| `animate-shimmer-sweep` | Horizontal shimmer gradient (right to left) | 3s linear infinite |
+| `shimmer-sweep` (keyframe only) | Horizontal shimmer gradient (right to left) | (set per-element) |
 | `animate-scale-in` | Scale from 0.92 + fade in | 0.6s ease-out |
 | `animate-toast-out` | Scale to 0.95 + fade out + slide up 8px | 0.3s ease-in forwards |
 | `animate-gauge-fill` | SVG circular gauge stroke fill | 1.5s ease-out |
 | `animate-bar-fill` | Horizontal bar scale from 0 to target | 0.8s ease-out |
-| `animate-terminal-type` | Typewriter width expansion (0 to 100%) | (set per-element) |
+| `terminal-type` (keyframe only) | Typewriter width expansion (0 to 100%) | (set per-element) |
 | `.sparkline-animated polyline` | SVG polyline stroke trace via `--sparkline-length` | 0.6s ease-out |
 | `radar-expand` (keyframe only) | Scale from 0 + fade in (for radar chart polygons) | (set per-element) |
 | `animate-hex-cell-in` | Scale from 0.3 + fade in (hex grid cells) | 0.45s ease-out |
@@ -364,7 +404,7 @@ Defined in `globals.css`:
 
 ## Historical badge palettes
 
-The Jade palette and its five existing palette identifiers retain their colors.
+The five historical palette identifiers — Jade, Indigo, Amber, Crimson and Mono — retain their colors.
 The redesign's additive Ice palette and global layout version are documented in
 `docs/svg-design.md`. Badge output uses literal raster-compatible colors and one
 renderer; it never inherits page theme or CSS custom properties. The historical

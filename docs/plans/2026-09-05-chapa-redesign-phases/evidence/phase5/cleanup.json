@@ -1,0 +1,14 @@
+{
+  "redesignOwnedRows": "zero; bootstrap cleanup verified all owned tables",
+  "featureFlags": "restored by bootstrap; journey receipts separately verify exact restoration",
+  "journeyOwnedRows": 0,
+  "unexpectedUpstreamCalls": 0,
+  "appServer": "stopped",
+  "galleryServer": "stopped",
+  "referenceServer": "stopped",
+  "standaloneServer": "stopped",
+  "disposableSupabaseProject": "chapa-redesign",
+  "disposableSupabase": "stopped with no backup; no running matching containers",
+  "otherProjects": "untouched",
+  "push": "not executed"
+}

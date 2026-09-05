@@ -1,0 +1,430 @@
+{
+  "startedAt": "2026-09-05T12:25:42.471Z",
+  "baseURL": "http://127.0.0.1:3001",
+  "canonicalContentRoutes": [
+    "/",
+    "/about",
+    "/about/scoring",
+    "/about/verification",
+    "/privacy",
+    "/terms",
+    "/archetypes/builder",
+    "/archetypes/guardian",
+    "/archetypes/marathoner",
+    "/archetypes/polymath",
+    "/archetypes/artificer",
+    "/archetypes/balanced",
+    "/archetypes/emerging"
+  ],
+  "fixtureScope": "Public signed-out local build. Browser-only POST /api/generate returns401; no authenticated or valid-record coverage claimed here.",
+  "cases": [
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-en-light-1440.png",
+        "scoring-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatternPenaltyTriggerWhat it meansBurst activity-15100+ contributions in a single dayExtre"
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "What it means"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "Extreme daily spikes reduce timing confidence"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Micro-commits-1060%+ of commits are very smallMany tiny changes reduce signal clarity"
+        }
+      ],
+      "screenshots": [
+        "scoring-en-light-390.png",
+        "scoring-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-en-dark-1440.png",
+        "scoring-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatternPenaltyTriggerWhat it meansBurst activity-15100+ contributions in a single dayExtre"
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "What it means"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "Extreme daily spikes reduce timing confidence"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Micro-commits-1060%+ of commits are very smallMany tiny changes reduce signal clarity"
+        }
+      ],
+      "screenshots": [
+        "scoring-en-dark-390.png",
+        "scoring-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-es-light-1440.png",
+        "scoring-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatrónPenalizaciónDesencadenanteQué significaActividad en ráfaga-15100+ contribuciones en "
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Desencadenante"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Qué significa"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "100+ contribuciones en un solo día"
+        }
+      ],
+      "screenshots": [
+        "scoring-es-light-390.png",
+        "scoring-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-es-dark-1440.png",
+        "scoring-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatrónPenalizaciónDesencadenanteQué significaActividad en ráfaga-15100+ contribuciones en "
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Desencadenante"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Qué significa"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "100+ contribuciones en un solo día"
+        }
+      ],
+      "screenshots": [
+        "scoring-es-dark-390.png",
+        "scoring-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    }
+  ],
+  "archetypeSmoke": [],
+  "failures": [],
+  "finishedAt": "2026-09-05T12:25:49.891Z",
+  "passed": true
+}
