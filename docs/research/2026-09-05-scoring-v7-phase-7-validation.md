@@ -32,6 +32,7 @@ apps/web/lib/insights/validation.test.ts
 apps/web/lib/insights/scoring.test.ts
 apps/web/lib/insights/craft-v7.test.ts
 apps/web/lib/insights/report-v7.test.ts
+apps/web/lib/insights/use-insights-import.test.tsx
 apps/web/lib/db/craft-v7.test.ts
 apps/web/lib/db/tool-insights.test.ts
 apps/web/lib/cache/craft-v7-cache.test.ts
@@ -41,4 +42,4 @@ apps/web/app/api/insights/route-v7.test.ts
 apps/web/app/api/cron/warm-cache/route.test.ts
 ```
 
-The worker's directory selection reported 13 suites / 313 tests; the explicit path reconstruction above identifies 12 suites. The authoritative integration test and database counts above come directly from retained local logs.
+The worker's directory selection covered six insights suites (including the import hook's TSX suite) plus seven explicit paths: 13 suites / 313 tests. Integration test and database counts above come directly from retained local logs.

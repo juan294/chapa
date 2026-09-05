@@ -32,19 +32,19 @@ record exact artifacts and stop; do not push or deploy
 ```
 
 Automated/checkable acceptance:
-- [ ] A merged PR alone cannot become proof of deployment, adoption, reliability or business value.
-- [ ] A passing CI count alone cannot become meaningful-test or security proof; rationale/artifact evidence is required.
-- [ ] Revert/rework/incident links include attribution and observation horizon; missing counterevidence is not proof of no defects.
-- [ ] Design, documentation, mentoring, maintenance and incident recovery have first-class categories without requiring more LOC.
-- [ ] Self-attestation cannot impersonate independent corroboration; duplicate/linking activity creates no extra points.
-- [ ] Evidence accepted/rejected/unknown follows the published rubric with identical treatment of AI/manual work.
-- [ ] Ownership, redaction, SSRF-safe bounded URL handling, RLS and durable-write contract tests pass.
-- [ ] A documented authenticated API/fixture CLI supports owner core/Craft evidence submission (including no-AI/no-report), independent reviewer assessment, amendment/retraction and owner withdrawal; every path has a local end-to-end contract.
+- [x] A merged PR alone cannot become proof of deployment, adoption, reliability or business value.
+- [x] A passing CI count alone cannot become meaningful-test or security proof; rationale/artifact evidence is required.
+- [x] Revert/rework/incident links include attribution and observation horizon; missing counterevidence is not proof of no defects.
+- [x] Design, documentation, mentoring, maintenance and incident recovery have first-class categories without requiring more LOC.
+- [x] Self-attestation cannot impersonate independent corroboration; duplicate/linking activity creates no extra points.
+- [x] Evidence accepted/rejected/unknown follows the published rubric with identical treatment of AI/manual work.
+- [x] Ownership, redaction, SSRF-safe bounded URL handling, RLS and durable-write contract tests pass.
+- [x] A documented authenticated API/fixture CLI supports owner core/Craft evidence submission (including no-AI/no-report), independent reviewer assessment, amendment/retraction and owner withdrawal; every path has a local end-to-end contract.
 
 Manual/domain acceptance:
-- [ ] An independent reviewer reconciles this task with policy.md and the cited audit cases.
-- [ ] Any semantic/data-source limitation is visible in evidence coverage and public claims.
-- [ ] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
+- [x] An independent reviewer reconciles this task with policy.md and the cited audit cases.
+- [x] Any semantic/data-source limitation is visible in evidence coverage and public claims.
+- [x] No task criterion is moved past relaunch or closed with an unimplemented placeholder.
 
 
 ## Sequential local verification

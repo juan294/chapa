@@ -38,3 +38,23 @@ describe("Craft private storage", () => {
     expect(await dbPurgeExpiredCraftRawV7()).toBe(2);
   });
 });
+
+it("uses immutable ledger authority after revoke/regrant without accepting a forged snapshot", async () => {
+  const { ledgerFixture } = await import("@/lib/evidence/test-fixtures");
+  const { assessmentToRow } = await import("./scoring-v7-contract");
+  const { craftClaimToRow } = await import("./craft-v7");
+  const fixture = ledgerFixture();
+  const claim = fixture.claims[0]!.claim;
+  const original = fixture.assessments[0]!.assessment;
+  const assessment = { ...original, criterion: "verification_debugging" as const };
+  const authority = { version: "ledger-authority-v1", ownerId: "owner", evaluatorId: "reviewer", grantedAt: "2026-09-01T00:00:00Z", assessedAt: assessment.assessedAt, recordedAt: assessment.recordedAt };
+  const row = { ...assessmentToRow("owner", assessment), ledger_payload: { authorization: authority, facts: fixture.assessments[0]!.facts } };
+  const data = { evidence: [craftClaimToRow(claim, fixture.claims[0]!.occurredAt)], assessments: [row],
+    grants: [{ reviewer_handle: "reviewer", granted_at: "2026-09-04T00:00:00Z", revoked_at: null }],
+    references: [{ owner_handle: "owner", reference_id: "ref:1", retention: "until_owner_withdrawal" }] };
+  mocks.rpc.mockResolvedValue({ data, error: null });
+  const result = await dbReadCraftV7("owner", "owner", window);
+  expect(result.inputs.counts.verification_debugging.lower).toBe(1);
+  mocks.rpc.mockResolvedValue({ data: { ...data, assessments: [{ ...row, ledger_payload: { authorization: { ...authority, ownerId: "forged" } } }] }, error: null });
+  expect((await dbReadCraftV7("owner", "owner", window)).inputs.counts.verification_debugging.lower).toBe(0);
+});
