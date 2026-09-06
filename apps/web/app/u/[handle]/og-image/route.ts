@@ -141,6 +141,7 @@ export async function GET(
     const verification = getPublicProfileVerification(materialized);
 
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+      scoring: materialized.scoring,
       avatarDataUri,
       config: configSnapshot.config,
       verificationHash: verification?.hash,

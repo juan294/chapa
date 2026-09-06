@@ -37,6 +37,7 @@ import {
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -523,6 +524,7 @@ async function warmHandle(
           // a fallback design must not overwrite the public SVG cache.
           if (configSnapshot.cacheable) {
             const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+              scoring: materialized.scoring,
               avatarDataUri,
               // #1191 — the cron writes to the same cache slot as the request
               // path, so it must render the same config. Warming with the
@@ -579,6 +581,13 @@ async function warmHandle(
     } catch {
       // Snapshot recording is non-critical — don't fail the warm
     }
+
+    // #1311 — the recurring path that keeps a consented subject's issued v7
+    // receipt as current as the snapshot written above. Non-consented handles
+    // skip silently, which is every handle until its owner opts in, so this
+    // adds no work for the overwhelming majority of the warm list. Failures
+    // are captured inside the helper and never fail the warm.
+    await issueScoreReceiptIfConsented(handle);
 
     return { warmed: true, snapshotRecorded, notified };
   } catch (err) {

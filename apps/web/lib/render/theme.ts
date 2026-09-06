@@ -240,11 +240,19 @@ export function getHeatmapColor(
  * @param theme - Resolved badge theme; defaults to Ice
  * @returns A hex color string
  */
+/**
+ * A v7 range whose interval straddles a tier boundary earns no tier at all, so
+ * `null` is a real result here rather than a missing value: it takes the same
+ * neutral ink as Emerging, because the honest reading is "not labelled", not
+ * "labelled poorly".
+ */
 export function getTierColor(
-  tier: ImpactTier,
+  tier: ImpactTier | null,
   theme: BadgeTheme = WARM_AMBER,
 ): string {
   switch (tier) {
+    case null:
+      return theme.textSecondary;
     case "Emerging":
       return theme.textSecondary;
     case "Solid":
@@ -267,6 +275,6 @@ export function getTierColor(
  * @param archetype - The developer archetype label
  * @returns A hex color string unique to the archetype
  */
-export function getArchetypeColor(archetype: DeveloperArchetype): string {
-  return BADGE_ARCHETYPE_COLORS[archetype];
+export function getArchetypeColor(archetype: DeveloperArchetype | null, theme: BadgeTheme = WARM_AMBER): string {
+  return archetype === null ? theme.textSecondary : BADGE_ARCHETYPE_COLORS[archetype];
 }

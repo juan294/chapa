@@ -9,6 +9,8 @@ import {
   sameScoredRevision,
 } from "@/lib/profile/score-view-model";
 import type { ImpactV6Result } from "@chapa/shared";
+import { renderBadgeSvg } from "./BadgeSvg";
+import { DEMO_STATS } from "./demoData";
 
 /**
  * S15 acceptance: badge, share page, public API, explanation and simulation
@@ -85,5 +87,66 @@ describe("one revision, one set of rendered numbers", () => {
     expect(sameScoredRevision(before, after)).toBe(false);
     expect(after.identity!.supersedesRevisionId).toBe(before.identity!.revisionId);
     expect(renderableScore(after)).not.toEqual(renderableScore(before));
+  });
+});
+
+/**
+ * The cutover regression. The badge is the artifact people embed, so it is the
+ * surface where a wrong policy version does the most damage: a v7 range drawn
+ * as a v6 point publishes a claim the evidence does not support, and a v6
+ * aggregate drawn as v7 explains legacy arithmetic that never ran.
+ */
+describe("badge SVG renders the resolved policy version", () => {
+  const stats = DEMO_STATS;
+  /** The badge still takes a v6 impact; with a v7 model supplied every drawn
+   *  magnitude comes from the model, so these values must never surface. */
+  const unusedLegacy: ImpactV6Result = {
+    handle: "alice", profileType: "collaborative",
+    dimensions: { delivery: 1, quality: 2, consistency: 3, breadth: 4 },
+    archetype: "Emerging", compositeScore: 3, confidence: 50, confidencePenalties: [],
+    adjustedComposite: 3, tier: "Emerging", computedAt: "2026-09-01T12:00:00.000Z",
+  };
+
+  it("draws a v6 aggregate unchanged, with its Craft axis intact", () => {
+    const impact: ImpactV6Result = {
+      handle: "alice", profileType: "collaborative",
+      dimensions: { delivery: 61, quality: 72, consistency: 55, breadth: 40, craft: 66 },
+      archetype: "Builder", compositeScore: 57, confidence: 90, confidencePenalties: [],
+      adjustedComposite: 57, tier: "Solid", computedAt: "2026-09-01T12:00:00.000Z",
+    };
+
+    const svg = renderBadgeSvg(stats, impact);
+
+    expect(svg).toContain(">57<");
+    expect(svg).toContain("Solid");
+    expect(svg).toContain("Builder");
+    // Five axes: Craft is a core dimension under v6 semantics.
+    expect(svg).toContain("Craft");
+  });
+
+  it("prints a v7 evidence range as an interval, and refuses to guess an archetype", async () => {
+    const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 9, undefined, true), null);
+    const model = receiptViewModel("alice", snapshot);
+    expect(model.composite.kind).toBe("range");
+    // Any non-point dimension forbids a definitive archetype.
+    expect(model.archetype).toBeNull();
+
+    const svg = renderBadgeSvg(stats, unusedLegacy, { scoring: model });
+
+    const composite = model.composite as { displayLower: number; displayUpper: number };
+    expect(svg).toContain(`${composite.displayLower}\u2013${composite.displayUpper}`);
+    expect(svg).toContain("insufficient evidence");
+    // Craft is never a core axis under v7, so the radar stays a diamond.
+    expect(svg).not.toContain("Craft");
+  });
+
+  it("shows no tier when the evidence interval straddles a tier boundary", async () => {
+    const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 9, undefined, true), null);
+    const straddling = { ...receiptViewModel("alice", snapshot), tier: null };
+
+    const svg = renderBadgeSvg(stats, unusedLegacy, { scoring: straddling });
+
+    expect(svg).toContain("evidence range");
+    for (const tier of ["Emerging", "Solid", "High", "Elite"]) expect(svg).not.toContain(`>${tier}<`);
   });
 });

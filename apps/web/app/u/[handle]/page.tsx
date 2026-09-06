@@ -265,6 +265,9 @@ export async function SharePageContent({
     const configSnapshot = await resolveBadgeConfigSnapshot(handle);
     configCacheable = configSnapshot.cacheable;
     inlineSvg = renderBadgeSvg(stats, impact, {
+      // `impact` is non-null here only because `materialized` was; the optional
+      // read keeps the compiler honest and falls back to the same legacy model.
+      scoring: materialized?.scoring,
       avatarDataUri,
       // #1191 — this render writes to the same cache slot the badge route
       // reads, so it must use the same config.

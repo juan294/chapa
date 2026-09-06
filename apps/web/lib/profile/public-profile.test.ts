@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeFullStats, makeImpact, makeSnapshot } from "../test-helpers/fixtures";
 import type { MaterializedProfile } from "./materialize-profile";
+import { legacyViewModel } from "./score-view-model";
 import {
   deferProfileCacheWork,
   getPublicProfileVerification,
@@ -116,6 +117,16 @@ function makeMaterializedProfile(): MaterializedProfile {
     }),
     inputsChanged: false,
     statsComplete: true,
+    scoring: legacyViewModel({
+      handle: "testuser",
+      profileType: "collaborative",
+      compositeScore: 73,
+      adjustedComposite: 65,
+      tier: "Solid",
+      computedAt: "2026-04-17T12:00:00.000Z",
+      dimensions: { delivery: 70, quality: 68, consistency: 74, breadth: 66 },
+      archetype: "Builder",
+    }),
   };
 }
 

@@ -335,6 +335,7 @@ async function finalizeMaterializedBadge(
 
   const renderStart = Date.now();
   const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+    scoring: materialized.scoring,
     avatarDataUri,
     config: configSnapshot.config,
     verificationHash: verification?.hash,

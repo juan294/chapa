@@ -7,6 +7,7 @@ import {
 } from "@/lib/evidence/workflow-state";
 import { dbReadEngineeringEvidence } from "@/lib/db/engineering-evidence";
 import { createScoringWindow } from "@chapa/shared";
+import { PublicationConsent } from "./PublicationConsent";
 
 const STATE_STYLE: Record<EvidenceWorkflowState, string> = {
   pending: "border-terminal-yellow/30 bg-terminal-yellow/10 text-terminal-yellow",
@@ -36,8 +37,11 @@ export async function EvidenceWorkflow({ handle, locale }: { handle: string; loc
   const owner = handle.toLowerCase();
 
   let items: ReturnType<typeof evidenceWorkflowItems> = [];
+  let publicConsent = false;
   try {
-    items = evidenceWorkflowItems(await dbReadEngineeringEvidence(owner, owner, createScoringWindow(new Date().toISOString())));
+    const snapshot = await dbReadEngineeringEvidence(owner, owner, createScoringWindow(new Date().toISOString()));
+    items = evidenceWorkflowItems(snapshot);
+    publicConsent = snapshot.publicConsent;
   } catch {
     // A ledger read failure must not take the whole settings page down; the
     // empty state below is honest about showing nothing.
@@ -83,6 +87,10 @@ export async function EvidenceWorkflow({ handle, locale }: { handle: string; loc
       <p className="mt-2 text-sm text-text-secondary">
         {t(summary.craftPortfolioEmpty ? "settings.evidenceCraftEmpty" : "settings.evidenceCraftPresent") as string}
       </p>
+
+      <div className="mt-8">
+        <PublicationConsent handle={owner} initialConsent={publicConsent} />
+      </div>
     </section>
   );
 }

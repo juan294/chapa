@@ -4,6 +4,7 @@ import {
   materializeImpactState,
   type MaterializedProfile,
 } from "./materialize-profile";
+import { legacyViewModel } from "./score-view-model";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -50,6 +51,7 @@ function makeMaterializedProfile(): MaterializedProfile {
   return {
     stats,
     ...impactState,
+    scoring: legacyViewModel(impactState.displayImpact),
   };
 }
 
