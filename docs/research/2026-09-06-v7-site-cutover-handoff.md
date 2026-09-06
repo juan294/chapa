@@ -388,3 +388,53 @@ Do not enable until all of these hold:
 
 This is the RPI scope. It should be planned as phases, not grown further on
 this branch.
+
+---
+
+## 10. Production compatibility (2026-09-06, judging period)
+
+Constraint stated by the user: judges are looking at the deployed project and
+no fix of any kind can be released, so nothing here may require a change to the
+production database.
+
+### 10.1 Nothing on this branch is deployed or deployable by accident
+
+`origin/develop` is 39 commits behind local `develop`. The entire v7 stack —
+migrations `039`–`048`, the evidence ledger, receipts, verification, the
+collectors — is unpushed, and `main` (production) is older still. This branch
+has never been pushed. Reaching production would require a push, a PR to
+`main`, a merge and a deploy, none of which have happened.
+
+### 10.2 Production has never seen the v7 schema
+
+`CLAUDE.md` records it and the migration history confirms it: production runs
+without migrations `039`–`048`, which is why a local stack pointed at the
+production project 502s on the missing v7 tables. Any code path that queries
+`scoring_v7_*` would therefore fail in production today.
+
+### 10.3 What this branch touches, and whether the flag protects it
+
+| Path | Touches a v7 table | Gated by `scoring_v7_rendering` | Introduced here |
+| --- | --- | --- | --- |
+| `readRenderableReceipt` (badge, OG, share, cron) | yes | **yes** — returns `null` without a query | yes |
+| `issueScoreReceiptIfConsented` (generate/refresh/recalculate/cron) | yes | **yes** — returns before the materializer | yes |
+| `PublicationConsent` opt-in (settings) | yes, a write | **yes** — not rendered when off | yes |
+| `EvidenceWorkflow` ledger read (settings) | yes | no | **no** — pre-existing (S12) |
+| `/api/profile/:handle` receipt read | yes | no | **no** — pre-existing (S15) |
+
+With the flag off, this branch issues no query against any `scoring_v7_*`
+table. The two unflagged readers predate it and are unchanged; both already
+fail closed (a `try/catch` returning an empty ledger, and a `null` receipt).
+
+### 10.4 The only migration added here is production-safe, and should still wait
+
+`049_seed_scoring_v7_rendering_flag.sql` inserts one row into `feature_flags`,
+a table production already has, with `ON CONFLICT DO NOTHING` and
+`enabled = false`. It creates no table, alters no column and changes no
+behaviour: the row it writes matches the default the code already falls back
+to.
+
+It is nonetheless part of an unpushed stack that also carries `039`–`048`, and
+must not be applied to production on its own or as part of that stack during
+judging. Migrations `039`–`048` are the ones that would matter, and none of
+them should run until the release procedure does.
