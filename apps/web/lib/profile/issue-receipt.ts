@@ -1,6 +1,7 @@
 import "server-only";
 import { materializeScoreReceiptV7 } from "./score-receipt-v7";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { isScoringV7RenderingEnabled } from "@/lib/feature-flags";
 
 /**
  * Issue a v7 receipt for a subject who has consented to publication.
@@ -21,6 +22,11 @@ export async function issueScoreReceiptIfConsented(
   handle: string,
   options: { token?: string; referenceTime?: string } = {},
 ): Promise<"issued" | "skipped" | "failed"> {
+  // Gated with the render half. Issuing while nothing renders a receipt would
+  // mint durable public artifacts no surface shows — and the warm-cache cron
+  // would mint a fresh `revision: 1` every hour, with no revision chain.
+  if (!(await isScoringV7RenderingEnabled())) return "skipped";
+
   try {
     const result = await materializeScoreReceiptV7(handle, options);
     if (result.status === "issued") return "issued";

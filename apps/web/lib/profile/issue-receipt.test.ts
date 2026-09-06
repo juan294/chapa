@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("./score-receipt-v7", () => ({ materializeScoreReceiptV7: vi.fn() }));
+const isScoringV7RenderingEnabled = vi.fn();
+vi.mock("@/lib/feature-flags", () => ({ isScoringV7RenderingEnabled: () => isScoringV7RenderingEnabled() }));
 const captureServerError = vi.fn();
 vi.mock("@/lib/analytics/server-errors", () => ({ captureServerError: (...a: unknown[]) => captureServerError(...a) }));
 
@@ -10,6 +12,7 @@ import { issueScoreReceiptIfConsented } from "./issue-receipt";
 beforeEach(() => {
   vi.mocked(materializeScoreReceiptV7).mockReset();
   captureServerError.mockReset();
+  isScoringV7RenderingEnabled.mockReset().mockResolvedValue(true);
 });
 
 describe("issueScoreReceiptIfConsented", () => {
@@ -35,5 +38,14 @@ describe("issueScoreReceiptIfConsented", () => {
     vi.mocked(materializeScoreReceiptV7).mockRejectedValue(new Error("boom"));
     expect(await issueScoreReceiptIfConsented("alice")).toBe("failed");
     expect(captureServerError).toHaveBeenCalledOnce();
+  });
+});
+
+describe("the scoring_v7_rendering gate", () => {
+  it("mints nothing while the flag is off", async () => {
+    isScoringV7RenderingEnabled.mockResolvedValue(false);
+
+    expect(await issueScoreReceiptIfConsented("alice")).toBe("skipped");
+    expect(materializeScoreReceiptV7).not.toHaveBeenCalled();
   });
 });

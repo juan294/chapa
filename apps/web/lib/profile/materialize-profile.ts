@@ -10,8 +10,7 @@ import {
   type SnapshotScoreInput,
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
-import { scoreModelFrom } from "./score-model";
-import { readScoreReceiptV7 } from "./score-receipt-v7";
+import { readRenderableReceipt, scoreModelFrom } from "./score-model";
 import type { ScoreViewModel } from "./score-view-model";
 import { getStats } from "@/lib/github/client";
 import { isValidLegacyStats } from "@/lib/github/stats-integrity";
@@ -174,7 +173,7 @@ export async function materializeDisplayProfile(
 ): Promise<MaterializedDisplayProfile | null> {
   const [inputs, receipt] = await Promise.all([
     loadDisplayInputs(handle, options.token, options.readOnly ?? false),
-    readScoreReceiptV7(handle),
+    readRenderableReceipt(handle),
   ]);
   if (!inputs) return null;
 
@@ -206,7 +205,7 @@ export async function materializeProfile(
       // #1311 — the issued v7 receipt, read alongside stats rather than after
       // them. A failed read falls back to the labelled v6 aggregate, which is
       // the same answer this surface gave before a receipt existed.
-      readScoreReceiptV7(handle),
+      readRenderableReceipt(handle),
     ]);
 
   const displayInputs =

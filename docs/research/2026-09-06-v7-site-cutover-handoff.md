@@ -2,7 +2,13 @@
 
 Date: 2026-09-06
 Branch: `feature/v7-site-cutover`
-Commit: `88891334` — *feat(scoring): render and issue v7 receipts across the site (Refs #1311, #1312)*
+Commits: `88891334` (cutover), `81ece18e` (this doc), `dea4eb54` (label fix),
+plus the flag commit below.
+
+> **Status after independent review (2026-09-06): the runtime is OFF by
+> default behind `scoring_v7_rendering`.** The review found that the cutover
+> reached the badge and nothing else, so enabling it would publish two
+> different numbers for one revision. See §9.
 Base: `develop` @ `548940d3`
 
 This document exists so an independent agent can validate the change without
@@ -277,3 +283,83 @@ and five test files.
    `/about/scoring` copy, EN and ES, for arithmetic accuracy.
 5. Decide whether §7.1/§7.2 are acceptable, or whether this should sit behind a
    flag until S18 and S19 complete.
+
+---
+
+## 9. Independent review outcome, and the flag
+
+An independent agent reviewed this branch and returned **not ready for
+production**. The verdict was correct, and §3–§7 above under-stated the
+problem: the handoff described the cutover as complete when it reached one
+surface.
+
+### 9.1 Confirmed findings
+
+All verified at the cited lines.
+
+| # | Finding | Status |
+| --- | --- | --- |
+| 1 | Share page header (`page.tsx:435`), JSON-LD description (`:373`) and the owner dashboard/breakdown/explanation panel all read the v6 impact while the badge above them draws v7 | **Open** |
+| 2 | Every caller passed `stringsFor(displayImpact.tier)`, and the renderer preferred that label whenever the v7 tier was non-null, so a v7 core printed a v6 tier word; the two v7-only labels were supplied by nobody and fell back to English in Spanish | **Fixed** — `dea4eb54` |
+| 3 | The verification HMAC is still generated from `displayImpact` (`public-profile.ts:66`), so a v7 badge's strip resolves to a record carrying v6 numbers | **Open** |
+| 4 | `getLeaderboard` reads `displayImpact.adjustedComposite` (`leaderboard.ts:75`) and `headline_score` is the v6 headline, so board and badge disagree; the public API's `displayScore` has the same problem | **Open** |
+| 5 | `BadgePreviewCard.tsx:64` renders without `scoring`, so an owner customizes a v6 preview of a badge that publishes as v7 | **Open** |
+| 6 | `getCachedReceiptSnapshotV7` hits the Supabase manifest RPC before Redis, and a null result costs a second RPC — on every badge cache miss, for handles that are almost all unconsented | **Open** (mitigated: the flag skips the read entirely while off) |
+| 7 | The cron renders from the receipt read at materialization and issues afterwards, so the cached badge lags one issuance; worse, `materializeScoreReceiptV7` always mints `revision: 1` with no supersedes link, so an hourly cron would produce ~24 unchained receipts per consented user per day, each with a fresh verification token | **Open** (mitigated: the flag blocks issuance) |
+| 8 | Granting consent issues nothing; settings says publication is on while the badge stays v6 until the next refresh or warm-cache pass | **Open** |
+
+Findings 1, 3, 4 and 5 are one defect repeated: the same revision publishing
+two numbers, which is precisely what `score-model.ts`'s own comment says the
+resolver exists to prevent.
+
+The reviewer also found that v6 byte-identity (§5.1) holds for 20 of 25
+rendered combinations. The five that differ are static renders with a
+translated tier: the accessible `<desc>` now prints the caller's translated
+label instead of the raw English tier. That was my change and I did not flag
+it. It is the same caller-supplied label as finding 2 and is now resolved from
+the drawn model.
+
+One reviewer claim did **not** reproduce: a reported single test failure. Three
+full runs on this branch were clean (9155, then 9158, then 9160 with the new
+regressions). Treat it as flaky.
+
+### 9.2 The flag
+
+`scoring_v7_rendering` — DB-backed via `checkFlag`, env fallback
+`SCORING_V7_RENDERING_ENABLED`, **off by default**, server-only.
+
+It gates **both** halves deliberately:
+
+- `readRenderableReceipt` returns `null` while off, so `materializeProfile`
+  never reads a receipt. Finding 6's cost does not arise, because the read
+  does not happen.
+- `issueScoreReceiptIfConsented` returns `"skipped"` before calling the
+  materializer, so nothing durable is minted. Finding 7's unchained hourly
+  receipts cannot occur.
+
+With it off, every surface shows the same v6 aggregate it always did, and the
+branch is inert apart from the `/about/scoring` copy, which is correct v7
+documentation of the policy the code implements.
+
+### 9.3 Conditions for turning it on
+
+Do not enable until all of these hold:
+
+1. Findings 1, 3, 4, 5 closed — share header, JSON-LD, verification HMAC,
+   leaderboard, public API headline and Studio preview all read
+   `ScoreViewModel`.
+2. Finding 7 closed — receipts form a revision chain (`supersedesRevisionId`,
+   incrementing `revision`) instead of minting a new root per pass, and the
+   cron issues before it renders.
+3. Finding 8 closed — granting consent issues a receipt synchronously, so the
+   settings state and the badge agree immediately.
+4. Finding 6 addressed — Redis before Supabase, and one RPC rather than two on
+   a miss.
+5. A v7 badge has actually been looked at: a ranged fixture rendered, the
+   five-character headline rasterized through the OG path, and the badge
+   latency budget re-measured with the receipt read enabled.
+6. The S18 pilot and the S19 migration rehearsal resolved, or an explicit
+   decision to proceed without them.
+
+This is the RPI scope. It should be planned as phases, not grown further on
+this branch.

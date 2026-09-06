@@ -1,6 +1,7 @@
 import "server-only";
 import type { ClientImpactV6Result } from "@chapa/shared";
 import { readScoreReceiptV7 } from "./score-receipt-v7";
+import { isScoringV7RenderingEnabled } from "@/lib/feature-flags";
 import type { ReceiptSnapshotV7 } from "@/lib/history/snapshot";
 import { legacyViewModel, receiptViewModel, type ScoreViewModel } from "./score-view-model";
 
@@ -23,7 +24,18 @@ export async function resolveScoreModel(
   handle: string,
   impact: ClientImpactV6Result,
 ): Promise<ScoreViewModel> {
-  return scoreModelFrom(handle, impact, await readScoreReceiptV7(handle));
+  return scoreModelFrom(handle, impact, await readRenderableReceipt(handle));
+}
+
+/**
+ * The receipt a rendering surface is allowed to draw, or `null`.
+ *
+ * Gated by `scoring_v7_rendering`, which is off by default. While it is off
+ * this never reads Supabase at all, so the cutover costs no latency on the
+ * badge path it is not yet serving.
+ */
+export async function readRenderableReceipt(handle: string): Promise<ReceiptSnapshotV7 | null> {
+  return (await isScoringV7RenderingEnabled()) ? readScoreReceiptV7(handle) : null;
 }
 
 /**

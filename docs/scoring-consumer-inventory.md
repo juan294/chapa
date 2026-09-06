@@ -134,6 +134,12 @@ score has far more surfaces than a badge does.
 | `apps/web/app/experiments/number-counters/page.tsx` | `apps/web/lib/profile/score-view-model.test.ts` |
 | `apps/web/app/experiments/tier-visuals/_components/tier-data.ts` | `apps/web/lib/profile/score-view-model.test.ts` |
 
+### feature flags
+
+| Consumer | Shared-receipt regression |
+| --- | --- |
+| `apps/web/lib/feature-flags.ts` | `apps/web/lib/feature-flags.test.ts` |
+
 ### global command bar
 
 | Consumer | Shared-receipt regression |

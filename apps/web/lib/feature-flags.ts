@@ -17,6 +17,7 @@ import { withTimeout } from "./async/with-timeout";
 import {
   getExperimentsEnabledEnv,
   getMcpServerEnabledEnv,
+  getScoringV7RenderingEnabledEnv,
 } from "@/lib/env";
 import {
   isStudioEnabledSync,
@@ -136,6 +137,32 @@ export async function isStudioDemoEnabled(): Promise<boolean> {
     "studio_demo_enabled",
     isStudioDemoEnabledSync() ? "true" : undefined,
   );
+}
+
+/**
+ * Check whether the site renders and issues Impact v7 receipts.
+ *
+ * Off by default, and deliberately gating BOTH halves of the cutover. With it
+ * off, `materializeProfile` does not read a receipt and the write paths do not
+ * issue one, so every surface keeps showing the same v6 aggregate it always
+ * did and no durable v7 artifact is minted.
+ *
+ * It exists because the cutover currently reaches the badge only: the share
+ * page header, the JSON-LD, the verification HMAC, the leaderboard, the public
+ * API headline and the Studio preview all still read the v6 aggregate. Turning
+ * this on before those surfaces read the shared model would publish two
+ * different numbers for one revision — the exact failure `score-model.ts`
+ * exists to prevent.
+ *
+ * Do not enable it until every surface in `docs/scoring-consumer-inventory.md`
+ * reads `ScoreViewModel`, and until receipt revisions form a chain rather than
+ * minting a fresh `revision: 1` per warm-cache pass.
+ *
+ * @returns `true` if the `scoring_v7_rendering` flag is on in DB or
+ *   `SCORING_V7_RENDERING_ENABLED` is `"true"`
+ */
+export async function isScoringV7RenderingEnabled(): Promise<boolean> {
+  return checkFlag("scoring_v7_rendering", getScoringV7RenderingEnabledEnv());
 }
 
 /**

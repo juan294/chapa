@@ -48,6 +48,13 @@ vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
+// The route issues a v7 receipt behind `scoring_v7_rendering`. Mocking the
+// flag module keeps this route test off the DB-backed flag machinery (and its
+// `unstable_cache`) and states the gate's position explicitly instead.
+vi.mock("@/lib/feature-flags", () => ({
+  isScoringV7RenderingEnabled: () => Promise.resolve(false),
+}));
+
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: (...args: unknown[]) =>
     mockMaterializeOrchestratedProfile(...args),
