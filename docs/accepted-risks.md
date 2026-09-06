@@ -246,6 +246,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## Profile type threshold boundary (0.15 review-to-PR ratio)
 
+> **Superseded for v7 (#1312).** v7 has no solo/collaborative switch: Quality
+> practices is one of four fixed dimensions at 0.25 each, counted from
+> demonstrated rationale, verification, review-or-correction and outcome
+> follow-up, and it is never excluded from the composite. This entry remains as
+> the accurate record of v6 behaviour, which v6 records still carry. See
+> `docs/impact-v7.md`.
+
 - **Risk:** A developer with exactly 15% review rate sits on the solo/collaborative boundary. Crossing the threshold changes which Quality formula is used and whether Quality is included in the composite.
 - **Mitigation:** The threshold is intentionally conservative (solo-favoring) because the collaborative path has a much stronger impact on scores. Edge cases near the boundary will see modest score changes when crossing. The threshold (0.15) is a shared constant (`SOLO_REVIEW_RATIO_THRESHOLD`) that can be tuned.
 - **Severity:** Low
@@ -254,6 +261,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 ---
 
 ## Per-platform quality-signal availability
+
+> **Superseded for v7 (#1312).** v7 does not silently absorb a source gap into
+> a lower score. A connected source that could not be fully read stays in scope
+> with its own incomplete coverage, and the affected dimensions publish an
+> evidence-completion range whose bounds contain every admissible completion.
+> The gap is disclosed in the receipt rather than mitigated by a panel note.
+> This entry remains as the accurate record of v6 behaviour.
 
 - **Risk:** PR-description, feature-branch, issue-linkage, batch-size, and lead-time signals are computed only from GitHub. GitLab, Bitbucket, and Codeberg do not expose them, so a profile whose merged work is mostly on those platforms has a Quality dimension based on limited data. For solo profiles, Quality is display-only and excluded from the composite.
 - **Mitigation:** The share-page "How is my score calculated" panel states this per platform. Quality is never counted in the solo composite, so the gap does not depress the headline score for solo developers.

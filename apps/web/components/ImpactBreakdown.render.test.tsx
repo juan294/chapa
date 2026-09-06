@@ -278,7 +278,10 @@ describe("getArchetypeProfile — Artificer archetype", () => {
       dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 30, craft: 92 },
     };
     const result = getArchetypeProfile(impact, tEn);
-    expect(result).toContain("defined by craft");
+    // v7 (#1312): Artificer is an optional Craft descriptor beside the core
+    // archetype, not a dominant dimension, and it describes recorded practice.
+    expect(result).toContain("optional Craft descriptor");
+    expect(result).toContain("not proven ability");
     // Weakest is breadth (30)
     expect(result).toContain("Breadth");
   });

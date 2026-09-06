@@ -8,27 +8,83 @@ This is the extended documentation for AI models and LLM crawlers. For a concise
 
 ## Overview
 
-Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Badges marked "Verified metrics" include a cryptographic verification hash (HMAC-SHA256) proving the data has not been tampered with. Badges marked "Public metrics" do not claim cryptographic attestation.
+Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes the last 365 calendar days across four core dimensions of equal weight, and reports a separate optional Craft practice portfolio beside them. Badges marked "Verified metrics" carry an HMAC-SHA256 hash showing the badge was issued by Chapa and has not been modified since; it does not establish that the underlying platform data is accurate. Badges marked "Public metrics" do not claim cryptographic attestation.
 
-## Scoring Model: Impact v6
+## Scoring Model: Impact v7
 
-### Core Dimensions (each scored 0-100)
+Chapa reports an **observed engineering activity and practices index** over a
+declared evidence scope. It does not certify ability, causal business impact,
+architecture, reliability or security. "Complete" means complete for the
+connected, consented sources and the reference window named in the receipt —
+never all work a person has done.
 
-1. **Delivery** — Measures shipping capability. Inputs: pull requests merged, issues closed, commit frequency. A ±5% flow efficiency modifier rewards fast PR turnaround (median creation-to-merge time). A high Delivery score indicates a developer who consistently ships meaningful changes.
+### The window
 
-2. **Quality** — Measures engineering discipline. For collaborative developers (review-to-PR ratio ≥ 15%), inputs are code reviews submitted and review-to-PR ratio. For solo developers (ratio < 15%), inputs are PR description rate, feature branch usage, issue linkage, and batch size score (fraction of PRs in the 20-500 line reviewable sweet spot). A high Quality score indicates someone who actively maintains engineering standards.
+One reference time is captured per scoring run. The window is the reference UTC
+date plus the preceding 364 UTC dates: 365 calendar dates including a partial
+current day, not a trailing 8760-hour interval. Every API response, receipt,
+snapshot and trend key carries that same context.
 
-3. **Consistency** — Measures sustained contribution over time. Inputs: active days (sqrt curve), heatmap evenness (weekly distribution with outlier clipping), and week coverage (fraction of weeks with any activity). A high Consistency score means reliable, regular contributions across weeks.
+### Core dimensions (four, each weighted 0.25)
 
-4. **Breadth** — Measures cross-project influence. Inputs: number of distinct repositories contributed to, diversity of organizations, contributions outside owned repos. A high Breadth score indicates influence across multiple projects and teams.
+Let N(x, c) = ln(1 + min(x, c)) / ln(1 + c).
 
-### Optional Fifth Dimension
+1. **Delivery** — D = 100 x N(delivery units, 120). A delivery unit is a
+   distinct (project, UTC date) pair containing at least one attributable
+   accepted change. Changed lines, files, PR count within the same project and
+   day, tool usage and merge latency have zero effect.
 
-5. **Craft** — Measures AI tool collaboration patterns. Computed from Claude Code usage insights when a developer imports their usage report. A high Craft score indicates deliberate, effective human-AI partnership.
+2. **Quality practices** — Q = 25 x (N(rationale, 12) + N(verification, 12) +
+   N(review or correction, 12) + N(outcome follow-up, 12)). These count
+   demonstrated practices, not software correctness rates. A work item can
+   qualify once per criterion; duplicate comments, approval clicks and reruns
+   add nothing.
 
-### Composite Score
+3. **Consistency** — C = 100 x N(active ISO weeks, 40). No weekend, burst or
+   response-speed penalty, and no tenure normalization: identical evidence with
+   only the account creation date changed scores identically.
 
-The composite score (0-100) is the average of all dimensions (4 or 5). It is further adjusted by confidence to produce an adjusted score. The adjusted score determines the tier.
+4. **Breadth** — B = 50 x N(eligible projects, 4) + 50 x N(eligible categories,
+   4). Stars, forks, watchers, repository concentration and changed-line
+   magnitude carry zero weight.
+
+For complete evidence, core = (D + Q + C + B) / 4. No optional Craft, solo
+switch, confidence deduction or recency multiplier enters that formula. The
+caps and thresholds above are published product choices, not measured
+percentiles.
+
+### Evidence-completion ranges
+
+Where coverage is incomplete, each count carries a lower bound from known
+observations and an upper bound from the completions the recorded coverage
+allows. The published interval contains every admissible completion. It is an
+evidence-completion range, not a statistical confidence interval, and it does
+not imply a developer's true ability lies within it. A range receives a tier
+only if the whole interval sits inside one tier; a non-point dimension set
+receives no definitive archetype.
+
+### Separate optional Craft
+
+K = 25 x (N(framing, 8) + N(verification/debugging, 8) + N(tool judgment, 8) +
+N(accepted outcome, 8)), over deduplicated work-item episodes assessed against
+the published rubric by an accountable reviewer.
+
+Craft is reported beside the core and never enters it. An absent, expired or
+withdrawn portfolio changes Craft alone. Tool name, tokens, lines, files,
+message counts, agent counts, parallel usage and reply speed receive zero
+automatic credit; choosing not to use or to constrain a tool demonstrates
+judgment the same way using one does, and a developer who uses no AI tool can
+submit a full practice portfolio. An optional Artificer descriptor requires a
+complete Craft point of at least 60 and at least one independently corroborated
+episode satisfying all four criteria.
+
+### Receipts
+
+Each scored revision issues an immutable public receipt containing every
+aggregate, coverage bound and rubric result needed to replay the arithmetic
+offline. It excludes private paths, repository names, report contents, tokens
+and evaluator identities. Public replay validates arithmetic over the issued
+aggregates; it does not establish private-source truth.
 
 ### Tiers
 
@@ -45,7 +101,7 @@ Based on the shape of the dimension radar chart, each developer is assigned one 
 - **Quality Champion**: Dominant in Quality. Reviews code rigorously, provides thorough feedback. The team's quality gatekeeper.
 - **Marathoner**: Dominant in Consistency. Shows up reliably week after week. Steady, dependable contributor.
 - **Polymath**: Dominant in Breadth. Works across many repos, orgs, and project boundaries. A cross-team collaborator.
-- **Artificer**: Dominant in Craft. Master of AI tool collaboration, amplifies output while maintaining quality through deliberate human-AI partnership.
+- **Artificer**: An optional Craft descriptor, not a core archetype. Requires a complete Craft point of at least 60 and at least one independently corroborated episode satisfying all four practice criteria, including an accepted outcome.
 - **Balanced**: No single dominant dimension — all are closely matched and collectively strong. A versatile, well-rounded contributor.
 - **Emerging**: Low overall activity or new to contribution. The starting point for developers building their profile.
 

@@ -12,12 +12,12 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 
 ## Key Concepts
 
-- **Impact v6 Profile**: A composite developer impact score (0-100) based on four core dimensions — Delivery, Quality, Consistency, and Breadth — plus an optional fifth Craft dimension (AI tool mastery), computed from 12 months of public development activity across linked platforms.
-- **Dimensions**: Delivery measures shipping (PRs merged, issues closed, flow efficiency). Quality measures engineering discipline (code reviews for teams, PR hygiene for solo devs). Consistency measures sustained contributions across weeks. Breadth measures cross-project influence. Craft (optional) measures AI tool collaboration patterns.
+- **Impact Profile**: An observed engineering activity and practices index (0-100) over four core dimensions of equal weight — Delivery, Quality practices, Consistency, and Breadth — computed from the last 365 calendar days of development activity across linked platforms, within a declared evidence scope. It is not a measure of ability, and complete means complete for that declared scope, not all work a person has done. A separate optional Craft practice portfolio is reported beside it and never changes the core.
+- **Dimensions**: Delivery counts distinct project/day buckets containing accepted work. Quality practices counts demonstrated rationale, verification, review-or-correction and outcome follow-up. Consistency counts active ISO weeks. Breadth counts eligible projects and eligible work categories. Craft (optional, separate) records assessed engineering practice: framing, verification and debugging, tool judgment, and accepted outcome. Tool name, token counts, message counts and session counts earn no credit anywhere.
 - **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
 - **Tier System**: Four tiers based on adjusted score — Emerging (0-29), Solid (30-69), High (70-84), and Elite (85-100).
-- **Confidence Rating**: A quality signal (50-100) based on data diversity and consistency.
-- **Badge Verification**: Badges marked "Verified metrics" include a cryptographic HMAC-SHA256 hash proving data authenticity. Badges marked "Public metrics" do not claim cryptographic attestation.
+- **Evidence completion ranges**: Where source coverage is incomplete, a dimension is published as a range whose bounds contain every admissible completion. This is an evidence-completion range, not a statistical confidence interval, and it says nothing about where a developer's true ability lies. A range that spans a tier boundary receives no tier.
+- **Badge Verification**: Badges marked "Verified metrics" carry an HMAC-SHA256 hash showing the badge was issued by Chapa and has not been modified since. It does not establish that the underlying platform data is accurate; public replay validates arithmetic over the issued aggregates, not private-source truth. Badges marked "Public metrics" make no cryptographic claim.
 
 ## Endpoints
 

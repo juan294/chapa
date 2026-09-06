@@ -41,7 +41,11 @@ describe("GET /llms-full.txt", () => {
     expect(text).toContain("Quality");
     expect(text).toContain("Consistency");
     expect(text).toContain("Breadth");
-    expect(text).toContain("0-100");
+    // v7 publishes the actual formulas and the window, not a bare 0-100 label.
+    expect(text).toContain("N(x, c) = ln(1 + min(x, c)) / ln(1 + c)");
+    expect(text).toContain("365 calendar dates");
+    expect(text).toContain("evidence-completion range");
+    expect(text).toContain("never enters it");
   });
 
   it("contains archetype descriptions", async () => {

@@ -176,7 +176,7 @@ export const en: Translations = {
     features: [
       {
         title: 'MULTI-DIMENSIONAL',
-        description: 'Commit counts reward volume, not impact. Chapa scores four core dimensions — Delivery, Quality, Consistency, Breadth — plus an optional Craft dimension for AI tool mastery.',
+        description: 'Commit counts reward volume, not impact. Chapa scores four core dimensions — Delivery, Quality, Consistency, Breadth — plus a separate optional Craft practice portfolio that never changes the core.',
       },
       {
         title: 'DEVELOPER ARCHETYPE',
@@ -224,7 +224,7 @@ export const en: Translations = {
     ],
     measure: {
       title: 'What we measure',
-      descriptionBefore: 'Chapa scores four core dimensions of your development activity over the past 12 months, plus an optional Craft dimension for AI tool mastery. Your combination determines your developer archetype:',
+      descriptionBefore: 'Chapa scores four core dimensions of your development activity over the past 12 months, plus a separate optional Craft practice portfolio. Your combination of the four core dimensions determines your developer archetype:',
       methodologyLink: 'Read the full scoring methodology',
     },
     dimensions: [
@@ -232,7 +232,7 @@ export const en: Translations = {
       { title: 'QUALITY', description: 'Engineering discipline — code reviews on teams, PR hygiene and structured workflow when solo.' },
       { title: 'CONSISTENCY', description: 'Reliable, sustained contributions — active days and even distribution over time.' },
       { title: 'BREADTH', description: 'Cross-project influence — working across repos and building community.' },
-      { title: 'CRAFT', description: 'AI tool mastery (optional) — how effectively you use tools like Claude Code to ship better work.' },
+      { title: 'CRAFT', description: 'Engineering practice (optional) — how you framed, verified, judged and delivered specific pieces of work. Reported separately; it never changes your core score.' },
     ],
     enterprise: {
       title: 'GitHub',
@@ -908,7 +908,7 @@ export const en: Translations = {
       h1: 'About Chapa',
       intro: [
         'When AI writes most code, traditional volume metrics — commits, lines of code (LOC), PR counts — become meaningless. What matters is how you contribute, not how much code you produce.',
-        'Chapa generates a live, embeddable SVG badge that decodes your developer impact from your linked platforms. It analyzes your last 12 months across four core dimensions — plus an optional fifth for AI tool mastery — to show what kind of developer you are.',
+        'Chapa generates a live, embeddable SVG badge that decodes your developer impact from your linked platforms. It analyzes your last 12 months across four core dimensions — plus a separate optional Craft practice portfolio — to show what kind of developer you are.',
       ],
       sectionDimensions: 'Dimensions',
       dimensionsBody: 'Delivery — shipping meaningful changes (PRs merged, issues closed). Quality — engineering discipline (code reviews on teams, PR hygiene and structured workflow when solo). Consistency — reliable, sustained contributions over time. Breadth — cross-project influence and diversity of work. Each dimension is scored 0-100 independently.',
@@ -1013,21 +1013,22 @@ export const en: Translations = {
         ['Forks', '5%', 'Deeper engagement than stars — someone intends to build on your work. Narrower and noisier signal'],
       ],
       breadthNote: 'Breadth prioritizes signals you can directly control — repo diversity (40%), contribution spread (25%), and documentation (15%) — over community signals like stars and forks that depend on external recognition. Watchers have been dropped entirely as the weakest and most passive indicator.',
-      sectionCraft: 'Craft — AI tool mastery (optional)',
-      craftIntro: 'Craft is an optional fifth dimension that measures how effectively you use AI coding tools like Claude Code. It appears on your badge as a pentagon axis when you upload an insights report.',
+      sectionCraft: 'Craft — engineering practice (optional)',
+      craftIntro: 'Craft is a separate, optional practice portfolio. It records how you worked on specific pieces of work, and it is reported beside your core score rather than inside it — an absent or expired portfolio never lowers your core. It is not a measure of how much you use a tool.',
       craftHowToHeading: 'How to unlock Craft',
       craftHowToBody: 'In Claude Code, run ',
       craftHowToCode: '/insights',
       craftHowToBodySuffix: ' to generate your insights report. Then upload it to Chapa from the user menu. Claude Code updates your insights every two weeks, so you can re-upload on that cadence to keep your Craft score fresh.',
       craftWhatHeading: 'What Craft measures',
-      craftWhatIntro: 'Craft is the average of three sub-dimensions, each scored 0 to 100:',
-      craftTableHeaders: ['Sub-dimension', 'What it measures', 'Key signals'],
+      craftWhatIntro: 'Craft has four criteria of equal weight. A work item can qualify once per criterion, and each acceptance is recorded by an accountable reviewer against the published rubric:',
+      craftTableHeaders: ['Criterion', 'What qualifies', 'What does not'],
       craftTableRows: [
-        ['Proficiency', 'Tool mastery & feature adoption', 'Tool diversity, agent usage, multi-clauding, session type diversity, engagement depth'],
-        ['Effectiveness', 'Outcome quality', 'Achievement rate (55%), satisfaction rate (45%)'],
-        ['Sophistication', 'Workflow complexity', 'Complex session rate, lines per session, multi-clauding intensity, files per session'],
+        ['Framing', 'The problem, its constraints and the condition the work had to meet', 'A restated ticket title'],
+        ['Verification / debugging', 'A tested hypothesis or a relevant verification result tied to the delivered revision', 'A green pipeline with no relevant check'],
+        ['Tool judgment', 'The reason to use, constrain, avoid or delegate to a tool, including review of its output', 'Tool names, message counts or session counts'],
+        ['Accepted outcome', 'The delivered artifact measured against the acceptance condition you stated', 'A model-estimated satisfaction score'],
       ],
-      craftFrictionNote1: "Friction events (wrong approach, buggy code) and tool errors are excluded from scoring. These reflect the AI tool's behavior, not your skill as a developer. Only your outcomes and satisfaction count.",
+      craftFrictionNote1: 'Tool name, token counts, lines, files, message counts, agent counts and response speed earn no Craft credit at all. Choosing not to use a tool, or to constrain one, demonstrates judgment the same way using one does — and a developer who uses no AI tool can submit a full practice portfolio.',
       sectionArchetypes: 'Developer archetypes',
       archetypesIntro: 'Your archetype is derived from the shape of your dimension profile. It tells you what kind of developer you are, not how good you are.',
       archetypesTableHeaders: ['Archetype', 'Rule', 'What it means'],
@@ -1537,7 +1538,7 @@ export const en: Translations = {
     craft: {
       label: 'Craft',
       subtitle: 'AI tool proficiency · effectiveness · sophistication',
-      tip: 'Measures AI tool mastery: proficiency with coding assistants, effectiveness of tool-assisted workflows, and sophistication of usage patterns.',
+      tip: 'An optional, separately reported practice portfolio: how you framed the problem, how you verified it, the judgment behind using or not using a tool, and whether the outcome was accepted. It never changes your core score.',
     },
   },
   tiers: {
@@ -1582,7 +1583,7 @@ export const en: Translations = {
     polymath: "Your profile is marked by reach — you contribute across multiple repositories and technology areas, connecting the dots between projects. Breadth is your dominant dimension, giving you a uniquely wide perspective.",
     balanced: "Your profile is impressively well-rounded — no single dimension dominates because you invest across delivery, reviewing, consistency, and breadth. This balance makes you versatile and adaptable to any team need.",
     emerging: "Your profile is still taking shape — with more contributions over the coming months, your strongest dimensions will emerge and reveal your developer identity. Every commit, review, and repo you touch sharpens the picture.",
-    artificer: "Your profile is defined by craft — you leverage AI coding tools with exceptional skill and sophistication, turning them into force multipliers for your development workflow. Craft is your dominant dimension, showcasing mastery of modern AI-assisted development.",
+    artificer: "Your profile carries an optional Craft descriptor: a complete practice portfolio scoring at least 60, with at least one independently corroborated episode that satisfies all four criteria including an accepted outcome. It sits beside your core archetype rather than replacing it, and it describes recorded practice — not proven ability.",
   },
   dimensionTips: {
     delivery: "To strengthen Delivery, focus on opening and merging more pull requests — even small, focused PRs that close open issues count significantly.",

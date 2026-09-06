@@ -5,7 +5,27 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
-2. Compute **Impact v6 Profile** from last 12 months (365 days):
+2. Compute the **Impact v7 profile** from the last 365 calendar dates
+   (`docs/impact-v7.md`; policy authority is
+   `docs/plans/2026-09-05-scoring-relaunch-phases/policy.md`):
+   - four core dimensions at a fixed 0.25 each — Delivery, Quality practices,
+     Consistency, Breadth — with `N(x,c) = ln(1+min(x,c))/ln(1+c)`
+   - a **separate optional Craft practice portfolio** that is reported beside
+     the core and never enters it; tool name, tokens, lines, files, message and
+     session counts earn zero credit anywhere
+   - incomplete coverage publishes an **evidence-completion range**, not a
+     lower score and not a statistical confidence interval; a range spanning a
+     tier boundary gets no tier, and a non-point dimension set gets no archetype
+   - each revision issues an immutable public receipt that replays offline
+   - **one materializer** (`lib/profile/score-receipt-v7.ts`), **one projection**
+     every consumer renders (`lib/profile/score-view-model.ts`), **one what-if
+     calculator** (`lib/impact/simulate.ts`), and a checked registry of every
+     scored consumer (`docs/scoring-consumer-inventory.md`, enforced by
+     `scoring-consumer-inventory.test.ts` in both directions)
+
+   Legacy **Impact v6** (below) keeps its own semantics and its non-replayable
+   status for existing records; v6 numbers are never explained as v7 arithmetic.
+   Compute **Impact v6 Profile** from last 12 months (365 days):
    - 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional 5th (Craft), each 0–100
    - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
      - Note: "Quality Champion" is the display name; internal code/routes use "guardian" (e.g., `/archetypes/guardian`, `--color-archetype-guardian`)
@@ -247,7 +267,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - `/u/:handle` shows badge + breakdown + embed snippet. Confidence (% + penalty flags) is shown only to the profile owner in the "How is my score calculated" panel; it is hidden from visitors and excluded from public metadata (JSON-LD). Enforced server-side, not just UI-hidden (#1067/#1122): `redactImpactForVisitor()` (`apps/web/lib/profile/public-profile.ts`) strips `confidence`/`confidencePenalties` before the impact object ever crosses into the `"use client"` tree, so a visitor's RSC payload never contains confidence data.
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
-- Repo contains `docs/impact-v6.md` (current spec truth), `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
+- Repo contains `docs/impact-v7.md` (current spec truth), `docs/impact-v6.md`, `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
 - Creator Studio at `/studio` allows badge customization (7 visual categories). Saving a config changes the embedded SVG badge and invalidates its cache. The three categories that could never reach an SVG — a hover tilt, a counting animation, a confetti burst on load — were removed in #1191 rather than shown as preview-only decoration.
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).

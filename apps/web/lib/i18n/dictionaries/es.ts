@@ -170,7 +170,7 @@ export const es: Translations = {
     features: [
       {
         title: 'MULTIDIMENSIONAL',
-        description: 'Los commits premian volumen, no impacto. Chapa puntúa cuatro dimensiones base: Entrega, Calidad, Constancia y Alcance, más una dimensión opcional de Oficio para dominio de herramientas de IA.',
+        description: 'Los commits premian volumen, no impacto. Chapa puntúa cuatro dimensiones base: Entrega, Calidad, Constancia y Alcance, más un portafolio de práctica Oficio, opcional y separado, que nunca cambia el núcleo.',
       },
       {
         title: 'ARQUETIPO DE DESARROLLADOR',
@@ -218,7 +218,7 @@ export const es: Translations = {
     ],
     measure: {
       title: 'Qué medimos',
-      descriptionBefore: 'Chapa puntúa cuatro dimensiones base de tu actividad de desarrollo en los últimos 12 meses, más una dimensión opcional de Oficio para dominio de herramientas de IA. Tu combinación determina tu arquetipo de desarrollador:',
+      descriptionBefore: 'Chapa puntúa cuatro dimensiones base de tu actividad de desarrollo en los últimos 12 meses, más un portafolio de práctica Oficio, opcional y separado. Tu combinación de las cuatro dimensiones base determina tu arquetipo de desarrollador:',
       methodologyLink: 'Leer la metodología completa de puntuación',
     },
     dimensions: [
@@ -226,7 +226,7 @@ export const es: Translations = {
       { title: 'CALIDAD', description: 'Disciplina de ingeniería: reviews en equipo, higiene de PRs y flujo estructurado cuando trabajas solo.' },
       { title: 'CONSTANCIA', description: 'Contribuciones sostenidas: días activos y distribución equilibrada en el tiempo.' },
       { title: 'ALCANCE', description: 'Influencia entre proyectos: trabajo en varios repos y construcción de comunidad.' },
-      { title: 'OFICIO', description: 'Dominio de herramientas de IA (opcional): cómo usas herramientas como Claude Code para entregar mejor trabajo.' },
+      { title: 'OFICIO', description: 'Práctica de ingeniería (opcional): cómo planteaste, verificaste, decidiste y entregaste piezas concretas de trabajo. Se informa por separado; nunca cambia tu puntuación base.' },
     ],
     enterprise: {
       title: 'GitHub',
@@ -897,7 +897,7 @@ export const es: Translations = {
       h1: 'Acerca de Chapa',
       intro: [
         'Cuando la IA escribe la mayor parte del código, las métricas de volumen tradicionales —commits, líneas de código (LOC), cantidad de PRs— se vuelven irrelevantes. Lo que importa es cómo contribuyes, no cuánto código produces.',
-        'Chapa genera una Chapa SVG embebible y en vivo que decodifica tu impacto como desarrollador desde tus plataformas vinculadas. Analiza tus últimos 12 meses en cuatro dimensiones base —más una quinta opcional para el dominio de herramientas de IA— para mostrar qué tipo de desarrollador eres.',
+        'Chapa genera una Chapa SVG embebible y en vivo que decodifica tu impacto como desarrollador desde tus plataformas vinculadas. Analiza tus últimos 12 meses en cuatro dimensiones base —más un portafolio de práctica Oficio, opcional y separado— para mostrar qué tipo de desarrollador eres.',
       ],
       sectionDimensions: 'Dimensiones',
       dimensionsBody: 'Entrega — enviar cambios significativos (PRs fusionadas, issues cerradas). Calidad — disciplina de ingeniería (revisiones de código en equipos, higiene de PRs y flujo estructurado cuando se trabaja solo). Constancia — contribuciones fiables y sostenidas en el tiempo. Alcance — influencia entre proyectos y diversidad del trabajo. Cada dimensión se puntúa de 0 a 100 de forma independiente.',
@@ -1002,21 +1002,22 @@ export const es: Translations = {
         ['Forks', '5%', 'Participación más profunda que las estrellas — alguien tiene intención de construir sobre tu trabajo. Señal más estrecha y ruidosa'],
       ],
       breadthNote: 'El Alcance prioriza las señales que puedes controlar directamente —diversidad de repos (40%), distribución de contribuciones (25%) y documentación (15%)— sobre las señales comunitarias como estrellas y forks que dependen del reconocimiento externo. Los Watchers han sido eliminados por completo como el indicador más débil y pasivo.',
-      sectionCraft: 'Oficio — dominio de herramientas de IA (opcional)',
-      craftIntro: 'El Oficio es una quinta dimensión opcional que mide con qué eficacia usas herramientas de codificación de IA como Claude Code. Aparece en tu Chapa como un eje de pentágono cuando subes un informe de insights.',
+      sectionCraft: 'Oficio — práctica de ingeniería (opcional)',
+      craftIntro: 'El Oficio es un portafolio de práctica opcional y separado. Registra cómo trabajaste en piezas concretas de trabajo y se informa junto a tu puntuación base, no dentro de ella: un portafolio ausente o caducado nunca baja tu núcleo. No mide cuánto usas una herramienta.',
       craftHowToHeading: 'Cómo desbloquear el Oficio',
       craftHowToBody: 'En Claude Code, ejecuta ',
       craftHowToCode: '/insights',
       craftHowToBodySuffix: ' para generar tu informe de insights. Luego súbelo a Chapa desde el menú de usuario. Claude Code actualiza tus insights cada dos semanas, así que puedes volver a subirlos en esa cadencia para mantener tu puntuación de Oficio actualizada.',
       craftWhatHeading: 'Qué mide el Oficio',
-      craftWhatIntro: 'El Oficio es el promedio de tres subdimensiones, cada una de 0 a 100:',
-      craftTableHeaders: ['Subdimensión', 'Qué mide', 'Señales clave'],
+      craftWhatIntro: 'El Oficio tiene cuatro criterios de igual peso. Una pieza de trabajo puede cumplir cada criterio una sola vez, y cada aceptación la registra una persona revisora responsable contra la rúbrica publicada:',
+      craftTableHeaders: ['Criterio', 'Qué cumple', 'Qué no cumple'],
       craftTableRows: [
-        ['Competencia', 'Dominio de herramientas y adopción de funciones', 'Diversidad de herramientas, uso de agentes, multi-clauding, diversidad de tipos de sesión, profundidad de participación'],
-        ['Eficacia', 'Calidad de resultados', 'Tasa de logros (55%), tasa de satisfacción (45%)'],
-        ['Sofisticación', 'Complejidad del flujo de trabajo', 'Tasa de sesiones complejas, líneas por sesión, intensidad de multi-clauding, archivos por sesión'],
+        ['Planteamiento', 'El problema, sus restricciones y la condición que el trabajo debía cumplir', 'Repetir el título de un ticket'],
+        ['Verificación y depuración', 'Una hipótesis probada o un resultado de verificación relevante ligado a la revisión entregada', 'Un pipeline en verde sin ninguna comprobación relevante'],
+        ['Criterio sobre herramientas', 'La razón para usar, limitar, evitar o delegar en una herramienta, incluida la revisión de su salida', 'Nombres de herramientas, número de mensajes o de sesiones'],
+        ['Resultado aceptado', 'El artefacto entregado medido contra la condición de aceptación que declaraste', 'Una satisfacción estimada por un modelo'],
       ],
-      craftFrictionNote1: 'Los eventos de fricción (enfoque incorrecto, código con errores) y los errores de herramienta se excluyen de la puntuación. Estos reflejan el comportamiento de la herramienta de IA, no tu habilidad como desarrollador. Solo cuentan tus resultados y satisfacción.',
+      craftFrictionNote1: 'El nombre de la herramienta, los tokens, las líneas, los archivos, el número de mensajes, el número de agentes y la velocidad de respuesta no otorgan ningún crédito de Oficio. Decidir no usar una herramienta, o limitarla, demuestra criterio igual que usarla, y quien no usa ninguna herramienta de IA puede enviar un portafolio de práctica completo.',
       sectionArchetypes: 'Arquetipos de desarrollador',
       archetypesIntro: 'Tu arquetipo se deriva de la forma de tu perfil de dimensiones. Te dice qué tipo de desarrollador eres, no qué tan bueno eres.',
       archetypesTableHeaders: ['Arquetipo', 'Regla', 'Qué significa'],
@@ -1526,7 +1527,7 @@ export const es: Translations = {
     craft: {
       label: 'Oficio',
       subtitle: 'Dominio de IA · efectividad · sofisticación',
-      tip: 'Mide el dominio de herramientas de IA: competencia con asistentes de código, efectividad de los flujos asistidos por IA y sofisticación de los patrones de uso.',
+      tip: 'Un portafolio de práctica opcional que se informa por separado: cómo planteaste el problema, cómo lo verificaste, el criterio detrás de usar o no una herramienta y si el resultado fue aceptado. Nunca cambia tu puntuación base.',
     },
   },
   tiers: {
@@ -1571,7 +1572,7 @@ export const es: Translations = {
     polymath: 'Tu perfil está marcado por el alcance — contribuyes en múltiples repositorios y áreas tecnológicas, conectando proyectos. El Alcance es tu dimensión dominante, dándote una perspectiva excepcionalmente amplia.',
     balanced: 'Tu perfil es impresionantemente equilibrado — ninguna dimensión domina porque inviertes en entrega, revisiones, constancia y alcance. Este equilibrio te hace versátil y adaptable a cualquier necesidad de equipo.',
     emerging: 'Tu perfil aún está tomándose forma — con más contribuciones en los próximos meses, tus dimensiones más fuertes emergerán y revelarán tu identidad como desarrollador. Cada commit, revisión y repositorio que tocas afina el cuadro.',
-    artificer: 'Tu perfil está definido por el Oficio — aprovechas las herramientas de IA con habilidad y sofisticación excepcionales, convirtiéndolas en multiplicadores de fuerza para tu flujo de trabajo. El Oficio es tu dimensión dominante, mostrando dominio del desarrollo moderno asistido por IA.',
+    artificer: 'Tu perfil lleva un descriptor Oficio opcional: un portafolio de práctica completo que puntúa al menos 60, con al menos un episodio corroborado de forma independiente que cumple los cuatro criterios, incluido un resultado aceptado. Acompaña a tu arquetipo base en vez de sustituirlo, y describe práctica registrada, no capacidad demostrada.',
   },
   dimensionTips: {
     delivery: 'Para fortalecer la Entrega, enfócate en abrir y fusionar más pull requests — incluso las PRs pequeñas y enfocadas que cierran issues cuentan significativamente.',
