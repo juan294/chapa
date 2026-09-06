@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ImpactV6Result } from "@chapa/shared";
-import type { LeaderboardEntry } from "@/lib/profile/leaderboard";
+import type { LeaderboardPlace } from "@/lib/profile/leaderboard";
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { NavbarClient } from "@/components/NavbarClient";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -44,7 +44,7 @@ const MEDALS = ["bg-medal-gold", "bg-medal-silver", "bg-medal-bronze"];
 
 /** Static translated body; interactions and URL effects stay in small client leaves. */
 export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topScored = [], t }: {
-  demoBadgeSvg: string; readmeBadgeSvg: string; demoImpact: ImpactV6Result; topScored?: LeaderboardEntry[]; t: TFunction;
+  demoBadgeSvg: string; readmeBadgeSvg: string; demoImpact: ImpactV6Result; topScored?: LeaderboardPlace[]; t: TFunction;
 }) {
   const r = (key: string) => t(`landing.redesign.${key}`) as string;
   const navLinks = tArray<{ label: string; href: string }>(t, "landing.navLinks");
@@ -80,15 +80,19 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topSc
           <span className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
             <span className="tracking-wider uppercase">{r("topScoresLabel")}</span>
             <ol className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              {topScored.map((profile) => (
-                <li key={profile.handle}>
-                  <Link href={`/u/${profile.handle}`} className="group inline-flex items-center gap-2 underline-offset-4 hover:underline">
-                    <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-[2px] px-1 text-[10px] font-semibold text-forest ${MEDALS[profile.rank - 1] ?? "bg-track"}`}>
-                      {profile.rank}
-                    </span>
-                    <span className="text-text-primary">@{profile.handle}</span>
-                    <span className="tabular-nums text-amber-text">{profile.score}</span>
-                  </Link>
+              {topScored.map((place) => (
+                <li key={place.score} className="flex items-center gap-2">
+                  <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-[2px] px-1 text-[10px] font-semibold text-forest ${MEDALS[place.rank - 1] ?? "bg-track"}`}>
+                    {place.rank}
+                  </span>
+                  {/* Everyone in a place shares the score, so it is printed
+                      once at the end rather than after each handle. */}
+                  {place.handles.map((handle, index) => (
+                    <Link key={handle} href={`/u/${handle}`} className="text-text-primary underline-offset-4 hover:underline">
+                      @{handle}{index < place.handles.length - 1 ? "," : ""}
+                    </Link>
+                  ))}
+                  <span className="tabular-nums text-amber-text">{place.score}</span>
                 </li>
               ))}
             </ol>

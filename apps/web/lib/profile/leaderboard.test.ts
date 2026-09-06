@@ -17,6 +17,10 @@ const mockCandidates = vi.mocked(dbGetScoredCandidates);
 const mockRegistered = vi.mocked(dbGetAllUserHandles);
 const mockMaterialize = vi.mocked(materializeDisplayProfile);
 
+function entry(handle: string, score: number, tier = "High") {
+  return { handle, score, tier, rank: 0 };
+}
+
 function live(adjustedComposite: number, tier = "High") {
   return { displayImpact: { adjustedComposite, tier } } as unknown as Awaited<
     ReturnType<typeof materializeDisplayProfile>
@@ -31,48 +35,50 @@ describe("getLeaderboard", () => {
     mockCandidates.mockResolvedValue([]);
   });
 
-  it("ranks only registered handles", async () => {
+  // A place is a score. Everyone on 80 shares first, and the next score is
+  // second, not third.
+  it("groups tied scores into one place and does not skip the next", async () => {
     mockRecorded.mockResolvedValue([
-      { handle: "a", score: 90, tier: "Elite", rank: 0 },
-      { handle: "b", score: 85, tier: "Elite", rank: 0 },
-      { handle: "c", score: 80, tier: "High", rank: 0 },
+      entry("w-winter", 80),
+      entry("juan294", 80),
+      entry("nicholaivogel", 78),
+      entry("lukiod", 75),
     ]);
 
-    await expect(getLeaderboard(3)).resolves.toHaveLength(3);
-    expect(mockRecorded).toHaveBeenCalledWith(["a", "b", "c", "d", "juan294"], 3);
+    const board = await getLeaderboard(3);
+
+    expect(board).toEqual([
+      { rank: 1, score: 80, tier: "High", handles: ["juan294", "w-winter"] },
+      { rank: 2, score: 78, tier: "High", handles: ["nicholaivogel"] },
+      { rank: 3, score: 75, tier: "High", handles: ["lukiod"] },
+    ]);
     expect(mockMaterialize).not.toHaveBeenCalled();
   });
 
-  // The podium is a fixed shape: a row whose snapshot predates headline_score
-  // is materialized rather than left as a gap.
-  it("fills the podium from live materialization when rows lack a headline", async () => {
-    mockRecorded.mockResolvedValue([{ handle: "a", score: 90, tier: "Elite", rank: 0 }]);
+  it("returns the requested number of places, not of handles", async () => {
+    mockRecorded.mockResolvedValue([entry("a", 90), entry("b", 90), entry("c", 80), entry("d", 70)]);
+
+    const board = await getLeaderboard(2);
+
+    expect(board.map((place) => place.score)).toEqual([90, 80]);
+    expect(board[0]?.handles).toEqual(["a", "b"]);
+  });
+
+  // A row whose snapshot predates headline_score cannot be published as-is, so
+  // the handle is materialized rather than leaving the board short.
+  it("fills missing places from live materialization", async () => {
+    mockRecorded.mockResolvedValue([entry("a", 90)]);
     mockCandidates.mockResolvedValue(["a", "b", "c"]);
     mockMaterialize.mockImplementation(async (handle: string) => live(handle === "b" ? 95 : 70));
 
     const board = await getLeaderboard(3);
 
-    expect(board).toEqual([
-      { handle: "b", score: 95, tier: "High", rank: 1 },
-      { handle: "a", score: 90, tier: "Elite", rank: 2 },
-      { handle: "c", score: 70, tier: "High", rank: 3 },
+    expect(board.map((place) => [place.rank, place.score])).toEqual([
+      [1, 95],
+      [2, 90],
+      [3, 70],
     ]);
-    // The recorded handle is never re-fetched.
     expect(mockMaterialize).not.toHaveBeenCalledWith("a");
-  });
-
-  // Equal scores share a place. Alphabetical order inside a tie is arbitrary
-  // and must not read as one developer beating another.
-  it("gives tied scores the same place and skips the next one", async () => {
-    mockRecorded.mockResolvedValue([
-      { handle: "juan294", score: 80, tier: "High", rank: 0 },
-      { handle: "w-winter", score: 80, tier: "High", rank: 0 },
-      { handle: "nicholaivogel", score: 78, tier: "High", rank: 0 },
-    ]);
-
-    const board = await getLeaderboard(3);
-
-    expect(board.map((entry) => entry.rank)).toEqual([1, 1, 3]);
   });
 
   it("rolls past a handle that cannot be fetched", async () => {
@@ -83,24 +89,26 @@ describe("getLeaderboard", () => {
       return live(60);
     });
 
-    await expect(getLeaderboard(1)).resolves.toEqual([{ handle: "c", score: 60, tier: "High", rank: 1 }]);
+    await expect(getLeaderboard(1)).resolves.toEqual([
+      { rank: 1, score: 60, tier: "High", handles: ["c"] },
+    ]);
   });
 
-  // Fetching a whole pool in parallel earns 403s, and every extra fetch past a
-  // full podium is waste.
-  it("stops materializing as soon as the podium is full", async () => {
+  // Fetching a pool in parallel earns 403s, and every fetch past a full board
+  // is waste.
+  it("stops materializing once the places are filled", async () => {
     mockCandidates.mockResolvedValue(["a", "b", "c", "d"]);
-    mockMaterialize.mockResolvedValue(live(70));
+    mockMaterialize.mockImplementation(async (handle: string) => live(handle === "a" ? 90 : 80));
 
     await getLeaderboard(2);
 
     expect(mockMaterialize).toHaveBeenCalledTimes(2);
   });
 
-  it("asks for a wider candidate pool than the podium", async () => {
+  it("reads a deeper pool than the number of places, so ties can collapse", async () => {
     await getLeaderboard(3);
 
-    expect(mockCandidates).toHaveBeenCalledWith(["a", "b", "c", "d", "juan294"], 12);
+    expect(mockRecorded).toHaveBeenCalledWith(["a", "b", "c", "d", "juan294"], 12);
   });
 
   // A badge rendered for a stranger creates a snapshot; it must not put that

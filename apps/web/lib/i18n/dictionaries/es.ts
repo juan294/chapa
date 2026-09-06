@@ -1113,7 +1113,7 @@ export const es: Translations = {
       sectionNumber: 'Qué número se compara',
       numberBody: 'El número de tu chapa, exactamente como lo dibuja tu chapa. Chapa guarda un segundo número suavizado para la línea de tendencia de tu perfil, y ese nunca se usa aquí, así que la clasificación nunca puede contradecir a tu chapa.',
       sectionTies: 'Empates',
-      tiesBody: 'Las puntuaciones iguales comparten puesto. Dos perfiles con 80 son ambos primeros, y el siguiente perfil es tercero. Dentro de un empate el orden es alfabético y no significa nada: ninguna persona va por delante de la otra.',
+      tiesBody: 'Un puesto es una puntuación, no una persona. Todas las personas con 80 comparten el primer puesto y aparecen juntas, y la siguiente puntuación es la segunda. Los nombres dentro de un puesto van en orden alfabético, lo que no significa nada: nadie va por delante dentro de un puesto.',
       sectionRefresh: 'Con qué frecuencia cambia',
       refreshBody: 'La clasificación se reconstruye cada hora. Una puntuación que cambió hace unos minutos puede tardar hasta una hora en mover la clasificación.',
       sectionScore: 'Cómo se calcula la puntuación',

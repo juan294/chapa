@@ -1124,7 +1124,7 @@ export const en: Translations = {
       sectionNumber: 'Which number is compared',
       numberBody: 'The number on your badge, exactly as your badge draws it. Chapa keeps a second, smoothed number for the trend line on your profile, and that one is never used here, so the board can never disagree with your badge.',
       sectionTies: 'Ties',
-      tiesBody: 'Equal scores share a place. Two profiles on 80 are both first, and the next profile is third. Within a tie the order is alphabetical, and it means nothing: neither developer is ahead of the other.',
+      tiesBody: 'A place is a score, not a person. Everyone on 80 shares first place and is listed together, and the next score down is second. Names inside a place are alphabetical, which means nothing: nobody in a place is ahead of anybody else.',
       sectionRefresh: 'How often it changes',
       refreshBody: 'The standings are rebuilt every hour. A score that changed a few minutes ago can take up to an hour to move the board.',
       sectionScore: 'How the score itself is calculated',

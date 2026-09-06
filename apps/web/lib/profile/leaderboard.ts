@@ -3,26 +3,28 @@ import { dbGetScoredCandidates, dbGetTopScoredProfiles } from "@/lib/db/snapshot
 import { dbGetAllUserHandles } from "@/lib/db/users";
 import { materializeDisplayProfile } from "./materialize-profile";
 
-export interface LeaderboardEntry {
-  handle: string;
-  /** The number the badge draws for this handle. */
+export interface LeaderboardPlace {
+  /** 1, 2, 3. A place is a score, so a tie is one place with several handles. */
+  rank: number;
+  /** The number the badge draws for everyone in this place. */
   score: number;
   tier: string;
-  /** Shared by everyone on the same score. Two 80s are both first, and the
-   * next place is third. Ordering inside a tie is alphabetical and carries no
-   * meaning, which is why it must not look like a ranking. */
-  rank: number;
+  /** Alphabetical, which carries no meaning and is not presented as an order. */
+  handles: string[];
 }
 
-/** Candidates are re-scored live, so the pool is wider than the podium: EMA
- * smoothing can hold a rising handle just below a falling one in the stored
- * ordering, and some candidates will not materialize at all. */
-const CANDIDATE_MULTIPLIER = 4;
+/** Entries needed to find three distinct scores: ties collapse into one place,
+ * so the pool has to be deeper than the number of places. */
+const ENTRY_MULTIPLIER = 4;
 
 /**
- * The platform's top scores, showing the same number the badge shows.
+ * The platform's top three scores, showing the same number the badge shows.
  *
- * Three rules hold this together.
+ * Four rules hold this together.
+ *
+ * **A place is a score, not a row.** Everyone on 80 shares first place and the
+ * next score is second. Ranking each handle separately put two identical
+ * scores in different positions, which reads as favouritism.
  *
  * **Only people who signed up.** A snapshot exists for any handle whose badge
  * was ever rendered, and rendering a stranger's badge is as easy as embedding
@@ -33,62 +35,72 @@ const CANDIDATE_MULTIPLIER = 4;
  * **The board's number is the badge's number.** A snapshot's
  * `adjustedComposite` is the EMA-smoothed composite, kept so the trend line
  * stays continuous, while the badge draws the fresh one (#1001). Rows written
- * since migration 047 record that fresh number as `headlineScore`, and those
- * are read straight from one indexed query.
+ * since migration 047 record that fresh number as `headlineScore`.
  *
- * **The podium is always full.** A row that predates `headlineScore` cannot be
- * published as-is, so rather than leaving a gap, the handle is materialized to
- * read the same headline `renderBadgeSvg` prints. Those run one at a time and
- * only until the podium fills — fetching a whole pool in parallel earns 403s
- * from GitHub, and a partial board is worse than a slightly slower revalidate.
+ * **Three places, always.** A row that predates `headlineScore` is
+ * materialized to read the badge's own headline rather than leaving a gap.
+ * Those run one at a time and only until three places exist: fetching a pool
+ * in parallel earns 403s from GitHub.
  *
  * Called at build/revalidate time from the statically generated landing page,
  * never per request.
  */
-export async function getLeaderboard(limit = 3): Promise<LeaderboardEntry[]> {
-  if (limit <= 0) return [];
+export async function getLeaderboard(places = 3): Promise<LeaderboardPlace[]> {
+  if (places <= 0) return [];
 
   const registered = await dbGetAllUserHandles();
   if (registered.length === 0) return [];
 
-  const entries = await dbGetTopScoredProfiles(registered, limit);
-  if (entries.length >= limit) return withSharedRanks(entries).slice(0, limit);
-
-  const seen = new Set(entries.map((entry) => entry.handle));
-  const candidates = (await dbGetScoredCandidates(registered, limit * CANDIDATE_MULTIPLIER))
-    .filter((handle) => !seen.has(handle));
-
-  for (const handle of candidates) {
-    if (entries.length >= limit) break;
-    let live: Awaited<ReturnType<typeof materializeDisplayProfile>> = null;
-    try {
-      live = await materializeDisplayProfile(handle);
-    } catch {
-      // A handle whose data cannot be fetched right now is skipped, and the
-      // next candidate takes the place rather than the podium losing a row.
-      continue;
-    }
-    if (!live) continue;
-    entries.push({
-      handle,
-      score: live.displayImpact.adjustedComposite,
-      tier: live.displayImpact.tier,
-      rank: 0,
-    });
+  const scored = new Map<string, { score: number; tier: string }>();
+  for (const entry of await dbGetTopScoredProfiles(registered, places * ENTRY_MULTIPLIER)) {
+    scored.set(entry.handle, { score: entry.score, tier: entry.tier });
   }
 
-  return withSharedRanks(entries).slice(0, limit);
+  if (countPlaces(scored) < places) {
+    const candidates = (await dbGetScoredCandidates(registered, places * ENTRY_MULTIPLIER))
+      .filter((handle) => !scored.has(handle));
+
+    for (const handle of candidates) {
+      if (countPlaces(scored) >= places) break;
+      let live: Awaited<ReturnType<typeof materializeDisplayProfile>> = null;
+      try {
+        live = await materializeDisplayProfile(handle);
+      } catch {
+        // A handle whose data cannot be fetched right now is skipped, and the
+        // next candidate takes the place rather than the board losing one.
+        continue;
+      }
+      if (!live) continue;
+      scored.set(handle, {
+        score: live.displayImpact.adjustedComposite,
+        tier: live.displayImpact.tier,
+      });
+    }
+  }
+
+  return groupIntoPlaces(scored).slice(0, places);
 }
 
-/** Standard competition ranking: equal scores take the same place, and the
- * place after a tie skips accordingly. */
-function withSharedRanks(entries: LeaderboardEntry[]): LeaderboardEntry[] {
-  const ordered = [...entries].sort((a, b) => b.score - a.score || a.handle.localeCompare(b.handle));
-  let rank = 0;
-  let previousScore: number | null = null;
-  return ordered.map((entry, index) => {
-    if (previousScore === null || entry.score !== previousScore) rank = index + 1;
-    previousScore = entry.score;
-    return { ...entry, rank };
-  });
+function countPlaces(scored: Map<string, { score: number }>): number {
+  return new Set([...scored.values()].map((entry) => entry.score)).size;
+}
+
+function groupIntoPlaces(scored: Map<string, { score: number; tier: string }>): LeaderboardPlace[] {
+  const byScore = new Map<number, LeaderboardPlace>();
+  for (const [handle, entry] of scored) {
+    const place = byScore.get(entry.score);
+    if (place) {
+      place.handles.push(handle);
+      continue;
+    }
+    byScore.set(entry.score, { rank: 0, score: entry.score, tier: entry.tier, handles: [handle] });
+  }
+
+  return [...byScore.values()]
+    .sort((a, b) => b.score - a.score)
+    .map((place, index) => ({
+      ...place,
+      rank: index + 1,
+      handles: [...place.handles].sort((a, b) => a.localeCompare(b)),
+    }));
 }
