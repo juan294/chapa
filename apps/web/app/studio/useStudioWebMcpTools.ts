@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import {
   DIMENSION_KEYS,
-  SOLO_DIMENSION_KEYS,
   type BadgeConfig,
   type CraftResult,
   type DimensionScores,
@@ -17,11 +16,7 @@ import {
 import { generateInsights } from "@/lib/dashboard/generate-insights";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { getBaseUrl } from "@/lib/env";
-import {
-  computeAdjustedScore,
-  getTier,
-} from "@/lib/impact/utils";
-import { applyRecencyWeight, computeRecencyRatio } from "@/lib/impact/recency";
+import { simulateCoreScore } from "@/lib/impact/simulate";
 import { useTranslation } from "@/lib/i18n";
 import {
   invalidInput,
@@ -277,28 +272,8 @@ export function useStudioWebMcpTools({
           const overrides = parseDimensionOverrides(inputs);
           if (typeof overrides === "string") return overrides;
 
-          const dimensions: DimensionScores = {
-            ...impact.dimensions,
-            ...overrides,
-          };
-          const dimensionKeys = impact.profileType === "solo"
-            ? SOLO_DIMENSION_KEYS
-            : DIMENSION_KEYS;
-          const activeScores = dimensionKeys
-            .map((dimension) => dimensions[dimension])
-            .filter((score): score is number => score !== undefined);
-          const composite = Math.round(
-            activeScores.reduce((sum, score) => sum + score, 0) /
-              activeScores.length,
-          );
-          const recencyWeighted = applyRecencyWeight(composite, computeRecencyRatio(stats.heatmapData));
-          const adjusted = computeAdjustedScore(recencyWeighted, impact.confidence);
-          return JSON.stringify({
-            composite,
-            adjusted,
-            tier: getTier(adjusted),
-            deltaVsCurrent: adjusted - impact.adjustedComposite,
-          });
+          // One shared calculator; the tool must not restate the pipeline.
+          return JSON.stringify(simulateCoreScore(impact, stats.heatmapData, overrides));
         },
       },
       {

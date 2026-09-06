@@ -12,6 +12,7 @@ const {
   mockGetClientIp,
   mockIsValidHandle,
   mockMaterializeDisplayProfile,
+  mockReadScoreReceiptV7,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetCachedLatestSnapshot: vi.fn(),
@@ -19,6 +20,11 @@ const {
   mockGetClientIp: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockMaterializeDisplayProfile: vi.fn(),
+  mockReadScoreReceiptV7: vi.fn(),
+}));
+
+vi.mock("@/lib/profile/score-receipt-v7", () => ({
+  readScoreReceiptV7: mockReadScoreReceiptV7,
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -134,6 +140,7 @@ beforeEach(() => {
   mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
   mockGetClientIp.mockReturnValue("127.0.0.1");
   mockMaterializeDisplayProfile.mockResolvedValue(MOCK_MATERIALIZED);
+  mockReadScoreReceiptV7.mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -170,7 +177,24 @@ describe("GET /api/profile/:handle", () => {
       computedAt: "2026-03-27T10:30:00Z",
       displayScore: 69,
       displayTier: "Solid",
+      scoring: null,
     });
+  });
+
+  // A v7 receipt is projected through the one shared view model, so this
+  // payload names the same revision the badge and verification link resolve to.
+  it("projects an issued v7 receipt through the shared view model", async () => {
+    const { buildReceiptSnapshotV7 } = await import("@/lib/history/snapshot");
+    const { receiptFixtureV7 } = await import("@/lib/history/__fixtures__/receipts-v7");
+    const { receiptViewModel } = await import("@/lib/profile/score-view-model");
+    const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 4), null);
+    mockReadScoreReceiptV7.mockResolvedValue(snapshot);
+
+    const body = await (await GET(makeRequest("juan294"), makeParams("juan294"))).json();
+
+    expect(body.scoring).toEqual(JSON.parse(JSON.stringify(receiptViewModel("juan294", snapshot))));
+    expect(body.scoring.identity.contentHash).toBe(snapshot.receipt.contentHash.value);
+    expect(body.scoring.policyVersion).toBe("v7");
   });
 
   // --- Success: profile without craft ---

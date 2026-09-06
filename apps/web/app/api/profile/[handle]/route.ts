@@ -7,6 +7,8 @@ import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { readScoreReceiptV7 } from "@/lib/profile/score-receipt-v7";
+import { receiptViewModel } from "@/lib/profile/score-view-model";
 
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
 
@@ -104,6 +106,7 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
 
   // Only after the 404 above — the missing-snapshot path stays a cheap cache read.
   const { displayScore, displayTier } = await getDisplayHeadline(handle);
+  const receipt = await readScoreReceiptV7(handle);
 
   const dimensions: DimensionScores = {
     delivery: snapshot.delivery,
@@ -133,6 +136,12 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
       // #1062 — fresh, matches the badge. Null when it cannot be computed.
       displayScore,
       displayTier,
+      // S15 — additive. Once a v7 receipt is issued, every consumer projects
+      // that one artifact through the shared view model, so this block, the
+      // badge, the share page and the verification link name the same
+      // revision. Null until v7 is issued for this subject; the v6 fields
+      // above keep their existing meaning either way.
+      scoring: receipt ? receiptViewModel(handle, receipt) : null,
     },
     {
       headers: {
