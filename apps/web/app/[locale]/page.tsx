@@ -10,6 +10,7 @@ import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
 import { LandingWebMcpTools } from "@/components/LandingWebMcpTools";
+import { getLeaderboard } from "@/lib/profile/leaderboard";
 
 // #982 / #1023 (FE-H1) — the landing page is statically generated for BOTH
 // locales (see app/[locale]/layout.tsx's generateStaticParams), so it stays
@@ -52,6 +53,11 @@ export default async function Home({ params }: HomeProps) {
     ...options,
     disableAnimation: true,
   });
+  // Read at build/revalidate time, not per request: this page stays
+  // force-static, so the standings refresh on the same hourly cycle as the
+  // rest of the page. An empty list (no database, or nothing scored yet)
+  // renders no standings rather than an error or a placeholder.
+  const topScored = await getLeaderboard(3);
   return (
     <>
       <LanguageProvider
@@ -71,7 +77,7 @@ export default async function Home({ params }: HomeProps) {
       >
         <LangSync />
         <LandingWebMcpTools />
-        <LandingContent demoBadgeSvg={demoBadgeSvg} readmeBadgeSvg={readmeBadgeSvg} demoImpact={LANDING_IMPACT} t={t} />
+        <LandingContent demoBadgeSvg={demoBadgeSvg} readmeBadgeSvg={readmeBadgeSvg} demoImpact={LANDING_IMPACT} topScored={topScored} t={t} />
       </LanguageProvider>
     </>
   );

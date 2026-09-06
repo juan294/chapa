@@ -6,6 +6,7 @@ import { computeImpactV6 } from "@/lib/impact/v6";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
 
 /**
  * POST /api/generate
@@ -78,6 +79,17 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   }
 
   if (!stats) {
+    // A connected platform whose token can no longer be refreshed makes the
+    // whole fetch null (see findUnusableSourceLinks). Retrying cannot fix
+    // that, and a generic "something went wrong" leaves the user with no
+    // action, so name the connection and send them to /settings instead.
+    const unusable = await findUnusableSourceLinks(handle);
+    if (unusable.length > 0) {
+      return NextResponse.json(
+        { error: `Reconnect ${unusable.join(", ")} to include it in your profile.`, staleSources: unusable },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: "Failed to fetch stats. Try again later." },
       { status: 502 },

@@ -176,6 +176,23 @@ export interface PlatformOAuthConfig {
  *       create state cookie -> issue single-use nonce -> build auth URL ->
  *       redirect
  */
+/**
+ * Where to send the user when the OAuth round trip ends.
+ *
+ * A connect started from /settings used to land on the share page, so linking
+ * a second platform meant navigating back and starting again. The caller says
+ * where it came from; anything that is not a same-origin path is ignored, so
+ * the parameter cannot become an open redirect.
+ */
+function safeReturnPath(value: string | null | undefined, fallback: string): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback;
+  return value;
+}
+
+function returnCookieName(platform: string): string {
+  return `chapa_${platform}_oauth_return`;
+}
+
 export function createConnectHandler(config: PlatformOAuthConfig) {
   return async function GET(request: NextRequest) {
     // 1. Feature flag check
@@ -215,6 +232,10 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
     // Reuses the exact same issue/consume helpers GitHub's login/callback
     // flow uses, including their Upstash read-your-writes retry/fallback
     // behavior — see oauth-state.ts.
+    const returnTo = safeReturnPath(
+      request.nextUrl.searchParams.get("returnTo"),
+      `/u/${session.login}`,
+    );
     const { state, cookie } = config.createStateCookie();
     const stateStoreMode = await issueOauthState(state);
     const baseUrl = getBaseUrl();
@@ -224,6 +245,10 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
     // 6. Redirect to platform
     const response = NextResponse.redirect(authUrl);
     response.headers.append("Set-Cookie", cookie);
+    response.headers.append(
+      "Set-Cookie",
+      `${returnCookieName(config.platform)}=${encodeURIComponent(returnTo)}; ${cookieFlags()}; Max-Age=600`,
+    );
     response.headers.append(
       "Set-Cookie",
       `${stateStoreCookieName(config)}=${stateStoreMode}; ${cookieFlags()}; Max-Age=600`,
@@ -264,7 +289,10 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
     if (error) return error;
 
     const handle = session.login;
-    const errorRedirectBase = `/u/${handle}`;
+    const errorRedirectBase = safeReturnPath(
+      decodeURIComponent(request.cookies.get(returnCookieName(config.platform))?.value ?? ""),
+      `/u/${handle}`,
+    );
 
     // 4. Validate authorization code
     const code = request.nextUrl.searchParams.get("code");
@@ -355,9 +383,13 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
 
     // 11. Clear state cookies and redirect to share page
     const response = NextResponse.redirect(
-      new URL(`/u/${handle}?${config.platform}=linked`, request.url),
+      new URL(`${errorRedirectBase}?${config.platform}=linked`, request.url),
     );
     response.headers.append("Set-Cookie", config.clearStateCookie());
+    response.headers.append(
+      "Set-Cookie",
+      `${returnCookieName(config.platform)}=; ${cookieFlags()}; Max-Age=0`,
+    );
     response.headers.append(
       "Set-Cookie",
       `${stateStoreCookieName(config)}=; ${cookieFlags()}; Max-Age=0`,
@@ -461,3 +493,6 @@ export function createStatusHandler(config: PlatformOAuthConfig) {
     });
   };
 }
+
+/** Test-only surface for the redirect guard. */
+export const __test = { safeReturnPath };

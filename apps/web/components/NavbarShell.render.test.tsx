@@ -78,9 +78,12 @@ describe("NavbarShell render", () => {
       expect(logoLink?.getAttribute("href")).toBe("/");
     });
 
-    it("shows a blinking cursor after the logo", () => {
+    // Two blinking cursors on one screen (logo and the hero /whoami prompt)
+    // read as flicker, so the logo underscore holds still.
+    it("shows a static cursor after the logo", () => {
       const { container } = render(<NavbarShell session={null} isAdmin={false} t={t} />);
-      expect(container.querySelector(".animate-cursor-blink")).not.toBeNull();
+      expect(screen.getByText("_")).toBeDefined();
+      expect(container.querySelector(".animate-cursor-blink")).toBeNull();
     });
   });
 
@@ -187,10 +190,8 @@ describe("NavbarShell render", () => {
     });
 
     it("logo cursor uses the text-safe accent token", () => {
-      const { container } = render(<NavbarShell session={null} isAdmin={false} t={t} />);
-      const cursor = container.querySelector(".animate-cursor-blink");
-      expect(cursor?.className).toContain("text-amber-text");
-      expect(cursor?.className).not.toBe("text-amber animate-cursor-blink");
+      render(<NavbarShell session={null} isAdmin={false} t={t} />);
+      expect(screen.getByText("_").className).toContain("text-amber-text");
     });
 
     it("login link has a 44px touch target and a legible prefix slash", () => {

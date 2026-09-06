@@ -9,6 +9,7 @@ const {
   mockRateLimitStrict,
   mockIsValidHandle,
   mockCaptureServerError,
+  mockFindUnusableSourceLinks,
   mockRevalidatePath,
   mockUpdateCraftCache,
   mockInvalidateProfileReadModels,
@@ -24,6 +25,7 @@ const {
   mockRateLimitStrict: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockFindUnusableSourceLinks: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockUpdateCraftCache: vi.fn(),
   mockInvalidateProfileReadModels: vi.fn(),
@@ -71,6 +73,10 @@ vi.mock("@/lib/profile/orchestrated-profile", () => ({
     mockMaterializeOrchestratedProfile(...args),
   persistOrchestratedSnapshot: (...args: unknown[]) =>
     mockPersistOrchestratedSnapshot(...args),
+}));
+
+vi.mock("@/lib/platform/source-diagnostics", () => ({
+  findUnusableSourceLinks: (...args: unknown[]) => mockFindUnusableSourceLinks(...args),
 }));
 
 vi.mock("@/lib/auth/github-session-token", () => ({
@@ -142,6 +148,7 @@ describe("POST /api/refresh", () => {
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     mockCacheDel.mockResolvedValue(undefined);
+    mockFindUnusableSourceLinks.mockResolvedValue([]);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     mockUpdateCraftCache.mockResolvedValue(undefined);
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
@@ -335,6 +342,20 @@ describe("POST /api/refresh", () => {
       }),
     );
     expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  // Same rule as /api/generate: a dead platform connection is the user's to
+  // fix, and "try again later" sends them in a circle.
+  it("names an expired connection with a 409 instead of a blank 502", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue(null);
+    mockFindUnusableSourceLinks.mockResolvedValue(["bitbucket"]);
+
+    const res = await POST(makeRequest("testuser"));
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.staleSources).toEqual(["bitbucket"]);
+    expect(mockCaptureServerError).not.toHaveBeenCalled();
   });
 
   it("returns 401 when no GitHub token is stored for the session", async () => {

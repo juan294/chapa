@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ImpactV6Result } from "@chapa/shared";
+import type { LeaderboardEntry } from "@/lib/profile/leaderboard";
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { NavbarClient } from "@/components/NavbarClient";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -38,10 +39,12 @@ const WEBMCP_TRANSCRIPT_URL = "https://github.com/juan294/chapa/blob/main/docs/w
 const SITE_TOOL_COUNT = new Set(SITE_TOOL_MAP.flatMap((entry) => entry.tools)).size;
 const action = "inline-flex min-h-12 items-center justify-between gap-4 rounded-[3px] border border-action bg-action px-6 py-3 font-heading text-sm font-semibold text-action-text shadow-card transition-colors hover:bg-action-hover";
 const inner = "mx-auto max-w-7xl px-5 sm:px-8 lg:px-12";
+/** Podium places, gold to bronze. A fourth entry would fall back to a neutral. */
+const MEDALS = ["bg-medal-gold", "bg-medal-silver", "bg-medal-bronze"];
 
 /** Static translated body; interactions and URL effects stay in small client leaves. */
-export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, t }: {
-  demoBadgeSvg: string; readmeBadgeSvg: string; demoImpact: ImpactV6Result; t: TFunction;
+export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topScored = [], t }: {
+  demoBadgeSvg: string; readmeBadgeSvg: string; demoImpact: ImpactV6Result; topScored?: LeaderboardEntry[]; t: TFunction;
 }) {
   const r = (key: string) => t(`landing.redesign.${key}`) as string;
   const navLinks = tArray<{ label: string; href: string }>(t, "landing.navLinks");
@@ -61,31 +64,68 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, t }: 
   return <div className="min-h-screen bg-bg text-text-primary">
     <LandingUrlEffects /><NavbarClient navLinks={navLinks} />
     <main id="main-content" className="pt-[69px]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stroke bg-card px-5 py-3 font-heading text-[11px] sm:px-8">
-        <span>● ● ● <span className="ml-3">chapa — ~/home</span></span>
-        <CommandPrompt command="/help" className="min-h-11 text-text-secondary">{r("keyboardInvite")} <kbd className="ml-2 border border-stroke-strong px-2">/</kbd></CommandPrompt>
+      {/* Terminal chrome carrying the platform's current standings: the three
+          highest live scores, each linking to that public badge. Sourced from
+          snapshots, never the signup table (see dbGetTopScoredProfiles). */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-stroke bg-card px-5 py-4 font-heading text-[11px] text-text-secondary sm:px-8">
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-track" />
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-track" />
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-track" />
+          <Link href="/about/leaderboard" className="ml-3 underline-offset-4 hover:text-text-primary hover:underline">
+            {r("leaderboardExplainer")}
+          </Link>
+        </span>
+        {topScored.length > 0 && (
+          <span className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="tracking-wider uppercase">{r("topScoresLabel")}</span>
+            <ol className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {topScored.map((profile) => (
+                <li key={profile.handle}>
+                  <Link href={`/u/${profile.handle}`} className="group inline-flex items-center gap-2 underline-offset-4 hover:underline">
+                    <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-[2px] px-1 text-[10px] font-semibold text-forest ${MEDALS[profile.rank - 1] ?? "bg-track"}`}>
+                      {profile.rank}
+                    </span>
+                    <span className="text-text-primary">@{profile.handle}</span>
+                    <span className="tabular-nums text-amber-text">{profile.score}</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          </span>
+        )}
       </div>
       <section id="hero" className="grid scroll-mt-24 border-b border-stroke lg:grid-cols-[.95fr_1.05fr]">
         <div className="min-w-0 px-5 py-12 sm:px-8 lg:px-12 lg:py-16">
-          <CommandPrompt command="/whoami" className="min-h-11 font-heading text-xs text-amber-text">guest@chapa:~ $ /whoami<span className="animate-cursor-blink" aria-hidden="true"> ▌</span></CommandPrompt>
+          <CommandPrompt command="/whoami" className="min-h-11 font-heading text-xs text-text-primary"><span className="text-amber-text">guest@chapa:~</span> $ /whoami<span className="animate-cursor-blink text-amber-text" aria-hidden="true"> ▌</span></CommandPrompt>
           <h1 className="mt-5 font-display text-[clamp(3.8rem,8.4vw,9rem)] leading-[.87] font-extrabold tracking-tight uppercase">
             {lines.map((line, index) => <span key={line} className={`block break-words ${index === lines.length - 1 ? "font-heading text-[.78em] font-bold leading-[1.15] tracking-tighter text-amber-text" : ""}`}>{line}</span>)}
           </h1>
           <p className="mt-8 max-w-lg text-base leading-relaxed text-text-secondary">{r("explanation")}</p>
-          <div className="mt-7 flex flex-wrap items-center gap-4"><Link href="/studio" className={action}>{r("studioCta")} ↗</Link><Link href="#features" className="inline-flex min-h-11 items-center font-heading text-sm underline underline-offset-4">/archetypes ↓</Link></div>
+          <div className="mt-7 flex flex-wrap items-center gap-4"><LoginCtaButton label={r("loginCta")} pendingLabel={t("landing.finalCta.buttonPending") as string} size="lg" /><Link href="#features" className="inline-flex min-h-11 items-center font-heading text-sm underline underline-offset-4">/archetypes ↓</Link></div>
           <dl id="stats" className="mt-9 flex flex-wrap gap-7 border-t border-stroke pt-5">
             {tArray<{ value: string; label: string }>(t, "landing.stats").map((stat) => <div key={stat.label}><dd className="font-heading text-2xl">{stat.value}</dd><dt className="font-heading text-[11px] text-text-secondary">{stat.label}</dt></div>)}
           </dl>
         </div>
         <div id="badge-preview" className="relative flex min-w-0 scroll-mt-28 flex-col justify-between overflow-hidden border-t border-stroke bg-hero-band px-6 py-8 sm:px-10 lg:border-t-0 lg:border-l">
           <div className="relative z-10 flex flex-wrap justify-between gap-3 font-heading text-[11px] text-text-secondary"><span>~/developer/profile.chapa</span><span>{r("stageLabel")}</span></div>
-          <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-[clamp(20rem,50vw,52rem)] leading-none text-amber/20">C</span>
+          <span aria-hidden="true" className="pointer-events-none absolute top-[14%] left-[-22%] aspect-square w-[78%] rounded-full bg-amber-dark" />
           <div className="relative mx-auto my-16 w-full max-w-[1200px] -rotate-3 sm:my-24">
-            {/* Escaped output of the one production renderer; the overlay shares its transform. */}
-            <div role="img" aria-label={sampleAlt} className="shadow-card [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: demoBadgeSvg }} />
+            {/* A second panel offset behind the frame: the badge reads as one
+                artifact off a stack, and the stage gains depth the flat SVG
+                cannot carry on its own. */}
+            <div aria-hidden="true" className="absolute inset-0 translate-x-4 translate-y-5 bg-dark-section" />
+            <div className="relative border border-forest-line bg-dark-section p-3 shadow-[0_30px_70px_-20px_rgba(0,0,0,.75)] sm:p-4">
+              {/* Escaped output of the one production renderer; the overlay shares its transform. */}
+              <div role="img" aria-label={sampleAlt} className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: demoBadgeSvg }} />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 font-heading text-[11px] text-forest-dim">
+                <span>/inspect badge.svg</span>
+                <Link href="/studio" className="inline-flex min-h-11 items-center tracking-wider text-forest-text uppercase underline-offset-4 hover:underline focus-visible:outline-forest-text!">{r("studioCta")} ↗</Link>
+              </div>
+            </div>
             <BadgeOverlay />
           </div>
-          <div className="relative z-10"><p className="max-w-xs font-heading text-sm">{r("stageCaption")}</p><p className="mt-4 max-w-xl text-xs leading-relaxed text-text-secondary">{r("sampleDisclosure")}</p><p className="mt-3 font-heading text-xs">{demoImpact.adjustedComposite} / {tierLabel}</p></div>
+          <div className="relative z-10"><p className="font-heading text-base leading-snug">{r("stageCaption").split(/(?<=\.)\s+/).map(sentence => <span key={sentence} className="block">{sentence}</span>)}</p><p className="mt-5 font-heading text-[11px] tracking-wider text-text-secondary">{r("stageFigure")}</p></div>
         </div>
       </section>
       <div className="flex flex-wrap items-center justify-between gap-5 border-b border-stroke px-5 py-6 sm:px-8">

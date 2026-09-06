@@ -49,6 +49,10 @@ const {
   mockResolveBadgeConfigSnapshot: vi.fn(),
 }));
 
+// The badge's verification strip is wrapped in next/link, whose module object
+// is circular; these assertions serialize the JSX tree with JSON.stringify.
+vi.mock("next/link", () => ({ default: "a" }));
+
 vi.mock("@/lib/render/badge-config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/render/badge-config")>();
   return {

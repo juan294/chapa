@@ -70,6 +70,7 @@ export const config = {
     "/about",
     "/about/scoring",
     "/about/verification",
+    "/about/leaderboard",
     "/privacy",
     "/terms",
     "/archetypes/builder",

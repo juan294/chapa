@@ -138,7 +138,7 @@ export function materializeImpactState(
     latestSnapshot,
     // Persist the smoothed composite so the history sparkline stays smooth and
     // tomorrow's EMA has a stable prior; the headline stays fresh.
-    snapshot: buildSnapshot(stats, smoothedImpact, options.today),
+    snapshot: buildSnapshot(stats, smoothedImpact, options.today, displayState.rawImpact.adjustedComposite),
     inputsChanged,
   };
 }

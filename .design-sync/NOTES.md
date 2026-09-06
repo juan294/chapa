@@ -465,7 +465,7 @@ empty list verbatim; all of it survived. Never hand-derive this list.
 
 The redesign preserves the existing project ID, package shape/name, global name,
 CSS entry, config keys, manual prop contracts and all 15 curated exports. The
-current token manifest contains **73 design declarations, including 67 colors**;
+current token manifest contains **77 design declarations, including 71 colors**;
 `--tw-*` engine variables remain in compiled CSS and are excluded from the
 separate token manifest. Historical counts above describe earlier revisions.
 

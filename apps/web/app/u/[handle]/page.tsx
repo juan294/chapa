@@ -26,6 +26,7 @@ import {
   resolveBadgeAvatar,
 } from "@/lib/render/avatar-outcome";
 import { CommandBarHint } from "@/components/CommandBarHint";
+import Link from "next/link";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
   getPublicProfileVerification,
@@ -435,7 +436,18 @@ export async function SharePageContent({
 
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
-          <div className="rounded-[3px] border border-stroke bg-card p-4">
+          <div className="relative rounded-[3px] border border-stroke bg-card p-4">
+            {/* The badge draws its own verification strip down the right edge.
+                That strip is the profile's only route to the verification
+                record now that the header pill is gone, so it is covered by a
+                transparent link rather than repeating the claim in text. */}
+            {verification?.hash && (
+              <Link
+                href={`/verify/${verification.hash}`}
+                aria-label={t("badge.metricsVerified") as string}
+                className="absolute top-4 right-4 bottom-4 z-10 w-[5%] rounded-[3px] focus-visible:outline-2 focus-visible:outline-amber-text"
+              />
+            )}
             <div
               role="img"
               aria-labelledby={badgeLabelId}

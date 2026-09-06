@@ -161,8 +161,13 @@ export async function fetchContributionData(
           .map((n) => ({ stargazerCount: n.stargazerCount, forkCount: n.forkCount, watchers: { totalCount: n.watchers.totalCount } })),
       },
     };
-  } catch {
-    console.error(`[github] fetch error for ${login}`);
+  } catch (error) {
+    // The reason matters and used to be dropped: an AbortError (the 15s
+    // timeout) and a TypeError from an unexpected payload shape are different
+    // problems with different fixes, and this line was the only trace of
+    // either. Error name and message carry no credentials.
+    const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    console.error(`[github] fetch error for ${login} — ${reason}`);
     return null;
   }
 }

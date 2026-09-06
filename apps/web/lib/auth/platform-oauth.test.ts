@@ -893,3 +893,16 @@ describe("badge SVG invalidation covers every locale (#1190)", () => {
     expect(source).toContain("invalidateBadgeSvgCacheForHandle");
   });
 });
+
+// The OAuth round trip used to always land on the share page, so linking a
+// second platform from /settings meant navigating back and starting over.
+describe("connect returnTo", () => {
+  it("only accepts a same-origin path", async () => {
+    const { __test } = await import("./platform-oauth");
+    expect(__test.safeReturnPath("/settings", "/u/juan294")).toBe("/settings");
+    expect(__test.safeReturnPath("//evil.example", "/u/juan294")).toBe("/u/juan294");
+    expect(__test.safeReturnPath("https://evil.example", "/u/juan294")).toBe("/u/juan294");
+    expect(__test.safeReturnPath(null, "/u/juan294")).toBe("/u/juan294");
+    expect(__test.safeReturnPath("", "/u/juan294")).toBe("/u/juan294");
+  });
+});

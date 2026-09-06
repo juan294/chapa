@@ -12,6 +12,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 /**
  * Client-side component that renders public share-page sections plus owner-only
@@ -27,9 +28,15 @@ import { useTranslation } from "@/lib/i18n";
  * - Visitor: i18n-aware acquisition CTA
  */
 
+/** Display names for connectable platforms; the API answers with lowercase ids. */
+const PLATFORM_NAMES: Record<string, string> = { bitbucket: "Bitbucket", codeberg: "Codeberg", gitlab: "GitLab" };
+
 function EmptyImpactState({ handle }: { handle: string }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  // A 409 names the platform connection that blocked the fetch. Regenerating
+  // cannot fix a dead token, so say which one and stop offering the loop.
+  const [staleSources, setStaleSources] = useState<string[]>([]);
 
   async function handleRegenerate() {
     setStatus("loading");
@@ -40,9 +47,19 @@ function EmptyImpactState({ handle }: { handle: string }) {
       if (res.ok) {
         setStatus("success");
         setTimeout(() => window.location.reload(), 800);
-      } else {
-        setStatus("error");
+        return;
       }
+      if (res.status === 409) {
+        const sources = await res.json().then(
+          (body: unknown) => {
+            const value = (body as { staleSources?: unknown } | null)?.staleSources;
+            return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+          },
+          () => [],
+        );
+        setStaleSources(sources);
+      }
+      setStatus("error");
     } catch {
       setStatus("error");
     }
@@ -52,7 +69,11 @@ function EmptyImpactState({ handle }: { handle: string }) {
     <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
       <div className="rounded-[3px] border border-stroke bg-card p-8 space-y-4">
         <p className="text-text-secondary text-sm">
-          {t('shareOwner.emptyState') as string}
+          {staleSources.length > 0
+            ? interpolate(t("generation.errorStaleSource") as string, {
+                platforms: staleSources.map((source) => PLATFORM_NAMES[source] ?? source).join(", "),
+              })
+            : (t('shareOwner.emptyState') as string)}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <button

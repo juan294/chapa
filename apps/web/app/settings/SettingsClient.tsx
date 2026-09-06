@@ -246,7 +246,7 @@ export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) 
                     </button>
                   ) : (
                     <a
-                      href={`/api/auth/${platform}/connect`}
+                      href={`/api/auth/${platform}/connect?returnTo=/settings`}
                       className="flex min-h-[44px] items-center rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-colors hover:bg-action-hover"
                     >
                       {t(LINK_KEYS[platform]) as string}

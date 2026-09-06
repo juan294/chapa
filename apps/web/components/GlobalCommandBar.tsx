@@ -2,9 +2,8 @@
 
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { navigateInApp } from "@/lib/navigation";
-import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
 import type { TerminalInputHandle } from "@/components/terminal/TerminalInput";
@@ -25,6 +24,7 @@ import {
 } from "@/lib/keyboard/shortcuts";
 
 const HISTORY_LIMIT = 50;
+const HINT_COUNT = 5;
 const EMPTY_COMMANDS: CommandDef[] = [];
 
 export interface GlobalCommandBarProps {
@@ -33,10 +33,9 @@ export interface GlobalCommandBarProps {
   scopedCommands?: CommandDef[];
   onCustomAction?: (action: Extract<CommandAction, {type: "custom"}>) => Promise<OutputLine[] | undefined>;
 }
-const CHIP_COUNT = 6;
 
 /**
- * Fixed bottom command bar with navigation commands + AuthorTypewriter pill.
+ * Fixed bottom command bar with navigation commands.
  * Use on any page that doesn't have its own terminal interface.
  */
 export function GlobalCommandBar({
@@ -49,6 +48,7 @@ export function GlobalCommandBar({
   const { theme, setTheme } = useTheme();
   const { studioEnabled } = useClientFeatureFlags();
   const { t } = useTranslation();
+  const pathname = usePathname();
   const terminalRef = useRef<TerminalInputHandle>(null);
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -73,7 +73,24 @@ export function GlobalCommandBar({
     };
     return createNavigationCommands({isAdmin, studioEnabled, descriptions, messages, additionalCommands: [themeCommand, ...scopedCommands]});
   }, [isAdmin, studioEnabled, descriptions, messages, scopedCommands, theme, setTheme]);
-  const chipCommands = useMemo(() => commands.slice(0, CHIP_COUNT), [commands]);
+
+  const hints = useMemo(
+    () => commands.slice(0, HINT_COUNT).map(command => command.usage ?? command.name),
+    [commands],
+  );
+  // Literal fallbacks match the command registry's own `d.x ?? "..."` style:
+  // a dock label is chrome, and an empty one reads as a rendering bug.
+  const dock = useMemo(() => {
+    const strings = tObject<Record<string, string>>(t, "terminalInput.dock");
+    return {
+      navigate: strings.navigate ?? "navigate",
+      complete: strings.complete ?? "tab complete",
+      dismiss: strings.dismiss ?? "esc dismiss",
+      enter: strings.enter ?? "enter",
+      anywhere: strings.anywhere ?? "press / anywhere",
+    };
+  }, [t]);
+  const cwd = pathname === "/" ? "~/home" : `~${pathname}`;
 
   useEffect(() => {
     const fill = (event: Event) => {
@@ -154,16 +171,26 @@ export function GlobalCommandBar({
     <TerminalPresentation value="ink">
       {!skipShortcutsListener && <KeyboardShortcutsListener />}
       {/* #1214 — the bar stays inline at the bottom of the viewport rather
-          than opening as a full-screen palette. The chips make the commands
-          discoverable without typing `/` first, which is what the palette
-          overlay was there to do. */}
-      {/* Reserve document space for the two-row dock, including on short pages. */}
-      <div aria-hidden="true" className="h-32 shrink-0" />
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-forest-line bg-forest px-4 py-2.5 text-forest-text md:pr-64">
-        <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
-          <AuthorTypewriter />
-        </div>
+          than opening as a full-screen palette. Typing `/` opens the
+          autocomplete, which is how commands are discovered here. */}
+      {/* Reserve document space for the three-row dock, including on short pages. */}
+      <div aria-hidden="true" className="h-28 shrink-0" />
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-forest-line bg-forest px-4 py-2.5 text-forest-text">
         <div className="relative mx-auto max-w-4xl">
+          {/* Terminal chrome: where you are on the left, the keys that work on
+              the right. Both are labels, not controls. */}
+          <div aria-hidden="true" className="mb-1.5 flex items-center justify-between gap-4 font-heading text-[11px] text-forest-dim">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="h-1.5 w-1.5 shrink-0 bg-forest-accent" />
+              chapa
+              <span className="ml-2 truncate text-forest-text">{cwd}</span>
+            </span>
+            <span className="hidden shrink-0 gap-5 sm:flex">
+              <span>↑↓ {dock.navigate}</span>
+              <span>{dock.complete}</span>
+              <span>{dock.dismiss}</span>
+            </span>
+          </div>
           {outputLines.length > 0 && (
             <div className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-[3px] border border-forest-line bg-forest-card shadow-card">
               <TerminalOutput lines={outputLines} />
@@ -191,32 +218,22 @@ export function GlobalCommandBar({
             suggestionsListboxId={TERMINAL_COMMAND_LISTBOX_ID}
             activeSuggestionId={activeSuggestionId}
             trailing={
-              <kbd
+              <span
                 aria-hidden="true"
-                className="hidden shrink-0 rounded border border-forest-line px-1.5 py-0.5 font-heading text-[11px] text-forest-dim sm:block"
+                className="hidden shrink-0 items-center gap-2.5 self-stretch border-l border-forest-line pl-3 font-heading text-[11px] text-forest-dim sm:flex"
               >
-                /
-              </kbd>
+                <span>{dock.enter} ↵</span>
+                <kbd className="rounded border border-forest-line px-1.5 py-0.5">/</kbd>
+              </span>
             }
           />
-          {chipCommands.length > 0 && (
-            <div
-              className="mt-2 flex gap-2 overflow-x-auto pb-0.5"
-              aria-label={t("aria.commandSuggestions") as string}
-            >
-              {chipCommands.map((command) => (
-                <button
-                  key={command.name}
-                  type="button"
-                  onClick={() => handleAutocompleteFill(command.name)}
-                  title={command.description}
-                  className="min-h-11 shrink-0 rounded-[3px] border border-forest-line px-3 py-1.5 font-heading text-xs whitespace-nowrap text-forest-dim transition-colors hover:border-forest-text hover:text-forest-text focus-visible:outline-forest-text!"
-                >
-                  {command.name}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Command hints, not buttons: the dock is for typing. */}
+          <div aria-hidden="true" className="mt-1.5 flex items-center justify-between gap-4 font-heading text-[11px] text-forest-dim">
+            <span className="flex min-w-0 gap-5 overflow-x-auto whitespace-nowrap">
+              {hints.map(hint => <span key={hint}>{hint}</span>)}
+            </span>
+            <span className="hidden shrink-0 sm:inline">{dock.anywhere}</span>
+          </div>
         </div>
       </div>
     </TerminalPresentation>

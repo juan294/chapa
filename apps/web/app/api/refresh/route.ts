@@ -4,6 +4,7 @@ import { rateLimitStrict } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
+import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
 import { getRequestId } from "@/lib/log";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
@@ -77,6 +78,18 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     token,
   });
   if (!materialized) {
+    // A connected platform whose token can no longer be refreshed makes the
+    // whole fetch null — a connected source must not silently disappear from
+    // an aggregate. Retrying cannot fix that, so name the connection instead
+    // of returning a bare 502 the user can only stare at (same treatment as
+    // /api/generate).
+    const unusable = await findUnusableSourceLinks(handle);
+    if (unusable.length > 0) {
+      return NextResponse.json(
+        { error: `Reconnect ${unusable.join(", ")} to include it in your profile.`, staleSources: unusable },
+        { status: 409 },
+      );
+    }
     void captureServerError({
       route: "/api/refresh",
       statusCode: 502,

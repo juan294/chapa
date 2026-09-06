@@ -16,4 +16,14 @@ describe("SharePageLoading render — i18n (#1109)", () => {
     expect(screen.getByRole("status", { name: "Loading" })).toBeDefined();
     expect(screen.getByText("Loading...")).toBeDefined();
   });
+
+  // The skeleton used to paint at 6% accent alpha, which is invisible on the
+  // dark ground: a multi-second wait looked like a blank page.
+  it("shows a visible sighted-user signal, not only screen-reader text", () => {
+    const { container } = render(<SharePageLoading />);
+    expect(screen.getByText("Building the badge")).toBeDefined();
+    expect(container.querySelector(".animate-shimmer")).not.toBeNull();
+    expect(container.querySelectorAll(".bg-track").length).toBeGreaterThan(5);
+    expect(container.innerHTML).not.toContain("bg-amber/[0.06]");
+  });
 });

@@ -432,7 +432,7 @@ describe("fetchContributionData", () => {
 
     expect(result).toBeNull();
     expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
-      "[github] fetch error for testuser",
+      expect.stringMatching(/^\[github\] fetch error for testuser — \w+: /),
     );
     consoleSpy.mockRestore();
   });
@@ -650,7 +650,7 @@ describe("fetchContributionData", () => {
 
     expect(result).toBeNull();
     expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
-      "[github] fetch error for testuser",
+      expect.stringMatching(/^\[github\] fetch error for testuser — \w+: /),
     );
     consoleSpy.mockRestore();
   });

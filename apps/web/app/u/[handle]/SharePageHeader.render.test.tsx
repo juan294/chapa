@@ -18,6 +18,16 @@ function renderHeader(overrides: Partial<Parameters<typeof SharePageHeader>[0]> 
 }
 
 describe("SharePageHeader (#1217)", () => {
+  // The badge below draws the score, tier and verification state, so the
+  // header no longer repeats them.
+  it("shows identity only, leaving the score to the badge", () => {
+    render(<SharePageHeader handle="juan294" displayLabel="Juan González" score={82} tier="High" verificationHash="abc123" />);
+
+    expect(screen.getByText("Juan González")).toBeDefined();
+    expect(screen.queryByText("82")).toBeNull();
+    expect(screen.queryByText(/verified metrics/i)).toBeNull();
+  });
+
   it("names whose profile this is in a real, visible h1", () => {
     renderHeader();
     const h1 = screen.getByRole("heading", { level: 1 });
@@ -30,22 +40,7 @@ describe("SharePageHeader (#1217)", () => {
     expect(container.textContent).toContain("% chapa profile @bertramgilfoyle");
   });
 
-  it("pairs the score with its caption and tier", () => {
-    renderHeader();
-    expect(screen.getByText("82")).toBeDefined();
-    expect(screen.getByText("impact score")).toBeDefined();
-    expect(screen.getByText("High")).toBeDefined();
-  });
 
-  it("links the verification pill to the verify page, in the complement family", () => {
-    renderHeader({ verificationHash: "abc123" });
-    const pill = screen.getByRole("link", { name: /verified metrics/i });
-    expect(pill.getAttribute("href")).toBe("/verify/abc123");
-    expect(pill.className).toContain("border-complement");
-    expect(pill.className).toContain("text-complement-text");
-    // Verification is never jade — that is the brand accent, a different signal.
-    expect(pill.className).not.toContain("text-amber");
-  });
 
   it("omits the verification pill when the profile has no seal", () => {
     renderHeader();

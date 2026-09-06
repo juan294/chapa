@@ -147,7 +147,9 @@ describe("Home page render (en)", () => {
     expect(readme?.alt).toBe("Sample Chapa badge: score 92, Elite, simulated metrics.");
     expect(screen.getAllByRole("img", { name: readme!.alt })).toHaveLength(2);
     expect(container.querySelectorAll("svg[data-testid='demo-badge']")).toHaveLength(1);
-    expect(screen.getByText("Curated simulated values. This example is not the computed profile of a real developer.")).toBeDefined();
+    // The sample claim now lives on the artifact itself (the badge's own
+    // "SAMPLE · NOT A REAL BADGE" strip), not in a paragraph beside it.
+    expect(screen.getByText("FIG. 01 — THE WORK BECOMES THE SIGNATURE")).toBeDefined();
   });
 
   it("renders how-it-works steps", async () => {

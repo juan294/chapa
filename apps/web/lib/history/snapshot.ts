@@ -13,6 +13,10 @@ export function buildSnapshot(
   stats: StatsData,
   impact: ImpactV6Result,
   today?: string,
+  /** The fresh, unsmoothed composite this capture displayed. Recorded beside
+   * the smoothed one so a snapshot reader can publish the badge's number
+   * without recomputing the profile. */
+  headlineScore?: number,
 ): MetricsSnapshot {
   const now = new Date();
   const snapshot: MetricsSnapshot = {
@@ -49,6 +53,7 @@ export function buildSnapshot(
     profileType: impact.profileType,
     compositeScore: impact.compositeScore,
     adjustedComposite: impact.adjustedComposite,
+    ...(headlineScore !== undefined && { headlineScore }),
     confidence: impact.confidence,
     tier: impact.tier,
   };

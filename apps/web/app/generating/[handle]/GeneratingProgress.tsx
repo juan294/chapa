@@ -3,9 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 type StepStatus = "pending" | "active" | "done" | "error";
-type ErrorKind = "rateLimited" | "session" | "generic";
+type ErrorKind = "rateLimited" | "session" | "staleSource" | "generic";
+
+/** Display names for the platforms a user can connect; the API answers with
+ * the lowercase provider ids the rest of the codebase uses. */
+const PLATFORM_NAMES: Record<string, string> = { bitbucket: "Bitbucket", codeberg: "Codeberg", gitlab: "GitLab" };
 
 const STEP_DELAY_MS = 300;
 const REDIRECT_DELAY_MS = 800;
@@ -44,6 +49,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
   // transition instead of a burst covering every step (#1114).
   const [announcedStepIndex, setAnnouncedStepIndex] = useState(0);
   const [errorKind, setErrorKind] = useState<ErrorKind | null>(null);
+  const [staleSources, setStaleSources] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [showSlowNotice, setShowSlowNotice] = useState(false);
 
@@ -62,6 +68,13 @@ export function GeneratingProgress({ handle }: { handle: string }) {
       message: t('generation.errorSession') as string,
       href: signInAgainHref,
       linkText: t('generation.signInAgain') as string,
+    },
+    staleSource: {
+      message: interpolate(t('generation.errorStaleSource') as string, {
+        platforms: staleSources.map((source) => PLATFORM_NAMES[source] ?? source).join(", "),
+      }),
+      href: "/settings",
+      linkText: t('generation.reconnect') as string,
     },
     generic: {
       message: t('generation.error') as string,
@@ -137,8 +150,24 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         if (cancelled) return;
 
         if (!res.ok) {
+          // 409 carries the connections that blocked the fetch; a malformed or
+          // missing body degrades to the generic message rather than throwing.
+          const sources = res.status === 409
+            ? await res.json().then(
+                (body: unknown) => {
+                  const value = (body as { staleSources?: unknown } | null)?.staleSources;
+                  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+                },
+                () => [],
+              )
+            : [];
+          if (cancelled) return;
+          setStaleSources(sources);
           const kind: ErrorKind =
-            res.status === 429 ? "rateLimited" : res.status === 401 ? "session" : "generic";
+            res.status === 429 ? "rateLimited"
+              : res.status === 401 ? "session"
+                : sources.length > 0 ? "staleSource"
+                  : "generic";
           setErrorKind(kind);
           setStepStatuses((prev) =>
             prev.map((s) => (s === 'active' ? 'error' : s)),

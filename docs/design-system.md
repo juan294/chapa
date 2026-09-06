@@ -21,7 +21,7 @@ Manrope is body/UI and Barlow Condensed is reserved for expressive display.
 
 ## Colors
 
-Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`: 73 tokens total, comprising 67 colors, four font roles and two shadows. Theme-aware colors use one `light-dark(<light>, <dark>)` declaration; fixed colors resolve identically in both themes. Both values are listed below. Token export must match the current declarations exactly, rather than assuming this count can never change.
+Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`: 77 tokens total, comprising 71 colors, four font roles and two shadows. Theme-aware colors use one `light-dark(<light>, <dark>)` declaration; fixed colors resolve identically in both themes. Both values are listed below. Token export must match the current declarations exactly, rather than assuming this count can never change.
 
 | Token | Light value | Dark value |
 | --- | --- | --- |
@@ -57,6 +57,10 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`: 73 tokens tot
 | `--color-forest-line` | `#f4f0e766` | `#f4f0e766` |
 | `--color-forest-text` | `#f4f0e7` | `#f4f0e7` |
 | `--color-forest-dim` | `#c2c0b8` | `#c2c0b8` |
+| `--color-forest-accent` | `#ff795f` | `#ff795f` |
+| `--color-medal-gold` | `#d4a017` | `#d4a017` |
+| `--color-medal-silver` | `#a8b0b8` | `#a8b0b8` |
+| `--color-medal-bronze` | `#b8763e` | `#b8763e` |
 | `--color-forest-grid` | `#f4f0e70a` | `#f4f0e70a` |
 | `--color-forest-ok` | `oklch(.8 .16 148)` | `oklch(.8 .16 148)` |
 | `--color-forest-warn` | `oklch(.82 .13 85)` | `oklch(.82 .13 85)` |
@@ -101,7 +105,8 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`: 73 tokens tot
   Primary actions use `bg-action text-action-text hover:bg-action-hover`.
   Both states use the same paired foreground; do not assume white-on-coral.
 - The hero/stage is theme-aware ice. Fixed terminals use ink `forest` surfaces
-  with `forest-text`, `forest-dim` and fixed `forest-ok/warn/err` status roles.
+  with `forest-text`, `forest-dim`, the fixed coral `forest-accent` (the terminal
+  prompt and status dot) and fixed `forest-ok/warn/err` status roles.
   A scoped terminal presentation context chooses these classes without changing
   theme tokens globally or affecting Studio's theme-aware session controls.
   Fixed ink controls use full-opacity `forest-text` focus outlines; page accent

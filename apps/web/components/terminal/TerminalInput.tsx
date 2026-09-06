@@ -144,8 +144,9 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
     // suggestion chips) belongs to the caller, so Studio and the global
     // command bar can frame the same field differently.
     <div className={`flex min-h-[46px] items-center gap-2 rounded-[3px] border px-3 font-terminal text-base leading-6 transition-colors sm:text-sm ${ink ? "border-forest-line bg-forest-card focus-within:border-forest-text" : "border-stroke-strong bg-card focus-within:border-amber-text"}`}>
-      <span className={`select-none shrink-0 ${ink ? "text-forest-text" : "text-amber-text"}`}>
-        {prompt} &gt;
+      <span className="select-none shrink-0">
+        <span className={ink ? "text-forest-accent" : "text-amber-text"}>{prompt}</span>
+        <span className={`ml-2 ${ink ? "text-forest-dim" : "text-terminal-dim"}`}>&gt;</span>
       </span>
       <div className="relative min-w-0 flex-1">
         <input

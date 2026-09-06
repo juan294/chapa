@@ -109,7 +109,10 @@ describe("SettingsClient", () => {
     renderSettings();
     const row = screen.getByTestId("settings-connection-codeberg");
     expect(
-      row.querySelector('a[href="/api/auth/codeberg/connect"]'),
+      // Linking from settings must come back to settings, so a second platform
+      // can be linked without navigating back (the OAuth round trip used to
+      // land on the share page).
+      row.querySelector('a[href="/api/auth/codeberg/connect?returnTo=/settings"]'),
     ).toBeTruthy();
   });
 

@@ -37,10 +37,40 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 6. Badge **verification** via HMAC-SHA256 hash (proves badge data hasn't been tampered with).
 7. Caching + rate limit friendliness (daily cache is fine).
 8. Minimal analytics (PostHog) for key events.
+9. Show a **landing leaderboard**: the three highest *current* scores, in the
+   strip between navbar and hero, each linking to that public badge.
+   **The number on the board is the number on the badge.** That is not free,
+   because a snapshot deliberately stores the EMA-smoothed composite while the
+   badge draws the fresh `adjustedComposite` (#1001) — a board built straight
+   off snapshots publishes a number the visitor cannot find on the profile it
+   links to. So `getLeaderboard` (`lib/profile/leaderboard.ts`) does it in two
+   steps: `dbGetTopScoredProfiles` picks a candidate pool with one indexed
+   query (each handle's most recent snapshot inside 30 days, so an unscored
+   handle drops out), then each candidate is materialized to read the same
+   live headline `renderBadgeSvg` prints, and the pool is ranked on *those*
+   numbers. A handle that cannot be materialized keeps its stored score rather
+   than vanishing. Candidates come from `metrics_snapshots`, never `users`: a
+   snapshot means a public badge already exists at `/u/:handle`, whereas the
+   signup table records who signed in, which is not ours to publish. That also
+   means a handle nobody registered (a README embed of a stranger's badge) can
+   rank. The landing page is `force-static` with `revalidate = 3600`, so this
+   runs hourly at revalidate, never per request.
+
+   The badge's number is recorded, not recomputed: `metrics_snapshots.headline_score`
+   (migration 047) holds the fresh adjusted composite each capture displayed,
+   beside the smoothed `adjusted_composite` the trend line needs. **A row
+   without a headline is not ranked at all** — the smoothed composite is a
+   different number, and publishing it would contradict the badge the row links
+   to, so the handle waits for its next capture instead of appearing with the
+   wrong score. That means the board is empty until snapshots written after 047
+   exist; `pnpm run recalculate-handles <handle> --apply` fills one in. Any
+   future surface that shows a stored score should read the headline for the
+   same reason.
 
 ## Non-goals (current scope)
 - No long-term history charts (lifetime metric snapshots are stored but no UI yet)
-- No leaderboard
+- No ranked leaderboard page, standings history, or pagination — the landing
+  strip's top three (below) is the whole ranking surface
 - No paid tiers
 
 ## Stack decisions
@@ -167,7 +197,7 @@ Shared types live in: `packages/shared/src/types.ts`
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body/UI font: **Manrope** (`font-body`). Selective expressive headings use **Barlow Condensed** (`font-display`); technical headings stay JetBrains Mono. Retain browser and bundled **Plus Jakarta Sans** for badge metrics/footer/tier.
 - System/light/dark preference uses the existing `next-themes` provider (system default). Paper light (`#F4F0E7`) and charcoal dark (`#141719`) use ice stages and neutral rules. The badge remains independently dark.
-- `apps/web/styles/globals.css` defines 73 Tailwind v4 `@theme` tokens: 67 colors, four font roles and two shadows. Export the actual declarations, including historical aliases. Raw archetype colors remain data accents; guide headings and small signal labels use the seven theme-aware `archetype-*-text` roles.
+- `apps/web/styles/globals.css` defines 77 Tailwind v4 `@theme` tokens: 71 colors, four font roles and two shadows. Export the actual declarations, including historical aliases. Raw archetype colors remain data accents; guide headings and small signal labels use the seven theme-aware `archetype-*-text` roles.
 - Fixed ink terminal chrome uses the scoped `forest-*` foreground/status family and full-opacity `forest-text` focus outlines. Keep it independent of page tokens; ordinary primary actions use their paired foreground in both default and hover states. Corners are restrained (usually 3px), shadows are neutral solid offsets, and the author signature retains its explicit pill shape.
 - Landing keeps its translated editorial body on the server with small interactive leaves. The fixed bottom dock reserves footer space and retains the last 50 submissions while mounted (no reload persistence). The shared keyboard listener alone owns `/` and Mod+K; landing commands extend the existing registry.
 - Studio uses the 69px navbar offset. Fit/50%/100% are preview-only zoom modes and do not change the seven-field saved configuration.
@@ -439,6 +469,18 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 - **Structure:** Use `describe` blocks grouped by behavior area
 - **Mocking:** Dependencies mocked at module level with `vi.mock()`, configured per test with `vi.mocked()`
 - **API routes:** Test by importing the handler directly and passing a `NextRequest`
+
+## Local database
+
+Local dev runs `develop`, whose migrations production has not seen, so a local
+stack must never point at the production project: `/api/generate` 502s on the
+missing v7 tables, and any local render would write `svg:`/`stats:` keys into
+the Redis instance production reads. Run the local stack instead
+(`supabase start`, `supabase db reset`) plus an Upstash-compatible Redis, and
+give it production's rows with `pnpm run clone-prod-db <prod-env-file>`
+(`scripts/clone-prod-db.ts`). That copy is destructive locally and refuses any
+non-local target. `.env.local` belongs at `apps/web/.env.local`, not the repo
+root — `next dev` runs from `apps/web` and silently ignores a root-level file.
 
 ## Key Commands
 

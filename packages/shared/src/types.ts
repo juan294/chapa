@@ -243,7 +243,14 @@ export interface MetricsSnapshot {
   archetype: DeveloperArchetype;
   profileType: ProfileType;
   compositeScore: number;
+  /** EMA-smoothed composite, kept so the trend line stays continuous (#1001). */
   adjustedComposite: number;
+  /**
+   * The number the badge drew for this capture — the fresh adjusted composite,
+   * before smoothing. Absent on rows written before it was recorded; a reader
+   * falls back to `adjustedComposite` rather than inventing one.
+   */
+  headlineScore?: number;
   confidence: number;
   tier: ImpactTier;
 

@@ -33,7 +33,7 @@ html[lang="en"] [data-document-locale="es"] {
   /* The landing hero band. Theme aware on purpose: an always-dark hero made
      light mode a strip around a dark slab (#1215). Only the badge panel it
      frames stays dark in both themes, via --color-forest-* below. */
-  --color-hero-band: light-dark(#dceaf0, #192b35);
+  --color-hero-band: light-dark(#dceaf0, #15222b);
 
   /* aliases kept for the existing bg-warm-* / border-warm-stroke utilities */
   --color-warm-bg: light-dark(#f4f0e7, #141719);
@@ -91,6 +91,14 @@ html[lang="en"] [data-document-locale="es"] {
   --color-forest-line: #f4f0e766;
   --color-forest-text: #f4f0e7;
   --color-forest-dim: #c2c0b8;
+  --color-forest-accent: #ff795f;
+
+  /* Podium places on the landing leaderboard. Fixed in both themes, like the
+     archetype colors: a medal is data, not chrome. Always paired with dark
+     ink text (`text-forest`), never with the theme's action foreground. */
+  --color-medal-gold: #d4a017;
+  --color-medal-silver: #a8b0b8;
+  --color-medal-bronze: #b8763e;
   --color-forest-grid: #f4f0e70a;
   /* Fixed status values for terminal contexts on either page theme. */
   --color-forest-ok: oklch(.8 .16 148);

@@ -8,7 +8,7 @@ afterEach(cleanup);
 const t = (key: string) => {
   const map: Record<string, string> = {
     "landing.footer.tagline": "Built for developers, by developers.",
-    "landing.footer.poweredBy": "Compatible with",
+    "landing.footer.poweredBy": "Import your work from",
     "landing.footer.about": "About",
     "landing.footer.scoring": "Scoring",
     "landing.footer.terms": "Terms",

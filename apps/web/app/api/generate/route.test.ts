@@ -22,12 +22,17 @@ vi.mock("@/lib/auth/github-session-token", () => ({
   getSessionGitHubToken: vi.fn(),
 }));
 
+vi.mock("@/lib/platform/source-diagnostics", () => ({
+  findUnusableSourceLinks: vi.fn(),
+}));
+
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { rateLimit } from "@/lib/cache/redis";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
+import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 
 const mockRequireSession = vi.mocked(requireSession);
@@ -35,6 +40,7 @@ const mockGetStats = vi.mocked(getStats);
 const mockComputeImpact = vi.mocked(computeImpactV6);
 const mockRateLimit = vi.mocked(rateLimit);
 const mockGetSessionGitHubToken = vi.mocked(getSessionGitHubToken);
+const mockFindUnusableSourceLinks = vi.mocked(findUnusableSourceLinks);
 
 function makeRequest(cookie?: string): NextRequest {
   const req = new NextRequest("http://localhost:3001/api/generate", {
@@ -55,6 +61,7 @@ describe("POST /api/generate", () => {
     vi.resetAllMocks();
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockGetSessionGitHubToken.mockResolvedValue("ghp_test");
+    mockFindUnusableSourceLinks.mockResolvedValue([]);
   });
 
   it("returns 401 when no session cookie is present", async () => {
@@ -129,6 +136,7 @@ describe("POST /api/generate", () => {
   it("returns 502 when both the session-token and server-token fetches fail", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue(null);
+    mockFindUnusableSourceLinks.mockResolvedValue([]);
 
     const res = await POST(makeRequest("chapa_session=abc"));
     expect(res.status).toBe(502);
@@ -137,6 +145,22 @@ describe("POST /api/generate", () => {
     expect(mockGetStats).toHaveBeenCalledTimes(2);
     expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
     expect(mockGetStats).toHaveBeenNthCalledWith(2, "juan294");
+  });
+
+  // A connected platform whose token cannot be refreshed makes getStats null.
+  // Retrying is useless, so the response has to name the connection.
+  it("returns 409 naming the connections that blocked the fetch", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockGetStats.mockResolvedValue(null);
+    mockFindUnusableSourceLinks.mockResolvedValue(["bitbucket", "gitlab"]);
+
+    const res = await POST(makeRequest("chapa_session=abc"));
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.staleSources).toEqual(["bitbucket", "gitlab"]);
+    expect(body.error).toContain("bitbucket");
+    expect(mockFindUnusableSourceLinks).toHaveBeenCalledWith("juan294");
   });
 
   // #1282/#1283 — a first-time handle has no baseline, so a session-token

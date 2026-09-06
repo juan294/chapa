@@ -4,9 +4,8 @@ import { render, screen, fireEvent, cleanup, act } from "@testing-library/react"
 import { GlobalCommandBar } from "./GlobalCommandBar";
 import type { OutputLine } from "./terminal/command-registry";
 
-vi.mock("next/navigation", () => ({useRouter: () => ({push: vi.fn()})}));
+vi.mock("next/navigation", () => ({useRouter: () => ({push: vi.fn()}), usePathname: () => "/"}));
 vi.mock("next-themes", () => ({useTheme: () => ({theme: "system", setTheme: vi.fn()})}));
-vi.mock("./AuthorTypewriter", () => ({AuthorTypewriter: () => null}));
 vi.mock("./KeyboardShortcutsListener", () => ({KeyboardShortcutsListener: () => null}));
 afterEach(cleanup);
 

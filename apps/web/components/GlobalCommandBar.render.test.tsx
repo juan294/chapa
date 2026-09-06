@@ -10,10 +10,7 @@ vi.mock("next-themes", () => ({useTheme: () => ({theme: "dark", setTheme: mockSe
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
-}));
-
-vi.mock("@/components/AuthorTypewriter", () => ({
-  AuthorTypewriter: () => <div data-testid="author-typewriter" />,
+  usePathname: () => "/",
 }));
 
 // Track the ref-clear calls
@@ -108,11 +105,6 @@ describe("GlobalCommandBar", () => {
   it("renders terminal input", () => {
     render(<GlobalCommandBar />);
     expect(screen.getByTestId("terminal-input")).toBeDefined();
-  });
-
-  it("renders AuthorTypewriter", () => {
-    render(<GlobalCommandBar />);
-    expect(screen.getByTestId("author-typewriter")).toBeDefined();
   });
 
   it("allows an editor to intercept command navigation", () => {
@@ -283,33 +275,13 @@ describe("GlobalCommandBar", () => {
     });
   });
 
-  // #1214 — the bar is inline and always visible, so the commands have to be
-  // discoverable without typing `/` first. That is what the rejected palette
-  // overlay was for.
+  // The chip row was removed: the landing page already carries the same
+  // navigation above the fold, and the dock is for typing commands, not
+  // clicking buttons. Typing `/` opens the autocomplete instead.
   describe("suggestion chips", () => {
-    it("renders a scrolling row of command chips", () => {
+    it("renders no chip row under the input", () => {
       render(<GlobalCommandBar />);
-      const row = screen.getByLabelText("Command suggestions");
-      expect(row.className).toContain("overflow-x-auto");
-      const chips = row.querySelectorAll("button");
-      expect(chips.length).toBeGreaterThan(0);
-      for (const chip of Array.from(chips)) {
-        expect(chip.textContent).toMatch(/^\//);
-        expect(chip.className).toContain("whitespace-nowrap");
-        // The unlayered page focus rule must not win on the fixed ink dock.
-        expect(chip.className).toContain("focus-visible:outline-forest-text!");
-      }
-    });
-
-    it("fills the input with the chip's command instead of running it", () => {
-      render(<GlobalCommandBar />);
-      const chip = screen
-        .getByLabelText("Command suggestions")
-        .querySelector("button") as HTMLButtonElement;
-      const command = chip.textContent!;
-      fireEvent.click(chip);
-      expect(mockPush).not.toHaveBeenCalled();
-      expect(mockFill).toHaveBeenCalledWith(`${command} `);
+      expect(screen.queryByLabelText("Command suggestions")).toBeNull();
     });
   });
 });

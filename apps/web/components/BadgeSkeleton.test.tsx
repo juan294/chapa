@@ -23,9 +23,19 @@ describe("BadgeSkeleton", () => {
     expect(shimmer).not.toBeNull();
   });
 
+  // The ratio now sits on the shared BadgeLoadingPlate inside the labelled
+  // element; what matters is that the reserved box is still badge-shaped, so
+  // the real SVG lands without shifting the page.
   it("maintains badge aspect ratio (aspect-[1200/630] class)", () => {
     render(<BadgeSkeleton />);
     const el = screen.getByRole("img", { name: "Loading badge..." });
-    expect(el.className).toContain("aspect-[1200/630]");
+    expect(el.querySelector(".aspect-\\[1200\\/630\\]")).not.toBeNull();
+  });
+
+  // Same plate as the route-level loading.tsx: the two fallbacks run back to
+  // back and must not look like two different states.
+  it("names what is happening", () => {
+    render(<BadgeSkeleton />);
+    expect(screen.getByText("Building the badge")).toBeDefined();
   });
 });

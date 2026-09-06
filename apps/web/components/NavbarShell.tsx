@@ -58,8 +58,8 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
       <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-3 sm:px-6">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <span className="font-heading text-lg tracking-tight text-text-primary">
-            Chapa<span className="text-amber-text animate-cursor-blink">_</span>
+          <span className="font-heading text-2xl font-bold tracking-tight text-text-primary sm:text-[27px]">
+            Chapa<span className="text-amber-text">_</span>
           </span>
         </Link>
 

@@ -11,7 +11,7 @@ import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { clearPlatformStatusCache } from "@/lib/platform/use-platform-connections";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
-import { GitHubIcon } from "@/components/icons";
+import { ChapaBadgeIcon } from "@/components/icons";
 
 /**
  * #1223 — the platform-connection cache, status fetching and unlink flow moved
@@ -67,7 +67,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={t('aria.userMenu') as string}
-        className="flex min-h-11 items-center gap-2 rounded-[3px] border border-text-primary bg-card px-1.5 py-1 transition-colors hover:border-text-primary hover:bg-card"
+        className="flex min-h-11 items-center gap-2 rounded-[3px] bg-transparent px-1.5 py-1 transition-colors hover:bg-purple-tint"
       >
         {imgError ? (
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber/10 text-sm font-semibold text-amber-text">
@@ -79,7 +79,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             alt={avatarAlt}
             width={32}
             height={32}
-            className="h-8 w-8 rounded-full img-outline"
+            className="h-8 w-8 rounded-full"
             onError={() => setImgError(true)}
           />
         )}
@@ -120,7 +120,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   alt={avatarAlt}
                   width={40}
                   height={40}
-                  className="h-10 w-10 rounded-full img-outline"
+                  className="h-10 w-10 rounded-full"
                   onError={() => setImgError(true)}
                 />
               )}
@@ -144,7 +144,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               onClick={() => setOpen(false)}
               className="flex min-h-11 items-center gap-3 rounded-[3px] px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-purple-tint"
             >
-              <GitHubIcon className="h-4 w-4 text-text-secondary" />
+              <ChapaBadgeIcon className="h-4 w-4 text-text-secondary" />
               {t('userMenu.myBadge') as string}
             </Link>
             {studioEnabled && (

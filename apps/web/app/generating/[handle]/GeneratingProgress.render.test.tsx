@@ -295,6 +295,48 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  // A connection the user has to repair: retrying the same URL can never fix
+  // it, so the message names the platform and points at /settings.
+  it("names the expired connection on a 409 and links to settings", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ staleSources: ["bitbucket", "gitlab"] }),
+      }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(
+      screen.getByText(
+        "Your Bitbucket, GitLab connection expired, so your profile cannot be completed without it. Reconnect it, then try again.",
+      ),
+    ).toBeDefined();
+    expect(screen.getByText("Reconnect it").closest("a")?.getAttribute("href")).toBe("/settings");
+    expect(screen.queryByText("Try again")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("degrades to the generic message when a 409 body carries no sources", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 409, json: () => Promise.reject(new Error("no body")) }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByText("Something went wrong generating your badge.")).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+
   it("keeps the generic error message on a 5xx response", async () => {
     vi.stubGlobal(
       "fetch",

@@ -50,6 +50,7 @@ interface SnapshotRow {
   profile_type: string;
   composite_score: number;
   adjusted_composite: number;
+  headline_score: number | null;
   confidence: number;
   tier: string;
   confidence_penalties: Array<{ flag: string; penalty: number }> | null;
@@ -91,6 +92,7 @@ function rowToSnapshot(row: SnapshotRow): MetricsSnapshot {
     archetype: row.archetype as MetricsSnapshot["archetype"],
     profileType: row.profile_type as MetricsSnapshot["profileType"],
     compositeScore: row.composite_score,
+    ...(typeof row.headline_score === "number" && { headlineScore: row.headline_score }),
     adjustedComposite: row.adjusted_composite,
     confidence: row.confidence,
     tier: row.tier as MetricsSnapshot["tier"],
@@ -142,6 +144,7 @@ function snapshotToRow(
     archetype: s.archetype,
     profile_type: s.profileType,
     composite_score: s.compositeScore,
+    headline_score: s.headlineScore ?? null,
     adjusted_composite: s.adjustedComposite,
     confidence: s.confidence,
     tier: s.tier,
@@ -219,6 +222,7 @@ const SNAPSHOT_COLUMNS = [
   "profile_type",
   "composite_score",
   "adjusted_composite",
+  "headline_score",
   "confidence",
   "tier",
   "confidence_penalties",
@@ -339,6 +343,144 @@ export async function dbGetSnapshots(
     return parseRows<SnapshotRow>(data, SNAPSHOT_REQUIRED_KEYS, "metrics_snapshots").map(rowToSnapshot);
   } catch (error) {
     console.error("[db] dbGetSnapshots failed:", (error as Error).message);
+    return [];
+  }
+}
+
+/**
+ * Handles with a recent standing, best first, whatever their row records.
+ *
+ * Ranking hint only: the smoothed composite it orders by is NOT publishable
+ * (see dbGetTopScoredProfiles), so this returns handles, never scores. The
+ * caller materializes each one to read the badge's own number.
+ */
+export async function dbGetScoredCandidates(
+  eligibleHandles: string[],
+  limit: number,
+  today = new Date(),
+): Promise<string[]> {
+  const db = getSupabase();
+  if (!db || limit <= 0) return [];
+
+  const eligible = [...new Set(eligibleHandles.map((handle) => handle.toLowerCase()).filter(Boolean))];
+  if (eligible.length === 0) return [];
+
+  const since = new Date(today.getTime() - TOP_SCORE_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
+
+  try {
+    const { data, error } = await db
+      .from("metrics_snapshots")
+      .select("handle, date, adjusted_composite")
+      .in("handle", eligible)
+      .gte("date", since)
+      .order("date", { ascending: false })
+      .limit(TOP_SCORE_SCAN_LIMIT);
+
+    if (error) throw error;
+
+    const latest = new Map<string, number>();
+    for (const row of Array.isArray(data) ? data : []) {
+      const { handle, adjusted_composite: score } = row as { handle?: unknown; adjusted_composite?: unknown };
+      if (typeof handle !== "string" || !handle.trim()) continue;
+      if (typeof score !== "number" || !Number.isFinite(score)) continue;
+      const key = handle.toLowerCase();
+      if (latest.has(key)) continue;
+      latest.set(key, score);
+    }
+
+    return [...latest.entries()]
+      .sort(([handleA, scoreA], [handleB, scoreB]) => scoreB - scoreA || handleA.localeCompare(handleB))
+      .slice(0, limit)
+      .map(([handle]) => handle);
+  } catch (error) {
+    console.error("[db] dbGetScoredCandidates failed:", (error as Error).message);
+    return [];
+  }
+}
+
+/** One entry of the landing page's top-score strip. */
+export interface TopScoredProfile {
+  handle: string;
+  score: number;
+  tier: string;
+  /** Assigned by the leaderboard, which is the only place that knows the full
+   * ordering; a row on its own has no place. */
+  rank: number;
+}
+
+/** How far back a snapshot still counts as a current standing. A handle that
+ * stopped being scored drops out rather than holding a podium spot forever. */
+const TOP_SCORE_WINDOW_DAYS = 30;
+/** Row ceiling for the scan below: bounded work, and enough rows to cover the
+ * window at one snapshot per handle per day. */
+const TOP_SCORE_SCAN_LIMIT = 2000;
+
+/**
+ * The highest current scores among `eligibleHandles`, best first.
+ *
+ * "Current" means each handle's most recent snapshot inside
+ * TOP_SCORE_WINDOW_DAYS, not its best ever: this is a standing, so a score a
+ * handle no longer holds must not keep it on the podium.
+ *
+ * `eligibleHandles` is required and never widened here. A snapshot exists for
+ * any handle whose badge was ever rendered, including developers who never
+ * signed up (someone embedding a stranger's badge in a README is enough), and
+ * putting those people on a public podium promotes them without their
+ * involvement. The caller passes the registered handles, and an empty list
+ * means an empty board.
+ */
+export async function dbGetTopScoredProfiles(
+  eligibleHandles: string[],
+  limit = 3,
+  today = new Date(),
+): Promise<TopScoredProfile[]> {
+  const db = getSupabase();
+  if (!db || limit <= 0) return [];
+
+  const eligible = [...new Set(eligibleHandles.map((handle) => handle.toLowerCase()).filter(Boolean))];
+  if (eligible.length === 0) return [];
+
+  const since = new Date(today.getTime() - TOP_SCORE_WINDOW_DAYS * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  try {
+    const { data, error } = await db
+      .from("metrics_snapshots")
+      .select("handle, date, headline_score, tier")
+      .in("handle", eligible)
+      // Only rows that recorded the badge's own number. A row written before
+      // migration 047 cannot say what its headline was, and the smoothed
+      // composite is a different number — publishing it would contradict the
+      // badge the row links to, so the handle waits for its next capture
+      // instead. `pnpm run recalculate-handles <handle> --apply` fills one in.
+      .not("headline_score", "is", null)
+      .gte("date", since)
+      .order("date", { ascending: false })
+      .limit(TOP_SCORE_SCAN_LIMIT);
+
+    if (error) throw error;
+
+    const latest = new Map<string, TopScoredProfile>();
+    for (const row of Array.isArray(data) ? data : []) {
+      const { handle, headline_score: score, tier } = row as {
+        handle?: unknown; headline_score?: unknown; tier?: unknown;
+      };
+      if (typeof handle !== "string" || !handle.trim()) continue;
+      // The badge's number, or nothing at all. The smoothed composite is a
+      // different number and must never stand in for it.
+      if (typeof score !== "number" || !Number.isFinite(score)) continue;
+      const key = handle.toLowerCase();
+      // Rows arrive newest first, so the first row per handle is its standing.
+      if (latest.has(key)) continue;
+      latest.set(key, { handle: key, score, tier: typeof tier === "string" ? tier : "", rank: 0 });
+    }
+
+    return [...latest.values()]
+      .sort((a, b) => b.score - a.score || a.handle.localeCompare(b.handle))
+      .slice(0, limit);
+  } catch (error) {
+    console.error("[db] dbGetTopScoredProfiles failed:", (error as Error).message);
     return [];
   }
 }
