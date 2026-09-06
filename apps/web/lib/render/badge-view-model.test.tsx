@@ -7,6 +7,7 @@ import {
   receiptViewModel,
   renderableScore,
   sameScoredRevision,
+  type ScoreViewModel,
 } from "@/lib/profile/score-view-model";
 import type { ImpactV6Result } from "@chapa/shared";
 import { renderBadgeSvg } from "./BadgeSvg";
@@ -222,5 +223,54 @@ describe("the accessible description stays locale-independent", () => {
     const svg = renderBadgeSvg(DEMO_STATS, v6, { scoring: model, disableAnimation: true });
 
     expect(svg).toContain("unassigned tier");
+  });
+});
+
+/**
+ * Locked after rendering one and looking at it.
+ *
+ * The first v7 badge ever rasterized showed "74–76" at a fixed 30px measuring
+ * about 90px across, sitting on a ring whose clear inner width is about 88px:
+ * the glyphs touched the stroke on both sides. No string assertion had caught
+ * it, because the markup was correct — only the geometry was wrong. This locks
+ * the headline inside the ring for every width a score can take.
+ */
+describe("the headline fits inside the score ring", () => {
+  const legacyStub: ImpactV6Result = {
+    handle: "alice", profileType: "collaborative",
+    dimensions: { delivery: 1, quality: 2, consistency: 3, breadth: 4 },
+    archetype: "Emerging", compositeScore: 3, confidence: 50, confidencePenalties: [],
+    adjustedComposite: 3, tier: "Emerging", computedAt: "2026-09-01T12:00:00.000Z",
+  };
+  const RING_CLEAR_WIDTH = 88;   // r=46, 4px stroke
+  const MONO_ADVANCE = 0.6;      // JetBrains Mono advances 0.6em per glyph
+
+  function headline(svg: string): { text: string; size: number } {
+    const match = /<text data-element="score"[^>]*font-size="(\d+)"[^>]*>([^<]+)</.exec(svg)!;
+    return { size: Number(match[1]), text: match[2]! };
+  }
+
+  it.each([
+    ["a two-digit point", { kind: "point", value: 91, display: 91 }],
+    ["a three-digit point", { kind: "point", value: 100, display: 100 }],
+    ["a two-by-two range", { kind: "range", lower: 74, upper: 76, displayLower: 74, displayUpper: 76 }],
+    ["a range reaching 100", { kind: "range", lower: 96, upper: 100, displayLower: 96, displayUpper: 100 }],
+    ["the widest possible range", { kind: "range", lower: 100, upper: 100, displayLower: 100, displayUpper: 100 }],
+  ])("keeps %s inside the ring", (_name, composite) => {
+    const model = {
+      policyVersion: "v7", handle: "alice", identity: null, window: null,
+      dimensions: {
+        delivery: { kind: "point", value: 70, display: 70 },
+        quality: { kind: "point", value: 70, display: 70 },
+        consistency: { kind: "point", value: 70, display: 70 },
+        breadth: { kind: "point", value: 70, display: 70 },
+      },
+      composite, tier: "High", archetype: "Builder", craft: null,
+      coverage: [], exclusions: [], limitations: [],
+    } as unknown as ScoreViewModel;
+
+    const { text, size } = headline(renderBadgeSvg(DEMO_STATS, legacyStub, { scoring: model }));
+
+    expect(text.length * size * MONO_ADVANCE).toBeLessThanOrEqual(RING_CLEAR_WIDTH);
   });
 });

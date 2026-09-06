@@ -236,8 +236,19 @@ export function renderBadgeSvg(
   const scoreStr = compositeValue.kind === "point"
     ? String(compositeValue.display)
     : `${compositeValue.displayLower}\u2013${compositeValue.displayUpper}`;
-  // Keep the headline inside the opaque score backing and its ring stroke.
-  const scoreFontSize = scoreStr.length > 4 ? 30 : scoreStr.length > 2 ? 48 : 52;
+  // Keep the headline inside the ring rather than across it.
+  //
+  // The ring is r=46 with a 4px stroke, so the clear width inside it is about
+  // 88px; JetBrains Mono advances 0.6em per glyph. One and two digits keep
+  // their established sizes, and three keeps 48 because that is what v6's
+  // "100" has always rendered at. Anything longer is a v7 interval, and its
+  // size is derived from the ring instead of guessed: at a fixed 30px "74–76"
+  // measured ~90px and sat on the stroke, which is what rendering one and
+  // looking at it showed.
+  const RING_TEXT_WIDTH = 84;
+  const scoreFontSize = scoreStr.length <= 2 ? 52
+    : scoreStr.length === 3 ? 48
+    : Math.min(48, Math.floor(RING_TEXT_WIDTH / (scoreStr.length * 0.6)));
   // #1181 — pre-resolved translated tier label; falls back to the raw tier
   // value (English) for callers that don't pass `strings.tierLabel`. Always
   // escaped below since `impact.tier`/a caller-supplied string both flow
