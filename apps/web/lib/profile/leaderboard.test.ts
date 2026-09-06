@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ImpactV6Result } from "@chapa/shared";
+import { legacyViewModel } from "./score-view-model";
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbGetTopScoredProfiles: vi.fn(),
@@ -21,8 +23,18 @@ function entry(handle: string, score: number, tier = "High") {
   return { handle, score, tier, rank: 0 };
 }
 
-function live(adjustedComposite: number, tier = "High") {
-  return { displayImpact: { adjustedComposite, tier } } as unknown as Awaited<
+/** A materialized profile as the board actually receives one: carrying the
+ *  resolved score model the badge draws, not just the v6 aggregate (#1311). */
+function live(adjustedComposite: number, tier = "High", handle = "someone") {
+  const displayImpact = {
+    handle, adjustedComposite, tier,
+    // `legacyViewModel` projects all four dimensions, so a fixture without
+    // them throws inside the materialize mock — where the loop's catch would
+    // silently treat every candidate as unfetchable.
+    dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 },
+    archetype: "Builder", compositeScore: adjustedComposite,
+  } as unknown as ImpactV6Result;
+  return { displayImpact, scoring: legacyViewModel(displayImpact) } as unknown as Awaited<
     ReturnType<typeof materializeDisplayProfile>
   >;
 }
@@ -123,5 +135,44 @@ describe("getLeaderboard", () => {
   it("returns nothing for a non-positive limit, without touching the database", async () => {
     await expect(getLeaderboard(0)).resolves.toEqual([]);
     expect(mockRegistered).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #1311 — the board publishes one number per place and links to the badge that
+ * number came from. A v7 evidence range has no single number, so it takes no
+ * place at all rather than publishing a bound the badge does not show. This is
+ * the same rule the file already applies to a snapshot with no headline: a
+ * handle whose number would contradict its badge waits instead.
+ */
+describe("a v7 evidence range takes no place", () => {
+  it("skips a ranged candidate and gives the place to the next one", async () => {
+    const ranged = {
+      displayImpact: { handle: "b", adjustedComposite: 95, tier: "High" },
+      scoring: {
+        policyVersion: "v7", handle: "b", identity: null, window: null,
+        dimensions: {
+          delivery: { kind: "range", lower: 60, upper: 80, displayLower: 60, displayUpper: 80 },
+          quality: { kind: "point", value: 54, display: 54 },
+          consistency: { kind: "point", value: 73, display: 73 },
+          breadth: { kind: "point", value: 68, display: 68 },
+        },
+        composite: { kind: "range", lower: 64, upper: 73, displayLower: 64, displayUpper: 73 },
+        tier: null, archetype: null, craft: null, coverage: [], exclusions: [], limitations: [],
+      },
+    } as unknown as Awaited<ReturnType<typeof materializeDisplayProfile>>;
+
+    mockRecorded.mockResolvedValue([]);
+    mockCandidates.mockResolvedValue(["b", "c"]);
+    mockMaterialize.mockImplementation(async (handle: string) =>
+      handle === "b" ? ranged : live(60, "High", "c"),
+    );
+
+    const board = await getLeaderboard(1);
+
+    expect(board).toEqual([{ rank: 1, score: 60, tier: "High", handles: ["c"] }]);
+    // Not merely unranked — its bounds never reach the board at all.
+    expect(JSON.stringify(board)).not.toContain("64");
+    expect(JSON.stringify(board)).not.toContain("73");
   });
 });

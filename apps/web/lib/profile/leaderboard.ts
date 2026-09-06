@@ -1,4 +1,5 @@
 import "server-only";
+import { renderableScore } from "./score-view-model";
 import { dbGetScoredCandidates, dbGetTopScoredProfiles } from "@/lib/db/snapshots";
 import { dbGetAllUserHandles } from "@/lib/db/users";
 import { materializeDisplayProfile } from "./materialize-profile";
@@ -71,10 +72,18 @@ export async function getLeaderboard(places = 3): Promise<LeaderboardPlace[]> {
         continue;
       }
       if (!live) continue;
-      scored.set(handle, {
-        score: live.displayImpact.adjustedComposite,
-        tier: live.displayImpact.tier,
-      });
+      // #1311 — ranked on the number the badge prints, which is the resolved
+      // model's, not the v6 aggregate's.
+      //
+      // A v7 evidence range takes no place at all. The board shows one number
+      // per place and links to a badge that would show an interval, and this
+      // file's existing rule is that a handle whose stored number would
+      // contradict its badge waits rather than appearing with the wrong one.
+      // The same reasoning applies to a range: there is no single number to
+      // publish, so the next candidate takes the place.
+      const drawn = renderableScore(live.scoring);
+      if (live.scoring.composite.kind !== "point" || drawn.tier === null) continue;
+      scored.set(handle, { score: drawn.composite, tier: drawn.tier });
     }
   }
 

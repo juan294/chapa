@@ -8,7 +8,7 @@ import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { readScoreReceiptV7 } from "@/lib/profile/score-receipt-v7";
-import { receiptViewModel } from "@/lib/profile/score-view-model";
+import { receiptViewModel, renderableScore } from "@/lib/profile/score-view-model";
 
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
 
@@ -46,10 +46,15 @@ async function getDisplayHeadline(
       readOnly: true,
     });
     if (!materialized) return { displayScore: null, displayTier: null };
-    return {
-      displayScore: materialized.displayImpact.adjustedComposite,
-      displayTier: materialized.displayImpact.tier,
-    };
+    // #1311 — documented as "the fresh value shown on the badge", so it is read
+    // from the model the badge draws. A v7 evidence range has no single number
+    // and reports null here rather than a point an external consumer would
+    // republish as exact; `scoring` on this same response carries the interval
+    // for anyone who wants it.
+    const drawn = renderableScore(materialized.scoring);
+    return materialized.scoring.composite.kind === "point"
+      ? { displayScore: drawn.composite, displayTier: drawn.tier }
+      : { displayScore: null, displayTier: drawn.tier };
   } catch {
     return { displayScore: null, displayTier: null };
   }
