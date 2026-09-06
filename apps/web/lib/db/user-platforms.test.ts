@@ -20,7 +20,16 @@ vi.mock("@/lib/auth/github", () => ({
 // All DB functions that encrypt/decrypt need NEXTAUTH_SECRET
 vi.stubEnv("NEXTAUTH_SECRET", "test-secret-for-encryption-32-chars");
 
+vi.mock("./platform-token-refresh", async original => ({
+  ...(await original<typeof import("./platform-token-refresh")>()),
+  releasePlatformTokenRefreshBarrier: vi.fn(async () => ({
+    status: "released" as const,
+    cleared: 1,
+  })),
+}));
+
 import { getSupabase } from "./supabase";
+import { releasePlatformTokenRefreshBarrier } from "./platform-token-refresh";
 import {
   dbGetLinkedPlatform,
   dbUpsertLinkedPlatform,
@@ -43,6 +52,9 @@ function mockSupabase() {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    // Resolves from the same slot as `then` so upsert(...).select().single()
+    // keeps honouring setResolveValue.
+    single: vi.fn(() => Promise.resolve(_resolveValue)),
     limit: vi.fn().mockResolvedValue({ data: [], error: null }),
     insert: vi.fn(() => query),
     update: vi.fn(() => query),
@@ -232,6 +244,51 @@ describe("dbUpsertLinkedPlatform", () => {
       null,
     );
     expect(result).toBe(false);
+  });
+
+  // A reconnect updates the existing row, so it inherits any unresolved refresh
+  // barrier unless the new grant clears the superseded attempt.
+  it("clears superseded refresh attempts for the reconnected grant", async () => {
+    const { setResolveValue } = mockSupabase();
+    setResolveValue({
+      data: { id: "11111111-1111-4111-8111-111111111111", updated_at: "2026-09-05T12:00:00.000002Z" },
+    });
+
+    expect(
+      await dbUpsertLinkedPlatform("TestUser", "gitlab", "gl-user", "access-123", "refresh-456", null),
+    ).toBe(true);
+    expect(releasePlatformTokenRefreshBarrier).toHaveBeenCalledWith({
+      id: "11111111-1111-4111-8111-111111111111",
+      updatedAt: "2026-09-05T12:00:00.000002Z",
+      handle: "testuser",
+      platform: "gitlab",
+    });
+  });
+
+  it("does not reach the refresh barrier for platforms that never refresh", async () => {
+    const { setResolveValue } = mockSupabase();
+    setResolveValue({
+      data: { id: "11111111-1111-4111-8111-111111111111", updated_at: "2026-09-05T12:00:00.000002Z" },
+    });
+
+    expect(
+      await dbUpsertLinkedPlatform("testuser", "github", "gh-user", "access-123", null, null),
+    ).toBe(true);
+    expect(releasePlatformTokenRefreshBarrier).not.toHaveBeenCalled();
+  });
+
+  it("still reports a stored grant when the barrier release is unavailable", async () => {
+    const { setResolveValue } = mockSupabase();
+    setResolveValue({
+      data: { id: "11111111-1111-4111-8111-111111111111", updated_at: "2026-09-05T12:00:00.000002Z" },
+    });
+    vi.mocked(releasePlatformTokenRefreshBarrier).mockRejectedValueOnce(
+      new Error("Platform refresh release unavailable"),
+    );
+
+    expect(
+      await dbUpsertLinkedPlatform("testuser", "gitlab", "gl-user", "access-123", "refresh-456", null),
+    ).toBe(true);
   });
 
   it("returns false on DB error", async () => {

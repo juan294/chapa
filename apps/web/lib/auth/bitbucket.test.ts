@@ -332,6 +332,60 @@ describe("fetchBitbucketUser", () => {
     expect(user!.links.avatar.href).toBe("https://example.com/avatar.png");
   });
 
+  // Atlassian removed `username` from current /user responses; `nickname` is
+  // the replacement display handle and account_id/uuid the stable identity.
+  it("accepts the current response shape without the deprecated username", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            nickname: "bb-nick",
+            account_id: "557058:abc",
+            uuid: "{11111111-1111-4111-8111-111111111111}",
+            display_name: "BB User",
+            links: { avatar: { href: "https://example.com/avatar.png" } },
+          }),
+      }),
+    );
+
+    const user = await fetchBitbucketUser("bb_access_token");
+    expect(user).toEqual({
+      username: "bb-nick",
+      display_name: "BB User",
+      links: { avatar: { href: "https://example.com/avatar.png" } },
+      account_id: "557058:abc",
+      uuid: "{11111111-1111-4111-8111-111111111111}",
+    });
+  });
+
+  it("prefers the still-present username over nickname", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ username: "bb-user", nickname: "bb-nick", display_name: "BB User", links: {} }),
+      }),
+    );
+
+    expect((await fetchBitbucketUser("bb_access_token"))!.username).toBe("bb-user");
+  });
+
+  // remote_login is NOT NULL: storing an undefined handle would fail the write.
+  it.each([{}, { username: "" }, { username: "   " }, { username: 42 }])(
+    "returns null when no usable handle is present: %o",
+    async body => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ...body, display_name: "BB User", links: {} }) }),
+      );
+
+      expect(await fetchBitbucketUser("bb_access_token")).toBeNull();
+    },
+  );
+
   it("sends Bearer token in Authorization header", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

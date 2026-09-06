@@ -1,7 +1,7 @@
 import type { RawContributionData } from "@chapa/shared";
 import { CONTRIBUTION_QUERY, SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { getGithubToken } from "@/lib/env";
-import { fetchWithRetry, sanitizeLogBody } from "@/lib/utils/fetch-retry";
+import { fetchWithRetry } from "@/lib/utils/fetch-retry";
 
 // Re-export for consumers that import from this module
 export type { RawContributionData };
@@ -11,6 +11,10 @@ export type { RawContributionData };
 // ---------------------------------------------------------------------------
 
 const FETCH_TIMEOUT_MS = 15_000; // 15 seconds — prevents SSR from hanging in CI
+export interface LegacyFetchContext {
+  readonly resolvedCredential?: { readonly token: string | null };
+  readonly referenceTime?: string;
+}
 
 /**
  * Fetch a user's GitHub contribution data via the GraphQL API.
@@ -26,8 +30,9 @@ const FETCH_TIMEOUT_MS = 15_000; // 15 seconds — prevents SSR from hanging in 
 export async function fetchContributionData(
   login: string,
   token?: string,
+  context: LegacyFetchContext = {},
 ): Promise<RawContributionData | null> {
-  const now = new Date();
+  const now = context.referenceTime ? new Date(context.referenceTime) : new Date();
   const since = new Date(now);
   since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
@@ -41,7 +46,7 @@ export async function fetchContributionData(
 
   // Use session token if available, otherwise fall back to server-side
   // GITHUB_TOKEN (provided automatically by GitHub Actions in CI).
-  const effectiveToken = token ?? getGithubToken();
+  const effectiveToken = context.resolvedCredential !== undefined ? context.resolvedCredential.token : token ?? getGithubToken();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -70,16 +75,14 @@ export async function fetchContributionData(
     });
 
     if (!res.ok) {
-      const rawBody = await res.text().catch(() => "(unreadable)");
-      const snippet = sanitizeLogBody(rawBody);
-      console.error(`[github] GraphQL HTTP ${res.status} for ${login}: ${snippet}`);
+      console.error(`[github] GraphQL HTTP ${res.status} for ${login}`);
       return null;
     }
 
     const json = await res.json();
 
     if (json.errors) {
-      console.error(`[github] GraphQL errors for ${login}:`, json.errors);
+      console.error(`[github] GraphQL errors for ${login}`);
 
       // Treat RATE_LIMITED or FORBIDDEN errors as a complete fetch failure.
       // GitHub returns partial data alongside these errors, but that partial data
@@ -158,8 +161,8 @@ export async function fetchContributionData(
           .map((n) => ({ stargazerCount: n.stargazerCount, forkCount: n.forkCount, watchers: { totalCount: n.watchers.totalCount } })),
       },
     };
-  } catch (err) {
-    console.error(`[github] fetch error for ${login}:`, err);
+  } catch {
+    console.error(`[github] fetch error for ${login}`);
     return null;
   }
 }

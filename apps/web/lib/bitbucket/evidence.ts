@@ -27,6 +27,9 @@ const API = "https://api.bitbucket.org/2.0";
 export interface BitbucketEvidenceOptions {
   /** Stable UUIDs, not names. Omit to enumerate current visible workspaces/repos. */
   readonly repositories?: readonly { readonly workspaceId: string; readonly repositoryId: string }[];
+  /** Stable repository UUIDs resolved with an empty-workspace lookup.
+   * Mutually exclusive with pre-resolved workspace/repository pairs. */
+  readonly repositoryIds?: readonly string[];
   readonly maxRequests?: number;
   readonly timeoutMs?: number;
 }
@@ -54,6 +57,8 @@ export async function fetchBitbucketEvidence(
   const maxRequests = options.maxRequests ?? 100; const timeoutMs = options.timeoutMs ?? 30_000;
   if (!Number.isInteger(maxRequests) || maxRequests < 1 || maxRequests > 500 || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120_000) throw new RangeError("Invalid Bitbucket evidence budget");
   if (options.repositories && (options.repositories.length > 500 || options.repositories.some((r) => !uuid(r.repositoryId) || !uuid(r.workspaceId)))) throw new RangeError("Invalid Bitbucket repository UUIDs");
+  if (options.repositories !== undefined && options.repositoryIds !== undefined) throw new RangeError("Ambiguous Bitbucket repository scope");
+  if (options.repositoryIds && (options.repositoryIds.length > 500 || options.repositoryIds.some(id => !uuid(id)))) throw new RangeError("Invalid Bitbucket repository UUIDs");
   const signal = AbortSignal.timeout(timeoutMs);
   const reasons = new Set<EvidenceReasonCode>();
   const progress: BitbucketEvidenceProgress[] = [];
@@ -125,8 +130,22 @@ export async function fetchBitbucketEvidence(
     if (!repositoryId) { reasons.add("attribution_unknown"); return; }
     repositories.set(repositoryId, { workspaceId, repositoryId, ...(text(repo.full_name) ? { fullName: String(repo.full_name) } : {}) });
   }
-  const explicit = options.repositories !== undefined;
-  if (explicit) for (const repo of options.repositories!) repositories.set(uuid(repo.repositoryId)!, { workspaceId: uuid(repo.workspaceId)!, repositoryId: uuid(repo.repositoryId)! });
+  const explicit = options.repositories !== undefined || options.repositoryIds !== undefined;
+  let repositoryDiscoveryComplete = explicit;
+  if (options.repositoryIds !== undefined) {
+    // https://developer.atlassian.com/cloud/bitbucket/rest/intro/#repository-object-and-uuid
+    // Resolve only declared repositories, within the same bounded HTTP budget.
+    for (const repositoryId of new Set(options.repositoryIds.map(id => uuid(id)!))) {
+      const initialUrl = `${API}/repositories/%7B%7D/${encodeURIComponent(repositoryId)}`;
+      const metadata = await request(initialUrl);
+      const repo = row(metadata.data); const workspaceId = uuid(row(repo.workspace).uuid);
+      const reason = metadata.error ?? (uuid(repo.uuid) !== repositoryId || !workspaceId ? "source_error" : null);
+      progress.push({ initialUrl, nextUrl: reason ? initialUrl : null, collectedNodes: reason ? 0 : 1,
+        complete: reason === null, reasonCodes: reason ? [reason] : [] });
+      if (reason) { reasons.add(reason); repositoryDiscoveryComplete = false; continue; }
+      addRepo(repo, workspaceId!);
+    }
+  } else if (options.repositories !== undefined) for (const repo of options.repositories) repositories.set(uuid(repo.repositoryId)!, { workspaceId: uuid(repo.workspaceId)!, repositoryId: uuid(repo.repositoryId)! });
   else {
     const workspaces = await collect(makeUrl("/user/workspaces"));
     for (const permission of workspaces.nodes) {
@@ -281,7 +300,7 @@ export async function fetchBitbucketEvidence(
     events: [...events.values()], progress, requestCount,
     coverage: { source: { provider: "bitbucket", host: "bitbucket.org", subjectId }, window,
       dataThrough: profileResponse.error ? null : window.referenceTime, status: "partial",
-      discovery: explicit ? "explicit_repositories" : "owned_and_contributed", repositoryIds: [...repositories.keys()].sort(), repositoryDiscoveryComplete: explicit,
+      discovery: explicit ? "explicit_repositories" : "owned_and_contributed", repositoryIds: [...repositories.keys()].sort(), repositoryDiscoveryComplete,
       eventKinds, reasonCodes: [...reasons].sort(), unknownPeriods: [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
     },
   };

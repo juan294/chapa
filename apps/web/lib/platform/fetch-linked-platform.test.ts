@@ -1,185 +1,92 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-const { mockCacheMGet, mockCacheSet } = vi.hoisted(() => ({
-  mockCacheMGet: vi.fn(),
-  mockCacheSet: vi.fn(),
-}));
-
-vi.mock("@/lib/cache/redis", () => ({
-  cacheMGet: mockCacheMGet,
-  cacheSet: mockCacheSet,
-}));
-
-import {
-  fetchLinkedPlatformStats,
-  CACHE_TTL,
-  NEG_CACHE_TTL,
-  type FetchLinkedPlatformConfig,
-  type LinkedPlatformRecord,
-} from "./fetch-linked-platform";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchLinkedPlatformStats, type FetchLinkedPlatformConfig } from "./fetch-linked-platform";
+import { readSourceAuthorization, type SourceAuthorization } from "./source-authorization";
+import { refreshSourceLink } from "./source-refresh";
+import { cacheMGet, cacheSet } from "@/lib/cache/redis";
 import { makeStats } from "../test-helpers/fixtures";
 
-const PLATFORM = "testplatform";
-const LOWER = "test-user";
-const CACHE_KEY = `stats:v2:${PLATFORM}:${LOWER}`;
-const NEG_KEY = `${CACHE_KEY}:neg`;
-
-const linkedRecord: LinkedPlatformRecord = {
-  remoteLogin: "remote-user",
-  tokens: {
-    accessToken: "token",
-    refreshToken: "refresh",
-    expiresAt: new Date("2099-12-31"),
-  },
-};
-
-function makeConfig(
-  overrides: Partial<FetchLinkedPlatformConfig> = {},
-): FetchLinkedPlatformConfig {
-  return {
-    platform: PLATFORM,
-    lowerHandle: LOWER,
-    isEnabled: vi.fn().mockResolvedValue(true),
-    getLinkedPlatform: vi.fn().mockResolvedValue(linkedRecord),
-    resolveAccessToken: vi.fn().mockResolvedValue("token"),
-    fetchStats: vi.fn().mockResolvedValue(makeStats({ commitsTotal: 5 })),
-    ...overrides,
-  };
+vi.mock("./source-authorization", async importOriginal => ({
+  ...await importOriginal<typeof import("./source-authorization")>(), readSourceAuthorization: vi.fn(),
+}));
+vi.mock("./source-refresh", () => ({ refreshSourceLink: vi.fn() }));
+vi.mock("@/lib/cache/redis", () => ({ cacheMGet: vi.fn(), cacheSet: vi.fn() }));
+const linked: Extract<SourceAuthorization, { status: "authorized" }> = { status: "authorized", consentVersion: "legacy-unpublished",
+  link: { id: "11111111-1111-4111-8111-111111111111", updatedAt: "2026-09-05T12:00:00.000001Z", handle: "alice", platform: "gitlab", remoteLogin: "linked-alice",
+    tokens: { accessToken: "current-token", refreshToken: "refresh-token", expiresAt: null } } };
+function config(): FetchLinkedPlatformConfig {
+  return { platform: "gitlab", lowerHandle: "Alice", fetchStats: vi.fn().mockResolvedValue(makeStats({ commitsTotal: 5 })) };
 }
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(readSourceAuthorization).mockResolvedValue(structuredClone(linked));
+  vi.mocked(refreshSourceLink).mockImplementation(async authorization => authorization);
+});
+afterEach(() => vi.useRealTimers());
 
-describe("fetchLinkedPlatformStats", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockCacheMGet.mockResolvedValue([null, null]);
-    mockCacheSet.mockResolvedValue(undefined);
+describe("current linked-source legacy boundary", () => {
+  it("returns a read-only miss without authorization, refresh, collection or cache I/O", async () => {
+    const input = { ...config(), readOnly: true };
+    expect(await fetchLinkedPlatformStats(input)).toBeNull();
+    expect(readSourceAuthorization).not.toHaveBeenCalled();
+    expect(refreshSourceLink).not.toHaveBeenCalled();
+    expect(input.fetchStats).not.toHaveBeenCalled();
+    expect(cacheMGet).not.toHaveBeenCalled(); expect(cacheSet).not.toHaveBeenCalled();
   });
-
-  it("looks up positive + negative cache in a single cacheMGet round-trip", async () => {
-    const config = makeConfig();
-
-    await fetchLinkedPlatformStats(config);
-
-    expect(mockCacheMGet).toHaveBeenCalledTimes(1);
-    expect(mockCacheMGet).toHaveBeenCalledWith([CACHE_KEY, NEG_KEY]);
+  it.each(["disabled", "unlinked", "unavailable"] as const)("does not bypass current %s state with old cached stats", async status => {
+    vi.mocked(readSourceAuthorization).mockResolvedValue({ status });
+    vi.mocked(cacheMGet).mockResolvedValue([makeStats({ commitsTotal: 900 }), null]);
+    const input = config();
+    expect(await fetchLinkedPlatformStats(input)).toBeNull();
+    expect(refreshSourceLink).not.toHaveBeenCalled(); expect(input.fetchStats).not.toHaveBeenCalled();
+    expect(cacheMGet).not.toHaveBeenCalled(); expect(cacheSet).not.toHaveBeenCalled();
   });
-
-  it("returns cached stats on positive cache hit without any other work", async () => {
-    const cached = makeStats({ commitsTotal: 42 });
-    mockCacheMGet.mockResolvedValueOnce([cached, null]);
-    const config = makeConfig();
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toEqual(cached);
-    expect(config.isEnabled).not.toHaveBeenCalled();
-    expect(config.getLinkedPlatform).not.toHaveBeenCalled();
-    expect(config.resolveAccessToken).not.toHaveBeenCalled();
-    expect(config.fetchStats).not.toHaveBeenCalled();
+  it("uses the refreshed current credential, returns detached stats and never stores an unbound cache row", async () => {
+    const updated = { ...structuredClone(linked), link: { ...linked.link!, updatedAt: "2026-09-05T12:00:00.000002Z",
+      tokens: { ...linked.link!.tokens, accessToken: "fresh-token" } } };
+    vi.mocked(refreshSourceLink).mockResolvedValue(updated);
+    vi.mocked(readSourceAuthorization).mockResolvedValue(updated).mockResolvedValueOnce(linked);
+    const stats = makeStats({ commitsTotal: 0, prsMergedCount: 0 });
+    const input = { ...config(), fetchStats: vi.fn().mockResolvedValue(stats) };
+    const result = await fetchLinkedPlatformStats(input);
+    expect(readSourceAuthorization).toHaveBeenCalledWith("alice", "gitlab", false);
+    expect(input.fetchStats).toHaveBeenCalledWith(updated.link, "fresh-token");
+    expect(result).toEqual(stats); expect(result).not.toBe(stats);
+    result!.commitsTotal = 99; expect(stats.commitsTotal).toBe(0);
+    expect(cacheMGet).not.toHaveBeenCalled(); expect(cacheSet).not.toHaveBeenCalled();
   });
-
-  it("returns null on negative cache hit without flag/db reads", async () => {
-    mockCacheMGet.mockResolvedValueOnce([null, true]);
-    const config = makeConfig();
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toBeNull();
-    expect(config.isEnabled).not.toHaveBeenCalled();
-    expect(config.getLinkedPlatform).not.toHaveBeenCalled();
+  it("does not collect when token refresh loses current linkage", async () => {
+    vi.mocked(refreshSourceLink).mockResolvedValue({ status: "unavailable" });
+    const input = config();
+    expect(await fetchLinkedPlatformStats(input)).toBeNull(); expect(input.fetchStats).not.toHaveBeenCalled();
   });
-
-  it("treats an empty array from cacheMGet (Redis unavailable) as a full cache miss and falls through to a live fetch", async () => {
-    // cacheMGet returns [] (not [null, null]) when Redis is unreachable —
-    // destructuring/indexing must not throw or misread this as a cache hit.
-    mockCacheMGet.mockResolvedValueOnce([]);
-    const stats = makeStats({ commitsTotal: 7 });
-    const config = makeConfig({ fetchStats: vi.fn().mockResolvedValue(stats) });
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toEqual(stats);
-    expect(config.isEnabled).toHaveBeenCalled();
-    expect(config.getLinkedPlatform).toHaveBeenCalled();
-    expect(config.fetchStats).toHaveBeenCalled();
-    expect(mockCacheSet).toHaveBeenCalledWith(CACHE_KEY, stats, CACHE_TTL);
+  it("does not collect when the row changes between refresh and its current-link check", async () => {
+    vi.mocked(readSourceAuthorization).mockResolvedValueOnce(linked).mockResolvedValue({ ...linked, link: { ...linked.link!, updatedAt: "2026-09-05T12:00:00.000002Z" } });
+    const input = config();
+    expect(await fetchLinkedPlatformStats(input)).toBeNull(); expect(input.fetchStats).not.toHaveBeenCalled();
   });
-
-  it("sets neg cache and returns null when not enabled", async () => {
-    const config = makeConfig({ isEnabled: vi.fn().mockResolvedValue(false) });
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toBeNull();
-    expect(mockCacheSet).toHaveBeenCalledWith(NEG_KEY, true, NEG_CACHE_TTL);
-    expect(config.getLinkedPlatform).not.toHaveBeenCalled();
+  it.each(["disabled", "unlinked", "unavailable"] as const)("withholds fetched stats when the source becomes %s", async status => {
+    const input = { ...config(), fetchStats: vi.fn().mockImplementation(async () => {
+      vi.mocked(readSourceAuthorization).mockResolvedValue({ status }); return makeStats();
+    }) };
+    expect(await fetchLinkedPlatformStats(input)).toBeNull(); expect(input.fetchStats).toHaveBeenCalledTimes(1);
+    expect(cacheSet).not.toHaveBeenCalled();
   });
-
-  it("sets neg cache and returns null when not linked", async () => {
-    const config = makeConfig({
-      getLinkedPlatform: vi.fn().mockResolvedValue(null),
-    });
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toBeNull();
-    expect(mockCacheSet).toHaveBeenCalledWith(NEG_KEY, true, NEG_CACHE_TTL);
-    expect(config.resolveAccessToken).not.toHaveBeenCalled();
+  it("withholds fetched stats when a replacement link is created during collection", async () => {
+    const input = { ...config(), fetchStats: vi.fn().mockImplementation(async () => {
+      vi.mocked(readSourceAuthorization).mockResolvedValue({ ...linked, link: { ...linked.link!, id: "22222222-2222-4222-8222-222222222222" } });
+      return makeStats();
+    }) };
+    expect(await fetchLinkedPlatformStats(input)).toBeNull();
   });
-
-  it("short-circuits without fetching when token resolution returns null", async () => {
-    const config = makeConfig({
-      resolveAccessToken: vi.fn().mockResolvedValue(null),
-    });
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toBeNull();
-    expect(config.fetchStats).not.toHaveBeenCalled();
-    expect(mockCacheSet).not.toHaveBeenCalled();
+  it.each([null, new Error("private upstream error")])("fails closed for null or failed source collection", async outcome => {
+    const input = { ...config(), fetchStats: vi.fn().mockImplementation(async () => { if (outcome instanceof Error) throw outcome; return outcome; }) };
+    expect(await fetchLinkedPlatformStats(input)).toBeNull(); expect(cacheSet).not.toHaveBeenCalled();
   });
-
-  it("happy path: resolves token, fetches, caches, and returns stats", async () => {
-    const stats = makeStats({ commitsTotal: 99 });
-    const config = makeConfig({
-      resolveAccessToken: vi.fn().mockResolvedValue("resolved-token"),
-      fetchStats: vi.fn().mockResolvedValue(stats),
-    });
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toEqual(stats);
-    expect(config.resolveAccessToken).toHaveBeenCalledWith(linkedRecord);
-    expect(config.fetchStats).toHaveBeenCalledWith(linkedRecord, "resolved-token");
-    expect(mockCacheSet).toHaveBeenCalledWith(CACHE_KEY, stats, CACHE_TTL);
-  });
-
-  it("does not cache when fetchStats returns null", async () => {
-    const config = makeConfig({
-      fetchStats: vi.fn().mockResolvedValue(null),
-    });
-
-    const result = await fetchLinkedPlatformStats(config);
-
-    expect(result).toBeNull();
-    expect(mockCacheSet).not.toHaveBeenCalled();
-  });
-
-  it("returns null and does not cache when the live fetch exceeds its deadline", async () => {
+  it("bounds a hung source request and performs no delayed cache write", async () => {
     vi.useFakeTimers();
-    const slowFetch: NonNullable<FetchLinkedPlatformConfig["fetchStats"]> = () =>
-      new Promise((resolve) => {
-        setTimeout(() => resolve(makeStats({ commitsTotal: 10 })), 9_000);
-      });
-    const config = makeConfig({
-      fetchStats: vi.fn(slowFetch),
-    });
-
-    const promise = fetchLinkedPlatformStats(config);
-    await vi.advanceTimersByTimeAsync(8_001);
-
-    await expect(promise).resolves.toBeNull();
-    expect(mockCacheSet).not.toHaveBeenCalled();
-
-    vi.useRealTimers();
+    const input = { ...config(), fetchStats: vi.fn(() => new Promise<ReturnType<typeof makeStats>>(resolve => setTimeout(() => resolve(makeStats()), 9000))) };
+    const pending = fetchLinkedPlatformStats(input);
+    await vi.advanceTimersByTimeAsync(8001); expect(await pending).toBeNull();
+    await vi.advanceTimersByTimeAsync(1000); expect(cacheSet).not.toHaveBeenCalled();
   });
 });

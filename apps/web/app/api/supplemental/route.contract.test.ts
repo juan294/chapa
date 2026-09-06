@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { StatsData, SupplementalStats } from "@chapa/shared";
 import { declareField, generatePayloads, runMatrix } from "@/test/contract/payload-matrix";
 import {
@@ -11,6 +11,7 @@ import {
 
 import { redisFake } from "@/test/contract/redis-fake";
 import { getStats } from "@/lib/github/client";
+import { stubLegacyGitHub } from "@/test/contract/github-fixture";
 
 import { POST } from "./route";
 
@@ -43,6 +44,7 @@ function validStats(): StatsData {
 
 describe("POST /api/supplemental contract", () => {
   let bearer: string;
+  afterEach(() => vi.unstubAllGlobals());
 
   beforeAll(async () => {
     bearer = makeCliBearer(HANDLE);
@@ -76,7 +78,10 @@ describe("POST /api/supplemental contract", () => {
     expect(stored.error).toBeNull();
     expect(stored.data?.stats.commitsTotal).toBe(100);
     expect(await redisFake.cacheGet(`supplemental:${HANDLE}`)).toBeNull();
-    const composed = await getStats(HANDLE, undefined, { readOnly: true });
+    // Unbound legacy baselines are retired. A current primary observation
+    // must still compose the upload committed before cache publication failed.
+    stubLegacyGitHub(HANDLE, 0, 10);
+    const composed = await getStats(HANDLE);
     expect(composed?.commitsTotal).toBe(110);
     expect(await redisFake.cacheGet(`stats:stale:v2:${HANDLE}`)).toEqual(baseline);
   });

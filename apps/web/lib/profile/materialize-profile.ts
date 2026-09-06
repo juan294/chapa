@@ -11,7 +11,7 @@ import {
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { getStats } from "@/lib/github/client";
-import { isPoisonedStats, isScopeBlindedStats } from "@/lib/github/stats-integrity";
+import { isValidLegacyStats } from "@/lib/github/stats-integrity";
 
 export interface MaterializeImpactStateOptions {
   craftResult?: CraftResult | null;
@@ -31,12 +31,8 @@ export interface MaterializedDisplayState {
   craftResult: CraftResult | null;
   rawImpact: ImpactV6Result;
   displayImpact: ImpactV6Result;
-  /**
-   * #1003 — False when the served stats look like the corrupt "0 merged PRs
-   * despite real commit/issue activity" shape (e.g. served from an old
-   * poisoned `stats:stale` entry). Gates permanent snapshot persistence and
-   * verification-record minting in `public-profile.ts` — a degraded payload
-   * is never attested, even though it can still be displayed.
+  /** Legacy compatibility name: structural validity for v6 persistence and
+   * lookup-record issuance. It does not certify source coverage or v7 evidence.
    */
   statsComplete: boolean;
 }
@@ -48,21 +44,9 @@ export interface MaterializedImpactState extends MaterializedDisplayState {
   inputsChanged: boolean;
 }
 
-/**
- * Thin wrapper over the shared poison predicates (Phase 4, extended by #1049)
- * so there's a single source of truth for "does this stats shape look
- * corrupted by the degraded-fetch bug" across the persist-boundary gate and
- * the `heal-poisoned-stats` repair script.
- *
- * Both corruption shapes are gated: the #1002 era (`isPoisonedStats`, count
- * collapsed to exactly 0) and the #1045 era (`isScopeBlindedStats`, a
- * plausible-but-wrong positive count from the token-scoped search with the
- * sample-derived fields collapsed). The second shape persisted three
- * poisoned snapshot rows for juan294 (2026-07-14 → 07-16) because only the
- * zero-check guarded this boundary.
- */
+/** Legacy persistence validity only. This boolean does not certify v7 source coverage. */
 function statsLookComplete(stats: StatsData): boolean {
-  return !isPoisonedStats(stats) && !isScopeBlindedStats(stats);
+  return isValidLegacyStats(stats);
 }
 
 export interface MaterializeProfileOptions

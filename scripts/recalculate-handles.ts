@@ -22,10 +22,8 @@
  *   1. Deletes `stats:v2:merged:<handle>` — the composed stats cache — so the
  *      next request recomposes instead of serving the old-code value.
  *   2. NEVER deletes `stats:stale:v2:<handle>` — the protected GitHub-derived
- *      baseline the #1002/#1004/#1050 degraded-fetch guards compare against.
- *      That is `heal-poisoned-stats.ts`'s job, only when the baseline is
- *      itself poisoned, which is a different situation from "correct data,
- *      old scoring code."
+ *      legacy baseline. `heal-poisoned-stats.ts` is now read-only: activity
+ *      magnitude and source labels cannot authorize historical deletion.
  *   3. Deletes `snapshot:v2:latest:<handle>` — the cached EMA prior — so the
  *      smoothing policy doesn't blend the corrected value against a stale
  *      (old-code) prior.
@@ -46,13 +44,12 @@
  *      snapshot for today would still hold the old-code value forever. The
  *      marker must be set BEFORE step 6's request, not after.
  *   6. Triggers the recompute with an anonymous (tokenless) GET to
- *      `/u/<handle>/badge.svg`. Per the #1050 correction (see
- *      `heal-poisoned-stats.ts`'s header), an anonymous request resolves to
- *      the server `GITHUB_TOKEN`, which carries `repo` scope and is
- *      private-inclusive — the user's own OAuth session token is the blind
- *      one and cannot repopulate private-repo merges. The base URL defaults
- *      to production and is configurable via `--base-url=<url>` (e.g. to
- *      point at a preview deployment or local dev server instead).
+ *      `/u/<handle>/badge.svg`. An anonymous request may use the server
+ *      `GITHUB_TOKEN`; it can observe only repositories accessible to that
+ *      credential, never universally complete private activity. The base URL
+ *      defaults to production and is configurable via `--base-url=<url>`.
+ *      Production use requires separate authorization; use localhost for
+ *      the scoring relaunch rehearsal.
  *
  * After `--apply`, this re-reads the `metrics_snapshots` row for today
  * (polling briefly — the durable snapshot write runs in Vercel's `after()`,

@@ -29,6 +29,10 @@ export interface GitHubEvidenceProgress {
   readonly reasonCodes: readonly EvidenceReasonCode[];
 }
 export interface GitHubEvidenceOptions {
+  /** Server coordinator already selected this credential. Null means anonymous;
+   * never re-read the environment after the access context has been bound.
+   */
+  readonly resolvedCredential?: { readonly token: string | null };
   /** Logical HTTP requests: no hidden retries. Defaults 80; maximum 500. */
   readonly maxRequests?: number;
   /** A single deadline across all requests. Defaults 30 seconds. */
@@ -61,7 +65,9 @@ export async function fetchGitHubEvidence(
   if (!Number.isInteger(maxRequests) || maxRequests < 1 || maxRequests > 500 || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120_000) throw new RangeError("Invalid GitHub evidence budget");
   if (options.repositoryIds && (options.repositoryIds.length > 500 || options.repositoryIds.some((id) => !string(id)))) throw new RangeError("Invalid explicit repository scope");
   const signal = AbortSignal.timeout(timeoutMs);
-  const effectiveToken = (token ?? getGithubToken())?.trim();
+  const effectiveToken = options.resolvedCredential !== undefined
+    ? options.resolvedCredential.token
+    : (token ?? getGithubToken())?.trim();
   const progress: GitHubEvidenceProgress[] = [];
   const reasons = new Set<EvidenceReasonCode>();
   let requestCount = 0;

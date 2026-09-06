@@ -166,11 +166,9 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("nonexistent");
 
     expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] GraphQL errors for nonexistent:"),
-      expect.arrayContaining([
-        expect.objectContaining({ message: "Could not resolve to a User" }),
-      ]),
+    // The provider's error body is never echoed into logs (S08).
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      "[github] GraphQL errors for nonexistent",
     );
     consoleSpy.mockRestore();
   });
@@ -433,9 +431,8 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("testuser", "token");
 
     expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] fetch error for testuser:"),
-      expect.any(DOMException),
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      "[github] fetch error for testuser",
     );
     consoleSpy.mockRestore();
   });
@@ -652,9 +649,8 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("testuser", "token");
 
     expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] fetch error for testuser:"),
-      expect.any(Error),
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      "[github] fetch error for testuser",
     );
     consoleSpy.mockRestore();
   });
@@ -700,11 +696,8 @@ describe("fetchContributionData", () => {
       const result = await fetchContributionData("testuser", "token");
 
       expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[github] GraphQL errors for testuser:"),
-        expect.arrayContaining([
-          expect.objectContaining({ extensions: { type: "RATE_LIMITED" } }),
-        ]),
+      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+        "[github] GraphQL errors for testuser",
       );
       consoleSpy.mockRestore();
     });

@@ -177,6 +177,19 @@ describe("materializeImpactState", () => {
 });
 
 describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
+  it.each(["2026-02-30", "2026-04-31"])("blocks persistence of an impossible heatmap date: %s", date => {
+    expect(materializeImpactState(makeFullStats({ heatmapData: [{ date, count: 0 }] })).statsComplete).toBe(false);
+  });
+
+  it("blocks persistence of an impossible fetched timestamp", () => {
+    expect(materializeImpactState(makeFullStats({ fetchedAt: "2026-02-30T12:00:00Z" })).statsComplete).toBe(false);
+  });
+
+  it("retains the persistence gate for structurally malformed legacy stats", () => {
+    const result = materializeImpactState(makeFullStats({ fetchedAt: "invalid" }));
+    expect(result.statsComplete).toBe(false);
+  });
+
   it("is true when prsMergedCount is greater than zero", () => {
     const stats = makeFullStats({ prsMergedCount: 5, commitsTotal: 50 });
 
@@ -197,7 +210,7 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
     expect(result.statsComplete).toBe(true);
   });
 
-  it("is false for the corrupt shape: 0 PRs but real commit activity", () => {
+  it("accepts measured zero with 0 PRs but real commit activity", () => {
     const stats = makeFullStats({
       prsMergedCount: 0,
       commitsTotal: 15585,
@@ -206,10 +219,10 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
 
     const result = materializeImpactState(stats);
 
-    expect(result.statsComplete).toBe(false);
+    expect(result.statsComplete).toBe(true);
   });
 
-  it("is false for the corrupt shape: 0 PRs but real issue activity", () => {
+  it("accepts measured zero with 0 PRs but real issue activity", () => {
     const stats = makeFullStats({
       prsMergedCount: 0,
       commitsTotal: 0,
@@ -218,13 +231,10 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
 
     const result = materializeImpactState(stats);
 
-    expect(result.statsComplete).toBe(false);
+    expect(result.statsComplete).toBe(true);
   });
 
-  it("is false for the #1049 scope-blinded shape: positive count, collapsed sample", () => {
-    // The exact juan294 2026-07-14 payload that DID persist and poison three
-    // snapshot rows: prsMergedCount 140 sails past the zero-check, while the
-    // fields Delivery actually scores on (weight is 70% of it) collapsed.
+  it("accepts positive counts with small samples without inferring corruption", () => {
     const stats = makeFullStats({
       prsMergedCount: 140,
       prsMergedWeight: 3.37828,
@@ -236,7 +246,7 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
 
     const result = materializeImpactState(stats);
 
-    expect(result.statsComplete).toBe(false);
+    expect(result.statsComplete).toBe(true);
   });
 
   it("stays true for a prolific user whose weight sits at the aggregation cap", () => {
@@ -284,7 +294,7 @@ describe("materializeDisplayProfile", () => {
     expect(result).not.toHaveProperty("latestSnapshot");
   });
 
-  it("preserves the completeness gate for poisoned stats", async () => {
+  it("accepts structurally valid zero-PR stats", async () => {
     mockGetStats.mockResolvedValue(
       makeFullStats({
         handle: "testuser",
@@ -297,7 +307,7 @@ describe("materializeDisplayProfile", () => {
 
     const result = await materializeDisplayProfile("testuser");
 
-    expect(result?.statsComplete).toBe(false);
+    expect(result?.statsComplete).toBe(true);
   });
 
   it("returns null instead of fabricating stats when the live load fails", async () => {

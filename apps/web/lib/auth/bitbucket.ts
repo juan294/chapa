@@ -7,9 +7,15 @@ import { getBaseUrl } from "@/lib/env";
 // ---------------------------------------------------------------------------
 
 export interface BitbucketUser {
+  /** Display handle only. `username` is deprecated and absent on current
+   * accounts, so `nickname` is accepted as a fallback. Neither is a stable
+   * identity: the v7 collector matches the credential subject on
+   * `account_id`/`uuid`, which are carried here for that purpose. */
   username: string;
   display_name: string;
   links: { avatar: { href: string } };
+  account_id: string | null;
+  uuid: string | null;
 }
 
 export interface BitbucketTokenResponse {
@@ -248,10 +254,18 @@ export async function fetchBitbucketUser(
     });
     if (!res.ok) return null;
     const data = await res.json();
+    const text = (value: unknown): string | null =>
+      typeof value === "string" && value.trim().length > 0 ? value : null;
+    // `remote_login` is NOT NULL, so a response carrying neither handle must
+    // fail the connection rather than reach storage as undefined.
+    const login = text(data.username) ?? text(data.nickname);
+    if (!login) return null;
     return {
-      username: data.username,
+      username: login,
       display_name: data.display_name,
       links: { avatar: { href: data.links?.avatar?.href ?? "" } },
+      account_id: text(data.account_id),
+      uuid: text(data.uuid),
     };
   } catch {
     return null;

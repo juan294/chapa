@@ -47,6 +47,9 @@ export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; del
     { table: "users", column: "handle" },
     { table: "metrics_snapshots", column: "handle" },
     { table: "verification_records", column: "handle" },
+    // Also removes platform_token_refresh_attempts through its mandatory
+    // link_id -> user_platforms.id ON DELETE CASCADE (migration046). That
+    // operational child has no handle column; do not filter its UUID by handle.
     { table: "user_platforms", column: "handle" },
     { table: "studio_configs", column: "handle" },
     { table: "supplemental_stats", column: "target_handle" },
