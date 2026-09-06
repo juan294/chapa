@@ -300,7 +300,14 @@ export function renderBadgeSvg(
   // (BadgeOverlay) used over the demo badges on the landing/archetype pages
   // — both of those are inline (disableAnimation left false/unset).
   const accessibleTitle = `${headerName} — Chapa Impact score ${scoreStr}, ${escapeXml(archetypeText)} archetype`;
-  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(tierLabel)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring))}`;
+  // The tier here is the canonical value, not the drawn label. The sentence is
+  // assembled in English and `describeScoringEvidence` continues it in English,
+  // so injecting a translated tier word would read as "Alto tier" mid-sentence
+  // — and it would change the `<desc>` of every existing v6 static badge in a
+  // non-default locale, which this cutover has no business doing. `null` is the
+  // v7 range that earned no tier.
+  const accessibleTier = score.tier ?? "unassigned";
+  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(accessibleTier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring))}`;
   const a11yAttrs = disableAnimation ? ' role="img"' : "";
   const a11yMarkup = disableAnimation
     ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`

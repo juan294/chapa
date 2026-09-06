@@ -194,14 +194,31 @@ Supabase), E2E, and any build. See §7.
 
 ## 5. Claims a reviewer should check hardest
 
-### 5.1 "v6 badges are byte-identical"
+### 5.1 v6 badges are byte-identical
 
-Asserted on the basis that `legacyViewModel` maps `adjustedComposite` through
-`point()`, whose `display` is `Math.round`, and `computeAdjustedScore` already
-returns `clampScore(...)` = `Math.round(...)` (`lib/impact/utils.ts:28`). So the
-projection rounds an already-rounded integer. All 527 pre-existing render tests
-pass unchanged, including byte-identity assertions in Studio. **Worth
-independent confirmation**, because if it is wrong every badge changes.
+**Confirmed by independent re-verification**, twice: 25 combinations of five v6
+impacts and five option sets rendered against the pre-branch renderer and
+compared by hash.
+
+The first review round found 20 of 25 identical and five differing — every
+static render carrying a translated tier label, where the accessible `<desc>`
+had started printing the caller's translated tier ("Alto tier") instead of the
+canonical one. That was an undeclared change to existing v6 output on the OG
+and reduced-motion paths, introduced by this branch and not flagged in the
+first version of this document.
+
+It is fixed: `<desc>` now prints `score.tier`, the canonical value, while the
+*visible* label stays translated. The sentence is assembled in English and
+`describeScoringEvidence` continues it in English, so a translated tier read as
+"Alto tier" mid-sentence regardless. A v7 range with no tier prints
+"unassigned tier". `badge-view-model.test.tsx` covers both.
+
+With that fix, v6 badge output is byte-identical to pre-branch across all 25
+combinations. The mechanism behind the identity claim is unchanged:
+`legacyViewModel` maps `adjustedComposite` through `point()`, whose `display`
+is `Math.round`, and `computeAdjustedScore` already returns `clampScore(...)`
+= `Math.round(...)` (`lib/impact/utils.ts:28`), so the projection rounds an
+already-rounded integer.
 
 ### 5.2 The Craft axis rule
 
@@ -300,6 +317,7 @@ All verified at the cited lines.
 | # | Finding | Status |
 | --- | --- | --- |
 | 1 | Share page header (`page.tsx:435`), JSON-LD description (`:373`) and the owner dashboard/breakdown/explanation panel all read the v6 impact while the badge above them draws v7 | **Open** |
+| 0 | No migration seeds a `scoring_v7_rendering` row, and `dbUpdateFeatureFlag` is an UPDATE rather than an upsert, so the /admin toggle matches nothing and the flag could only be flipped by a Vercel env change plus a redeploy | **Fixed** — migration `049` |
 | 2 | Every caller passed `stringsFor(displayImpact.tier)`, and the renderer preferred that label whenever the v7 tier was non-null, so a v7 core printed a v6 tier word; the two v7-only labels were supplied by nobody and fell back to English in Spanish | **Fixed** — `dea4eb54` |
 | 3 | The verification HMAC is still generated from `displayImpact` (`public-profile.ts:66`), so a v7 badge's strip resolves to a record carrying v6 numbers | **Open** |
 | 4 | `getLeaderboard` reads `displayImpact.adjustedComposite` (`leaderboard.ts:75`) and `headline_score` is the v6 headline, so board and badge disagree; the public API's `displayScore` has the same problem | **Open** |
@@ -319,9 +337,12 @@ label instead of the raw English tier. That was my change and I did not flag
 it. It is the same caller-supplied label as finding 2 and is now resolved from
 the drawn model.
 
-One reviewer claim did **not** reproduce: a reported single test failure. Three
-full runs on this branch were clean (9155, then 9158, then 9160 with the new
-regressions). Treat it as flaky.
+One reviewer claim did not reproduce here but was later pinned down on their
+side: a single full-suite failure in the Studio `beforeunload` guard, which
+passes in isolation. Both machines agree it is a timing flake under full-suite
+load rather than a defect in this branch. It needs its own issue, because a
+test that fails on full-suite timing will eventually fail in CI on an unrelated
+PR.
 
 ### 9.2 The flag
 
@@ -345,6 +366,10 @@ documentation of the policy the code implements.
 
 Do not enable until all of these hold:
 
+0. **Done** — `supabase/migrations/049_seed_scoring_v7_rendering_flag.sql` seeds
+   the row disabled, so the flag can be flipped from /admin and, more
+   importantly, flipped back without a deploy. Nothing below could be exercised
+   in production without it.
 1. Findings 1, 3, 4, 5 closed — share header, JSON-LD, verification HMAC,
    leaderboard, public API headline and Studio preview all read
    `ScoreViewModel`.

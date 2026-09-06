@@ -185,3 +185,42 @@ describe("the drawn label comes from the drawn model", () => {
     }
   });
 });
+
+/**
+ * The accessible description is assembled in English and continued in English
+ * by `describeScoringEvidence`, so the tier inside it stays canonical. A
+ * translated word there would read as "Alto tier" mid-sentence, and — the
+ * reason this is a regression rather than a preference — it would change the
+ * `<desc>` of every existing v6 static badge rendered in a non-default locale.
+ */
+describe("the accessible description stays locale-independent", () => {
+  const spanish = (key: string) => (key === "tiers.high" ? "Alto" : key === "tiers.solid" ? "Sólido" : key);
+  const v6: ImpactV6Result = {
+    handle: "alice", profileType: "collaborative",
+    dimensions: { delivery: 61, quality: 72, consistency: 55, breadth: 40 },
+    archetype: "Builder", compositeScore: 57, confidence: 90, confidencePenalties: [],
+    adjustedComposite: 57, tier: "Solid", computedAt: "2026-09-01T12:00:00.000Z",
+  };
+
+  it("keeps the canonical tier in <desc> while the drawn label is translated", () => {
+    const svg = renderBadgeSvg(DEMO_STATS, v6, {
+      disableAnimation: true,
+      strings: buildBadgeI18nStrings(spanish, "Solid"),
+    });
+
+    expect(svg).toContain("<desc>");
+    expect(svg).toContain("Solid tier");
+    expect(svg).not.toContain("Sólido tier");
+    // The visible label is still the translated one.
+    expect(svg).toContain(">Sólido<");
+  });
+
+  it("says the tier is unassigned rather than naming one, for a v7 range", async () => {
+    const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 9, undefined, true), null);
+    const model = { ...receiptViewModel("alice", snapshot), tier: null };
+
+    const svg = renderBadgeSvg(DEMO_STATS, v6, { scoring: model, disableAnimation: true });
+
+    expect(svg).toContain("unassigned tier");
+  });
+});
