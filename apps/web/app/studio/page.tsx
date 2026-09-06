@@ -159,6 +159,7 @@ export default async function StudioPage(
     initialConfig,
     stats: materialized.stats,
     impact: materialized.displayImpact,
+    scoring: materialized.scoring,
     craftResult: materialized.craftResult,
     handle: session.login,
     verification,

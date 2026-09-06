@@ -172,7 +172,10 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               </h2>
             </div>
             <LiteYouTubeEmbed
-              videoId="wcXXGn3JYyw"
+              // The v7 explainer. The earlier video described v6 scoring — confidence
+              // penalties, EMA smoothing, a Craft dimension inside the core — none
+              // of which this page documents any more.
+              videoId="jJiNANmCBw0"
               title={t('about.scoring.videoTitle') as string}
             />
             <p className="text-text-secondary text-sm mt-2">

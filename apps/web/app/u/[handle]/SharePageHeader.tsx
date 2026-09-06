@@ -6,10 +6,6 @@ interface SharePageHeaderProps {
   handle: string;
   /** Display name when GitHub has one, otherwise the handle. */
   displayLabel: string;
-  score: number | null;
-  tier: string | null;
-  /** Present only when the profile carries an HMAC verification record. */
-  verificationHash?: string | null;
 }
 
 /**
@@ -19,9 +15,13 @@ interface SharePageHeaderProps {
  * "Your Impact, Decoded" line: nothing on screen named whose profile it was.
  *
  * The score, tier and verification state are drawn by the badge directly
- * below, so repeating them here only made the header taller. `score`, `tier`
- * and `verificationHash` stay in the props for the callers that already pass
- * them and for the metadata built from the same values.
+ * below, so repeating them here only made the header taller.
+ *
+ * It once accepted `score`, `tier` and `verificationHash` and rendered none of
+ * them. They are gone (#1311): a v6 score arriving at a component that looks
+ * like it displays one is exactly the trap a reader falls into — a review of
+ * the v7 cutover read those props as a live contradiction with the badge below.
+ * A prop that is never rendered should not exist.
  */
 export function SharePageHeader({ handle, displayLabel }: SharePageHeaderProps) {
   const { t } = useTranslation();

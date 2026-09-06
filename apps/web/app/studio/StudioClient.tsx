@@ -15,6 +15,7 @@ import type {
   ImpactV6Result,
 } from "@chapa/shared";
 import { useUnsavedNavigation } from "@/hooks/useUnsavedNavigation";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { BadgePreviewCard } from "./BadgePreviewCard";
@@ -53,6 +54,8 @@ export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: StatsData;
   impact: ImpactV6Result;
+  /** The model the public badge draws; forwarded to the preview (#1311). */
+  scoring?: ScoreViewModel;
   craftResult?: CraftResult | null;
   handle?: string;
   verification?: PreviewVerification | null;
@@ -196,6 +199,7 @@ export function StudioClient({
   initialConfig,
   stats,
   impact,
+  scoring,
   craftResult = null,
   handle = "",
   verification = null,
@@ -757,6 +761,7 @@ export function StudioClient({
                 config={config}
                 stats={stats}
                 impact={impact}
+                scoring={scoring}
                 verification={verification}
                 avatarDataUri={avatarDataUri}
                 demoMode={demo}

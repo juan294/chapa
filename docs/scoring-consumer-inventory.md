@@ -89,6 +89,7 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
+| `apps/web/app/api/generate/route.ts` | `apps/web/app/api/generate/route.test.ts` |
 | `apps/web/app/api/recalculate/route.ts` | `apps/web/app/api/recalculate/route.test.ts` |
 | `apps/web/app/api/refresh/route.ts` | `apps/web/app/api/refresh/route.test.ts` |
 
@@ -191,6 +192,7 @@ score has far more surfaces than a badge does.
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/lib/profile/issue-receipt.ts` | `apps/web/lib/profile/issue-receipt.test.ts` |
+| `apps/web/lib/profile/score-description.ts` | `apps/web/lib/profile/score-description.test.ts` |
 | `apps/web/lib/profile/score-model.ts` | `apps/web/lib/profile/score-model.test.ts` |
 | `apps/web/lib/profile/score-receipt-v7.ts` | `apps/web/lib/profile/score-receipt-v7.test.ts` |
 | `apps/web/lib/profile/score-view-model.ts` | `apps/web/lib/profile/score-view-model.test.ts` |

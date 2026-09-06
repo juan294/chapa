@@ -51,6 +51,7 @@ import { interpolate } from "@/lib/i18n/interpolate";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageHeader } from "./SharePageHeader";
+import { describeScoreForMetadata } from "@/lib/profile/score-description";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
@@ -362,17 +363,20 @@ export async function SharePageContent({
 
   const displayLabel = stats?.displayName ?? handle;
 
+  const scoreDescription = describeScoreForMetadata(materialized?.scoring ?? null);
+
   const personJsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
     name: displayLabel,
     url: `https://github.com/${handle}`,
     sameAs: [`https://github.com/${handle}`],
-    ...(impact
-      ? {
-          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier).`,
-        }
-      : {}),
+    // #1311 — described from the model the badge draws, not the v6 aggregate.
+    // A v7 evidence range has no single number and may have no tier, and this
+    // description is what a search result and an LLM quote back: publishing a
+    // point here while the badge shows an interval would put a number Chapa
+    // does not claim into someone else's index.
+    ...(scoreDescription ? { description: scoreDescription } : {}),
     ...(verification?.hash
       ? {
           potentialAction: {
@@ -429,13 +433,7 @@ export async function SharePageContent({
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
 
         {/* ── Header: identity paired with the headline score (#1217) ── */}
-        <SharePageHeader
-          handle={handle}
-          displayLabel={displayLabel}
-          score={impact?.adjustedComposite ?? null}
-          tier={impact?.tier ?? null}
-          verificationHash={verification?.hash ?? null}
-        />
+        <SharePageHeader handle={handle} displayLabel={displayLabel} />
 
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
