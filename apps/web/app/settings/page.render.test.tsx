@@ -24,6 +24,13 @@ vi.mock("@/components/Navbar", () => ({
     <div data-testid="navbar" data-links={navLinks.map((l) => l.href).join(",")} />
   ),
 }));
+// An async server component cannot render in this environment; the owner-facing
+// evidence states have their own suite in lib/evidence/workflow-state.test.ts.
+vi.mock("./EvidenceWorkflow", () => ({
+  EvidenceWorkflow: ({ handle }: { handle: string }) => (
+    <div data-testid="evidence-workflow" data-handle={handle} />
+  ),
+}));
 vi.mock("./SettingsClient", () => ({
   SettingsClient: ({
     login,

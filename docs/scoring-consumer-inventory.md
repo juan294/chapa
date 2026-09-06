@@ -57,6 +57,7 @@ score has far more surfaces than a badge does.
 | `apps/web/lib/render/archetypeDemoData.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
 | `apps/web/lib/render/demoData.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
 | `apps/web/lib/render/landing-demo-data.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
+| `apps/web/lib/render/scoring-evidence-label.ts` | `apps/web/lib/render/scoring-evidence-label.test.ts` |
 
 ### WebMCP
 
@@ -116,6 +117,7 @@ score has far more surfaces than a badge does.
 | `apps/web/components/dashboard/ScoreBoldNumber.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/components/dashboard/ScoreExplanationPanel.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/lib/dashboard/generate-insights.ts` | `apps/web/lib/dashboard/generate-insights.test.ts` |
+| `apps/web/lib/dashboard/receipt-explanation.ts` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
 | `apps/web/lib/dashboard/score-explanation.ts` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 
 ### email

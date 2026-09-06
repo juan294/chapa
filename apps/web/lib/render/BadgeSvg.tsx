@@ -15,6 +15,8 @@ import {
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
 import { BADGE_RENDER_VARIANT } from "./badge-render-variant";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
+import { describeScoringEvidence } from "./scoring-evidence-label";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 
 /**
  * Locale-resolved strings for the ~10 literals rendered directly onto the
@@ -41,6 +43,17 @@ export interface BadgeI18nStrings {
 }
 
 interface BadgeOptions {
+  /**
+   * The issued v7 receipt projection, when this subject has one (#1310/#1311).
+   *
+   * The drawn artwork is unchanged; what this adds is truth in the accessible
+   * name. A screen reader otherwise hears a composite and an archetype with no
+   * way to tell a point from an evidence-completion range, an absent Craft
+   * portfolio from a zero one, or complete coverage from partial. The badge is
+   * consumed as an `<img>` in READMEs, where that description is the only text
+   * a reader gets.
+   */
+  scoring?: ScoreViewModel;
   includeBranding?: boolean;
   avatarDataUri?: string;
   verificationHash?: string;
@@ -90,7 +103,7 @@ export function renderBadgeSvg(
   impact: ImpactV6Result,
   options: BadgeOptions = {},
 ): string {
-  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {}, config = DEFAULT_BADGE_CONFIG } = options;
+  const { scoring, includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {}, config = DEFAULT_BADGE_CONFIG } = options;
   const hasVerification = Boolean(verificationHash && verificationDate);
   // #1242 — the palette is resolved from the config, not a module singleton,
   // so a Studio palette reaches the artifact people embed rather than only the
@@ -261,7 +274,7 @@ export function renderBadgeSvg(
   // (BadgeOverlay) used over the demo badges on the landing/archetype pages
   // — both of those are inline (disableAnimation left false/unset).
   const accessibleTitle = `${headerName} — Chapa Impact score ${scoreStr}, ${escapeXml(archetypeText)} archetype`;
-  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(impact.tier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.`;
+  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(impact.tier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring))}`;
   const a11yAttrs = disableAnimation ? ' role="img"' : "";
   const a11yMarkup = disableAnimation
     ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`

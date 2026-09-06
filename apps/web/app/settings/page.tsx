@@ -5,6 +5,7 @@ import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { SettingsClient } from "./SettingsClient";
+import { EvidenceWorkflow } from "./EvidenceWorkflow";
 
 // Session-gated like /studio, not a public content page (#1223): it reads the
 // session from request headers, so it can never be statically rendered.
@@ -51,6 +52,12 @@ export default async function SettingsPage() {
             name={session.name ?? null}
             avatarUrl={session.avatar_url ?? null}
           />
+          {/* Server-rendered: the evidence ledger is owner-only data and must
+              never cross into the client tree for anyone else (#1067's rule,
+              applied to evidence rather than confidence). */}
+          <div className="mx-auto max-w-4xl px-6 pb-16">
+            <EvidenceWorkflow handle={session.login} locale={locale} />
+          </div>
         </div>
       </main>
     </DynamicRouteShell>

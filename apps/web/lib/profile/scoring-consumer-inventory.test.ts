@@ -19,7 +19,7 @@ const INVENTORY = "docs/scoring-consumer-inventory.md";
  * positive costs one inventory row, a false negative costs a silent second
  * answer somewhere in the product. */
 const SCORED_SYMBOLS =
-  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|adjustedComposite|compositeScore)\b/;
+  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|ScoreViewModel|explainReceipt|simulateCoreScore|adjustedComposite|compositeScore)\b/;
 const SCAN_ROOTS = ["apps/web/app", "apps/web/components", "apps/web/lib", "scripts"];
 const NOT_A_CONSUMER = /(\.test\.|\.spec\.|__fixtures__|\/test-helpers\/|\/__mocks__\/)/;
 
@@ -46,7 +46,7 @@ const scanned = SCAN_ROOTS.flatMap(root => sourceFiles(join(repoRoot, root)))
 
 describe("scored-consumer inventory", () => {
   it("registers at least the consumers that existed when the contract was written", () => {
-    expect(registered.length).toBeGreaterThanOrEqual(61);
+    expect(registered.length).toBeGreaterThanOrEqual(62);
   });
 
   it("names no consumer twice", () => {
