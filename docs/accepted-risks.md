@@ -244,6 +244,29 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Vercel builds only production; preview builds are skipped platform-wide
+
+- **Risk:** Every Vercel project in the `thecreativetoken` team carries an
+  Ignored Build Step of `if [ "$VERCEL_ENV" != "production" ]; then exit 0; fi; exit 1`,
+  set on 2026-09-06. A preview deployment is still created by a push, but its
+  build is skipped and consumes no build minutes. Two consequences follow.
+  First, `docs/release/release-playbook.md` §3 requires a Preview proof bound to
+  the exact release candidate, and that Preview will not build while the guard
+  is in place. Second, no branch can be exercised on Vercel before it reaches
+  production.
+- **Mitigation:** Deliberate. Preview minutes were being spent on builds that
+  never reach production, and the owner's standing rule is that a hosted
+  platform must not build on git push. The release path stays open because the
+  guard is a project setting, not code: re-enable a candidate Preview for the
+  duration of a release by clearing `commandForIgnoringBuildStep` on that one
+  project, run §3, then restore it. `layalga` keeps its original
+  `test ! -f package.json` condition composed after the production check.
+- **Severity:** Low — reversible per project in one API call or one dashboard
+  field, with no code change and no deployment.
+- **Accepted:** 2026-09-06
+
+---
+
 ## Profile type threshold boundary (0.15 review-to-PR ratio)
 
 > **Superseded for v7 (#1312).** v7 has no solo/collaborative switch: Quality

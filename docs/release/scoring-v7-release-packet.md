@@ -110,12 +110,14 @@ Two consequences the owner should decide on before any push:
 
 - **Six workflows consume paid minutes per push to `develop`.** Three of them
   ignore documentation-only paths; three do not.
-- **The Vercel Git integration, if connected, deploys on push.** A push to
-  `develop` would create a Preview and a push to `main` would deploy
-  production. That must be confirmed read-only before pushing, because a
-  Git-triggered Preview is exactly what the policy prohibits during this work.
-  Nothing here dispatches a workflow, opens a PR, sends email or mutates
-  production data.
+- **The Vercel Git integration is connected**, confirmed read-only. Since
+  2026-09-06 every project in the team carries a production-only Ignored Build
+  Step, so a push to `develop` creates a preview deployment whose build is
+  skipped and costs no build minutes. A push to `main` still builds and deploys
+  production. See `docs/accepted-risks.md` — the same guard means the Preview
+  proof in `release-playbook.md` §3 needs that setting cleared for the duration
+  of a release. Nothing here dispatches a workflow, opens a PR, sends email or
+  mutates production data.
 
 ## What the owner is being asked to decide
 
