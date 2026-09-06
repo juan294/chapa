@@ -179,6 +179,26 @@ The checked-in release playbook at docs/release/release-playbook.md:85 requires 
 
 Before future publication, run every applicable local gate and inspect GitHub/Vercel triggers; if a push would create a preview, use the documented non-destructive disable/bypass path or stop before pushing. Production deployment, migration and recomputation require separately explicit authorization. develop→main release uses a merge-commit PR; main is never a development branch.
 
+## Implementation outcome (2026-09-06)
+
+S01-S17, S19 and S20 are implemented and locally verified. The full status
+matrix, the local gate results, the read-only remote-trigger audit and the
+decisions the owner is being asked to make are in
+`docs/release/scoring-v7-release-packet.md`.
+
+**Relaunch remains blocked**, on two items that cannot be closed by more code:
+
+1. **S18's empirical pilot has not started.** It needs the owner's
+   authorization to review selected public profiles read-only, to approach
+   candidate participants for consenting private evidence, and to engage at
+   least one independent human domain reviewer. The 19 matched-pair invariants
+   that do pass test this rubric against its own rules; they are arithmetic
+   conformance, not calibration, and the policy forbids substituting them.
+2. **S04's issue-API scope amendment** is still awaiting explicit approval.
+
+No production migration, recompute, deployment or release is authorized by the
+completion of the implementation work.
+
 ## Planning validation
 
 Planning review must check: all53 findings covered; all20 tasks have executable acceptance criteria; DAG is acyclic; batch files do not overlap; new tables precede their route users; core and Craft disclosure invariants hold; range semantics are mathematical bounds; pilot claims stay within evidence; no production action is implied by issue completion.

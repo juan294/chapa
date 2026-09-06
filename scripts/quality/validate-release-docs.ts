@@ -74,8 +74,13 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   const exploreCommand = read(root, EXPLORE_COMMAND, errors);
   const prodplaybookCommand = read(root, PRODPLAYBOOK_COMMAND, errors);
 
-  if (playbook && lineCount(playbook) > 200) {
-    errors.push(`${PLAYBOOK}: exceeds 200 lines`);
+  // The playbook stays short so it reads as one authority rather than a manual.
+  // Raised from 200 to 205 in #1315 for the scoring-v7 Preview sequencing note:
+  // it prevents a reader treating local verification as a substitute for the
+  // required Preview proof, which is exactly the kind of rule this file exists
+  // to hold. Raise it again only for something that earns its lines the same way.
+  if (playbook && lineCount(playbook) > 205) {
+    errors.push(`${PLAYBOOK}: exceeds 205 lines`);
   }
 
   for (const stage of [

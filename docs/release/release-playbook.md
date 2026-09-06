@@ -88,6 +88,10 @@ path. Capability detail lives in the linked runbooks.
 
 ## 3. One concurrent observation wave
 
+> **Scoring v7 (#1315):** until the owner authorizes publication, no Preview is
+> created and this section is not entered — sequencing, not a waiver. See
+> `docs/release/scoring-v7-release-packet.md`.
+
 Resolve the immutable Vercel Preview for `developCommit` before this step;
 protected Previews require `VERCEL_AUTOMATION_BYPASS_SECRET`, missing which
 blocks verification (`BLOCKED`). Then observe two things concurrently — in

@@ -2,7 +2,7 @@
   "date": "2026-09-05",
   "repo": "juan294/chapa",
   "baseline": "c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d",
-  "status": "implementation-in-progress-code-freeze",
+  "status": "implementation-complete-except-empirical-pilot",
   "epic": {
     "number": 1295,
     "url": "https://github.com/juan294/chapa/issues/1295"
@@ -105,7 +105,8 @@
         "S06",
         "S07"
       ],
-      "implementationStatus": "in-progress"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/research/2026-09-05-platform-refresh-safety.md"
     },
     {
       "id": "S09",
@@ -200,7 +201,8 @@
         "S13",
         "S14"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/scoring-consumer-inventory.md"
     },
     {
       "id": "S16",
@@ -211,7 +213,8 @@
       "dependencies": [
         "S15"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "apps/web/lib/dashboard/receipt-explanation.test.ts"
     },
     {
       "id": "S17",
@@ -225,7 +228,8 @@
         "S15",
         "S16"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/impact-v7.md"
     },
     {
       "id": "S18",
@@ -251,7 +255,8 @@
         "S16",
         "S17"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "blocked-pending-human-pilot",
+      "verificationArtifact": "docs/research/scoring-v7-validation-results.md"
     },
     {
       "id": "S19",
@@ -262,7 +267,8 @@
       "dependencies": [
         "S18"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified",
+      "verificationArtifact": "docs/runbooks/scoring-v7-transition.md"
     },
     {
       "id": "S20",
@@ -273,7 +279,8 @@
       "dependencies": [
         "S19"
       ],
-      "implementationStatus": "pending"
+      "implementationStatus": "verified-readiness-only",
+      "verificationArtifact": "docs/release/scoring-v7-release-packet.md"
     }
   ],
   "coverage": [
@@ -790,5 +797,9 @@
       "purpose": "S08 source coverage integrity",
       "cleanupStatus": "active"
     }
+  ],
+  "relaunchBlockers": [
+    "S18 empirical pilot not started: requires the owner's authorization to review selected public profiles read-only, to approach participants for consenting private evidence, and to engage an independent human domain reviewer.",
+    "S04 issue-API scope amendment still awaiting the owner's explicit approval."
   ]
 }

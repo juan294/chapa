@@ -96,17 +96,25 @@ describe("validateReleaseDocs", () => {
     expect(validateReleaseDocs(compliantRoot())).toEqual([]);
   });
 
-  it("rejects a playbook over 200 lines", () => {
+  it("rejects a playbook over 205 lines", () => {
     const root = compliantRoot();
     write(
       root,
       "docs/release/release-playbook.md",
-      Array.from({ length: 201 }, (_, index) => `line ${index + 1}`).join("\n"),
+      Array.from({ length: 206 }, (_, index) => `line ${index + 1}`).join("\n"),
     );
 
     expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: exceeds 200 lines",
+      "docs/release/release-playbook.md: exceeds 205 lines",
     );
+  });
+
+  it("still accepts a playbook exactly at the budget", () => {
+    const root = compliantRoot();
+    const body = fs.readFileSync(path.join(root, "docs/release/release-playbook.md"), "utf8");
+    write(root, "docs/release/release-playbook.md", `${body}\n\n\n`);
+
+    expect(validateReleaseDocs(root)).toEqual([]);
   });
 
   it("rejects a release command that does not delegate", () => {
@@ -291,7 +299,7 @@ describe("repository release procedure", () => {
   );
 
   it("documents exact dispatch, one concurrent wave, and tag-last publication", () => {
-    expect(playbook.split(/\r?\n/).length).toBeLessThanOrEqual(200);
+    expect(playbook.split(/\r?\n/).length).toBeLessThanOrEqual(205);
     for (const required of [
       "STOP — Gate 1: approve the release",
       "STOP — Gate 2: authorize production",
