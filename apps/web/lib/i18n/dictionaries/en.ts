@@ -562,6 +562,8 @@ export const en: Translations = {
     metricsVerified: 'Verified metrics',
     metricsPublic: 'Public metrics',
     radarNoData: 'no data yet',
+    tierUnknown: 'evidence range',
+    archetypeUnknown: 'insufficient evidence',
     verifiedLabel: 'VERIFIED',
     sampleDisclosure: 'SAMPLE · NOT A REAL BADGE · FOR ILLUSTRATION ONLY',
     invalidHandle: 'Invalid GitHub handle.',

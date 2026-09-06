@@ -22,10 +22,15 @@ export type BadgeTranslate = (key: string) => unknown;
  * Pure and synchronous, matching `renderBadgeSvg` itself. Returns a fresh
  * object (including a fresh `radarLabels`) on every call, so no caller can
  * mutate another's bundle.
+ *
+ * `tier` is the tier of the model actually being drawn, and `null` is a real
+ * v7 result: an evidence-completion range whose interval straddles a boundary
+ * earns no tier. Passing the v6 aggregate's tier while the badge draws a v7
+ * receipt would print one policy's label over the other policy's number.
  */
 export function buildBadgeI18nStrings(
   t: BadgeTranslate,
-  tier: string,
+  tier: string | null,
 ): BadgeI18nStrings {
   return {
     activityHeading: t("badge.activityHeading") as string,
@@ -44,6 +49,10 @@ export function buildBadgeI18nStrings(
     radarNoData: t("badge.radarNoData") as string,
     verifiedLabel: t("badge.verifiedLabel") as string,
     sampleDisclosure: t("badge.sampleDisclosure") as string,
-    tierLabel: t(`tiers.${tier.toLowerCase()}`) as string,
+    // Omitted entirely for a tier-less v7 range, so the renderer falls through
+    // to `tierUnknownLabel` rather than receiving an empty translated string.
+    ...(tier === null ? {} : { tierLabel: t(`tiers.${tier.toLowerCase()}`) as string }),
+    tierUnknownLabel: t("badge.tierUnknown") as string,
+    archetypeUnknownLabel: t("badge.archetypeUnknown") as string,
   };
 }

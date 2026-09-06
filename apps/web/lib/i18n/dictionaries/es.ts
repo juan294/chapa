@@ -551,6 +551,8 @@ export const es: Translations = {
     metricsVerified: 'Métricas verificadas',
     metricsPublic: 'Métricas públicas',
     radarNoData: 'aún sin datos',
+    tierUnknown: 'rango de evidencia',
+    archetypeUnknown: 'evidencia insuficiente',
     verifiedLabel: 'VERIFICADO',
     sampleDisclosure: 'MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN',
     invalidHandle: 'Usuario de GitHub no válido.',

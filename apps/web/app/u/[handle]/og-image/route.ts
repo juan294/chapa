@@ -151,7 +151,7 @@ export async function GET(
       disableAnimation: true,
       // Same resolved bundle that produced ogCacheKey above, so the image and
       // the key it is stored under are always for the same locale (#1190).
-      strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
+      strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
     });
 
     const png = await withTimeout(

@@ -346,7 +346,7 @@ async function finalizeMaterializedBadge(
     // #1181 — resolved strings for `options.locale` via the shared
     // resolveBadgeLocale helper (never built ad hoc here); `renderBadgeSvg`
     // itself stays pure/sync and never resolves locale on its own.
-    strings: resolveBadgeLocale(options.locale).stringsFor(materialized.displayImpact.tier),
+    strings: resolveBadgeLocale(options.locale).stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
   });
   const renderMs = Date.now() - renderStart;
 

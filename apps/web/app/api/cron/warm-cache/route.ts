@@ -535,7 +535,7 @@ async function warmHandle(
               // Mirrors the request path — this SVG is served to <img> embeds,
               // where SMIL <animate> never runs.
               disableAnimation: true,
-              strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
+              strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
             });
             if (avatarCachePolicy === "short") {
               await writeBadgeSvgCache(svgCacheKey, svg, handle, {

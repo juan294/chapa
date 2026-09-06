@@ -27,6 +27,8 @@ describe("buildBadgeI18nStrings", () => {
         craft: "dimensions.craft.label",
       },
       radarNoData: "badge.radarNoData",
+      tierUnknownLabel: "badge.tierUnknown",
+      archetypeUnknownLabel: "badge.archetypeUnknown",
       verifiedLabel: "badge.verifiedLabel",
       sampleDisclosure: "badge.sampleDisclosure",
       tierLabel: "tiers.solid",

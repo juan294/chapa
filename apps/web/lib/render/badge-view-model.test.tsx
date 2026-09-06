@@ -11,6 +11,7 @@ import {
 import type { ImpactV6Result } from "@chapa/shared";
 import { renderBadgeSvg } from "./BadgeSvg";
 import { DEMO_STATS } from "./demoData";
+import { buildBadgeI18nStrings } from "./badge-i18n-strings";
 
 /**
  * S15 acceptance: badge, share page, public API, explanation and simulation
@@ -148,5 +149,39 @@ describe("badge SVG renders the resolved policy version", () => {
 
     expect(svg).toContain("evidence range");
     for (const tier of ["Emerging", "Solid", "High", "Elite"]) expect(svg).not.toContain(`>${tier}<`);
+  });
+});
+
+/**
+ * The label bug the first cutover shipped: every caller resolved its tier
+ * string from the v6 aggregate, and the renderer preferred a caller-supplied
+ * label whenever the v7 tier was non-null. A v7 core of 72 therefore printed
+ * the v6 word "Solid" beside it, and Spanish badges fell back to English for
+ * the two v7-only labels because no caller supplied them.
+ */
+describe("the drawn label comes from the drawn model", () => {
+  const t = (key: string) => (key === "badge.tierUnknown" ? "rango de evidencia"
+    : key === "badge.archetypeUnknown" ? "evidencia insuficiente"
+    : key === "tiers.high" ? "Alto"
+    : key === "tiers.solid" ? "Sólido"
+    : key);
+
+  it("labels a v7 tier from the v7 tier, not the v6 aggregate's", () => {
+    expect(buildBadgeI18nStrings(t, "High").tierLabel).toBe("Alto");
+    expect(buildBadgeI18nStrings(t, "Solid").tierLabel).toBe("Sólido");
+  });
+
+  it("supplies no tier label at all when the range earns no tier", () => {
+    const strings = buildBadgeI18nStrings(t, null);
+    expect(strings.tierLabel).toBeUndefined();
+    expect(strings.tierUnknownLabel).toBe("rango de evidencia");
+  });
+
+  it("always carries the two v7-only labels, so they are never English by default", () => {
+    for (const tier of ["High", null]) {
+      const strings = buildBadgeI18nStrings(t, tier);
+      expect(strings.tierUnknownLabel).toBe("rango de evidencia");
+      expect(strings.archetypeUnknownLabel).toBe("evidencia insuficiente");
+    }
   });
 });

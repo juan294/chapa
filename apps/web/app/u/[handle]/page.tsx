@@ -276,7 +276,7 @@ export async function SharePageContent({
       verificationDate: verification?.date,
       // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
       // so content and key are always for the same locale.
-      strings: badgeLocale.stringsFor(impact.tier),
+      strings: badgeLocale.stringsFor(materialized?.scoring?.tier ?? impact.tier),
     });
     renderedFresh = true;
   }
