@@ -16,7 +16,7 @@ const BAR = "animate-pulse rounded bg-track";
 
 export default function SharePageLoading() {
   return (
-    <main id="main-content" className="min-h-screen bg-bg" role="status" aria-label={t("aria.loading") as string}>
+    <div className="min-h-screen bg-bg" role="status" aria-label={t("aria.loading") as string}>
       <span className="sr-only">{t("common.loading") as string}</span>
       <div className="relative mx-auto max-w-4xl px-6 py-16">
         {/* The wait is the product working, so say so in its own voice rather
@@ -68,6 +68,6 @@ export default function SharePageLoading() {
           <div className="h-11 w-32 animate-pulse rounded-[3px] bg-card" />
         </div>
       </div>
-    </main>
+    </div>
   );
 }

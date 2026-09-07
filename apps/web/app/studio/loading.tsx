@@ -8,7 +8,7 @@ import { getServerLocale, getServerT } from "@/lib/i18n/server";
 export default async function StudioLoading() {
   const t = getServerT(await getServerLocale());
   return (
-    <main id="main-content" className="min-h-screen bg-bg" role="status" aria-label={t("aria.loading") as string}>
+    <div className="min-h-screen bg-bg" role="status" aria-label={t("aria.loading") as string}>
       <span className="sr-only">{t("common.loading") as string}</span>
       {/* Nav placeholder */}
       <div className="fixed top-0 z-50 w-full border-b border-stroke bg-bg">
@@ -52,6 +52,6 @@ export default async function StudioLoading() {
         </div>
       </div>
 
-    </main>
+    </div>
   );
 }

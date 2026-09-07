@@ -349,19 +349,21 @@ describe("dbUpdateUserProfile", () => {
 describe("dbGetUsers", () => {
   it("returns mapped user rows ordered by registered_at desc", async () => {
     const rows = [
-      { id: 2, handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
-      { id: 1, handle: "bob", registered_at: "2025-06-14T10:00:00Z", display_name: null, avatar_url: null },
+      { id: 2, handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: "Alice", avatar_url: "https://example.com/alice.png", email: "alice@example.com" },
+      { id: 1, handle: "bob", registered_at: "2025-06-14T10:00:00Z", display_name: null, avatar_url: null, email: null },
     ];
 
     listResolve = { data: rows, error: null };
 
     const result = await dbGetUsers();
 
+    // LE-8-4 — `hasEmail` says whether the OAuth callback wrote the row
+    // (#1239); the address itself never leaves this module through here.
     expect(result).toEqual([
-      { handle: "alice", registeredAt: "2025-06-15T10:00:00Z", displayName: "Alice", avatarUrl: "https://example.com/alice.png" },
-      { handle: "bob", registeredAt: "2025-06-14T10:00:00Z", displayName: null, avatarUrl: null },
+      { handle: "alice", registeredAt: "2025-06-15T10:00:00Z", displayName: "Alice", avatarUrl: "https://example.com/alice.png", hasEmail: true },
+      { handle: "bob", registeredAt: "2025-06-14T10:00:00Z", displayName: null, avatarUrl: null, hasEmail: false },
     ]);
-    expect(mockSelect).toHaveBeenCalledWith("id, handle, registered_at, display_name, avatar_url");
+    expect(mockSelect).toHaveBeenCalledWith("id, handle, registered_at, display_name, avatar_url, email");
     expect(mockOrder).toHaveBeenCalledWith("registered_at", {
       ascending: false,
     });

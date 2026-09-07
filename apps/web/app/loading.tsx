@@ -15,8 +15,7 @@ const dictionary = DEFAULT_LOCALE === "es" ? es : en;
 
 export default function RootLoading() {
   return (
-    <main
-      id="main-content"
+    <div
       className="flex min-h-screen items-center justify-center bg-bg px-6"
       role="status"
       aria-label={resolveTranslation("aria.loading", dictionary) as string}
@@ -78,6 +77,6 @@ export default function RootLoading() {
           <div className="animate-shimmer motion-reduce:animate-none h-1 w-24 rounded-full bg-forest-dim/10" />
         </div>
       </div>
-    </main>
+    </div>
   );
 }

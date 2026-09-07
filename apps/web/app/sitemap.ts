@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getBaseUrl } from "@/lib/env";
 import { dbGetUsers } from "@/lib/db/users";
+import { isValidHandle } from "@/lib/validation";
 
 const BASE_URL = getBaseUrl();
 
@@ -71,7 +72,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
   );
 
-  const userPages: MetadataRoute.Sitemap = users.map((user) => ({
+  // LE-8-4 — advertise only pages a crawler can actually open for a person
+  // who actually signed up. The share page rejects a handle that fails
+  // isValidHandle (an EMU login with an underscore), and a users row without
+  // an email was registered by a render path, not by the OAuth callback that
+  // is the only writer of email (#1239): a stranger whose badge someone
+  // viewed, not a signup.
+  const userPages: MetadataRoute.Sitemap = users
+    .filter((user) => user.hasEmail && isValidHandle(user.handle))
+    .map((user) => ({
     url: `${BASE_URL}/u/${user.handle}`,
     lastModified: new Date(user.registeredAt),
     changeFrequency: "daily" as const,

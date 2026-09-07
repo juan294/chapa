@@ -9,8 +9,7 @@ import { getServerLocale, getServerT } from "@/lib/i18n/server";
 export default async function GeneratingLoading() {
   const t = getServerT(await getServerLocale());
   return (
-    <main
-      id="main-content"
+    <div
       className="flex min-h-screen items-center justify-center bg-bg px-6"
       role="status"
       aria-label={t("aria.loading") as string}
@@ -44,6 +43,6 @@ export default async function GeneratingLoading() {
           <div className="h-3 w-44 animate-pulse rounded bg-amber/[0.06] font-heading" />
         </div>
       </div>
-    </main>
+    </div>
   );
 }

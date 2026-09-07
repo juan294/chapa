@@ -20,6 +20,7 @@ interface UserRow {
   registered_at: string;
   display_name: string | null;
   avatar_url: string | null;
+  email?: string | null;
 }
 
 const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
@@ -195,7 +196,19 @@ export async function dbUpdateUserProfile(
  */
 export async function dbGetUsers(
   opts?: { limit?: number; offset?: number },
-): Promise<{ handle: string; registeredAt: string; displayName: string | null; avatarUrl: string | null }[]> {
+): Promise<{
+  handle: string;
+  registeredAt: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  /**
+   * Whether the row was written by the OAuth callback, the only writer of
+   * `email` (#1239). A row without one was registered by a render path before
+   * that rule existed — a stranger whose badge someone viewed, not a signup.
+   * The address itself stays here; callers only learn that one exists.
+   */
+  hasEmail: boolean;
+}[]> {
   const db = getSupabase();
   if (!db) return [];
 
@@ -203,7 +216,7 @@ export async function dbGetUsers(
     const baseQuery = () =>
       db
         .from("users")
-        .select("id, handle, registered_at, display_name, avatar_url")
+        .select("id, handle, registered_at, display_name, avatar_url, email")
         .order("registered_at", { ascending: false })
         .order("id", { ascending: false });
 
@@ -227,6 +240,7 @@ export async function dbGetUsers(
       registeredAt: row.registered_at,
       displayName: row.display_name ?? null,
       avatarUrl: row.avatar_url ?? null,
+      hasEmail: typeof row.email === "string" && row.email.length > 0,
     }));
   } catch (error) {
     console.error("[db] dbGetUsers failed:", (error as Error).message);

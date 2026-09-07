@@ -86,6 +86,24 @@ describe("SettingsPage", () => {
     );
   });
 
+  // LE-5-3 — a streamed document holds the root loading fallback beside the
+  // page until React swaps them (in dev that swap waits for hydration, so it
+  // can land after `load`). Only the page may own the main landmark and the
+  // skip-link target; the fallback stays a status region the whole time.
+  it("owns the only main#main-content, even beside the root loading fallback", async () => {
+    const { default: SettingsPage } = await import("./page");
+    const { default: RootLoading } = await import("../loading");
+    const { container } = render(
+      <>
+        <RootLoading />
+        {await SettingsPage()}
+      </>,
+    );
+    expect(container.querySelectorAll("main")).toHaveLength(1);
+    expect(container.querySelectorAll("#main-content")).toHaveLength(1);
+    expect(screen.getByRole("status")).toBeDefined();
+  });
+
   it("links back to the owner's badge", async () => {
     const { default: SettingsPage } = await import("./page");
     render(await SettingsPage());

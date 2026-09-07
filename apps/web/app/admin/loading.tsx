@@ -1,6 +1,6 @@
 export default function AdminLoading() {
   return (
-    <main
+    <div
       className="mx-auto min-h-screen max-w-7xl bg-bg px-6 pt-24 pb-24"
       role="status"
       aria-label="Loading"
@@ -56,6 +56,6 @@ export default function AdminLoading() {
           </div>
         ))}
       </div>
-    </main>
+    </div>
   );
 }
