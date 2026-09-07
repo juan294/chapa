@@ -206,8 +206,18 @@ export async function materializeScoreReceiptV7(
     // `canonicalJson` serializes a receipt structure, not an arbitrary value,
     // so an absent Craft channel is compared as absence rather than passed
     // through it as `null`.
+    // Counts and result, not the whole `inputs`: the Craft inputs embed the
+    // window exactly as the core inputs do, so comparing them wholesale never
+    // matched either. This was the third instance of the same mistake in one
+    // comparison, and the reason a "no-op" pass kept publishing a correction.
     const craftIdentity = (value: typeof craft | PublicScoringReceipt["craft"]) =>
-      value ? canonicalJson({ inputs: value.inputs, result: value.result }) : "";
+      value
+        ? canonicalJson({
+            counts: value.inputs.counts,
+            eligibleEpisodes: value.inputs.eligibleEpisodes,
+            result: value.result,
+          })
+        : "";
     if (previous
       && prior
       && prior.action !== "retract"
