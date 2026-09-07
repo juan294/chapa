@@ -13,6 +13,9 @@ const {
   mockIsValidHandle,
   mockMaterializeDisplayProfile,
   mockReadScoreReceiptV7,
+  mockCacheGet,
+  mockCacheSet,
+  mockFetchStats,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetCachedLatestSnapshot: vi.fn(),
@@ -21,6 +24,9 @@ const {
   mockIsValidHandle: vi.fn(),
   mockMaterializeDisplayProfile: vi.fn(),
   mockReadScoreReceiptV7: vi.fn(),
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
+  mockFetchStats: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/score-receipt-v7", () => ({
@@ -33,6 +39,33 @@ vi.mock("@/lib/validation", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  cacheGet: mockCacheGet,
+  cacheSet: mockCacheSet,
+}));
+
+// The warm-cache test below runs the REAL materializer and the REAL
+// `getStats` so that the read-only stats path is exercised end to end from
+// this route; only the I/O boundaries beneath them are stubbed.
+vi.mock("@/lib/env", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/env")>(),
+  getGithubToken: () => "server-token",
+  getNextauthSecret: () => "profile-route-fixture-secret",
+}));
+vi.mock("@/lib/github/stats", () => ({ fetchStats: mockFetchStats }));
+vi.mock("@/lib/platform/source-authorization", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/platform/source-authorization")>(),
+  readSourceAuthorization: async () => ({ status: "unlinked" }),
+}));
+vi.mock("@/lib/platform/source-refresh", () => ({ refreshSourceLink: async (value: unknown) => value }));
+vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: vi.fn() }));
+vi.mock("@/lib/db/supplemental", () => ({ dbGetSupplemental: async () => null }));
+vi.mock("@/lib/bitbucket/client", () => ({ fetchBitbucketIfLinked: async () => null }));
+vi.mock("@/lib/codeberg/client", () => ({ fetchCodebergIfLinked: async () => null }));
+vi.mock("@/lib/gitlab/client", () => ({ fetchGitlabIfLinked: async () => null }));
+vi.mock("@/lib/cache/craft-cache", () => ({ getCachedCraftScore: async () => null }));
+vi.mock("@/lib/profile/score-model", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/profile/score-model")>(),
+  readRenderableReceipt: async () => null,
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
@@ -514,5 +547,40 @@ describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () =>
     await GET(makeRequest("juan294"), makeParams("juan294"));
 
     expect(mockGetCachedLatestSnapshot).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LE-1-1 — a warm, bound stats cache must reach a read-only caller
+// ---------------------------------------------------------------------------
+
+describe("GET /api/profile/:handle — warm read-only stats (LE-1-1)", () => {
+  // The badge route materializes live and writes `stats:v3:<handle>` under the
+  // server token's binding. This route reads with `readOnly: true`, under the
+  // same binding, so it must be served that record: a badge printing 80 beside
+  // a `displayScore: null` from this endpoint is the finding this covers.
+  it("reports the drawn headline from the bound stats cache without a live fetch", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/profile/materialize-profile")>("@/lib/profile/materialize-profile");
+    const { makeStats } = await import("@/lib/test-helpers/fixtures");
+    const { renderableScore } = await import("@/lib/profile/score-view-model");
+    mockMaterializeDisplayProfile.mockImplementation(actual.materializeDisplayProfile);
+    mockFetchStats.mockResolvedValue(makeStats({ handle: "juan294", commitsTotal: 400, prsMergedCount: 40, reviewsSubmittedCount: 20, activeDays: 200 }));
+    mockCacheGet.mockResolvedValue(null);
+
+    // What the live badge path leaves behind.
+    const warm = await actual.materializeDisplayProfile("juan294");
+    const entry = mockCacheSet.mock.calls.find(([key]) => key === "stats:v3:juan294")![1];
+    mockCacheGet.mockImplementation(async key => key === "stats:v3:juan294" ? entry : null);
+    mockFetchStats.mockClear();
+    mockCacheSet.mockClear();
+
+    const body = await (await GET(makeRequest("juan294"), makeParams("juan294"))).json();
+
+    const drawn = renderableScore(warm!.scoring);
+    expect(typeof drawn.composite).toBe("number");
+    expect(body.displayScore).toBe(drawn.composite);
+    expect(body.displayTier).toBe(drawn.tier);
+    expect(mockFetchStats).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 });

@@ -49,12 +49,54 @@ beforeEach(() => {
   Object.values(fetchers).forEach(fetcher => vi.mocked(fetcher).mockResolvedValue(null));
 });
 
-describe("uncached v6 compatibility during the receipt migration", () => {
-  it("returns a read-only miss without provider, database, cache or registration work", async () => {
-    vi.mocked(cacheGet).mockResolvedValue(makeStats({ commitsTotal: 900 }));
-    expect(await getStats("alice", undefined, { ...options, readOnly: true })).toBeNull();
-    for (const fn of [fetchStats, readSourceAuthorization, refreshSourceLink, dbGetSupplemental, cacheGet, cacheSet, dbUpsertUser, ...Object.values(fetchers)]) expect(fn).not.toHaveBeenCalled();
+describe("read-only callers", () => {
+  // `/api/profile/:handle` and the remote MCP tools read with `readOnly`. They
+  // may be served the record the live path wrote under their own binding; they
+  // may never fetch, write, refresh a grant, or register anything.
+  const readOnly = { ...options, readOnly: true };
+  const forbidden = [fetchStats, refreshSourceLink, dbGetSupplemental, cacheSet, dbUpsertUser, ...Object.values(fetchers)];
+  async function warmedBy(token: string | undefined): Promise<{ entry: unknown; stats: StatsData }> {
+    const stats = (await getStats("alice", token, options))!;
+    const entry = vi.mocked(cacheSet).mock.calls.find(([key]) => key === "stats:v3:alice")![1];
+    _resetInflight(); for (const fn of forbidden) vi.mocked(fn).mockClear();
+    return { entry, stats };
+  }
+  it("serves the record the server token wrote, with no fetch and no write", async () => {
+    const { entry, stats } = await warmedBy(undefined);
+    vi.mocked(cacheGet).mockResolvedValue(entry);
+    const result = await getStats("Alice", undefined, readOnly);
+    expect(result).toEqual(stats); expect(result).not.toBe(stats);
+    expect(cacheGet).toHaveBeenCalledWith("stats:v3:alice");
+    for (const fn of forbidden) expect(fn).not.toHaveBeenCalled();
   });
+  it("misses honestly on an empty cache, without a fetch or a write", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(null);
+    expect(await getStats("alice", undefined, readOnly)).toBeNull();
+    expect(cacheGet).toHaveBeenCalledWith("stats:v3:alice");
+    for (const fn of forbidden) expect(fn).not.toHaveBeenCalled();
+  });
+  it("refuses a record another grant wrote rather than fetching in its place", async () => {
+    const { entry } = await warmedBy("pat");
+    vi.mocked(cacheGet).mockResolvedValue(entry);
+    expect(await getStats("alice", undefined, readOnly)).toBeNull();
+    for (const fn of forbidden) expect(fn).not.toHaveBeenCalled();
+  });
+  it("refuses an unbound record, which is what the retired handle-only key held", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(makeStats({ commitsTotal: 900 }));
+    expect(await getStats("alice", undefined, readOnly)).toBeNull();
+    for (const fn of forbidden) expect(fn).not.toHaveBeenCalled();
+  });
+  it("withholds a hit whose grants changed while it was being read, as the live path does", async () => {
+    const { entry } = await warmedBy(undefined);
+    vi.mocked(cacheGet).mockResolvedValue(entry);
+    let reads = 0;
+    vi.mocked(readSourceAuthorization).mockImplementation(async (_owner, provider) => ++reads > 3 && provider === "gitlab" ? authorization("gitlab") : { status: "unlinked" });
+    expect(await getStats("alice", undefined, readOnly)).toBeNull();
+    for (const fn of forbidden) expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe("uncached v6 compatibility during the receipt migration", () => {
   it.each([0, 1, 5])("accepts %i observed PRs and refuses a larger unbound cache record", async prsMergedCount => {
     // A bare StatsData is what the pre-S08 handle-only key held. It carries no
     // binding, so the read must reject it and collect live instead.

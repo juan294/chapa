@@ -23,12 +23,15 @@ interface StatsOverlays {
 }
 const platforms = ["bitbucket", "codeberg", "gitlab"] as const;
 
-/** Temporary v6 compatibility boundary before S15. Old handle-only cache rows
- * carry no authorization binding and are never read or written. Read-only
- * callers receive an honest miss. Scalars never become v7 source observations.
+/** Legacy v6 collection. Old handle-only cache rows carry no authorization
+ * binding and are never read or written; the bound `stats:v3:` record is the
+ * only cache. A read-only caller (`/api/profile/:handle`, the remote MCP tools)
+ * is served that record when it was written under the caller's own binding,
+ * and gets an honest miss otherwise: it never fetches, writes, refreshes a
+ * grant, or joins the in-flight map. Scalars never become v7 source
+ * observations.
  */
 export async function getStats(handle: string, token?: string, options: { readOnly?: boolean; referenceTime?: string } = {}): Promise<StatsData | null> {
-  if (options.readOnly) return null;
   try {
     const owner = handle.toLowerCase();
     const effectiveToken = token ?? getGithubToken();
@@ -37,7 +40,9 @@ export async function getStats(handle: string, token?: string, options: { readOn
       scope: { discovery: "legacy_upload", repositoryIds: [], eventKinds: [] } }, { kind: "github", token: effectiveToken ?? "" });
     const initial = await Promise.all(platforms.map(async provider => {
       const auth = await readSourceAuthorization(owner, provider, false);
-      return auth.status === "authorized" ? refreshSourceLink(auth, { owner, provider }, false) : auth;
+      // A token refresh is a write. Read-only binds to the row as it is; an
+      // expired grant is then a miss until the live path has refreshed it.
+      return auth.status === "authorized" && !options.readOnly ? refreshSourceLink(auth, { owner, provider }, false) : auth;
     }));
     if (initial.some(source => source.status === "unavailable")) return null;
     const current = async () => {
@@ -52,6 +57,13 @@ export async function getStats(handle: string, token?: string, options: { readOn
     // day, which is what lets concurrent renders of one handle share a single
     // GitHub fetch instead of each paying ~10s for the same answer.
     const binding = statsCacheBinding({ accessContextId: context.accessContextId, links, referenceDate: window.referenceDate });
+    if (options.readOnly) {
+      // The same hit and the same `current()` re-check as the live path, and
+      // nothing else. Not through `inflight`: a read-only entry there would
+      // hand a live caller a miss without the fetch it came for.
+      const cached = binding ? await readCachedStats(owner, binding, window.referenceDate) : null;
+      return cached && await current() ? structuredClone(cached) : null;
+    }
     const key = binding ?? context.selectionId + ":" + links;
     let work = inflight.get(key);
     if (!work) {

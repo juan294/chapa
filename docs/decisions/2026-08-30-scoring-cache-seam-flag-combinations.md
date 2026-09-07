@@ -19,7 +19,7 @@ order; #1193 removed the fold-order dependence BE-H1 had only made tolerable).
 This document is a derived table, not prose. It replaces the corresponding
 paragraphs in CLAUDE.md rather than joining them, because a duplicate
 description of the same rules makes drift worse rather than better - that exact
-failure produced the stale `stats:stale:` comment fixed in Wave 1.
+failure produced the stale `stats:stale:` comment fixed in Wave 1. (S08, #1302, later removed the `stats:v2:merged:`/`stats:stale:v2:` keys altogether; 8fcc0371 restored a single grant-bound `stats:v3:<handle>` record, and the read-only row below was rewritten on 2026-09-07 to match.)
 
 ## Decision
 
@@ -30,8 +30,8 @@ seam.
 
 | Flag | Cache keys READ | Cache keys WRITTEN | Live GitHub fetch? | Snapshot may persist? | Verification record may persist? |
 |---|---|---|---|---|---|
-| `readOnly: true`<br>(#1083, #1180) | `stats:v2:merged:h`, then on miss `stats:stale:v2:h` + overlays (`supplemental:h`, platform link rows) | **none** - the `_enrichWithLogins` backfill is suppressed too | **No.** Short-circuits to `_composeFromBaselineOnly`; returns `null` when no baseline exists | No - `persistProfileSnapshot` returns `false` immediately | No - `runPublicProfileSideEffects` returns before `deferProfileCacheWork` |
-| `readOnly: false` (default) | same, plus a GitHub GraphQL fetch on miss | `stats:v2:merged:h` always; `stats:stale:v2:h` only when the fetch passes the integrity guards | Yes, on miss past the 6h TTL | Yes, subject to `statsComplete` and the once-per-day SETNX guard | Yes, subject to `statsComplete` |
+| `readOnly: true`<br>(#1083, #1180; rewritten for `stats:v3`, 2026-09-07) | `stats:v3:h` only, and only when the record's binding (access context + linked-grant versions + UTC day) matches the caller's | **none** — no cache write, no token refresh, no inflight entry | **No.** Returns `null` on a miss or a foreign binding | No - `persistProfileSnapshot` returns `false` immediately | No - `runPublicProfileSideEffects` returns before `deferProfileCacheWork` |
+| `readOnly: false` (default) | `stats:v3:h` on a matching binding, otherwise a GitHub GraphQL fetch (deduplicated per binding through the inflight map) | `stats:v3:h`, bound to the caller's grant and day (6 h TTL) | Yes, on miss | Yes, subject to `statsComplete` and the once-per-day SETNX guard | Yes, subject to `statsComplete` |
 | `inputsChanged: true`<br>(#826) | `stats:dirty:h` supplies the default when the option is absent | clears `stats:dirty:h` after the write | no effect | Yes, and **replaces** today's row (`dbReplaceSnapshot` UPSERT) instead of skipping on the `UNIQUE(handle, date)` conflict; also bypasses the same-day EMA lock for the value written | no effect |
 | `ignoreSnapshot: true`<br>(#930) | **skips** the `getCachedLatestSnapshot` read entirely | none | no effect | Yes. With no prior, the EMA has nothing to smooth toward, so the persisted value equals the fresh score | no effect |
 | `policy`<br>(EMA) | none | none | no effect | Selects the smoothing branch applied to the **snapshot** value only | no effect |
