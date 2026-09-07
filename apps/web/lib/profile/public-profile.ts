@@ -57,8 +57,16 @@ export function getPublicProfileVerification(
   materialized: Pick<
     MaterializedProfile,
     "stats" | "displayImpact" | "statsComplete"
-  >,
+  > & { scoring?: MaterializedProfile["scoring"] },
 ): PublicVerificationCode | null {
+  // #1311 — a v6 HMAC attests v6 dimensions, tier, archetype and confidence.
+  // Issuing one for a profile whose badge draws a v7 receipt would put a
+  // verification link on that badge resolving to a different set of numbers,
+  // which is the "two answers for one revision" the shared model exists to
+  // prevent, arriving from the other direction. A v7 profile is attested by
+  // its receipt (see `deriveReceiptVerificationTokenV7`), never by this.
+  if (materialized.scoring?.policyVersion === "v7") return null;
+
   // #1003 — Never attest a verification record from stats that look
   // incomplete (e.g. served from an old poisoned `stats:stale` entry). This
   // single gate covers all four call sites: the three route call sites and

@@ -42,7 +42,7 @@ import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
-import { getPublicProfileVerification } from "@/lib/profile/public-profile";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -516,7 +516,7 @@ async function warmHandle(
         );
         const avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
         const avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
-        const verification = getPublicProfileVerification(materialized);
+        const verification = await resolveBadgeVerification(materialized);
 
         if (avatarCachePolicy !== "skip" && verification) {
           const configSnapshot = await resolveBadgeConfigSnapshot(handle);

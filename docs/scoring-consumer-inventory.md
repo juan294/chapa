@@ -192,6 +192,7 @@ score has far more surfaces than a badge does.
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/lib/profile/issue-receipt.ts` | `apps/web/lib/profile/issue-receipt.test.ts` |
+| `apps/web/lib/profile/badge-verification.ts` | `apps/web/lib/profile/badge-verification.test.ts` |
 | `apps/web/lib/profile/score-description.ts` | `apps/web/lib/profile/score-description.test.ts` |
 | `apps/web/lib/profile/score-model.ts` | `apps/web/lib/profile/score-model.test.ts` |
 | `apps/web/lib/profile/score-receipt-v7.ts` | `apps/web/lib/profile/score-receipt-v7.test.ts` |

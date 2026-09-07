@@ -1,5 +1,6 @@
 import "server-only";
 import { materializeScoreReceiptV7 } from "./score-receipt-v7";
+import { issueReceiptVerificationV7 } from "@/lib/verification/store";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { isScoringV7RenderingEnabled } from "@/lib/feature-flags";
 
@@ -29,7 +30,18 @@ export async function issueScoreReceiptIfConsented(
 
   try {
     const result = await materializeScoreReceiptV7(handle, options);
-    if (result.status === "issued") return "issued";
+    if (result.status === "issued") {
+      // The receipt and the link that resolves it are one act. Issuing the
+      // receipt without recording its verification would put a derived token
+      // on the badge that `/verify` answers "not found" to.
+      try {
+        await issueReceiptVerificationV7(handle, handle, result.snapshot.receipt.receipt);
+      } catch (error) {
+        void captureServerError({ route: "issue-score-receipt-v7", statusCode: 500, error });
+        return "failed";
+      }
+      return "issued";
+    }
     if (result.status === "unavailable" && result.reason === "storage_error") {
       void captureServerError({
         route: "issue-score-receipt-v7",

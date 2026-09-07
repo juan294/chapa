@@ -33,12 +33,12 @@ import { captureServerError } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import {
-  getPublicProfileVerification,
   deferProfileCacheWork,
   materializePublicProfile,
   persistProfileSnapshot,
   type PublicVerificationCode,
 } from "@/lib/profile/public-profile";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import type { MaterializedProfile } from "@/lib/profile/materialize-profile";
 import {
   formatServerTiming,
@@ -327,7 +327,7 @@ async function finalizeMaterializedBadge(
     avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
     avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
   }
-  const verification = getPublicProfileVerification(materialized);
+  const verification = await resolveBadgeVerification(materialized);
 
   // #1191 — the owner's Studio configuration. Resolved on the RENDER path only;
   // the cache-hit path above must stay a single Redis read.
