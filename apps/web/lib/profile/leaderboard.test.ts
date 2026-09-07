@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ImpactV6Result } from "@chapa/shared";
-import { legacyViewModel } from "./score-view-model";
+import { legacyViewModel, receiptViewModel, renderableScore } from "./score-view-model";
+import { buildReceiptSnapshotV7 } from "@/lib/history/snapshot";
+import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbGetTopScoredProfiles: vi.fn(),
@@ -8,16 +10,19 @@ vi.mock("@/lib/db/snapshots", () => ({
 }));
 vi.mock("@/lib/db/users", () => ({ dbGetAllUserHandles: vi.fn() }));
 vi.mock("./materialize-profile", () => ({ materializeDisplayProfile: vi.fn() }));
+vi.mock("./score-model", () => ({ readRenderableReceipt: vi.fn() }));
 
 import { getLeaderboard } from "./leaderboard";
 import { dbGetScoredCandidates, dbGetTopScoredProfiles } from "@/lib/db/snapshots";
 import { dbGetAllUserHandles } from "@/lib/db/users";
 import { materializeDisplayProfile } from "./materialize-profile";
+import { readRenderableReceipt } from "./score-model";
 
 const mockRecorded = vi.mocked(dbGetTopScoredProfiles);
 const mockCandidates = vi.mocked(dbGetScoredCandidates);
 const mockRegistered = vi.mocked(dbGetAllUserHandles);
 const mockMaterialize = vi.mocked(materializeDisplayProfile);
+const mockReceipt = vi.mocked(readRenderableReceipt);
 
 function entry(handle: string, score: number, tier = "High") {
   return { handle, score, tier, rank: 0 };
@@ -39,14 +44,17 @@ function live(adjustedComposite: number, tier = "High", handle = "someone") {
   >;
 }
 
-describe("getLeaderboard", () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    mockRegistered.mockResolvedValue(["a", "b", "c", "d", "juan294"]);
-    mockRecorded.mockResolvedValue([]);
-    mockCandidates.mockResolvedValue([]);
-  });
+beforeEach(() => {
+  vi.resetAllMocks();
+  mockRegistered.mockResolvedValue(["a", "b", "c", "d", "juan294"]);
+  mockRecorded.mockResolvedValue([]);
+  mockCandidates.mockResolvedValue([]);
+  // The flag-off short-circuit: no receipt to draw, so a stored headline
+  // stands as recorded.
+  mockReceipt.mockResolvedValue(null);
+});
 
+describe("getLeaderboard", () => {
   // A place is a score. Everyone on 80 shares first, and the next score is
   // second, not third.
   it("groups tied scores into one place and does not skip the next", async () => {
@@ -174,5 +182,77 @@ describe("a v7 evidence range takes no place", () => {
     // Not merely unranked — its bounds never reach the board at all.
     expect(JSON.stringify(board)).not.toContain("64");
     expect(JSON.stringify(board)).not.toContain("73");
+  });
+});
+
+/**
+ * LE-6-4 — the same rule on the stored-headline path. `headline_score` is the
+ * number the badge printed when the snapshot was captured; once a v7 receipt
+ * has been issued, the badge draws the receipt instead, so the stored number is
+ * no longer the badge's number. The board reads the receipt the badge would
+ * draw and ranks on that, or not at all.
+ */
+describe("a stored headline is checked against the receipt the badge draws", () => {
+  it("gives a range subject's place to the next candidate", async () => {
+    // A range with a tier: the composite kind decides, not the tier alone.
+    const ranged = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 8, undefined, true), null);
+    expect(ranged.receipt.receipt.core.composite.kind).toBe("range");
+    mockRecorded.mockResolvedValue([entry("juan294", 79), entry("c", 70)]);
+    mockReceipt.mockImplementation(async (handle) => (handle === "juan294" ? ranged : null));
+
+    const board = await getLeaderboard(1);
+
+    expect(board).toEqual([{ rank: 1, score: 70, tier: "High", handles: ["c"] }]);
+    // Neither the stale stored headline nor either bound of the range reaches
+    // the board.
+    const drawn = renderableScore(receiptViewModel("juan294", ranged));
+    for (const number of [79, drawn.composite]) expect(JSON.stringify(board)).not.toContain(String(number));
+    expect(mockMaterialize).not.toHaveBeenCalled();
+  });
+
+  it("does not re-fetch a dropped range subject on the live-fill path", async () => {
+    const ranged = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 8, undefined, true), null);
+    mockRecorded.mockResolvedValue([entry("juan294", 79)]);
+    mockReceipt.mockImplementation(async (handle) => (handle === "juan294" ? ranged : null));
+    mockCandidates.mockResolvedValue(["juan294", "d"]);
+    mockMaterialize.mockImplementation(async () => live(60, "High", "d"));
+
+    const board = await getLeaderboard(1);
+
+    expect(board).toEqual([{ rank: 1, score: 60, tier: "High", handles: ["d"] }]);
+    expect(mockMaterialize).toHaveBeenCalledTimes(1);
+    expect(mockMaterialize).not.toHaveBeenCalledWith("juan294");
+  });
+
+  it("ranks a point subject on the number the receipt draws, not the stored headline", async () => {
+    const pointed = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 12), null);
+    const drawn = renderableScore(receiptViewModel("juan294", pointed));
+    expect(drawn.composite).toBe(81);
+    expect(drawn.tier).toBe("High");
+    mockRecorded.mockResolvedValue([entry("juan294", 79), entry("c", 70)]);
+    mockReceipt.mockImplementation(async (handle) => (handle === "juan294" ? pointed : null));
+
+    const board = await getLeaderboard(2);
+
+    expect(board).toEqual([
+      { rank: 1, score: 81, tier: "High", handles: ["juan294"] },
+      { rank: 2, score: 70, tier: "High", handles: ["c"] },
+    ]);
+  });
+
+  it("keeps a stored headline as recorded while no receipt is drawable", async () => {
+    mockRecorded.mockResolvedValue([entry("juan294", 79), entry("c", 70)]);
+
+    const board = await getLeaderboard(2);
+
+    expect(board).toEqual([
+      { rank: 1, score: 79, tier: "High", handles: ["juan294"] },
+      { rank: 2, score: 70, tier: "High", handles: ["c"] },
+    ]);
+    // One flag-gated read per stored candidate and nothing else: with the flag
+    // off `readRenderableReceipt` returns before any query, so this is the
+    // whole cost of the check.
+    expect(mockReceipt.mock.calls.map(([handle]) => handle).sort()).toEqual(["c", "juan294"]);
+    expect(mockMaterialize).not.toHaveBeenCalled();
   });
 });

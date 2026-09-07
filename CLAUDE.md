@@ -65,7 +65,12 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
    wrong score. That means the board is empty until snapshots written after 047
    exist; `pnpm run recalculate-handles <handle> --apply` fills one in. Any
    future surface that shows a stored score should read the headline for the
-   same reason.
+   same reason. A headline is only the badge's number while no v7 receipt is
+   drawable, so the rule "a v7 evidence range takes no place, and a v7 point
+   ranks on the number the receipt draws" now holds on both paths: each stored
+   candidate is checked against `readRenderableReceipt` (which returns before
+   any query while `scoring_v7_rendering` is off), not only the live-fill
+   candidates (LE-6-4).
 
 ## Non-goals (current scope)
 - No long-term history charts (lifetime metric snapshots are stored but no UI yet)
