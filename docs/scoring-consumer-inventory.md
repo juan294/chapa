@@ -102,6 +102,12 @@ score has far more surfaces than a badge does.
 | `apps/web/lib/verification/hmac.ts` | `apps/web/lib/verification/hmac.test.ts` |
 | `apps/web/lib/verification/types.ts` | `apps/web/lib/verification/store.test.ts` |
 
+### authenticated evidence
+
+| Consumer | Shared-receipt regression |
+| --- | --- |
+| `apps/web/app/api/evidence/route.ts` | `apps/web/app/api/evidence/route.test.ts` |
+
 ### cron
 
 | Consumer | Shared-receipt regression |

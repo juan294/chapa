@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import {
+  canonicalJson,
   createScoringWindow,
   projectReceiptEvidence,
   sealScoreReceipt,
@@ -184,10 +185,31 @@ export async function materializeScoreReceiptV7(
     const craft = await readCraft(handle, window);
     const projected = projectReceiptEvidence(scope, publishableAssessments(ledger.assessments));
 
+    // Revisions form a chain. Minting a fresh root every time would give one
+    // subject an unbounded pile of unrelated `revision: 1` receipts, each with
+    // its own verification token and none superseding another — about 24 a day
+    // once the hourly warm-cache cron calls this.
+    const previous = await readScoreReceiptV7(handle);
+    const prior = previous?.receipt.receipt ?? null;
+
+    // Re-scoring the same evidence is not a new revision. The window's
+    // reference date and the scored inputs together are the identity of a
+    // scoring result, so when both match the stored one there is nothing to
+    // issue and the existing receipt is returned unchanged.
+    if (prior
+      && prior.action !== "retract"
+      && prior.window.referenceDate === window.referenceDate
+      && canonicalJson(prior.inputs) === canonicalJson(core.inputs)
+      && canonicalJson(prior.craft ?? null) === canonicalJson(craft ? { inputs: craft.inputs, result: craft.result } : null)) {
+      return { status: "stored", snapshot: previous! };
+    }
+
     const envelope = await sealScoreReceipt({
       schemaVersion: "v7", policyVersion: "v7",
-      receiptId: randomUUID(), revisionId: randomUUID(), subjectRef: "subject-1",
-      revision: 1, supersedesRevisionId: null, action: "create",
+      receiptId: prior?.receiptId ?? randomUUID(), revisionId: randomUUID(), subjectRef: "subject-1",
+      revision: (prior?.revision ?? 0) + 1,
+      supersedesRevisionId: prior?.revisionId ?? null,
+      action: prior ? "correct" : "create",
       recordedAt: window.referenceTime, window,
       inputs: core.inputs, core: core.core,
       craft: craft ? { inputs: craft.inputs, result: craft.result } : null,

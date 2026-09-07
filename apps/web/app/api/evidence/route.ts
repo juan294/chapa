@@ -9,6 +9,7 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { MAX_EVIDENCE_BYTES, parseLedgerCommand } from "@/lib/evidence/validation";
 import { dbReadEngineeringArtifact, dbReadEngineeringEvidence, dbWriteEngineeringEvidence, LedgerStorageError } from "@/lib/db/engineering-evidence";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 
 const headers = { "Cache-Control": "private, no-store" };
 function json(body: unknown, status = 200) { return NextResponse.json(body, { status, headers }); }
@@ -63,6 +64,16 @@ async function postEvidence(request: NextRequest) {
       ? await withdrawReceiptPublicationV7(command.owner, auth.handle, true)
       : await dbWriteEngineeringEvidence(auth.handle, command, referenceTime);
     await invalidateProfileReadModels(command.owner, { stats: true, craft: true, snapshot: true, history: true, badgeSvg: true });
+
+    // #1311 — granting consent is what makes a receipt issuable, so issue one
+    // now. Without this the settings page reported publication as on while the
+    // badge kept showing a legacy v6 aggregate until the next refresh or the
+    // next hourly warm pass, which is up to an hour of the product
+    // contradicting itself about the thing the user just turned on.
+    // Awaited: the response reports the outcome of the opt-in.
+    if (command.action === "consent" && command.enabled) {
+      await issueScoreReceiptIfConsented(command.owner);
+    }
     // Revocation is already committed. Empty retries cannot re-identify erased
     // owner/revision links, so they await the recurring content-free sweep.
     if (withdrawing && result.success === false) {

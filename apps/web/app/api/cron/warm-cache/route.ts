@@ -452,6 +452,13 @@ async function warmHandle(
   requestId?: string,
 ): Promise<HandleResult> {
   try {
+    // #1311 — issue before materializing, not after. Materialization is what
+    // reads the receipt the badge is rendered from, so issuing afterwards left
+    // the warmed SVG a revision behind for a full hour. Non-consented handles
+    // skip silently — every handle until its owner opts in — and failures are
+    // captured inside the helper rather than failing the warm.
+    await issueScoreReceiptIfConsented(handle);
+
     const materialized = await materializeOrchestratedProfile(handle);
     if (!materialized) {
       void captureServerError({
@@ -581,13 +588,6 @@ async function warmHandle(
     } catch {
       // Snapshot recording is non-critical — don't fail the warm
     }
-
-    // #1311 — the recurring path that keeps a consented subject's issued v7
-    // receipt as current as the snapshot written above. Non-consented handles
-    // skip silently, which is every handle until its owner opts in, so this
-    // adds no work for the overwhelming majority of the warm list. Failures
-    // are captured inside the helper and never fail the warm.
-    await issueScoreReceiptIfConsented(handle);
 
     return { warmed: true, snapshotRecorded, notified };
   } catch (err) {

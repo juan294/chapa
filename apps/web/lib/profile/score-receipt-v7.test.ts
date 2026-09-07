@@ -231,3 +231,45 @@ describe("v7 receipt materialization", () => {
     }
   });
 });
+
+/**
+ * #1311 — revisions are a chain, and re-scoring unchanged evidence is not a
+ * revision at all.
+ *
+ * Before this, every call minted `revision: 1` with no supersedes link and its
+ * own verification token. Once the hourly warm-cache cron began calling this,
+ * that was roughly 24 unrelated root receipts per consented subject per day,
+ * each claiming to be the first.
+ */
+describe("revision identity", () => {
+  it("supersedes the stored revision instead of minting a second root", async () => {
+    const stored = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 4), null);
+    vi.mocked(dbReadReceiptV7).mockResolvedValue(stored);
+    // Different evidence than the stored receipt, so a new revision is due.
+    vi.mocked(dbReadCraftV7).mockResolvedValue(emptyCraftPortfolio());
+
+    await materializeScoreReceiptV7("alice", { referenceTime });
+
+    const [, , envelope] = vi.mocked(dbPublishReceiptV7).mock.calls[0]!;
+    const issued = (envelope as unknown as { receipt: Record<string, unknown> }).receipt;
+    const prior = stored.receipt.receipt;
+    expect(issued.receiptId).toBe(prior.receiptId);
+    expect(issued.revision).toBe(prior.revision + 1);
+    expect(issued.supersedesRevisionId).toBe(prior.revisionId);
+    expect(issued.action).toBe("correct");
+  });
+
+  it("issues nothing when the same evidence is scored again in the same window", async () => {
+    // The mocked ledger has no events and no connected source, so the
+    // materializer computes zero counts — the stored receipt must carry the
+    // same ones for this to be a re-score rather than a real change.
+    const stored = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 0), null);
+    vi.mocked(dbReadReceiptV7).mockResolvedValue(stored);
+    vi.mocked(dbReadCraftV7).mockRejectedValue(new Error("no portfolio"));
+
+    const result = await materializeScoreReceiptV7("alice", { referenceTime });
+
+    expect(dbPublishReceiptV7).not.toHaveBeenCalled();
+    expect(result.status).toBe("stored");
+  });
+});
