@@ -5,7 +5,7 @@ Date: 2026-09-07. Candidate: local `develop` at `8fcc0371`, working tree clean,
 
 ## Status
 
-Executed 2026-09-07 13:40–20:15 CEST. Report: `docs/agents/local-e2e-report.md` (gitignored path). Verdict: READY FOR RELEASE PREP; 11 findings fixed and committed locally (develop at 65bd7dee), 9 open items carried into the relaunch work. Evidence screenshots stay untracked (53 MB); JSON, SVG and text evidence are committed.
+Executed 2026-09-07 13:40–20:15 CEST. Report: `docs/agents/local-e2e-report.md` (gitignored path). Verdict: READY FOR RELEASE PREP; 16 findings fixed across two rounds and committed locally (develop at 04081dfd, 18 commits), 5 items left open by decision (consent latency, share-page 404 status, cold-render SLO, render-registered residue cleanup after the freeze, OG/Studio preview hash minting). Evidence screenshots stay untracked (53 MB); JSON, SVG and text evidence are committed.
 
 ## Purpose and scope
 
