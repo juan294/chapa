@@ -43,6 +43,7 @@ import {
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
+import { deferProfileCacheWork } from "@/lib/profile/public-profile";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -551,6 +552,17 @@ async function warmHandle(
             } else {
               await writeBadgeSvgCache(svgCacheKey, svg, handle);
             }
+            // LE-6-1 — this SVG is the public badge for the rest of the day,
+            // and the hash it prints was minted here, by a materialization
+            // nothing else sees. The record has to be stored by the same
+            // pass: the snapshot writer below never touches
+            // `verification_records`, and the request path only stores what
+            // IT rendered. A v7 profile stores nothing here (its receipt is
+            // the attestation); `deferProfileCacheWork` enforces that.
+            await deferProfileCacheWork(handle, materialized, {
+              verification,
+              verificationOnly: true,
+            });
           }
         }
       }

@@ -563,58 +563,57 @@ describe("SharePage /u/[handle]", () => {
     const callback = mockAfter.mock.calls[0][0];
     await callback();
 
-    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
-      "testuser",
-      FAKE_MATERIALIZED,
-      { readOnly: false },
-    );
-    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
       { verification: { hash: "abc12345", date: "2026-04-17" } },
     );
+    // The page no longer sequences the two halves itself.
+    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
-  // #1091 (PE-M6) — persistProfileSnapshot is a durable Supabase write with
-  // nothing in the rendered HTML depending on its result. It must not hold
-  // TTFB open, mirroring the badge route's #1013 fix.
+  // #1091 (PE-M6) — the durable side effects (snapshot persist, verification
+  // record) have nothing in the rendered HTML depending on their result. They
+  // must not hold TTFB open, mirroring the badge route's #1013 fix.
   describe("durable snapshot write deferred to after() (#1091)", () => {
-    it("does not await the durable snapshot write on the render path — only after() invokes it", async () => {
+    it("does not await the durable side effects on the render path — only after() invokes them", async () => {
       await renderPage();
 
       // The render call itself must return without having invoked the
       // durable write directly.
-      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
       expect(mockAfter).toHaveBeenCalledTimes(1);
 
       const callback = mockAfter.mock.calls[0][0];
       await callback();
 
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
-        "testuser",
-        FAKE_MATERIALIZED,
-        { readOnly: false },
-      );
-      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
         "testuser",
         FAKE_MATERIALIZED,
         { verification: { hash: "abc12345", date: "2026-04-17" } },
       );
     });
 
-    it("skips deferProfileCacheWork when persistProfileSnapshot resolves false", async () => {
-      mockPersistProfileSnapshot.mockResolvedValue(false);
-
+    // LE-6-1 — the strip on the inline SVG and the record the deferred
+    // sequence stores come from the same minted code.
+    it("hands the exact verification the inline SVG printed to the deferred sequence", async () => {
       await renderPage();
       const callback = mockAfter.mock.calls[0][0];
       await callback();
 
-      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({ verificationHash: "abc12345", verificationDate: "2026-04-17" }),
+      );
+      const [, , options] = mockRunPublicProfileSideEffects.mock.calls[0];
+      expect(options.verification).toEqual(mockGetPublicProfileVerification.mock.results[0].value);
     });
 
     it("escalates a deferred snapshot-write failure via captureServerError instead of swallowing it", async () => {
       const writeError = new Error("supabase write failed");
-      mockPersistProfileSnapshot.mockRejectedValue(writeError);
+      mockRunPublicProfileSideEffects.mockRejectedValue(writeError);
 
       await renderPage();
       const callback = mockAfter.mock.calls[0][0];

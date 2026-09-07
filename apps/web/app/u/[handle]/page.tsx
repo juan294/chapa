@@ -30,10 +30,9 @@ import Link from "next/link";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
   getPublicProfileVerification,
-  deferProfileCacheWork,
   materializePublicProfile,
-  persistProfileSnapshot,
   redactImpactForVisitor,
+  runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { captureServerError } from "@/lib/analytics/server-errors";
@@ -296,13 +295,18 @@ export async function SharePageContent({
   // It still gets a write, just a short-TTL one, so it doesn't shadow a
   // later good render for the full 24h+jitter a normal write would use.
   //
-  // #1091 — persistProfileSnapshot is a durable Supabase write with nothing
+  // #1091 — the snapshot persist is a durable Supabase write with nothing
   // in the rendered HTML depending on its result, so (mirroring the badge
-  // route's #1013 fix) it now runs inside after() alongside the deferred
-  // cache work it gates, instead of blocking TTFB. A genuine failure from
-  // the deferred chain is escalated via captureServerError rather than
-  // swallowed — persistProfileSnapshot already does this internally for its
-  // own "failed" write outcome; this outer catch covers any other error.
+  // route's #1013 fix) it runs inside after() alongside the deferred cache
+  // work, instead of blocking TTFB. A genuine failure from the deferred chain
+  // is escalated via captureServerError rather than swallowed —
+  // persistProfileSnapshot already does this internally for its own "failed"
+  // write outcome; this outer catch covers any other error.
+  //
+  // LE-6-1 — `verification` is the code rendered into the inline SVG above
+  // (or minted for this visit when the cached SVG was served), and
+  // `runPublicProfileSideEffects` records it on every visit rather than only
+  // on the first of the day, so the strip's link always resolves.
   if (materialized && inlineSvg && !readOnly) {
     const cacheEligible =
       renderedFresh && configCacheable && !!verification && avatarCachePolicy !== "skip";
@@ -322,11 +326,7 @@ export async function SharePageContent({
           svgCacheTtlSeconds !== undefined ? { ttlSeconds: svgCacheTtlSeconds } : undefined,
         );
       }
-      return persistProfileSnapshot(handle, materialized, { readOnly })
-        .then((shouldRunDeferred) => {
-          if (!shouldRunDeferred) return;
-          return deferProfileCacheWork(handle, materialized, { verification });
-        })
+      return runPublicProfileSideEffects(handle, materialized, { verification })
         .catch((err) => {
           fireAndForget(() =>
             captureServerError({
@@ -417,10 +417,11 @@ export async function SharePageContent({
         handle={handle}
         isOwner={isOwner}
       />
-      {webmcpEnabled && stats && impactForClient && (
+      {webmcpEnabled && stats && impactForClient && materialized && (
         <SharePageWebMcpTools
           handle={handle}
           impact={impactForClient}
+          scoring={materialized.scoring}
           stats={stats}
           verification={verification}
           trend={trendData.trend}

@@ -240,7 +240,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       await flushAfterCallbacks();
       expect(mockRenderBadgeSvg).toHaveBeenCalled();
       expect(mockCacheSet).not.toHaveBeenCalled();
-      expect(mockPersistProfileSnapshot).toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalled();
     } finally { vi.useRealTimers(); }
   });
 
@@ -320,19 +320,24 @@ describe("GET /u/[handle]/badge.svg", () => {
     // must be explicitly flushed before asserting on them.
     await flushAfterCallbacks();
 
-    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
-      "testuser",
-      FAKE_MATERIALIZED,
-      { readOnly: false },
+    // LE-6-1 — the code the SVG was rendered with is the code handed to the
+    // shared sequence, which stores its record on every render.
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({ verificationHash: "abc12345", verificationDate: "2026-04-17" }),
     );
-    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
       {
-        verification: { hash: "abc12345", date: "2026-04-17" },
         readOnly: false,
+        verification: { hash: "abc12345", date: "2026-04-17" },
       },
     );
+    // The route no longer sequences the two halves itself.
+    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
   it("does not cache an unverified badge so a later complete fetch can heal", async () => {
@@ -354,7 +359,6 @@ describe("GET /u/[handle]/badge.svg", () => {
   });
 
   it("passes read-only mode and skips SVG cache writes for smoke requests", async () => {
-    mockPersistProfileSnapshot.mockResolvedValue(false);
     const [req, ctx] = makeRequest(
       "testuser",
       { "x-forwarded-for": "1.2.3.4" },
@@ -367,13 +371,14 @@ describe("GET /u/[handle]/badge.svg", () => {
       token: undefined,
       readOnly: true,
     });
-    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+    // Read-only is threaded through; the shared sequence writes nothing for it.
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
-      { readOnly: true },
+      expect.objectContaining({ readOnly: true }),
     );
+    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
     expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
-    expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
     expect(mockCacheSet).not.toHaveBeenCalled();
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
   });
@@ -391,17 +396,17 @@ describe("GET /u/[handle]/badge.svg", () => {
     );
   });
 
-  // #1013 — persistProfileSnapshot is a durable Supabase write with nothing in
-  // the response depending on its result. It must run in after() so it can
-  // never block (or, hypothetically, fail and destroy) an otherwise-successful
-  // render.
+  // #1013 — the durable side effects (snapshot persist, verification record,
+  // telemetry) have nothing in the response depending on their result. They
+  // must run in after() so they can never block (or, hypothetically, fail and
+  // destroy) an otherwise-successful render.
   describe("deferred durable persistence (#1013)", () => {
-    it("returns the response without waiting for persistProfileSnapshot to resolve", async () => {
+    it("returns the response without waiting for the durable side effects to resolve", async () => {
       // Never resolves — if the route still awaited this inline on the
       // critical path (the pre-fix behavior), `await GET(...)` below would
       // hang forever and this test would time out.
-      mockPersistProfileSnapshot.mockImplementation(
-        () => new Promise<boolean>(() => undefined),
+      mockRunPublicProfileSideEffects.mockImplementation(
+        () => new Promise<void>(() => undefined),
       );
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
@@ -410,29 +415,29 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(res.status).toBe(200);
       expect(await res.text()).toBe(FAKE_SVG);
       // Not called on the synchronous path — only after() has scheduled it.
-      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
     });
 
-    it("schedules persistProfileSnapshot inside after(), not on the synchronous path", async () => {
+    it("schedules the durable side effects inside after(), not on the synchronous path", async () => {
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
 
       // Not called yet — only after() has been registered with the work.
-      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
       expect(mockAfter).toHaveBeenCalledWith(expect.any(Function));
 
       await flushAfterCallbacks();
 
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
         "testuser",
         FAKE_MATERIALIZED,
-        { readOnly: false },
+        expect.objectContaining({ readOnly: false }),
       );
     });
 
     it("still captures/alerts via the existing error-handling path when the deferred work rejects", async () => {
       const persistError = new Error("supabase write failed");
-      mockPersistProfileSnapshot.mockRejectedValue(persistError);
+      mockRunPublicProfileSideEffects.mockRejectedValue(persistError);
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
@@ -976,8 +981,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       await flushAfterCallbacks();
 
       expect(mockCacheSet).toHaveBeenCalledTimes(1);
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledTimes(1);
-      expect(mockDeferProfileCacheWork).toHaveBeenCalledTimes(1);
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledTimes(1);
     });
 
     // `writeBadgeSvgCache` itself fails open (`withCacheFallback` catches and
@@ -998,10 +1002,10 @@ describe("GET /u/[handle]/badge.svg", () => {
       await flushAfterCallbacks();
 
       expect(mockCaptureServerError).not.toHaveBeenCalled();
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
         "testuser",
         FAKE_MATERIALIZED,
-        { readOnly: false },
+        expect.objectContaining({ readOnly: false }),
       );
     });
   });
@@ -1095,12 +1099,13 @@ describe("GET /u/[handle]/badge.svg", () => {
           FAKE_SVG,
           expect.any(Number),
         );
-        expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+        // LE-6-1 — the background continuation stores the record for the
+        // hash it just published, exactly like the foreground path.
+        expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
           "testuser",
           FAKE_MATERIALIZED,
-          { readOnly: false },
+          { readOnly: false, verification: { hash: "abc12345", date: "2026-04-17" } },
         );
-        expect(mockDeferProfileCacheWork).toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
       }
@@ -1121,9 +1126,8 @@ describe("GET /u/[handle]/badge.svg", () => {
           order.push("cacheSet-end");
           return true;
         });
-        mockPersistProfileSnapshot.mockImplementation(async () => {
+        mockRunPublicProfileSideEffects.mockImplementation(async () => {
           order.push("persist");
-          return true;
         });
 
         mockCacheGet

@@ -28,6 +28,7 @@ const {
   mockGetPublicProfileVerification,
   mockPersistProfileSnapshot,
   mockDeferProfileCacheWork,
+  mockRunPublicProfileSideEffects,
   mockRedactImpactForVisitor,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -42,6 +43,7 @@ const {
   mockGetPublicProfileVerification: vi.fn(),
   mockPersistProfileSnapshot: vi.fn(),
   mockDeferProfileCacheWork: vi.fn(),
+  mockRunPublicProfileSideEffects: vi.fn(),
   mockRedactImpactForVisitor: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -71,6 +73,8 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+  runPublicProfileSideEffects: (...args: unknown[]) =>
+    mockRunPublicProfileSideEffects(...args),
   redactImpactForVisitor: (...args: unknown[]) =>
     mockRedactImpactForVisitor(...args),
 }));
@@ -156,6 +160,7 @@ beforeEach(() => {
   });
   mockPersistProfileSnapshot.mockResolvedValue(true);
   mockDeferProfileCacheWork.mockResolvedValue(undefined);
+  mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
   mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
   mockRenderBadgeSvg.mockReturnValue(
     '<svg xmlns="http://www.w3.org/2000/svg">FRESH</svg>',

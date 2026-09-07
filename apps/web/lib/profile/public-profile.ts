@@ -100,6 +100,22 @@ function buildVerificationRecord(
   };
 }
 
+/**
+ * The durable side effects that follow a rendered badge or share page: the
+ * badge route (foreground and background continuation) and the share page
+ * both run exactly this sequence inside `after()`.
+ *
+ * LE-6-1 — `verification` is the code the artifact was rendered with, and it
+ * is stored on EVERY render, not only on the first render of the day. The
+ * snapshot write is deduplicated by a once-per-day guard, and this sequence
+ * used to stop dead when that guard said "exists". But a hash moves whenever
+ * the stats behind it move (a refetch after the 6h stats TTL, a fetch under a
+ * different token scope, a refresh, a recalculate), and each later render
+ * that day printed a new hash into a 24h-cached SVG that no row backed —
+ * `/verify/<hash>` answered 404 for the number on the badge. The snapshot,
+ * telemetry and profile-refresh writes stay once per day; the record for
+ * the hash that was just published does not.
+ */
 export async function runPublicProfileSideEffects(
   handle: string,
   materialized: MaterializedProfile,
@@ -115,15 +131,15 @@ export async function runPublicProfileSideEffects(
     readOnly: options.readOnly,
   });
 
-  // The SETNX dedup guard returning "exists" means deferred work already ran
-  // earlier today for this handle — skip re-running it. Incomplete stats
-  // (#1003) also skip persistence but are NOT a dedup case: the badge still
-  // rendered for a real visitor, so telemetry/notifications should still run
-  // once for this view. The verification record is separately gated inside
-  // getPublicProfileVerification, so it stays skipped either way.
-  if (!persisted && materialized.statsComplete) return;
-
-  await deferProfileCacheWork(handle, materialized, options);
+  // `persisted` is false for the same-day dedup (work already ran today) and
+  // for incomplete stats (#1003). Either way only the verification record for
+  // the artifact just rendered may still be written — and for incomplete
+  // stats `getPublicProfileVerification` has already refused to mint one, so
+  // nothing is written at all.
+  await deferProfileCacheWork(handle, materialized, {
+    ...options,
+    verificationOnly: !persisted,
+  });
 }
 
 export async function persistProfileSnapshot(
@@ -205,8 +221,18 @@ export async function deferProfileCacheWork(
 ): Promise<void> {
   if (options.readOnly) return;
 
-  const verification = options.verification ??
-    getPublicProfileVerification(materialized);
+  // One mint per artifact: a caller that resolved the verification — to a
+  // code or to null — is never second-guessed here, so the stored hash is the
+  // printed hash. Only a caller that resolved nothing gets one minted for it.
+  // A v7 model is attested by its receipt (`resolveBadgeVerification`), never
+  // by a legacy row (#1311), so its token must not land in
+  // `verification_records` under the receipt token either.
+  const verification =
+    materialized.scoring?.policyVersion === "v7"
+      ? null
+      : options.verification !== undefined
+        ? options.verification
+        : getPublicProfileVerification(materialized);
   const ops: Promise<unknown>[] = [];
 
   if (verification) {

@@ -33,9 +33,8 @@ import { captureServerError } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import {
-  deferProfileCacheWork,
   materializePublicProfile,
-  persistProfileSnapshot,
+  runPublicProfileSideEffects,
   type PublicVerificationCode,
 } from "@/lib/profile/public-profile";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
@@ -375,36 +374,6 @@ async function finalizeMaterializedBadge(
 }
 
 /**
- * The same durable side-effect sequence the foreground path runs inside
- * `after()` on a successful materialize — extracted so the PE-H1 background
- * continuation (deadline-fallback path) can run it identically once its own
- * materialize call finishes, warming the cache for the next request.
- *
- * NOTE: this intentionally mirrors the route's own pre-existing inline
- * sequence rather than calling `runPublicProfileSideEffects` from
- * `lib/profile/public-profile.ts`. That function skips deferred cache work
- * only on the dedup case (`!persisted && statsComplete`), so it still runs
- * telemetry for an incomplete-stats view; this route has always skipped
- * deferred work on any `!persisted`, incomplete stats included. Reconciling
- * that behavioral difference is a separate, pre-existing concern outside the
- * scope of this change — not introduced by it.
- */
-async function runBadgeSideEffects(
-  handle: string,
-  materialized: MaterializedProfile,
-  options: { readOnly: boolean; verification: PublicVerificationCode | null },
-): Promise<void> {
-  const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
-    readOnly: options.readOnly,
-  });
-  if (!shouldRunDeferred) return;
-  await deferProfileCacheWork(handle, materialized, {
-    verification: options.verification,
-    readOnly: options.readOnly,
-  });
-}
-
-/**
  * #1086 (PE-H1) background continuation for the deadline-fallback path: lets
  * the original `materializePublicProfile` call keep running after a
  * degraded stale-SVG response has already been sent, so the cache is warm
@@ -431,7 +400,10 @@ async function warmBadgeCacheInBackground(
     // deferred to a second after() the way the foreground winner path defers
     // its own write.
     const { verification } = await finalizeMaterializedBadge(handle, materialized, options);
-    await runBadgeSideEffects(handle, materialized, { readOnly: options.readOnly, verification });
+    // LE-6-1 — the same sequence as the foreground path, and `verification`
+    // is the code this render printed: the record it stores is the one the
+    // strip links to.
+    await runPublicProfileSideEffects(handle, materialized, { readOnly: options.readOnly, verification });
   } catch (err) {
     fireAndForget(() => captureServerError({
       route: `/u/${handle}/badge.svg`,
@@ -709,11 +681,14 @@ export async function GET(
       { readOnly, svgCacheKey, locale, deferCacheWrite: true },
     );
 
-    // #1013 — persistProfileSnapshot is a durable Supabase write with nothing
+    // #1013 — the snapshot persist is a durable Supabase write with nothing
     // in the response depending on its result; it must not block (or, on
     // failure, retroactively invalidate) an otherwise-successful render. Both
     // it, the already-deferred cache work, and (#1166) the shared SVG cache
-    // write now run in after().
+    // write now run in after(). LE-6-1 — `verification` is the code rendered
+    // into `svg` above; `runPublicProfileSideEffects` stores its record on
+    // every render, not only the first of the day, so the hash the strip
+    // links to always resolves.
     after(() => {
       return persistFinalizedBadgeCache(handle, svg, {
         readOnly,
@@ -722,7 +697,7 @@ export async function GET(
         avatarCachePolicy,
         configCacheable,
       })
-        .then(() => runBadgeSideEffects(handle, profile, { readOnly, verification }))
+        .then(() => runPublicProfileSideEffects(handle, profile, { readOnly, verification }))
         .catch((err) => {
           fireAndForget(() => captureServerError({
             route: `/u/${handle}/badge.svg`,

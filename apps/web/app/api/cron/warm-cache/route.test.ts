@@ -34,6 +34,7 @@ const {
   mockCaptureOperationalAlert,
   mockRenderBadgeSvg,
   mockGetPublicProfileVerification,
+  mockDeferProfileCacheWork,
   mockBuildBadgeSvgCacheKey,
   mockWriteBadgeSvgCache,
   mockReadBadgeSvgCache,
@@ -59,6 +60,7 @@ const {
   mockCaptureOperationalAlert: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
+  mockDeferProfileCacheWork: vi.fn(),
   mockBuildBadgeSvgCacheKey: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockReadBadgeSvgCache: vi.fn(),
@@ -123,6 +125,8 @@ vi.mock("@/lib/render/BadgeSvg", () => ({
 vi.mock("@/lib/profile/public-profile", () => ({
   getPublicProfileVerification: (...args: unknown[]) =>
     mockGetPublicProfileVerification(...args),
+  deferProfileCacheWork: (...args: unknown[]) =>
+    mockDeferProfileCacheWork(...args),
 }));
 
 vi.mock("@/lib/render/badge-svg-cache", () => ({
@@ -218,6 +222,7 @@ describe("GET /api/cron/warm-cache", () => {
       (handle: string, date: string) => `badge:v1:${handle}:warm-amber-v3:${date}`,
     );
     mockWriteBadgeSvgCache.mockResolvedValue(true);
+    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     // Default: no pre-existing badge SVG cache entry for today's key, so the
     // existing render/write assertions below keep passing unchanged.
     mockReadBadgeSvgCache.mockResolvedValue(null);
@@ -709,6 +714,41 @@ it("reports raw-retention failures without claiming deletion success", async () 
       expect(body.warmed).toBe(2);
       expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
+    });
+
+    // LE-6-1 — the SVG the cron publishes at the date rollover is the public
+    // badge for the rest of the day, and nothing else ever stored the record
+    // for the hash it printed: the snapshot writer below never writes
+    // `verification_records`, and the request path only stores what IT
+    // rendered. Once a visitor's stats moved, `/verify/<hash>` was a 404 for
+    // the number on the badge.
+    it("stores the verification record for the hash it rendered into the warmed SVG", async () => {
+      await GET(makeRequest());
+
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+        "alice",
+        FAKE_MATERIALIZED,
+        { verification: { hash: "verified-hash", date: "2026-04-17" }, verificationOnly: true },
+      );
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+        "bob",
+        FAKE_MATERIALIZED,
+        { verification: { hash: "verified-hash", date: "2026-04-17" }, verificationOnly: true },
+      );
+      // The record is stored after the SVG that prints it is published.
+      const writeOrder = mockWriteBadgeSvgCache.mock.invocationCallOrder[0]!;
+      const storeOrder = mockDeferProfileCacheWork.mock.invocationCallOrder[0]!;
+      expect(storeOrder).toBeGreaterThan(writeOrder);
+    });
+
+    it("stores no record when today's SVG was already warm (nothing new was printed)", async () => {
+      mockReadBadgeSvgCache.mockResolvedValue("<svg>already cached</svg>");
+
+      await GET(makeRequest());
+
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
     });
 
     it("withholds the SVG cache write when the avatar fails to resolve", async () => {
