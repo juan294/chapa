@@ -273,3 +273,28 @@ describe("revision identity", () => {
     expect(result.status).toBe("stored");
   });
 });
+
+/**
+ * #1311 — a clean `null` from the cached path is an answer, not a miss.
+ *
+ * The cached path consults the receipt manifest first and already falls back
+ * to the durable read on a cache miss, so repeating that read spent a second
+ * RPC to be told the same thing — on every badge cache miss, for the handles
+ * that have no receipt, which is nearly all of them.
+ */
+describe("the durable read is a fallback, not a default", () => {
+  it("does not re-read durably when the cached path says there is no receipt", async () => {
+    vi.mocked(getCachedReceiptSnapshotV7).mockResolvedValue(null);
+
+    expect(await readScoreReceiptV7("alice")).toBeNull();
+    expect(dbReadReceiptV7).not.toHaveBeenCalled();
+  });
+
+  it("still falls back when the cached path fails outright", async () => {
+    vi.mocked(getCachedReceiptSnapshotV7).mockRejectedValue(new Error("redis down"));
+    const stored = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 4), null);
+    vi.mocked(dbReadReceiptV7).mockResolvedValue(stored);
+
+    expect(await readScoreReceiptV7("alice")).toBe(stored);
+  });
+});

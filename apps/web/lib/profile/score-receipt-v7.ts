@@ -123,9 +123,17 @@ async function readCraft(owner: string, window: ScoringWindow) {
 export async function readScoreReceiptV7(owner: string, revisionId?: string): Promise<ReceiptSnapshotV7 | null> {
   const handle = owner.toLowerCase();
   try {
-    const cached = await getCachedReceiptSnapshotV7(handle, revisionId);
-    if (cached) return cached;
-  } catch { /* A cache miss is not an authority on issuance. */ }
+    // A clean `null` here is an answer, not a miss: the cached path consults
+    // the receipt manifest first and already falls back to the durable read on
+    // a cache miss, so `null` means this subject has no current revision.
+    // Repeating the durable read would spend a second RPC to be told the same
+    // thing — on every badge cache miss, for the handles that have no receipt,
+    // which is nearly all of them.
+    return await getCachedReceiptSnapshotV7(handle, revisionId);
+  } catch {
+    // Only a failure of that path is worth a second attempt; an unavailable
+    // cache or manifest is not an authority on issuance.
+  }
   try {
     return await dbReadReceiptV7(handle, revisionId);
   } catch {
