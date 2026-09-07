@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { useState } from "react";
 import { LanguageContext, type LanguageContextValue } from "@/lib/i18n";
@@ -1814,6 +1814,16 @@ describe("StudioClient render", () => {
   // spurious "leave site?" prompt on every judge-demo exit would itself be a
   // regression.
   describe("beforeunload guard", () => {
+    // #1316 — these dispatch on the shared `window`, and the guard registers
+    // and unregisters on the save-state transition rather than on mount. The
+    // file-level `afterEach(cleanup)` should already remove every listener, so
+    // this is belt-and-braces against a component from an earlier test still
+    // being mounted when the next one dispatches: a stale dirty-state listener
+    // would call preventDefault and fail the "saved state" assertion below.
+    // The flake it guards against has not been reproduced on demand, so this
+    // is defensive rather than a confirmed fix.
+    beforeEach(cleanup);
+
     function dispatchBeforeUnload(): Event {
       const event = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(event);

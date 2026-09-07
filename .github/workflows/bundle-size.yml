@@ -4,8 +4,9 @@
 # 1. `analyze` — Standard build, measures aggregate directory sizes, comments
 #    on PRs with a size table.
 # 2. `bundle-analyzer` — Runs @next/bundle-analyzer (ANALYZE=true), uploads
-#    interactive HTML treemap reports as CI artifacts, and enforces a 350 KB
-#    per-file budget on JS bundles.
+#    interactive HTML treemap reports as CI artifacts. It does NOT enforce the
+#    size budget: it builds with ANALYZE=true, which is not the build that
+#    ships (#1319). The budget is enforced in `analyze`, against the real build.
 #
 # NOTE: Turbopack limitation (see GitHub issue #303)
 #
@@ -97,6 +98,14 @@ jobs:
           NEXTAUTH_SECRET: dummy-secret-for-ci-32-characters
           UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
           UPSTASH_REDIS_REST_TOKEN: dummy
+
+      # #1319 — the budget is enforced here, against `pnpm run build`, because
+      # this is the build that deploys. It used to live only in the
+      # `bundle-analyzer` job, which builds with ANALYZE=true and therefore
+      # measured output production never emits: a 368 KB chunk sat over budget
+      # while this workflow reported success.
+      - name: Enforce JS bundle size budget
+        run: bash scripts/check-bundle-size.sh
 
       - name: Analyze bundle
         id: bundle
