@@ -17,9 +17,15 @@ const INVENTORY = "docs/scoring-consumer-inventory.md";
 
 /** A file reads a score if it names one of these. Deliberately broad: a false
  * positive costs one inventory row, a false negative costs a silent second
- * answer somewhere in the product. */
+ * answer somewhere in the product.
+ *
+ * The v7 cutover (#1311) added the last five: a surface can now reach a score
+ * through the resolver or the metadata description without ever naming an
+ * `Impact*` type, and the share page did exactly that — it stopped matching
+ * this pattern the moment its JSON-LD switched from `adjustedComposite` to the
+ * shared model, while still very much publishing a score. */
 const SCORED_SYMBOLS =
-  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|ScoreViewModel|explainReceipt|simulateCoreScore|adjustedComposite|compositeScore)\b/;
+  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|ScoreViewModel|explainReceipt|simulateCoreScore|adjustedComposite|compositeScore|resolveScoreModel|scoreModelFrom|readRenderableReceipt|issueScoreReceiptIfConsented|describeScoreForMetadata)\b/;
 const SCAN_ROOTS = ["apps/web/app", "apps/web/components", "apps/web/lib", "scripts"];
 const NOT_A_CONSUMER = /(\.test\.|\.spec\.|__fixtures__|\/test-helpers\/|\/__mocks__\/)/;
 

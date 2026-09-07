@@ -118,6 +118,20 @@ const MOCK_CRAFT = {
  */
 const MOCK_MATERIALIZED = {
   displayImpact: { adjustedComposite: 69, tier: "Solid" },
+  // #1311 — the route reads its headline from the resolved model, since that
+  // is what the badge draws and what this field is documented to match.
+  scoring: {
+    policyVersion: "v6" as const, handle: "juan294", identity: null, window: null,
+    dimensions: {
+      delivery: { kind: "point" as const, value: 69, display: 69 },
+      quality: { kind: "point" as const, value: 69, display: 69 },
+      consistency: { kind: "point" as const, value: 69, display: 69 },
+      breadth: { kind: "point" as const, value: 69, display: 69 },
+    },
+    composite: { kind: "point" as const, value: 69, display: 69 },
+    tier: "Solid" as const, archetype: "Builder" as const, craft: null,
+    coverage: [], exclusions: [], limitations: ["legacy_aggregate" as const],
+  },
 };
 
 const LATEST_UPLOADED_CRAFT = {

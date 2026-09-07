@@ -89,6 +89,7 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
+| `apps/web/app/api/generate/route.ts` | `apps/web/app/api/generate/route.test.ts` |
 | `apps/web/app/api/recalculate/route.ts` | `apps/web/app/api/recalculate/route.test.ts` |
 | `apps/web/app/api/refresh/route.ts` | `apps/web/app/api/refresh/route.test.ts` |
 
@@ -100,6 +101,12 @@ score has far more surfaces than a badge does.
 | `apps/web/lib/db/verification.ts` | `apps/web/lib/db/verification.test.ts` |
 | `apps/web/lib/verification/hmac.ts` | `apps/web/lib/verification/hmac.test.ts` |
 | `apps/web/lib/verification/types.ts` | `apps/web/lib/verification/store.test.ts` |
+
+### authenticated evidence
+
+| Consumer | Shared-receipt regression |
+| --- | --- |
+| `apps/web/app/api/evidence/route.ts` | `apps/web/app/api/evidence/route.test.ts` |
 
 ### cron
 
@@ -115,6 +122,7 @@ score has far more surfaces than a badge does.
 | `apps/web/components/dashboard/DimensionCardsRow.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/components/dashboard/ImpactDashboard.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/components/dashboard/ScoreBoldNumber.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
+| `apps/web/components/dashboard/ReceiptExplanationPanel.tsx` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
 | `apps/web/components/dashboard/ScoreExplanationPanel.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/lib/dashboard/generate-insights.ts` | `apps/web/lib/dashboard/generate-insights.test.ts` |
 | `apps/web/lib/dashboard/receipt-explanation.ts` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
@@ -133,6 +141,12 @@ score has far more surfaces than a badge does.
 | --- | --- |
 | `apps/web/app/experiments/number-counters/page.tsx` | `apps/web/lib/profile/score-view-model.test.ts` |
 | `apps/web/app/experiments/tier-visuals/_components/tier-data.ts` | `apps/web/lib/profile/score-view-model.test.ts` |
+
+### feature flags
+
+| Consumer | Shared-receipt regression |
+| --- | --- |
+| `apps/web/lib/feature-flags.ts` | `apps/web/lib/feature-flags.test.ts` |
 
 ### global command bar
 
@@ -184,6 +198,10 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
+| `apps/web/lib/profile/issue-receipt.ts` | `apps/web/lib/profile/issue-receipt.test.ts` |
+| `apps/web/lib/profile/badge-verification.ts` | `apps/web/lib/profile/badge-verification.test.ts` |
+| `apps/web/lib/profile/score-description.ts` | `apps/web/lib/profile/score-description.test.ts` |
+| `apps/web/lib/profile/score-model.ts` | `apps/web/lib/profile/score-model.test.ts` |
 | `apps/web/lib/profile/score-receipt-v7.ts` | `apps/web/lib/profile/score-receipt-v7.test.ts` |
 | `apps/web/lib/profile/score-view-model.ts` | `apps/web/lib/profile/score-view-model.test.ts` |
 

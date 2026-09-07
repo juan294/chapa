@@ -1,416 +1,374 @@
 # Chapa Scoring System — Full Explainer
 
-> This document explains the complete logic behind Chapa's developer Impact Profile scoring system. It is designed to serve as source material for an explanatory video about how Chapa calculates developer impact scores.
+> This document explains the complete logic behind Chapa's Impact v7 scoring system. It is designed to serve as source material for an explanatory video about how Chapa calculates a developer's score. It describes v7 only. The previous system, v6, is documented separately in `docs/impact-v6.md`; existing v6 records keep their own meaning and are never re-explained as v7 arithmetic. The technical specification this document follows is `docs/impact-v7.md`, and the policy that governs both is `docs/plans/2026-09-05-scoring-relaunch-phases/policy.md`.
 
 ---
 
 ## The Big Picture: What Is Chapa Measuring?
 
-Chapa generates a **Developer Impact Profile** by analyzing the last 12 months of a developer's activity across platforms like GitHub, Bitbucket, and Codeberg. Instead of producing a single number that blends everything together, Chapa breaks impact down into **four core dimensions** — Delivery, Quality, Consistency, and Breadth — plus an optional fifth dimension called **Craft** that measures AI tool mastery.
+Chapa reports an **observed engineering activity and practices index**. It looks at the last 365 calendar days of a developer's activity across the platforms they have connected — GitHub, GitLab, Bitbucket and Codeberg — plus optional engineering evidence and an optional AI practice portfolio, and it reports four numbers instead of one:
 
-Each dimension is scored independently on a 0-to-100 scale. The philosophy is simple: a developer who ships tons of code is doing something very different from a developer who reviews dozens of pull requests. Both are valuable. A single blended number would hide those differences. Four (or five) independent dimensions let each contribution style shine.
+- **Delivery** — on how many project-days did accepted work land?
+- **Quality practices** — how often did the developer demonstrate good engineering practices?
+- **Consistency** — in how many weeks of the year was the developer active?
+- **Breadth** — across how many projects and kinds of work did that activity spread?
 
-On top of the dimension scores, Chapa assigns a **developer archetype** (like Builder, Marathoner, or Quality Champion) that describes the shape of your contribution profile, a **composite score** that averages your dimensions, a **confidence rating** that measures how much signal the system had to work with, and a **tier** classification (Emerging, Solid, High, or Elite).
+Each dimension is a number from 0 to 100. The four are averaged with fixed equal weights into a **core score**, which is the headline number on the badge. On top of the core, Chapa reports a **tier** (Emerging, Solid, High or Elite), a descriptive **archetype** (Builder, Quality Champion, Marathoner, Polymath or Balanced), and — separately, beside the core and never inside it — an optional **Craft** score describing AI-assisted practice.
 
----
-
-## Why Multi-Dimensional Scoring?
-
-Traditional developer metrics — commit counts, lines of code, number of pull requests — are increasingly unreliable in the age of AI-assisted development. A developer using AI tools might generate 500 lines of code in an afternoon. Does that mean they had more impact than someone who spent the same time carefully reviewing three pull requests and catching critical bugs? Of course not.
-
-Volume metrics are also trivially gameable. Someone could split one logical change into 20 micro-commits and suddenly look 20 times more "productive" by commit count. Chapa's multi-dimensional approach sidesteps this problem by measuring orthogonal qualities: not just "how much" but "how consistently," "how broadly," and "how carefully."
+The word **observed** matters. Every number in Chapa is derived from evidence the system could actually see. Chapa does not estimate what it could not see, and it never lowers a score because evidence was missing.
 
 ---
 
-## The Raw Signals
+## What the Number Is Not
 
-Before any scoring happens, Chapa collects raw activity data. Here are the key signals:
+This is the most important framing in v7, and the video should say it plainly.
 
-- **Commits**: Total contributions in the 12-month window. This is a baseline activity measure.
-- **Pull Request Weight**: Merged pull requests, weighted by size and complexity. A PR that changes 200 lines across 5 files counts more than a one-line typo fix.
-- **Code Reviews**: Reviews submitted on other people's pull requests. This captures collaboration and mentorship.
-- **Issues Closed**: Issues the developer resolved. This captures problem-solving beyond just writing code.
-- **Active Days**: Days with at least one contribution. This measures consistency over time.
-- **Repos Contributed To**: Distinct repositories with 3 or more commits (shallow drive-by contributions are excluded).
-- **Stars and Forks**: Community recognition metrics from repositories the developer owns.
-- **Heatmap Data**: The distribution of activity across weeks, used to measure rhythm and evenness.
-- **Burst Activity**: Maximum commits in any 10-minute window, used as a confidence signal.
-- **PR Metadata**: Description quality, branch naming, issue linkage — used for solo developer quality assessment.
+Chapa's score does **not** certify a developer's ability. It does not measure business impact, and it does not prove that someone writes scalable, reliable or secure software. It is an index of observed activity and observed practices, nothing more.
 
-Signals that Chapa deliberately ignores for scoring purposes include follower counts (a social metric, not an engineering one) and raw lines of code (too easily gamed — used only for confidence heuristics).
+Every constant in the system — every cap, every tier boundary — is a **published product choice**. Chapa does not claim that a score of 70 is "the 70th percentile," does not publish a "confidence percentage" that pretends to be statistically calibrated, and does not claim that any threshold was externally validated as mastery.
+
+"Complete" also has a precise meaning. A profile is complete **for its declared scope**: the sources the developer connected and consented to, the repositories that were accessible, the discovery strategy used, and the evidence that was registered — over the window named in the receipt. It never means "all the work this person has ever done." Private work the system could not see stays unknown, and Chapa never treats "I could not see it" as "it did not happen."
 
 ---
 
-## Dimension 1: Delivery (Shipping Meaningful Changes)
+## Why v7 Replaced v6
 
-Delivery measures how much meaningful code a developer ships. It is the "output" dimension — are you getting work done and getting it merged?
+The previous system, v6, blended many signals: pull-request size, commit counts, stars and forks, review ratios, PR descriptions, burst detection, "confidence penalties," a solo-developer mode, a recency multiplier and a set of AI mastery tiers. Each piece had a reason. Together they had three problems.
 
-### The Formula
+1. **They measured things a developer could not inspect or replay.** A score moved because of a hidden multiplier, and nobody could sit down with the published numbers and reproduce it.
+2. **They treated missing evidence as bad evidence.** A developer whose work lived in repositories Chapa could not see was scored *lower*, as though the work did not exist. A "confidence penalty" reduced a number because a pattern looked unusual, and the developer had no way to prove otherwise.
+3. **They rewarded proxies.** Lines changed, files touched, tokens spent, stars earned, speed of reply — none of these is engineering quality, and all of them are easy to inflate.
 
-Delivery is calculated as a weighted combination of three signals:
-
-- **70% — Pull Request Weight**: This is the dominant signal. PRs are weighted by size and complexity, not just counted. A PR that changes 200 lines counts more than a PR that changes 2 lines. In fact, PRs with fewer than 10 total changes (additions plus deletions) receive zero weight — they are considered trivial. The weight ramps up linearly from 0 to 1 as total changes go from 0 to 10.
-- **20% — Issues Closed**: How many issues did you resolve? This captures problem-solving that goes beyond writing code.
-- **10% — Commits**: Total commit count is the weakest signal because it is the easiest to game. It gets just 10% weight.
-
-After the base Delivery score is computed, a **lead time modifier** is applied based on the median time from PR creation to merge. Fast merges (≤4 hours) earn a 5% boost (1.05x), while slow merges (≥168 hours / 1 week) incur a 5% penalty (0.95x). Merges between 4 and 48 hours are neutral. When lead time data is unavailable, the modifier is 1.0x — no effect. This implements the DORA "lead time for changes" signal without restructuring existing dimension weights.
-
-Each of these raw values is log-normalized before being combined. Log normalization means that your first few contributions count a lot, but each additional one counts a bit less. Going from 0 to 5 PRs is a big jump. Going from 50 to 55 PRs barely moves the needle. This prevents outliers — developers with enormous volumes — from dominating the scale.
-
-### Normalization Caps
-
-Each signal has a cap beyond which additional volume has zero effect:
-
-- PR weight is capped at 60 (roughly 25 merged PRs per year reaches 83% of the maximum)
-- Issues closed is capped at 40 (10 issues per year reaches 70%)
-- Commits is capped at 300 (150 commits per year reaches 81%)
-
-These caps were calibrated so that a developer at the 50th to 75th percentile of activity lands in a meaningful scoring range — not bottomed out, not maxed out.
-
-### What a High Delivery Score Looks Like
-
-A developer with 25 merged PRs of moderate size, 5 issues closed, and 80 commits over the year would score around 74 in Delivery. That is a strong score — it says "this person is shipping consistently and solving real problems."
+v7 answers each problem directly. Every score is arithmetic over published counts, and every count is in a public receipt anyone can replay offline. Missing evidence widens a **range** instead of lowering a number. And the raw proxies — lines, files, tokens, stars, forks, watchers, tool names, message counts, session counts — carry **zero weight** anywhere in the system.
 
 ---
 
-## Dimension 2: Quality (Engineering Discipline)
+## One Clock
 
-Quality measures how carefully and rigorously a developer works. But here is an important nuance: Quality is calculated differently depending on whether the developer works in a team or solo.
+Before any counting begins, Chapa fixes one reference time. That single timestamp is captured once, at the boundary of the scoring pipeline, and every downstream artifact — the API response, the receipt, the daily snapshot, the verification record, the trend key — carries that same reference.
 
-### Collaborative Profile (Has Code Reviews)
-
-Profile type is determined by the review-to-PR ratio: if `reviewsSubmittedCount / max(prsMergedCount, 1)` is 0.15 or higher, the developer is classified as "collaborative." Below that threshold (including zero reviews), they are "solo." This ratio-based approach prevents a handful of incidental reviews from forcing a developer into the collaborative scoring path. For collaborative developers, Quality is measured through:
-
-- **60% — Reviews Submitted**: How many code reviews did you do? Reviewing other people's code is one of the strongest signals of engineering discipline. It means you care about code quality beyond your own contributions. This is log-normalized with a cap of 80.
-- **25% — Review-to-PR Ratio**: How many reviews did you submit per PR you merged? A ratio of 3:1 (three reviews for every PR you merged) indicates strong collaborative habits. This is capped at a 5:1 ratio.
-- **15% — Batch Size Score**: What fraction of your merged PRs fall in the reviewable sweet spot of 20–500 lines changed? Research from Google and DORA shows that small, reviewable changes are a top code quality signal. PRs smaller than 20 lines or larger than 500 lines score lower on this component.
-
-### Solo Profile (No Code Reviews)
-
-Many developers work solo — on personal projects, side projects, or as the sole developer on a codebase. They have few or no code reviews relative to their PR output. Chapa does not penalize them for that. Instead, it looks at different quality signals:
-
-- **40% — PR Description Rate**: What percentage of your merged PRs have non-empty descriptions? Writing good PR descriptions shows you care about documentation and communication, even when working alone.
-- **25% — Feature Branch Rate**: What percentage of your merged PRs come from properly named feature branches? Using feature branches (instead of committing directly to main) shows disciplined workflow.
-- **20% — Issue Linkage Rate**: What percentage of your merged PRs reference and close at least one issue? Linking PRs to issues shows structured project management.
-- **15% — Batch Size Score**: Same as the collaborative profile — rewards PRs in the reviewable sweet spot (20–500 lines changed).
-
-### The Solo Exception
-
-Here is a crucial design decision: for solo developers, Quality is computed and displayed on the badge for informational purposes, but it is **excluded from the composite score calculation**. The composite score for solo developers averages only Delivery, Consistency, and Breadth (plus Craft if present).
-
-Why? Because the Quality Champion archetype is fundamentally about peer review and collaboration. Measuring a solo developer's quality against a different rubric and then mixing it into their overall score would create an unfair comparison. So Chapa shows you your solo quality signals — you can see how disciplined your workflow is — but it does not let a lower or higher solo quality score skew your overall impact.
+The window is the reference date in UTC plus the 364 UTC dates before it: **365 calendar dates**, including a partial current day. It is deliberately not a trailing 8,760-hour interval, because calendar dates are what people can check for themselves. An event qualifies only if it happened inside that window and at or before the reference time, so an event stamped later the same day is rejected rather than counted early.
 
 ---
 
-## Dimension 3: Consistency (Reliable, Sustained Contributions)
+## The Evidence Model
 
-Consistency measures the rhythm and sustainability of your contributions. Are you coding every week, or did you do everything in one intense weekend?
+v7 does not score a platform's summary statistics. It scores **normalized events**. Each event records where it came from (provider and host), who it belongs to, which repository and work item it relates to, what kind of event it is, when it occurred, what was measured, and — crucially — how complete the system's view of it is.
 
-### The Formula
+Three ideas from the evidence model shape everything that follows.
 
-Consistency combines three signals:
+**Coverage.** Every source and every event declares its coverage: complete, partial, unavailable, stale or legacy. The system distinguishes an *observed zero* ("we looked, and there was nothing") from *absent* ("we could not look"). Only the first is a zero. The second becomes a range.
 
-- **45% — Active Days**: How many days in the year did you make at least one contribution? This uses a square root curve instead of a linear one. Why? Because linear scaling would make 50 active days worth only 14% of the maximum — discouraging for anyone who does not code every single day. The square root curve gives 50 days a 37% score, and 120 days gets you to 57%. It rewards sustained activity without requiring obsessive daily commits.
-- **40% — Heatmap Evenness**: This looks at your weekly activity totals across the year and measures how evenly distributed they are. If you contributed roughly the same amount each week, your evenness is high (close to 1.0). If all your activity happened in one explosive week, your evenness is low (around 0.2). The math uses the coefficient of variation (standard deviation divided by the mean) — low variation means high evenness. To prevent a single outlier week from dominating the score, weekly totals are clipped at 3× the median before computing the CV. This is the most nuanced signal in the Consistency dimension because it rewards genuine sustained rhythm, not just "I was active on many different days."
-- **15% — Week Coverage**: What fraction of weeks in the scoring window had any contribution activity? This measures sustainable cadence — did you show up regularly, week after week? A developer active in 40 out of 52 weeks scores 77% on this signal. This replaced the old "inverse burst" signal because it captures consistency without penalizing legitimately productive days (common in agent-driven development workflows).
+**Attribution and identity.** Identity is established per connected source. Two hosts are two different identities until an explicit mapping says otherwise. Mirrors and forks of the same project need an explicit canonical mapping before they are treated as one project. Duplicate references to the same artifact — a PR, its merge commit, the issue it closed — are collapsed to **one accepted work item with one acceptance event** before anything is counted. When the system cannot tell whether two things are the same, it says so; it does not guess in either direction.
 
-### What Consistency Really Means
-
-A developer with 150 active days, even weekly activity, and broad week coverage would score around 72 in Consistency. That says "this person shows up reliably and contributes at a sustainable pace." Compare that to someone with 300 commits but only 20 active days — they would score poorly in Consistency because all that work was crammed into a few sessions.
+**Provenance.** Facts observed directly from a source are one thing. Self-reported claims are another. Assessments by an evaluator are a third. The receipt keeps these apart. A self-report never earns credit on its own, and an automated assessment is labelled as automated rather than passed off as a source fact or a human review.
 
 ---
 
-## Dimension 4: Breadth (Cross-Project Influence)
+## The Normalization Formula
 
-Breadth measures how widely a developer's contributions span across projects and the open-source community.
+Every count in v7 passes through one function before it becomes points:
 
-### The Formula
+**N(x, c) = ln(1 + min(x, c)) / ln(1 + c)**
 
-Breadth combines five signals:
+It takes a count and a cap and returns a value between 0 and 1. Three properties matter for the video.
 
-- **40% — Repos Contributed To**: How many distinct repositories did you contribute to? This is the dominant signal. It is measured linearly against a cap of 12 repositories. Five repos gets you to about 42% of the maximum. Importantly, a repo only counts if you have 3 or more commits in it. Single-commit drive-by contributions (fixing a typo in someone's README) do not count toward breadth. This "repo depth threshold" prevents gaming.
-- **25% — Inverse Top-Repo Concentration**: What percentage of your activity is concentrated in your most active repository? If 95% of your work is in one repo, you score low here. If your activity is spread across multiple repos, you score high. The formula is simply 1 minus the percentage of activity in your top repo. Note that this concentration metric uses all repos (even those with 1 commit) to get an honest picture.
-- **15% — Documentation PR Ratio**: What percentage of your PRs are documentation-only changes? Writing docs shows breadth of contribution beyond just code.
-- **10% — Stars**: How many stars do your repositories have? This is a community recognition signal — it means people found your work useful. Log-normalized with a cap of 150.
-- **5% — Forks**: How many forks do your repos have? Similar to stars but weighted less because forks are a weaker signal of quality. Log-normalized with a cap of 80.
+1. **Diminishing returns.** The first few units count a lot; each additional unit counts a little less.
+2. **A hard ceiling.** At the cap, N is exactly 1. Beyond the cap, more volume changes nothing.
+3. **Full precision.** All arithmetic runs unrounded. Only the displayed number is rounded, and the rounding is always the last step.
 
-### Why Breadth Matters
+A few reference points, with the exact caps used below:
 
-A developer who contributes meaningfully to 8 different repositories, with activity spread relatively evenly, demonstrates versatility and cross-project awareness. This is qualitatively different from someone who is deeply focused on a single project. Neither is "better" — they are just different dimensions of impact.
+| Count | Delivery (cap 120) | Consistency (cap 40) |
+|---|---|---|
+| 10 | 50 | 65 |
+| 20 | — | 82 |
+| 30 | 72 | 93 |
+| 60 | 86 | — |
+| 90 | 94 | — |
+| cap | 100 | 100 |
 
----
-
-## Dimension 5: Craft (AI Tool Mastery) — Optional
-
-Craft is the newest dimension, added in version 6 of the scoring system. It measures how effectively a developer uses AI coding tools — specifically, the sophistication, effectiveness, and proficiency of their AI-assisted workflow.
-
-Craft is optional because it requires the developer to upload insights data from their AI tools (like Claude Code). Developers who do not use AI tools or choose not to share this data simply do not have a Craft score, and their profile remains a 4-dimension diamond instead of a 5-dimension pentagon.
-
-### Three Sub-Dimensions
-
-Craft is the average of three sub-dimensions:
-
-#### Proficiency (Tool Mastery and Feature Adoption)
-
-This measures how deeply a developer has learned their AI tools. It looks at:
-
-- **Tool diversity (30%)**: Are you using a variety of tools within the AI assistant, or just one or two? This is measured using Shannon entropy — a mathematical measure of diversity from information theory.
-- **Agent usage rate (25%)**: What percentage of your interactions involve agentic (autonomous) AI workflows? Higher agent usage suggests more advanced tool adoption.
-- **Advanced features (25%)**: Are you using advanced capabilities like multi-clauding (running multiple AI sessions in parallel) and diverse session types?
-- **Engagement depth (20%)**: How frequently and responsively do you interact with AI tools? Measured by messages per day and response time.
-
-#### Effectiveness (Outcome Quality)
-
-This measures whether the AI-assisted work actually produces good results:
-
-- **Achievement rate (40%)**: What fraction of AI-assisted tasks were fully or mostly achieved? Fully achieved outcomes get full weight, mostly achieved get 70%, partially achieved get 30%.
-- **Satisfaction rate (25%)**: Are you satisfied with the AI's output? Measured from explicit feedback signals.
-- **Friction ratio (20%)**: How often does the AI produce buggy code, take wrong approaches, or misunderstand the task? Lower friction means higher effectiveness.
-- **Error recovery (15%)**: What is the ratio of tool errors to total tool calls? Lower error rates indicate better tool utilization.
-
-#### Sophistication (Workflow Complexity)
-
-This measures the complexity and ambition of AI-assisted workflows:
-
-- **Complex session rate (30%)**: What fraction of sessions involve multi-task or iterative workflows (as opposed to simple one-shot questions)?
-- **Lines per session (25%)**: How much code is generated or modified per session? More lines suggest more ambitious tasks.
-- **Multi-clauding intensity (25%)**: How intensively are you using parallel AI sessions? This captures advanced workflow patterns.
-- **Files per session (20%)**: How many files are touched per session? More files suggest cross-cutting, architectural work.
-
-### Craft Tier Mapping
-
-- Master (80-100): Expert-level AI tool usage
-- Expert (55-79): Strong, effective AI collaboration
-- Practitioner (30-54): Growing proficiency with AI tools
-- Novice (0-29): Early stages of AI tool adoption
+Halfway to the cap already earns the large majority of the points. Splitting the same work into more pieces buys very little, and past the cap it buys nothing.
 
 ---
 
-## Composite Score: Bringing It All Together
+## Dimension 1: Delivery — Observed Accepted-Work Cadence
 
-The composite score is a simple average of all present dimensions:
+**Formula:** D = 100 · N(deliveryUnits, 120)
 
-- **With Craft**: (Delivery + Quality + Consistency + Breadth + Craft) / 5
-- **Without Craft**: (Delivery + Quality + Consistency + Breadth) / 4
-- **Solo developers**: Quality is excluded from the average (Delivery + Consistency + Breadth [+ Craft]) / 3 or 4
+A **delivery unit** is a distinct pair of (project, UTC date) on which at least one attributable piece of work was *accepted*. Accepted means one of:
 
-This equal weighting is deliberate. Chapa does not believe any one dimension is inherently more valuable than another. A world-class code reviewer (high Quality) contributes just as much as a prolific code shipper (high Delivery) — they just contribute differently.
+- an authored change that was merged,
+- a directly authored commit that reached the tracked default branch,
+- completed issue work with a linked accepted result, or
+- an accepted documentation, design or maintenance artifact.
 
----
+The date of a unit is the **acceptance** date — when the change was merged, not when it was authored. If the system cannot trust the acceptance timestamp for a commit, it does not quietly substitute the author date; it marks acceptance-time coverage as unknown and keeps the authored activity as a separate diagnostic.
 
-## Recency Weighting: Rewarding Current Activity
+Two things make Delivery hard to game and easy to explain:
 
-After the composite score is calculated, Chapa applies a subtle recency adjustment. This accounts for the fact that GitHub activity rolls on a 365-day window, and contributions from 11 months ago are about to drop off.
+- **One project-day is one unit.** Ten PRs merged into the same project on the same day are one delivery unit. Splitting a change into smaller PRs on the same day gains nothing.
+- **Size is invisible.** Changed lines, changed files, the number of PRs in a day, whether an AI tool was used, and how long the merge took all have **zero effect** on D. A one-line fix accepted on Tuesday and a thousand-line refactor accepted on Tuesday are the same unit.
 
-The system calculates a "recency ratio" — what fraction of your total activity happened in the last 90 days? Then it applies a multiplier:
+Closing an issue without a linked accepted result does not create a unit. Generated changes are eligible on exactly the same terms as hand-written ones.
 
-- If your recency ratio is 0% (all your activity is old): **0.98x multiplier** (tiny 2% penalty)
-- If your recency ratio is 25% (proportionally distributed): **1.0x multiplier** (neutral)
-- If your recency ratio is 100% (all recent): **1.06x multiplier** (modest 6% boost)
+The cap is 120 project-days. Sixty accepted project-days in a year already scores about 86; thirty scores about 72.
 
-The range is intentionally narrow — 0.98x to 1.06x. This is not meant to dramatically change scores. It is a gentle cushion that acknowledges reality: if you were very active 10 months ago but have slowed down recently, your score should start softly declining rather than cliff-diving when that activity drops off the 365-day window.
-
----
-
-## Confidence: How Much Signal Did We Have?
-
-Confidence is one of the most thoughtful parts of the scoring system. It measures how much the system trusts its own scores — not whether the developer did anything wrong. This distinction is critical: confidence is about **signal clarity**, not morality.
-
-### How It Works
-
-Confidence starts at 100 and gets reduced by penalties when certain patterns are detected. Each penalty reduces confidence by a fixed amount, and the floor is 50 — confidence can never go below 50.
-
-### The Penalty Table
-
-| Pattern | Penalty | Why It Reduces Confidence |
-|---------|---------|--------------------------|
-| **Burst activity** | -15 | 100+ commits in a 10-minute window. Activity concentrated in short bursts gives the system less temporal signal to work with. The threshold was raised from 20 to 100 to accommodate agent-driven development workflows where high commit volumes in short windows are normal. |
-| **Micro-commit pattern** | -10 | 60%+ of commits are micro-sized. Many tiny changes make it harder to assess the real substance of contributions. |
-| **Generated change pattern** | -15 | 20,000+ lines changed with 2 or fewer reviews. Very large volumes with minimal peer review suggest possible automation, which reduces signal clarity. Only applies to collaborative profiles. |
-| **Low collaboration signal** | -10 | 10+ PRs merged with 1 or fewer reviews. Significant output without peer interaction means less external validation signal. Only applies to collaborative profiles. |
-| **Single repo concentration** | -5 | 95%+ of activity in a single repository with only 1 repo total. Less cross-project signal available. |
-| **Supplemental unverified** | -5 | Includes data from linked accounts (like Bitbucket). These sources cannot be independently verified through the same OAuth flow. |
-| **Low activity signal** | -10 | Fewer than 30 active days or fewer than 50 commits. Limited activity means less data for the system to base its assessment on. |
-| **Review volume imbalance** | -10 | 50+ reviews with fewer than 3 PRs merged. Very high review volume with almost no shipping reduces confidence in the balanced nature of the profile. |
-
-### Important Design Rules
-
-- The "generated change pattern" and "low collaboration signal" penalties are **skipped for solo developers** — these patterns are expected when working alone.
-- "Review volume imbalance" and "low collaboration signal" are **mutually exclusive** — if one applies, the other does not.
-- Maximum possible penalties: 50 points (which brings confidence to its floor of 50).
-- **Messaging is never accusatory**. The system says things like "Activity concentrated in short bursts reduces temporal signal" rather than "This looks like you're cheating." The confidence system describes patterns, not intent.
+Chapa is candid about the limit of this design: it bounds same-project, same-day splitting. It does not claim immunity to spreading work across many dates or many projects, and the validation work measures that remaining incentive rather than pretending it away.
 
 ---
 
-## Adjusted Score: Applying Confidence
+## Dimension 2: Quality Practices — Evidence of Practices Performed
 
-The confidence rating feeds into the final adjusted score through a gentle formula:
+**Formula:** Q = 25 · [ N(rationale, 12) + N(verification, 12) + N(reviewOrCorrection, 12) + N(outcomeFollowup, 12) ]
 
-**Adjusted Score = Recency-Weighted Composite x (0.85 + 0.15 x Confidence/100)**
+Quality in v7 does not measure how correct someone's software is. It counts how many distinct pieces of work **demonstrated** each of four engineering practices. Each criterion is worth up to 25 points, and a single work item can satisfy each criterion at most once. Duplicate comments, repeated approvals, CI re-runs and re-uploads add nothing.
 
-At confidence 100, the multiplier is exactly 1.0 — no adjustment. At the minimum confidence of 50, the multiplier is about 0.925 — a mere 7.5% reduction. This is intentionally mild. Even with multiple confidence concerns, the impact on the final score is modest. The system is designed to be informative, not punitive.
+- **Rationale.** The work states the specific problem, the condition for calling it done, and why this approach fits. Non-empty boilerplate does not count.
+- **Verification.** A relevant test, check or measurement, with its result, tied to the delivered revision. "CI was green" without a relevant check and a reason is not enough.
+- **Review or correction.** Attributable feedback identified a concrete concern and the evidence shows it was resolved. A solo developer's documented debugging and correction qualifies under exactly the same rubric. An approval click, by itself, does not.
+- **Outcome follow-up.** A relevant observed result after the change, with an observation period and a method: a reproduced defect confirmed fixed, a performance or accessibility change measured, a stakeholder accepting the result against the stated condition. "No incidents were reported" alone is not enough.
 
----
+Twelve demonstrated items per criterion saturate it. Six already earn about 19 of the 25 points; three earn about 13.
 
-## Score Smoothing: Preventing Jarring Changes
+**How a criterion is decided.** A rubric verdict is recorded per work item and per criterion. Facts observed from the platform and accountable assessments support eligibility. A raw self-assertion stays "self-reported, unassessed" until it is assessed. Every accepted verdict carries an evaluator identity, a rubric version and a rationale, and it is replayable. An automated tool may *propose* a claim, but acceptance under the rubric must record an accountable evaluator. A developer cannot label their own claim "independently corroborated."
 
-When scores appear on the badge and share page, one final transformation is applied: exponential moving average (EMA) smoothing.
-
-**Smoothed Score = 0.15 x Today's Raw Score + 0.85 x Yesterday's Smoothed Score**
-
-This means the displayed score changes gradually over time rather than jumping around. If your raw score drops by 10 points overnight (maybe a burst of old activity fell off the 365-day window), the displayed score will drift down by about 1.5 points per day over 4 days.
-
-The half-life of this smoothing is about 4.3 days. A 10-point raw change takes roughly a week to fully manifest in the displayed score.
-
-For first-time users with no historical data, there is nothing to smooth against, so the raw score passes through unchanged.
+**Unknown is not zero.** If an item was never inspected, the criterion is unknown for that item, and unknown widens the range. If an item *was* inspected and did not demonstrate the criterion, it simply supplies no qualifying observation, and the rationale is kept. Whether the code was written with AI provenance never changes the rubric.
 
 ---
 
-## Developer Archetypes: What Kind of Developer Are You?
+## Dimension 3: Consistency — Observed Annual Cadence
 
-Archetypes describe the **shape** of your contribution profile — what kind of developer you are, not how good you are. A Marathoner is not "better" than a Builder. They just have different strengths.
+**Formula:** C = 100 · N(activeIsoWeeks, 40)
 
-### How Archetypes Are Assigned
+An active week is an ISO week, in UTC, that intersects the window and contains at least one attributable contribution: a delivery, substantive reviewing, documentation or design work, maintenance or issue work, or qualifying practice evidence. Each week counts once, no matter how much happened in it.
 
-The system evaluates archetypes in a specific order:
+There is **no weekend penalty, no burst penalty and no response-speed penalty**. Forty active weeks saturate the dimension; twenty active weeks already score about 82.
 
-1. **Emerging** (the fallback): If your average dimension score is below 25, or no single dimension reaches 40, you are classified as Emerging. This is not a negative label — it means you are getting started or had light activity in the scoring window.
-
-2. **Balanced**: If all your dimensions are within 20 points of each other and your average is at least 50, you are Balanced. This means you contribute meaningfully across all areas without any single standout.
-
-3. **Specific Archetypes**: If your highest dimension is at least 60, you are assigned the archetype that corresponds to that dimension:
-   - **Builder** — Delivery is your strongest dimension. You ship a high volume of meaningful code.
-   - **Quality Champion** — Quality is your strongest dimension. You are dedicated to engineering discipline, especially code review. (Not available for solo profiles, since it is fundamentally about peer review.)
-   - **Marathoner** — Consistency is your strongest dimension. You show up reliably, week after week.
-   - **Polymath** — Breadth is your strongest dimension. You contribute across many projects.
-   - **Artificer** — Craft is your strongest dimension. You have mastered AI-assisted development workflows.
-
-### Tie-Breaking
-
-When two dimensions are tied at the top, the system uses a priority order: Polymath > Quality Champion > Marathoner > Builder > Artificer. This priority order favors rarer contribution patterns — being a Polymath (contributing broadly across many projects) is less common than being a Builder (shipping lots of code), so it gets higher priority in tie-breaks.
+There is also **no tenure normalization**. Two developers with identical evidence score identically even if one account was created last month and the other ten years ago. A short observation history is disclosed, not scored. Consistency describes an observed cadence over one year. It is never labelled "sustainable behaviour" or "ability."
 
 ---
 
-## Tier Classification
+## Dimension 4: Breadth — Diversity of Observed Work
 
-Tiers provide a simple, human-readable classification based on the adjusted composite score:
+**Formula:** B = 50 · N(eligibleProjects, 4) + 50 · N(eligibleCategories, 4)
 
-| Tier | Score Range | What It Means |
-|------|-------------|---------------|
-| **Emerging** | 0-29 | Getting started or light activity in the scoring window |
-| **Solid** | 30-69 | Active hobbyists through consistent contributors |
-| **High** | 70-84 | Strong impact across multiple dimensions |
-| **Elite** | 85-100 | Exceptional breadth and depth of contribution |
+Breadth has two halves, each worth up to 50 points.
 
----
+**Eligible projects.** A project counts only if it has attributable work on at least **three distinct dates**. A drive-by typo fix does not make a repository part of someone's breadth. Four eligible projects saturate this half; three earn about 43 of 50.
 
-## The Normalization Formula (Technical Detail)
+**Eligible categories.** The four categories of work are implementation, verification/review, documentation/design, and maintenance/support. A category counts only if it, too, has at least three distinct dates of artifact-supported work. A title or an inferred skill is not evidence; each category needs an artifact behind it. One item may support more than one category only when it carries distinct evidence for each.
 
-Almost every raw metric in the scoring system passes through a logarithmic normalization function before being used:
+Documentation is classified by inspecting a complete list of changed files against versioned rules — README, CHANGELOG, LICENSE, CONTRIBUTING and similar files, docs directories, and documentation extensions such as `.md`, `.mdx`, `.rst`, `.adoc` and `.txt`. A mixed code-and-docs change is not documentation-only. A partial file list is unknown, not a guess.
 
-**f(x, cap) = ln(1 + min(x, cap)) / ln(1 + cap)**
-
-This function takes a raw value and a cap, and returns a number between 0 and 1. It has three key properties:
-
-1. **Diminishing returns**: The first few contributions count a lot. Going from 0 to 5 PRs is a much bigger score jump than going from 50 to 55 PRs.
-2. **Capped at a maximum**: Beyond the cap value, additional volume has zero effect. This prevents outliers from distorting the scale.
-3. **Smooth curve**: The transition from high-impact (early) to low-impact (later) contributions is gradual, not abrupt.
-
-This logarithmic approach is one of Chapa's key anti-gaming measures. Splitting one change into 10 commits gives you roughly 10% more normalized credit, not 10 times more. The incentive structure rewards genuine contribution over volume inflation.
+What has **zero weight** in Breadth: stars, forks, watchers, how concentrated activity is in one repository, how many lines were changed, and how many programming languages appear. Popularity and concentration may still be shown as labelled context on a profile. They are not personal annual influence and they never enter the score.
 
 ---
 
-## Anti-Gaming Measures
+## The Core: Bringing Four Dimensions Together
 
-The scoring system includes several defenses against manipulation:
+**core = (D + Q + C + B) / 4**
 
-- **PR size multiplier**: Pull requests with fewer than 10 total line changes get zero weight. You cannot inflate your Delivery score with empty or trivial PRs.
-- **Repo depth threshold**: Repositories with fewer than 3 commits do not count toward the Breadth dimension. Drive-by single-commit contributions to many repos will not boost your Breadth score.
-- **Logarithmic normalization**: As described above, volume inflation has sharply diminishing returns.
-- **Batch size scoring**: The Quality dimension rewards PRs in the 20–500 line sweet spot. Both micro PRs and oversized PRs score lower, discouraging artificial splitting or bundling of changes.
-- **Confidence penalties**: Patterns like burst commits, generated changes, and review imbalances are flagged and reduce the confidence rating, which in turn slightly reduces the adjusted score.
+The four weights are fixed at 0.25 each. Nothing else enters this formula. There is no optional fifth dimension inside it, no solo-developer switch, no confidence deduction, and no recency multiplier. What you see is the mean of the four published dimensions.
 
----
+A worked example, using the real formulas:
 
-## Solo Developer Philosophy
+| Dimension | Observed counts | Points |
+|---|---|---|
+| Delivery | 60 accepted project-days | 85.7 |
+| Quality practices | rationale 6, verification 4, review/correction 3, outcome follow-up 1 | 54.9 |
+| Consistency | 30 active weeks | 92.5 |
+| Breadth | 3 eligible projects, 2 eligible categories | 77.2 |
+| **Core** | (85.7 + 54.9 + 92.5 + 77.2) / 4 | **77.6 → High** |
 
-Chapa has a strong opinion about solo developers: they should never be penalized for working alone. In the era of AI-assisted development, a solo developer with high line counts and AI-assisted pull requests represents the new normal, not an anomaly.
-
-When Chapa detects a solo profile (review-to-PR ratio below 0.15), it:
-
-1. Switches to a PR-based quality rubric (description quality, branch naming, issue linkage, batch size) instead of review-based quality.
-2. Excludes Quality from the composite score calculation.
-3. Blocks the Quality Champion archetype (since it is fundamentally about peer review).
-4. Skips review-related confidence penalties (like "generated change pattern" and "low collaboration signal").
-
-The result is that solo developers are evaluated on the signals that are meaningful for their workflow, without being compared against a collaborative rubric that does not apply to them.
+Every one of those five numbers can be recomputed from the four counts with a calculator.
 
 ---
 
-## Lifetime Metrics and History
+## Incomplete Evidence Produces a Range, Not a Lower Score
 
-Chapa captures a snapshot of each developer's metrics once per day. These snapshots are stored permanently and include all raw stats, dimension scores, archetype, composite score, confidence, and tier.
+This is the single biggest change from v6, and it deserves its own segment in the video.
 
-These historical snapshots serve two purposes:
+When coverage is incomplete — a linked source that could not be enumerated, a stale sync, a paginated fetch that stopped early, an item nobody has assessed yet — v7 does not lower the score and it does not invent a midpoint. Each count gets a **lower bound** from what was actually observed and an **upper bound** from the completions the recorded coverage still allows. Both bounds pass through the same formula, and the result is an interval.
 
-1. **Score smoothing**: The EMA smoothing algorithm needs yesterday's score to calculate today's displayed score.
-2. **Trend tracking**: Over time, developers can see how their profile evolves — whether their Consistency is improving, whether their Breadth is expanding, and so on.
+The bounds are derived per component, conservatively:
 
-One snapshot per user per day is enforced by a unique constraint. Multiple badge views or profile visits on the same day will not create duplicate snapshots.
+- Delivery's upper bound counts the distinct project-dates that unknown accepted work could still fill.
+- Consistency's upper bound adds only the currently inactive weeks that overlap the unknown period.
+- Quality's upper bound adds each unassessed work item at most once per criterion.
+- Breadth's upper bound counts a project or category only if observed plus possible dates could still reach the three-date threshold.
+- When discovery itself is unknown — the system does not even know which repositories exist — the affected component's upper bound is its full cap.
 
----
+Raw item counts are never added directly to week, project or category totals. The interval must contain every admissible completion, even if its two ends could not both be true at once.
 
-## The Full Scoring Pipeline
+Displayed ranges use the floor of the lower bound and the ceiling of the upper bound, with the exact bounds preserved in the receipt. A **point** is displayed only when the exact bounds coincide.
 
-Here is the complete journey from raw data to displayed score:
+Say this precisely on screen: the range is an **evidence-completion range**. It is not a statistical confidence interval, and it does not imply that a developer's "true ability" lies inside it. It means: "given everything we saw and everything we know we could not see, the score is somewhere in here."
 
-1. **Collect data**: Gather 365 days of activity from GitHub (and optionally Bitbucket, Codeberg).
-2. **Detect profile type**: Solo (review-to-PR ratio < 0.15) or Collaborative (ratio ≥ 0.15).
-3. **Compute 4 core dimensions**: Delivery, Quality, Consistency, Breadth — each 0 to 100.
-4. **Optionally compute Craft**: If AI tool insights are available.
-5. **Derive archetype**: Based on dimension shape and thresholds.
-6. **Calculate composite score**: Dynamic average of relevant dimensions.
-7. **Apply recency weighting**: Gentle 0.98x to 1.06x adjustment.
-8. **Compute confidence**: Start at 100, apply penalties.
-9. **Calculate adjusted score**: Composite x confidence factor.
-10. **Assign tier**: Emerging, Solid, High, or Elite.
-11. **Apply EMA smoothing**: Only for badge and share page display.
-
-The entire pipeline is implemented as pure functions — given the same input, you will always get the same output. This makes the scoring system deterministic, testable, and transparent.
+**No source is ever dropped to obtain a point.** A connected source that cannot be read stays in the calculation as incompleteness. That is deliberate. A narrow point built by ignoring evidence would be a worse answer than an honest range.
 
 ---
 
-## Multi-Platform Integration
+## Tiers
 
-Chapa supports three code platforms:
+| Tier | Core score | Meaning |
+|---|---|---|
+| **Emerging** | below 30 | Little observed activity in the window, or a truthful zero |
+| **Solid** | 30 to below 70 | Regular observed activity and practices |
+| **High** | 70 to below 85 | Strong observed activity across dimensions |
+| **Elite** | 85 and above | Saturating several dimensions |
 
-- **GitHub**: The primary source. Connected via OAuth at login. Provides the most comprehensive data.
-- **Bitbucket**: Optional. Connected via OAuth from the user menu. Supplements GitHub data with Bitbucket activity.
-- **Codeberg**: Optional. Connected via OAuth from the user menu. Supplements GitHub data with Codeberg activity.
+The thresholds are declared product choices, kept from earlier versions for familiarity. Two rules govern them.
 
-Data from linked platforms is merged into the same scoring pipeline. There is a minor confidence penalty (-5 points) for supplemental (non-GitHub) data because it cannot be verified through the same OAuth flow, but the penalty is minimal and the data fully contributes to all dimension calculations.
+**Tiers use the unrounded core.** A core of 69.9 displays as 70 but is Solid, not High. To avoid a surprising display, the UI shows one decimal, or writes "<70", whenever integer rounding would visually cross a boundary.
+
+**A range gets a tier only if the whole interval sits inside one tier.** A profile whose range runs from 64 to 73 straddles the 70 boundary. It receives no tier. "Somewhere between Solid and High" is the honest answer; picking one would not be.
 
 ---
 
-## Badge Verification
+## Archetypes: The Shape of the Evidence
 
-Every Chapa badge includes a verification hash — an HMAC-SHA256 signature that proves the badge data has not been tampered with. Anyone can visit the verification page and confirm that a badge's scores, archetype, and tier are genuine.
+An archetype describes the **shape** of a profile, not its rank. A Marathoner is not better than a Builder; they have different strongest dimensions. Archetypes are evaluated on unrounded values, in this order:
 
-This matters because badges are embeddable anywhere — in GitHub READMEs, personal websites, resumes. Without verification, someone could create a fake badge with inflated scores. The HMAC signature makes that impossible without access to Chapa's secret key.
+1. **Emerging.** The mean of the four dimensions is below 25, or no dimension reaches 40.
+2. **Balanced.** All four dimensions sit within 20 points of each other and the mean is at least 50.
+3. **A specialist archetype.** The highest dimension is at least 60:
+   - **Builder** — Delivery leads.
+   - **Quality Champion** — Quality practices lead.
+   - **Marathoner** — Consistency leads.
+   - **Polymath** — Breadth leads.
+4. Otherwise, **Emerging**.
+
+Ties are broken in a fixed order: Breadth, then Quality practices, then Consistency, then Delivery — so a tie goes to the rarer shape.
+
+Two v6 exclusions are gone. There is no "solo" profile type, so Quality Champion is available to everyone, including a developer who works alone and documents their own verification and corrections. And Craft is not an archetype dimension any more; the optional Artificer descriptor is explained below.
+
+**No archetype for a range.** If any dimension is a range rather than a point, no archetype is assigned. The UI says "insufficient evidence" instead of guessing. This avoids a subtle failure where a label could flip depending on which corner of the interval you looked at.
+
+---
+
+## Craft: A Separate, Optional Practice Portfolio
+
+**Formula:** K = 25 · [ N(framing, 8) + N(verificationDebugging, 8) + N(toolJudgment, 8) + N(acceptedOutcome, 8) ]
+
+Craft is Chapa's description of AI-assisted engineering practice, and its most important property is where it lives: **beside the core, never inside it**. Adding, expiring or withdrawing a Craft portfolio changes Craft alone. The four core dimensions and the headline score do not move.
+
+Craft is built from deduplicated **work-item episodes**. Each episode is assessed against four criteria, each worth up to 25 points and saturating at eight episodes:
+
+1. **Framing.** The problem, its constraints and the acceptance condition were stated.
+2. **Verification and debugging.** A debugging hypothesis was tested, or a relevant verification result was recorded.
+3. **Tool judgment.** There was a stated reason to use, constrain, avoid or delegate to a tool, including review of its output.
+4. **Accepted outcome.** An artifact was accepted against the stated acceptance condition.
+
+Read criterion three carefully, because it is the point of the design. **Choosing not to use an AI tool, or deliberately constraining one, demonstrates judgment in exactly the same way that delegating does.** A developer who uses no AI tool at all can submit a full Craft portfolio and score fully on it.
+
+What earns **zero** automatic credit in Craft: the tool's name, tokens consumed, lines generated, files touched, message counts, session counts, entropy or "diversity" of tool use, agent counts, parallel sessions and reply speed. A Claude Code insights report remains a supported optional import for descriptive diagnostics, but model-estimated outcomes and satisfaction are labelled as estimates and cannot by themselves prove a criterion. "Likely satisfied" is a distinct label from "satisfied."
+
+**No portfolio means not observed, never zero.** A profile without eligible episodes shows Craft as `not_observed`. Missing criteria produce explicit ranges using the same completion logic as the core.
+
+**The Artificer descriptor.** A profile may carry the descriptor "Artificer" when its Craft is a complete point of at least 60 **and** at least one episode satisfying all four criteria — including an accepted outcome — has been independently corroborated by a human evaluator who is not the developer. The descriptor accompanies the core archetype; it does not replace it. The old automatic Novice, Practitioner, Expert and Master labels are retired from v7 output; legacy receipts keep their historical labels.
+
+Evidence across multiple uploads is unioned and deduplicated. A newer upload cannot overwrite better or differently dated evidence, and uploading an old report today does not make its evidence current.
+
+---
+
+## Attributable Outcome Evidence
+
+Alongside the four dimensions, v7 keeps an **outcome ledger** for evidence of delivered benefit: correctness and security, performance and accessibility, reliability and cost, design and documentation, mentoring and review, maintenance and incident recovery.
+
+Every claim in the ledger records what was observed, the method and time horizon, a baseline (or an explanation of why none exists), and its limitations or counter-evidence. Attribution is explicit: individual action, team participation, or unclear. A team's deployment win or reliability gain is never converted into an individual causal claim by assumption.
+
+This ledger is where the honesty about "impact" lives. Chapa records outcome evidence and attributes it explicitly. It does not infer business impact from activity or AI logs.
+
+---
+
+## Receipts: Every Score Can Be Replayed
+
+Each scored revision issues an **immutable public receipt**. The receipt carries every aggregate count, every coverage bound and every rubric result needed to redo the arithmetic — plus the full calculation trace: the count, the cap, the normalized value and the weighted points for every step of every dimension.
+
+Anyone can take that receipt and replay the score **offline**, with no network, no secrets and no clock. An independent calculator must reconcile every public numeric output. The profile page's "how is my score calculated" explanation is itself read out of the receipt's trace rather than recomputed, so the explanation and the artifact can never disagree.
+
+What the receipt **excludes**: private paths, repository names, report contents, tokens, and evaluator identities. Public criterion results expose a structured status, category, count and a safe reason code — never free-text rationale, quoted evidence or private URLs. Those stay in the owner's private view.
+
+Three limits, stated plainly:
+
+- Public replay validates **arithmetic over the issued aggregates**. It does not establish that the private sources were truthful, and issuing a receipt is not a claim about the accuracy of the platform's own data.
+- A retraction or correction creates a **new immutable revision**. The old receipt keeps its historical arithmetic status and can show a redacted "superseded" or "retracted" state without revealing the private reason.
+- Withdrawing consent revokes public access and deletes the private backing records, leaving only a content-free tombstone. Copies that others downloaded earlier cannot be recalled, and Chapa says so before publication.
+
+The verification page distinguishes three separate checks — recorded issuance, signature authentication and arithmetic replay — and does not inspect an SVG image or prove the identity drawn on a badge. Legacy v6 records can still be looked up, but their complete signed inputs were never saved, so they cannot be replayed.
+
+---
+
+## Headline and Trend
+
+The **headline** score — the number on the badge — is always fresh. It is the current receipt's core.
+
+The **trend** line is smoothed separately, so a day-to-day wobble does not hide the direction of travel:
+
+**s(t) = 0.85^Δdays · s(previous) + (1 − 0.85^Δdays) · raw(t)**
+
+where Δdays is the number of days since the previous exact observation. Three honest caveats travel with it:
+
+- The formula assumes the newly observed value applied across the unobserved gap. That is a labelled approximation, and it is never used to backfill missing history.
+- Only exact **point** observations enter the trend. A range creates a gap; the next point resumes from the elapsed days.
+- Repeated reads or uploads on the same day do not feed back into the state. A same-day revision recomputes from the previous day's immutable anchor. Different policy versions segment the trend rather than blending v6 and v7 numbers.
+
+---
+
+## Worked Figures From the Real Scorer
+
+The table below is generated by the same function that scores a real profile, and a test fails if the published table and a fresh run disagree. Reference time: 2026-09-01T12:00:00Z.
+
+| Case | Delivery | Quality | Consistency | Breadth | Core | Tier | Archetype |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Complete evidence | 61 | 54 | 73 | 68 | 64 | Solid | Balanced |
+| One source incomplete | 61–80 | 54 | 72–81 | 68–78 | 64–73 | none | none |
+| No observed evidence | 0 | 0 | 0 | 0 | 0 | Emerging | Emerging |
+
+Read the middle row against the first. One incomplete source leaves every lower bound exactly where it was and raises the upper bounds. Missing coverage widens the interval; it never lowers the score. That row earns no tier and no archetype, because its interval straddles 70 and the whole interval must sit inside one tier before a label is assigned.
+
+The last row is a truthful zero — a real result with a real tier, not a failure to compute.
+
+---
+
+## What Left the System, and Why
+
+For viewers who knew v6, name the departures explicitly.
+
+| Gone in v7 | Why |
+|---|---|
+| Confidence score and penalty table | Penalised patterns the developer could not disprove. Replaced by evidence-completion ranges. |
+| Adjusted score (composite × confidence factor) | A hidden multiplier on the headline. The core is now the headline. |
+| Solo vs collaborative profile switch | A second rubric for some people. One rubric now; a solo developer's own documented correction counts as review-or-correction. |
+| Recency multiplier (0.98× to 1.06×) | Another hidden multiplier. Trend is shown separately instead. |
+| PR size weight, batch-size sweet spot, micro-commit ratio | Lines and PR counts are proxies. A project-day of accepted work is the unit. |
+| Stars, forks, watchers, top-repo concentration | Popularity is not personal annual work. May be shown as context; zero weight. |
+| Burst detection, active-day square root, heatmap evenness | Replaced by active ISO weeks with no penalties. |
+| Craft inside the composite; Novice/Expert/Master labels | Craft is separate and optional. Tokens, lines, tool names earn nothing. |
+| Blended platform stats | Normalized events with coverage, attribution and provenance. |
 
 ---
 
 ## Design Philosophy Summary
 
-The Chapa scoring system is built on several core principles:
+1. **Observed, not inferred.** Every number traces to evidence the system saw. The receipt says what was in scope.
+2. **Missing evidence widens, never lowers.** A range is an honest answer. A guessed midpoint is not.
+3. **Practices, not proxies.** Rationale, verification, review, follow-up. Not lines, tokens, stars or speed.
+4. **Four fixed weights, nothing hidden.** The core is the mean of four published dimensions. No multipliers.
+5. **One rubric for everyone.** No solo mode, no penalty for AI use, no penalty for choosing not to use AI, no tenure adjustment.
+6. **Craft beside the core.** Optional, separate, and impossible to inflate with volume.
+7. **Replayable.** An immutable public receipt lets anyone redo the arithmetic offline.
+8. **Private by construction.** Receipts carry aggregates and reason codes, never paths, names or rationale.
+9. **Labels only when earned.** No tier across a boundary, no archetype for a range, no Artificer without corroboration.
+10. **Limits stated out loud.** The index does not certify ability or impact, and its constants are product choices, not statistical claims.
 
-1. **Multi-dimensional over single-number**: Different contribution styles deserve separate measurement.
-2. **Logarithmic normalization over linear**: Reward genuine contribution, not volume inflation.
-3. **Non-accusatory confidence**: Describe patterns, never impute intent.
-4. **Solo-friendly**: Adapt to the developer's actual workflow, do not force a collaborative rubric on a solo developer.
-5. **Transparent**: Every weight, cap, and formula is documented. No black boxes.
-6. **Deterministic**: Pure functions, same input produces same output, fully testable.
-7. **Gently smoothed**: Score changes propagate gradually, no jarring day-to-day jumps.
-8. **Anti-gaming by design**: Logarithmic curves, depth thresholds, and confidence penalties make manipulation impractical and unrewarding.
+---
 
-The goal is not to rank developers against each other. It is to give each developer a clear, honest, multi-dimensional picture of their own impact — and to make that picture beautiful enough to share.
+## Validation Status
+
+The v7 rubric is implemented and tested against fixtures covering the invariants above: AI-disclosure and tool invariance, matched pairs by role, tenure and visibility, duplicate and split work, unknown and zero evidence, range containment, receipt replay and same-day trend behaviour.
+
+An empirical pilot is prespecified and is a relaunch blocker: 24 public or consenting profiles across six work-role groups, 144 sampled work items, two independent rubric assessments each, an independent human domain reviewer, published inter-rater agreement with confusion matrices, a usability gate on range width, and sensitivity analysis on every cap and weight. Until that pilot completes, Chapa describes v7 as a fully specified rubric whose feasibility has not yet been empirically demonstrated. Passing the pilot tests feasibility and exposes problems; it does not prove universal fairness, and no pilot result is generalized to population percentiles.
+
+The goal has not changed from v6: not to rank developers against each other, but to give each developer a clear, honest, multi-dimensional picture of their own observed work — one they can check, replay and share.

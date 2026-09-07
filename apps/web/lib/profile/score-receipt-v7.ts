@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import {
+  canonicalJson,
   createScoringWindow,
   projectReceiptEvidence,
   sealScoreReceipt,
@@ -9,6 +10,7 @@ import {
   type EngineeringEvidenceInput,
   type NormalizedEngineeringEvent,
   type PrivateCriterionAssessment,
+  type PublicScoringReceipt,
   type ScoringScope,
   type ScoringWindow,
   type SourceCoverage,
@@ -124,7 +126,13 @@ export async function readScoreReceiptV7(owner: string, revisionId?: string): Pr
   try {
     const cached = await getCachedReceiptSnapshotV7(handle, revisionId);
     if (cached) return cached;
-  } catch { /* A cache miss is not an authority on issuance. */ }
+    // A `null` here is NOT proof that no receipt exists, which is what an
+    // earlier attempt at saving the second round trip assumed. The cached path
+    // resolves through the receipt manifest, and the contract suite against
+    // real persistence shows the manifest can be absent while the receipt is
+    // durably stored — so the durable read below is the authority on issuance
+    // and the manifest is only a fast path to it.
+  } catch { /* A cache miss is not an authority on issuance either. */ }
   try {
     return await dbReadReceiptV7(handle, revisionId);
   } catch {
@@ -184,10 +192,40 @@ export async function materializeScoreReceiptV7(
     const craft = await readCraft(handle, window);
     const projected = projectReceiptEvidence(scope, publishableAssessments(ledger.assessments));
 
+    // Revisions form a chain. Minting a fresh root every time would give one
+    // subject an unbounded pile of unrelated `revision: 1` receipts, each with
+    // its own verification token and none superseding another — about 24 a day
+    // once the hourly warm-cache cron calls this.
+    const previous = await readScoreReceiptV7(handle);
+    const prior = previous?.receipt.receipt ?? null;
+
+    // Re-scoring the same evidence is not a new revision. The window's
+    // reference date and the scored inputs together are the identity of a
+    // scoring result, so when both match the stored one there is nothing to
+    // issue and the existing receipt is returned unchanged.
+    // `canonicalJson` serializes a receipt structure, not an arbitrary value,
+    // so an absent Craft channel is compared as absence rather than passed
+    // through it as `null`.
+    const craftIdentity = (value: typeof craft | PublicScoringReceipt["craft"]) =>
+      value ? canonicalJson({ inputs: value.inputs, result: value.result }) : "";
+    if (previous
+      && prior
+      && prior.action !== "retract"
+      && prior.window.referenceDate === window.referenceDate
+      // Counts, not the whole `inputs` object: `inputs` embeds the window, and
+      // the window carries a per-call `referenceTime`, so comparing inputs
+      // wholesale never matched and every pass published a correction.
+      && canonicalJson(prior.inputs.counts) === canonicalJson(core.inputs.counts)
+      && craftIdentity(prior.craft) === craftIdentity(craft)) {
+      return { status: "stored", snapshot: previous };
+    }
+
     const envelope = await sealScoreReceipt({
       schemaVersion: "v7", policyVersion: "v7",
-      receiptId: randomUUID(), revisionId: randomUUID(), subjectRef: "subject-1",
-      revision: 1, supersedesRevisionId: null, action: "create",
+      receiptId: prior?.receiptId ?? randomUUID(), revisionId: randomUUID(), subjectRef: "subject-1",
+      revision: (prior?.revision ?? 0) + 1,
+      supersedesRevisionId: prior?.revisionId ?? null,
+      action: prior ? "correct" : "create",
       recordedAt: window.referenceTime, window,
       inputs: core.inputs, core: core.core,
       craft: craft ? { inputs: craft.inputs, result: craft.result } : null,

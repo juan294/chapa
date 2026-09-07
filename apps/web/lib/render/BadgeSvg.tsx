@@ -16,7 +16,7 @@ import { renderVerificationStrip, renderDemoVerificationStrip } from "./Verifica
 import { BADGE_RENDER_VARIANT } from "./badge-render-variant";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 import { describeScoringEvidence } from "./scoring-evidence-label";
-import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { legacyViewModel, renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
 
 /**
  * Locale-resolved strings for the ~10 literals rendered directly onto the
@@ -34,8 +34,12 @@ export interface BadgeI18nStrings {
   metricsSimulated?: string;
   metricsVerified?: string;
   metricsPublic?: string;
-  /** Pre-resolved translated label for `impact.tier` (e.g. "Sólido" for "Solid"). */
+  /** Pre-resolved translated label for the drawn tier (e.g. "Sólido" for "Solid"). */
   tierLabel?: string;
+  /** Shown in place of a tier when a v7 evidence range straddles a boundary. */
+  tierUnknownLabel?: string;
+  /** Shown in place of an archetype when any dimension is a range. */
+  archetypeUnknownLabel?: string;
   radarLabels?: Partial<Omit<RadarChartLabels, "noData">>;
   radarNoData?: string;
   verifiedLabel?: string;
@@ -118,8 +122,15 @@ export function renderBadgeSvg(
   const nameFit = Array.from(stats.displayName || `@${stats.handle}`).length * 32 * 0.6 > 820
     ? ' textLength="820" lengthAdjust="spacingAndGlyphs"'
     : "";
-  const tierColor = getTierColor(impact.tier, t);
-  const archetypeColor = getArchetypeColor(impact.archetype);
+  // #1311 — every drawn magnitude comes from the one projection, so an issued
+  // v7 receipt and the legacy v6 aggregate cannot disagree about the same
+  // revision. `renderableScore` draws a range at its lower bound, which is the
+  // only claim the evidence supports, and names the ranged keys so the
+  // accessible description can disclose the interval.
+  const model = scoring ?? legacyViewModel(impact);
+  const score = renderableScore(model);
+  const tierColor = getTierColor(score.tier, t);
+  const archetypeColor = getArchetypeColor(score.archetype, t);
 
   // Layout constants
   const W = 1200;
@@ -165,7 +176,7 @@ export function renderBadgeSvg(
   const pillGap = 8;
   const dotGap = 6; // extra space for · separator between pills
   // Archetype pill: icon(20) + gap(6) + text
-  const archetypeText = impact.archetype;
+  const archetypeText = score.archetype ?? strings.archetypeUnknownLabel ?? "insufficient evidence";
   const archetypePillWidth = 14 + 20 + 6 + archetypeText.length * 10 + 14;
   // Metric pills: icon(16) + gap(4) + "count label"
   const reposLabel = `${reposStr} Repos`;
@@ -208,24 +219,50 @@ export function renderBadgeSvg(
     craft: strings.radarLabels?.craft ?? "Craft",
     noData: strings.radarNoData ?? "no data yet",
   };
-  const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR, radarLabels, t);
+  // Craft is a core radar axis under v6 and never one under v7, where it is a
+  // separate portfolio reported beside the core. Legacy badges keep their
+  // pentagon; a v7 badge draws the diamond its four fixed dimensions describe,
+  // rather than a fifth axis that would read as a core dimension scoring zero.
+  const radarDimensions = model.policyVersion === "v6" && impact.dimensions.craft != null
+    ? { ...score.dimensions, craft: impact.dimensions.craft }
+    : score.dimensions;
+  const radarSvg = renderRadarChart(radarDimensions, radarCX, radarCY, radarR, radarLabels, t);
 
   // ── Hero score ring (right column, below radar) ───────────
-  const scoreStr = String(impact.adjustedComposite);
-  // Keep three digits inside the opaque score backing and its ring stroke.
-  const scoreFontSize = scoreStr.length > 2 ? 48 : 52;
+  // A v7 evidence-completion range prints both bounds. Collapsing it to one
+  // number would publish a point claim the evidence does not support, and the
+  // headline is the number a reader carries away.
+  const compositeValue = model.composite;
+  const scoreStr = compositeValue.kind === "point"
+    ? String(compositeValue.display)
+    : `${compositeValue.displayLower}\u2013${compositeValue.displayUpper}`;
+  // Keep the headline inside the ring rather than across it.
+  //
+  // The ring is r=46 with a 4px stroke, so the clear width inside it is about
+  // 88px; JetBrains Mono advances 0.6em per glyph. One and two digits keep
+  // their established sizes, and three keeps 48 because that is what v6's
+  // "100" has always rendered at. Anything longer is a v7 interval, and its
+  // size is derived from the ring instead of guessed: at a fixed 30px "74–76"
+  // measured ~90px and sat on the stroke, which is what rendering one and
+  // looking at it showed.
+  const RING_TEXT_WIDTH = 84;
+  const scoreFontSize = scoreStr.length <= 2 ? 52
+    : scoreStr.length === 3 ? 48
+    : Math.min(48, Math.floor(RING_TEXT_WIDTH / (scoreStr.length * 0.6)));
   // #1181 — pre-resolved translated tier label; falls back to the raw tier
   // value (English) for callers that don't pass `strings.tierLabel`. Always
   // escaped below since `impact.tier`/a caller-supplied string both flow
   // into SVG text content.
-  const tierLabel = strings.tierLabel ?? impact.tier;
+  const tierLabel = score.tier === null
+    ? strings.tierUnknownLabel ?? "evidence range"
+    : strings.tierLabel ?? score.tier;
   const ringCY = 466;
   const ringR = 46;
   const ringCircumference = 2 * Math.PI * ringR; // ≈289.03
-  const ringOffset = ringCircumference * (1 - impact.adjustedComposite / 100);
+  const ringOffset = ringCircumference * (1 - score.composite / 100);
   const tierLabelY = ringCY + ringR + 24;
   const tierEffect = renderTierTreatment(config.tierTreatment, {
-    tier: impact.tier,
+    tier: score.tier ?? "",
     centerX: radarCX,
     y: tierLabelY,
     color: tierColor,
@@ -274,7 +311,14 @@ export function renderBadgeSvg(
   // (BadgeOverlay) used over the demo badges on the landing/archetype pages
   // — both of those are inline (disableAnimation left false/unset).
   const accessibleTitle = `${headerName} — Chapa Impact score ${scoreStr}, ${escapeXml(archetypeText)} archetype`;
-  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(impact.tier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring))}`;
+  // The tier here is the canonical value, not the drawn label. The sentence is
+  // assembled in English and `describeScoringEvidence` continues it in English,
+  // so injecting a translated tier word would read as "Alto tier" mid-sentence
+  // — and it would change the `<desc>` of every existing v6 static badge in a
+  // non-default locale, which this cutover has no business doing. `null` is the
+  // v7 range that earned no tier.
+  const accessibleTier = score.tier ?? "unassigned";
+  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(accessibleTier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring))}`;
   const a11yAttrs = disableAnimation ? ' role="img"' : "";
   const a11yMarkup = disableAnimation
     ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`

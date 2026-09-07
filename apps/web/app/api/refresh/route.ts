@@ -9,6 +9,7 @@ import { getRequestId } from "@/lib/log";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -152,6 +153,12 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     snapshot: true,
     history: true,
   });
+
+  // #1311 — a refresh is an owner-initiated recompute, so it is where a
+  // consented subject's v7 receipt is re-issued. Awaited rather than deferred:
+  // the invalidation above has already cleared the badge, and issuing after
+  // that clear is what makes the next render draw the new revision.
+  await issueScoreReceiptIfConsented(handle, token ? { token } : {});
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;

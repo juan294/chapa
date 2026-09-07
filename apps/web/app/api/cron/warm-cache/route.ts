@@ -37,11 +37,12 @@ import {
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
-import { getPublicProfileVerification } from "@/lib/profile/public-profile";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -451,6 +452,13 @@ async function warmHandle(
   requestId?: string,
 ): Promise<HandleResult> {
   try {
+    // #1311 — issue before materializing, not after. Materialization is what
+    // reads the receipt the badge is rendered from, so issuing afterwards left
+    // the warmed SVG a revision behind for a full hour. Non-consented handles
+    // skip silently — every handle until its owner opts in — and failures are
+    // captured inside the helper rather than failing the warm.
+    await issueScoreReceiptIfConsented(handle);
+
     const materialized = await materializeOrchestratedProfile(handle);
     if (!materialized) {
       void captureServerError({
@@ -515,7 +523,7 @@ async function warmHandle(
         );
         const avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
         const avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
-        const verification = getPublicProfileVerification(materialized);
+        const verification = await resolveBadgeVerification(materialized);
 
         if (avatarCachePolicy !== "skip" && verification) {
           const configSnapshot = await resolveBadgeConfigSnapshot(handle);
@@ -523,6 +531,7 @@ async function warmHandle(
           // a fallback design must not overwrite the public SVG cache.
           if (configSnapshot.cacheable) {
             const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+              scoring: materialized.scoring,
               avatarDataUri,
               // #1191 — the cron writes to the same cache slot as the request
               // path, so it must render the same config. Warming with the
@@ -533,7 +542,7 @@ async function warmHandle(
               // Mirrors the request path — this SVG is served to <img> embeds,
               // where SMIL <animate> never runs.
               disableAnimation: true,
-              strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
+              strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
             });
             if (avatarCachePolicy === "short") {
               await writeBadgeSvgCache(svgCacheKey, svg, handle, {

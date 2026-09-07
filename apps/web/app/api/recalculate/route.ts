@@ -6,6 +6,7 @@ import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -93,6 +94,11 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     snapshot: true,
     history: true,
   });
+
+  // #1311 — recalculate exists to make a subject's published numbers current
+  // after a scoring change, so a consented subject's receipt is re-issued here
+  // for the same reason the snapshot was rewritten above.
+  await issueScoreReceiptIfConsented(handle);
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;

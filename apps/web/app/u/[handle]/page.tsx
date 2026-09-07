@@ -51,6 +51,9 @@ import { interpolate } from "@/lib/i18n/interpolate";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageHeader } from "./SharePageHeader";
+import { describeScoreForMetadata } from "@/lib/profile/score-description";
+import { readRenderableReceipt } from "@/lib/profile/score-model";
+import { explainReceipt } from "@/lib/dashboard/receipt-explanation";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
@@ -265,6 +268,9 @@ export async function SharePageContent({
     const configSnapshot = await resolveBadgeConfigSnapshot(handle);
     configCacheable = configSnapshot.cacheable;
     inlineSvg = renderBadgeSvg(stats, impact, {
+      // `impact` is non-null here only because `materialized` was; the optional
+      // read keeps the compiler honest and falls back to the same legacy model.
+      scoring: materialized?.scoring,
       avatarDataUri,
       // #1191 — this render writes to the same cache slot the badge route
       // reads, so it must use the same config.
@@ -273,7 +279,7 @@ export async function SharePageContent({
       verificationDate: verification?.date,
       // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
       // so content and key are always for the same locale.
-      strings: badgeLocale.stringsFor(impact.tier),
+      strings: badgeLocale.stringsFor(materialized?.scoring?.tier ?? impact.tier),
     });
     renderedFresh = true;
   }
@@ -359,17 +365,27 @@ export async function SharePageContent({
 
   const displayLabel = stats?.displayName ?? handle;
 
+  const scoreDescription = describeScoreForMetadata(materialized?.scoring ?? null);
+
+  // #1311 — a v7 subject's breakdown is the receipt's own arithmetic. Resolved
+  // here rather than in the client tree: `explainReceipt` reads the sealed
+  // receipt, and the projection it returns is what crosses the boundary.
+  const receiptExplanation = materialized?.scoring?.policyVersion === "v7"
+    ? await readRenderableReceipt(handle).then(snapshot => (snapshot ? explainReceipt(snapshot) : null))
+    : null;
+
   const personJsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
     name: displayLabel,
     url: `https://github.com/${handle}`,
     sameAs: [`https://github.com/${handle}`],
-    ...(impact
-      ? {
-          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier).`,
-        }
-      : {}),
+    // #1311 — described from the model the badge draws, not the v6 aggregate.
+    // A v7 evidence range has no single number and may have no tier, and this
+    // description is what a search result and an LLM quote back: publishing a
+    // point here while the badge shows an interval would put a number Chapa
+    // does not claim into someone else's index.
+    ...(scoreDescription ? { description: scoreDescription } : {}),
     ...(verification?.hash
       ? {
           potentialAction: {
@@ -426,13 +442,7 @@ export async function SharePageContent({
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
 
         {/* ── Header: identity paired with the headline score (#1217) ── */}
-        <SharePageHeader
-          handle={handle}
-          displayLabel={displayLabel}
-          score={impact?.adjustedComposite ?? null}
-          tier={impact?.tier ?? null}
-          verificationHash={verification?.hash ?? null}
-        />
+        <SharePageHeader handle={handle} displayLabel={displayLabel} />
 
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
@@ -496,6 +506,7 @@ export async function SharePageContent({
           isOwner={isOwner}
           embedMarkdown={embedMarkdown}
           embedHtml={embedHtml}
+          receiptExplanation={receiptExplanation}
         />
       </div>
 

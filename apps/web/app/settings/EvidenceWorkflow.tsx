@@ -7,6 +7,8 @@ import {
 } from "@/lib/evidence/workflow-state";
 import { dbReadEngineeringEvidence } from "@/lib/db/engineering-evidence";
 import { createScoringWindow } from "@chapa/shared";
+import { PublicationConsent } from "./PublicationConsent";
+import { isScoringV7RenderingEnabled } from "@/lib/feature-flags";
 
 const STATE_STYLE: Record<EvidenceWorkflowState, string> = {
   pending: "border-terminal-yellow/30 bg-terminal-yellow/10 text-terminal-yellow",
@@ -36,13 +38,17 @@ export async function EvidenceWorkflow({ handle, locale }: { handle: string; loc
   const owner = handle.toLowerCase();
 
   let items: ReturnType<typeof evidenceWorkflowItems> = [];
+  let publicConsent = false;
   try {
-    items = evidenceWorkflowItems(await dbReadEngineeringEvidence(owner, owner, createScoringWindow(new Date().toISOString())));
+    const snapshot = await dbReadEngineeringEvidence(owner, owner, createScoringWindow(new Date().toISOString()));
+    items = evidenceWorkflowItems(snapshot);
+    publicConsent = snapshot.publicConsent;
   } catch {
     // A ledger read failure must not take the whole settings page down; the
     // empty state below is honest about showing nothing.
   }
   const summary = summarizeEvidenceWorkflow(items);
+  const v7Enabled = await isScoringV7RenderingEnabled();
 
   return (
     <section aria-labelledby="settings-evidence" className="border-t border-stroke pt-8">
@@ -83,6 +89,16 @@ export async function EvidenceWorkflow({ handle, locale }: { handle: string; loc
       <p className="mt-2 text-sm text-text-secondary">
         {t(summary.craftPortfolioEmpty ? "settings.evidenceCraftEmpty" : "settings.evidenceCraftPresent") as string}
       </p>
+
+      {/* Gated with the rest of the cutover. While `scoring_v7_rendering` is
+          off nothing renders or issues a receipt, so offering the opt-in would
+          promise a publication that cannot happen — and its POST is the only
+          v7-table write this branch adds. */}
+      {v7Enabled ? (
+        <div className="mt-8">
+          <PublicationConsent handle={owner} initialConsent={publicConsent} />
+        </div>
+      ) : null}
     </section>
   );
 }

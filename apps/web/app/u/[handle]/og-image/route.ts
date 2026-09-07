@@ -18,9 +18,9 @@ import { toDateString } from "@/lib/utils/date";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import {
-  getPublicProfileVerification,
   materializePublicProfile,
 } from "@/lib/profile/public-profile";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 
 const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000;
@@ -138,9 +138,10 @@ export async function GET(
       ? await getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
       : undefined;
 
-    const verification = getPublicProfileVerification(materialized);
+    const verification = await resolveBadgeVerification(materialized);
 
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+      scoring: materialized.scoring,
       avatarDataUri,
       config: configSnapshot.config,
       verificationHash: verification?.hash,
@@ -150,7 +151,7 @@ export async function GET(
       disableAnimation: true,
       // Same resolved bundle that produced ogCacheKey above, so the image and
       // the key it is stored under are always for the same locale (#1190).
-      strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
+      strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
     });
 
     const png = await withTimeout(

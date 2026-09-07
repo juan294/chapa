@@ -10,6 +10,8 @@ import {
   type SnapshotScoreInput,
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
+import { readRenderableReceipt, scoreModelFrom } from "./score-model";
+import type { ScoreViewModel } from "./score-view-model";
 import { getStats } from "@/lib/github/client";
 import { isValidLegacyStats } from "@/lib/github/stats-integrity";
 
@@ -65,10 +67,19 @@ export interface MaterializeProfileOptions
 
 export interface MaterializedProfile extends MaterializedImpactState {
   stats: StatsData;
+  /**
+   * What every rendering surface draws (#1311). An issued v7 receipt projects
+   * to `policyVersion: "v7"`; a subject with no receipt gets the v6 aggregate
+   * projected into the same shape and labelled `v6`. Resolving it here rather
+   * than per surface is what stops the badge, the OG image, the share page and
+   * the warm-cache pre-render from disagreeing about one revision.
+   */
+  scoring: ScoreViewModel;
 }
 
 export interface MaterializedDisplayProfile extends MaterializedDisplayState {
   stats: StatsData;
+  scoring: ScoreViewModel;
 }
 
 interface DisplayInputs {
@@ -160,12 +171,17 @@ export async function materializeDisplayProfile(
   handle: string,
   options: { token?: string; readOnly?: boolean } = {},
 ): Promise<MaterializedDisplayProfile | null> {
-  const inputs = await loadDisplayInputs(handle, options.token, options.readOnly ?? false);
+  const [inputs, receipt] = await Promise.all([
+    loadDisplayInputs(handle, options.token, options.readOnly ?? false),
+    readRenderableReceipt(handle),
+  ]);
   if (!inputs) return null;
 
+  const displayState = materializeDisplayState(inputs.stats, inputs.craftResult);
   return {
     stats: inputs.stats,
-    ...materializeDisplayState(inputs.stats, inputs.craftResult),
+    ...displayState,
+    scoring: scoreModelFrom(handle, displayState.displayImpact, receipt),
   };
 }
 
@@ -178,7 +194,7 @@ export async function materializeProfile(
   // dominates; on cache hit, this saves a round-trip vs the previous serial
   // shape. Cache lookup failures fail open to defaults rather than rejecting
   // the whole profile fetch.
-  const [displayInputsSettled, snapshotSettled, dirtySettled] =
+  const [displayInputsSettled, snapshotSettled, dirtySettled, receiptSettled] =
     await Promise.allSettled([
       loadDisplayInputs(handle, options.token, options.readOnly),
       // #930 — Skip snapshot lookup when the caller wants to force-recalculate
@@ -186,6 +202,10 @@ export async function materializeProfile(
       // read so the EMA same-day lock never sees a stale today-snapshot.
       options.ignoreSnapshot ? Promise.resolve(null) : getCachedLatestSnapshot(handle),
       isStatsDirty(handle),
+      // #1311 — the issued v7 receipt, read alongside stats rather than after
+      // them. A failed read falls back to the labelled v6 aggregate, which is
+      // the same answer this surface gave before a receipt existed.
+      readRenderableReceipt(handle),
     ]);
 
   const displayInputs =
@@ -206,14 +226,20 @@ export async function materializeProfile(
     dirtySettled.status === "fulfilled" && dirtySettled.value === true;
   const inputsChanged = options.inputsChanged ?? dirtyFromCache;
 
+  const impactState = materializeImpactState(stats, {
+    craftResult,
+    latestSnapshot,
+    policy: options.policy,
+    today: options.today,
+    inputsChanged,
+  });
   return {
     stats,
-    ...materializeImpactState(stats, {
-      craftResult,
-      latestSnapshot,
-      policy: options.policy,
-      today: options.today,
-      inputsChanged,
-    }),
+    ...impactState,
+    scoring: scoreModelFrom(
+      handle,
+      impactState.displayImpact,
+      receiptSettled.status === "fulfilled" ? receiptSettled.value : null,
+    ),
   };
 }
