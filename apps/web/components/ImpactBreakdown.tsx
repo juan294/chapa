@@ -121,9 +121,11 @@ export function DataSources({ stats, handle, isOwner = false }: DataSourcesProps
 
   return (
     <div>
-      <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:260ms]">
+      {/* An h2: on /u/:handle this is the first heading after the page h1
+          and a peer of the "Impact breakdown" / "Embed badge" h2s (LE-8-3). */}
+      <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:260ms]">
         {t('dashboard.dataSources') as string}
-      </h3>
+      </h2>
       <div className="flex flex-wrap gap-3">
         {platforms.map((platform, i) => {
           const display = PLATFORM_DISPLAY[platform];

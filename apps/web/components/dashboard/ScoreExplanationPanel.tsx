@@ -99,7 +99,6 @@ export function ScoreExplanationPanel({
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
-        aria-label={t("aria.toggleScoreExplanation") as string}
         onClick={toggle}
         className="flex w-full cursor-pointer items-center justify-between gap-4 p-4 text-left sm:p-5"
       >

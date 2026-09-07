@@ -412,7 +412,7 @@ describe("DimensionCard", () => {
 
     const toggleButton = container.querySelector("button[aria-expanded]") as HTMLButtonElement;
     expect(toggleButton).not.toBeNull();
-    expect(toggleButton!.getAttribute("aria-label")).toBe("Toggle Delivery breakdown");
+    expect(toggleButton!.getAttribute("aria-label")).toMatch(/^Toggle Delivery breakdown: /);
   });
 
   it("toggle button aria-label uses correct dimension name for quality", () => {
@@ -421,7 +421,7 @@ describe("DimensionCard", () => {
     );
 
     const toggleButton = container.querySelector("button[aria-expanded]") as HTMLButtonElement;
-    expect(toggleButton!.getAttribute("aria-label")).toBe("Toggle Quality breakdown");
+    expect(toggleButton!.getAttribute("aria-label")).toMatch(/^Toggle Quality breakdown: /);
   });
 
   // ----------------------------------------------------------------

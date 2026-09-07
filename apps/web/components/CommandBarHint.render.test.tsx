@@ -49,6 +49,13 @@ describe("CommandBarHint — progressive disclosure", () => {
     expect(chip.getAttribute("aria-label")).toBeTruthy();
   });
 
+  it("the accessible name contains the visible text (WCAG 2.5.3, Lighthouse label-content-name-mismatch)", () => {
+    render(<CommandBarHint />);
+    const chip = screen.getByTestId("command-bar-hint");
+    const visible = chip.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    expect(chip.getAttribute("aria-label")?.replace(/\s+/g, " ")).toContain(visible);
+  });
+
   it("keeps the command entry touch-sized and uses the shared visible focus outline", () => {
     render(<CommandBarHint />);
     const chip = screen.getByTestId("command-bar-hint");

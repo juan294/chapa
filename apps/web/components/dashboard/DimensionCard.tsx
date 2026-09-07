@@ -190,7 +190,9 @@ export function DimensionCard({
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
-        aria-label={interpolate(t('aria.toggleBreakdown') as string, { label })}
+        // WCAG 2.5.3: the visible subtitle must be part of the accessible
+        // name, so a voice-control user can say what they see (LE-8-3).
+        aria-label={`${interpolate(t('aria.toggleBreakdown') as string, { label })}: ${subtitle}`}
         onClick={toggle}
         onKeyDown={handleKeyDown}
         className="flex w-full cursor-pointer items-center justify-between p-4 pt-3 text-left"

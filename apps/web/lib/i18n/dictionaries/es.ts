@@ -57,7 +57,6 @@ export const es: Translations = {
     contributionOnDate: '{count} contribución(es) el {date}',
     keyStatistics: 'Estadísticas clave',
     toggleBreakdown: 'Alternar desglose de {label}',
-    toggleScoreExplanation: 'Alternar cómo se calcula tu puntuación',
     keyboardShortcuts: 'Atajos de teclado',
     closeKeyboardShortcuts: 'Cerrar atajos de teclado',
     dimensionScore: '{label}: puntuación {score}',
@@ -323,7 +322,7 @@ export const es: Translations = {
   },
   commandHint: {
     label: 'para comandos',
-    ariaLabel: 'Abrir la barra de comandos — o pulsa la tecla /',
+    ariaLabel: '/ para comandos: abrir la barra de comandos, o pulsa la tecla /',
   },
   terminalInput: {
     placeholder: 'Escribe / para ver comandos...',

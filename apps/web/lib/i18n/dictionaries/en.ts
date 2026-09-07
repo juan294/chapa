@@ -63,7 +63,6 @@ export const en: Translations = {
     contributionOnDate: '{count} contribution(s) on {date}',
     keyStatistics: 'Key statistics',
     toggleBreakdown: 'Toggle {label} breakdown',
-    toggleScoreExplanation: 'Toggle how your score is calculated',
     keyboardShortcuts: 'Keyboard shortcuts',
     closeKeyboardShortcuts: 'Close keyboard shortcuts',
     dimensionScore: '{label} dimension score: {score}',
@@ -329,7 +328,7 @@ export const en: Translations = {
   },
   commandHint: {
     label: 'for commands',
-    ariaLabel: 'Open the command bar — or press the / key',
+    ariaLabel: '/ for commands: open the command bar, or press the / key',
   },
   terminalInput: {
     placeholder: 'Type / for commands...',

@@ -86,6 +86,9 @@ export function CommandBarHint({ isAdmin }: { isAdmin?: boolean } = {}) {
           <kbd className="rounded border border-stroke bg-bg/60 px-1.5 py-0.5 font-terminal text-[0.7rem] leading-none text-amber-text group-hover:border-amber-text">
             /
           </kbd>
+          {/* A real space between the key and the label, so the visible text
+              reads "/ for commands" for assistive tech and matches the name. */}
+          {" "}
           <span>{t("commandHint.label") as string}</span>
         </button>
       )}
