@@ -762,6 +762,16 @@ describe("SharePage /u/[handle]", () => {
       expect(mockAfter).not.toHaveBeenCalled();
     });
 
+    it("treats the owner exactly like a visitor: a session for the handle still gets notFound()", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "ghost", token: "gho_x" });
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      await expect(renderPage("ghost")).rejects.toThrow("NOT_FOUND");
+
+      expect(mockNotFound).toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
     it("keeps the try-later state, never notFound(), when materialization is merely unavailable", async () => {
       mockMaterializePublicProfile.mockResolvedValue(null);
 

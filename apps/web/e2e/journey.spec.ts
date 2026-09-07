@@ -89,8 +89,13 @@ test.describe("full impact journey", () => {
         expect(generating).not.toBeNull();
         expect(generating!.status()).toBeLessThan(500);
 
+        // The fixture handle has no GitHub account. The badge route answers
+        // 404 with a localized SVG for a user GitHub does not know (LE-8-2),
+        // or the try-later 200 when the fetch ran under the fixture's fake
+        // session token; either way the body is an SVG and persistence below
+        // is what this journey proves.
         const badge = await page.request.get(`/u/${shape.handle}/badge.svg`);
-        expect(badge.status()).toBe(200);
+        expect([200, 404]).toContain(badge.status());
         expect(badge.headers()["content-type"] ?? "").toContain("image/svg+xml");
         const svg = await badge.text();
         expect(svg).toContain("<svg");
@@ -102,7 +107,7 @@ test.describe("full impact journey", () => {
         // #1191 hotfix (v2.29.2) — the save now awaits invalidation of both
         // cache layers before responding and reports the outcome. This fixture
         // seeds a synthetic handle that does not exist on GitHub, so a live
-        // badge re-render always falls back to the "could not load data" SVG
+        // badge re-render answers 404 (or the "could not load data" SVG)
         // (`json.data.user` is null for an unknown login regardless of token —
         // see lib/github/queries.ts) — the config-marker content itself can't
         // be asserted through this fixture. What IS provable end-to-end,
@@ -116,7 +121,7 @@ test.describe("full impact journey", () => {
         const afterSave = await page.request.get(
           `/u/${shape.handle}/badge.svg?after-save=${Date.now()}`,
         );
-        expect(afterSave.status()).toBe(200);
+        expect([200, 404]).toContain(afterSave.status());
         expect(afterSave.headers()["content-type"] ?? "").toContain("image/svg+xml");
 
         const share = await page.goto(`/u/${shape.handle}`, {
@@ -125,7 +130,13 @@ test.describe("full impact journey", () => {
         expect(share).not.toBeNull();
         expect(share!.status()).toBeLessThan(500);
         await expect(page.locator("body")).toContainText(shape.handle);
-        await expect(page.locator("body")).toContainText(/Markdown|HTML/);
+        // LE-8-2 — the fixture handle has no GitHub account, so the honest
+        // share page is the not-found state (streamed, so still HTTP 200),
+        // for the owner exactly as for a visitor. A handle GitHub knows
+        // renders the profile with its embed snippets instead.
+        await expect(page.locator("body")).toContainText(
+          /Page not found|Página no encontrada|Markdown|HTML/,
+        );
 
         await context.setOffline(true);
         const offlineResult = await saveStudioConfigInBrowser(page, {
@@ -533,7 +544,11 @@ function encryptedSessionValue(handle: string): string {
   const payload = JSON.stringify({
     login: handle,
     name: handle,
-    avatar_url: "https://example.com/avatar.png",
+    // A host `next.config.ts` allows for next/image. In dev the loader throws
+    // on any other host, and that throw in the navbar's UserMenu replaced
+    // every owner page with the error boundary once the client re-rendered
+    // it (LE-8-2 made this visible: a streamed not-found is client-rendered).
+    avatar_url: "https://avatars.githubusercontent.com/u/583231?v=4",
     token: "ghp_e2e_fixture",
     iat: Math.floor(Date.now() / 1000),
   });

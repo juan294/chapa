@@ -905,6 +905,20 @@ describe("fetchContributionData", () => {
       consoleSpy.mockRestore();
     });
 
+    it("still returns null, never the sentinel, when the token is rejected with HTTP 401", async () => {
+      // A bad or expired session token is GitHub refusing to answer, not
+      // GitHub saying the handle is nobody's. The badge route falls back to
+      // its 200 try-later SVG on null; a 404 here would 404 a real user.
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: false, status: 401, text: () => Promise.resolve("Bad credentials") }),
+      );
+
+      expect(await fetchContributionData("ghost", "ghp_e2e_fixture")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
     it("still returns null when the user key is absent rather than null", async () => {
       stubGraphql({ data: {} });
 
