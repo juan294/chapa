@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found";
 import { makeFullStats, makeImpact, makeSnapshot } from "../test-helpers/fixtures";
 import type { MaterializedProfile } from "./materialize-profile";
 import { legacyViewModel } from "./score-view-model";
@@ -133,6 +134,12 @@ function makeMaterializedProfile(): MaterializedProfile {
 describe("materializePublicProfile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("LE-8-2: passes the not-found sentinel through to the public surfaces", async () => {
+    mockMaterializeProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+    expect(isGitHubUserNotFound(await materializePublicProfile("ghost"))).toBe(true);
   });
 
   it("delegates to the shared materializer with the public display policy", async () => {

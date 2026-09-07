@@ -581,6 +581,7 @@ export const en: Translations = {
     sampleDisclosure: 'SAMPLE · NOT A REAL BADGE · FOR ILLUSTRATION ONLY',
     invalidHandle: 'Invalid GitHub handle.',
     loadError: 'Could not load data. Try again later.',
+    userNotFound: 'No GitHub user with this handle.',
     renderError: 'Something went wrong. Try again later.',
     tagline: 'Developer Impact Badge',
   },

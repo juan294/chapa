@@ -12,10 +12,12 @@ import { createSourceContext } from "@/lib/platform/source-context";
 import { readSourceAuthorization, sameSourceAuthorization } from "@/lib/platform/source-authorization";
 import { refreshSourceLink } from "@/lib/platform/source-refresh";
 import { withTimeout } from "@/lib/async/with-timeout";
-import { statsCacheBinding, readCachedStats, writeCachedStats } from "@/lib/cache/stats-cache";
+import { statsCacheBinding, readCachedStats, writeCachedStats, readStatsNotFound, writeStatsNotFound } from "@/lib/cache/stats-cache";
+import { githubUserNotFound, isGitHubUserNotFound, type GitHubUserNotFound } from "./not-found";
 export { selectSourceEvidence } from "@/lib/platform/source-collectors";
 
-const inflight = new Map<string, Promise<StatsData | null>>();
+type StatsOutcome = StatsData | GitHubUserNotFound | null;
+const inflight = new Map<string, Promise<StatsOutcome>>();
 export function _resetInflight(): void { inflight.clear(); }
 interface StatsOverlays {
   bitbucket: StatsData | null; codeberg: StatsData | null; gitlab: StatsData | null;
@@ -30,8 +32,14 @@ const platforms = ["bitbucket", "codeberg", "gitlab"] as const;
  * and gets an honest miss otherwise: it never fetches, writes, refreshes a
  * grant, or joins the in-flight map. Scalars never become v7 source
  * observations.
+ *
+ * LE-8-2 — a handle GitHub says nobody owns comes back as the
+ * `GitHubUserNotFound` sentinel rather than `null`. It is never written under
+ * `stats:v3:` (that key holds stats only); a short `stats:notfound:` marker
+ * spares GitHub the repeat hits, and reading it is a read, so the read-only
+ * path sees it too. Every other failure is still `null`.
  */
-export async function getStats(handle: string, token?: string, options: { readOnly?: boolean; referenceTime?: string } = {}): Promise<StatsData | null> {
+export async function getStats(handle: string, token?: string, options: { readOnly?: boolean; referenceTime?: string } = {}): Promise<StatsOutcome> {
   try {
     const owner = handle.toLowerCase();
     const effectiveToken = token ?? getGithubToken();
@@ -62,7 +70,8 @@ export async function getStats(handle: string, token?: string, options: { readOn
       // nothing else. Not through `inflight`: a read-only entry there would
       // hand a live caller a miss without the fetch it came for.
       const cached = binding ? await readCachedStats(owner, binding, window.referenceDate) : null;
-      return cached && await current() ? structuredClone(cached) : null;
+      if (cached) return await current() ? structuredClone(cached) : null;
+      return await readStatsNotFound(owner) ? githubUserNotFound(owner) : null;
     }
     const key = binding ?? context.selectionId + ":" + links;
     let work = inflight.get(key);
@@ -73,7 +82,9 @@ export async function getStats(handle: string, token?: string, options: { readOn
         // that the grant is still in force.
         const cached = binding ? await readCachedStats(owner, binding, window.referenceDate) : null;
         if (cached) return cached;
+        if (await readStatsNotFound(owner)) return githubUserNotFound(owner);
         const primary = await context.collect(captured => fetchStats(owner, undefined, { resolvedCredential: { token: captured || null }, referenceTime: window.referenceTime }));
+        if (isGitHubUserNotFound(primary)) { await writeStatsNotFound(owner); return primary; }
         if (!primary || !await current()) return null;
         const fetchers = [fetchBitbucketIfLinked, fetchCodebergIfLinked, fetchGitlabIfLinked];
         const linked = await Promise.all(fetchers.map((fetcher, i) => initial[i]!.status === "authorized" ? fetcher!(owner, owner) : null));
@@ -93,6 +104,7 @@ export async function getStats(handle: string, token?: string, options: { readOn
       void work.finally(() => { if (inflight.get(key) === work) inflight.delete(key); }).catch(() => undefined);
     }
     const result = await work;
+    if (isGitHubUserNotFound(result)) return result;
     return result && await current() ? structuredClone(result) : null;
   } catch { return null; }
 }

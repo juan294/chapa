@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fetchContributionData } from "./queries";
+import { githubUserNotFound, isGitHubUserNotFound } from "./not-found";
+import { expectFound } from "@/lib/test-helpers/found";
 import { _setRetryDelayFn } from "@/lib/utils/fetch-retry";
 
 describe("fetchContributionData", () => {
@@ -279,9 +281,8 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.mergedPrTotalCount).toBe(904);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.mergedPrTotalCount).toBe(904);
   });
 
   it("defaults mergedPrTotalCount to 0 when search is missing from the response", async () => {
@@ -309,9 +310,8 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.mergedPrTotalCount).toBe(0);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.mergedPrTotalCount).toBe(0);
   });
 
   it("does not throw when pullRequestContributions is null (optional-chained, defaults to empty sample)", async () => {
@@ -340,12 +340,11 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.pullRequests).toEqual({ totalCount: 0, nodes: [] });
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.pullRequests).toEqual({ totalCount: 0, nodes: [] });
     // The authoritative count still comes through — this is exactly the shape
     // assessRawFetchIntegrity (stats-integrity.ts) rejects downstream.
-    expect(result!.mergedPrTotalCount).toBe(904);
+    expect(result.mergedPrTotalCount).toBe(904);
   });
 
   it("skips PR contribution nodes where pullRequest is null", async () => {
@@ -381,13 +380,11 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-
-    expect(result).not.toBeNull();
+    const result = expectFound(await fetchContributionData("testuser", "token"));
     // Should have 2 nodes (the null one filtered out)
-    expect(result!.pullRequests.nodes).toHaveLength(2);
-    expect(result!.pullRequests.nodes[0]!.additions).toBe(10);
-    expect(result!.pullRequests.nodes[1]!.additions).toBe(5);
+    expect(result.pullRequests.nodes).toHaveLength(2);
+    expect(result.pullRequests.nodes[0]!.additions).toBe(10);
+    expect(result.pullRequests.nodes[1]!.additions).toBe(5);
   });
 
   it("passes an AbortSignal with timeout to fetch", async () => {
@@ -469,11 +466,10 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.ownedRepoStars.nodes).toHaveLength(2);
-    expect(result!.ownedRepoStars.nodes[0]!.stargazerCount).toBe(50);
-    expect(result!.ownedRepoStars.nodes[1]!.stargazerCount).toBe(30);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.ownedRepoStars.nodes).toHaveLength(2);
+    expect(result.ownedRepoStars.nodes[0]!.stargazerCount).toBe(50);
+    expect(result.ownedRepoStars.nodes[1]!.stargazerCount).toBe(30);
   });
 
   it("handles missing ownedRepos gracefully", async () => {
@@ -501,9 +497,8 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.ownedRepoStars.nodes).toEqual([]);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.ownedRepoStars.nodes).toEqual([]);
   });
 
   it("handles unreadable error body on HTTP failure", async () => {
@@ -618,8 +613,7 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
+    expectFound(await fetchContributionData("testuser", "token"));
     expect(callCount).toBeGreaterThanOrEqual(2);
   });
 
@@ -835,12 +829,86 @@ describe("fetchContributionData", () => {
         }),
       );
 
-      const result = await fetchContributionData("testuser", "token");
-
       // Non-blocking error — should still return data
-      expect(result).not.toBeNull();
-      expect(result!.login).toBe("testuser");
+      const result = expectFound(await fetchContributionData("testuser", "token"));
+      expect(result.login).toBe("testuser");
       consoleSpy.mockRestore();
+    });
+  });
+
+  // LE-8-2 — the one answer that must not collapse into the same `null` as an
+  // outage: GitHub responded, and the handle is nobody's.
+  describe("a handle GitHub does not know (LE-8-2)", () => {
+    function stubGraphql(body: unknown) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) }),
+      );
+    }
+    const nullUser = { user: null, search: { issueCount: 0 } };
+
+    it("returns the not-found sentinel when data.user is null beside GitHub's NOT_FOUND error", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({
+        data: nullUser,
+        errors: [
+          {
+            type: "NOT_FOUND",
+            path: ["user"],
+            locations: [{ line: 2, column: 3 }],
+            message: "Could not resolve to a User with the login of 'ghost'.",
+          },
+        ],
+      });
+
+      const result = await fetchContributionData("ghost", "token");
+
+      expect(result).toEqual(githubUserNotFound("ghost"));
+      consoleSpy.mockRestore();
+    });
+
+    it("returns the sentinel when data.user is null and there are no errors at all", async () => {
+      stubGraphql({ data: nullUser });
+
+      expect(isGitHubUserNotFound(await fetchContributionData("ghost", "token"))).toBe(true);
+    });
+
+    it("recognizes NOT_FOUND carried in extensions.type as well", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ data: nullUser, errors: [{ message: "no such user", extensions: { type: "NOT_FOUND" } }] });
+
+      expect(isGitHubUserNotFound(await fetchContributionData("ghost", "token"))).toBe(true);
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null when data.user is null beside an error that is not NOT_FOUND", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ data: nullUser, errors: [{ message: "Something went wrong while executing your query." }] });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null for RATE_LIMITED even when data.user is null", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ data: nullUser, errors: [{ message: "rate limited", extensions: { type: "RATE_LIMITED" } }] });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null when the payload carries no data object at all", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ errors: [{ type: "NOT_FOUND", message: "no such user" }] });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null when the user key is absent rather than null", async () => {
+      stubGraphql({ data: {} });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
     });
   });
 });

@@ -1,4 +1,5 @@
 import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
+import type { GitHubUserNotFound } from "@/lib/github/not-found";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { cacheDel, cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
@@ -44,7 +45,7 @@ export function redactImpactForVisitor(
 export async function materializePublicProfile(
   handle: string,
   options: { token?: string; today?: string; readOnly?: boolean } = {},
-): Promise<MaterializedProfile | null> {
+): Promise<MaterializedProfile | GitHubUserNotFound | null> {
   return materializeProfile(handle, {
     token: options.token,
     today: options.today,

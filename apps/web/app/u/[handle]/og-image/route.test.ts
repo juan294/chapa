@@ -74,6 +74,7 @@ vi.mock("@/lib/render/badge-config", () => ({
 }));
 
 import { GET } from "./route";
+import { githubUserNotFound } from "@/lib/github/not-found";
 
 const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
 const FAKE_PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -260,6 +261,16 @@ describe("GET /u/[handle]/og-image", () => {
     const res = await GET(req, ctx);
 
     expect(res.status).toBe(400);
+  });
+
+  it("LE-8-2: returns 404 without rendering when GitHub does not know the handle", async () => {
+    mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+    const [req, ctx] = makeRequest("ghost");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(404);
+    expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
   });
 
   it("returns 404 when public materialization returns null", async () => {

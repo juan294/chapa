@@ -3,6 +3,7 @@ import { buildStatsFromRaw } from "@chapa/shared";
 import { captureServerEvent } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { fetchContributionData, type LegacyFetchContext } from "./queries";
+import { isGitHubUserNotFound, type GitHubUserNotFound } from "./not-found";
 import { assessRawFetchIntegrity } from "./stats-integrity";
 
 // v7 consumers receive dated evidence; fetchStats below remains the explicit v6 reader.
@@ -17,8 +18,10 @@ export async function fetchStats(
   handle: string,
   token?: string,
   context?: LegacyFetchContext,
-): Promise<StatsData | null> {
+): Promise<StatsData | GitHubUserNotFound | null> {
   const raw = context ? await fetchContributionData(handle, token, context) : await fetchContributionData(handle, token);
+  // LE-8-2 — nothing to validate or score: GitHub said the handle is nobody's.
+  if (isGitHubUserNotFound(raw)) return raw;
   if (!raw) return null;
 
   // Structural validation only: legacy samples do not establish v7 coverage.

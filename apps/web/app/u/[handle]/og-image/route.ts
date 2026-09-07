@@ -20,6 +20,7 @@ import { captureServerError } from "@/lib/analytics/server-errors";
 import {
   materializePublicProfile,
 } from "@/lib/profile/public-profile";
+import { isGitHubUserNotFound } from "@/lib/github/not-found";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 
 const OG_CACHE_TTL = 172800; // 48 hours
@@ -130,6 +131,10 @@ export async function GET(
 
   try {
     const materialized = await materializePublicProfile(handle);
+    // LE-8-2 — GitHub says nobody owns the handle; distinct body, same status.
+    if (isGitHubUserNotFound(materialized)) {
+      return new NextResponse("No GitHub user with this handle", { status: 404 });
+    }
     if (!materialized) {
       return new NextResponse("Could not load data", { status: 404 });
     }

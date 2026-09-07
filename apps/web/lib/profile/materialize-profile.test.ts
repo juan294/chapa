@@ -7,6 +7,8 @@ import {
   materializeImpactState,
   materializeProfile,
 } from "./materialize-profile";
+import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found";
+import { expectFound } from "@/lib/test-helpers/found";
 
 const mockGetStats = vi.fn();
 const mockGetCachedCraftScore = vi.fn();
@@ -364,9 +366,7 @@ describe("materializeProfile", () => {
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(null);
 
-    const result = await materializeProfile("testuser");
-
-    expect(result).toBeNull();
+    expect(await materializeProfile("testuser")).toBeNull();
   });
 
   it("always reads craft from the cache (no live recomputation on read paths)", async () => {
@@ -381,10 +381,10 @@ describe("materializeProfile", () => {
     mockGetCachedCraftScore.mockResolvedValue(craftResult);
     mockGetCachedLatestSnapshot.mockResolvedValue(latestSnapshot);
 
-    const result = await materializeProfile("testuser", {
+    const result = expectFound(await materializeProfile("testuser", {
       token: "oauth-token",
       today: "2026-04-17",
-    });
+    }));
 
     expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token", {
       readOnly: undefined,
@@ -416,7 +416,7 @@ describe("materializeProfile", () => {
     mockGetCachedCraftScore.mockRejectedValue(new Error("craft cache down"));
     mockGetCachedLatestSnapshot.mockRejectedValue(new Error("snapshot cache down"));
 
-    const result = await materializeProfile("testuser");
+    const result = expectFound(await materializeProfile("testuser"));
 
     expect(result).not.toBeNull();
     expect(result?.craftResult).toBeNull();
@@ -436,10 +436,10 @@ describe("materializeProfile", () => {
     mockGetCachedLatestSnapshot.mockResolvedValue(badSameDaySnapshot);
     mockIsStatsDirty.mockResolvedValue(false);
 
-    const result = await materializeProfile("testuser", {
+    const result = expectFound(await materializeProfile("testuser", {
       today: "2026-04-17",
       ignoreSnapshot: true,
-    });
+    }));
 
     expect(result).not.toBeNull();
     // Raw score passes through — same-day lock never consulted.
@@ -470,9 +470,9 @@ describe("materializeProfile", () => {
       inputsChanged: true,
     });
 
-    const result = await materializeProfile("testuser", {
+    const result = expectFound(await materializeProfile("testuser", {
       today: "2026-04-17",
-    });
+    }));
 
     expect(mockIsStatsDirty).toHaveBeenCalledWith("testuser");
     expect(result?.inputsChanged).toBe(true);
@@ -484,5 +484,32 @@ describe("materializeProfile", () => {
     expect(result?.snapshot.adjustedComposite).toBe(
       expected.snapshot.adjustedComposite,
     );
+  });
+});
+
+// LE-8-2 — the stats loader distinguishes "GitHub says nobody owns this
+// handle" from "could not load". The public materializer must carry that
+// through rather than fold it into the same null an outage produces.
+describe("a handle GitHub does not know (LE-8-2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetStats.mockResolvedValue(githubUserNotFound("ghost"));
+    mockGetCachedCraftScore.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
+    mockIsStatsDirty.mockResolvedValue(false);
+  });
+
+  it("materializeProfile returns the sentinel, not null", async () => {
+    expect(isGitHubUserNotFound(await materializeProfile("ghost"))).toBe(true);
+  });
+
+  it("materializeProfile still returns null when stats are merely unavailable", async () => {
+    mockGetStats.mockResolvedValue(null);
+
+    expect(await materializeProfile("ghost")).toBeNull();
+  });
+
+  it("materializeDisplayProfile keeps its null contract for the owner and read-only callers", async () => {
+    expect(await materializeDisplayProfile("ghost", { readOnly: true })).toBeNull();
   });
 });

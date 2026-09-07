@@ -39,6 +39,7 @@ import {
 } from "@/lib/profile/public-profile";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import type { MaterializedProfile } from "@/lib/profile/materialize-profile";
+import { isGitHubUserNotFound, type GitHubUserNotFound } from "@/lib/github/not-found";
 import {
   formatServerTiming,
   type ServerTimingEntry,
@@ -388,12 +389,12 @@ async function finalizeMaterializedBadge(
  */
 async function warmBadgeCacheInBackground(
   handle: string,
-  materializePromise: Promise<MaterializedProfile | null>,
+  materializePromise: Promise<MaterializedProfile | GitHubUserNotFound | null>,
   options: { readOnly: boolean; svgCacheKey: string; locale: Locale },
 ): Promise<void> {
   try {
     const materialized = await materializePromise;
-    if (!materialized) return;
+    if (!materialized || isGitHubUserNotFound(materialized)) return;
     // #1166 (PE-H2) — `options` never sets `deferCacheWrite`, so this AWAITS
     // the SVG cache write inline (the default). This call has no response to
     // race — cache warming is its entire purpose — so the write must not be
@@ -597,7 +598,7 @@ export async function GET(
       readOnly,
     });
     const staleSvgForDeadlineFallback = staleSvgLookup ? await staleSvgLookup : null;
-    let materialized: MaterializedProfile | null;
+    let materialized: MaterializedProfile | GitHubUserNotFound | null;
 
     if (staleSvgForDeadlineFallback) {
       // #1086 (PE-H1) — bound the wait for materialize to roughly the SLO
@@ -653,6 +654,30 @@ export async function GET(
     }
 
     const materializeMs = Date.now() - materializeStart;
+    if (isGitHubUserNotFound(materialized)) {
+      // LE-8-2 — GitHub answered that nobody owns this handle. Nothing has
+      // streamed yet, so this route can say so with the status. Short edge
+      // TTL under the handle's own purge tag: camo retries stay off the
+      // origin, and a handle claimed later is not pinned to a 404. The
+      // `null` branch below is untouched — an outage keeps the 200 fallback.
+      const notFoundResult = {
+        svg: localizedFallbackSvg(handle, locale, "badge.userNotFound"),
+        status: 404,
+        headers: badgeCacheHeaders(
+          handle,
+          "public, s-maxage=300, stale-while-revalidate=600",
+          DEGRADED_CLIENT_POLICY,
+        ),
+      } satisfies BadgeRenderResult;
+      deferred.resolve(notFoundResult);
+      return badgeSvgResponse(
+        notFoundResult.svg,
+        notFoundResult.headers,
+        startedAt,
+        [...cacheTimeoutMetric, { name: "materialize", desc: "not-found", durMs: materializeMs }],
+        notFoundResult.status,
+      );
+    }
     if (!materialized) {
       const fallbackResult = {
         svg: localizedFallbackSvg(handle, locale, "badge.loadError"),

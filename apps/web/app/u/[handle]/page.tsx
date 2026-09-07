@@ -35,6 +35,7 @@ import {
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
+import { isGitHubUserNotFound } from "@/lib/github/not-found";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
@@ -139,6 +140,15 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const t = getServerT(locale);
   const errorMessage = getOAuthErrorMessage(errorCode, (key) => t(key) as string);
 
+  // Every notFound() on this route is a soft 404 (LE-8-2): the root
+  // `app/loading.tsx` and this route's own `loading.tsx` each wrap the page
+  // in a Suspense boundary, so Next has committed the response to 200 before
+  // this function runs. Next renders
+  // the not-found UI into the stream and injects
+  // `<meta name="robots" content="noindex">`, which is the documented
+  // behaviour for a streamed not-found. A real 404 status would need the
+  // check to run before the shell — in `proxy.ts`, which the i18n carve-out
+  // ADR deliberately keeps away from `/u/*`, or without that root boundary.
   if (!isValidHandle(handle)) {
     notFound();
   }
@@ -220,13 +230,20 @@ export async function SharePageContent({
   // served an English badge).
   const badgeLocale = resolveBadgeLocale(locale);
   const svgCacheKey = badgeLocale.cacheKey(handle, today);
-  const [session, materialized, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
+  const [session, materialization, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
     materializePublicProfile(handle, { readOnly }),
     getTrendData(handle).catch(() => ({ trend: null, diff: null })),
     isWebmcpEnabled(),
     readBadgeSvgCache(svgCacheKey),
   ]);
+  // LE-8-2 — GitHub answered that nobody owns this handle. Not the empty
+  // "try later" state, which is reserved for `null` (an outage or a rate
+  // limit must never 404 a real user): Next's mid-stream not-found, with the
+  // not-found UI and an injected noindex — see the shell note on SharePage
+  // for why the status itself is already 200 here.
+  if (isGitHubUserNotFound(materialization)) notFound();
+  const materialized = materialization;
   const isOwner = session?.login === handle;
   const stats = materialized?.stats ?? null;
   // `impact` stays the FULL, unredacted result — it feeds renderBadgeSvg and
@@ -467,9 +484,14 @@ export async function SharePageContent({
               {inlineSvg ? (
                 <InlineBadgeSvg svg={inlineSvg} />
               ) : (
-                /* Fallback: if SVG render failed, load via <img> with skeleton */
+                /* Fallback: if SVG render failed, load via <img> with the
+                   loading plate layered BEHIND it (LE-5-1). The plate is out
+                   of flow so the frame is one badge-shaped box, not two
+                   stacked; the positioned image paints over it once loaded. */
                 <div className="relative">
-                  <BadgeSkeleton />
+                  <div aria-hidden="true" className="absolute inset-0">
+                    <BadgeSkeleton />
+                  </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={badgeImageSrc}
@@ -478,7 +500,7 @@ export async function SharePageContent({
                     width={1200}
                     height={630}
                     fetchPriority="high"
-                    className="w-full relative"
+                    className="relative w-full"
                   />
                 </div>
               )}

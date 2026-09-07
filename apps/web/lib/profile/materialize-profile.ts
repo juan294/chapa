@@ -13,6 +13,7 @@ import { computeImpactV6 } from "@/lib/impact/v6";
 import { readRenderableReceipt, scoreModelFrom } from "./score-model";
 import type { ScoreViewModel } from "./score-view-model";
 import { getStats } from "@/lib/github/client";
+import { isGitHubUserNotFound, type GitHubUserNotFound } from "@/lib/github/not-found";
 import { isValidLegacyStats } from "@/lib/github/stats-integrity";
 
 export interface MaterializeImpactStateOptions {
@@ -104,13 +105,15 @@ async function loadDisplayInputs(
   handle: string,
   token: string | undefined,
   readOnly: boolean | undefined,
-): Promise<DisplayInputs | null> {
+): Promise<DisplayInputs | GitHubUserNotFound | null> {
   const [statsSettled, craftSettled] = await Promise.allSettled([
     getStats(handle, token, { readOnly }),
     getCachedCraftScore(handle),
   ]);
 
   const stats = statsSettled.status === "fulfilled" ? statsSettled.value : null;
+  // LE-8-2 — carried, not folded into the `null` an outage produces.
+  if (isGitHubUserNotFound(stats)) return stats;
   if (!stats) return null;
 
   return {
@@ -166,6 +169,11 @@ export function materializeImpactState(
  * through as `true` for a public, unauthenticated caller (#1180 PE-L2) —
  * otherwise a cold-key read-only caller could trigger a live GitHub fetch,
  * which #1083 specifically forbids for that class of caller.
+ *
+ * A handle GitHub does not know is `null` here (LE-8-2): the owner's Studio,
+ * the read-only profile API, the MCP tools and the leaderboard all treat an
+ * unloadable subject the same way, and none of them is a 404 surface. The
+ * public surfaces go through `materializeProfile`, which carries the sentinel.
  */
 export async function materializeDisplayProfile(
   handle: string,
@@ -175,7 +183,7 @@ export async function materializeDisplayProfile(
     loadDisplayInputs(handle, options.token, options.readOnly ?? false),
     readRenderableReceipt(handle),
   ]);
-  if (!inputs) return null;
+  if (!inputs || isGitHubUserNotFound(inputs)) return null;
 
   const displayState = materializeDisplayState(inputs.stats, inputs.craftResult);
   return {
@@ -185,10 +193,16 @@ export async function materializeDisplayProfile(
   };
 }
 
+/**
+ * Resolves to the `GitHubUserNotFound` sentinel when GitHub answered that
+ * nobody owns the handle (LE-8-2), so the share page, badge and OG routes can
+ * say so. `null` still means "could not load" — an outage, a rate limit, a
+ * rejected fetch — and must keep every consumer's "try later" state.
+ */
 export async function materializeProfile(
   handle: string,
   options: MaterializeProfileOptions = {},
-): Promise<MaterializedProfile | null> {
+): Promise<MaterializedProfile | GitHubUserNotFound | null> {
   // #800 — getStats and the three cache lookups all only need the handle, so
   // they run concurrently. On cache miss for stats, GitHub's GraphQL still
   // dominates; on cache hit, this saves a round-trip vs the previous serial
@@ -212,6 +226,7 @@ export async function materializeProfile(
     displayInputsSettled.status === "fulfilled"
       ? displayInputsSettled.value
       : null;
+  if (isGitHubUserNotFound(displayInputs)) return displayInputs;
   if (!displayInputs) {
     return null;
   }

@@ -8,6 +8,7 @@ import { getServiceClient } from "@/test/contract/invoke";
 import { redisFake } from "@/test/contract/redis-fake";
 import { stubLegacyGitHub } from "@/test/contract/github-fixture";
 import { makeFullStats } from "@/lib/test-helpers/fixtures";
+import { expectFound } from "@/lib/test-helpers/found";
 
 // Real legacy collection/materialization/persistence; only GitHub HTTP is
 // synthetic. Local Supabase requests use the original fetch implementation.
@@ -59,12 +60,12 @@ describe("source integrity through actual legacy collection and local persistenc
   });
   it.each([0, 1])("persists an actually fetched valid legacy PR count of %i", async prsMergedCount => {
     const handle = `contract-valid-pr-${prsMergedCount}`; stubLegacyGitHub(handle, prsMergedCount);
-    const materialized = await materializeProfile(handle);
-    expect(materialized).not.toBeNull(); expect(materialized!.statsComplete).toBe(true);
-    expect(await persistProfileSnapshot(handle, materialized!)).toBe(true);
+    const materialized = expectFound(await materializeProfile(handle));
+    expect(materialized.statsComplete).toBe(true);
+    expect(await persistProfileSnapshot(handle, materialized)).toBe(true);
     expect(await dbGetLatestSnapshot(handle)).toMatchObject({ prsMergedCount, prsMergedWeight: 0 });
     // This remains explicitly legacy verification; it cannot mint a v7 receipt.
-    const verification = getPublicProfileVerification(materialized!);
+    const verification = getPublicProfileVerification(materialized);
     expect(verification).not.toBeNull(); expect(verification!.hash.startsWith("v7.")).toBe(false);
   });
   it("never turns a malformed unbound hot-cache row into a snapshot on a read-only call", async () => {

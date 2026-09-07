@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fetchStats } from "./stats";
 import * as queries from "./queries";
+import { githubUserNotFound, isGitHubUserNotFound } from "./not-found";
+import { expectFound } from "@/lib/test-helpers/found";
 import * as serverErrors from "@/lib/analytics/server-errors";
 
 vi.mock("./queries");
@@ -86,18 +88,17 @@ describe("fetchStats", () => {
   it("transforms raw data into StatsData shape", async () => {
     mockedQueries.fetchContributionData.mockResolvedValue(makeContribData());
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats).not.toBeNull();
-    expect(stats!.handle).toBe("test-user");
-    expect(stats!.commitsTotal).toBeGreaterThanOrEqual(0);
-    expect(stats!.activeDays).toBeGreaterThanOrEqual(0);
-    expect(stats!.activeDays).toBeLessThanOrEqual(91);
-    expect(stats!.prsMergedCount).toBe(3);
-    expect(stats!.reviewsSubmittedCount).toBe(15);
-    expect(stats!.issuesClosedCount).toBe(5);
-    expect(stats!.reposContributed).toBe(4);
-    expect(stats!.heatmapData).toHaveLength(91);
-    expect(stats!.fetchedAt).toBeTruthy();
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.handle).toBe("test-user");
+    expect(stats.commitsTotal).toBeGreaterThanOrEqual(0);
+    expect(stats.activeDays).toBeGreaterThanOrEqual(0);
+    expect(stats.activeDays).toBeLessThanOrEqual(91);
+    expect(stats.prsMergedCount).toBe(3);
+    expect(stats.reviewsSubmittedCount).toBe(15);
+    expect(stats.issuesClosedCount).toBe(5);
+    expect(stats.reposContributed).toBe(4);
+    expect(stats.heatmapData).toHaveLength(91);
+    expect(stats.fetchedAt).toBeTruthy();
   });
 
   it("computes PR weight with log formula, capped at 3.0 per PR", async () => {
@@ -111,9 +112,9 @@ describe("fetchStats", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats("test-user", "gho_token");
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
     // w = 0.5 + 0.25*ln(1+20) + 0.25*ln(1+1500) = 0.5 + 0.76 + 1.83 = 3.09 → capped at 3.0
-    expect(stats!.prsMergedWeight).toBeCloseTo(3.0, 1);
+    expect(stats.prsMergedWeight).toBeCloseTo(3.0, 1);
   });
 
   it("excludes unmerged PRs from weight calculation", async () => {
@@ -129,8 +130,8 @@ describe("fetchStats", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats!.prsMergedCount).toBe(1);
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.prsMergedCount).toBe(1);
   });
 
   it("computes topRepoShare as proportion of top repo commits", async () => {
@@ -145,8 +146,8 @@ describe("fetchStats", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats!.topRepoShare).toBeCloseTo(0.9, 2);
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.topRepoShare).toBeCloseTo(0.9, 2);
   });
 
   it("sets topRepoShare to 0 when no repos", async () => {
@@ -155,8 +156,8 @@ describe("fetchStats", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats!.topRepoShare).toBe(0);
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.topRepoShare).toBe(0);
   });
 
   it("passes displayName and avatarUrl from raw data", async () => {
@@ -164,9 +165,9 @@ describe("fetchStats", () => {
       makeContribData({ name: "Juan García", avatarUrl: "https://avatars.githubusercontent.com/u/42" }),
     );
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats!.displayName).toBe("Juan García");
-    expect(stats!.avatarUrl).toBe("https://avatars.githubusercontent.com/u/42");
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.displayName).toBe("Juan García");
+    expect(stats.avatarUrl).toBe("https://avatars.githubusercontent.com/u/42");
   });
 
   it("sets displayName to undefined when GitHub name is null", async () => {
@@ -174,15 +175,14 @@ describe("fetchStats", () => {
       makeContribData({ name: null }),
     );
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats!.displayName).toBeUndefined();
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.displayName).toBeUndefined();
   });
 
   it("returns null when the query fails", async () => {
     mockedQueries.fetchContributionData.mockResolvedValue(null);
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats).toBeNull();
+    expect(await fetchStats("test-user", "gho_token")).toBeNull();
   });
 
   it("accepts an empty legacy sample without inferring corruption from a separate count", async () => {
@@ -190,7 +190,7 @@ describe("fetchStats", () => {
       mergedPrTotalCount: 904,
       pullRequests: { totalCount: 143, nodes: [] },
     }));
-    const stats = await fetchStats("test-user", "gho_token");
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
     expect(stats).toMatchObject({ prsMergedCount: 904, prsMergedWeight: 0 });
     expect(mockedServerErrors.captureServerEvent).not.toHaveBeenCalled();
   });
@@ -199,10 +199,8 @@ describe("fetchStats", () => {
     const data = makeContribData({ mergedPrTotalCount: 904 });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats("test-user", "gho_token");
-
-    expect(stats).not.toBeNull();
-    expect(stats!.prsMergedCount).toBe(904);
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.prsMergedCount).toBe(904);
     expect(mockedServerErrors.captureServerEvent).not.toHaveBeenCalled();
   });
 
@@ -221,9 +219,7 @@ describe("fetchStats", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats("test-user", "gho_token");
-
-    expect(stats).toBeNull();
+    expect(await fetchStats("test-user", "gho_token")).toBeNull();
     await vi.waitFor(() => {
       expect(mockedServerErrors.captureServerEvent).toHaveBeenCalledWith(
         "stats_fetch_rejected",
@@ -249,7 +245,16 @@ describe("fetchStats", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats("test-user", "gho_token");
-    expect(stats!.activeDays).toBe(10);
+    const stats = expectFound(await fetchStats("test-user", "gho_token"));
+    expect(stats.activeDays).toBe(10);
+  });
+
+  it("LE-8-2: passes the not-found sentinel through untouched, without scoring or telemetry", async () => {
+    mockedQueries.fetchContributionData.mockResolvedValue(githubUserNotFound("ghost"));
+
+    const result = await fetchStats("ghost");
+
+    expect(isGitHubUserNotFound(result)).toBe(true);
+    expect(mockedServerErrors.captureServerEvent).not.toHaveBeenCalled();
   });
 });

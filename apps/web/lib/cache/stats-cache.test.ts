@@ -5,7 +5,12 @@ import {
   statsCacheBinding,
   readCachedStats,
   writeCachedStats,
+  STATS_NOT_FOUND_TTL_SECONDS,
+  buildStatsNotFoundKey,
+  readStatsNotFound,
+  writeStatsNotFound,
 } from "./stats-cache";
+import { githubUserNotFound } from "@/lib/github/not-found";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getNextauthSecret } from "@/lib/env";
 import { makeStats } from "../test-helpers/fixtures";
@@ -94,5 +99,31 @@ describe("writeCachedStats", () => {
     await writeCachedStats("alice", "b1", "2026-09-05", stats);
     vi.mocked(cacheGet).mockResolvedValue(vi.mocked(cacheSet).mock.calls[0]![1]);
     expect(await readCachedStats("alice", "b1", "2026-09-05")).toEqual(stats);
+  });
+});
+
+// LE-8-2 — a handle GitHub has said nobody owns. Kept beside the stats cache
+// because it is the same seam, but never under the stats key: `stats:v3:`
+// holds stats only.
+describe("not-found marker", () => {
+  it("lives under its own key, case-insensitive, with a short TTL", async () => {
+    expect(buildStatsNotFoundKey("Ghost")).toBe("stats:notfound:ghost");
+    expect(buildStatsNotFoundKey("ghost")).not.toBe(buildStatsCacheKey("ghost"));
+
+    await writeStatsNotFound("Ghost");
+
+    expect(cacheSet).toHaveBeenCalledWith("stats:notfound:ghost", expect.objectContaining({ kind: "github_user_not_found" }), STATS_NOT_FOUND_TTL_SECONDS);
+    expect(STATS_NOT_FOUND_TTL_SECONDS).toBeLessThanOrEqual(600);
+  });
+
+  it("reads true only for the sentinel shape, so a stray value cannot 404 a real user", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(githubUserNotFound("ghost"));
+    expect(await readStatsNotFound("ghost")).toBe(true);
+
+    vi.mocked(cacheGet).mockResolvedValue(makeStats());
+    expect(await readStatsNotFound("ghost")).toBe(false);
+
+    vi.mocked(cacheGet).mockResolvedValue(null);
+    expect(await readStatsNotFound("ghost")).toBe(false);
   });
 });

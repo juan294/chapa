@@ -2,9 +2,29 @@ import type { RawContributionData } from "@chapa/shared";
 import { CONTRIBUTION_QUERY, SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { getGithubToken } from "@/lib/env";
 import { fetchWithRetry } from "@/lib/utils/fetch-retry";
+import { githubUserNotFound, type GitHubUserNotFound } from "./not-found";
 
 // Re-export for consumers that import from this module
 export type { RawContributionData };
+
+interface GraphqlError {
+  type?: string;
+  code?: string;
+  extensions?: { type?: string };
+}
+
+/**
+ * LE-8-2 — `user: null` beside GitHub's NOT_FOUND error (or beside no error
+ * at all) is GitHub saying the handle is nobody's. A payload with no `data`,
+ * a `data` without the `user` key, or a null user beside some other error is
+ * an answer that cannot be trusted and stays an ordinary failure.
+ */
+function isUserNotFound(json: { data?: { user?: unknown }; errors?: GraphqlError[] }): boolean {
+  if (!json.data || json.data.user !== null) return false;
+  const errors = json.errors ?? [];
+  if (errors.length === 0) return true;
+  return errors.some((e) => e.type === "NOT_FOUND" || e.extensions?.type === "NOT_FOUND");
+}
 
 // ---------------------------------------------------------------------------
 // Fetch function
@@ -22,8 +42,10 @@ export interface LegacyFetchContext {
  * Queries the last 365 days of contribution activity (commits, PRs, reviews,
  * issues, repositories, contribution calendar). Uses the provided OAuth token
  * if available, otherwise falls back to `GITHUB_TOKEN` env var. Returns the
- * raw `RawContributionData` shape used by the scoring pipeline, or `null` on
- * error (HTTP failure, rate limiting, or missing user).
+ * raw `RawContributionData` shape used by the scoring pipeline, `null` on
+ * error (HTTP failure, rate limiting, an untrusted payload), or the
+ * `GitHubUserNotFound` sentinel when GitHub answered that no such user exists
+ * (LE-8-2) — the one outcome callers may turn into a 404.
  *
  * Timeout: 15 seconds via `AbortSignal.timeout()`.
  */
@@ -31,7 +53,7 @@ export async function fetchContributionData(
   login: string,
   token?: string,
   context: LegacyFetchContext = {},
-): Promise<RawContributionData | null> {
+): Promise<RawContributionData | GitHubUserNotFound | null> {
   const now = context.referenceTime ? new Date(context.referenceTime) : new Date();
   const since = new Date(now);
   since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
@@ -88,7 +110,7 @@ export async function fetchContributionData(
       // GitHub returns partial data alongside these errors, but that partial data
       // has zero stars/forks/watchers which would get cached for 6h and cause
       // score drops. Returning null lets the caller serve stale cache instead.
-      const isBlocking = (json.errors as { extensions?: { type?: string }; code?: string }[]).some(
+      const isBlocking = (json.errors as GraphqlError[]).some(
         (e) =>
           e.extensions?.type === "RATE_LIMITED" ||
           e.extensions?.type === "FORBIDDEN" ||
@@ -98,7 +120,7 @@ export async function fetchContributionData(
       if (isBlocking) return null;
     }
 
-    if (!json.data?.user) return null;
+    if (!json.data?.user) return isUserNotFound(json) ? githubUserNotFound(login) : null;
 
     const user = json.data.user;
     const cc = user.contributionsCollection;

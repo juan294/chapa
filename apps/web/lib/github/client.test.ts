@@ -12,6 +12,8 @@ import { fetchBitbucketIfLinked } from "@/lib/bitbucket/client";
 import { fetchCodebergIfLinked } from "@/lib/codeberg/client";
 import { fetchGitlabIfLinked } from "@/lib/gitlab/client";
 import { makeStats } from "../test-helpers/fixtures";
+import { githubUserNotFound, isGitHubUserNotFound } from "./not-found";
+import { expectFound } from "@/lib/test-helpers/found";
 
 vi.mock("./stats", () => ({ fetchStats: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getGithubToken: vi.fn(), getNextauthSecret: () => "legacy-context-fixture-secret" }));
@@ -56,7 +58,7 @@ describe("read-only callers", () => {
   const readOnly = { ...options, readOnly: true };
   const forbidden = [fetchStats, refreshSourceLink, dbGetSupplemental, cacheSet, dbUpsertUser, ...Object.values(fetchers)];
   async function warmedBy(token: string | undefined): Promise<{ entry: unknown; stats: StatsData }> {
-    const stats = (await getStats("alice", token, options))!;
+    const stats = expectFound(await getStats("alice", token, options));
     const entry = vi.mocked(cacheSet).mock.calls.find(([key]) => key === "stats:v3:alice")![1];
     _resetInflight(); for (const fn of forbidden) vi.mocked(fn).mockClear();
     return { entry, stats };
@@ -102,7 +104,7 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     // binding, so the read must reject it and collect live instead.
     vi.mocked(fetchStats).mockResolvedValue(makeStats({ handle: "alice", prsMergedCount }));
     vi.mocked(cacheGet).mockResolvedValue(makeStats({ prsMergedCount: 999 }));
-    expect((await getStats("alice", undefined, options))!.prsMergedCount).toBe(prsMergedCount);
+    expect(expectFound(await getStats("alice", undefined, options)).prsMergedCount).toBe(prsMergedCount);
     expect(cacheGet).toHaveBeenCalledWith("stats:v3:alice"); expect(dbUpsertUser).not.toHaveBeenCalled();
     expect(cacheSet).toHaveBeenCalledWith("stats:v3:alice", expect.objectContaining({
       binding: expect.any(String), referenceDate: "2026-09-05", stats: expect.objectContaining({ prsMergedCount }),
@@ -133,11 +135,11 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     const overlay = makeStats({ handle: `remote-${platform}`, commitsTotal: 3, prsMergedCount: 0 });
     vi.mocked(fetchStats).mockResolvedValue(primary);
     vi.mocked(fetchers[platform]).mockImplementation(async () => { expect(fetchStats).toHaveBeenCalledTimes(1); return overlay; });
-    const result = await getStats("alice", undefined, options);
-    expect(result!.handle).toBe("alice"); expect(result!.commitsTotal).toBe(5);
-    expect(result!.linkedPlatforms).toEqual([platform]); expect(result!.linkedPlatformLogins).toEqual({ [platform]: `remote-${platform}` });
+    const result = expectFound(await getStats("alice", undefined, options));
+    expect(result.handle).toBe("alice"); expect(result.commitsTotal).toBe(5);
+    expect(result.linkedPlatforms).toEqual([platform]); expect(result.linkedPlatformLogins).toEqual({ [platform]: `remote-${platform}` });
     expect(primary.commitsTotal).toBe(2); expect(overlay.commitsTotal).toBe(3);
-    expect(result!.hasSupplementalData).toBe(false);
+    expect(result.hasSupplementalData).toBe(false);
   });
   it.each(["bitbucket", "codeberg", "gitlab"] as const)("does not silently drop connected inaccessible %s", async platform => {
     vi.mocked(readSourceAuthorization).mockImplementation(async (_owner, provider) => provider === platform ? authorization(platform) : { status: "unlinked" });
@@ -155,8 +157,8 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     const primary = makeStats({ handle: "alice", commitsTotal: 0, prsMergedCount: 0 });
     vi.mocked(fetchStats).mockResolvedValue(primary);
     vi.mocked(dbGetSupplemental).mockResolvedValue({ targetHandle: "alice", sourceHandle: "emu", stats: makeStats({ commitsTotal: 20, prsMergedCount: 0 }), uploadedAt: referenceTime });
-    const result = await getStats("alice", undefined, options);
-    expect(result!.commitsTotal).toBe(20); expect(result!.hasSupplementalData).toBe(true); expect(primary.commitsTotal).toBe(0);
+    const result = expectFound(await getStats("alice", undefined, options));
+    expect(result.commitsTotal).toBe(20); expect(result.hasSupplementalData).toBe(true); expect(primary.commitsTotal).toBe(0);
     // The composed value is what callers receive, so it is what gets cached.
     expect(cacheSet).toHaveBeenCalledWith("stats:v3:alice", expect.objectContaining({
       stats: expect.objectContaining({ commitsTotal: 20, hasSupplementalData: true }),
@@ -167,7 +169,7 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     vi.mocked(fetchStats).mockImplementation(async () => { started.resolve(); return finish.promise; });
     const first = getStats("alice", "pat", options); const second = getStats("ALICE", "pat", options);
     await started.promise; finish.resolve(makeStats({ handle: "alice" }));
-    const [a, b] = await Promise.all([first, second]);
+    const [a, b] = (await Promise.all([first, second])).map(value => expectFound(value));
     expect(fetchStats).toHaveBeenCalledTimes(1); expect(a).toEqual(b); expect(a).not.toBe(b);
     a!.commitsTotal = 1000; expect(b!.commitsTotal).not.toBe(1000);
     await getStats("alice", "pat", options); expect(fetchStats).toHaveBeenCalledTimes(2);
@@ -190,5 +192,62 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     const pending = [getStats("alice", "pat-a", options), getStats("alice", "pat-a", { referenceTime: "2026-09-06T12:00:00.000Z" })];
     await started.promise; finish.resolve(makeStats({ handle: "alice" })); await Promise.all(pending);
     expect(fetchStats).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("a handle GitHub does not know (LE-8-2)", () => {
+  const marker = "stats:notfound:ghost";
+
+  it("returns the sentinel from a live collection and never writes it as stats", async () => {
+    vi.mocked(fetchStats).mockResolvedValue(githubUserNotFound("ghost"));
+
+    const result = await getStats("ghost", undefined, options);
+
+    expect(isGitHubUserNotFound(result)).toBe(true);
+    const writtenKeys = vi.mocked(cacheSet).mock.calls.map(([key]) => key);
+    expect(writtenKeys).not.toContain("stats:v3:ghost");
+    expect(cacheSet).toHaveBeenCalledWith(marker, expect.objectContaining({ kind: "github_user_not_found" }), 300);
+    expect(dbGetSupplemental).not.toHaveBeenCalled();
+    for (const fetcher of Object.values(fetchers)) expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("serves the marker on a stats miss without asking GitHub again", async () => {
+    vi.mocked(cacheGet).mockImplementation(async key => key === marker ? githubUserNotFound("ghost") : null);
+
+    const result = await getStats("ghost", undefined, options);
+
+    expect(isGitHubUserNotFound(result)).toBe(true);
+    expect(fetchStats).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
+  it("lets a bound stats hit win over a stale marker", async () => {
+    vi.mocked(fetchStats).mockResolvedValue(makeStats({ handle: "ghost" }));
+    const stats = expectFound(await getStats("ghost", undefined, options));
+    const entry = vi.mocked(cacheSet).mock.calls.find(([key]) => key === "stats:v3:ghost")![1];
+    _resetInflight(); vi.mocked(fetchStats).mockClear();
+    vi.mocked(cacheGet).mockImplementation(async key => key === marker ? githubUserNotFound("ghost") : entry);
+
+    expect(await getStats("ghost", undefined, options)).toEqual(stats);
+    expect(fetchStats).not.toHaveBeenCalled();
+  });
+
+  it("ignores a value under the marker key that is not the sentinel", async () => {
+    vi.mocked(cacheGet).mockImplementation(async key => key === marker ? { stale: true } : null);
+    vi.mocked(fetchStats).mockResolvedValue(makeStats({ handle: "ghost" }));
+
+    expect(isGitHubUserNotFound(await getStats("ghost", undefined, options))).toBe(false);
+    expect(fetchStats).toHaveBeenCalledTimes(1);
+  });
+
+  it("is visible to a read-only caller as a read, never a fetch or a write", async () => {
+    vi.mocked(cacheGet).mockImplementation(async key => key === marker ? githubUserNotFound("ghost") : null);
+
+    const result = await getStats("ghost", undefined, { ...options, readOnly: true });
+
+    expect(isGitHubUserNotFound(result)).toBe(true);
+    expect(fetchStats).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
+    expect(refreshSourceLink).not.toHaveBeenCalled();
   });
 });

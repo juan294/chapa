@@ -117,6 +117,7 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 import { GET } from "./route";
+import { githubUserNotFound } from "@/lib/github/not-found";
 
 /** Invoke and await every `after()` callback registered so far by the route. */
 async function flushAfterCallbacks(): Promise<void> {
@@ -473,6 +474,83 @@ describe("GET /u/[handle]/badge.svg", () => {
       "public, s-maxage=300, stale-while-revalidate=600",
     );
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+  });
+
+
+  // LE-8-2 — GitHub answered that nobody owns the handle. Unlike the share
+  // page, this route has not streamed anything yet, so it can say so with the
+  // status code. An outage still gets the 200 try-later fallback above: the
+  // README embed of a real user must never turn into a 404 because GitHub
+  // was unavailable.
+  describe("a handle GitHub does not know (LE-8-2)", () => {
+    it("answers 404 with a localized fallback SVG and runs no side effects", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(404);
+      expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+      expect(await res.text()).toContain("No GitHub user with this handle.");
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+      expect(mockCacheSet).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
+    });
+
+    it("caches the 404 briefly at the edge under the handle's purge tag, and only briefly on the client", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+        "public, s-maxage=300, stale-while-revalidate=600",
+      );
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-ghost");
+    });
+
+    it("localizes the not-found SVG from ?lang=", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" }, "?lang=es");
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(404);
+      expect(await res.text()).toContain("No existe ningún usuario de GitHub con este nombre.");
+    });
+
+    it("shares the 404 with a request coalesced onto the same render", async () => {
+      let resolveMaterialized!: () => void;
+      const gate = new Promise<void>((resolve) => { resolveMaterialized = resolve; });
+      mockMaterializePublicProfile.mockImplementation(async () => {
+        await gate;
+        return githubUserNotFound("ghost");
+      });
+
+      const [req1, ctx1] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const [req2, ctx2] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const first = GET(req1, ctx1);
+      const second = GET(req2, ctx2);
+      await Promise.resolve();
+      resolveMaterialized();
+      const [res1, res2] = await Promise.all([first, second]);
+
+      expect(res1.status).toBe(404);
+      expect(res2.status).toBe(404);
+      expect(mockMaterializePublicProfile).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the 200 try-later fallback when materialization is merely unavailable", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("Could not load data.");
+    });
   });
 
   it("captures and returns a 500 fallback when rendering throws", async () => {

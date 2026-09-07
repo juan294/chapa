@@ -9,6 +9,7 @@ import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "./orchestrated-profile";
+import { githubUserNotFound } from "@/lib/github/not-found";
 
 const mockMaterializeProfile = vi.fn();
 const mockDbInsertSnapshot = vi.fn();
@@ -195,5 +196,13 @@ describe("persistOrchestratedSnapshot", () => {
     expect(persisted).toBe(true);
     expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
     expect(mockCaptureServerEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("materializeOrchestratedProfile — a handle GitHub does not know (LE-8-2)", () => {
+  it("collapses the not-found sentinel to null: the refresh, recalculate and warm-cache writers have nothing to persist", async () => {
+    mockMaterializeProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+    expect(await materializeOrchestratedProfile("ghost")).toBeNull();
   });
 });

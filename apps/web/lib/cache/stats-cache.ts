@@ -4,6 +4,7 @@ import { canonicalJson } from "@chapa/shared";
 import type { StatsData } from "@chapa/shared";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getNextauthSecret } from "@/lib/env";
+import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found";
 
 /**
  * The read-through cache for composed legacy stats.
@@ -100,4 +101,39 @@ export async function writeCachedStats(
 ): Promise<void> {
   const entry: CachedStatsEntry = { binding, referenceDate, stats };
   await cacheSet(buildStatsCacheKey(handle), entry, STATS_CACHE_TTL_SECONDS);
+}
+
+// ---------------------------------------------------------------------------
+// LE-8-2 — the not-found marker
+// ---------------------------------------------------------------------------
+
+/**
+ * Short on purpose. The marker only exists so that repeat hits on a handle
+ * nobody owns (a crawler, GitHub's camo proxy retrying an embed, a typo
+ * someone keeps refreshing) stop reaching GitHub; five minutes is plenty for
+ * that, and short enough that a handle claimed today is a real profile
+ * within minutes rather than hours.
+ */
+export const STATS_NOT_FOUND_TTL_SECONDS = 300;
+
+/** Its own key: `stats:v3:` holds stats and nothing else. */
+export function buildStatsNotFoundKey(handle: string): string {
+  return `stats:notfound:${handle.toLowerCase()}`;
+}
+
+/**
+ * True only for the sentinel shape. A stray or mistyped value under this key
+ * must never 404 a real user, and the tests that mock Redis with one value
+ * for every key depend on the same discrimination.
+ */
+export async function readStatsNotFound(handle: string): Promise<boolean> {
+  return isGitHubUserNotFound(await cacheGet<unknown>(buildStatsNotFoundKey(handle)));
+}
+
+export async function writeStatsNotFound(handle: string): Promise<void> {
+  await cacheSet(
+    buildStatsNotFoundKey(handle),
+    { ...githubUserNotFound(handle.toLowerCase()), observedAt: new Date().toISOString() },
+    STATS_NOT_FOUND_TTL_SECONDS,
+  );
 }

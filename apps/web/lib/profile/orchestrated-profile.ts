@@ -2,6 +2,7 @@ import {
   materializeProfile,
   type MaterializedProfile,
 } from "./materialize-profile";
+import { isGitHubUserNotFound } from "@/lib/github/not-found";
 import { guardStatsComplete } from "./persist-guard";
 import {
   reconcileSnapshotWrite,
@@ -19,12 +20,16 @@ export async function materializeOrchestratedProfile(
     ignoreSnapshot?: boolean;
   } = {},
 ): Promise<MaterializedProfile | null> {
-  return materializeProfile(handle, {
+  const materialized = await materializeProfile(handle, {
     token: options.token,
     today: options.today,
     policy: "public-display",
     ignoreSnapshot: options.ignoreSnapshot,
   });
+  // LE-8-2 — for the refresh, recalculate and warm-cache writers a handle
+  // GitHub does not know is "nothing to persist", exactly as an unavailable
+  // fetch is. Only the public read surfaces turn the sentinel into a 404.
+  return isGitHubUserNotFound(materialized) ? null : materialized;
 }
 
 export async function persistOrchestratedSnapshot(

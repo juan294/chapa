@@ -58,6 +58,20 @@ Three pairings account for most of the issue history above:
    supplemental could lift a scope-blinded fetch over both detection
    signatures. `_compose` runs after the guards, never before.
 
+### The not-found marker (LE-8-2, 2026-09-07)
+
+`getStats` has a third outcome beside stats and `null`: the
+`GitHubUserNotFound` sentinel (`lib/github/not-found.ts`), returned only when
+GitHub answered with `user: null` beside its NOT_FOUND error or beside no
+error at all. It is never written under `stats:v3:h` — that key holds stats
+only — and it does not touch any row of the table above. Its own key,
+`stats:notfound:h`, holds the sentinel for five minutes so repeat hits on a
+handle nobody owns stop reaching GitHub; the live path checks it after a
+stats miss and before fetching, and the read-only path reads it too, since a
+read is all it is. Every other failure is still `null`, which is why an
+outage or a rate limit can never become a 404 on the badge route or the
+share page.
+
 ### What this document deliberately does not do
 
 No property tests and no CI gate. The value here is comprehension; the

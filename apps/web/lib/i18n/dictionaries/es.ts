@@ -570,6 +570,7 @@ export const es: Translations = {
     sampleDisclosure: 'MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN',
     invalidHandle: 'Usuario de GitHub no válido.',
     loadError: 'No se pudieron cargar los datos. Inténtalo de nuevo más tarde.',
+    userNotFound: 'No existe ningún usuario de GitHub con este nombre.',
     renderError: 'Algo salió mal. Inténtalo de nuevo más tarde.',
     tagline: 'Chapa de impacto para desarrolladores',
   },

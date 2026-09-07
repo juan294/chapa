@@ -11,6 +11,7 @@ import {
 
 import { redisFake } from "@/test/contract/redis-fake";
 import { getStats } from "@/lib/github/client";
+import { expectFound } from "@/lib/test-helpers/found";
 import { stubLegacyGitHub } from "@/test/contract/github-fixture";
 
 import { POST } from "./route";
@@ -82,7 +83,7 @@ describe("POST /api/supplemental contract", () => {
     // must still compose the upload committed before cache publication failed.
     stubLegacyGitHub(HANDLE, 0, 10);
     const composed = await getStats(HANDLE);
-    expect(composed?.commitsTotal).toBe(110);
+    expect(expectFound(composed).commitsTotal).toBe(110);
     expect(await redisFake.cacheGet(`stats:stale:v2:${HANDLE}`)).toEqual(baseline);
   });
 

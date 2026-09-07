@@ -1,10 +1,11 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
+import { isGitHubUserNotFound } from "@/lib/github/not-found";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
-import { captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
+import { captureServerError, captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
 import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
@@ -48,7 +49,14 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
     );
   }
 
-  let stats = await getStats(handle, token);
+  // The subject is the session's own login, which exists by construction;
+  // should GitHub ever answer otherwise, treat it as a failed fetch below.
+  const loadOwnStats = async (fetchToken?: string) => {
+    const result = await (fetchToken === undefined ? getStats(handle) : getStats(handle, fetchToken));
+    return isGitHubUserNotFound(result) ? null : result;
+  };
+  let stats = await loadOwnStats(token);
+  let serverTokenRowFetched = false;
 
   // #1282/#1283 — This is a first-time signup's very first fetch, so there is
   // no last-known-good baseline for `getStats` to fall back on: a null here is
@@ -76,7 +84,8 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
         }),
       () => undefined,
     );
-    stats = await getStats(handle);
+    stats = await loadOwnStats();
+    serverTokenRowFetched = true;
   }
 
   if (!stats) {
@@ -104,6 +113,24 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // first v7 receipt, so the badge they are about to see is the issued revision
   // rather than a legacy aggregate that a later refresh would silently replace.
   await issueScoreReceiptIfConsented(handle, token ? { token } : {});
+
+  // LE-5-1 — the stats cache row is bound to the credential that fetched it
+  // (source-context hashes the token into accessContextId), and the share
+  // page materializes tokenless, as the server GITHUB_TOKEN. Warming only the
+  // session-token row therefore left the owner's very first /u/:handle load
+  // on a cold live fetch, which can time out and render the badge (served
+  // from the SVG cache) beside an empty Impact Breakdown. Warm the row the
+  // page will actually read, off the response path. The fallback above
+  // already fetched it when it ran.
+  if (!serverTokenRowFetched) {
+    after(async () => {
+      try {
+        await getStats(handle);
+      } catch (error) {
+        await captureServerError({ route: "/api/generate", statusCode: 200, error });
+      }
+    });
+  }
 
   return NextResponse.json({ success: true, handle });
 });
