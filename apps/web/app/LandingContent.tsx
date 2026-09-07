@@ -67,12 +67,12 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topSc
       {/* Terminal chrome carrying the platform's current standings: the three
           highest live scores, each linking to that public badge. Sourced from
           snapshots, never the signup table (see dbGetTopScoredProfiles). */}
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-stroke bg-card px-5 py-4 font-heading text-[11px] text-text-secondary sm:px-8">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 border-b border-stroke bg-card px-5 py-0.5 font-heading text-[11px] text-text-secondary sm:px-8">
         <span className="flex items-center gap-1.5">
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-track" />
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-track" />
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-track" />
-          <Link href="/about/leaderboard" className="ml-3 underline-offset-4 hover:text-text-primary hover:underline">
+          <Link href="/about/leaderboard" className="ml-3 inline-flex min-h-11 items-center underline-offset-4 hover:text-text-primary hover:underline">
             {r("leaderboardExplainer")}
           </Link>
         </span>
@@ -88,7 +88,7 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topSc
                   {/* Everyone in a place shares the score, so it is printed
                       once at the end rather than after each handle. */}
                   {place.handles.map((handle, index) => (
-                    <Link key={handle} href={`/u/${handle}`} className="text-text-primary underline-offset-4 hover:underline">
+                    <Link key={handle} href={`/u/${handle}`} className="inline-flex min-h-11 min-w-11 items-center text-text-primary underline-offset-4 hover:underline">
                       @{handle}{index < place.handles.length - 1 ? "," : ""}
                     </Link>
                   ))}
@@ -120,14 +120,20 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topSc
                 cannot carry on its own. */}
             <div aria-hidden="true" className="absolute inset-0 translate-x-4 translate-y-5 bg-dark-section" />
             <div className="relative border border-forest-line bg-dark-section p-3 shadow-[0_30px_70px_-20px_rgba(0,0,0,.75)] sm:p-4">
-              {/* Escaped output of the one production renderer; the overlay shares its transform. */}
-              <div role="img" aria-label={sampleAlt} className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: demoBadgeSvg }} />
+              {/* Escaped output of the one production renderer. The overlay
+                  sits inside this box, not the frame around it: its hotspots
+                  are percentages of the 1200x630 viewBox, so the box they
+                  fill must be the SVG itself, never the frame's padding or
+                  the inspect row below. */}
+              <div className="relative">
+                <div role="img" aria-label={sampleAlt} className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: demoBadgeSvg }} />
+                <BadgeOverlay />
+              </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 font-heading text-[11px] text-forest-dim">
                 <span>/inspect badge.svg</span>
                 <Link href="/studio" className="inline-flex min-h-11 items-center tracking-wider text-forest-text uppercase underline-offset-4 hover:underline focus-visible:outline-forest-text!">{r("studioCta")} ↗</Link>
               </div>
             </div>
-            <BadgeOverlay />
           </div>
           <div className="relative z-10"><p className="font-heading text-base leading-snug">{r("stageCaption").split(/(?<=\.)\s+/).map(sentence => <span key={sentence} className="block">{sentence}</span>)}</p><p className="mt-5 font-heading text-[11px] tracking-wider text-text-secondary">{r("stageFigure")}</p></div>
         </div>

@@ -224,6 +224,24 @@ describe("Home page render (en)", () => {
     expect(container.querySelector("footer")).not.toBeNull();
   });
 
+  // LE-4-1 — BadgeOverlay is `absolute inset-0` and lays its hotspots out as
+  // percentages of the 1200x630 viewBox, so the box it fills must be the
+  // rendered SVG's own box. The redesign frame (006ca7de) wrapped the SVG in
+  // padding plus an inspect row and left the overlay on the outer wrapper,
+  // which put every hotspot up to 14px off its element. The overlay's
+  // parent must contain the badge and nothing else.
+  it("mounts the badge overlay in the same box as the demo badge SVG, with no padding or siblings between them", async () => {
+    await renderHome();
+    const overlay = screen.getByTestId("badge-overlay");
+    const badge = screen.getByTestId("demo-badge").parentElement!;
+    expect(badge.getAttribute("role")).toBe("img");
+    const box = overlay.parentElement!;
+    expect(box).toBe(badge.parentElement);
+    expect(Array.from(box.children)).toEqual([badge, overlay]);
+    expect(box.className.split(/\s+/)).toContain("relative");
+    expect(box.className).not.toMatch(/\bp[xytrbl]?-/);
+  });
+
   // Keep the verification CTA readable in its distinct trust color family.
   it("links the Verify a Badge CTA to /verify in the verification family", async () => {
     await renderHome();
