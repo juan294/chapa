@@ -438,3 +438,79 @@ It is nonetheless part of an unpushed stack that also carries `039`–`048`, and
 must not be applied to production on its own or as part of that stack during
 judging. Migrations `039`–`048` are the ones that would matter, and none of
 them should run until the release procedure does.
+
+---
+
+## 11. All review findings closed (2026-09-07)
+
+Every finding from §9.1 is now fixed, plus two the work surfaced on its own.
+
+| # | Finding | Closed by |
+| --- | --- | --- |
+| 0 | Flag had no seeded row; /admin toggle silently matched nothing | `ef689436` |
+| 1a | JSON-LD described the profile from the v6 aggregate | `fb96cd23` |
+| 1b | Owner breakdown explained v6 arithmetic beside a v7 badge | `074a52cb` |
+| 2 | v6 tier word printed on a v7 badge; v7-only labels English in Spanish | `dea4eb54` |
+| 3 | Verification strip on a v7 badge resolved to a v6 HMAC record | `64ba979d` |
+| 4 | Leaderboard and API headline read the v6 aggregate | `095de3f7` |
+| 5 | Studio previewed v6 while the public badge published v7 | `fb96cd23` |
+| 6 | Redundant durable read on every badge cache miss | `f01573a6` |
+| 7 | Unchained `revision: 1` receipts; cron issued after rendering | `faf719f7` |
+| 8 | Granting consent issued nothing | `faf719f7` |
+| — | Headline overflowed the score ring for an interval | `21db9e86` |
+| — | Published arithmetic had no gate against the policy | `5636a0ca` |
+
+### 11.1 Corrections to the review
+
+Two findings were not quite as reported, and the record should say so.
+
+**The share page header never showed a score.** It destructured only `handle`
+and `displayLabel`; `score`, `tier` and `verificationHash` were accepted and
+dropped. A visitor could not have seen "67 Solid" above a ranged badge. The
+props are gone anyway — a component that accepts a score and silently discards
+it is what produced the misreading.
+
+**"Redis before the manifest" would be a regression.** The manifest-first order
+in `getCachedReceiptSnapshotV7` is deliberate: the manifest establishes the
+current revision, and it is rechecked after the cache read so a revoked or
+replaced revision cannot escape a delayed hit. The real waste was one level up,
+in `readScoreReceiptV7` treating a clean `null` as a cache miss and repeating
+the durable read.
+
+### 11.2 A v7 badge has now been looked at
+
+Three cases were rendered and rasterized through the real OG path: a point, a
+range with a tier, and a range with none. The point badge was correct. The
+range badge was not — `74–76` at a fixed 30px measures about 90px inside a ring
+whose clear width is about 88px, so the glyphs sat on the stroke. Every string
+assertion passed throughout, because the markup was right and only the geometry
+was wrong.
+
+The headline size is now derived from the ring, and a regression asserts the
+fit for five widths up to `100–100`. Also confirmed by eye: the radar is a
+diamond with no Craft axis, a tier-less range reads "rango de evidencia", the
+archetype reads "evidencia insuficiente", and a ranged badge that earns a tier
+prints the translated v7 word.
+
+### 11.3 Four modules were built and never wired
+
+`legacyViewModel`, `renderableScore`, `issueReceiptVerificationV7` and
+`explainReceipt` all shipped in earlier phases with no production consumer.
+Each was found only by going looking for it. The pattern is worth naming
+because the phases that added them were all recorded as verified: a module with
+tests and no caller passes every gate this repository has.
+
+### 11.4 What remains before the flag can be turned on
+
+1. §9.3 conditions 5 and 6 — the badge latency budget has still not been
+   re-measured with the receipt read enabled, and the S18 pilot and S19
+   migration rehearsal remain unresolved.
+2. Contract tests have not been run (`pnpm run test:contract:local`, needs a
+   local Supabase).
+3. No production build has been run.
+4. The remaining v6 copy surfaces are still unmigrated: `llms.txt`,
+   `llms-full.txt`, the seven archetype pages, landing copy, and the email
+   templates.
+
+Production is unaffected by all of it: the flag is off, `origin/develop` is 39
+commits behind, and nothing here has been pushed.
