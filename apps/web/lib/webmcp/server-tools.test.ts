@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { makeSnapshot, makeStats } from "@/lib/test-helpers/fixtures";
+import { legacyViewModel, type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { SITE_TOOL_MAP } from "./site-tool-map";
 
 const mocks = vi.hoisted(() => ({
@@ -104,6 +105,7 @@ describe("remote MCP server tools", () => {
       rawImpact: impact,
       displayImpact: impact,
       statsComplete: true,
+      scoring: legacyViewModel({ ...impact, handle }),
     }));
     mocks.getCachedCraftScore.mockResolvedValue(craftResult);
     mocks.getSnapshots.mockResolvedValue([
@@ -320,6 +322,148 @@ describe("remote MCP server tools", () => {
     expect(profile.dimensions).toEqual(
       expect.objectContaining({ craft: 64 }),
     );
+  });
+
+  describe("headline is the number the badge draws (#1001/#1311)", () => {
+    // The stored snapshot keeps the EMA-smoothed composite for the trend line;
+    // the badge draws the resolved score model. In the observed LE-7-1 case the
+    // snapshot said 79 while the badge printed 80.
+    const smoothedSnapshot = {
+      ...snapshot,
+      compositeScore: 80,
+      adjustedComposite: 79,
+      tier: "High",
+    };
+
+    function pointModel(handle: string, composite: number, tier: string): ScoreViewModel {
+      return {
+        ...legacyViewModel({ ...impact, handle }),
+        policyVersion: "v7",
+        composite: { kind: "point", value: composite, display: composite },
+        tier: tier as ScoreViewModel["tier"],
+      };
+    }
+
+    function rangeModel(handle: string): ScoreViewModel {
+      return {
+        ...legacyViewModel({ ...impact, handle }),
+        policyVersion: "v7",
+        composite: {
+          kind: "range",
+          lower: 70,
+          upper: 85,
+          displayLower: 70,
+          displayUpper: 85,
+        },
+        tier: "High",
+      };
+    }
+
+    function materializedWith(scoring: ScoreViewModel) {
+      return {
+        stats: { ...stats, handle: scoring.handle },
+        craftResult: null,
+        rawImpact: impact,
+        // The v6 aggregate agrees with the smoothed snapshot here, so a tool
+        // reading either of them instead of the drawn model reports 79.
+        displayImpact: { ...impact, adjustedComposite: 79, tier: "High" as const },
+        statsComplete: true,
+        scoring,
+      };
+    }
+
+    beforeEach(() => {
+      mocks.getCachedLatestSnapshot.mockResolvedValue(smoothedSnapshot);
+      mocks.materializeDisplayProfile.mockImplementation(async (handle: string) =>
+        materializedWith(
+          handle === "hubot" ? pointModel(handle, 72, "High") : pointModel(handle, 80, "Elite"),
+        ),
+      );
+    });
+
+    it("get_impact_profile publishes the drawn point beside the smoothed snapshot fields", async () => {
+      const profile = parseResult(
+        await tool("get_impact_profile").execute({ handle: "octocat" }),
+      );
+
+      expect(profile.displayScore).toBe(80);
+      expect(profile.displayTier).toBe("Elite");
+      expect(profile.adjustedComposite).toBe(79);
+      expect(profile.compositeScore).toBe(80);
+      expect(profile.scoring).toEqual(expect.objectContaining({
+        policyVersion: "v7",
+        composite: expect.objectContaining({ kind: "point", display: 80 }),
+      }));
+    });
+
+    it("compare_profiles scores both sides with the drawn point", async () => {
+      const comparison = parseResult(
+        await tool("compare_profiles").execute({
+          handle: "octocat",
+          other_handle: "hubot",
+        }),
+      );
+
+      expect(comparison.current).toEqual(expect.objectContaining({
+        handle: "octocat",
+        score: 80,
+        tier: "Elite",
+      }));
+      expect(comparison.other).toEqual(expect.objectContaining({
+        handle: "hubot",
+        score: 72,
+        tier: "High",
+      }));
+      expect((comparison.differences as { score: number }).score).toBe(-8);
+    });
+
+    it("reports a null score with the tier when the badge draws an evidence range", async () => {
+      mocks.materializeDisplayProfile.mockImplementation(async (handle: string) =>
+        materializedWith(rangeModel(handle)),
+      );
+
+      const profile = parseResult(
+        await tool("get_impact_profile").execute({ handle: "octocat" }),
+      );
+      expect(profile.displayScore).toBeNull();
+      expect(profile.displayTier).toBe("High");
+      expect(profile.scoring).toEqual(expect.objectContaining({
+        composite: expect.objectContaining({ kind: "range", displayLower: 70, displayUpper: 85 }),
+      }));
+
+      const comparison = parseResult(
+        await tool("compare_profiles").execute({
+          handle: "octocat",
+          other_handle: "hubot",
+        }),
+      );
+      expect(comparison.current).toEqual(expect.objectContaining({
+        score: null,
+        tier: "High",
+      }));
+      expect((comparison.differences as { score: unknown }).score).toBeNull();
+    });
+
+    it("never substitutes the smoothed adjustedComposite when the live profile is unavailable", async () => {
+      mocks.materializeDisplayProfile.mockResolvedValue(null);
+
+      const profile = parseResult(
+        await tool("get_impact_profile").execute({ handle: "octocat" }),
+      );
+      expect(profile.displayScore).toBeNull();
+      expect(profile.scoring).toBeNull();
+
+      const comparison = parseResult(
+        await tool("compare_profiles").execute({
+          handle: "octocat",
+          other_handle: "hubot",
+        }),
+      );
+      expect((comparison.current as { score: unknown }).score).toBeNull();
+      expect((comparison.other as { score: unknown }).score).toBeNull();
+      expect((comparison.differences as { score: unknown }).score).toBeNull();
+      expect(JSON.stringify(comparison)).not.toContain("79");
+    });
   });
 
   it("preserves the recovery string and emits error telemetry when a tool throws", async () => {

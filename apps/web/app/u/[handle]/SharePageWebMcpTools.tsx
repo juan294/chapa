@@ -10,6 +10,7 @@ import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import type { TrendSummary } from "@/lib/history/trend";
 import { useTranslation } from "@/lib/i18n";
+import { renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { isValidHandle } from "@/lib/validation";
 import {
   COMPARE_PROFILES_INPUT_SCHEMA,
@@ -36,6 +37,14 @@ interface PublicVerification {
 interface SharePageWebMcpToolsProps {
   handle: string;
   impact: ClientImpactV6Result;
+  /**
+   * The resolved score model the badge on this page draws from. `impact` is
+   * the v6 aggregate and today carries the same number, but under the v7
+   * receipt the badge draws this projection, so it is the only source a tool
+   * may publish as the score (#1001/#1311, LE-7-1). It is a public projection:
+   * nothing owner-only (confidence, penalties) lives on it.
+   */
+  scoring: ScoreViewModel;
   stats: StatsData;
   verification: PublicVerification | null;
   trend: TrendSummary | null;
@@ -43,6 +52,38 @@ interface SharePageWebMcpToolsProps {
   craftResult?: CraftResult | null;
   embedMarkdown: string;
   embedHtml: string;
+}
+
+const HEADLINE_NOTE =
+  "score and tier are the headline the badge draws; null when the badge shows an evidence range or the live profile could not be materialized. The stored trend snapshot's smoothed composite is never reported as the score.";
+
+interface DrawnHeadline {
+  displayScore: number | null;
+  displayTier: string | null;
+}
+
+/** Same rule as the remote MCP twin (`lib/webmcp/server-tools.ts`): a point
+ * publishes the drawn integer, an evidence range publishes null and leaves the
+ * interval to `scoring`. */
+function drawnHeadline(scoring: ScoreViewModel): DrawnHeadline {
+  const drawn = renderableScore(scoring);
+  return scoring.composite.kind === "point"
+    ? { displayScore: drawn.composite, displayTier: drawn.tier }
+    : { displayScore: null, displayTier: drawn.tier };
+}
+
+/** `/api/profile` publishes `displayScore`/`displayTier` as the badge's
+ * headline and `scoring` as the interval carrier. There is deliberately no
+ * fallback to its `adjustedComposite`: that is the smoothed trend value, not
+ * the number on the other badge. */
+function otherHeadline(other: Record<string, unknown>): DrawnHeadline & {
+  scoring: Record<string, unknown> | null;
+} {
+  return {
+    displayScore: typeof other.displayScore === "number" ? other.displayScore : null,
+    displayTier: typeof other.displayTier === "string" ? other.displayTier : null,
+    scoring: isWebMcpRecord(other.scoring) ? other.scoring : null,
+  };
 }
 
 async function readJson(response: Response): Promise<Record<string, unknown> | null> {
@@ -57,6 +98,7 @@ async function readJson(response: Response): Promise<Record<string, unknown> | n
 export function SharePageWebMcpTools({
   handle,
   impact,
+  scoring,
   stats,
   verification,
   trend,
@@ -71,14 +113,20 @@ export function SharePageWebMcpTools({
   const tools = useMemo<WebMcpTool[]>(() => {
     if (!webmcpEnabled) return [];
 
+    const headline = drawnHeadline(scoring);
+
     const getImpactProfile: WebMcpTool = {
       name: "get_impact_profile",
-      description: "Return the public impact profile shown in the current page render.",
+      description:
+        "Return the public impact profile shown in the current page render. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); impact carries the legacy aggregate.",
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
       annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: () => JSON.stringify({
         handle,
         impact,
+        displayScore: headline.displayScore,
+        displayTier: headline.displayTier,
+        scoring,
         stats: publicStats(stats),
         verification,
         trend,
@@ -88,6 +136,7 @@ export function SharePageWebMcpTools({
           statsFetchedAt: stats.fetchedAt,
           impactComputedAt: impact.computedAt,
         },
+        note: HEADLINE_NOTE,
       }),
     };
 
@@ -193,36 +242,35 @@ export function SharePageWebMcpTools({
 
         const other = await readJson(response);
         const otherDimensions = other?.dimensions;
-        const otherScore = typeof other?.displayScore === "number"
-          ? other.displayScore
-          : other?.adjustedComposite;
-        if (
-          !other ||
-          !isWebMcpRecord(otherDimensions) ||
-          typeof otherScore !== "number"
-        ) {
+        if (!other || !isWebMcpRecord(otherDimensions)) {
           return "The comparison profile returned an unreadable response.";
         }
+        const otherDrawn = otherHeadline(other);
+        const currentScore = headline.displayScore;
+        const otherScore = otherDrawn.displayScore;
 
         return JSON.stringify({
           current: {
             handle,
-            score: impact.adjustedComposite,
-            tier: impact.tier,
+            score: currentScore,
+            tier: headline.displayTier,
             dimensions: impact.dimensions,
+            scoring,
           },
           other: {
             handle: typeof other.handle === "string" ? other.handle : otherHandle,
             score: otherScore,
-            tier: typeof other.displayTier === "string"
-              ? other.displayTier
-              : other.tier,
+            tier: otherDrawn.displayTier,
             dimensions: otherDimensions,
+            scoring: otherDrawn.scoring,
           },
           differences: {
-            score: otherScore - impact.adjustedComposite,
+            score: currentScore !== null && otherScore !== null
+              ? otherScore - currentScore
+              : null,
             dimensions: compareDimensions(impact.dimensions, otherDimensions),
           },
+          note: HEADLINE_NOTE,
         });
       },
     };
@@ -257,6 +305,7 @@ export function SharePageWebMcpTools({
     embedMarkdown,
     handle,
     impact,
+    scoring,
     stats,
     t,
     trend,

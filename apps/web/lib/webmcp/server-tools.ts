@@ -10,6 +10,7 @@ import { getServerT } from "@/lib/i18n/server";
 import type { LanguageContextValue } from "@/lib/i18n";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { redactImpactForVisitor } from "@/lib/profile/public-profile";
+import { renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { isValidHandle } from "@/lib/validation";
 import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
 import { toPublicVerificationRecord } from "@/lib/verification/types";
@@ -75,8 +76,29 @@ interface PublicProfilePayload {
   } | null;
   snapshotDate: string;
   computedAt: string;
+  /**
+   * The headline the badge draws (#1001/#1311), read from the resolved score
+   * model exactly as `/api/profile` and the leaderboard do. `compositeScore`
+   * and `adjustedComposite` above are the stored snapshot's EMA-smoothed trend
+   * values and may lag the badge by a point; they are kept for compatibility,
+   * never published as the score. A v7 evidence range has no single number and
+   * reports `null` here with `scoring` carrying the interval.
+   */
   displayScore: number | null;
   displayTier: string | null;
+  scoring: ScoreViewModel | null;
+}
+
+const HEADLINE_NOTE =
+  "score and tier are the headline the badge draws; null when the badge shows an evidence range or the live profile could not be materialized. The stored trend snapshot's smoothed composite is never reported as the score.";
+
+function drawnHeadline(
+  scoring: ScoreViewModel,
+): { displayScore: number | null; displayTier: string | null } {
+  const drawn = renderableScore(scoring);
+  return scoring.composite.kind === "point"
+    ? { displayScore: drawn.composite, displayTier: drawn.tier }
+    : { displayScore: null, displayTier: drawn.tier };
 }
 
 function readString(inputs: unknown, key: string): string {
@@ -119,6 +141,7 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
 
   let displayScore: number | null = null;
   let displayTier: string | null = null;
+  let scoring: ScoreViewModel | null = null;
   let craftResult = null;
   let materializedAvailable = false;
   try {
@@ -127,8 +150,8 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
     });
     if (materialized) {
       materializedAvailable = true;
-      displayScore = materialized.displayImpact.adjustedComposite;
-      displayTier = materialized.displayImpact.tier;
+      scoring = materialized.scoring;
+      ({ displayScore, displayTier } = drawnHeadline(scoring));
       if (snapshot.craft == null) {
         craftResult = materialized.craftResult;
       }
@@ -171,6 +194,7 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
     computedAt: snapshot.capturedAt,
     displayScore,
     displayTier,
+    scoring,
   };
 }
 
@@ -248,7 +272,8 @@ const findProfile: ServerMcpTool = {
 
 const getImpactProfile: ServerMcpTool = {
   name: "get_impact_profile",
-  description: "Return the latest public impact profile for a GitHub handle.",
+  description:
+    "Return the latest public impact profile for a GitHub handle. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); compositeScore and adjustedComposite are the stored trend snapshot's smoothed values.",
   inputSchema: FIND_PROFILE_INPUT_SCHEMA,
   annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
@@ -373,7 +398,7 @@ const explainDimension: ServerMcpTool = {
 
 const compareProfiles: ServerMcpTool = {
   name: "compare_profiles",
-  description: "Compare two public Chapa impact profiles.",
+  description: "Compare two public Chapa impact profiles by the headline each badge draws.",
   inputSchema: COMPARE_PROFILES_SERVER_INPUT_SCHEMA,
   annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
@@ -396,28 +421,33 @@ const compareProfiles: ServerMcpTool = {
     ]);
     if (!current) return missingProfile(handle);
     if (!other) return missingProfile(otherHandle);
-    const currentScore = current.displayScore ?? current.adjustedComposite;
-    const otherScore = other.displayScore ?? other.adjustedComposite;
+    // No fallback to the snapshot's smoothed composite: that number is not
+    // the one on either badge, and publishing it here is what LE-7-1 caught.
+    const currentScore = current.displayScore;
+    const otherScore = other.displayScore;
     return JSON.stringify({
       current: {
         handle,
         score: currentScore,
-        tier: current.displayTier ?? current.tier,
+        tier: current.displayTier,
         dimensions: current.dimensions,
       },
       other: {
         handle: otherHandle,
         score: otherScore,
-        tier: other.displayTier ?? other.tier,
+        tier: other.displayTier,
         dimensions: other.dimensions,
       },
       differences: {
-        score: otherScore - currentScore,
+        score: currentScore !== null && otherScore !== null
+          ? otherScore - currentScore
+          : null,
         dimensions: compareDimensions(
           current.dimensions,
           Object.fromEntries(Object.entries(other.dimensions)),
         ),
       },
+      note: HEADLINE_NOTE,
     });
   },
 };
