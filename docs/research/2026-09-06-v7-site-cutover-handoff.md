@@ -514,3 +514,67 @@ tests and no caller passes every gate this repository has.
 
 Production is unaffected by all of it: the flag is off, `origin/develop` is 39
 commits behind, and nothing here has been pushed.
+
+---
+
+## 12. Verification actually performed (2026-09-07)
+
+The three things §11.4 listed as unrun have now been run.
+
+### 12.1 Production build
+
+`pnpm run build` compiles successfully. Static generation is intact: all nine
+locale-segmented content pages, including `/en/about/scoring` and
+`/es/about/scoring`, are still prerendered (SSG), and the dynamic routes are
+still dynamic. The GitHub fetch timeouts in the build log are the landing
+leaderboard materializing handles without a token locally, and occur on
+`develop` too.
+
+### 12.2 Contract suite, against local Supabase
+
+Run for the first time in this work, and it found a real defect.
+
+**The finding-6 optimization was wrong.** `readScoreReceiptV7` had been changed
+to treat a clean `null` from the cached path as proof that no receipt exists.
+Against real persistence the manifest can be absent while the receipt is
+durably stored, so the change made the reader return null for receipts that
+exist — including under "reads back the exact issued artifact every consumer
+projects", the invariant the entire cutover rests on. Reverted in `bf519f3b`.
+
+Nothing in the unit suite could have caught it: the unit test mocked the cached
+path and asserted the very assumption that was false.
+
+Also fixed: `vitest.contract-setup.ts` mocks every feature-flag helper globally
+and did not know about `scoring_v7_rendering`, which failed four route suites
+outright. It is mocked off, matching the production default.
+
+Final contract state: 3 failures in 2 files
+(`platform-token-refresh.contract.test.ts` browser-role denial ×2,
+`source-context.contract.test.ts` RPC denial ×1). All are pre-existing on
+`develop`, whose own baseline is 4 failures in 3 files.
+
+Migration `049` applies cleanly through `supabase db reset`.
+
+### 12.3 The bundle budget is red, and was already
+
+`scripts/check-bundle-size.sh` fails: one chunk is 368 KB against a 350 KB
+budget. Building `develop` produces **the identical chunk** — same content
+hash, same 368 KB — so this branch does not contribute to it.
+
+The gate is nonetheless reporting green in CI. The `bundle-analyzer` job builds
+with `ANALYZE: "true"`, which is not the build that ships, so the budget is
+enforced against different output than production emits. That is the same shape
+as the claims gate that let v6 arithmetic survive a "verified" task: a gate
+measuring something other than the artifact it is supposed to protect.
+
+Not fixed here — it is pre-existing, outside this work, and changing bundle
+composition during a judging freeze is not a change worth making. It needs its
+own issue.
+
+### 12.4 Still not done
+
+- Badge latency has not been re-measured with the receipt read enabled
+  (§9.3 condition 5). It needs a deployed environment.
+- Contract coverage of the **flag-on** v7 path does not exist; the suite
+  currently exercises the flag-off path that ships today.
+- S18 pilot and S19 migration rehearsal remain unresolved.
