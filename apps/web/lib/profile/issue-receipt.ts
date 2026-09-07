@@ -35,7 +35,10 @@ export async function issueScoreReceiptIfConsented(
       // receipt without recording its verification would put a derived token
       // on the badge that `/verify` answers "not found" to.
       try {
-        await issueReceiptVerificationV7(handle, handle, result.snapshot.receipt.receipt);
+        // The sealed envelope, not the receipt inside it: `issueReceiptVerificationV7`
+        // re-verifies what it is given, and the inner payload does not carry the
+        // hash that verification binds to.
+        await issueReceiptVerificationV7(handle, handle, result.snapshot.receipt);
       } catch (error) {
         void captureServerError({ route: "issue-score-receipt-v7", statusCode: 500, error });
         return "failed";

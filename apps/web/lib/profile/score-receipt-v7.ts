@@ -10,6 +10,7 @@ import {
   type EngineeringEvidenceInput,
   type NormalizedEngineeringEvent,
   type PrivateCriterionAssessment,
+  type PublicScoringReceipt,
   type ScoringScope,
   type ScoringWindow,
   type SourceCoverage,
@@ -202,12 +203,21 @@ export async function materializeScoreReceiptV7(
     // reference date and the scored inputs together are the identity of a
     // scoring result, so when both match the stored one there is nothing to
     // issue and the existing receipt is returned unchanged.
-    if (prior
+    // `canonicalJson` serializes a receipt structure, not an arbitrary value,
+    // so an absent Craft channel is compared as absence rather than passed
+    // through it as `null`.
+    const craftIdentity = (value: typeof craft | PublicScoringReceipt["craft"]) =>
+      value ? canonicalJson({ inputs: value.inputs, result: value.result }) : "";
+    if (previous
+      && prior
       && prior.action !== "retract"
       && prior.window.referenceDate === window.referenceDate
-      && canonicalJson(prior.inputs) === canonicalJson(core.inputs)
-      && canonicalJson(prior.craft ?? null) === canonicalJson(craft ? { inputs: craft.inputs, result: craft.result } : null)) {
-      return { status: "stored", snapshot: previous! };
+      // Counts, not the whole `inputs` object: `inputs` embeds the window, and
+      // the window carries a per-call `referenceTime`, so comparing inputs
+      // wholesale never matched and every pass published a correction.
+      && canonicalJson(prior.inputs.counts) === canonicalJson(core.inputs.counts)
+      && craftIdentity(prior.craft) === craftIdentity(craft)) {
+      return { status: "stored", snapshot: previous };
     }
 
     const envelope = await sealScoreReceipt({
