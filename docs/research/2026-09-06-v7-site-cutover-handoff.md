@@ -502,7 +502,7 @@ tests and no caller passes every gate this repository has.
 
 ### 11.4 What remains before the flag can be turned on
 
-1. §9.3 conditions 5 and 6 — the badge latency budget has still not been
+1. §9.3 condition 5 — the badge latency budget has still not been
    re-measured with the receipt read enabled, and the S18 pilot and S19
    migration rehearsal remain unresolved.
 2. Contract tests have not been run (`pnpm run test:contract:local`, needs a
@@ -578,3 +578,57 @@ own issue.
 - Contract coverage of the **flag-on** v7 path does not exist; the suite
   currently exercises the flag-off path that ships today.
 - S18 pilot and S19 migration rehearsal remain unresolved.
+
+---
+
+## 13. Local follow-ups (2026-09-07)
+
+Everything workable during the freeze, now done on `fix/v7-local-followups`.
+
+### 13.1 The no-op skip now holds (#1321, fixed)
+
+The same mistake appeared three times in one comparison, and only the third
+instance was visible without real persistence.
+
+`inputs` embeds the scoring window, and the window carries a per-call
+`referenceTime`, so comparing `inputs` wholesale could never match. Narrowing
+the core side to `inputs.counts` was not enough: the **Craft** inputs embed the
+window too, and the stored receipt carried a Craft block. Narrowed to counts,
+eligible episodes and result, a second pass over identical evidence now returns
+`stored` instead of publishing a correction the receipt RPC then rejects.
+
+This is what bounds the warm-cache cron to at most one revision per subject per
+day, so it was a precondition for turning the flag on at all.
+
+Diagnosed by reporting the second pass's view of the stored receipt through an
+assertion message, because the contract runner suppresses console output.
+
+### 13.2 Bundle budget: gate fixed, threshold is a decision (#1319)
+
+The budget now runs in the `analyze` job against `pnpm run build`, the build
+that deploys. It previously ran only under `ANALYZE=true`, measuring output
+production never emits, which is why a 368 KB chunk passed CI indefinitely.
+
+**CI is red until the threshold question is answered, deliberately.** The chunk
+is the AI insights report parser (`zod`, 581 references), reached through a
+dynamic import in `use-insights-import.ts:133`. It is lazily fetched on the
+import path, not page weight, and every other client chunk is well under
+budget. Options and a recommendation are on #1319; it is a product-standards
+decision.
+
+### 13.3 Studio flake (#1316, defensive only)
+
+`beforeEach(cleanup)` added to the `beforeunload` describe. The file already
+cleaned up after each test, so this is belt-and-braces against a component from
+an earlier test still being mounted when the next dispatches on the shared
+`window`. The flake has not been reproduced on demand and the issue stays open.
+
+### 13.4 What is left, and why
+
+- **Badge latency with the receipt read enabled.** Needs a deployed
+  environment; cannot be measured locally.
+- **S18 pilot.** Needs human reviewers. Longest lead time and the only
+  relaunch item the freeze does not block.
+- **S19 migration rehearsal.** Recorded `verified`, but the rehearsal it
+  describes has not been run against production-shaped data.
+- **The bundle threshold decision** above.

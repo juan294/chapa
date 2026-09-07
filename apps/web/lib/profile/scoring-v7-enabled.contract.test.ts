@@ -75,13 +75,19 @@ describe("the v7 path with rendering enabled", () => {
     expect(resolved!.signatureAuthenticated).toBe(true);
   });
 
-  // The no-op skip added for review finding 7 does NOT hold against real
-  // persistence: a second pass over identical evidence still publishes a
-  // correction rather than observing the stored revision. Tracked separately —
-  // it is a real defect, not a test problem, and the unit test that covers it
-  // passes because its fixture reproduces the stored counts exactly while the
-  // durable round trip does not. Chaining (same receiptId, incrementing
-  // revision, supersedes link) is verified in score-receipt-v7.contract.ts.
+  it("issues nothing on a second pass over identical evidence", async () => {
+    expect(await issueScoreReceiptIfConsented(owner)).toBe("issued");
+    const first = await readRenderableReceipt(owner);
+
+    // What the hourly warm-cache cron does. Without the skip this published a
+    // correction every hour, each with its own verification token.
+    expect(await issueScoreReceiptIfConsented(owner)).toBe("skipped");
+
+    const second = await readRenderableReceipt(owner);
+    expect(second!.receipt.receipt.revisionId).toBe(first!.receipt.receipt.revisionId);
+    expect((await db().from("scoring_v7_receipts").select("id").eq("owner_handle", owner)).data)
+      .toHaveLength(1);
+  });
 
   it("stops attesting once publication is withdrawn", async () => {
     expect(await issueScoreReceiptIfConsented(owner)).toBe("issued");
