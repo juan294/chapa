@@ -363,6 +363,40 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## AI insights parser chunk exceeds the per-file bundle budget (2026-09-07)
+
+**Risk:** One client JS chunk is 368 KB against a documented 350 KB per-file
+budget, and `scripts/check-bundle-size.sh` exempts it explicitly.
+
+**Why it is accepted:** The chunk is the AI insights report parser, reached
+only through a dynamic import:
+
+`use-insights-import.ts:133` -> `lib/insights/parser` -> `lib/insights/report-v7`
+-> `zod`
+
+It is therefore fetched when someone imports an insights report, and never as
+part of loading a page. The budget exists to stop pages getting heavy; this
+chunk does not make any page heavier. Every other client chunk is well under
+the ceiling (next largest 227 KB, then 125 KB).
+
+Raising the budget to 400 KB for everything would have hidden a future genuine
+380 KB page chunk, which is the failure the budget exists to catch. Splitting
+or replacing the zod schema is real work on a validation path and buys nothing
+a reader would notice.
+
+**Bounded how:** The exemption is not a filename allowlist — Turbopack chunk
+names are content hashes and would drift on every change. The chunk is
+identified by a stable literal from the insights schema, only one chunk may be
+exempted, and it must still stay under a separate 400 KB ceiling. Both bounds
+are covered: a different over-budget chunk fails, and the exempt chunk fails
+once it passes its own ceiling.
+
+**Revisit if:** the parser grows toward 400 KB, the insights import stops being
+dynamically loaded, or a second chunk needs the same treatment — a second
+exception means the rule, not the chunk, is wrong.
+
+**Refs:** [#1319](https://github.com/juan294/chapa/issues/1319)
+
 ## Review schedule
 
 These accepted risks should be re-evaluated:
