@@ -515,7 +515,7 @@ describe("createCallbackHandler", () => {
   it("invalidates stats cache on success", async () => {
     await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
   });
@@ -726,7 +726,7 @@ describe("createDisconnectHandler", () => {
   it("invalidates stats cache on success", async () => {
     await POST(makeRequest());
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
   });
@@ -767,7 +767,7 @@ describe("createDisconnectHandler", () => {
 
     await POST(makeRequest());
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
     expect(mockCacheDel).toHaveBeenCalledWith("supplemental:testuser");

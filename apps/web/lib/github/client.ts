@@ -12,6 +12,7 @@ import { createSourceContext } from "@/lib/platform/source-context";
 import { readSourceAuthorization, sameSourceAuthorization } from "@/lib/platform/source-authorization";
 import { refreshSourceLink } from "@/lib/platform/source-refresh";
 import { withTimeout } from "@/lib/async/with-timeout";
+import { statsCacheBinding, readCachedStats, writeCachedStats } from "@/lib/cache/stats-cache";
 export { selectSourceEvidence } from "@/lib/platform/source-collectors";
 
 const inflight = new Map<string, Promise<StatsData | null>>();
@@ -45,10 +46,21 @@ export async function getStats(handle: string, token?: string, options: { readOn
     };
     // Each linked token is part of the private key through its exact row version.
     const links = initial.map(source => source.status === "authorized" ? [source.link?.id, source.link?.updatedAt].join(":") : source.status).join("|");
-    const key = context.selectionId + ":" + links;
+    // `selectionId` is an HMAC over the exact reference *instant*, so it is
+    // unique per call and made both this map and any cache derived from it
+    // dead. The binding below is stable for the same grant on the same scoring
+    // day, which is what lets concurrent renders of one handle share a single
+    // GitHub fetch instead of each paying ~10s for the same answer.
+    const binding = statsCacheBinding({ accessContextId: context.accessContextId, links, referenceDate: window.referenceDate });
+    const key = binding ?? context.selectionId + ":" + links;
     let work = inflight.get(key);
     if (!work) {
       work = withTimeout((async () => {
+        // A hit is still re-checked against `current()` below, exactly as a
+        // live fetch is: the binding proves which grant produced the data, not
+        // that the grant is still in force.
+        const cached = binding ? await readCachedStats(owner, binding, window.referenceDate) : null;
+        if (cached) return cached;
         const primary = await context.collect(captured => fetchStats(owner, undefined, { resolvedCredential: { token: captured || null }, referenceTime: window.referenceTime }));
         if (!primary || !await current()) return null;
         const fetchers = [fetchBitbucketIfLinked, fetchCodebergIfLinked, fetchGitlabIfLinked];
@@ -59,7 +71,11 @@ export async function getStats(handle: string, token?: string, options: { readOn
         if (!await current()) return null;
         const linkedPlatforms: Platform[] = []; const linkedPlatformLogins: Record<string, string> = {};
         initial.forEach((source, i) => { if (source.status === "authorized" && source.link) { linkedPlatforms.push(platforms[i]!); linkedPlatformLogins[platforms[i]!] = source.link.remoteLogin; } });
-        return _compose(primary, { bitbucket: linked[0] ?? null, codeberg: linked[1] ?? null, gitlab: linked[2] ?? null, supplemental, linkedPlatforms, linkedPlatformLogins });
+        const composed = _compose(primary, { bitbucket: linked[0] ?? null, codeberg: linked[1] ?? null, gitlab: linked[2] ?? null, supplemental, linkedPlatforms, linkedPlatformLogins });
+        // Best-effort: a cache write that fails must not fail the fetch that
+        // already succeeded. `cacheSet` swallows its own errors already.
+        if (binding) await writeCachedStats(owner, binding, window.referenceDate, composed);
+        return composed;
       })(), 30_000, "Legacy source collection").catch(() => null);
       inflight.set(key, work);
       void work.finally(() => { if (inflight.get(key) === work) inflight.delete(key); }).catch(() => undefined);

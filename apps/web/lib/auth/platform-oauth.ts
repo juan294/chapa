@@ -16,6 +16,7 @@ import { requireSession } from "@/lib/auth/require-session";
 import { getBaseUrl } from "@/lib/env";
 import { dbUpsertLinkedPlatform, dbDeleteLinkedPlatform, dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
 import { cacheDel, rateLimit, rateLimitStrict } from "@/lib/cache/redis";
+import { buildStatsCacheKey } from "@/lib/cache/stats-cache";
 import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeTokenExpiry } from "@/lib/auth/bitbucket";
@@ -81,7 +82,7 @@ async function invalidatePlatformReadModels(
 ): Promise<void> {
   const lh = handle.toLowerCase();
   const deletes: Array<Promise<unknown>> = [
-    cacheDel(`stats:v2:merged:${lh}`),
+    cacheDel(buildStatsCacheKey(lh)),
     cacheDel(`stats:v2:${platform}:${lh}`),
     cacheDel(`stats:v2:${platform}:${lh}:neg`),
     invalidateBadgeSvgCache(handle),

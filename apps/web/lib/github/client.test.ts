@@ -55,11 +55,16 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     expect(await getStats("alice", undefined, { ...options, readOnly: true })).toBeNull();
     for (const fn of [fetchStats, readSourceAuthorization, refreshSourceLink, dbGetSupplemental, cacheGet, cacheSet, dbUpsertUser, ...Object.values(fetchers)]) expect(fn).not.toHaveBeenCalled();
   });
-  it.each([0, 1, 5])("accepts %i observed PRs without consulting a larger unbound cache", async prsMergedCount => {
+  it.each([0, 1, 5])("accepts %i observed PRs and refuses a larger unbound cache record", async prsMergedCount => {
+    // A bare StatsData is what the pre-S08 handle-only key held. It carries no
+    // binding, so the read must reject it and collect live instead.
     vi.mocked(fetchStats).mockResolvedValue(makeStats({ handle: "alice", prsMergedCount }));
     vi.mocked(cacheGet).mockResolvedValue(makeStats({ prsMergedCount: 999 }));
     expect((await getStats("alice", undefined, options))!.prsMergedCount).toBe(prsMergedCount);
-    expect(cacheGet).not.toHaveBeenCalled(); expect(cacheSet).not.toHaveBeenCalled(); expect(dbUpsertUser).not.toHaveBeenCalled();
+    expect(cacheGet).toHaveBeenCalledWith("stats:v3:alice"); expect(dbUpsertUser).not.toHaveBeenCalled();
+    expect(cacheSet).toHaveBeenCalledWith("stats:v3:alice", expect.objectContaining({
+      binding: expect.any(String), referenceDate: "2026-09-05", stats: expect.objectContaining({ prsMergedCount }),
+    }), 21_600);
   });
   it("captures the server credential before asynchronous source checks and forwards one reference", async () => {
     vi.mocked(readSourceAuthorization).mockImplementation(async () => { vi.mocked(getGithubToken).mockReturnValue("rotated-token"); return { status: "unlinked" }; });
@@ -73,7 +78,7 @@ describe("uncached v6 compatibility during the receipt migration", () => {
   it("does not serve an unbound stale record when current GitHub collection fails", async () => {
     vi.mocked(fetchStats).mockResolvedValue(null); vi.mocked(cacheGet).mockResolvedValue(makeStats());
     expect(await getStats("alice", undefined, options)).toBeNull();
-    expect(cacheGet).not.toHaveBeenCalled(); expect(dbGetSupplemental).not.toHaveBeenCalled(); expect(dbUpsertUser).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled(); expect(dbGetSupplemental).not.toHaveBeenCalled(); expect(dbUpsertUser).not.toHaveBeenCalled();
   });
   it("checks source availability before collection", async () => {
     vi.mocked(readSourceAuthorization).mockResolvedValue({ status: "unavailable" });
@@ -110,7 +115,10 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     vi.mocked(dbGetSupplemental).mockResolvedValue({ targetHandle: "alice", sourceHandle: "emu", stats: makeStats({ commitsTotal: 20, prsMergedCount: 0 }), uploadedAt: referenceTime });
     const result = await getStats("alice", undefined, options);
     expect(result!.commitsTotal).toBe(20); expect(result!.hasSupplementalData).toBe(true); expect(primary.commitsTotal).toBe(0);
-    expect(cacheSet).not.toHaveBeenCalled();
+    // The composed value is what callers receive, so it is what gets cached.
+    expect(cacheSet).toHaveBeenCalledWith("stats:v3:alice", expect.objectContaining({
+      stats: expect.objectContaining({ commitsTotal: 20, hasSupplementalData: true }),
+    }), 21_600);
   });
   it("deduplicates only the same exact principal/window and returns separate objects", async () => {
     const started = deferred<void>(); const finish = deferred<StatsData>();
@@ -122,11 +130,23 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     a!.commitsTotal = 1000; expect(b!.commitsTotal).not.toBe(1000);
     await getStats("alice", "pat", options); expect(fetchStats).toHaveBeenCalledTimes(2);
   });
-  it("does not share concurrent work across PATs or exact reference instants", async () => {
+  it("does not share concurrent work across PATs, and does share it across instants on one scoring day", async () => {
+    // The binding is deliberately day-scoped, not instant-scoped. Two renders
+    // of one handle a second apart score the identical 365-day window, and
+    // binding to the instant is what made both this map and the cache dead
+    // weight: every production caller omits referenceTime, so every call
+    // produced a unique key and paid its own ~10s GitHub fetch.
     const started = deferred<void>(); const finish = deferred<StatsData>(); let count = 0;
-    vi.mocked(fetchStats).mockImplementation(async () => { if (++count === 3) started.resolve(); return finish.promise; });
+    vi.mocked(fetchStats).mockImplementation(async () => { if (++count === 2) started.resolve(); return finish.promise; });
     const pending = [getStats("alice", "pat-a", options), getStats("alice", "pat-b", options), getStats("alice", "pat-a", { referenceTime: "2026-09-05T12:00:01.000Z" })];
     await started.promise; finish.resolve(makeStats({ handle: "alice" })); await Promise.all(pending);
-    expect(fetchStats).toHaveBeenCalledTimes(3);
+    expect(fetchStats).toHaveBeenCalledTimes(2);
+  });
+  it("does not share concurrent work across scoring days", async () => {
+    const started = deferred<void>(); const finish = deferred<StatsData>(); let count = 0;
+    vi.mocked(fetchStats).mockImplementation(async () => { if (++count === 2) started.resolve(); return finish.promise; });
+    const pending = [getStats("alice", "pat-a", options), getStats("alice", "pat-a", { referenceTime: "2026-09-06T12:00:00.000Z" })];
+    await started.promise; finish.resolve(makeStats({ handle: "alice" })); await Promise.all(pending);
+    expect(fetchStats).toHaveBeenCalledTimes(2);
   });
 });

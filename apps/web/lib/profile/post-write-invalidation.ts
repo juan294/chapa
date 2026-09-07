@@ -1,4 +1,5 @@
 import { cacheDel } from "@/lib/cache/redis";
+import { buildStatsCacheKey } from "@/lib/cache/stats-cache";
 import { buildCraftKey } from "@/lib/cache/craft-cache";
 import { buildSnapshotKey } from "@/lib/cache/snapshot-cache";
 import { invalidateHistoryCache } from "@/lib/history/history";
@@ -39,7 +40,7 @@ export async function invalidateProfileReadModels(
   // `isBadgeCacheRefreshed`, consumed only by `app/api/studio/config/route.ts`).
   await Promise.allSettled([
     options.stats &&
-      runInvalidationStep(() => cacheDel(`stats:v2:merged:${normalizedHandle}`)),
+      runInvalidationStep(() => cacheDel(buildStatsCacheKey(normalizedHandle))),
 
     options.craft &&
       runInvalidationStep(() => cacheDel(buildCraftKey(normalizedHandle))),

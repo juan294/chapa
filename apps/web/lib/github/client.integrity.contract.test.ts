@@ -24,11 +24,21 @@ beforeEach(async () => { redisFake.__reset(); _resetInflight(); await cleanup();
 afterEach(async () => { vi.unstubAllGlobals(); await cleanup(); });
 
 describe("source integrity through actual legacy collection and local persistence", () => {
-  it("accepts a valid empty PR sample without creating an unbound cache entry", async () => {
-    const handle = handles[0]!; stubLegacyGitHub(handle);
+  it("accepts a valid empty PR sample and caches it only under a bound entry", async () => {
+    const handle = handles[0]!; const http = stubLegacyGitHub(handle);
     expect(await getStats(handle)).toMatchObject({ prsMergedCount: 904, prsMergedWeight: 0 });
+    // The pre-S08 handle-only keys stay empty; the replacement carries the
+    // binding that decides whether a later reader may have the row at all.
     expect(await redisFake.cacheGet(`stats:v2:merged:${handle}`)).toBeNull();
     expect(await redisFake.cacheGet(`stats:stale:v2:${handle}`)).toBeNull();
+    expect(await redisFake.cacheGet(`stats:v3:${handle}`)).toMatchObject({
+      binding: expect.any(String), referenceDate: expect.any(String), stats: { prsMergedCount: 904 },
+    });
+    // Same grant, same scoring day: the second read is served from that entry.
+    const before = http.mock.calls.filter(([input]) => String(input).includes("api.github.com")).length;
+    _resetInflight();
+    expect(await getStats(handle)).toMatchObject({ prsMergedCount: 904 });
+    expect(http.mock.calls.filter(([input]) => String(input).includes("api.github.com"))).toHaveLength(before);
   });
   it("does not substitute a larger unbound legacy baseline for the current small observation", async () => {
     const handle = handles[1]!;

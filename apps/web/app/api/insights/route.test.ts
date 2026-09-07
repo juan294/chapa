@@ -255,7 +255,7 @@ describe("POST /api/insights", () => {
   it("invalidates badge cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
     await flushAfterCallbacks();
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:juan294");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:juan294");
   });
 
   it("invalidates snapshot cache after successful upload", async () => {

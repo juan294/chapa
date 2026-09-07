@@ -292,7 +292,7 @@ describe("GET /api/auth/codeberg/callback", () => {
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_cb_oauth_state=xyz" }),
     );
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:codeberg:testuser");
   });
 
