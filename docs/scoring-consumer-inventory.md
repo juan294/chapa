@@ -122,6 +122,7 @@ score has far more surfaces than a badge does.
 | `apps/web/components/dashboard/DimensionCardsRow.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/components/dashboard/ImpactDashboard.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/components/dashboard/ScoreBoldNumber.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
+| `apps/web/components/dashboard/ReceiptExplanationPanel.tsx` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
 | `apps/web/components/dashboard/ScoreExplanationPanel.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/lib/dashboard/generate-insights.ts` | `apps/web/lib/dashboard/generate-insights.test.ts` |
 | `apps/web/lib/dashboard/receipt-explanation.ts` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |

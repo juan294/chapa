@@ -52,6 +52,8 @@ import { tArray } from "@/lib/i18n/typed-accessors";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageHeader } from "./SharePageHeader";
 import { describeScoreForMetadata } from "@/lib/profile/score-description";
+import { readRenderableReceipt } from "@/lib/profile/score-model";
+import { explainReceipt } from "@/lib/dashboard/receipt-explanation";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
@@ -365,6 +367,13 @@ export async function SharePageContent({
 
   const scoreDescription = describeScoreForMetadata(materialized?.scoring ?? null);
 
+  // #1311 — a v7 subject's breakdown is the receipt's own arithmetic. Resolved
+  // here rather than in the client tree: `explainReceipt` reads the sealed
+  // receipt, and the projection it returns is what crosses the boundary.
+  const receiptExplanation = materialized?.scoring?.policyVersion === "v7"
+    ? await readRenderableReceipt(handle).then(snapshot => (snapshot ? explainReceipt(snapshot) : null))
+    : null;
+
   const personJsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
@@ -497,6 +506,7 @@ export async function SharePageContent({
           isOwner={isOwner}
           embedMarkdown={embedMarkdown}
           embedHtml={embedHtml}
+          receiptExplanation={receiptExplanation}
         />
       </div>
 

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { ReceiptExplanationPanel } from "@/components/dashboard/ReceiptExplanationPanel";
+import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
 import { useState } from "react";
 import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
@@ -131,6 +133,10 @@ interface SharePageOwnerContentProps {
   // equivalent using the same formula.
   embedMarkdown?: string;
   embedHtml?: string;
+  /** #1311 — the issued v7 receipt's own arithmetic, resolved server-side.
+   *  Present only for a subject with a receipt; its presence is what switches
+   *  this surface off the v6 explanation. */
+  receiptExplanation?: ReceiptExplanation | null;
 }
 
 export function SharePageOwnerContent({
@@ -143,6 +149,7 @@ export function SharePageOwnerContent({
   isOwner: isOwnerProp,
   embedMarkdown: embedMarkdownProp,
   embedHtml: embedHtmlProp,
+  receiptExplanation = null,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -192,7 +199,15 @@ export function SharePageOwnerContent({
         <EmptyImpactState handle={handle} />
       )}
 
-      {impact && stats && (
+      {/* #1311 — a v7 subject is explained by its receipt. The v6 panel
+          explains confidence penalties, an adjusted score and a recency
+          multiplier, none of which produced the number on the badge above,
+          so showing it here would explain arithmetic that never ran. */}
+      {receiptExplanation ? (
+        <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
+          <ReceiptExplanationPanel explanation={receiptExplanation} />
+        </section>
+      ) : impact && stats ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
           <ScoreExplanationPanel
             impact={impact}
@@ -201,7 +216,7 @@ export function SharePageOwnerContent({
             isOwner={isOwner}
           />
         </section>
-      )}
+      ) : null}
 
       {/* Embed Snippets */}
       <section className="space-y-6 animate-fade-in-up motion-reduce:animate-none [animation-delay:500ms]">
