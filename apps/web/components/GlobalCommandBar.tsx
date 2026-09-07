@@ -24,6 +24,7 @@ import {
 } from "@/lib/keyboard/shortcuts";
 
 const HISTORY_LIMIT = 50;
+const SCROLL_HEIGHT_ROUNDING_PX = 1;
 const HINT_COUNT = 5;
 const EMPTY_COMMANDS: CommandDef[] = [];
 
@@ -56,6 +57,8 @@ export function GlobalCommandBar({
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const [history, setHistory] = useState<string[]>([]);
   const outputRevision = useRef(0);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [dockHeight, setDockHeight] = useState<number>();
   const autocompleteExpanded = showAutocomplete && !!activeSuggestionId;
 
   const descriptions = useMemo(() => tObject<Record<string, string>>(t, "commands.descriptions"), [t]);
@@ -99,6 +102,24 @@ export function GlobalCommandBar({
     };
     window.addEventListener("chapa:terminal-fill", fill);
     return () => window.removeEventListener("chapa:terminal-fill", fill);
+  }, []);
+
+  // LE-4-3 — the spacer must reserve what the dock actually covers. Two
+  // things a fixed `h-28` cannot know: the dock's border box follows font
+  // metrics plus its 1px top border, and the document's height is rounded to
+  // an integer scroll height, so up to one sub-pixel of the page's bottom
+  // edge is unreachable by scrolling. That pixel is taken from the spacer,
+  // the last element in flow, and the footer above it ends under the dock
+  // (0.375px on a Pixel 5). Measure the dock, round up, and reserve one more
+  // pixel for the rounding; `h-28` stays as the floor until measured.
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!dock || typeof ResizeObserver === "undefined") return;
+    const measure = () => setDockHeight(Math.ceil(dock.getBoundingClientRect().height) + SCROLL_HEIGHT_ROUNDING_PX);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(dock);
+    return () => observer.disconnect();
   }, []);
 
   const handleSubmit = useCallback(
@@ -174,8 +195,8 @@ export function GlobalCommandBar({
           than opening as a full-screen palette. Typing `/` opens the
           autocomplete, which is how commands are discovered here. */}
       {/* Reserve document space for the three-row dock, including on short pages. */}
-      <div aria-hidden="true" className="h-28 shrink-0" />
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-forest-line bg-forest px-4 py-2.5 text-forest-text">
+      <div aria-hidden="true" className="h-28 shrink-0" style={dockHeight ? {height: `${dockHeight}px`} : undefined} />
+      <div ref={dockRef} className="fixed bottom-0 left-0 right-0 z-40 border-t border-forest-line bg-forest px-4 py-2.5 text-forest-text">
         <div className="relative mx-auto max-w-4xl">
           {/* Terminal chrome: where you are on the left, the keys that work on
               the right. Both are labels, not controls. */}

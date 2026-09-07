@@ -287,6 +287,52 @@ describe("GlobalCommandBar", () => {
 });
 
 
+// LE-4-3 — a hard-coded spacer (`h-28`, 112px) left the footer 0.375px under
+// the dock on the Pixel 5 viewport: the dock's height follows font metrics
+// plus its 1px border, and the integer scroll height discards up to one
+// sub-pixel of the document's bottom edge, which the spacer absorbs. The
+// spacer follows the measured border box, rounded up, plus that one pixel.
+describe("dock spacer", () => {
+  const spacerOf = (container: HTMLElement) => container.querySelector(".fixed")!.previousElementSibling as HTMLElement;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("reserves the dock's rendered height plus the scroll-height rounding pixel, and follows resizes", () => {
+    let notify: ResizeObserverCallback | undefined;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { notify = callback; }
+      observe = observe;
+      disconnect = disconnect;
+    });
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({height: 112.375} as DOMRect);
+
+    const {container, unmount} = render(<GlobalCommandBar />);
+    const spacer = spacerOf(container);
+    expect(spacer.style.height).toBe("114px");
+    expect(observe).toHaveBeenCalledWith(container.querySelector(".fixed"));
+
+    rect.mockReturnValue({height: 96} as DOMRect);
+    act(() => notify!([], {} as ResizeObserver));
+    expect(spacer.style.height).toBe("97px");
+
+    unmount();
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the static floor when the dock cannot be measured", () => {
+    vi.stubGlobal("ResizeObserver", undefined);
+    const {container} = render(<GlobalCommandBar />);
+    const spacer = spacerOf(container);
+    expect(spacer.className).toContain("h-28");
+    expect(spacer.style.height).toBe("");
+  });
+});
+
 describe("theme and session history", () => {
   it("reads provider preference and only sets valid choices", () => {
     mockSetTheme.mockClear();
