@@ -261,10 +261,7 @@ for (const locale of ["en", "es"] as const) {
     expect(visits.flatMap((v) => v.failedRequests.filter((r) => !r.startsWith("rate-limited")).map((r) => `${r} on ${v.url}`)), "same-origin requests >= 400").toEqual([]);
     expect(visits.flatMap((v) => v.consoleErrors.map((e) => `${v.url}: ${e.slice(0, 200)}`)), "console errors").toEqual([]);
     expect(visits.flatMap((v) => v.consoleErrors.filter((e) => HYDRATION.test(e)).map((e) => `${v.url}: ${e.slice(0, 120)}`)), "hydration warnings").toEqual([]);
-    // `/experiments/*` are flag-gated prototypes and exempt from the product
-    // layout rules (docs/design-system.md); their overflow is recorded in the
-    // attached JSON but does not fail the crawl.
-    expect(visits.filter((v) => v.overflowPx > 0 && !v.url.startsWith("/experiments/")).map((v) => `${v.url}: +${v.overflowPx}px at ${viewportWidth}`), "horizontal overflow").toEqual([]);
+    expect(visits.filter((v) => v.overflowPx > 0).map((v) => `${v.url}: +${v.overflowPx}px at ${viewportWidth}`), "horizontal overflow").toEqual([]);
     expect(visits.flatMap((v) => v.localeLeaks.map((h) => `${v.url}: ${h}`)), "locale-prefixed hrefs").toEqual([]);
     expect(visits.flatMap((v) => v.brokenImages.map((s) => `${v.url}: ${s}`)), "broken images").toEqual([]);
 

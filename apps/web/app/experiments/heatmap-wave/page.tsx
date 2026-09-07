@@ -113,7 +113,7 @@ export default function HeatmapWavePage() {
 
         {/* ── Main Showcase ──────────────────────────────────── */}
         <div className="mt-10">
-          <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8">
+          <div className="overflow-x-auto rounded-2xl border border-warm-stroke bg-warm-card/50 p-8">
             <div className="mb-4 flex items-baseline justify-between">
               <h2 className="font-heading text-xl font-bold text-text-primary">
                 {VARIANTS.find((v) => v.id === activeVariant)?.label}
