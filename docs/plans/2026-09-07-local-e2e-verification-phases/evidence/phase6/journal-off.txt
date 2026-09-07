@@ -1,0 +1,4 @@
+session: juan294
+flag off: displayScore=80 policy=null
+badge flag off: score=80 craftAxis=true
+consent control visible with flag off: false

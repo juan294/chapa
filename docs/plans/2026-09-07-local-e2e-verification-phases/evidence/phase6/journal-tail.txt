@@ -1,0 +1,9 @@
+share owner v7: headline text has range: true; mentions receipt/evidence range: true; confidence word: false
+studio preview v7: score=46–100 craftAxis=false
+og v7 -> 200 image/png 87943 bytes
+POST /api/refresh -> 200
+no-op skip: revisionId before=c3f51ce6-195e-499c-b442-dc1b46bad288 after=c3f51ce6-195e-499c-b442-dc1b46bad288 same=true
+withdraw -> 200 {"success":true,"withdrawn":true,"cleanup":{"complete":true,"status":"complete","receipts":{"attempted":1,"deleted":1,"failed":0},"privateCopies":{"attempted":1
+GET /api/verify/<v7> after withdrawal -> 410 {"version":"v7","status":"revoked","revisionId":"c3f51ce6-195e-499c-b442-dc1b46bad288","signatureAuthenticated":false}
+profile after withdrawal: displayScore=null policy=null
+badge after withdrawal: score=80 craftAxis=true

@@ -1,0 +1,5 @@
+session: juan294
+before consent: displayScore=80 tier=High scoring=null
+badge with flag on and no consent: still v6 pentagon? craftAxis=true score=80
+consent control visible with flag on: true
+consent copy mentions withdrawal consequence: true
