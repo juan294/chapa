@@ -216,6 +216,36 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  // LE-5-2 — the share page's owner cache warm posts /api/refresh on the
+  // visit that follows this redirect. /api/generate just made that exact
+  // session-token fetch, so the warm is recorded as done before the redirect
+  // and the visit does not spend one of the five hourly refreshes.
+  it("marks the owner cache warm as done before redirecting", async () => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(sessionStorage.getItem("chapa:refreshed:testuser")).toBe("1");
+    vi.unstubAllGlobals();
+  });
+
+  it("does not mark the owner cache warm when generation fails", async () => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502 }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(sessionStorage.getItem("chapa:refreshed:testuser")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it("surfaces an error state instead of hanging forever when the request never settles (#1108)", async () => {
     // A fetch that never resolves and never rejects — simulates a stalled
     // network request. Without a timeout, hasError/catch would never fire.

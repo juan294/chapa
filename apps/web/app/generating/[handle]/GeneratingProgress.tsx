@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { markCacheWarmed } from "@/hooks/useOwnerCacheWarm";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 
@@ -175,6 +176,10 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           return;
         }
 
+        // LE-5-2 — the share page this redirects to warms the owner's cache
+        // with the same session-token fetch that just succeeded here. Record
+        // it as done so that visit does not spend a refresh on a repeat.
+        markCacheWarmed(handle);
         setStepStatuses(['done', 'active', 'pending', 'pending']);
         setAnnouncedStepIndex(1);
         completeRemainingSteps(registerStepTimer);
@@ -196,7 +201,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
       controller.abort();
       stepTimerIds.forEach(clearTimeout);
     };
-  }, [completeRemainingSteps]);
+  }, [completeRemainingSteps, handle]);
 
   // Reassure the user the wait is normal progress, not a freeze, once the
   // request has been in flight for a while (#1108).
