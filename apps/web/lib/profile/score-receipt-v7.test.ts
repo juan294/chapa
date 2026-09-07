@@ -282,12 +282,16 @@ describe("revision identity", () => {
  * RPC to be told the same thing — on every badge cache miss, for the handles
  * that have no receipt, which is nearly all of them.
  */
-describe("the durable read is a fallback, not a default", () => {
-  it("does not re-read durably when the cached path says there is no receipt", async () => {
+describe("the durable store is the authority on issuance", () => {
+  it("still reads durably when the cached path returns nothing", async () => {
+    // The manifest the cached path resolves through can be absent while the
+    // receipt is durably stored; the contract suite against real persistence
+    // is what established that, after an optimization assumed otherwise.
     vi.mocked(getCachedReceiptSnapshotV7).mockResolvedValue(null);
+    const stored = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 4), null);
+    vi.mocked(dbReadReceiptV7).mockResolvedValue(stored);
 
-    expect(await readScoreReceiptV7("alice")).toBeNull();
-    expect(dbReadReceiptV7).not.toHaveBeenCalled();
+    expect(await readScoreReceiptV7("alice")).toBe(stored);
   });
 
   it("still falls back when the cached path fails outright", async () => {
