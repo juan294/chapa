@@ -112,7 +112,7 @@ Each archetype has a dedicated guide page at /archetypes/{type} explaining the t
 - **Live SVG**: Rendered server-side, embeddable anywhere that supports images (GitHub README, portfolio sites, LinkedIn, resumes).
 - **Activity Timeline**: Dot-based daily contribution visualization showing activity distribution.
 - **Radar Chart**: Dynamic radar visualization — five-point pentagon when Craft data exists, four-point diamond otherwise.
-- **Score and Tier**: Prominent adjusted score with tier badge.
+- **Score and Tier**: Prominent core score with tier badge. Where source coverage is incomplete the score is published as an interval, and an interval spanning a tier boundary carries no tier.
 - **Archetype Label**: Primary archetype classification.
 - **Creator Studio**: Visual customization tool at /studio with 7 categories (background, card style, border, score effect, heatmap animation, tier treatment, color palette), every one of which renders in the embeddable badge.
 
@@ -162,7 +162,7 @@ Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless St
 ### Public (no auth required)
 - \`GET /u/{handle}/badge.svg\` — Embeddable badge image. Returns SVG with Cache-Control headers (6h s-maxage, 7d stale-while-revalidate).
 - \`GET /u/{handle}\` — Share page with badge, breakdown, and embed snippets.
-- \`GET /api/profile/{handle}\` — JSON: impact dimensions, archetype, tier, and optional craft score. Two headline pairs, deliberately distinct: \`displayScore\`/\`displayTier\` are the FRESH values shown on the badge and share page, while \`compositeScore\`/\`adjustedComposite\`/\`tier\` come from the persisted daily snapshot and are EMA-smoothed for the trend sparkline. Use \`displayScore\` to match the badge; use \`adjustedComposite\` to plot history. \`displayScore\`/\`displayTier\` are null when the fresh score cannot be computed.
+- \`GET /api/profile/{handle}\` — JSON: impact dimensions, archetype, tier, and optional craft score. Two headline pairs, deliberately distinct: \`displayScore\`/\`displayTier\` are the FRESH values shown on the badge and share page, while \`compositeScore\`/\`adjustedComposite\`/\`tier\` come from the persisted daily snapshot and are EMA-smoothed for the trend sparkline. Use \`displayScore\` to match the badge; use \`adjustedComposite\` to plot history. \`displayScore\` is null when the fresh score cannot be computed AND when the score is an evidence-completion range, because a range has no single number an external consumer could republish as exact — read \`scoring\` on the same response for the interval and its bounds.
 - \`GET /api/history/{handle}\` — JSON: score history, trend (improving/stable/declining), and snapshot diffs.
 - \`GET /about/scoring\` — Scoring methodology page.
 - \`GET /archetypes/{type}\` — Archetype guide (builder, guardian, marathoner, polymath, artificer, balanced, emerging).
