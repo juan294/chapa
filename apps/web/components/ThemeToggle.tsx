@@ -29,7 +29,7 @@ export function ThemeToggle() {
   const { t } = useTranslation();
 
   if (!hydrated) {
-    return <div className="h-11 w-11" aria-hidden="true" />;
+    return <div className="h-11 w-11 shrink-0" aria-hidden="true" />;
   }
 
   // An unset or unrecognized value means no explicit choice has been made,
@@ -41,7 +41,7 @@ export function ThemeToggle() {
     <button
       onClick={() => setTheme(next)}
       data-theme-mode={mode}
-      className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full text-terminal-dim transition-colors hover:text-amber-text"
+      className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-terminal-dim transition-colors hover:text-amber-text"
       aria-label={t(NEXT_MODE_LABEL[mode]) as string}
     >
       <span className={iconClass(mode === "system")}>

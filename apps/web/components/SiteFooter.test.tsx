@@ -94,3 +94,33 @@ describe("SiteFooter", () => {
     });
   });
 });
+
+// LE-5-5 — the platform icon links were 14x14 and the Claude Code star 7x12:
+// far under the 44x44 minimum in docs/design-system.md ("Touch targets").
+// Their boxes are not measured for positioning, so the element itself is
+// sized (the first of the two documented approaches); a before: overlay
+// would overlap the neighbouring icon at the old 24px pitch.
+describe("SiteFooter touch targets (LE-5-5)", () => {
+  const PLATFORMS = ["GitHub", "Bitbucket", "Codeberg", "GitLab", "Claude Code"];
+
+  it.each(PLATFORMS)("%s link is a 44x44 box", (label) => {
+    render(<SiteFooter t={t} />);
+    const link = screen.getByLabelText(label);
+    expect(link.className).toContain("h-11 w-11");
+    expect(link.className).toContain("items-center justify-center");
+  });
+
+  it.each(["About", "Scoring", "Terms", "Privacy"])("%s link is at least 44px tall and wide", (label) => {
+    render(<SiteFooter t={t} />);
+    const link = screen.getByRole("link", { name: label });
+    expect(link.className).toContain("min-h-11");
+    expect(link.className).toContain("min-w-11");
+    expect(link.className).toContain("whitespace-nowrap");
+  });
+
+  it("attribution row wraps so the label and five 44px icons fit in 320px", () => {
+    render(<SiteFooter t={t} />);
+    const row = screen.getByText("Import your work from").parentElement;
+    expect(row?.className).toContain("flex-wrap");
+  });
+});

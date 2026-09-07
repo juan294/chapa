@@ -215,7 +215,7 @@ contrast compound.
 
 - Use `max-w-7xl` for editorial composition/nav; constrain long-form prose separately.
 - Use generous section fields, asymmetric desktop composition and neutral dividers.
-- Horizontal padding is responsive: editorial containers commonly use `px-6`; the navbar uses `px-3 sm:px-6` to retain 44px controls on narrow screens.
+- Horizontal padding is responsive: editorial containers commonly use `px-6`; the navbar uses `px-2 sm:px-6` so that at 320px its five controls (logo, menu toggle, language, theme, login or user menu) keep their 44px hit areas without horizontal overflow (LE-5-6).
 - Section dividers: `border-l border-stroke` — vertical left border for terminal output blocks.
 
 ## Landing composition and shell

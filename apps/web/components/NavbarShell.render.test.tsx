@@ -212,3 +212,48 @@ describe("NavbarShell render", () => {
     });
   });
 });
+
+// LE-5-5 / LE-5-6 — at a 320px viewport the bar holds five controls (logo,
+// menu toggle, language, theme, login/user). With 12px side padding and a
+// 24px logo they did not fit: the toggle was squeezed to 22px and the login
+// link ran 3px past the edge. The budget below is what makes 320px fit with
+// every control at its full 44px: 8px side padding, a 20px logo under 400px,
+// and tighter horizontal padding on the two text controls.
+describe("320px fit and touch targets (LE-5-5 / LE-5-6)", () => {
+  it("logo link is a 44px-tall target that never shrinks", () => {
+    render(<NavbarShell session={null} isAdmin={false} t={t} />);
+    const logo = screen.getByText("Chapa").closest("a");
+    expect(logo?.className).toContain("min-h-[44px]");
+    expect(logo?.className).toContain("shrink-0");
+  });
+
+  it("logo wordmark steps down to text-xl below 400px and back up above it", () => {
+    render(<NavbarShell session={null} isAdmin={false} t={t} />);
+    const wordmark = screen.getByText("Chapa");
+    for (const cls of ["text-xl", "min-[400px]:text-2xl", "sm:text-[27px]"]) {
+      expect(wordmark.classList.contains(cls)).toBe(true);
+    }
+  });
+
+  it("inner container uses 8px side padding on mobile (px-2 sm:px-6)", () => {
+    const { container } = render(<NavbarShell session={null} isAdmin={false} t={t} />);
+    const inner = container.querySelector(".max-w-7xl");
+    expect(inner?.classList.contains("px-2")).toBe(true);
+    expect(inner?.classList.contains("sm:px-6")).toBe(true);
+    expect(inner?.classList.contains("px-3")).toBe(false);
+  });
+
+  it("login link tightens its horizontal padding on mobile (px-1.5 sm:px-3)", () => {
+    render(<NavbarShell session={null} isAdmin={false} t={t} />);
+    const link = screen.getByText("login").closest("a");
+    expect(link?.classList.contains("px-1.5")).toBe(true);
+    expect(link?.classList.contains("sm:px-3")).toBe(true);
+    expect(link?.classList.contains("whitespace-nowrap")).toBe(true);
+  });
+
+  it("right controls container never shrinks below its content", () => {
+    render(<NavbarShell session={null} isAdmin={false} t={t} />);
+    const controls = screen.getByTestId("theme-toggle").parentElement;
+    expect(controls?.className).toContain("shrink-0");
+  });
+});

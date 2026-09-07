@@ -105,7 +105,7 @@ export function LanguageSwitcher() {
         }}
         aria-expanded={isExpanded}
         aria-haspopup="listbox"
-        className="flex h-11 items-center gap-1.5 px-3 rounded-[3px] font-heading text-sm text-terminal-dim transition-colors hover:text-amber-text"
+        className="flex h-11 min-w-11 shrink-0 items-center gap-1 rounded-[3px] px-1.5 font-heading text-sm text-terminal-dim transition-colors hover:text-amber-text sm:gap-1.5 sm:px-3"
       >
         <span suppressHydrationWarning>{current.label}</span>
         {/* Inline chevron — no icon library dependency */}

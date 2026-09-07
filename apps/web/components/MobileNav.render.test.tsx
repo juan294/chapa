@@ -221,3 +221,13 @@ describe("MobileNav", () => {
     });
   });
 });
+
+// LE-5-5 — at 320px the toggle was squeezed to 22px wide despite w-11.
+describe("MobileNav toggle never shrinks (LE-5-5)", () => {
+  it("toggle carries w-11 h-11 and shrink-0", () => {
+    render(<MobileNav links={LINKS} />);
+    const toggle = screen.getByLabelText("Toggle navigation");
+    expect(toggle.className).toContain("w-11 h-11");
+    expect(toggle.className).toContain("shrink-0");
+  });
+});

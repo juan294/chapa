@@ -178,3 +178,24 @@ describe("ThemeToggle — mobile responsiveness (#240)", () => {
     expect(placeholder.getAttribute("aria-hidden")).toBe("true");
   });
 });
+
+// LE-5-5 — at 320px the flex row squeezed the toggle to 39px wide even though
+// it declares w-11: a flex item shrinks unless told not to.
+describe("ThemeToggle — never shrinks in a tight flex row (LE-5-5)", () => {
+  beforeEach(() => {
+    mockTheme = "light";
+    isClientState.current = true;
+  });
+
+  it("button carries shrink-0", () => {
+    render(<ThemeToggle />);
+    expect(screen.getByRole("button").className).toContain("shrink-0");
+  });
+
+  it("hydration placeholder carries shrink-0 too", () => {
+    isClientState.current = false;
+    const { container } = render(<ThemeToggle />);
+    const placeholder = container.firstElementChild as HTMLElement;
+    expect(placeholder.className).toContain("shrink-0");
+  });
+});

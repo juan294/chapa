@@ -80,32 +80,35 @@ export function SiteFooter({ t, showCta = false }: SiteFooterProps) {
             <span className="text-xs text-text-secondary">{tagline}</span>
           </div>
 
-          <div className="flex items-center gap-3 text-text-secondary">
+          {/* LE-5-5 — every link here is a 44x44 box, so the row wraps: at
+              320px the label sits above the five icons instead of forcing
+              the row past the viewport edge. */}
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-text-secondary">
             <span className="text-xs">{poweredBy}</span>
-            <div className="flex items-center gap-2.5">
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber-text transition-colors">
+            <div className="flex items-center">
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="flex h-11 w-11 items-center justify-center rounded-[3px] hover:text-amber-text transition-colors">
                 <GitHubIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" aria-label="Bitbucket" title="Bitbucket" className="hover:text-amber-text transition-colors">
+              <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" aria-label="Bitbucket" title="Bitbucket" className="flex h-11 w-11 items-center justify-center rounded-[3px] hover:text-amber-text transition-colors">
                 <BitbucketIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="hover:text-amber-text transition-colors">
+              <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="flex h-11 w-11 items-center justify-center rounded-[3px] hover:text-amber-text transition-colors">
                 <CodebergIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://gitlab.com" target="_blank" rel="noopener noreferrer" aria-label="GitLab" title="GitLab" className="hover:text-amber-text transition-colors">
+              <a href="https://gitlab.com" target="_blank" rel="noopener noreferrer" aria-label="GitLab" title="GitLab" className="flex h-11 w-11 items-center justify-center rounded-[3px] hover:text-amber-text transition-colors">
                 <GitlabIcon className="w-3.5 h-3.5" />
               </a>
-              <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber-text transition-colors">
+              <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="flex h-11 w-11 items-center justify-center rounded-[3px] font-heading text-xs leading-none hover:text-amber-text transition-colors">
                 <ClaudeCodeStar />
               </a>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs text-text-secondary">
-            <Link href="/about" className="hover:text-amber-text transition-colors">{about}</Link>
-            <Link href="/about/scoring" className="hover:text-amber-text transition-colors">{scoring}</Link>
-            <Link href="/terms" className="hover:text-amber-text transition-colors">{terms}</Link>
-            <Link href="/privacy" className="hover:text-amber-text transition-colors">{privacy}</Link>
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-text-secondary">
+            <Link href="/about" className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-[3px] px-1 hover:text-amber-text transition-colors">{about}</Link>
+            <Link href="/about/scoring" className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-[3px] px-1 hover:text-amber-text transition-colors">{scoring}</Link>
+            <Link href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-[3px] px-1 hover:text-amber-text transition-colors">{terms}</Link>
+            <Link href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-[3px] px-1 hover:text-amber-text transition-colors">{privacy}</Link>
           </div>
         </div>
 

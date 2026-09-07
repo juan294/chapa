@@ -55,10 +55,13 @@ export interface NavbarShellProps {
 export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: NavbarShellProps) {
   return (
     <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-3 sm:px-6">
+      {/* LE-5-6 — 320px budget: 8px side padding, a 20px wordmark below 400px
+          and px-1.5 on the two text controls let logo + menu toggle + language +
+          theme + login all sit at their full 44px without overflow. */}
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-2 py-3 sm:px-6">
         {/* Left: Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <span className="font-heading text-2xl font-bold tracking-tight text-text-primary sm:text-[27px]">
+        <Link href="/" className="flex min-h-[44px] shrink-0 items-center gap-2">
+          <span className="font-heading text-xl font-bold tracking-tight text-text-primary min-[400px]:text-2xl sm:text-[27px]">
             Chapa<span className="text-amber-text">_</span>
           </span>
         </Link>
@@ -85,7 +88,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
         )}
 
         {/* Right: Language switcher + Theme toggle + User or login */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <LanguageSwitcher />
           <ThemeToggle />
           <div suppressHydrationWarning>
@@ -111,7 +114,7 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
               // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a
                 href="/api/auth/login"
-                className="inline-flex min-h-[44px] items-center gap-1 rounded-[3px] px-3 font-heading text-sm text-text-secondary transition-colors hover:bg-purple-tint hover:text-text-primary"
+                className="inline-flex min-h-[44px] items-center gap-1 whitespace-nowrap rounded-[3px] px-1.5 font-heading text-sm text-text-secondary transition-colors hover:bg-purple-tint hover:text-text-primary sm:px-3"
               >
                 <span className="text-amber-text">/</span> {t('common.login') as string}
               </a>
