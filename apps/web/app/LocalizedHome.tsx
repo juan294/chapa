@@ -4,7 +4,7 @@ import { DEMO_STATS } from "@/lib/render/demoData";
 import { LANDING_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { LANDING_IMPACT } from "@/lib/render/landing-demo-data";
-import { LandingContent } from "../LandingContent";
+import { LandingContent } from "./LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -12,13 +12,12 @@ import { getServerT } from "@/lib/i18n/server";
 import { isSupportedLocale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { DocumentLocaleMarker } from "@/lib/i18n/document-locale";
 import { LandingWebMcpTools } from "@/components/LandingWebMcpTools";
 import { getLeaderboard } from "@/lib/profile/leaderboard";
 
-// The sample and standings share one live scoring selection. Hourly ISR would
-// keep publishing the previous policy after an administrative cutover.
-export const dynamic = "force-dynamic";
-
+// The literal en/es route wrappers declare force-dynamic: the sample and
+// standings must share one live scoring selection after a cutover.
 // #1065 (FE-H1) — the root layout no longer sets a blanket canonical, so
 // every page (including this one) must declare its own. `/` is the one
 // place a root-relative canonical is actually correct.
@@ -61,6 +60,7 @@ export default async function Home({ params }: HomeProps) {
   const topScored = await getLeaderboard(3, selection);
   return (
     <>
+      <DocumentLocaleMarker locale={locale} />
       <LanguageProvider
         initialLocale={locale}
         // The static root provider always renders at DEFAULT_LOCALE. A request

@@ -91,3 +91,13 @@ Found: two profiles can share the core observation window while their selected C
 Chose: keep compatible core comparisons, but omit the Craft delta and report an explicit report-period limitation when those report periods differ. Resolve the landing policy per request and rank all current consented receipts under the same captured selection.
 
 Why: a valid core comparison does not establish report-period comparability, and a cached landing policy must not contradict the linked badge after a flag switch. This changes neither the formula nor the badge design.
+
+### Phase 9 — landing route admission during local qualification
+
+Plan said: keep per-request landing scoring selection and validate the completed candidate's core routes.
+
+Found: the force-dynamic locale landing accepted an unknown top-level path, first crashing on a missing dictionary and then streaming HTTP200 before a guarded notFound could take effect.
+
+Chose: keep the shared landing renderer and explicit English/Spanish dynamic routes, with the same canonical URL, locale marker and live scoring selection. Unknown top-level paths no longer match a landing route. Preserve the strict HTTP404 browser check.
+
+Why: rendering a correct error page is insufficient when the response status contradicts it. This fixes route admission without changing the scoring policy or expanding the proxy matcher.

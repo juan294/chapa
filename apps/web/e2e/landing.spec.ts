@@ -1,4 +1,19 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+async function expectLandingLocale(page: Page, locale: "en" | "es") {
+  await expect(page.locator("html")).toHaveAttribute("lang", locale);
+  // Streaming navigation may temporarily retain the outgoing hidden page.
+  const hero = page.locator("main #hero:visible");
+  await expect(hero).toHaveCount(1);
+  const heading = hero.getByRole("heading", { level: 1 });
+  await expect(heading).toHaveCount(1);
+  await expect(heading).toBeVisible();
+  await expect(heading).toContainText(locale === "en" ? "GOOD WORK" : "EL BUEN TRABAJO");
+  const cta = hero.getByRole("link", { name: locale === "en" ? "Open the Creator Studio ↗" : "Abre el Estudio de Creación ↗", exact: true });
+  await expect(cta).toHaveCount(1);
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute("href", "/studio");
+}
 
 test.describe("Landing page — sections and content", () => {
   test.beforeEach(async ({ page }) => {
@@ -85,31 +100,25 @@ test.describe("Landing page — sections and content", () => {
     await page.getByRole("option", { name: "English" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("h1")).toContainText("GOOD WORK");
-    await expect(
-      page.locator('main a[href="/studio"]').first()
-    ).toContainText("Open the Creator Studio");
+    await expectLandingLocale(page, "en");
 
     await page.getByRole("button", { name: "EN", exact: true }).click();
     await page.getByRole("option", { name: "Español" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("h1")).toContainText("EL BUEN TRABAJO");
-    await expect(
-      page.locator('main a[href="/studio"]').first()
-    ).toContainText("Abre el Estudio de Creación");
+    await expectLandingLocale(page, "es");
   });
 
   test("switching from a directly visited locale route returns to the canonical URL", async ({
     page,
   }) => {
     await page.goto("/es");
-    await expect(page.locator("h1")).toContainText("EL BUEN TRABAJO");
+    await expectLandingLocale(page, "es");
 
     await page.getByRole("button", { name: "ES", exact: true }).click();
     await page.getByRole("option", { name: "English" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("h1")).toContainText("GOOD WORK");
+    await expectLandingLocale(page, "en");
   });
 });

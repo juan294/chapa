@@ -33,8 +33,12 @@ describe("locale-segmented content pages remain statically generated (#1167 / UX
   }
 
   it("the scored landing page follows captured live policy instead of hourly ISR", () => {
-    const source = fs.readFileSync(path.resolve(__dirname, "page.tsx"), "utf-8");
-    expect(source).toContain('export const dynamic = "force-dynamic"');
+    const source = fs.readFileSync(path.resolve(__dirname, "../LocalizedHome.tsx"), "utf-8");
+    for (const locale of ["en", "es"]) {
+      const route = fs.readFileSync(path.resolve(__dirname, `../${locale}/page.tsx`), "utf-8");
+      expect(route).toContain('export const dynamic = "force-dynamic"');
+    }
+    expect(fs.existsSync(path.resolve(__dirname, "page.tsx"))).toBe(false);
     expect(source).not.toMatch(/export const revalidate\s*=/);
     expect(source).toContain("getLeaderboard(3, selection)");
   });

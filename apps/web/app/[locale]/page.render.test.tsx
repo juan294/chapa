@@ -10,7 +10,7 @@ import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
 import { LANDING_SECTIONS } from "@/components/landing/landing-commands";
 
-// page.tsx computes the demo badge SVG per locale, resolves the
+// LocalizedHome.tsx computes the demo badge SVG per locale, resolves the
 // [locale] route param, and calls the REAL getServerT(locale) — this is the
 // #1023 (FE-H1) fix: the landing page is now a genuine per-locale RSC, so
 // this test exercises the actual English dictionary rather than mocking
@@ -74,8 +74,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 async function renderHome(locale: "en" | "es" = "en") {
-  const { default: Home } = await import("./page");
-  const jsx = await Home({ params: Promise.resolve({ locale }) });
+  const { default: Home } = locale === "en" ? await import("../en/page") : await import("../es/page");
+  const jsx = await Home();
   // Match production: the static root layout owns the DEFAULT_LOCALE provider
   // (app/layout.tsx resolves its dictionary the same way), while the
   // locale-segmented page overrides it for the other locale. Derived from
@@ -92,7 +92,7 @@ async function renderHome(locale: "en" | "es" = "en") {
 
 describe("Home page metadata", () => {
   it("rejects an unknown route segment before translating or rendering the landing", async () => {
-    const { default: Home, generateMetadata } = await import("./page");
+    const { default: Home, generateMetadata } = await import("../LocalizedHome");
     const props = { params: Promise.resolve({ locale: "nonexistent-page-xyz" }) };
     await expect(generateMetadata(props)).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK;404");
     await expect(Home(props)).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK;404");
@@ -101,13 +101,16 @@ describe("Home page metadata", () => {
     ["en", "Chapa — Developer Impact, Decoded", "Your developer impact"],
     ["es", "Chapa — Impacto de desarrollador, decodificado", "Tu impacto como desarrollador"],
   ] as const)("renders %s metadata from the selected route", async (locale, title, descriptionStart) => {
-    const { generateMetadata } = await import("./page");
-    const metadata = await generateMetadata({
-      params: Promise.resolve({ locale }),
-    });
+    const { generateMetadata } = locale === "en" ? await import("../en/page") : await import("../es/page");
+    const metadata = await generateMetadata();
 
     expect(metadata.title).toEqual({ absolute: title });
     expect(metadata.description).toContain(descriptionStart);
+    expect(metadata.alternates?.canonical).toBe("/");
+  });
+  it.each(["en", "es"] as const)("keeps the early %s locale marker without the dynamic segment layout", async locale => {
+    await renderHome(locale);
+    expect(document.querySelector(`template[data-chapa-document-locale="${locale}"]`)).not.toBeNull();
   });
 });
 
@@ -312,7 +315,7 @@ describe("landing badge locale", () => {
   it.each(["en", "es"] as const)("renders animated and static %s samples from the same 92/Elite inputs", async (locale) => {
     const { renderBadgeSvg } = await import("@/lib/render/BadgeSvg");
     vi.mocked(renderBadgeSvg).mockClear();
-    const { default: Home } = await import("./page");
+    const { default: Home } = await import("../LocalizedHome");
     await Home({ params: Promise.resolve({ locale }) });
     const calls = vi.mocked(renderBadgeSvg).mock.calls;
     expect(calls).toHaveLength(2);
