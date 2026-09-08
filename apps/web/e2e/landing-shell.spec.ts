@@ -108,16 +108,21 @@ test.describe("Landing developer shell", () => {
 
   test("reduced motion shows the complete badge without waiting for its reveal", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    const state = await page.locator('#badge-preview svg[data-badge-design]').evaluate((svg: SVGSVGElement) => {
+    const badge = page.locator('#hero:visible #badge-preview svg[data-badge-design]');
+    await expect(badge).toHaveCount(1);
+    await expect(badge).toBeVisible();
+    await badge.evaluate((svg: SVGSVGElement) => {
       svg.pauseAnimations();
       svg.setCurrentTime(0);
+    });
+    // Emulating the preference can precede the next computed-style update.
+    // Keep the timeline paused at zero while waiting for the actual CSS rule,
+    // so an ordinary reveal animation cannot satisfy the complete-state check.
+    await expect.poll(() => badge.evaluate((svg: SVGSVGElement) => {
       const cells = [...svg.querySelectorAll('[data-element="activity"] rect')];
       const arc = svg.querySelector('circle[stroke-dashoffset]')!;
-      return { cells: cells.length, visible: cells.every(cell => getComputedStyle(cell).opacity === '1'), ringAnimation: getComputedStyle(arc).animationName };
-    });
-    expect(state.cells).toBe(91);
-    expect(state.visible).toBe(true);
-    expect(state.ringAnimation).toBe('none');
+      return { reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, cells: cells.length, visible: cells.every(cell => getComputedStyle(cell).opacity === '1'), ringAnimation: getComputedStyle(arc).animationName };
+    })).toEqual({ reducedMotion: true, cells: 91, visible: true, ringAnimation: 'none' });
   });
 
   test("footer clears the dock and closing focus uses its paired foreground", async ({ page }) => {
