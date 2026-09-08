@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { inspectLocalSql as sql } from "@/test/contract/local-sql";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createScoringWindow } from "@chapa/shared";
 import { getServiceClient, invokeJson, makeCliBearer } from "@/test/contract/invoke";
@@ -16,11 +15,7 @@ function fixture(second = false) {
     events: [{ eventId: second ? "merge-2" : "merge-1", repositoryId: "repo-1", actorId: "work-42", workItemId: second ? "pr-2" : "pr-1",
       kind: "accepted_change", occurredAt: occurred, artifactRevision: second ? "sha-2" : "sha-1", additions: 1, deletions: 0 }] };
 }
-function sql(command: string) {
-  const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
-  if (!project) throw new Error("Missing disposable database project");
-  return execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", command], { encoding: "utf8" });
-}
+
 function clearFailure() {
   sql("DROP TRIGGER IF EXISTS contract_supplemental_v2_failure ON public.scoring_v7_source_observations; DROP FUNCTION IF EXISTS public.contract_supplemental_v2_failure()");
 }

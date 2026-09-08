@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { inspectLocalSql } from "@/test/contract/local-sql";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createScoringWindow } from "@chapa/shared";
@@ -90,10 +89,8 @@ describe("ledger real transaction contracts", () => {
 });
 
 it("denies browser roles the ledger RPCs and keeps its existing tables under forced RLS", () => {
-  const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
-  if (!project) throw new Error("Missing local database project");
   const query = "SELECT has_function_privilege('anon','public.scoring_v7_ledger_write(text,text,text,jsonb)','EXECUTE'), has_function_privilege('authenticated','public.scoring_v7_ledger_read(text,text,timestamptz)','EXECUTE'), has_function_privilege('authenticated','public.scoring_v7_ledger_artifact(text,text,text)','EXECUTE'), bool_and(relrowsecurity AND relforcerowsecurity) FROM pg_class WHERE relnamespace='public'::regnamespace AND relname IN ('scoring_v7_evidence','scoring_v7_assessments','scoring_v7_evidence_references','scoring_v7_raw_artifacts')";
-  expect(execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", query], { encoding: "utf8" }).trim()).toBe("f|f|f|t");
+  expect(inspectLocalSql(query)).toBe("f|f|f|t");
 });
 
 it("a conflicted latest Craft verdict does not resurrect its prior accepted revision", async () => {

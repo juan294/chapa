@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { inspectLocalSql } from "@/test/contract/local-sql";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { canonicalJson } from "@chapa/shared";
 import { getServiceClient } from "@/test/contract/invoke";
@@ -19,10 +18,8 @@ describe("v7 durable issuance (real local database)", () => {
     return { p_owner: owner, p_actor: owner, p_revision: receipt.revisionId, p_key_version: "contract-key", p_signature: receipt.revisionId.replaceAll("-", "").repeat(2), p_canonical: canonicalJson(receipt) };
   }
   it("denies browser roles access to every verification and deletion RPC", () => {
-    const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
-    if (!project) throw new Error("Missing local Supabase project identity");
     const query = "SELECT p.proname, has_function_privilege('anon',p.oid,'EXECUTE'), has_function_privilege('authenticated',p.oid,'EXECUTE'), has_function_privilege('service_role',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('scoring_v7_issue_verification','scoring_v7_read_verification','scoring_v7_withdraw_with_receipts','scoring_v7_delete_user_with_receipts','scoring_v7_revocation_batch') ORDER BY p.proname";
-    const rows = execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", query], { encoding: "utf8" }).trim().split("\n");
+    const rows = inspectLocalSql(query).split("\n");
     expect(rows).toHaveLength(5);
     for (const row of rows) expect(row.split("|").slice(1)).toEqual(["f", "f", "t"]);
   });

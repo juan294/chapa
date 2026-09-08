@@ -1,6 +1,5 @@
+import { inspectLocalSql as sql } from "@/test/contract/local-sql";
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { PrivateCriterionAssessment, PrivateEvidenceClaim, PrivateEvidenceReference } from "@chapa/shared";
 import { assessmentToRow, assessmentFromRow, evidenceClaimToRow, evidenceReferenceToRow, type AssessmentRow } from "./scoring-v7-contract";
@@ -10,7 +9,6 @@ const owner = "contract-scoring-v7-owner";
 const reviewer = "contract-scoring-v7-reviewer";
 const stranger = "contract-scoring-v7-stranger";
 const db = () => getServiceClient();
-const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
 
 /** Foundation fixtures exercise storage invariants, not S12 arithmetic. */
 function boundReceiptRow(row: { id: string | undefined; owner_handle: string; policy_version: string; reference_time: string; revision: number; public_receipt: object; supersedes_id?: string; canonical_receipt: string }) {
@@ -19,10 +17,7 @@ function boundReceiptRow(row: { id: string | undefined; owner_handle: string; po
   return { ...row, issued_at: row.reference_time, public_receipt: payload, canonical_receipt: JSON.stringify(payload) };
 }
 
-function sql(statement: string): string {
-  if (!project) throw new Error("Missing local Supabase project identity");
-  return execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", statement], { encoding: "utf8" }).trim();
-}
+
 
 describe("v7 scoring database foundation (real local contract)", () => {
   beforeEach(async () => {

@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { basename, isAbsolute } from "node:path";
 import { getSupabaseUrl } from "@/lib/env";
 
 /** Test-only inspection of the established local project. Credentials come
@@ -19,7 +20,13 @@ export function assertLocalSqlTarget(): string {
     throw new Error("Local SQL inspection requires a loopback Supabase URL");
   }
 
-  const config = readFileSync("supabase/config.toml", "utf8");
+  // An override is explicit and never falls back to another running project.
+  // Accept config files only, never an environment/credential file.
+  const override = process.env.CONTRACT_SUPABASE_CONFIG;
+  if (override !== undefined && (!isAbsolute(override) || basename(override) !== "config.toml" || override.includes("\0"))) {
+    throw new Error("Explicit local Supabase config path must be an absolute config.toml path");
+  }
+  const config = readFileSync(override ?? "supabase/config.toml", "utf8");
   const root = config.split(/^\s*\[/m)[0] ?? "";
   const identities = [...root.matchAll(/^\s*project_id\s*=\s*(.*?)\s*$/gm)];
   const project = identities.length === 1

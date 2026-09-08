@@ -1,6 +1,5 @@
+import { inspectLocalSql } from "@/test/contract/local-sql";
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { aggregateEngineeringEvidence, createScoringWindow } from "@chapa/shared";
 import { getServiceClient } from "@/test/contract/invoke";
@@ -69,10 +68,8 @@ describe("supplemental v2 real durable source transactions", () => {
     expect((await readSupplementalEvidenceV2(owner, createScoringWindow(before))).evidence.events).toEqual([]);
   });
   it("denies browser roles every private supplemental RPC", () => {
-    const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
-    if (!project) throw new Error("Missing disposable database project");
     const query = "SELECT has_function_privilege('anon','public.scoring_v7_store_supplemental(text,text,uuid,text,jsonb)','EXECUTE'), has_function_privilege('authenticated','public.scoring_v7_supplemental_manifest(text,text,timestamptz,integer)','EXECUTE'), has_function_privilege('authenticated','public.scoring_v7_read_supplemental(text,text,uuid[],timestamptz)','EXECUTE')";
-    expect(execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", query], { encoding: "utf8" }).trim()).toBe("f|f|f");
+    expect(inspectLocalSql(query)).toBe("f|f|f");
   });
 
 });

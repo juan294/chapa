@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { inspectLocalSql } from "@/test/contract/local-sql";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createScoringWindow, type PrivateEvidenceClaim, type PrivateCriterionAssessment } from "@chapa/shared";
@@ -112,10 +111,8 @@ it("round-trips dated no-report ledger evidence and excludes raw uploaded verdic
 
 
 it("denies browser roles all private Craft RPC access", () => {
-  const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
-  if (!project) throw new Error("Missing local database project");
   const query = "SELECT has_function_privilege('anon','public.scoring_v7_store_craft_report(text,text,uuid,text,timestamptz,timestamptz,jsonb,text)','EXECUTE'), has_function_privilege('authenticated','public.scoring_v7_read_craft(text,text,timestamptz)','EXECUTE'), has_function_privilege('authenticated','public.scoring_v7_purge_expired_raw()','EXECUTE')";
-  expect(execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", query], { encoding: "utf8" }).trim()).toBe("f|f|f");
+  expect(inspectLocalSql(query)).toBe("f|f|f");
 });
 
 
