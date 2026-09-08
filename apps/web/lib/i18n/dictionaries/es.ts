@@ -495,6 +495,46 @@ export const es: Translations = {
     consentWithdraw: 'Retirar la publicación',
     consentError: 'No se pudo actualizar el consentimiento de publicación. Inténtalo de nuevo más tarde.',
   },
+  observedScoring: {
+    "uploadInsights": "Subir insights",
+    "intro": "Las evidencias registradas contribuyen a esta puntuación; la falta de evidencia no es un juicio sobre tu capacidad.",
+    "coreSeparate": "Cada una de las cuatro dimensiones principales aporta un 25 %. Oficio se muestra por separado y nunca cambia la puntuación principal.",
+    "unavailable": "No disponible",
+    "updateInsights": "Actualizar insights",
+    "noArchetype": "Sin arquetipo asignado",
+    "stale": "Registrado para el {date}; las evidencias posteriores no se reflejan aquí.",
+    "evidenceDetails": "Evidencias registradas",
+    "missingEvidence": "No se acreditaron observaciones válidas para este criterio. Añade evidencias del trabajo que has realizado.",
+    "coaching": "Evidencias que documentar",
+    "craftReport": "Estimación del modelo derivada del informe",
+    "craftInsufficient": "Datos del informe insuficientes",
+    "craftNone": "Sin informe de insights",
+    "craftUnavailable": "Este informe no aporta una puntuación actual de Oficio. Actualiza insights para incluir un informe válido.",
+    "reportPeriod": "Periodo del informe: del {start} al {end}",
+    "reportCoverage": "Resultados clasificados: {recognized} de {total} sesiones.",
+    "outcomeCredits": "Créditos por resultado",
+    "unknownSessions": "Resultados desconocidos",
+    "unclassifiedSessions": "Sesiones sin clasificar",
+    "explanationUnavailable": "La explicación del recibo exacto no está disponible. La puntuación mostrada sigue identificando su recibo registrado.",
+    "coverageIncomplete": "La cobertura es parcial. Solo contribuyen las observaciones válidas; no se estima crédito por la evidencia que falta.",
+    "activityOnly": "La actividad de las fuentes es descriptiva y no desglosa la evidencia acreditada para la puntuación.",
+    "steps": {
+      "delivery_units": "Unidades de entrega",
+      "active_iso_weeks": "Semanas ISO activas",
+      "eligible_projects": "Proyectos válidos",
+      "eligible_categories": "Categorías válidas",
+      "rationale": "Justificación",
+      "verification": "Verificación",
+      "review_or_correction": "Revisión o corrección",
+      "outcome_followup": "Seguimiento del resultado"
+    },
+    "outcomes": {
+      "fully_achieved": "Completamente logrado",
+      "mostly_achieved": "Mayormente logrado",
+      "partially_achieved": "Parcialmente logrado",
+      "not_achieved": "No logrado"
+    }
+  },
   userMenu: {
     myBadge: 'Mi Chapa',
     creatorStudio: 'Creator Studio',
@@ -571,6 +611,14 @@ export const es: Translations = {
     github: 'GITHUB',
   },
   badge: {
+    illustrativeExample: 'Ejemplo ilustrativo de puntuación.',
+    craftUpdate: 'Actualiza insights',
+    observedScoreDescription: 'Puntuación principal observada a partir de evidencia acreditada; Craft no entra en la media principal.',
+    reportCraftDescription: 'Craft: {score}/100 a partir de {credited} sesiones con crédito por resultados de {total}. Resultados clasificados: {recognized}/{total}. Periodo del informe: {start} a {end} (fin exclusivo).',
+    reportCraftAbsent: 'No hay una puntuación actual de Craft derivada de un informe.',
+    reportCraftUnavailable: 'Craft está desbloqueado; actualiza insights para obtener una puntuación actual.',
+    incompleteSources: '{incomplete} de {total} fuentes incompletas.',
+    excludedSources: '{count} fuentes excluidas y declaradas.',
     activityHeading: '01 / ACTIVIDAD',
     heatmapCaption: '13 SEMANAS × 7 DÍAS',
     impactHeading: '02 / IMPACTO',
@@ -965,6 +1013,147 @@ export const es: Translations = {
       contactEmail: 'support@chapa.thecreativetoken.com',
       contactBodyEnd: '.',
     },
+    scoringObserved: {
+      metadataTitle: 'Metodología de puntuación observada · v7.2',
+      metadataDescription: 'Cómo Chapa calcula una puntuación principal observada con cuatro pesos fijos y Craft opcional derivado de informes, recibos reproducibles y límites explícitos de cobertura.',
+      "h1": "Metodología de puntuación · v7.2",
+      "intro": "Una puntuación principal observada, cuatro pesos fijos y un resultado Craft opcional derivado de un informe. Los ejemplos son ilustrativos, no afirmaciones sobre una persona.",
+      "archivedNotice": "Metodología archivada: algoritmo v7.1, política de recibos v7. No es la política observada actual v7.2.",
+      "sectionPhilosophy": "Qué significa el punto observado",
+      "philosophyBody": [
+            "La puntuación describe evidencia de ingeniería que cumple los requisitos y se registra dentro del periodo. No es una medida completa de la capacidad de una persona ni del impacto comercial. Las comparaciones bajo la misma política describen este índice registrado, no la capacidad relativa de las personas.",
+            "Delivery, prácticas de Quality, Consistency y Breadth aportan exactamente 0.25 cada una. Las mismas reglas se aplican a todos los perfiles. No hay multiplicador de confianza, premio por antigüedad ni penalización por trabajo individual."
+      ],
+      "sectionWindow": "Un periodo y un reloj",
+      "windowBody": [
+            "Cada recibo fija una hora de referencia y las 365 fechas del calendario UTC que terminan en su fecha de referencia. Los eventos no pueden ser posteriores a esa hora. Todas las dimensiones principales comparten ese contexto.",
+            "El informe debe quedar completamente dentro del periodo. Se rechaza una fecha final futura. Si solo indica fechas y termina hoy, su final se limita una vez a la primera captura del servidor; las importaciones idénticas posteriores conservan ese límite."
+      ],
+      "sectionNormalization": "Normalización de los recuentos",
+      "normalizationBody": [
+            "Cada recuento válido x utiliza la misma función logarítmica N con su tope fijo c. Parte de cero, llega a uno en el tope y no concede crédito adicional por superarlo."
+      ],
+      "normalizationFormula": "N(x, c) = ln(1 + min(x, c)) / ln(1 + c)",
+      "sectionCaps": "Topes fijos",
+      "capsBody": [
+            "Los topes son constantes de la política, no percentiles ni comparaciones entre personas."
+      ],
+      "capsTableHeaders": [
+            "Recuento válido",
+            "Tope"
+      ],
+      "capsTableRows": [
+            [
+                  "Unidades de Delivery",
+                  "120"
+            ],
+            [
+                  "Cada criterio de Quality",
+                  "12"
+            ],
+            [
+                  "Semanas ISO activas",
+                  "40"
+            ],
+            [
+                  "Proyectos válidos",
+                  "4"
+            ],
+            [
+                  "Categorías de trabajo válidas",
+                  "4"
+            ]
+      ],
+      "sectionDimensions": "Las cuatro dimensiones principales",
+      "dimensionsBody": [
+            "Los recuentos corresponden a evidencia válida sin duplicados. El volumen bruto de commits y las afirmaciones propias no cumplen los requisitos automáticamente."
+      ],
+      "dimensionsTableHeaders": [
+            "Dimensión",
+            "Fórmula",
+            "Qué se cuenta"
+      ],
+      "dimensionsTableRows": [
+            [
+                  "Delivery",
+                  "D = 100 × N(deliveryUnits, 120)",
+                  "Grupos distintos de trabajo aceptado válido por proyecto y fecha UTC. Dividir el trabajo no multiplica el mismo grupo."
+            ],
+            [
+                  "Prácticas de Quality",
+                  "Q = 25 × [N(rationale, 12) + N(verification, 12) + N(review_or_correction, 12) + N(outcome_followup, 12)]",
+                  "Evidencia acreditada de justificación, verificación, revisión o corrección y seguimiento del resultado. La ausencia de observaciones acreditadas significa que no aportan a este índice; no implica falta de capacidad."
+            ],
+            [
+                  "Consistency",
+                  "C = 100 × N(activeIsoWeeks, 40)",
+                  "Semanas ISO con contribuciones atribuibles válidas. Sin penalizaciones por fines de semana ni ráfagas de actividad."
+            ],
+            [
+                  "Breadth",
+                  "B = 50 × N(eligibleProjects, 4) + 50 × N(eligibleCategories, 4)",
+                  "Proyectos y categorías de trabajo válidos, sujetos a las reglas de tres fechas distintas. La popularidad no mide esta diversidad."
+            ]
+      ],
+      "sectionCraft": "Craft a partir de un informe de insights",
+      "craftBody": [
+            "Importa un informe de Claude Code /insights y, si hace falta, acepta la publicación numérica en esa misma acción. Craft se deriva del informe y es una estimación del modelo; reproducir su cálculo no verifica el informe de forma independiente.",
+            "Los créditos son: fully achieved = 1, mostly achieved = 0.7, partially achieved = 0.3 y not achieved o failed = 0. Todas las sesiones permanecen en el denominador, incluidas las de resultado desconocido o sin clasificar."
+      ],
+      "craftFormula": "Craft = 100 × (fully + 0.7 × mostly + 0.3 × partially) / totalSessions",
+      "craftExample": "Ejemplo ilustrativo: 10 sesiones, con 4 fully, 2 mostly, 1 partially, 1 failed, 1 desconocida y 1 sin clasificar. La cobertura reconocida es 8/10 y los resultados acreditados suman 5.7.",
+      "craftExampleFormula": "100 × (4 + 0.7 × 2 + 0.3 × 1) / 10 = 57",
+      "craftStates": "Sin informe no hay puntuación de informe. Los datos insuficientes —sin sesiones o sin resultados reconocidos— tampoco producen puntuación. Un informe válido con resultados fallidos mide cero y desbloquea el quinto eje. Un informe Craft57 deja un core46 en 46: Craft tiene peso cero en el núcleo.",
+      "craftSelection": "Se selecciona el periodo de observación válido más reciente; los informes no se suman. Un contenido distinto para el mismo periodo declarado exige una corrección explícita. Una importación inválida o insuficiente conserva la puntuación válida anterior. El contenido idéntico es idempotente. Craft caducado o no disponible conserva su quinto espacio desbloqueado, con aviso de actualización y sin un vértice cero inventado.",
+      "sectionRanges": "Recuentos observados y cobertura de fuentes",
+      "rangesBody": [
+            "La puntuación actual utiliza el límite inferior original del recuento válido: evidencia realmente acreditada, sin estimar un punto medio ni utilizar el máximo posible. Los límites originales, las fuentes incompletas, las exclusiones y las fechas de observación permanecen en los metadatos del recibo.",
+            "Una fuente parcial puede dejar trabajo real sin observar. Un cero observado no demuestra que no hubiera trabajo. Si falla la recopilación, se conserva la publicación anterior como desactualizada o no disponible, en lugar de sustituirla silenciosamente por una puntuación vacía."
+      ],
+      "sectionArchetypes": "Cuándo hay un arquetipo",
+      "archetypesBody": [
+            "El arquetipo puede estar ausente aunque se muestre una puntuación principal puntual. Su elegibilidad sigue exigiendo que coincidan los extremos originales normalizados de las dimensiones; el punto observado no inventa esa certeza.",
+            "Los perfiles válidos utilizan el árbol descriptivo existente y su orden fijo de desempate: Breadth, Quality, Consistency y Delivery. Craft nunca cambia el arquetipo principal ni concede un nuevo título de dominio."
+      ],
+      "sectionComposite": "Núcleo, presentación y niveles",
+      "compositeBody": [
+            "El núcleo se calcula con los valores sin redondear de las dimensiones. Los enteros mostrados nunca se promedian para reconstruirlo."
+      ],
+      "compositeFormula": "core = 0.25 × D + 0.25 × Q + 0.25 × C + 0.25 × B",
+      "roundingBody": "Los niveles utilizan el núcleo sin redondear. Normalmente se muestra el entero más cercano; si eso cruzaría un umbral, se trunca a dos decimales por debajo. Por ejemplo, 69.999 se muestra como 69.99 y sigue siendo Solid. Las dimensiones y Craft se muestran con el entero más cercano. El recibo conserva los valores exactos y los pasos del cálculo.",
+      "tiersTableHeaders": [
+            "Nivel",
+            "Núcleo sin redondear"
+      ],
+      "tiersTableRows": [
+            [
+                  "Emerging",
+                  "Menos de 30"
+            ],
+            [
+                  "Solid",
+                  "De 30 a menos de 70"
+            ],
+            [
+                  "High",
+                  "De 70 a menos de 85"
+            ],
+            [
+                  "Elite",
+                  "De 85 a 100"
+            ]
+      ],
+      "sectionReceipts": "Recibos, reproducción y límites",
+      "receiptsBody": [
+            "El recibo público inmutable registra las versiones de política y algoritmo, recuentos exactos, puntuaciones puntuales, límites originales, periodo del informe, cobertura y pasos del cálculo. Reproducirlo comprueba la coherencia numérica y la integridad; no verifica la verdad de las fuentes. Los recibos históricos conservan sus reglas originales.",
+            "La publicación requiere consentimiento. El texto del informe y las etiquetas desconocidas siguen siendo privados; los archivos originales caducan a los 30 días, mientras que el resumen numérico mínimo se conserva hasta la retirada del consentimiento o la eliminación. Las referencias públicas de informes son identificadores opacos.",
+            "Las correcciones conservan su relación con las versiones anteriores. La tendencia opcional se identifica por separado y usa una retención diaria de 0.85; nunca sustituye al núcleo bruto ni a su nivel."
+      ],
+      "sectionExcludes": "Qué no aporta crédito por sí solo",
+      "excludesBody": [
+            "Seguidores, estrellas, forks, watchers, líneas modificadas, nombres de herramientas, tokens, mensajes, antigüedad de la cuenta y nombres de repositorios privados no aportan puntos principales por sí solos. Una política común no elimina las limitaciones de acceso, atribución ni calidad del informe."
+      ]
+},
     scoring: {
       metadataTitle: 'Metodología de puntuación',
       metadataDescription: 'Cómo puntúa Chapa la actividad de ingeniería con Impact v7: cuatro dimensiones fijas, un portafolio Craft separado, rangos por evidencia incompleta y un recibo público reproducible.',
@@ -1233,7 +1422,8 @@ export const es: Translations = {
     terminalWelcome: 'Creator Studio — personaliza la vista previa de tu Chapa',
     terminalHint: 'Escribe /help para ver los comandos o usa los Controles Rápidos.',
     title: 'Creator Studio',
-    subtitle: 'Previsualiza y personaliza tu Chapa — los cambios aquí nunca afectan a tu Chapa pública ni a tu página compartida.',
+    subtitle: 'Los cambios se previsualizan aquí hasta que guardas. Guardar actualiza tu Chapa pública, página compartida y vista previa social.',
+    demoSubtitle: 'Demo ilustrativa. Los cambios se quedan en esta vista previa; Guardar no los publica.',
     quickControls: 'Controles rápidos',
     presetsHeading: 'Preajustes',
     session: 'SESIÓN',
@@ -1264,11 +1454,12 @@ export const es: Translations = {
     verificationLabel: 'VERIFICADA',
     demoMarker: 'DEMO',
     save: {
-      saved: 'Vista previa guardada',
+      saved: 'Configuración guardada',
+      demoPreview: 'Solo vista previa de demo',
       dirty: 'Cambios de vista previa sin guardar',
       saving: 'Guardando...',
-      success: 'Configuración guardada. Tu Chapa pública y tu página compartida ya la muestran.',
-      successDeferred: 'Configuración guardada. Tu Chapa pública puede tardar unas horas en actualizarse.',
+      success: 'Configuración guardada. Tu Chapa pública, página compartida y vista previa social ya la usan.',
+      successDeferred: 'Configuración guardada. Las vistas previas públicas aún no se han podido actualizar.',
       demoNotPersisted: '(demo) la configuración no se ha guardado',
       changedDuringSave: 'Se guardaron los cambios anteriores de la vista previa. Los cambios nuevos de la vista previa siguen sin guardar.',
       alreadySaving: 'Ya hay un guardado en curso.',

@@ -62,6 +62,8 @@ export interface ScoreIdentityView {
  * semantics and must never be labelled or explained as v7 arithmetic.
  */
 export interface ScoreViewModel {
+  /** Explicit synthetic demo; no issued receipt or personal evidence claim. */
+  readonly illustrative?: boolean;
   readonly policyVersion: "v6" | "v7" | "v7.2";
   readonly reportCraft?: PublicObservedCraft | null;
   readonly freshness?: "current" | "stale" | "unavailable";

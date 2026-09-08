@@ -19,6 +19,8 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { STUDIO_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 
 export const dynamic = "force-dynamic";
@@ -94,10 +96,12 @@ export default async function StudioPage(
 
   const params = searchParams ? await searchParams : {};
   if (params.demo === "1" && await isStudioDemoEnabled()) {
+    const scoringSelection = await readScoringRenderSelection();
     return renderStudio({
       initialConfig: DEFAULT_BADGE_CONFIG,
       stats: DEMO_STATS,
       impact: DEMO_IMPACT,
+      ...(scoringSelection.enabled ? { scoring: STUDIO_OBSERVED_DEMO } : {}),
       craftResult: null,
       handle: DEMO_STATS.handle,
       verification: null,
@@ -115,9 +119,11 @@ export default async function StudioPage(
     redirect("/api/auth/login");
   }
 
+  const scoringSelection = await readScoringRenderSelection();
+
   // Fetch the live owner display projection and saved config in parallel.
   const [sessionMaterialized, savedConfigResult] = await Promise.all([
-    materializeDisplayProfile(session.login, { token }),
+    materializeDisplayProfile(session.login, { token, scoringSelection }),
     loadStudioConfig(session.login),
   ]);
 
@@ -133,7 +139,7 @@ export default async function StudioPage(
   // profile"). Retry once as the server GITHUB_TOKEN, which is private-
   // inclusive and classified `authenticated`, before giving up.
   const materialized =
-    sessionMaterialized ?? (await materializeDisplayProfile(session.login));
+    sessionMaterialized ?? (await materializeDisplayProfile(session.login, { scoringSelection }));
 
   if (!materialized) {
     throw new Error(`Unable to load Studio profile for ${session.login}`);

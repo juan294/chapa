@@ -14,7 +14,6 @@ import * as path from "node:path";
 // archetypes-isr.test.ts.
 const STATIC_PAGES = [
   "about/page.tsx",
-  "about/scoring/page.tsx",
   "about/verification/page.tsx",
   "privacy/page.tsx",
   "terms/page.tsx",
@@ -33,6 +32,17 @@ describe("locale-segmented content pages remain statically generated (#1167 / UX
       expect(source).not.toMatch(/export const dynamic = ["']force-dynamic["']/);
     });
   }
+
+  it("the scoring methodology explicitly follows live policy selection instead of hourly ISR", () => {
+    const source = fs.readFileSync(path.resolve(__dirname, "about/scoring/page.tsx"), "utf-8");
+    expect(source).toMatch(/export const dynamic = ["']force-dynamic["']/);
+    expect(source).not.toMatch(/export const revalidate\s*=/);
+    expect(source).toContain("readScoringRenderSelection");
+    expect(source).toContain("observed={selection.enabled}");
+    // Its EN/ES route render tests verify both current arithmetic and the
+    // explicitly archived off-policy content; every unrelated page above
+    // retains its original static/hourly contract.
+  });
 
   it("SiteFooter has no 'use client' directive (stays server-render-safe on force-static pages)", () => {
     const source = fs.readFileSync(

@@ -16,6 +16,8 @@ import { LANDING_SECTIONS } from "@/components/landing/landing-commands";
 // this test exercises the actual English dictionary rather than mocking
 // translation. Only heavy/interactive dependencies are mocked below.
 
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788861600000 })) }));
+
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: vi.fn(() => "<svg data-testid='demo-badge'></svg>"),
 }));
@@ -319,4 +321,17 @@ describe("landing badge locale", () => {
     expect(hero![2]).not.toHaveProperty("verificationHash");
     expect(readme![2]).not.toHaveProperty("verificationHash");
   });
+});
+
+it("uses the current calculated illustrative sample for both badge renderings", async () => {
+  const { readScoringRenderSelection } = await import("@/lib/scoring-render-selection");
+  const { renderBadgeSvg } = await import("@/lib/render/BadgeSvg");
+  const { LANDING_OBSERVED_DEMO } = await import("@/lib/render/observed-demo-data");
+  vi.mocked(readScoringRenderSelection).mockResolvedValueOnce({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: 1788861600000 });
+  vi.mocked(renderBadgeSvg).mockClear();
+  const { container } = await renderHome();
+  expect(container.querySelector('[data-dimension="quality"] summary')?.textContent).toContain("81");
+  expect(container.querySelector('[data-dimension="breadth"] summary')?.textContent).toContain("100");
+  expect(vi.mocked(renderBadgeSvg).mock.calls).toHaveLength(2);
+  for (const call of vi.mocked(renderBadgeSvg).mock.calls) expect(call[2]?.scoring).toEqual(LANDING_OBSERVED_DEMO);
 });

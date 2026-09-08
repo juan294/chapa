@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { ImpactV6Result } from "@chapa/shared";
 import type { LeaderboardPlace } from "@/lib/profile/leaderboard";
 import { BadgeOverlay } from "@/components/BadgeOverlay";
@@ -43,8 +44,8 @@ const inner = "mx-auto max-w-7xl px-5 sm:px-8 lg:px-12";
 const MEDALS = ["bg-medal-gold", "bg-medal-silver", "bg-medal-bronze"];
 
 /** Static translated body; interactions and URL effects stay in small client leaves. */
-export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topScored = [], t }: {
-  demoBadgeSvg: string; readmeBadgeSvg: string; demoImpact: ImpactV6Result; topScored?: LeaderboardPlace[]; t: TFunction;
+export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, demoScoring, topScored = [], t }: {
+  demoBadgeSvg: string; readmeBadgeSvg: string; demoImpact: ImpactV6Result; demoScoring?: ScoreViewModel; topScored?: LeaderboardPlace[]; t: TFunction;
 }) {
   const r = (key: string) => t(`landing.redesign.${key}`) as string;
   const navLinks = tArray<{ label: string; href: string }>(t, "landing.navLinks");
@@ -54,8 +55,15 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topSc
   const agentTools = tObject<Record<string, string>>(t, "landing.agentTools");
   const goals = tObject<Record<(typeof SITE_TOOL_MAP)[number]["route"], string>>(t, "landing.redesign.goals");
   const steps = tArray<{ number: string; title: string; description: string }>(t, "landing.steps");
-  const tierLabel = t(`tiers.${demoImpact.tier.toLowerCase()}`) as string;
-  const sampleAlt = interpolate(r("sampleAlt"), { score: String(demoImpact.adjustedComposite), tier: tierLabel });
+  const drawn = demoScoring ? renderableScore(demoScoring) : null;
+  const headline = drawn ? drawn.composite : demoImpact.adjustedComposite;
+  const tier = drawn ? drawn.tier : demoImpact.tier;
+  const demoDimensions: Partial<Record<(typeof DIMENSIONS)[number], number>> = drawn ? {
+    ...drawn.dimensions,
+    ...(demoScoring?.reportCraft?.status === "scored" ? { craft: demoScoring.reportCraft.report.result.point.displayValue } : {}),
+  } : demoImpact.dimensions;
+  const tierLabel = tier ? t(`tiers.${tier.toLowerCase()}`) as string : "";
+  const sampleAlt = interpolate(r("sampleAlt"), { score: String(headline), tier: tierLabel });
   const snippet = `![${t("landing.embed.altText") as string}](https://chapa.thecreativetoken.com/u/developer/badge.svg)`;
   const explorerItems = EXAMPLES.map(({ id, glyph, impact }) => ({
     id, glyph, label: t(`landing.archetypes.${id}`) as string, description: r(`archetypeDescriptions.${id}`),
@@ -153,8 +161,8 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, topSc
         </div>
       </section>
       <section id="scoring" className="scroll-mt-24 bg-forest py-16 text-forest-text sm:py-24"><div className={`${inner} grid gap-10 lg:grid-cols-2`}>
-        <div className="min-w-0"><p className="font-heading text-xs text-forest-dim">~ % /dimensions</p><h2 className="mt-5 break-words font-heading text-[clamp(1.4rem,3vw,3rem)] leading-tight">{r("dimensionTitle")}</h2><p className="mt-6 max-w-lg text-base leading-relaxed text-forest-dim">{r("dimensionIntro")}</p><p className="mt-5 font-heading text-sm">{demoImpact.adjustedComposite} / {tierLabel} · {r("stageLabel")}</p><Link href="/about/scoring" className="mt-6 inline-flex min-h-12 items-center border border-forest-text px-5 font-heading text-sm focus-visible:outline-forest-text!">{t("landing.measure.methodologyLink") as string} ↗</Link></div>
-        <DimensionExplorer items={DIMENSIONS.flatMap((id, index) => demoImpact.dimensions[id] === undefined ? [] : [{ id, label: dimensions[index]!.title, description: dimensions[index]!.description, value: demoImpact.dimensions[id]! }])} optionalLabel={r("optional")} />
+        <div className="min-w-0"><p className="font-heading text-xs text-forest-dim">~ % /dimensions</p><h2 className="mt-5 break-words font-heading text-[clamp(1.4rem,3vw,3rem)] leading-tight">{r("dimensionTitle")}</h2><p className="mt-6 max-w-lg text-base leading-relaxed text-forest-dim">{r("dimensionIntro")}</p><p className="mt-5 font-heading text-sm">{headline} / {tierLabel} · {r("stageLabel")}</p><Link href="/about/scoring" className="mt-6 inline-flex min-h-12 items-center border border-forest-text px-5 font-heading text-sm focus-visible:outline-forest-text!">{t("landing.measure.methodologyLink") as string} ↗</Link></div>
+        <DimensionExplorer items={DIMENSIONS.flatMap((id, index) => demoDimensions[id] === undefined ? [] : [{ id, label: dimensions[index]!.title, description: dimensions[index]!.description, value: demoDimensions[id]! }])} optionalLabel={r("optional")} />
       </div></section>
       <section id="how-it-works" className={`${inner} scroll-mt-24 py-16 sm:py-24`}><div id="embed" className="scroll-mt-24" /><SectionHeader command="/embed" />
         <div className="grid items-center gap-10 lg:grid-cols-[.8fr_1.2fr]"><div><h2 className="font-display text-[clamp(3rem,6vw,6rem)] font-bold leading-[.95]">{r("readmeTitle")}</h2><p className="mt-5 text-base leading-relaxed text-text-secondary">{r("readmeIntro")}</p><ol className="my-7 space-y-4">{steps.map((step) => <li key={step.number} className="flex gap-4 border-t border-stroke pt-4"><span className="font-heading text-xs text-amber-text">{step.number}</span><div><h3 className="text-base font-semibold">{step.title}</h3><p className="mt-2 text-sm text-text-secondary">{step.description}</p></div></li>)}</ol><Link href="/studio" className={action}>{r("studioCta")} ↗</Link></div>

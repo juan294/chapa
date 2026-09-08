@@ -16,8 +16,9 @@ export interface RadarChartLabels {
   consistency: string;
   breadth: string;
   craft: string;
-  /** Empty-state text shown when every dimension is 0 (e.g. "no data yet"). */
+  /** Empty-state text for an all-zero four-axis chart (e.g. "no data yet"). */
   noData: string;
+  craftUnavailable?: string;
 }
 
 const DEFAULT_RADAR_LABELS: RadarChartLabels = {
@@ -29,11 +30,14 @@ const DEFAULT_RADAR_LABELS: RadarChartLabels = {
   noData: "no data yet",
 };
 
+export type RadarDimensions = Omit<DimensionScores, "craft"> & { craft?: number | null };
+
 /**
  * Renders a radar chart as SVG markup.
  *
  * When all 5 dimensions are present (including craft), renders a 5-axis pentagon.
  * When craft is absent, falls back to the original 4-axis diamond layout.
+ * Null Craft retains its guide and label but leaves the data shape open.
  *
  * Pentagon axes (72° spacing from top): Delivery, Quality, Consistency, Breadth, Craft.
  * Diamond axes (90° spacing from top): Delivery, Quality, Consistency, Breadth.
@@ -48,16 +52,18 @@ const DEFAULT_RADAR_LABELS: RadarChartLabels = {
  * @returns SVG group string (<g>...</g>)
  */
 export function renderRadarChart(
-  dimensions: DimensionScores,
+  dimensions: RadarDimensions,
   cx: number,
   cy: number,
   radius: number,
   labels: RadarChartLabels = DEFAULT_RADAR_LABELS,
   theme: BadgeTheme = WARM_AMBER,
+  options: { observed?: boolean } = {},
 ): string {
   const t = theme;
 
-  const hasCraft = dimensions.craft != null;
+  const hasCraft = dimensions.craft !== undefined;
+  const craftUnavailable = dimensions.craft === null;
 
   // Pentagon (72° spacing) when craft present; diamond (90° spacing) when absent
   const axes: { key: keyof DimensionScores; label: string; angle: number }[] = hasCraft
@@ -100,13 +106,12 @@ export function renderRadarChart(
     .join("\n    ");
 
   // Data shape
-  const dataPoints = axes.map((a) => {
-    const val = (dimensions[a.key] ?? 0) / 100;
-    const dist = val * radius;
-    return toPoint(a.angle, dist);
+  const dataPoints = axes.flatMap(axis => {
+    const value = dimensions[axis.key];
+    return value === null || value === undefined ? [] : [{ axis: axis.key, value, point: toPoint(axis.angle, value / 100 * radius) }];
   });
-  const allZero = axes.every((a) => (dimensions[a.key] ?? 0) === 0);
-  const dataPointsStr = dataPoints.map(([x, y]) => `${x},${y}`).join(" ");
+  const allZero = dataPoints.every(({ value }) => value === 0);
+  const dataPointsStr = dataPoints.map(({ point: [x, y] }) => `${x},${y}`).join(" ");
 
   // Axis labels — position based on angle direction (works for any rotation)
   const labelOffset = 20;
@@ -120,11 +125,13 @@ export function renderRadarChart(
       if (cosA > 0.3) { anchor = "start"; dx = 4; }
       else if (cosA < -0.3) { anchor = "end"; dx = -4; }
       const dy = sinA < -0.3 ? -4 : sinA > 0.3 ? 14 : 4;
-      return `<text${a.key === "craft" ? ' data-element="craft"' : ""} x="${x + dx}" y="${y + dy}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="${anchor}">${escapeXml(a.label)}</text>`;
+      const unavailableLabel = a.key === "craft" && craftUnavailable
+        ? `<text x="${x + dx}" y="${y + dy + 15}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="11" fill="${t.textSecondary}" text-anchor="${anchor}">${escapeXml(labels.craftUnavailable ?? "Update insights")}</text>` : "";
+      return `<text${a.key === "craft" ? ' data-element="craft"' : ""} x="${x + dx}" y="${y + dy}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="${anchor}">${escapeXml(a.label)}</text>${unavailableLabel}`;
     })
     .join("\n    ");
 
-  if (allZero) {
+  if (allZero && (!options.observed || !hasCraft)) {
     return `<g>
     ${ringSvg}
     ${axisLines}
@@ -137,11 +144,13 @@ export function renderRadarChart(
   return `<g>
     ${ringSvg}
     ${axisLines}
-    <polygon points="${dataPointsStr}" fill="${t.accent}" fill-opacity="0.15" stroke="${t.accent}" stroke-width="2" stroke-opacity="0.8"/>
+    ${craftUnavailable
+      ? `<polyline data-role="radar-incomplete" points="${dataPointsStr}" fill="none" stroke="${t.accent}" stroke-width="2" stroke-opacity="0.8"/>`
+      : `<polygon points="${dataPointsStr}" fill="${t.accent}" fill-opacity="0.15" stroke="${t.accent}" stroke-width="2" stroke-opacity="0.8"/>`}
     ${dataPoints
       .map(
-        ([x, y]) =>
-          `<circle cx="${x}" cy="${y}" r="4" fill="${t.accent}" stroke="${t.bg}" stroke-width="2"/>`,
+        ({ axis, value, point: [x, y] }) =>
+          `<circle${options.observed ? ` data-axis="${axis}" data-value="${value}"` : ""} cx="${x}" cy="${y}" r="4" fill="${t.accent}" stroke="${t.bg}" stroke-width="2"/>`,
       )
       .join("\n    ")}
     ${labelSvg}

@@ -740,7 +740,7 @@ export function StudioClient({
             >
               {saveState.status === "error"
                 ? saveState.message
-                : (t(`studio.save.${saveState.status}`) as string)}
+                : (t(demo && saveState.status === "saved" ? "studio.save.demoPreview" : `studio.save.${saveState.status}`) as string)}
             </span>
           </div>
         </div>
@@ -828,7 +828,7 @@ export function StudioClient({
               data-testid="studio-visible-subtitle"
               className="text-sm leading-relaxed text-pretty text-text-secondary"
             >
-              {t("studio.subtitle") as string}
+              {t(demo ? "studio.demoSubtitle" : "studio.subtitle") as string}
             </p>
           </div>
 

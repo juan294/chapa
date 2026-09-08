@@ -1,5 +1,7 @@
 "use client";
 
+import { ObservedStepDetails } from "./ObservedStepDetails";
+import { ReportCraftDetails } from "./ReportCraftDetails";
 import { useTranslation } from "@/lib/i18n";
 import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
 import type { ExactNumericBounds } from "@chapa/shared";
@@ -18,14 +20,15 @@ import type { ExactNumericBounds } from "@chapa/shared";
  * these two", and inventing the middle would be exactly the false precision
  * the range policy exists to avoid.
  */
-function Bounds({ value }: { value: ExactNumericBounds }) {
-  const lower = Math.round(value.lower * 10) / 10;
-  const upper = Math.round(value.upper * 10) / 10;
+function Bounds({ value, exact = false }: { value: ExactNumericBounds; exact?: boolean }) {
+  const lower = exact ? value.lower : Math.round(value.lower * 10) / 10;
+  const upper = exact ? value.upper : Math.round(value.upper * 10) / 10;
   return <span className="tabular-nums">{lower === upper ? lower : `${lower}–${upper}`}</span>;
 }
 
 export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptExplanation }) {
   const { t } = useTranslation();
+  const current = explanation.policyVersion === "v7.2";
   const dimensionLabel = (key: string) => t(`dimensions.${key}.label`) as string;
 
   return (
@@ -40,7 +43,7 @@ export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptE
         {t("receiptExplanation.title") as string}
       </h3>
       <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-text-secondary">
-        {t("receiptExplanation.intro") as string}
+        {t(current ? "observedScoring.intro" : "receiptExplanation.intro") as string}
       </p>
 
       <dl className="mt-6 grid gap-3 @sm:grid-cols-2">
@@ -49,7 +52,7 @@ export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptE
             {t("receiptExplanation.core") as string}
           </dt>
           <dd className="font-heading text-2xl text-text-primary">
-            <Bounds value={explanation.composite} />
+            {current && explanation.displayedComposite.kind === "point" ? explanation.displayedComposite.display : <Bounds value={explanation.composite} />}
           </dd>
         </div>
         <div>
@@ -65,7 +68,7 @@ export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptE
             {t("receiptExplanation.archetype") as string}
           </dt>
           <dd className="text-sm text-text-primary">
-            {explanation.archetype ?? (t("receiptExplanation.archetypeNone") as string)}
+            {explanation.archetype ?? (t(current ? "observedScoring.noArchetype" : "receiptExplanation.archetypeNone") as string)}
           </dd>
         </div>
         <div>
@@ -86,11 +89,11 @@ export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptE
               <h4 className="font-heading text-sm font-medium text-text-primary">
                 {dimensionLabel(dimension.key)}
               </h4>
-              <p className="font-heading text-xs text-text-secondary">
-                <Bounds value={dimension.dimension} />
+              <p className="font-heading break-words text-xs text-text-secondary">
+                {current && dimension.displayed.kind === "point" ? dimension.displayed.display : <Bounds value={dimension.dimension} />}
                 {" · "}
                 {t("receiptExplanation.contributes") as string}{" "}
-                <Bounds value={dimension.contribution} />
+                <Bounds value={dimension.contribution} exact={current} />
               </p>
             </div>
             <ul className="mt-2 space-y-1">
@@ -99,13 +102,15 @@ export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptE
                   key={entry.label}
                   className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stroke/50 pb-1 text-sm"
                 >
-                  <span className="text-text-secondary">{entry.label}</span>
-                  <span className="font-heading text-xs text-text-secondary">
+                  <span className="text-text-secondary">{current ? t(`observedScoring.steps.${entry.label}`) as string : entry.label}</span>
+                  <span className="font-heading break-words text-xs text-text-secondary">
+                    {current ? <ObservedStepDetails step={entry.step} /> : <>
                     <Bounds value={entry.step.observed} />
                     {" / "}
                     {entry.step.cap}
                     {" → "}
                     <Bounds value={entry.step.weighted} />
+                    </>}
                   </span>
                 </li>
               ))}
@@ -116,7 +121,11 @@ export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptE
 
       {/* Craft is reported beside the core, never inside it. An absent
           portfolio reads as not observed rather than as a zero. */}
-      <div className="mt-8 border-t border-stroke pt-6">
+      {current && explanation.reportCraft ? <div className="mt-8 border-t border-stroke pt-6">
+        <h4 className="mb-2 font-heading text-sm font-medium text-text-primary">{t("receiptExplanation.craft") as string}</h4>
+        {explanation.reportCraft.status === "scored" && <p className="mb-2 font-heading text-2xl tabular-nums">{explanation.reportCraft.report.result.point.displayLabel}</p>}
+        <ReportCraftDetails craft={explanation.reportCraft} />
+      </div> : <div className="mt-8 border-t border-stroke pt-6">
         <h4 className="font-heading text-sm font-medium text-text-primary">
           {t("receiptExplanation.craft") as string}
         </h4>
@@ -132,9 +141,11 @@ export function ReceiptExplanationPanel({ explanation }: { explanation: ReceiptE
         </p>
       </div>
 
+      }
+
       {explanation.coverage.some((row) => row.status !== "complete") ? (
         <p className="mt-6 text-sm text-text-secondary">
-          {t("receiptExplanation.coverageIncomplete") as string}
+          {t(current ? "observedScoring.coverageIncomplete" : "receiptExplanation.coverageIncomplete") as string}
         </p>
       ) : null}
     </section>

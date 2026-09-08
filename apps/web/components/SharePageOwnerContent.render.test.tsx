@@ -535,3 +535,11 @@ describe("SharePageOwnerContent — render", () => {
     expect(screen.queryByTestId("data-sources")).toBeNull();
   });
 });
+
+it("never falls back to legacy arithmetic when the current receipt explanation is unavailable", async () => {
+  const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+  const fixture = await scoringConsistencyFixture({ craft: 57 });
+  render(<SharePageOwnerContent handle="alice" stats={fixture.stats} impact={fixture.impact} scoring={fixture.model} isOwner receiptExplanation={null} />);
+  expect(screen.queryByText("How is my score calculated?")).toBeNull();
+  expect(screen.queryByText(/confidence adjustment/i)).toBeNull();
+});

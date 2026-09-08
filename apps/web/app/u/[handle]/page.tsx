@@ -54,7 +54,8 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageHeader } from "./SharePageHeader";
 import { describeScoreForMetadata } from "@/lib/profile/score-description";
 import { readScoreReceiptV7 } from "@/lib/profile/score-receipt-v7";
-import { explainReceipt } from "@/lib/dashboard/receipt-explanation";
+import { readObservedScoreReceipt } from "@/lib/profile/score-receipt-observed";
+import { explainReceipt, explainObservedReceipt } from "@/lib/dashboard/receipt-explanation";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
@@ -392,12 +393,15 @@ export async function SharePageContent({
   // #1311 — a v7 subject's breakdown is the receipt's own arithmetic. Resolved
   // here rather than in the client tree: `explainReceipt` reads the sealed
   // receipt, and the projection it returns is what crosses the boundary.
-  const historicalIdentity = materialized?.scoring?.policyVersion === "v7" ? materialized.scoring.identity : null;
-  const receiptExplanation = historicalIdentity
-    ? await readScoreReceiptV7(handle, historicalIdentity.revisionId).then(snapshot =>
-        snapshot && snapshot.receipt.receipt.revisionId === historicalIdentity.revisionId
-          && snapshot.receipt.contentHash.value === historicalIdentity.contentHash ? explainReceipt(snapshot) : null)
-    : null;
+  const identity = materialized?.scoring?.identity;
+  const receiptExplanation = identity && materialized?.scoring.policyVersion === "v7.2"
+    ? await readObservedScoreReceipt(handle, identity.revisionId).then(stored =>
+        stored.status === "found" && stored.envelope.receipt.revisionId === identity.revisionId && stored.envelope.contentHash.value === identity.contentHash
+          ? explainObservedReceipt({ receipt: stored.envelope, trend: stored.trend }, scoringSelection.capturedAt) : null)
+    : identity && materialized?.scoring.policyVersion === "v7"
+      ? await readScoreReceiptV7(handle, identity.revisionId).then(snapshot =>
+          snapshot && snapshot.receipt.receipt.revisionId === identity.revisionId && snapshot.receipt.contentHash.value === identity.contentHash ? explainReceipt(snapshot) : null)
+      : null;
 
   const personJsonLd = {
     "@context": "https://schema.org",
@@ -538,6 +542,7 @@ export async function SharePageContent({
           embedMarkdown={embedMarkdown}
           embedHtml={embedHtml}
           receiptExplanation={receiptExplanation}
+          scoring={materialized?.scoring ?? null}
         />
       </div>
 

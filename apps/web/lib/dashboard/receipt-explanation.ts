@@ -5,14 +5,19 @@ import {
   type NormalizationTrace,
   type PublicCoverageSummary,
   type PublicScoringReceipt,
+  type PublicObservedCraft,
+  type ObservedScalarTrace,
 } from "@chapa/shared";
 import {
+  observedReceiptViewModel,
   CORE_DIMENSION_KEYS,
   CRAFT_CRITERION_KEYS,
   type CoreDimensionKey,
   type CraftCriterionKey,
   type ScoreValue,
+  type ScoreViewModel,
 } from "@/lib/profile/score-view-model";
+import type { ObservedReceiptSnapshot } from "@/lib/profile/score-receipt-observed";
 import type { ReceiptSnapshotV7 } from "@/lib/history/snapshot";
 
 /** One step of the published arithmetic, in the receipt's own numbers. */
@@ -20,6 +25,8 @@ export interface ExplainedStep {
   /** The counted evidence, before the cap. */
   readonly observed: ExactNumericBounds;
   readonly cap: number;
+  readonly clamped?: number;
+  readonly multiplier?: number;
   readonly normalized: ExactNumericBounds;
   /** This step's points inside its dimension. */
   readonly weighted: ExactNumericBounds;
@@ -45,14 +52,15 @@ export interface ExplainedCraft {
 }
 
 export interface ReceiptExplanation {
-  readonly policyVersion: "v7";
+  readonly policyVersion: "v7" | "v7.2";
+  readonly reportCraft?: PublicObservedCraft;
   readonly window: PublicScoringReceipt["window"];
   readonly dimensions: readonly ExplainedDimension[];
   /** The sum of the four contributions. Equal to the receipt's composite. */
   readonly composite: ExactNumericBounds;
   readonly displayedComposite: ScoreValue;
   readonly tier: PublicScoringReceipt["core"]["tier"];
-  readonly archetype: PublicScoringReceipt["core"]["archetype"];
+  readonly archetype: ScoreViewModel["archetype"];
   /** Null when this subject has no Craft channel at all. Craft never enters
    * the composite above; it is reported beside it. */
   readonly craft: ExplainedCraft | null;
@@ -144,4 +152,26 @@ export function explanationReconciles(explanation: ReceiptExplanation, snapshot:
     const summed = row.steps.map(entry => entry.step.weighted).reduce(add, { lower: 0, upper: 0 });
     return close(summed, row.dimension) && close(quarter(row.dimension), row.contribution);
   });
+}
+
+/** The current explanation reads exact observed counts/trace, never historical
+ * completion bounds or rounded display values as inputs to the arithmetic. */
+export function explainObservedReceipt(snapshot: ObservedReceiptSnapshot, capturedAt: number): ReceiptExplanation {
+  const receipt = snapshot.receipt.receipt, trace = receipt.calculation.core;
+  const model = observedReceiptViewModel("", snapshot, capturedAt);
+  const exact = (value: number): ExactNumericBounds => ({ lower: value, upper: value });
+  const observedStep = (value: ObservedScalarTrace<number, number>): ExplainedStep => ({ observed: exact(value.observedCount), cap: value.cap, clamped: value.clamped, multiplier: value.multiplier,
+    normalized: exact(value.normalized), weighted: exact(value.weighted) });
+  return {
+    policyVersion: "v7.2", window: receipt.window,
+    dimensions: CORE_DIMENSION_KEYS.map(key => ({ key,
+      steps: key === "delivery" ? [{ label: "delivery_units", step: observedStep(trace.delivery) }]
+        : key === "consistency" ? [{ label: "active_iso_weeks", step: observedStep(trace.consistency) }]
+        : key === "breadth" ? [{ label: "eligible_projects", step: observedStep(trace.breadth.projects) }, { label: "eligible_categories", step: observedStep(trace.breadth.categories) }]
+        : (["rationale", "verification", "review_or_correction", "outcome_followup"] as const).map(criterion => ({ label: criterion, step: observedStep(trace.quality[criterion]) })),
+      dimension: exact(trace.dimensions[key]), contribution: exact(trace.weightedDimensions[key]), displayed: model.dimensions[key],
+    })),
+    composite: exact(trace.composite), displayedComposite: model.composite, tier: model.tier, archetype: model.archetype,
+    craft: null, reportCraft: model.reportCraft ?? receipt.craft, coverage: receipt.coverage, limitations: receipt.limitations,
+  };
 }

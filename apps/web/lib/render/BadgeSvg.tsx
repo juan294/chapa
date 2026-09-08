@@ -3,7 +3,7 @@ import { formatCompact, DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { badgeTheme, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderBadgeBranding } from "./BadgeBranding";
-import { renderRadarChart, type RadarChartLabels } from "./RadarChart";
+import { renderRadarChart, type RadarChartLabels, type RadarDimensions } from "./RadarChart";
 import { escapeXml } from "./escape";
 import {
   renderBackgroundEffect,
@@ -15,7 +15,7 @@ import {
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
 import { BADGE_RENDER_VARIANT } from "./badge-render-variant";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
-import { describeScoringEvidence } from "./scoring-evidence-label";
+import { describeScoringEvidence, type ScoringEvidenceLabels } from "./scoring-evidence-label";
 import { legacyViewModel, renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
 
 /**
@@ -42,6 +42,7 @@ export interface BadgeI18nStrings {
   archetypeUnknownLabel?: string;
   radarLabels?: Partial<Omit<RadarChartLabels, "noData">>;
   radarNoData?: string;
+  scoringEvidence?: ScoringEvidenceLabels;
   verifiedLabel?: string;
   sampleDisclosure?: string;
 }
@@ -218,15 +219,20 @@ export function renderBadgeSvg(
     breadth: strings.radarLabels?.breadth ?? "Breadth",
     craft: strings.radarLabels?.craft ?? "Craft",
     noData: strings.radarNoData ?? "no data yet",
+    craftUnavailable: strings.radarLabels?.craftUnavailable ?? "Update insights",
   };
-  // Craft is a core radar axis under v6 and never one under v7, where it is a
-  // separate portfolio reported beside the core. Legacy badges keep their
-  // pentagon; a v7 badge draws the diamond its four fixed dimensions describe,
-  // rather than a fifth axis that would read as a core dimension scoring zero.
-  const radarDimensions = model.policyVersion === "v6" && impact.dimensions.craft != null
-    ? { ...score.dimensions, craft: impact.dimensions.craft }
-    : score.dimensions;
-  const radarSvg = renderRadarChart(radarDimensions, radarCX, radarCY, radarR, radarLabels, t);
+  // The optional report axis is visible beside the four core axes, while
+  // its points never enter the core average. Null preserves an unlocked spoke
+  // without inventing a measured zero after expiry or source unavailability.
+  const reportCraft = model.policyVersion === "v7.2" ? model.reportCraft : null;
+  const radarDimensions: RadarDimensions = reportCraft?.status === "scored"
+    ? { ...score.dimensions, craft: reportCraft.report.result.point.displayValue }
+    : reportCraft?.unlocked
+      ? { ...score.dimensions, craft: null }
+      : model.policyVersion === "v6" && impact.dimensions.craft != null
+        ? { ...score.dimensions, craft: impact.dimensions.craft }
+        : score.dimensions;
+  const radarSvg = renderRadarChart(radarDimensions, radarCX, radarCY, radarR, radarLabels, t, { observed: model.policyVersion === "v7.2" });
 
   // ── Hero score ring (right column, below radar) ───────────
   // A v7 evidence-completion range prints both bounds. Collapsing it to one
@@ -318,7 +324,7 @@ export function renderBadgeSvg(
   // non-default locale, which this cutover has no business doing. `null` is the
   // v7 range that earned no tier.
   const accessibleTier = score.tier ?? "unassigned";
-  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(accessibleTier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring))}`;
+  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(accessibleTier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring, strings.scoringEvidence))}`;
   const a11yAttrs = disableAnimation ? ' role="img"' : "";
   const a11yMarkup = disableAnimation
     ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`

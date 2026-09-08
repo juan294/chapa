@@ -45,8 +45,18 @@ export function buildBadgeI18nStrings(
       consistency: t("dimensions.consistency.label") as string,
       breadth: t("dimensions.breadth.label") as string,
       craft: t("dimensions.craft.label") as string,
+      craftUnavailable: t("badge.craftUpdate") as string,
     },
     radarNoData: t("badge.radarNoData") as string,
+    scoringEvidence: {
+      illustrativeExample: t("badge.illustrativeExample") as string,
+      observedScoreDescription: t("badge.observedScoreDescription") as string,
+      reportCraftDescription: t("badge.reportCraftDescription") as string,
+      reportCraftAbsent: t("badge.reportCraftAbsent") as string,
+      reportCraftUnavailable: t("badge.reportCraftUnavailable") as string,
+      incompleteSources: t("badge.incompleteSources") as string,
+      excludedSources: t("badge.excludedSources") as string,
+    },
     verifiedLabel: t("badge.verifiedLabel") as string,
     sampleDisclosure: t("badge.sampleDisclosure") as string,
     // Omitted entirely for a tier-less v7 range, so the renderer falls through

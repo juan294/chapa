@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { useState } from "react";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 import { LanguageContext, type LanguageContextValue } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -100,7 +102,9 @@ vi.mock("./BadgePreviewCard", () => ({
     config,
     verification,
     avatarDataUri,
+    scoring,
   }: {
+    scoring?: ScoreViewModel;
     config: Record<string, unknown>;
     verification?: { hash: string; date: string } | null;
     avatarDataUri?: string;
@@ -110,6 +114,7 @@ vi.mock("./BadgePreviewCard", () => ({
       <div
         data-testid="badge-preview"
         data-instance-id={instanceId}
+        data-scoring={JSON.stringify(scoring)}
         data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
         data-avatar={avatarDataUri ?? "none"}
       >
@@ -386,6 +391,27 @@ describe("StudioClient render", () => {
       expect(
         screen.getByTestId("studio-visible-subtitle").textContent,
       ).not.toBe("");
+    });
+
+    it.each(["en", "es"] as const)("explains Save publication and keeps demo wording local in %s", (locale) => {
+      const live = locale === "en"
+        ? "Changes preview locally until you save. Save updates your public badge, share page, and social preview."
+        : "Los cambios se previsualizan aquí hasta que guardas. Guardar actualiza tu Chapa pública, página compartida y vista previa social.";
+      const demoText = locale === "en" ? "Illustrative demo. Changes stay in this preview; Save does not publish them." : "Demo ilustrativa. Los cambios se quedan en esta vista previa; Guardar no los publica.";
+      const { rerender } = render(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} /></LanguageContext.Provider>);
+      expect(screen.getByTestId("studio-visible-subtitle").textContent).toBe(live);
+      rerender(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} demo /></LanguageContext.Provider>);
+      expect(screen.getByTestId("studio-visible-subtitle").textContent).toBe(demoText);
+      expect(screen.getByText(locale === "en" ? "Demo preview only" : "Solo vista previa de demo")).toBeDefined();
+    });
+
+    it("forwards observed core46 and report0 unchanged to the real preview boundary", async () => {
+      const fixture = await scoringConsistencyFixture({ craft: 0 });
+      render(<StudioClient initialConfig={defaultConfig} stats={fixture.stats} impact={fixture.impact} scoring={fixture.model} />);
+      const model = JSON.parse(screen.getByTestId("badge-preview").getAttribute("data-scoring")!);
+      expect(model).toEqual(fixture.model);
+      expect(model.composite.display).toBe(46);
+      expect(model.reportCraft.report.result.point.exact).toBe(0);
     });
 
     it("forwards materialized Craft data to the Studio WebMCP tools", () => {
@@ -966,7 +992,7 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      expect(screen.getByText("Preview saved")).toBeDefined();
+      expect(screen.getByText("Configuration saved")).toBeDefined();
 
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/set bg aurora" } });
@@ -991,7 +1017,7 @@ describe("StudioClient render", () => {
       fireEvent.change(input, { target: { value: "/set bg solid" } });
       fireEvent.keyDown(input, { key: "Enter" });
 
-      expect(screen.getByText("Preview saved")).toBeDefined();
+      expect(screen.getByText("Configuration saved")).toBeDefined();
       expect(screen.queryByText("Unsaved preview changes")).toBeNull();
     });
 
@@ -1239,7 +1265,7 @@ describe("StudioClient render", () => {
       expect(save.hasAttribute("disabled")).toBe(true);
       resolveSave(new Response("{}", { status: 200 }));
       await screen.findByText(
-        "Configuration saved. Your public badge and share page now show it.",
+        "Configuration saved. Your public badge, share page, and social preview now use it.",
       );
     });
 
@@ -1256,7 +1282,7 @@ describe("StudioClient render", () => {
       fireEvent.click(screen.getByTestId("studio-save"));
 
       const line = await screen.findByText(
-        "Configuration saved. Your public badge may take a few hours to update.",
+        "Configuration saved. Public previews could not be refreshed yet.",
       );
       expect(line.getAttribute("data-line-type")).toBe("warning");
       expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -1288,7 +1314,7 @@ describe("StudioClient render", () => {
       expect(screen.getByText("A save is already in progress.")).toBeDefined();
       resolveSave(new Response("{}", { status: 200 }));
       await screen.findByText(
-        "Configuration saved. Your public badge and share page now show it.",
+        "Configuration saved. Your public badge, share page, and social preview now use it.",
       );
     });
 
@@ -1883,7 +1909,7 @@ describe("StudioClient render", () => {
 
       fireEvent.change(input, { target: { value: "/save" } });
       fireEvent.keyDown(input, { key: "Enter" });
-      await screen.findByText("Preview saved");
+      await screen.findByText("Configuration saved");
 
       const event = dispatchBeforeUnload();
       expect(event.defaultPrevented).toBe(false);
@@ -2159,7 +2185,7 @@ describe("persisted configuration and pending response bodies", () => {
     render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
     await command({ type: "set", category: "background", value: "aurora" });
     await command({ type: "reset" });
-    expect(screen.getByText("Preview saved")).toBeDefined();
+    expect(screen.getByText("Configuration saved")).toBeDefined();
     expect(unload()).toBe(false);
   });
   it("keeps saving through body delivery and leaves body-time edits unsaved", async () => {

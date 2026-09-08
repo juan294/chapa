@@ -61,3 +61,23 @@ Found: a prior-day raw image cannot re-evaluate Craft eligibility after the annu
 Chose: retain prior-day fallback only for legacy policy. Current-policy images use the captured UTC context date; the central selection cache refreshes at midnight and current response freshness also ends at midnight. A late render cannot populate the new date's namespace or renew old eligibility.
 
 Why: a bounded stale score is still a contradictory current Craft state. Redis hits remain available within the current day, while expiry requires a fresh projection. This accepts the origin-work trade without relaxing score correctness.
+
+### Phase 6 — descriptive activity and explicit illustrative samples
+
+Plan said: keep the visual design, project current scores everywhere, and preserve descriptive activity counts without inventing scoring attribution.
+
+Found: the existing heatmap attaches seeded per-day dimension percentages unrelated to recorded criteria. Existing demos also carry intentionally curated legacy values that cannot explain current arithmetic.
+
+Chose: keep the current heatmap and actual activity counts, omitting invented per-day dimension attribution only for current policy. Add clearly illustrative current samples calculated by the real core/report engines, without publication identity, and pass their same projection to both badge and dimension explorer. Preserve existing legacy demo and badge bytes when legacy policy is selected.
+
+Why: every displayed attribution must have an evidence basis. Example profiles remain examples, while their arithmetic is now internally consistent. The public methodology resolves live policy rather than retaining an hour-old method; historical v7.1 content is explicitly archived. Landing's live leaderboard cache selection is completed in phase7.
+
+### Phases 6 and 9 — focused browser acceptance on the completed candidate
+
+Plan said: inspect changed scoring pages in Spanish/mobile/light/dark, Save and restore a palette, and repeat final acceptance on the completed production-mode local candidate.
+
+Found: this owner requested continuous completion and explicitly asked to avoid repeating the recent end-to-end campaign. Renderer arithmetic/geometry can be qualified independently before the remaining API/tool work.
+
+Chose: run phase6 component, policy/content, real-font raster and all local automated gates now; consolidate the focused interactive browser card with phase9's exact completed candidate. Preserve phase6 raster evidence as intermediate evidence, not final-build proof.
+
+Why: the final browser acceptance must exercise the integrated API/tool behavior and exact candidate. This avoids a redundant intermediate manual campaign without dropping any acceptance case.

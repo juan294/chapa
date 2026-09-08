@@ -121,6 +121,45 @@ function SECTION_INDEX(t: TFunction) {
   }));
 }
 
+/** Current observed policy reuses the document's sections and table treatment. */
+function ObservedSections({ t }: { t: TFunction }) {
+  const key = (name: string) => `about.scoringObserved.${name}`;
+  const text = (name: string) => t(key(name)) as string;
+  const paragraphs = (name: string) => tArray<string>(t, key(name)).map((body) => <p key={body}>{body}</p>);
+  const table = (name: string) => <Table headers={tArray<string>(t, key(`${name}TableHeaders`))} rows={tArray<string[]>(t, key(`${name}TableRows`))} />;
+  return <>
+    <SectionHeading id="scoring-philosophy">{text("sectionPhilosophy")}</SectionHeading>
+    {paragraphs("philosophyBody")}
+    <SectionHeading id="scoring-window">{text("sectionWindow")}</SectionHeading>
+    {paragraphs("windowBody")}
+    <SectionHeading id="scoring-normalization">{text("sectionNormalization")}</SectionHeading>
+    {paragraphs("normalizationBody")}
+    <Formula>{text("normalizationFormula")}</Formula>
+    <SectionHeading id="scoring-caps">{text("sectionCaps")}</SectionHeading>
+    {paragraphs("capsBody")}{table("caps")}
+    <SectionHeading id="scoring-dimensions">{text("sectionDimensions")}</SectionHeading>
+    {paragraphs("dimensionsBody")}{table("dimensions")}
+    <SectionHeading id="scoring-craft">{text("sectionCraft")}</SectionHeading>
+    {paragraphs("craftBody")}
+    <Formula>{text("craftFormula")}</Formula>
+    <p>{text("craftExample")}</p>
+    <Formula>{text("craftExampleFormula")}</Formula>
+    <p>{text("craftStates")}</p><p>{text("craftSelection")}</p>
+    <SectionHeading id="scoring-ranges">{text("sectionRanges")}</SectionHeading>
+    {paragraphs("rangesBody")}
+    <SectionHeading id="scoring-archetypes">{text("sectionArchetypes")}</SectionHeading>
+    {paragraphs("archetypesBody")}
+    <SectionHeading id="scoring-composite">{text("sectionComposite")}</SectionHeading>
+    {paragraphs("compositeBody")}
+    <Formula>{text("compositeFormula")}</Formula>
+    <p>{text("roundingBody")}</p>{table("tiers")}
+    <SectionHeading id="scoring-receipts">{text("sectionReceipts")}</SectionHeading>
+    {paragraphs("receiptsBody")}
+    <SectionHeading id="scoring-excludes">{text("sectionExcludes")}</SectionHeading>
+    {paragraphs("excludesBody")}
+  </>;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Page                                                                    */
 /* ---------------------------------------------------------------------- */
@@ -128,12 +167,13 @@ function SECTION_INDEX(t: TFunction) {
 /**
  * Server-rendered scoring methodology content (#1023 / FE-H1). `t` is
  * `getServerT(locale)`, resolved from the route's `[locale]` segment param —
- * both locale variants are statically pre-rendered, so there is no
+ * both locale variants resolve the selected policy on the server, with no
  * client-side re-render/flash. No genuinely-interactive leaf is needed here;
  * `LiteYouTubeEmbed` and `GlobalCommandBarLazy` are already independent
  * client components.
  */
-export function ScoringMethodologyContent({ t }: { t: TFunction }) {
+export function ScoringMethodologyContent({ t, observed = false }: { t: TFunction; observed?: boolean }) {
+  const namespace = observed ? "about.scoringObserved" : "about.scoring";
   return (
     <div className="min-h-screen bg-bg">
       <NavbarClient />
@@ -143,16 +183,17 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
         className="relative mx-auto max-w-5xl px-6 pt-32 pb-24"
       >
         <div className="@container relative">
+          {!observed && <p className="mb-4 text-sm text-text-secondary">{t("about.scoringObserved.archivedNotice") as string}</p>}
           <ContentPageHeader
             command="chapa explain --scoring"
-            title={t('about.scoring.h1') as string}
-            intro={t('about.scoring.intro') as string}
+            title={t(`${namespace}.h1`) as string}
+            intro={t(`${namespace}.intro`) as string}
           />
 
           {/* ---------------------------------------------------------- */}
           {/* Video explainer                                              */}
           {/* ---------------------------------------------------------- */}
-          <div className="mb-10 animate-fade-in-up [animation-delay:150ms]">
+          {!observed && <div className="mb-10 animate-fade-in-up [animation-delay:150ms]">
             <div className="flex items-center gap-2 mb-3">
               <svg
                 viewBox="0 0 24 24"
@@ -181,14 +222,15 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             <p className="text-text-secondary text-sm mt-2">
               {t('about.scoring.videoReadingNote') as string}
             </p>
-          </div>
+          </div>}
 
           <div className="grid gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
           <OnThisPageIndex
-            items={SECTION_INDEX(t)}
+            items={observed ? SECTION_KEYS.map(([id, key]) => ({ id, label: t(`${namespace}.${key}`) as string })) : SECTION_INDEX(t)}
             heading={t('content.onThisPage') as string}
           />
           <div className="min-w-0 space-y-2 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:200ms]">
+            {observed ? <ObservedSections t={t} /> : <>
             {/* ---------------------------------------------------------- */}
             {/* Philosophy                                                  */}
             {/* ---------------------------------------------------------- */}
@@ -392,6 +434,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
                 </a>
               </div>
             </div>
+            </>}
           </div>
           </div>
         </div>

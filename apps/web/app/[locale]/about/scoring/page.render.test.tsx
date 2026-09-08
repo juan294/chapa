@@ -2,6 +2,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
+const selectedPolicy = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: selectedPolicy.enabled, machinePolicy: selectedPolicy.enabled ? "v7.2" : "v6", cacheable: true, capturedAt: 0 })) }));
+
 vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
@@ -32,6 +35,7 @@ vi.mock("@/lib/i18n/server", () => ({
       // so this mock has to carry the key rather than relying on the client
       // translation fallback the component used to reach for itself.
       "content.onThisPage": "On this page",
+      "about.scoringObserved.archivedNotice": "Archived methodology: algorithm v7.1, receipt policy v7. This is not the current observed v7.2 policy.",
       "about.scoring.h1": "Scoring Methodology",
       "about.scoring.intro": "Full transparency on how Chapa decodes your developer impact.",
       "about.scoring.videoHeading": "Watch the explainer",
@@ -147,7 +151,7 @@ vi.mock("@/lib/i18n/server", () => ({
   }),
 }));
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); selectedPolicy.enabled = false; vi.restoreAllMocks(); });
 
 // #1023 (FE-H1) — ScoringMethodologyContent no longer reads translation via
 // the client useTranslation() context; it receives `t` (getServerT(locale))
@@ -158,6 +162,7 @@ describe("ScoringMethodologyPage render", () => {
     const { default: ScoringMethodologyPage } = await import("./page");
     render(await ScoringMethodologyPage({ params: Promise.resolve({ locale: "en" }) }));
     expect(screen.getByText("Scoring Methodology")).toBeDefined();
+    expect(screen.getByText(/Archived methodology: algorithm v7.1/)).toBeDefined();
   });
 
   it("renders the navbar", async () => {
@@ -243,5 +248,40 @@ describe("ScoringMethodologyPage generateMetadata", () => {
     const { generateMetadata } = await import("./page");
     const meta = await generateMetadata({ params: Promise.resolve({ locale: "en" }) });
     expect(meta.title).toBeTruthy();
+  });
+});
+
+
+describe("current observed methodology", () => {
+  it.each(["en", "es"] as const)("renders current policy arithmetic and report states in %s", async (locale) => {
+    selectedPolicy.enabled = true;
+    const { getServerT } = await import("@/lib/i18n/server");
+    const { en } = await import("@/lib/i18n/dictionaries/en");
+    const { es } = await import("@/lib/i18n/dictionaries/es");
+    const { resolveTranslation } = await import("@/lib/i18n/resolve");
+    vi.mocked(getServerT).mockReturnValueOnce(((key: string) => resolveTranslation(key, locale === "en" ? en : es)) as ReturnType<typeof getServerT>);
+    const { default: Page } = await import("./page");
+    const { container } = render(await Page({ params: Promise.resolve({ locale }) }));
+    const text = container.textContent ?? "";
+    expect(text).toContain("v7.2");
+    expect(text).toContain("N(x, c) = ln(1 + min(x, c)) / ln(1 + c)");
+    expect(text).toContain("0.25 × D + 0.25 × Q + 0.25 × C + 0.25 × B");
+    expect(text).toContain("100 × (4 + 0.7 × 2 + 0.3 × 1) / 10 = 57");
+    expect(text).toContain("8/10");
+    expect(text).toContain("69.99");
+    expect(text).toContain("46");
+    expect(text).not.toContain("N(framing, 8)");
+    expect(text).not.toContain("Master");
+    expect(screen.queryByTestId("youtube-embed")).toBeNull();
+    expect(container.querySelectorAll("h2[id]")).toHaveLength(11);
+    const craft = document.getElementById("scoring-craft")?.parentElement;
+    expect(craft?.textContent).toMatch(locale === "en" ? /failed.*zero/i : /fallidos.*cero/i);
+    expect(text).toMatch(locale === "en" ? /no report.*insufficient/i : /sin informe.*insuficientes/i);
+    expect(text).toMatch(locale === "en" ? /archetype.*absent/i : /arquetipo.*ausente/i);
+    vi.mocked(getServerT).mockReturnValueOnce(((key: string) => resolveTranslation(key, locale === "en" ? en : es)) as ReturnType<typeof getServerT>);
+    const { generateMetadata } = await import("./page");
+    const metadata = await generateMetadata({ params: Promise.resolve({ locale }) });
+    expect(metadata.title).toContain("v7.2");
+    expect(metadata.description).not.toMatch(/completion ranges|intervalos de/i);
   });
 });

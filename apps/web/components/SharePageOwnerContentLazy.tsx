@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
 import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
@@ -61,6 +62,7 @@ interface Props {
   embedMarkdown?: string;
   embedHtml?: string;
   receiptExplanation?: ReceiptExplanation | null;
+  scoring?: ScoreViewModel | null;
 }
 
 export function SharePageOwnerContentLazy(props: Props) {

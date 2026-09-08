@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ReceiptExplanationPanel } from "@/components/dashboard/ReceiptExplanationPanel";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
 import { useState } from "react";
 import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
@@ -137,6 +138,7 @@ interface SharePageOwnerContentProps {
    *  Present only for a subject with a receipt; its presence is what switches
    *  this surface off the v6 explanation. */
   receiptExplanation?: ReceiptExplanation | null;
+  scoring?: ScoreViewModel | null;
 }
 
 export function SharePageOwnerContent({
@@ -150,6 +152,7 @@ export function SharePageOwnerContent({
   embedMarkdown: embedMarkdownProp,
   embedHtml: embedHtmlProp,
   receiptExplanation = null,
+  scoring,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -188,7 +191,10 @@ export function SharePageOwnerContent({
       {impact && stats ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
           <ImpactDashboard
+            isOwner={isOwner}
             impact={impact}
+            scoring={scoring}
+            receiptExplanation={receiptExplanation}
             stats={stats}
             craftResult={craftResult}
             trend={trend}
@@ -207,6 +213,8 @@ export function SharePageOwnerContent({
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
           <ReceiptExplanationPanel explanation={receiptExplanation} />
         </section>
+      ) : scoring?.policyVersion === "v7.2" ? (
+        <p className="mb-12 text-sm text-text-secondary">{t("observedScoring.explanationUnavailable") as string}</p>
       ) : impact && stats ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
           <ScoreExplanationPanel

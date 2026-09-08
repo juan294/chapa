@@ -501,6 +501,46 @@ export const en: Translations = {
     consentWithdraw: 'Withdraw publication',
     consentError: 'Could not update publication consent. Try again later.',
   },
+  observedScoring: {
+    "uploadInsights": "Upload insights",
+    "intro": "Recorded evidence contributes to this score; missing evidence is not a judgment of your ability.",
+    "coreSeparate": "The four core dimensions each contribute 25%. Craft is reported separately and never changes the core.",
+    "unavailable": "Unavailable",
+    "updateInsights": "Update insights",
+    "noArchetype": "No archetype assigned",
+    "stale": "Recorded for {date}; newer evidence is not reflected here.",
+    "evidenceDetails": "Recorded evidence",
+    "missingEvidence": "No qualifying observations were credited for this criterion. Add supporting evidence for work you have done.",
+    "coaching": "Evidence to document",
+    "craftReport": "Report-derived model estimate",
+    "craftInsufficient": "Insufficient report data",
+    "craftNone": "No insights report",
+    "craftUnavailable": "This report does not supply a current Craft point. Update insights to include an eligible report.",
+    "reportPeriod": "Report period: {start} to {end}",
+    "reportCoverage": "Classified outcomes: {recognized} of {total} sessions.",
+    "outcomeCredits": "Outcome credits",
+    "unknownSessions": "Unknown outcomes",
+    "unclassifiedSessions": "Unclassified sessions",
+    "explanationUnavailable": "The exact receipt explanation is unavailable. The displayed score still identifies its recorded receipt.",
+    "coverageIncomplete": "Coverage is partial. Only qualifying observations contribute; missing evidence receives no estimated credit.",
+    "activityOnly": "Source activity is descriptive and is not a breakdown of credited score evidence.",
+    "steps": {
+      "delivery_units": "Delivery units",
+      "active_iso_weeks": "Active ISO weeks",
+      "eligible_projects": "Eligible projects",
+      "eligible_categories": "Eligible categories",
+      "rationale": "Rationale",
+      "verification": "Verification",
+      "review_or_correction": "Review or correction",
+      "outcome_followup": "Outcome follow-up"
+    },
+    "outcomes": {
+      "fully_achieved": "Fully achieved",
+      "mostly_achieved": "Mostly achieved",
+      "partially_achieved": "Partially achieved",
+      "not_achieved": "Not achieved"
+    }
+  },
   userMenu: {
     myBadge: 'My Badge',
     creatorStudio: 'Creator Studio',
@@ -582,6 +622,14 @@ export const en: Translations = {
   // the existing `dimensions.*.label` / `tiers.*` keys below instead of
   // duplicating them here.
   badge: {
+    illustrativeExample: 'Illustrative scoring example.',
+    craftUpdate: 'Update insights',
+    observedScoreDescription: 'Observed core score from credited evidence; Craft does not enter the core average.',
+    reportCraftDescription: 'Craft: {score}/100 from {credited} credited outcome sessions out of {total}. Classified outcomes: {recognized}/{total}. Report period: {start} to {end} (end exclusive).',
+    reportCraftAbsent: 'No current report-derived Craft score.',
+    reportCraftUnavailable: 'Craft is unlocked; update insights for a current score.',
+    incompleteSources: '{incomplete} of {total} sources incomplete.',
+    excludedSources: '{count} sources excluded and disclosed.',
     activityHeading: '01 / ACTIVITY',
     heatmapCaption: '13 WEEKS × 7 DAYS',
     impactHeading: '02 / IMPACT',
@@ -976,6 +1024,147 @@ export const en: Translations = {
       contactEmail: 'support@chapa.thecreativetoken.com',
       contactBodyEnd: '.',
     },
+    scoringObserved: {
+      metadataTitle: 'Observed scoring methodology · v7.2',
+      metadataDescription: 'How Chapa calculates one observed core point with four fixed weights and optional report-derived Craft, with replayable receipts and explicit coverage limits.',
+      "h1": "Scoring methodology · v7.2",
+      "intro": "One observed core score, four fixed weights, and an optional report-derived Craft result. Examples below are illustrative, not claims about a developer.",
+      "archivedNotice": "Archived methodology: algorithm v7.1, receipt policy v7. This is not the current observed v7.2 policy.",
+      "sectionPhilosophy": "What the observed point means",
+      "philosophyBody": [
+            "The score describes qualifying engineering evidence recorded within the scoring window. It is not a complete measure of developer ability or business impact. Comparisons under the same policy describe this recorded index, not relative personal ability.",
+            "Delivery, Quality practices, Consistency and Breadth each carry exactly 0.25 of the core. The same rules apply to every subject. There is no confidence multiplier, tenure bonus, or solo-work penalty."
+      ],
+      "sectionWindow": "One window, one clock",
+      "windowBody": [
+            "A receipt captures one reference time and the 365 UTC calendar dates ending on its reference date. Events must occur no later than that reference time. Every core dimension uses that same context.",
+            "A report must fit wholly within the window. A future declared end date is rejected. For a date-only report ending today, the end is bounded once by the first server capture; identical later uploads retain that original cutoff."
+      ],
+      "sectionNormalization": "The count normalization",
+      "normalizationBody": [
+            "Each qualifying count x uses the same logarithmic function N with its fixed cap c. It starts at zero, reaches one at the cap, and adds no credit beyond the cap."
+      ],
+      "normalizationFormula": "N(x, c) = ln(1 + min(x, c)) / ln(1 + c)",
+      "sectionCaps": "Fixed caps",
+      "capsBody": [
+            "Caps are policy constants, not percentiles or comparisons with other developers."
+      ],
+      "capsTableHeaders": [
+            "Qualifying count",
+            "Cap"
+      ],
+      "capsTableRows": [
+            [
+                  "Delivery units",
+                  "120"
+            ],
+            [
+                  "Each Quality criterion",
+                  "12"
+            ],
+            [
+                  "Active ISO weeks",
+                  "40"
+            ],
+            [
+                  "Eligible projects",
+                  "4"
+            ],
+            [
+                  "Eligible work categories",
+                  "4"
+            ]
+      ],
+      "sectionDimensions": "The four core dimensions",
+      "dimensionsBody": [
+            "Counts refer to qualifying, deduplicated evidence. Raw commit volume and self-reported assertions do not automatically qualify."
+      ],
+      "dimensionsTableHeaders": [
+            "Dimension",
+            "Formula",
+            "What is counted"
+      ],
+      "dimensionsTableRows": [
+            [
+                  "Delivery",
+                  "D = 100 × N(deliveryUnits, 120)",
+                  "Distinct eligible accepted-work project/UTC-date buckets. Splitting work does not multiply the same bucket."
+            ],
+            [
+                  "Quality practices",
+                  "Q = 25 × [N(rationale, 12) + N(verification, 12) + N(review_or_correction, 12) + N(outcome_followup, 12)]",
+                  "Credited evidence for each of four criteria: rationale, verification, review or correction, and outcome follow-up. Missing credited observations mean missing contribution to this index, not poor developer ability."
+            ],
+            [
+                  "Consistency",
+                  "C = 100 × N(activeIsoWeeks, 40)",
+                  "ISO weeks with qualifying attributable contributions. No weekend or burst penalty."
+            ],
+            [
+                  "Breadth",
+                  "B = 50 × N(eligibleProjects, 4) + 50 × N(eligibleCategories, 4)",
+                  "Eligible projects and work categories, subject to the three-distinct-date qualification rules. Popularity is not breadth."
+            ]
+      ],
+      "sectionCraft": "Craft from one insights report",
+      "craftBody": [
+            "Import a Claude Code /insights report and acknowledge public numerical publication in the same import action if needed. Craft is report-derived and model-estimated; a reproducible calculation does not independently verify the report.",
+            "Outcome credits are fully achieved = 1, mostly achieved = 0.7, partially achieved = 0.3, and not achieved or failed = 0. Every session stays in the denominator, including unknown and unclassified outcomes."
+      ],
+      "craftFormula": "Craft = 100 × (fully + 0.7 × mostly + 0.3 × partially) / totalSessions",
+      "craftExample": "Illustrative example: 10 sessions, with 4 fully, 2 mostly, 1 partially, 1 failed, 1 unknown and 1 unclassified. Recognized coverage is 8/10; credited outcomes total 5.7.",
+      "craftExampleFormula": "100 × (4 + 0.7 × 2 + 0.3 × 1) / 10 = 57",
+      "craftStates": "No report means no report score. Insufficient data means no sessions or no recognized outcomes, also without a score. A valid report of failed outcomes has a measured zero and unlocks the fifth axis. A valid Craft57 report leaves a core46 at 46: Craft has zero core weight.",
+      "craftSelection": "The latest eligible observation period is selected; reports are not added together. Different contents for the same declared period require an explicit correction. Invalid or insufficient imports preserve the previous valid score. Identical content is idempotent. Expired or unavailable Craft keeps its unlocked fifth slot with an update label and no fabricated zero vertex.",
+      "sectionRanges": "Observed counts and source coverage",
+      "rangesBody": [
+            "The current score uses the original lower qualifying count: evidence actually credited, not an estimated completion midpoint or an optimistic upper bound. Original count bounds, incomplete sources, exclusions and observation dates remain in the receipt metadata.",
+            "A partial source can leave real work unobserved. An observed zero is not proof that no work happened. Collection failures preserve the prior publication as stale or unavailable rather than silently replacing it with an empty score."
+      ],
+      "sectionArchetypes": "When an archetype is available",
+      "archetypesBody": [
+            "An archetype may be absent even when a core point is shown. Eligibility still requires the original normalized dimension endpoints to agree; the observed point does not manufacture that certainty.",
+            "Eligible profiles use the existing descriptive decision tree and its fixed tie order: Breadth, Quality, Consistency, Delivery. Craft never changes the core archetype and does not grant a new proficiency title."
+      ],
+      "sectionComposite": "The core, display and tiers",
+      "compositeBody": [
+            "Compute the core from the unrounded dimension values. Displayed dimension integers are never averaged back into the core."
+      ],
+      "compositeFormula": "core = 0.25 × D + 0.25 × Q + 0.25 × C + 0.25 × B",
+      "roundingBody": "Tiers use the unrounded core. Display normally rounds to the nearest integer; if that would cross a tier threshold, it truncates to two decimals below the threshold. For example, 69.999 displays as 69.99 and remains Solid. Dimensions and Craft use nearest-integer display. The receipt retains exact values and calculation traces.",
+      "tiersTableHeaders": [
+            "Tier",
+            "Unrounded core"
+      ],
+      "tiersTableRows": [
+            [
+                  "Emerging",
+                  "Below 30"
+            ],
+            [
+                  "Solid",
+                  "30 to below 70"
+            ],
+            [
+                  "High",
+                  "70 to below 85"
+            ],
+            [
+                  "Elite",
+                  "85 to 100"
+            ]
+      ],
+      "sectionReceipts": "Receipts, replay and limitations",
+      "receiptsBody": [
+            "The immutable public receipt records its policy and algorithm versions, exact counts, point values, original bounds, report period, coverage and calculation trace. Replaying it checks numerical reproducibility and integrity; it does not verify real-world source truth. Historical receipts keep their original rules.",
+            "Receipt publication is opt-in. Raw report text and unknown labels stay private; raw artifacts expire after 30 days, while the minimal numerical replay summary remains until withdrawal or deletion. Public report references are opaque identifiers.",
+            "Corrections preserve lineage. The optional trend is a separately labelled value with 0.85 daily retention; it never replaces the raw core or its tier."
+      ],
+      "sectionExcludes": "What earns no credit by itself",
+      "excludesBody": [
+            "Followers, stars, forks, watchers, lines changed, tool names, token counts, message counts, account age and private repository names do not earn core points by themselves. A common policy does not eliminate gaps in source access, attribution, or report quality."
+      ]
+},
     scoring: {
       metadataTitle: 'Scoring Methodology',
       metadataDescription: 'How Chapa scores engineering activity under Impact v7: four fixed dimensions, a separate Craft portfolio, evidence-completion ranges, and a replayable public receipt.',
@@ -1244,7 +1433,8 @@ export const en: Translations = {
     terminalWelcome: 'Creator Studio — customize your badge preview',
     terminalHint: 'Type /help for commands or use Quick Controls.',
     title: 'Creator Studio',
-    subtitle: 'Preview and customize your badge — changes here never affect your public badge or share page.',
+    subtitle: 'Changes preview locally until you save. Save updates your public badge, share page, and social preview.',
+    demoSubtitle: 'Illustrative demo. Changes stay in this preview; Save does not publish them.',
     quickControls: 'Quick Controls',
     presetsHeading: 'Presets',
     session: 'SESSION',
@@ -1275,11 +1465,12 @@ export const en: Translations = {
     verificationLabel: 'VERIFIED',
     demoMarker: 'DEMO',
     save: {
-      saved: 'Preview saved',
+      saved: 'Configuration saved',
+      demoPreview: 'Demo preview only',
       dirty: 'Unsaved preview changes',
       saving: 'Saving...',
-      success: 'Configuration saved. Your public badge and share page now show it.',
-      successDeferred: 'Configuration saved. Your public badge may take a few hours to update.',
+      success: 'Configuration saved. Your public badge, share page, and social preview now use it.',
+      successDeferred: 'Configuration saved. Public previews could not be refreshed yet.',
       demoNotPersisted: '(demo) configuration not persisted',
       changedDuringSave: 'Earlier preview changes were saved. New preview changes are still unsaved.',
       alreadySaving: 'A save is already in progress.',

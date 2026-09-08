@@ -203,3 +203,29 @@ describe("BadgePreviewCard verification and identity", () => {
     );
   });
 });
+
+// Shared contradiction fixture must reach the real renderer without a v6 fallback.
+describe("Studio observed receipt consistency", () => {
+  it.each(["none", 57, 0, "expired"] as const)("preserves core46 and the optional Craft %s state", async (craft) => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const fixture = await scoringConsistencyFixture({ craft });
+    render(<BadgePreviewCard config={DEFAULT_BADGE_CONFIG} stats={fixture.stats} impact={fixture.impact} scoring={fixture.model} />);
+    const preview = screen.getByTestId("badge-preview");
+    expect(preview.querySelector('[data-element="score"]')?.textContent).toBe("46");
+    expect(preview.querySelector('[data-element="archetype"]')?.textContent).not.toContain("Builder");
+    const polygon = preview.querySelector('[data-element="dimensions"] polygon[fill-opacity="0.15"]');
+    const vertices = polygon?.getAttribute("points")?.trim().split(/\s+/);
+    if (craft === "expired") {
+      expect(preview.querySelectorAll('[data-element="dimensions"] line')).toHaveLength(5);
+      expect(preview.querySelector('[data-element="craft"]')?.textContent).toContain("Craft");
+      expect(polygon).toBeNull();
+      expect(preview.querySelector('circle[data-axis="craft"]')).toBeNull();
+      expect(preview.querySelector('[data-role="radar-incomplete"]')?.getAttribute("points")?.trim().split(/\s+/)).toHaveLength(4);
+    } else expect(vertices).toHaveLength(craft === 57 || craft === 0 ? 5 : 4);
+    if (craft === 0) {
+      const axis = preview.querySelector('[data-element="dimensions"] line');
+      expect(vertices?.[4]).toBe(`${axis?.getAttribute("x1")},${axis?.getAttribute("y1")}`);
+    }
+    if (craft === "expired") expect(preview.textContent).toMatch(/expired|update/i);
+  });
+});

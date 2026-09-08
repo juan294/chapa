@@ -46,3 +46,17 @@ describe("ReceiptExplanationPanel (#1311)", () => {
     expect(screen.getByText(/never enters the core/i)).toBeDefined();
   });
 });
+
+it("prints canonical current points while expanded arithmetic retains exact trace and report credits", async () => {
+  const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+  const { explainObservedReceipt } = await import("@/lib/dashboard/receipt-explanation");
+  const fixture = await scoringConsistencyFixture({ craft: 57, boundary: true });
+  const explanation = explainObservedReceipt({ receipt: fixture.envelope, trend: null }, Date.parse(fixture.envelope.receipt.window.referenceTime));
+  render(<ReceiptExplanationPanel explanation={explanation} />);
+  expect(screen.getByText(fixture.envelope.receipt.core.composite.displayLabel)).toBeDefined();
+  expect(screen.getByText("57")).toBeDefined();
+  expect(screen.getByText(/5\.7 \/ 10 × 100 = 57/)).toBeDefined();
+  expect(screen.getAllByText(/ln\(1 \+/).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/interval rather than a midpoint/i)).toBeNull();
+  expect(screen.queryByText(/proficiency|Master|Expert/i)).toBeNull();
+});

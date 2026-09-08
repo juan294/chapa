@@ -35,6 +35,7 @@ describe("resolveBadgeLocale", () => {
       consistency: "Constancia",
       breadth: "Alcance",
       craft: "Oficio",
+      craftUnavailable: "Actualiza insights",
     });
     expect(strings.radarNoData).toBe("aún sin datos");
     expect(strings.verifiedLabel).toBe("VERIFICADO");
@@ -59,6 +60,7 @@ describe("resolveBadgeLocale", () => {
       consistency: "Consistency",
       breadth: "Breadth",
       craft: "Craft",
+      craftUnavailable: "Update insights",
     });
     expect(strings.radarNoData).toBe("no data yet");
     expect(strings.verifiedLabel).toBe("VERIFIED");
