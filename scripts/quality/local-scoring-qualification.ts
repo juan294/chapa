@@ -1,6 +1,7 @@
 /** Local-only bootstrap/launcher. No Docker actions, remote deployment or production credentials. */
 import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstatSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { qualificationBuildEnvironment, assertNoImplicitBuildEnvironment, assertUntrackedEvidenceOutput, verifyLocalBuildManifest } from "./candidate-artifact-manifest";
 
@@ -92,6 +93,25 @@ async function recordRemainingCache(environment: NodeJS.ProcessEnv, evidenceDir:
   await writeFile(join(evidenceDir, "remaining-cache-keys.json"), `${JSON.stringify({ service: REDIS_ORIGIN, disposition: "dedicated disposable service retained for owner cleanup", keys: [...keys].sort() }, null, 2)}\n`, { mode: 0o600 });
 }
 
+/** A sanitized build can cache absent DB flags. Discard only that mutable
+ * fetch data after artifact verification; compiled files remain byte-identical.
+ */
+export function discardQualificationFetchCache(root: string): void {
+  let current = resolve(root);
+  for (const segment of ["apps", "web", ".next", "cache", "fetch-cache"]) {
+    current = join(current, segment);
+    let stat;
+    try { stat = lstatSync(current); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) throw new Error("Qualification fetch cache path must not contain a symlink");
+    if (!stat.isDirectory()) throw new Error("Qualification fetch cache path must contain only directories");
+  }
+  rmSync(current, { recursive: true });
+}
+
 export async function launchLocalScoringQualification(root: string, evidenceDir: string, source: Record<string, string | undefined>, port = 3217) {
   root = resolve(root); evidenceDir = resolve(evidenceDir);
   assertUntrackedEvidenceOutput(root, join(evidenceDir, "ready.json"));
@@ -99,6 +119,7 @@ export async function launchLocalScoringQualification(root: string, evidenceDir:
   const environment = qualificationRuntimeEnvironment(root, evidenceDir, source, port);
   if (!environment.RELEASE_BUILD_MANIFEST) throw new Error("RELEASE_BUILD_MANIFEST is required before launching a qualified server");
   const manifest = verifyLocalBuildManifest(JSON.parse(await readFile(environment.RELEASE_BUILD_MANIFEST, "utf8")), root);
+  discardQualificationFetchCache(root);
   await mkdir(evidenceDir, { recursive: true, mode: 0o700 });
   // Fixture helpers read only this explicitly constructed local environment.
   process.env = environment;

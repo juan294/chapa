@@ -1,5 +1,8 @@
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, symlinkSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { qualificationRuntimeEnvironment, seedQualificationCache, QUALIFICATION_SESSION_SECRET, withQualificationServer } from "./local-scoring-qualification";
+import { qualificationRuntimeEnvironment, seedQualificationCache, QUALIFICATION_SESSION_SECRET, withQualificationServer, discardQualificationFetchCache } from "./local-scoring-qualification";
 const local = { SUPABASE_URL: "http://127.0.0.1:55331", SUPABASE_SERVICE_ROLE_KEY: "local-service-key", UPSTASH_REDIS_REST_URL: "http://127.0.0.1:56380", UPSTASH_REDIS_REST_TOKEN: "local-redis-key", REDESIGN_DISPOSABLE_PROJECT: "chapa-redesign" };
 describe("disposable scoring qualification launcher", () => {
   it("constructs only local explicit runtime settings without inherited production routing", () => {
@@ -49,4 +52,31 @@ it("uses synthetic OAuth settings and admits only the named redesign admin fixtu
   expect(env.ADMIN_HANDLES?.split(",").sort()).toEqual(["en", "es"].flatMap(locale => ["light", "dark"].flatMap(theme => ["desktop", "mobile"].map(device => `chapa-redesign-${locale}-${theme}-${device}`))).sort());
   expect(Object.values(env)).not.toContain("external-id");
   expect(env.ADMIN_HANDLES).not.toContain("real-owner");
+});
+
+it("discards only build-time fetch cache while preserving compiled and other cache artifacts", () => {
+  const root = mkdtempSync(join(tmpdir(), "chapa-qualification-cache-"));
+  try {
+    const next = join(root, "apps/web/.next");
+    mkdirSync(join(next, "cache/fetch-cache"), { recursive: true });
+    writeFileSync(join(next, "cache/fetch-cache/negative-flag"), "null");
+    writeFileSync(join(next, "cache/keep"), "other cache");
+    writeFileSync(join(next, "BUILD_ID"), "compiled build");
+    discardQualificationFetchCache(root);
+    expect(existsSync(join(next, "cache/fetch-cache"))).toBe(false);
+    expect(existsSync(join(next, "cache/keep"))).toBe(true);
+    expect(existsSync(join(next, "BUILD_ID"))).toBe(true);
+    expect(() => discardQualificationFetchCache(root)).not.toThrow();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+it.each(["cache", "cache/fetch-cache"])("rejects symlink at %s without touching its target", relative => {
+  const root = mkdtempSync(join(tmpdir(), "chapa-qualification-cache-"));
+  try {
+    const next = join(root, "apps/web/.next"), target = join(root, "separate");
+    mkdirSync(target); writeFileSync(join(target, "keep"), "untouched");
+    mkdirSync(join(next, relative === "cache" ? "" : "cache"), { recursive: true });
+    symlinkSync(target, join(next, relative));
+    expect(() => discardQualificationFetchCache(root)).toThrow(/symlink/);
+    expect(existsSync(join(target, "keep"))).toBe(true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
