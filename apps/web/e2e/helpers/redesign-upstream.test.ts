@@ -119,3 +119,14 @@ it('serves the exact historical journey avatar from local fixture bytes only', a
   await expect(replay('https://avatars.githubusercontent.com/u/583231?v=4', { method: 'POST' })).rejects.toThrow(/Unexpected/);
   expect(send).not.toHaveBeenCalled();
 });
+
+it('classifies denied GraphQL without logging query bodies, credentials or arbitrary handles', async () => {
+  const unexpected = vi.fn();
+  const replay = createRedesignFetch({ cache: {}, github: { 'chapa-score-boundary': {} } }, vi.fn(), unexpected);
+  await expect(replay('https://api.github.com/graphql', { method: 'POST', headers: { Authorization: 'private-secret' }, body: JSON.stringify({ query: 'query V7Profile { private_sentinel }', variables: { login: 'chapa-score-boundary' } }) })).rejects.toThrow(/Unexpected/);
+  expect(unexpected.mock.calls[0]?.[0]).toMatch(/operation=V7Profile querySha256=[a-f0-9]{64} login=chapa-score-boundary/);
+  expect(unexpected.mock.calls[0]?.[0]).not.toMatch(/private_sentinel|private-secret/);
+  await expect(replay('https://api.github.com/graphql', { method: 'POST', body: JSON.stringify({ query: 'query PrivateCustomer { x }', variables: { login: 'private-customer' } }) })).rejects.toThrow(/Unexpected/);
+  expect(unexpected.mock.calls[1]?.[0]).toMatch(/operation=other querySha256=[a-f0-9]{64} login=not_allowlisted/);
+  expect(unexpected.mock.calls[1]?.[0]).not.toMatch(/PrivateCustomer|private-customer/);
+});

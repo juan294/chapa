@@ -5,9 +5,10 @@ import { readFile, writeFile } from 'node:fs/promises';
 import type { BrowserContext } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY } from '@chapa/shared';
+import { buildRedesignGitHubFixture } from './redesign-github';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
-import { SCORING_POINT_HANDLES, fixtureStatsBinding } from "./scoring-point-fixtures";
 import { DEMO_STATS } from '../../lib/render/demoData';
+import { SCORING_POINT_HANDLES, fixtureStatsBinding } from "./scoring-point-fixtures";
 
 export const REDESIGN_OWNERS = ['en', 'es'].flatMap(locale => ['light', 'dark'].flatMap(theme => ['desktop', 'mobile'].map(device => `chapa-redesign-${locale}-${theme}-${device}`)));
 export const REDESIGN_HANDLES = ['octocat', 'juan294', 'chapa-redesign-owner', 'chapa-redesign-visitor', ...REDESIGN_OWNERS];
@@ -88,6 +89,7 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
       cache[`stats:stale:v2:${handle}`] = JSON.stringify(stats);
       github[handle] = { data: { user: { login: handle, name: handle, avatarUrl: '', contributionsCollection: { contributionCalendar: { totalContributions: 0, weeks: [] }, pullRequestContributions: { totalCount: 0, nodes: [] }, pullRequestReviewContributions: { totalCount: 0 }, issueContributions: { totalCount: 0 } }, repositories: { totalCount: 0, nodes: [] } }, search: { issueCount: 0 } } };
     }
+    for (const handle of SCORING_POINT_HANDLES) github[handle] = buildRedesignGitHubFixture(handle, new Date().toISOString()).response;
     const today = new Date().toISOString();
     await check(db.from('verification_records').insert({ hash: REDESIGN_VALID_HASH, handle: 'chapa-redesign-owner', display_name: 'Local redesign fixture', adjusted_composite: 70, confidence: 86, tier: 'High', archetype: 'Builder', profile_type: 'collaborative', building: 74, guarding: 69, consistency: 71, breadth: 67, commits_total: 124, prs_merged_count: 18, reviews_submitted: 33, generated_at: today.slice(0, 10), expires_at: new Date(Date.now() + 86400_000).toISOString() }));
     await writeFile(upstreamFile, JSON.stringify({ cache, github, journeyRunId: 'redesign', contributionQuery: CONTRIBUTION_QUERY, avatarPng: (await readFile(resolve(__dirname, '../../public/logo-512.png'))).toString('base64') }));

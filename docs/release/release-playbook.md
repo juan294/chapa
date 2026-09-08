@@ -73,7 +73,7 @@ pnpm run check:licenses
 pnpm run check:vulnerabilities
 pnpm exec tsx scripts/quality/candidate-artifact-manifest.ts --root "$candidateRoot" --output "$manifestPath"
 bash scripts/check-bundle-size.sh
-pnpm exec tsx scripts/scoring/reference-calculator.ts packages/shared/src/__fixtures__/observed-owner-envelope.json
+pnpm exec tsx --tsconfig tsconfig.scripts.json scripts/scoring/reference-calculator.ts packages/shared/src/__fixtures__/observed-owner-envelope.json
 ```
 
 `test:coverage` supplies both `unitTests` and `coverage` evidence: it runs the

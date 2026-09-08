@@ -90,7 +90,7 @@ export async function replayReceipt(value: unknown) {
 }
 async function main(): Promise<void> {
   const file = process.argv[2];
-  if (!file) { console.error("Usage: pnpm exec tsx scripts/scoring/reference-calculator.ts receipt.json"); process.exitCode = 1; }
+  if (!file) { console.error("Usage: pnpm exec tsx --tsconfig tsconfig.scripts.json scripts/scoring/reference-calculator.ts receipt.json"); process.exitCode = 1; }
   else {
     try { console.log(JSON.stringify(await replayReceipt(JSON.parse(await readFile(file, "utf8"))), null, 2)); }
     catch { console.error("Receipt rejected: invalid schema, digest, policy or arithmetic. Legacy evidence cannot be reconstructed."); process.exitCode = 1; }

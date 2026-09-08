@@ -7,8 +7,8 @@ import { canonicalJson, canonicalSha256, createScoringWindow, DEFAULT_BADGE_CONF
 import { observedReceiptFixture } from "../../lib/history/__fixtures__/receipts-observed";
 import { calculateReportCraftInputs } from "../../lib/insights/report-craft";
 import { observedSemanticIdentity } from "../../lib/profile/receipt-semantic-identity";
-import { DEMO_IMPACT, DEMO_STATS } from "../../lib/render/demoData";
-import { makeFullStats } from "../../lib/test-helpers/fixtures";
+import { DEMO_IMPACT } from "../../lib/render/demoData";
+import { buildRedesignGitHubFixture } from "./redesign-github";
 import { localCandidateTarget } from "./local-candidate";
 
 export const SCORING_POINT_HANDLES = ["chapa-score-chromium", "chapa-score-mobile", "chapa-score-expired", "chapa-score-boundary"] as const;
@@ -37,7 +37,7 @@ export async function buildScoringPointSeeds(referenceTime: string) {
     const fixed = (n: number) => ({ lower: n, upper: n });
     const counts: CoreCountInputs | undefined = handle.endsWith("boundary") ? { deliveryUnits: fixed(14), quality: { rationale: fixed(1), verification: fixed(1), review_or_correction: fixed(1), outcome_followup: fixed(1) }, activeIsoWeeks: fixed(35), eligibleProjects: fixed(4), eligibleCategories: fixed(4) } : undefined;
     const envelope = await observedReceiptFixture({ referenceTime: window.referenceTime, craft, counts });
-    const stats = makeFullStats({ ...DEMO_STATS, handle, displayName: handle, avatarUrl: "", linkedPlatforms: [], linkedPlatformLogins: {}, fetchedAt: referenceTime });
+    const stats = buildRedesignGitHubFixture(handle, referenceTime).stats;
     const legacyImpact = { ...DEMO_IMPACT, handle, adjustedComposite: 80, compositeScore: 80, archetype: "Builder" as const, dimensions: { delivery: 100, quality: 74, consistency: 67, breadth: 71, craft: 83 }, computedAt: referenceTime };
     return { handle, envelope, stats, legacyImpact };
   }));

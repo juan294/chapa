@@ -65,7 +65,7 @@ C11–C16, C19. Promote the two audit probes into permanent regressions. Use rea
 ```sh
 pnpm exec vitest run packages/shared/src/scoring-observed.test.ts apps/web/lib/profile/score-receipt-v7.test.ts apps/web/lib/profile/issue-receipt.test.ts apps/web/lib/profile/badge-verification.test.ts scripts/scoring/reference-calculator.test.ts --no-file-parallelism
 pnpm run test:contract:local
-pnpm exec tsx scripts/scoring/reference-calculator.ts docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase6/receipt-envelope.json
+pnpm exec tsx --tsconfig tsconfig.scripts.json scripts/scoring/reference-calculator.ts docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase6/receipt-envelope.json
 pnpm run validate:migrations
 pnpm run typecheck
 pnpm run lint

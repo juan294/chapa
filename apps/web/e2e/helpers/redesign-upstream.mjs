@@ -1,5 +1,6 @@
 /** Test-process-only replay. Never imported by application code. */
 import { appendFileSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onUnexpected = () => {}) {
   const cache = new Map(Object.entries(fixtures.cache));
@@ -104,7 +105,21 @@ export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onU
     if (url.origin === 'https://avatars.githubusercontent.com' && fixtures.github[url.pathname.slice(1)] && fixtures.avatarPng) {
       return new Response(Buffer.from(fixtures.avatarPng, 'base64'), { headers: { 'Content-Type': 'image/png' } });
     }
-    const message = `Unexpected redesign upstream: ${url.origin}${url.pathname}`;
+    let diagnostic = '';
+    if (url.href === 'https://api.github.com/graphql') {
+      let request;
+      try { request = JSON.parse(String(body)); } catch { request = {}; }
+      const query = typeof request?.query === 'string' ? request.query : '';
+      const known = ['V7Profile', 'V7Repositories', 'V7ContributedRepositories', 'V7MergedChanges', 'V7Files', 'V7ReviewDiscovery', 'V7Reviews', 'V7Commits'];
+      const named = query.match(/\bquery\s+([A-Za-z0-9_]+)/)?.[1];
+      const operation = query === fixtures.contributionQuery ? 'legacy_contribution' : known.includes(named) ? named : 'other';
+      const candidate = request?.variables?.login;
+      const isSynthetic = typeof candidate === 'string' && ((Object.hasOwn(fixtures.github, candidate) && /^chapa-[a-z0-9-]+$/.test(candidate)) || journeyShape(candidate));
+      const login = isSynthetic ? candidate : 'not_allowlisted';
+      // Diagnose only denied calls; never emit headers, bodies or arbitrary identifiers.
+      diagnostic = ` operation=${operation} querySha256=${createHash('sha256').update(query).digest('hex')} login=${login}`;
+    }
+    const message = `Unexpected redesign upstream: ${url.origin}${url.pathname}${diagnostic}`;
     onUnexpected(message);
     throw new Error(message);
   };

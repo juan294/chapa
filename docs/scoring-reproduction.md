@@ -27,7 +27,7 @@ A public v7 receipt reproduces arithmetic over issued counts and evidence-comple
 From this repository, with dependencies already installed, run:
 
 ```sh
-pnpm exec tsx scripts/scoring/reference-calculator.ts receipt.json
+pnpm exec tsx --tsconfig tsconfig.scripts.json scripts/scoring/reference-calculator.ts receipt.json
 ```
 
 The file is a JSON envelope with `receipt` and `contentHash` fields. The CLI reads only that local file and local code. It uses no secrets, network or ambient clock. It rejects unknown policies, unexpected fields, hash mismatches and disagreement in any numeric trace or displayed result. A successful result says `arithmetic_reproduced`; it is not an issuance signature verification. S14 owns durable issuance authentication and revocation.

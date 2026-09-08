@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -67,6 +68,14 @@ describe("independent observed receipt replay", () => {
     const expected = await replayReceipt(envelope);
     vi.useFakeTimers(); vi.setSystemTime("2035-01-01T00:00:00Z");
     try { expect(await replayReceipt(envelope)).toEqual(expected); } finally { vi.useRealTimers(); }
+  });
+  it("runs the documented explicit-tsconfig CLI without inherited test or Git environment", () => {
+    const cli = createRequire(import.meta.url).resolve("tsx/cli");
+    const output = execFileSync(process.execPath, [cli, "--tsconfig", "tsconfig.scripts.json", "scripts/scoring/reference-calculator.ts", "packages/shared/src/__fixtures__/observed-owner-envelope.json"], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, TZ: "UTC", TSX_DISABLE_CACHE: "1" },
+    });
+    expect(JSON.parse(output)).toMatchObject({ policyVersion: "v7.2", replayStatus: "arithmetic_reproduced" });
   });
   it("runs the actual CLI offline in two distant timezones", () => {
     const directory = mkdtempSync(join(tmpdir(), "chapa-observed-replay-"));

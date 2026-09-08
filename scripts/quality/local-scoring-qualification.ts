@@ -144,11 +144,9 @@ export async function launchLocalScoringQualification(root: string, evidenceDir:
     // Redis is real. This file contains provider replay only; the legacy in-memory cache branch stays unused.
     const cache = { ...upstream.cache, ...scoring.cache };
     upstream.cache = {};
-    // All synthetic owners may serve the same public contribution query shape.
-    const githubTemplate = upstream.github["chapa-redesign-owner"];
-    for (const handle of Object.keys(scoring.publicManifest.owners)) upstream.github[handle] = {
-      ...githubTemplate, data: { ...githubTemplate.data, user: { ...githubTemplate.data.user, login: handle, name: handle } },
-    };
+    // Use the same captured raw ancillary dataset as the scoring stats seed.
+    const { buildRedesignGitHubFixture } = await import("../../apps/web/e2e/helpers/redesign-github");
+    for (const handle of Object.keys(scoring.publicManifest.owners)) upstream.github[handle] = buildRedesignGitHubFixture(handle, referenceTime).response;
     await writeFile(environment.REDESIGN_FIXTURE_FILE!, JSON.stringify(upstream), { mode: 0o600 });
     cleanupTasks.push(await seedQualificationCache(environment.UPSTASH_REDIS_REST_URL!, environment.UPSTASH_REDIS_REST_TOKEN!, cache));
     const preload = join(root, "apps/web/e2e/helpers/redesign-upstream.mjs");

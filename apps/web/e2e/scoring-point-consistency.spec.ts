@@ -79,6 +79,10 @@ async function currentSurface(page: Page, handle: string, craft: null | 57 | 0, 
   await servedImage(page);
   await expect(page.getByRole("article", { name: /^Craft/ })).toHaveCount(craft === null ? 0 : 1);
   if (craft !== null) {
+    // Upload invalidates the bound stats cache. The public activity must
+    // survive the resulting provider replay alongside the unchanged core.
+    await expect(page.locator("table.sr-only, .sr-only table")).toHaveCount(1);
+    await expect(page.locator("table.sr-only tbody tr, .sr-only table tbody tr")).toHaveCount(91);
     const card = page.getByRole("article", { name: /^Craft/ });
     await card.locator("button[aria-controls]").click();
     await expect(card).toContainText(`Classified outcomes: ${craft === 57 ? 8 : 10} of 10 sessions.`);
