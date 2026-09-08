@@ -537,3 +537,55 @@ three sheets and current source/handoff hashes are archived with the report.
 The integrated `72c376b3` rebuild preserves the exact CSS, entry and preview
 hashes listed above. None of the 15 gallery component sources changed in that
 integration, so the refreshed captures still represent the integrated build.
+
+## Re-sync 2026-09-08 — paper/ink redesign shipped to Claude Design
+
+First remote upload since the 2026-08-31 Jade-era sync. Synced from `develop`
+@ a0fe9314 with skill 2.1.263 staged. 16 components: the 15 curated ones plus
+`ChapaBadgeIcon` (`components/icons/ChapaBadgeIcon.tsx`, added in the
+redesign). It qualifies on the standing test: plain SVG in `currentColor`, no
+`next/*` in its import graph, `process.env` count in the bundle stayed 0.
+
+### The remote anchor predated the redesign, so every card was regraded
+
+The driver reported `14 verified-by-upload, 1 changed (InsightCard), 1 new`
+because verification is keyed on `sourceKeys` (see the 2026-08-31 correction).
+Those 14 "verified" grades were earned against the Jade look. Per the standing
+rule, a pure restyle re-grades nothing, so all 16 review sheets were read and
+graded by hand before the driver ran; `pendingGrade` came back empty and the
+grades carried forward. Do the same whenever `styleSha` moves this much.
+
+### `[OUT_UNSAFE]` when `ds-bundle/` holds only `tokens/`
+
+`emit-tokens.mjs` had been run on 2026-09-05 without a converter build, so
+`ds-bundle/` contained `tokens/chapa-tokens.css` and nothing else. The converter
+does not recognise that as a prior bundle and refuses to clean it. `rm -rf
+ds-bundle` first; it is gitignored, generated output.
+
+### Chunk hash moved again (fifth run): `3uag-26sduzvh` -> `33fbpnpmroi7x`
+
+Two chunks exist after a build now; the global one is the larger file carrying
+`--color-action:` and a `.font-display` rule, not the ~24 KB one. The
+regeneration recipe is unchanged (fonts, safelist, chunk).
+
+### Conventions header edits this run
+
+Sixteen components; `ChapaBadgeIcon` listed with the "product mark, never a
+platform logo" rule; `text-forest-accent` in the fixed-ink row; a rule for the
+seven `text-archetype-<name>-text` roles and the three `bg-medal-*` fills.
+Every added class was grepped as a shipped rule in `_ds_bundle.css` before it
+went in (all present; nothing needed `safelist.css`).
+
+### Anchor read back clean; `upload.deletePaths` was `[]` again
+
+`styleSha` `95b12746…`, `auxSha` `0a44d6882330260a`, `bundleSha12`
+`f18aecb73571` all matched the local file. The designer's `handoff-chapa-v2/`,
+`templates/`, `uploads/`, `export/`, `screenshots/` and
+`design_handoff_jade_palette/` survived, as they must.
+
+### Session prerequisite
+
+The `DesignSync` tool needs `/design-login` in the Claude Code session before
+any remote call, even with a signed-in claude.ai account. Every local stage
+(build, converter, validate, capture, grading) runs without it; only the anchor
+fetch and the upload wait.

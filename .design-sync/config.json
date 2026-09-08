@@ -21,6 +21,7 @@
     "BitbucketIcon": "components/icons/BitbucketIcon.tsx",
     "CodebergIcon": "components/icons/CodebergIcon.tsx",
     "CopyIcon": "components/icons/CopyIcon.tsx",
+    "ChapaBadgeIcon": "components/icons/ChapaBadgeIcon.tsx",
     "SectionHeader": "components/SectionHeader.tsx",
     "ContentPageHeader": "components/content/ContentPageHeader.tsx",
     "OnThisPageIndex": "components/content/OnThisPageIndex.tsx"
@@ -38,6 +39,7 @@
     "BitbucketIcon": "className?: string;",
     "CodebergIcon": "className?: string;",
     "CopyIcon": "className?: string;",
+    "ChapaBadgeIcon": "/** Chapa shield + chevron in currentColor. Decorative, always aria-hidden. Any SVG attribute is spread onto the root. */\n  className?: string;",
     "SectionHeader": "/** The command, without the `%` prefix. For example `chapa features`. */\n  command: string;\n  /** Right-aligned meta, e.g. \"exit 0 \\u00b7 5 results\". */\n  meta?: React.ReactNode;\n  /** Rendered as the accessible heading for the section (visually hidden). */\n  title?: string;\n  className?: string;",
     "ContentPageHeader": "/** The command, without the `%` prefix. For example `chapa explain --scoring`. */\n  command: string;\n  /** Accepts a node so a page can highlight part of its own title. */\n  title: React.ReactNode;\n  intro?: React.ReactNode;",
     "OnThisPageIndex": "heading: string;\n  items: { id: string; label: string }[];"

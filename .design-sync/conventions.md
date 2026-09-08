@@ -40,7 +40,7 @@ tokens are the design language, and raw colours break theming.
 | Status | `text-terminal-green`, `text-terminal-red`, `text-complement-text` (slate-blue verification) |
 | Type | `font-heading` and `font-terminal` (JetBrains Mono), `font-body` (Manrope), selective `font-display` (Barlow Condensed) |
 | Depth | `shadow-card`, `hover:shadow-card-hover` (neutral solid offsets) |
-| Fixed ink terminal | `bg-forest`, `bg-forest-card`, `border-forest-line`, `text-forest-text`, `text-forest-dim`, `text-forest-ok`, `text-forest-warn`, `text-forest-err` |
+| Fixed ink terminal | `bg-forest`, `bg-forest-card`, `border-forest-line`, `text-forest-text`, `text-forest-dim`, `text-forest-accent` (prompt glyph, status dot), `text-forest-ok`, `text-forest-warn`, `text-forest-err` |
 
 Use semantic roles for both foreground and background. Primary actions keep
 `text-action-text` on normal and hover fills. Never put white text directly on
@@ -54,6 +54,12 @@ contrast measured after compositing on their actual surface.
   `text-complement-text` and `hover:text-complement-text-hover` for text.
 - Status colors resolve per surface. Theme-aware `terminal-*` belongs on page
   surfaces; fixed ink terminals use the corresponding `forest-*` colors.
+- Raw `archetype-*` colors identify charts and data. Headings and small signal
+  labels for an archetype use the paired `text-archetype-<name>-text` role
+  (`builder`, `guardian`, `marathoner`, `polymath`, `balanced`, `emerging`,
+  `artificer`), which keeps the hue readable in both themes. Leaderboard podium
+  fills are `bg-medal-gold` / `bg-medal-silver` / `bg-medal-bronze`, always
+  with dark ink text (`text-forest`), never the action foreground.
 - Technical headings, commands and metadata stay monospace. Never italicize
   JetBrains Mono. Use Barlow only for expressive headings; content pages remain
   restrained. Manrope is body/UI, while SVG metrics retain Plus Jakarta Sans.
@@ -65,7 +71,7 @@ contrast measured after compositing on their actual surface.
 
 ## Components
 
-Fifteen components in four groups. Read each `.prompt.md` and `.d.ts` before
+Sixteen components in four groups. Read each `.prompt.md` and `.d.ts` before
 using one; they carry the real prop contract.
 
 - **general** — `StatusCallout` (4 variants: success, error, warning,
@@ -74,7 +80,10 @@ using one; they carry the real prop contract.
 - **content** — `ContentPageHeader`, `OnThisPageIndex`
 - **dashboard** — `InsightCard`, `Sparkline`
 - **icons** — `GitHubIcon`, `GitlabIcon`, `BitbucketIcon`, `CodebergIcon`,
-  `CopyIcon` (all take `className` for sizing, e.g. `className="w-5 h-5"`)
+  `CopyIcon`, `ChapaBadgeIcon` (all take `className` for sizing, e.g.
+  `className="w-5 h-5"`). `ChapaBadgeIcon` is the product's own shield mark:
+  use it wherever Chapa's badge is meant, never a platform logo, since GitHub
+  is one of four sources a badge can read.
 
 Two things to know:
 
