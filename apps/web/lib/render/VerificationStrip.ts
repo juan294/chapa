@@ -1,5 +1,6 @@
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 import { escapeXml } from "./escape";
+import { parseVerificationTokenV7 } from "../verification/constants";
 
 const DEFAULT_VERIFIED_LABEL = "VERIFIED";
 const DEFAULT_SAMPLE_DISCLOSURE = "SAMPLE · NOT A REAL BADGE · FOR ILLUSTRATION ONLY";
@@ -21,6 +22,12 @@ export function renderVerificationStrip(
   verifiedLabel: string = DEFAULT_VERIFIED_LABEL,
 ): string {
   const safeHash = escapeXml(hash);
+  const receiptToken = parseVerificationTokenV7(hash);
+  // The full receipt token remains in the link; a compact reference keeps
+  // the existing 14px vertical label inside the badge in both locales.
+  const visibleHash = receiptToken
+    ? `v7.${receiptToken.revisionId.slice(0, 8)}.${receiptToken.signature.slice(0, 8)}`
+    : safeHash;
   const safeDate = escapeXml(date);
 
   const lineX = 1145;
@@ -38,7 +45,7 @@ export function renderVerificationStrip(
        after that shrink. The <a> wrapper is inert in an <img> embed but is a
        working affordance on the share page's inline-SVG path \u2014 never remove it. -->
   <a href="${verifyUrl}" target="_blank">
-    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="1" text-anchor="middle" letter-spacing="2" style="cursor:pointer">${escapeXml(verifiedLabel)} \u00B7 ${safeHash} \u00B7 ${safeDate}</text>
+    <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="${VERIFICATION_CORAL}" opacity="1" text-anchor="middle" letter-spacing="2" style="cursor:pointer">${escapeXml(verifiedLabel)} \u00B7 ${visibleHash} \u00B7 ${safeDate}</text>
   </a>
 </g>`;
 }

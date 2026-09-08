@@ -183,3 +183,24 @@ describe("renderDemoVerificationStrip", () => {
     expect(parseFloat(match![1]!)).toBeGreaterThanOrEqual(0.85);
   });
 });
+
+
+describe("receipt verification reference layout", () => {
+  const revision = "12345678-1234-4123-8123-123456789abc";
+  const signature = "abcdef01".repeat(8);
+  const token = `v7.${revision}.${signature}`;
+  it.each(["VERIFIED", "VERIFICADO"])("keeps %s receipt reference within the 570px strip and links the full token", label => {
+    const svg = renderVerificationStrip(token, "2026-09-08", label);
+    expect(svg).toContain(`href="https://chapa.thecreativetoken.com/verify/${token}"`);
+    const visible = svg.match(/<text[^>]*>([^<]+)<\/text>/)![1]!;
+    expect(visible).toBe(`${label} · v7.12345678.abcdef01 · 2026-09-08`);
+    // JetBrains Mono advances 0.6em per glyph; reserve the existing 2px tracking.
+    expect(visible.length * (14 * 0.6 + 2)).toBeLessThan(570);
+    expect(svg).toContain('font-size="14"');
+  });
+  it.each(["abc12345", "abcdef0123456789", "abcdef01".repeat(4), "v7.not-a-receipt.signature"])("preserves the full historical or unrecognized reference %s", hash => {
+    const svg = renderVerificationStrip(hash, "2026-09-08");
+    expect(svg).toContain(`>VERIFIED · ${hash} · 2026-09-08</text>`);
+    expect(svg).toContain(`href="https://chapa.thecreativetoken.com/verify/${hash}"`);
+  });
+});
