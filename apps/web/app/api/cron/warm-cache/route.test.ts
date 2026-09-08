@@ -111,7 +111,10 @@ vi.mock("@/lib/history/significant-change", () => ({
   isSignificantChange: (...args: unknown[]) => mockIsSignificantChange(...args),
 }));
 
+vi.mock("@/lib/profile/score-model", () => ({ readRenderableReceipt: vi.fn(async () => null) }));
+
 vi.mock("@/lib/email/score-bump", () => ({
+  notifyObservedScoreChange: vi.fn(async () => false),
   notifyScoreBump: (...args: unknown[]) => mockNotifyScoreBump(...args),
 }));
 
@@ -345,6 +348,30 @@ it("reports raw-retention failures without claiming deletion success", async () 
       expect.any(Object),
       expect.objectContaining({ significant: true, reason: "score_bump" }),
     );
+  });
+
+  it("never sends a legacy score bump while the observed policy is selected", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
+    mockDbGetLatestSnapshotBatch.mockResolvedValue(new Map([["alice", { date: "2026-04-16", adjustedComposite: 55 }]]));
+    mockIsSignificantChange.mockReturnValue({ significant: true, reason: "score_bump", allReasons: ["score_bump"] });
+    await GET(makeRequest());
+    expect(mockCompareSnapshots).not.toHaveBeenCalled();
+    expect(mockNotifyScoreBump).not.toHaveBeenCalled();
+  });
+
+  it("compares published observed revisions captured around issuance, never legacy snapshots", async () => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const { readRenderableReceipt } = await import("@/lib/profile/score-model");
+    const { notifyObservedScoreChange } = await import("@/lib/email/score-bump");
+    const before = await scoringConsistencyFixture();
+    const after = await scoringConsistencyFixture({ boundary: true });
+    const model = { ...after.model, identity: { ...after.model.identity!, revisionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } };
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
+    vi.mocked(readRenderableReceipt).mockResolvedValueOnce({ receipt: before.envelope, trend: null });
+    mockMaterializeOrchestratedProfile.mockResolvedValue({ ...FAKE_MATERIALIZED, scoring: model });
+    await GET(makeRequest());
+    expect(notifyObservedScoreChange).toHaveBeenCalledWith("alice", expect.objectContaining({ status: "comparable", current: expect.objectContaining({ identity: model.identity, composite: expect.objectContaining({ display: 69.99 }) }) }));
+    expect(mockCompareSnapshots).not.toHaveBeenCalled();
   });
 
   it("skips notifications when the snapshot was not persisted", async () => {

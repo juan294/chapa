@@ -12,6 +12,8 @@ import {
   runPublicProfileSideEffects,
 } from "./public-profile";
 
+const mockResolveScoreModel = vi.fn();
+vi.mock("./score-model", () => ({ resolveScoreModel: (...args: unknown[]) => mockResolveScoreModel(...args) }));
 const mockMaterializeProfile = vi.fn();
 const mockGenerateVerificationCode = vi.fn();
 const mockStoreVerificationRecord = vi.fn();
@@ -494,7 +496,18 @@ describe("runPublicProfileSideEffects", () => {
       sendFirstBadgeNotification: true,
     });
 
-    expect(mockNotifyFirstBadge).toHaveBeenCalledWith("testuser", materialized.displayImpact);
+    expect(mockNotifyFirstBadge).toHaveBeenCalledWith("testuser", materialized.displayImpact, materialized.scoring);
+  });
+
+  it("rereads the published receipt with the captured selection before first-badge content", async () => {
+    const { scoringConsistencyFixture } = await import("./__fixtures__/scoring-consistency");
+    const { model } = await scoringConsistencyFixture({ craft: 0 });
+    const materialized = makeMaterializedProfile();
+    const selection = { enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") };
+    mockResolveScoreModel.mockResolvedValue(model);
+    await deferProfileCacheWork("testuser", materialized, { sendFirstBadgeNotification: true, scoringSelection: selection });
+    expect(mockResolveScoreModel).toHaveBeenCalledWith("testuser", materialized.displayImpact, selection);
+    expect(mockNotifyFirstBadge).toHaveBeenCalledWith("testuser", materialized.displayImpact, model);
   });
 
   it("skips the profile refresh when displayName and avatarUrl are both absent", async () => {

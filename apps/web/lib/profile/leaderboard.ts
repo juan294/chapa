@@ -1,4 +1,5 @@
 import "server-only";
+import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { observedReceiptViewModel, renderableScore, type ScoreViewModel } from "./score-view-model";
 import { dbGetScoredCandidates, dbGetTopScoredProfiles, type TopScoredProfile } from "@/lib/db/snapshots";
 import { dbGetAllUserHandles } from "@/lib/db/users";
@@ -8,6 +9,7 @@ import { readRenderableReceipt } from "./score-model";
 export interface LeaderboardPlace {
   /** 1, 2, 3. A place is a score, so a tie is one place with several handles. */
   rank: number;
+  policyVersion?: "v7.2";
   /** The number the badge draws for everyone in this place. */
   score: number;
   tier: string;
@@ -19,55 +21,37 @@ export interface LeaderboardPlace {
  * so the pool has to be deeper than the number of places. */
 const ENTRY_MULTIPLIER = 4;
 
-/**
- * The platform's top three scores, showing the same number the badge shows.
- *
- * Four rules hold this together.
- *
- * **A place is a score, not a row.** Everyone on 80 shares first place and the
- * next score is second. Ranking each handle separately put two identical
- * scores in different positions, which reads as favouritism.
- *
- * **Only people who signed up.** A snapshot exists for any handle whose badge
- * was ever rendered, and rendering a stranger's badge is as easy as embedding
- * it in a README, so ranking straight off snapshots would put developers on a
- * public podium they never opted into. `users` is written by exactly one
- * caller, the OAuth callback (#1239), which makes it the test for consent.
- *
- * **The board's number is the badge's number.** A snapshot's
- * `adjustedComposite` is the EMA-smoothed composite, kept so the trend line
- * stays continuous, while the badge draws the fresh one (#1001). Rows written
- * since migration 047 record that fresh number as `headlineScore`.
- *
- * **Three places, always.** A row that predates `headlineScore` is
- * materialized to read the badge's own headline rather than leaving a gap.
- * Those run one at a time and only until three places exist: fetching a pool
- * in parallel earns 403s from GitHub.
- *
- * **A v7 evidence range takes no place at all**, on either path. The board
- * shows one number per place and links to a badge that would show an
- * interval; a handle whose stored number would contradict its badge waits
- * rather than appearing with the wrong one. Once a receipt is issued the badge
- * draws the receipt, so a stored headline is only the badge's number while no
- * receipt is drawable: each stored candidate is checked against
- * `readRenderableReceipt`, which returns before any query while
- * `scoring_v7_rendering` is off (LE-6-4).
- *
- * Called at build/revalidate time from the statically generated landing page,
- * never per request.
- */
-export async function getLeaderboard(places = 3): Promise<LeaderboardPlace[]> {
+/** The board ranks canonical displayed points and groups equal points into a
+ * single place, with handles alphabetically listed inside that tie. Current
+ * policy considers every registered subject with a drawable current receipt;
+ * unavailable and legacy-only subjects take no current-policy place.
+ * The legacy branch retains its stored headline/provider fallback behavior. */
+export async function getLeaderboard(places = 3, selection?: ScoringRenderSelection): Promise<LeaderboardPlace[]> {
   if (places <= 0) return [];
 
+  const captured = selection ?? await readScoringRenderSelection();
+  if (!captured.cacheable) return [];
   const registered = await dbGetAllUserHandles();
   if (registered.length === 0) return [];
+
+  if (captured.machinePolicy === "v7.2") {
+    const current = new Map<string, { score: number; tier: string }>();
+    // Current ordering cannot inherit the legacy candidate cutoff. Read every
+    // registered subject, in bounded batches, without fetching provider data.
+    for (let offset = 0; offset < registered.length; offset += 16) {
+      const handles = registered.slice(offset, offset + 16);
+      const rows = await Promise.all(handles.map(handle => drawnForStored({ handle }, captured)));
+      rows.forEach((row, index) => { if (row && row !== "unplaceable") current.set(handles[index]!, row); });
+    }
+    return groupIntoPlaces(current).slice(0, places).map(row => ({ ...row, policyVersion: "v7.2" }));
+  }
 
   const scored = new Map<string, { score: number; tier: string }>();
   /** Every handle already decided, ranked or not, so the live-fill path does
    * not spend a GitHub fetch re-deciding a range subject. */
   const settled = new Set<string>();
   const stored = await dbGetTopScoredProfiles(registered, places * ENTRY_MULTIPLIER);
-  const drawnByStored = await Promise.all(stored.map((entry) => drawnForStored(entry)));
+  const drawnByStored = await Promise.all(stored.map((entry) => drawnForStored(entry, captured)));
   for (const [index, entry] of stored.entries()) {
     settled.add(entry.handle);
     const drawn = drawnByStored[index];
@@ -83,7 +67,7 @@ export async function getLeaderboard(places = 3): Promise<LeaderboardPlace[]> {
       if (countPlaces(scored) >= places) break;
       let live: Awaited<ReturnType<typeof materializeDisplayProfile>> = null;
       try {
-        live = await materializeDisplayProfile(handle);
+        live = await materializeDisplayProfile(handle, { scoringSelection: captured });
       } catch {
         // A handle whose data cannot be fetched right now is skipped, and the
         // next candidate takes the place rather than the board losing one.
@@ -108,16 +92,17 @@ export async function getLeaderboard(places = 3): Promise<LeaderboardPlace[]> {
  * unavailable current receipt.
  */
 async function drawnForStored(
-  entry: TopScoredProfile,
+  entry: Pick<TopScoredProfile, "handle">,
+  selection: ScoringRenderSelection,
 ): Promise<{ score: number; tier: string } | "unplaceable" | null> {
   let receipt: Awaited<ReturnType<typeof readRenderableReceipt>> = null;
   try {
-    receipt = await readRenderableReceipt(entry.handle);
+    receipt = await readRenderableReceipt(entry.handle, selection);
   } catch {
     return "unplaceable";
   }
   if (receipt && "unavailable" in receipt) return "unplaceable";
-  return receipt ? placeable(observedReceiptViewModel(entry.handle, receipt)) : null;
+  return receipt ? placeable(observedReceiptViewModel(entry.handle, receipt, selection.capturedAt)) : null;
 }
 
 /**

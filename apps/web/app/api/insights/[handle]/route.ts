@@ -1,3 +1,5 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { readPublicObservedScore } from "@/lib/profile/post-write-score";
 import { type NextRequest, NextResponse } from "next/server";
 import { isValidHandle } from "@/lib/validation";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
@@ -33,8 +35,13 @@ export const GET = withErrorCapture("/api/insights/[handle]", async (
     );
   }
 
+  const selection = await readScoringRenderSelection();
+  const current = await readPublicObservedScore(handle, selection);
+  if (current.status === "unavailable") return NextResponse.json({ error: "Current scoring is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
+  if (current.status === "current") return NextResponse.json({ handle, ...current.projection }, { headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
+
   // Authoritative rule: dbGetToolInsights returns the latest uploaded report.
   const craftScore = await dbGetToolInsights(handle);
 
-  return NextResponse.json({ craftScore });
+  return NextResponse.json({ policyVersion: "v6", craftScore }, { headers: { "Cache-Control": "no-store" } });
 });

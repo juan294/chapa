@@ -3,6 +3,8 @@ import type { ImpactV6Result } from "@chapa/shared";
 import { legacyViewModel, observedReceiptViewModel, renderableScore } from "./score-view-model";
 import { observedReceiptFixture } from "@/lib/history/__fixtures__/receipts-observed";
 
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788861600000 }) }));
+
 vi.mock("@/lib/db/snapshots", () => ({
   dbGetTopScoredProfiles: vi.fn(),
   dbGetScoredCandidates: vi.fn(),
@@ -252,5 +254,28 @@ describe("a stored headline is checked against the receipt the badge draws", () 
     // whole cost of the check.
     expect(mockReceipt.mock.calls.map(([handle]) => handle).sort()).toEqual(["c", "juan294"]);
     expect(mockMaterialize).not.toHaveBeenCalled();
+  });
+});
+
+describe("observed leaderboard policy isolation", () => {
+  const selection = { enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") };
+  it("ranks all current registered receipts without a legacy top-pool cutoff", async () => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const low = await scoringConsistencyFixture();
+    const boundary = await scoringConsistencyFixture({ boundary: true });
+    mockRegistered.mockResolvedValue(["low", "missing", "boundary", "unavailable"]);
+    mockRecorded.mockResolvedValue([entry("missing", 99)]);
+    mockReceipt.mockImplementation(async handle => handle === "low" ? { receipt: low.envelope, trend: null } : handle === "boundary" ? { receipt: boundary.envelope, trend: null } : handle === "unavailable" ? { unavailable: true } : null);
+    expect(await getLeaderboard(3, selection)).toEqual([
+      { rank: 1, score: 69.99, tier: "Solid", handles: ["boundary"], policyVersion: "v7.2" },
+      { rank: 2, score: 46, tier: "Solid", handles: ["low"], policyVersion: "v7.2" },
+    ]);
+    expect(mockRecorded).not.toHaveBeenCalled();
+    expect(mockMaterialize).not.toHaveBeenCalled();
+    expect(mockReceipt).toHaveBeenCalledWith("boundary", selection);
+  });
+  it("publishes no standing when policy authority is unavailable", async () => {
+    expect(await getLeaderboard(3, { ...selection, cacheable: false })).toEqual([]);
+    expect(mockRecorded).not.toHaveBeenCalled();
   });
 });

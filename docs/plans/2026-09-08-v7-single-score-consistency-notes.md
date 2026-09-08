@@ -81,3 +81,13 @@ Found: this owner requested continuous completion and explicitly asked to avoid 
 Chose: run phase6 component, policy/content, real-font raster and all local automated gates now; consolidate the focused interactive browser card with phase9's exact completed candidate. Preserve phase6 raster evidence as intermediate evidence, not final-build proof.
 
 Why: the final browser acceptance must exercise the integrated API/tool behavior and exact candidate. This avoids a redundant intermediate manual campaign without dropping any acceptance case.
+
+### Phase 7 — point comparisons keep core and report periods explicit
+
+Plan said: require compatible policy/window context and report the actual current dimensions.
+
+Found: two profiles can share the core observation window while their selected Craft reports cover different periods. The landing page also retained an hourly static policy context.
+
+Chose: keep compatible core comparisons, but omit the Craft delta and report an explicit report-period limitation when those report periods differ. Resolve the landing policy per request and rank all current consented receipts under the same captured selection.
+
+Why: a valid core comparison does not establish report-period comparability, and a cached landing policy must not contradict the linked badge after a flag switch. This changes neither the formula nor the badge design.

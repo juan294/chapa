@@ -91,6 +91,7 @@ function makeRunCommand() {
 }
 
 function setup(overrides?: {
+  scoring?: import("@/lib/profile/score-view-model").ScoreViewModel;
   stats?: StatsData;
   config?: BadgeConfig;
   impact?: ImpactV6Result;
@@ -107,6 +108,7 @@ function setup(overrides?: {
       config,
       stats: overrides?.stats ?? { ...DEMO_STATS, heatmapData: [] },
       impact,
+      scoring: overrides?.scoring,
       craftResult: overrides?.craftResult ?? null,
       handle: "dev user",
       enabled: overrides?.enabled ?? true,
@@ -409,6 +411,7 @@ describe("useStudioWebMcpTools", () => {
     );
 
     expect(payload).toEqual({
+      hypothetical: true, policyVersion: "v6",
       composite: 58,
       adjusted: 57,
       tier: "Solid",
@@ -580,4 +583,17 @@ describe("production recency simulation", () => {
     const payload = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { delivery: 81, quality: 81, consistency: 81, breadth: 81, craft: 81 } }));
     expect(payload).toMatchObject({ composite: 81, adjusted: 86, tier: "Elite" });
   });
+});
+
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
+it("Studio tools simulate and explain the selected receipt without legacy proficiency", async () => {
+  const f = await scoringConsistencyFixture({ craft: 57 });
+  const { getTool } = setup({ impact: f.impact, stats: f.stats, scoring: f.model });
+  const simulation = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { craft: 0 } }));
+  expect(simulation).toMatchObject({ hypothetical: true, policyVersion: "v7.2", displayScore: 46, baselineRevision: f.model.identity!.revisionId });
+  expect(JSON.parse(await execute(getTool("simulate_score"), { counts: {} }))).toMatchObject({ scope: "evidence_counts", displayScore: 46 });
+  const explanation = JSON.parse(await execute(getTool("explain_dimension"), { dimension: "craft" }));
+  expect(explanation).toMatchObject({ policyVersion: "v7.2", score: 57, craft: { status: "scored" } });
+  expect(JSON.stringify(explanation)).not.toMatch(/proficiency|sophistication|Expert/);
+  expect(await execute(getTool("suggest_improvements"))).not.toMatch(/points to|Master|Expert/);
 });

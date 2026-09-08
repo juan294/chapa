@@ -1,3 +1,4 @@
+import { postWriteScore } from "@/lib/profile/post-write-score";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
@@ -101,7 +102,9 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
   // #1311 — recalculate exists to make a subject's published numbers current
   // after a scoring change, so a consented subject's receipt is re-issued here
   // for the same reason the snapshot was rewritten above.
-  await issueScoreReceiptIfConsented(handle, { token: auth.token, scoringSelection });
+  const issuance = await issueScoreReceiptIfConsented(handle, { token: auth.token, scoringSelection });
+
+  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
@@ -110,6 +113,12 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
   }
 
   revalidatePath(`/u/${handle}`);
+
+  if (publishedScore.status !== "legacy") return NextResponse.json({
+    success: true,
+    ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : { policyVersion: "v7.2", displayScore: null, exactScore: null, compositeScore: null, adjustedComposite: null, scoring: null, publication: "pending" }),
+    legacy: { impact: materialized.displayImpact },
+  }, { headers: { "Cache-Control": "no-store" } });
 
   return NextResponse.json({
     success: true,

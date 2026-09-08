@@ -560,6 +560,7 @@ export function StudioClient({
     enabled: webmcpEnabled,
     stats,
     impact,
+    scoring,
     craftResult,
     handle,
     saveStatus: saveState.status,

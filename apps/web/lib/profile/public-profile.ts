@@ -1,3 +1,4 @@
+import { resolveScoreModel } from "./score-model";
 import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
 import type { GitHubUserNotFound } from "@/lib/github/not-found";
@@ -126,6 +127,7 @@ export async function runPublicProfileSideEffects(
     verification?: PublicVerificationCode | null;
     readOnly?: boolean;
     sendFirstBadgeNotification?: boolean;
+    scoringSelection?: ScoringRenderSelection;
   } = {},
 ): Promise<void> {
   if (options.readOnly) return;
@@ -219,6 +221,7 @@ export async function deferProfileCacheWork(
     verification?: PublicVerificationCode | null;
     readOnly?: boolean;
     sendFirstBadgeNotification?: boolean;
+    scoringSelection?: ScoringRenderSelection;
     verificationOnly?: boolean;
   } = {},
 ): Promise<void> {
@@ -258,7 +261,12 @@ export async function deferProfileCacheWork(
 
   ops.push(trackBadgeGenerated(handle));
   if (options.sendFirstBadgeNotification) {
-    ops.push(notifyFirstBadge(handle, materialized.displayImpact));
+    // If issuance/repair occurred after initial materialization, resolve the
+    // published current receipt using the caller's captured selection.
+    const scoring = options.scoringSelection
+      ? await resolveScoreModel(handle, materialized.displayImpact, options.scoringSelection)
+      : materialized.scoring;
+    if (options.scoringSelection?.cacheable !== false) ops.push(notifyFirstBadge(handle, materialized.displayImpact, scoring));
   }
 
   if (materialized.stats.displayName || materialized.stats.avatarUrl) {

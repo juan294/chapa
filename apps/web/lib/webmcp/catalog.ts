@@ -155,3 +155,19 @@ export function verificationCodeFormat(hash: string): string {
     ? "V7 receipt revision and full 256-bit HMAC."
     : `Legacy ${hash.length}-character verification code; lookup does not replay the complete signed payload.`;
 }
+
+const COUNT_BOUND_SCHEMA = {
+  type: "object", properties: { lower: { type: "number", minimum: 0 }, upper: { type: "number", minimum: 0 } },
+  required: ["lower", "upper"], additionalProperties: false,
+};
+/** An agent can construct a valid scenario from the registered schema alone. */
+export const OBSERVED_SIMULATE_SCORE_INPUT_SCHEMA = {
+  type: "object", properties: {
+    dimensions: { type: "object", properties: Object.fromEntries(DIMENSION_KEYS.map(key => [key, { type: "number", minimum: 0, maximum: 100 }])), additionalProperties: false },
+    counts: { type: "object", properties: {
+      deliveryUnits: COUNT_BOUND_SCHEMA, activeIsoWeeks: COUNT_BOUND_SCHEMA,
+      eligibleProjects: COUNT_BOUND_SCHEMA, eligibleCategories: COUNT_BOUND_SCHEMA,
+      quality: { type: "object", properties: Object.fromEntries(["rationale", "verification", "review_or_correction", "outcome_followup"].map(key => [key, COUNT_BOUND_SCHEMA])), additionalProperties: false },
+    }, additionalProperties: false },
+  }, oneOf: [{ required: ["dimensions"] }, { required: ["counts"] }], additionalProperties: false,
+};

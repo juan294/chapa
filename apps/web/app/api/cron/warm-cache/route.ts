@@ -1,3 +1,6 @@
+import { readRenderableReceipt } from "@/lib/profile/score-model";
+import { observedReceiptViewModel } from "@/lib/profile/score-view-model";
+import { scoringObservation, compareScoringObservations } from "@/lib/history/scoring-observations";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { sweepRevokedReceiptCachesV7, sweepRetiredSupplementalCachesV7 } from "@/lib/verification/cleanup";
 import { NextRequest, NextResponse } from "next/server";
@@ -10,7 +13,7 @@ import {
 } from "@/lib/db/snapshots";
 import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
-import { notifyScoreBump } from "@/lib/email/score-bump";
+import { notifyScoreBump, notifyObservedScoreChange } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbPurgeExpiredCraftRawV7 } from "@/lib/db/craft-v7";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
@@ -460,6 +463,10 @@ async function warmHandle(
     // skip silently — every handle until its owner opts in — and failures are
     // captured inside the helper rather than failing the warm.
     const scoringSelection = await readScoringRenderSelection();
+    const baseline = scoringSelection.cacheable && scoringSelection.machinePolicy === "v7.2"
+      ? await readRenderableReceipt(handle, scoringSelection).catch(() => null) : null;
+    const previousObserved = baseline && !("unavailable" in baseline)
+      ? scoringObservation(observedReceiptViewModel(handle, baseline, scoringSelection.capturedAt)) : null;
     await issueScoreReceiptIfConsented(handle, { scoringSelection });
 
     const materialized = await materializeOrchestratedProfile(handle, { scoringSelection });
@@ -584,7 +591,7 @@ async function warmHandle(
         snapshotRecorded = true;
 
         // Score bump notification: compare new vs previous snapshot
-        if (previousSnapshot) {
+        if (previousSnapshot && scoringSelection.cacheable && scoringSelection.machinePolicy === "v6" && materialized.scoring?.policyVersion !== "v7.2" && materialized.scoring?.freshness !== "unavailable") {
           try {
             const diff = compareSnapshots(
               previousSnapshot as Parameters<typeof compareSnapshots>[0],
@@ -604,6 +611,12 @@ async function warmHandle(
       // Snapshot recording is non-critical — don't fail the warm
     }
 
+    if (previousObserved && materialized.scoring && scoringSelection.cacheable) {
+      const current = scoringObservation(materialized.scoring);
+      if (current && current.identity?.revisionId !== previousObserved.identity?.revisionId) {
+        notified = await notifyObservedScoreChange(handle, compareScoringObservations(previousObserved, current)).catch(() => false);
+      }
+    }
     return { warmed: true, snapshotRecorded, notified };
   } catch (err) {
     void captureServerError({

@@ -45,3 +45,18 @@ describe("describeScoreForMetadata", () => {
     expect(description).not.toContain("tier");
   });
 });
+
+
+describe("current receipt metadata agreement", () => {
+  it("uses canonical69.99 and recorded scope, never a rounded70 or legacy80", async () => {
+    const { scoringConsistencyFixture } = await import("./__fixtures__/scoring-consistency");
+    const { model } = await scoringConsistencyFixture({ boundary: true, craft: 0 });
+    const text = describeScoreForMetadata(model)!;
+    expect(text).toContain("69.99");
+    expect(text).toContain("Solid");
+    expect(text).toContain("v7.2");
+    expect(text).toContain("recorded evidence");
+    expect(text).not.toContain("70");
+    expect(text).not.toContain("80");
+  });
+});

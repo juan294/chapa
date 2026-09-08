@@ -54,7 +54,9 @@ describe("supplemental v2 real durable source transactions", () => {
     expect((await readSupplementalEvidenceV2(owner, window)).evidence.events).toEqual([]);
   });
   it("uses identical dated inputs after cache failure and excludes pre-upload historical access", async () => {
-    const before = new Date().toISOString();
+    // A strictly earlier reference, even when fixture creation and publication
+    // share the same millisecond on a fast local database.
+    const before = new Date(Date.now() - 1000).toISOString();
     await dbStoreSupplementalEvidenceV2(owner, fixture(), new Date().toISOString());
     redisFake.__failNext("cacheSet"); redisFake.__failNext("cacheDel");
     const window = createScoringWindow(new Date().toISOString());

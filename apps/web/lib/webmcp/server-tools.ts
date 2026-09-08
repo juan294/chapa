@@ -1,3 +1,5 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { readObservedScoringHistory } from "@/lib/history/observed-history";
 import type { DimensionScores } from "@chapa/shared";
 import type { AgentClass } from "@/lib/analytics/agent-ua";
 import { scheduleServerEvent } from "@/lib/analytics/schedule-server-event";
@@ -10,7 +12,8 @@ import { getServerT } from "@/lib/i18n/server";
 import type { LanguageContextValue } from "@/lib/i18n";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { redactImpactForVisitor } from "@/lib/profile/public-profile";
-import { renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
+import { publicScoreProjection, comparePublicScores } from "@/lib/profile/public-score-projection";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import { isValidHandle } from "@/lib/validation";
 import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
 import { toPublicVerificationRecord } from "@/lib/verification/types";
@@ -25,7 +28,6 @@ import {
   VERIFICATION_EXPLANATION,
   RECEIPT_VERIFICATION_EXPLANATION,
   VERIFY_BADGE_SERVER_INPUT_SCHEMA,
-  compareDimensions,
 } from "./catalog";
 import { invalidInput, WEBMCP_INVALID_INPUT_PREFIX } from "./errors";
 import {
@@ -62,44 +64,7 @@ const MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS = {
   openWorldHint: false,
 } as const;
 
-interface PublicProfilePayload {
-  handle: string;
-  dimensions: DimensionScores;
-  compositeScore: number;
-  adjustedComposite: number;
-  archetype: string;
-  tier: string;
-  craft: {
-    tool: string | undefined;
-    tier: string;
-    score: number;
-  } | null;
-  snapshotDate: string;
-  computedAt: string;
-  /**
-   * The headline the badge draws (#1001/#1311), read from the resolved score
-   * model exactly as `/api/profile` and the leaderboard do. `compositeScore`
-   * and `adjustedComposite` above are the stored snapshot's EMA-smoothed trend
-   * values and may lag the badge by a point; they are kept for compatibility,
-   * never published as the score. A v7 evidence range has no single number and
-   * reports `null` here with `scoring` carrying the interval.
-   */
-  displayScore: number | null;
-  displayTier: string | null;
-  scoring: ScoreViewModel | null;
-}
-
-const HEADLINE_NOTE =
-  "score and tier are the headline the badge draws; null when the badge shows an evidence range or the live profile could not be materialized. The stored trend snapshot's smoothed composite is never reported as the score.";
-
-function drawnHeadline(
-  scoring: ScoreViewModel,
-): { displayScore: number | null; displayTier: string | null } {
-  const drawn = renderableScore(scoring);
-  return scoring.composite.kind === "point"
-    ? { displayScore: drawn.composite, displayTier: drawn.tier }
-    : { displayScore: null, displayTier: drawn.tier };
-}
+const HEADLINE_NOTE = "Current scores and dimensions come from one selected policy and receipt context; legacy snapshot fields are explicitly nested.";
 
 function readString(inputs: unknown, key: string): string {
   if (!isWebMcpRecord(inputs) || typeof inputs[key] !== "string") return "";
@@ -135,7 +100,7 @@ function unavailable(tool: string): string {
   return `${tool} is unavailable right now. Please try again later.`;
 }
 
-async function loadPublicProfile(handle: string): Promise<PublicProfilePayload | null> {
+async function loadPublicProfile(handle: string) {
   const snapshot = await getCachedLatestSnapshot(handle);
   if (!snapshot) return null;
 
@@ -151,7 +116,8 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
     if (materialized) {
       materializedAvailable = true;
       scoring = materialized.scoring;
-      ({ displayScore, displayTier } = drawnHeadline(scoring));
+      const projection = publicScoreProjection(scoring);
+      displayScore = projection.displayScore; displayTier = projection.tier;
       if (snapshot.craft == null) {
         craftResult = materialized.craftResult;
       }
@@ -176,7 +142,7 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
     ...(craftScore != null && { craft: craftScore }),
   };
 
-  return {
+  const legacy = {
     handle,
     dimensions,
     compositeScore: snapshot.compositeScore,
@@ -196,6 +162,12 @@ async function loadPublicProfile(handle: string): Promise<PublicProfilePayload |
     displayTier,
     scoring,
   };
+  if (!scoring) return { handle, scoring: null, displayScore: null, exactScore: null, displayTier: null,
+    dimensions: {}, exactDimensions: {}, tier: null, archetype: null, craft: null,
+    policyVersion: null, identity: null, window: null, compositeScore: null, adjustedComposite: null, freshness: "unavailable", legacy };
+  const projection = publicScoreProjection(scoring, craftScore);
+  return { handle, ...projection, displayTier: projection.tier, compositeScore: projection.displayScore,
+    adjustedComposite: projection.displayScore, legacy };
 }
 
 export async function executeServerMcpTool(
@@ -273,7 +245,7 @@ const findProfile: ServerMcpTool = {
 const getImpactProfile: ServerMcpTool = {
   name: "get_impact_profile",
   description:
-    "Return the latest public impact profile for a GitHub handle. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); compositeScore and adjustedComposite are the stored trend snapshot's smoothed values.",
+    "Return the latest public impact profile for a GitHub handle. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); legacy contains the stored trend snapshot; top-level values use the selected policy.",
   inputSchema: FIND_PROFILE_INPUT_SCHEMA,
   annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
@@ -300,10 +272,18 @@ const getImpactHistory: ServerMcpTool = {
     if (!handle) {
       return invalidInput("get_impact_history", "handle must be a public GitHub handle");
     }
+    const selection = await readScoringRenderSelection();
+    if (!selection.cacheable) return JSON.stringify({ handle, status: "unavailable", reason: "policy_unavailable" });
+    if (selection.enabled) {
+      const result = await readObservedScoringHistory(handle);
+      if (result.status === "unavailable") return JSON.stringify({ handle, policyVersion: "v7.2", status: "unavailable", reason: "history_unavailable" });
+      if (result.status === "found") return JSON.stringify({ handle, policyVersion: "v7.2", snapshots: result.history.observations, trend: result.history.trend, comparisons: result.history.comparisons });
+    }
     const snapshots = await getSnapshots(handle);
     const publicSnapshots = snapshots.map(redactSnapshotForVisitor);
     return JSON.stringify({
       handle,
+      policyVersion: "v6",
       snapshots: publicSnapshots,
       trend: computeTrend(snapshots),
     });
@@ -384,6 +364,7 @@ const explainDimension: ServerMcpTool = {
     if (!materialized) return missingProfile(handle);
     const browserTwin = createExplainDimensionTool({
       impact: redactImpactForVisitor(materialized.displayImpact),
+      scoring: materialized.scoring,
       stats: materialized.stats,
       craftResult: materialized.craftResult,
       t: getServerT("en") as LanguageContextValue["t"],
@@ -421,34 +402,11 @@ const compareProfiles: ServerMcpTool = {
     ]);
     if (!current) return missingProfile(handle);
     if (!other) return missingProfile(otherHandle);
-    // No fallback to the snapshot's smoothed composite: that number is not
-    // the one on either badge, and publishing it here is what LE-7-1 caught.
-    const currentScore = current.displayScore;
-    const otherScore = other.displayScore;
-    return JSON.stringify({
-      current: {
-        handle,
-        score: currentScore,
-        tier: current.displayTier,
-        dimensions: current.dimensions,
-      },
-      other: {
-        handle: otherHandle,
-        score: otherScore,
-        tier: other.displayTier,
-        dimensions: other.dimensions,
-      },
-      differences: {
-        score: currentScore !== null && otherScore !== null
-          ? otherScore - currentScore
-          : null,
-        dimensions: compareDimensions(
-          current.dimensions,
-          Object.fromEntries(Object.entries(other.dimensions)),
-        ),
-      },
-      note: HEADLINE_NOTE,
-    });
+    if (!current.scoring || !other.scoring) return JSON.stringify({ current: { handle, score: current.displayScore, tier: current.displayTier, scoring: current.scoring }, other: { handle: otherHandle, score: other.displayScore, tier: other.displayTier, scoring: other.scoring }, status: "not_comparable", reason: "unavailable", differences: null });
+    const comparison = comparePublicScores(publicScoreProjection(current.scoring, current.dimensions.craft), publicScoreProjection(other.scoring, other.dimensions.craft));
+    return JSON.stringify({ ...comparison,
+      current: { handle, ...comparison.current, score: comparison.current.displayScore },
+      other: { handle: otherHandle, ...comparison.other, score: comparison.other.displayScore }, note: HEADLINE_NOTE });
   },
 };
 

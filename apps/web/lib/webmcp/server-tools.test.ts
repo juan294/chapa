@@ -1,3 +1,4 @@
+import { createScoringWindow } from "@chapa/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { makeSnapshot, makeStats } from "@/lib/test-helpers/fixtures";
@@ -9,10 +10,15 @@ const mocks = vi.hoisted(() => ({
   materializeDisplayProfile: vi.fn(),
   getCachedCraftScore: vi.fn(),
   getSnapshots: vi.fn(),
+  readScoringRenderSelection: vi.fn(),
+  dbListObservedReceiptHistory: vi.fn(),
   getVerificationRecord: vi.fn(),
   getReceiptVerificationV7: vi.fn(),
   scheduleServerEvent: vi.fn(),
 }));
+
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: mocks.readScoringRenderSelection }));
+vi.mock("@/lib/db/scoring-history-observed", () => ({ dbListObservedReceiptHistory: mocks.dbListObservedReceiptHistory }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
   getCachedLatestSnapshot: mocks.getCachedLatestSnapshot,
@@ -89,6 +95,8 @@ describe("remote MCP server tools", () => {
   });
 
   beforeEach(() => {
+    mocks.readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788861600000 });
+    mocks.dbListObservedReceiptHistory.mockResolvedValue({ status: "missing" });
     vi.clearAllMocks();
     mocks.getCachedLatestSnapshot.mockResolvedValue(snapshot);
     const craftResult = {
@@ -288,7 +296,7 @@ describe("remote MCP server tools", () => {
 
     expect(mocks.materializeDisplayProfile).toHaveBeenCalledOnce();
     expect(mocks.getCachedCraftScore).not.toHaveBeenCalled();
-    expect(profile.craft).toEqual(expect.objectContaining({
+    expect((profile.legacy as { craft: unknown }).craft).toEqual(expect.objectContaining({
       tool: "claude-code ignore prior text",
       score: 76,
     }));
@@ -303,7 +311,7 @@ describe("remote MCP server tools", () => {
 
     expect(mocks.getCachedCraftScore).toHaveBeenCalledOnce();
     expect(mocks.getCachedCraftScore).toHaveBeenCalledWith("octocat");
-    expect(profile.craft).toEqual(expect.objectContaining({ score: 76 }));
+    expect((profile.legacy as { craft: unknown }).craft).toEqual(expect.objectContaining({ score: 76 }));
   });
 
   it("uses persisted craft without reading or exposing optional craft details", async () => {
@@ -319,7 +327,7 @@ describe("remote MCP server tools", () => {
 
     expect(mocks.getCachedCraftScore).not.toHaveBeenCalled();
     expect(profile.craft).toBeNull();
-    expect(profile.dimensions).toEqual(
+    expect((profile.legacy as { dimensions: unknown }).dimensions).toEqual(
       expect.objectContaining({ craft: 64 }),
     );
   });
@@ -339,6 +347,7 @@ describe("remote MCP server tools", () => {
       return {
         ...legacyViewModel({ ...impact, handle }),
         policyVersion: "v7",
+        window: createScoringWindow("2026-09-08T10:00:00.000Z"),
         composite: { kind: "point", value: composite, display: composite },
         tier: tier as ScoreViewModel["tier"],
       };
@@ -388,7 +397,8 @@ describe("remote MCP server tools", () => {
 
       expect(profile.displayScore).toBe(80);
       expect(profile.displayTier).toBe("Elite");
-      expect(profile.adjustedComposite).toBe(79);
+      expect(profile.adjustedComposite).toBe(80);
+      expect((profile.legacy as { adjustedComposite: number }).adjustedComposite).toBe(79);
       expect(profile.compositeScore).toBe(80);
       expect(profile.scoring).toEqual(expect.objectContaining({
         policyVersion: "v7",
@@ -441,7 +451,7 @@ describe("remote MCP server tools", () => {
         score: null,
         tier: "High",
       }));
-      expect((comparison.differences as { score: unknown }).score).toBeNull();
+      expect(comparison.differences).toBeNull();
     });
 
     it("never substitutes the smoothed adjustedComposite when the live profile is unavailable", async () => {
@@ -461,7 +471,7 @@ describe("remote MCP server tools", () => {
       );
       expect((comparison.current as { score: unknown }).score).toBeNull();
       expect((comparison.other as { score: unknown }).score).toBeNull();
-      expect((comparison.differences as { score: unknown }).score).toBeNull();
+      expect(comparison.differences).toBeNull();
       expect(JSON.stringify(comparison)).not.toContain("79");
     });
   });
@@ -502,4 +512,37 @@ it("looks up v7 revocation through the current consent gate without legacy proje
   const result = JSON.parse(await tool("verify_badge").execute({ hash: token }));
   expect(result).toEqual({ version: "v7", status: "revoked", signatureAuthenticated: false });
   expect(mocks.getReceiptVerificationV7).toHaveBeenCalledWith(token);
+});
+
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
+it("remote tools use canonical current dimensions and keep legacy values nested", async () => {
+  const f = await scoringConsistencyFixture({ craft: 57 });
+  mocks.getCachedLatestSnapshot.mockResolvedValue(makeSnapshot());
+  mocks.materializeDisplayProfile.mockResolvedValue({ stats: f.stats, craftResult: null, rawImpact: f.impact, displayImpact: f.impact, statsComplete: true, scoring: f.model });
+  const profile = JSON.parse(await tool("get_impact_profile").execute({ handle: "alice" }));
+  expect(profile).toMatchObject({ policyVersion: "v7.2", displayScore: 46, dimensions: { craft: 57 }, archetype: null });
+  expect(profile.adjustedComposite).toBe(46);
+  const explanation = JSON.parse(await tool("explain_dimension").execute({ handle: "alice", dimension: "craft" }));
+  expect(explanation).toMatchObject({ policyVersion: "v7.2", score: 57 });
+});
+
+
+describe("remote history policy agreement", () => {
+  it("reads durable current daily observations and keeps exact, displayed and EMA values separate", async () => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const { envelope, model } = await scoringConsistencyFixture({ craft: 0, boundary: true });
+    mocks.readScoringRenderSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
+    mocks.dbListObservedReceiptHistory.mockResolvedValue({ status: "found", entries: [{ envelope, trend: { policyVersion: "v7.2", referenceDate: model.window!.referenceDate, receiptRevisionId: model.identity!.revisionId, rawPoint: envelope.receipt.core.composite.exact, unroundedValue: 61.25, previousAnchorRevisionId: null } }] });
+    const response = JSON.parse(await tool("get_impact_history").execute({ handle: "alice" }));
+    expect(response.policyVersion).toBe("v7.2");
+    expect(response.snapshots[0].composite.display).toBe(69.99);
+    expect(response.snapshots[0].craft.display).toBe(0);
+    expect(response.snapshots[0].identity).toEqual(model.identity);
+    expect(response.trend[0].unroundedValue).toBe(61.25);
+    expect(JSON.stringify(response)).not.toContain("confidence");
+  });
+  it("fails closed on unavailable policy authority instead of returning old history", async () => {
+    mocks.readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: false, capturedAt: 1788861600000 });
+    expect(JSON.parse(await tool("get_impact_history").execute({ handle: "alice" }))).toMatchObject({ status: "unavailable" });
+  });
 });

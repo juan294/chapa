@@ -10,7 +10,9 @@
  */
 
 import type { ImpactV6Result } from "@chapa/shared";
-import { getResend } from "./resend";
+import { getResend, escapeHtml } from "./resend";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { scoringObservation } from "@/lib/history/scoring-observations";
 import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getBaseUrl, getVercelEnv, getSupportForwardEmail } from "@/lib/env";
@@ -20,8 +22,10 @@ const MARKER_TTL = 31_536_000; // 365 days in seconds
 export async function notifyFirstBadge(
   handle: string,
   impact: ImpactV6Result,
+  scoring?: ScoreViewModel,
 ): Promise<void> {
   try {
+    if (scoring && (scoring.freshness === "unavailable" || scoring.illustrative)) return;
     // 1. Production guard
     if (getVercelEnv() !== "production") return;
 
@@ -44,10 +48,10 @@ export async function notifyFirstBadge(
     const baseUrl = getBaseUrl();
     const shareUrl = `${baseUrl}/u/${lowerHandle}`;
     const badgeUrl = `${baseUrl}/u/${lowerHandle}/badge.svg`;
-    const subject = `New badge: ${lowerHandle} — ${impact.archetype} (${impact.tier})`;
+    let subject = `New badge: ${lowerHandle} — ${impact.archetype} (${impact.tier})`;
     const { dimensions } = impact;
 
-    const html = buildHtml({
+    let html = buildHtml({
       handle: lowerHandle,
       archetype: impact.archetype,
       compositeScore: impact.compositeScore,
@@ -60,7 +64,7 @@ export async function notifyFirstBadge(
       computedAt: impact.computedAt,
     });
 
-    const text = [
+    let text = [
       "CHAPA — New Badge Created",
       "═".repeat(40),
       "",
@@ -83,6 +87,19 @@ export async function notifyFirstBadge(
       "",
       `Computed at: ${impact.computedAt}`,
     ].join("\n");
+
+    if (scoring && scoring.policyVersion !== "v6") {
+      const observed = scoringObservation(scoring);
+      if (!observed || !observed.identity) return;
+      subject = `New badge: ${lowerHandle} — ${observed.tier ?? "Unassigned"} (${observed.policyVersion})`;
+      text = ["CHAPA — New Badge Created", `Handle: ${lowerHandle}`, `Policy: ${observed.policyVersion}`,
+        `Score: ${observed.composite.display}`, `Exact score: ${observed.composite.exact}`, `Tier: ${observed.tier ?? "Unassigned"}`,
+        `Archetype: ${observed.archetype ?? "Unassigned"}`, ...Object.entries(observed.dimensions).map(([key, point]) => `${key}: ${point.display}`),
+        `Craft: ${observed.craft?.display ?? "Unavailable"} (separate from core)`, `Revision: ${observed.identity.revisionId}`,
+        `Content hash: ${observed.identity.contentHash}`, `Window: ${observed.window?.startInclusive} to ${observed.window?.endExclusive}`,
+        `Profile: ${shareUrl}`, `Badge: ${badgeUrl}`].join("\n");
+      html = `<pre style="white-space:pre-wrap">${escapeHtml(text)}</pre>`;
+    }
 
     // 6. Send
     const { error } = await withTimeout(

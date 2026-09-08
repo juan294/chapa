@@ -17,7 +17,6 @@ const STATIC_PAGES = [
   "about/verification/page.tsx",
   "privacy/page.tsx",
   "terms/page.tsx",
-  "page.tsx", // home
 ];
 
 describe("locale-segmented content pages remain statically generated (#1167 / UX-B1)", () => {
@@ -32,6 +31,13 @@ describe("locale-segmented content pages remain statically generated (#1167 / UX
       expect(source).not.toMatch(/export const dynamic = ["']force-dynamic["']/);
     });
   }
+
+  it("the scored landing page follows captured live policy instead of hourly ISR", () => {
+    const source = fs.readFileSync(path.resolve(__dirname, "page.tsx"), "utf-8");
+    expect(source).toContain('export const dynamic = "force-dynamic"');
+    expect(source).not.toMatch(/export const revalidate\s*=/);
+    expect(source).toContain("getLeaderboard(3, selection)");
+  });
 
   it("the scoring methodology explicitly follows live policy selection instead of hourly ISR", () => {
     const source = fs.readFileSync(path.resolve(__dirname, "about/scoring/page.tsx"), "utf-8");

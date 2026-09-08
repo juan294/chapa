@@ -1,3 +1,4 @@
+import { postWriteScore } from "@/lib/profile/post-write-score";
 import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
@@ -56,6 +57,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
   }
 
   const scoringSelection = await readScoringRenderSelection();
+  const publications: { handle: string; result: Awaited<ReturnType<typeof postWriteScore>> }[] = [];
 
   // Optional cursor: ?after=<handle> continues an all-user page or resumes a
   // time-limited run (BE-H7). The database applies this unique keyset cursor
@@ -129,6 +131,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
         {
           partial: true,
           completed,
+          ...(scoringSelection.enabled && { publications }),
           pending: handles.filter((h) => !completedSet.has(h)),
           recalculated,
           failed: errors.length,
@@ -162,7 +165,8 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
-            await issueScoreReceiptIfConsented(handle, { scoringSelection });
+            const issuance = await issueScoreReceiptIfConsented(handle, { scoringSelection });
+            publications.push({ handle, result: await postWriteScore(handle, scoringSelection, issuance) });
             await invalidateProfileReadModels(handle, {
               stats: true,
               badgeSvg: true,
@@ -198,6 +202,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     {
       partial: hasMore,
       completed,
+      ...(scoringSelection.enabled && { publications }),
       recalculated,
       failed: errors.length,
       total: totalAvailable,

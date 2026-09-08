@@ -52,3 +52,12 @@ describe("LandingContent — leaderboard links carry a 44px tap area (LE-8-3)", 
     }
   });
 });
+
+it("labels current standings with policy while preserving canonical boundary score", () => {
+  const { container } = render(<LandingContent demoBadgeSvg="<svg/>" readmeBadgeSvg="<svg/>" demoImpact={LANDING_IMPACT}
+    topScored={[{ rank: 1, score: 69.99, tier: "Solid", handles: ["alice"], policyVersion: "v7.2" }]} t={getServerT("en")} />);
+  const standing = container.querySelector('[data-scoring-policy="v7.2"]');
+  expect(standing?.textContent).toContain("69.99");
+  expect(standing?.textContent).toContain("v7.2");
+  expect(standing?.querySelector('a')?.getAttribute("href")).toBe("/u/alice");
+});

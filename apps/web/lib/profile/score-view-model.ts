@@ -1,6 +1,7 @@
 import type {
   ClientImpactV6Result,
   PublicObservedCraft,
+  ObservedCoreInputs,
   DeveloperArchetype,
   EvidenceReasonCode,
   ImpactTier,
@@ -64,6 +65,8 @@ export interface ScoreIdentityView {
 export interface ScoreViewModel {
   /** Explicit synthetic demo; no issued receipt or personal evidence claim. */
   readonly illustrative?: boolean;
+  /** Replay-safe public count inputs, bound to this model's exact receipt context. */
+  readonly observedInputs?: ObservedCoreInputs;
   readonly policyVersion: "v6" | "v7" | "v7.2";
   readonly reportCraft?: PublicObservedCraft | null;
   readonly freshness?: "current" | "stale" | "unavailable";
@@ -154,6 +157,7 @@ export function observedReceiptViewModel(handle: string, snapshot: ObservedRecei
       : { status: "unavailable", unlocked: true, report: null, lastReport: reportCraft.report, reason: "outside_window" };
   }
   return {
+    observedInputs: receipt.inputs,
     policyVersion: "v7.2", handle: handle.toLowerCase(),
     identity: { receiptId: receipt.receiptId, revisionId: receipt.revisionId, revision: receipt.revision, recordedAt: receipt.recordedAt,
       action: receipt.action, supersedesRevisionId: receipt.supersedesRevisionId, contentHash: snapshot.receipt.contentHash.value },

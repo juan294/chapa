@@ -14,14 +14,9 @@ import type { Metadata } from "next";
 import { LandingWebMcpTools } from "@/components/LandingWebMcpTools";
 import { getLeaderboard } from "@/lib/profile/leaderboard";
 
-// #982 / #1023 (FE-H1) — the landing page is statically generated for BOTH
-// locales (see app/[locale]/layout.tsx's generateStaticParams), so it stays
-// ISR/CDN-cacheable while rendering fully translated copy server-side with no
-// client-side re-render/flash. The public, canonical URL stays `/` — the
-// root `proxy.ts` rewrites the incoming request to this internal
-// `/[locale]` route based on the `chapa-locale` cookie / Accept-Language.
-export const dynamic = "force-static";
-export const revalidate = 3600;
+// The sample and standings share one live scoring selection. Hourly ISR would
+// keep publishing the previous policy after an administrative cutover.
+export const dynamic = "force-dynamic";
 
 // #1065 (FE-H1) — the root layout no longer sets a blanket canonical, so
 // every page (including this one) must declare its own. `/` is the one
@@ -58,11 +53,9 @@ export default async function Home({ params }: HomeProps) {
     ...options,
     disableAnimation: true,
   });
-  // Read at build/revalidate time, not per request: this page stays
-  // force-static, so the standings refresh on the same hourly cycle as the
-  // rest of the page. An empty list (no database, or nothing scored yet)
-  // renders no standings rather than an error or a placeholder.
-  const topScored = await getLeaderboard(3);
+  // A failed authority read produces no standings; no previous-policy rows
+  // are substituted for unavailable current receipts.
+  const topScored = await getLeaderboard(3, selection);
   return (
     <>
       <LanguageProvider

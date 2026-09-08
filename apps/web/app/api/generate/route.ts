@@ -1,3 +1,4 @@
+import { postWriteScore } from "@/lib/profile/post-write-score";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
@@ -114,7 +115,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // first v7 receipt, so the badge they are about to see is the issued revision
   // rather than a legacy aggregate that a later refresh would silently replace.
   const scoringSelection = await readScoringRenderSelection();
-  await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
+  const issuance = await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
 
   // LE-5-1 — the stats cache row is bound to the credential that fetched it
   // (source-context hashes the token into accessContextId), and the share
@@ -134,5 +135,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
     });
   }
 
-  return NextResponse.json({ success: true, handle });
+  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
+
+  return NextResponse.json({ success: true, handle, ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : publishedScore.status === "unavailable" ? { policyVersion: "v7.2", displayScore: null, scoring: null, publication: "pending" } : { policyVersion: "v6" }) });
 });

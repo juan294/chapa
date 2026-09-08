@@ -869,10 +869,12 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
 
-      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
-      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-        "public, s-maxage=300",
-      );
+      // Response age is reduced by elapsed render time; it must never extend
+      // the five-minute policy bound just because the test crossed a second.
+      const ttl = Number(res.headers.get("Cache-Control")?.match(/^public, max-age=(\d+)$/)?.[1]);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(300);
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(`public, s-maxage=${ttl}`);
       expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
     });
 
@@ -918,10 +920,12 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
 
-      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
-      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-        "public, s-maxage=300",
-      );
+      // Response age is reduced by elapsed render time; it must never extend
+      // the five-minute policy bound just because the test crossed a second.
+      const ttl = Number(res.headers.get("Cache-Control")?.match(/^public, max-age=(\d+)$/)?.[1]);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(300);
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(`public, s-maxage=${ttl}`);
       expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
     });
 

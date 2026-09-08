@@ -10,11 +10,11 @@ import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import type { TrendSummary } from "@/lib/history/trend";
 import { useTranslation } from "@/lib/i18n";
-import { renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
+import { publicScoreProjection, comparePublicScores, readPublicComparison } from "@/lib/profile/public-score-projection";
+import { type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { isValidHandle } from "@/lib/validation";
 import {
   COMPARE_PROFILES_INPUT_SCHEMA,
-  compareDimensions,
   publicStats,
 } from "@/lib/webmcp/catalog";
 import {
@@ -57,35 +57,6 @@ interface SharePageWebMcpToolsProps {
 const HEADLINE_NOTE =
   "score and tier are the headline the badge draws; null when the badge shows an evidence range or the live profile could not be materialized. The stored trend snapshot's smoothed composite is never reported as the score.";
 
-interface DrawnHeadline {
-  displayScore: number | null;
-  displayTier: string | null;
-}
-
-/** Same rule as the remote MCP twin (`lib/webmcp/server-tools.ts`): a point
- * publishes the drawn integer, an evidence range publishes null and leaves the
- * interval to `scoring`. */
-function drawnHeadline(scoring: ScoreViewModel): DrawnHeadline {
-  const drawn = renderableScore(scoring);
-  return scoring.composite.kind === "point"
-    ? { displayScore: drawn.composite, displayTier: drawn.tier }
-    : { displayScore: null, displayTier: drawn.tier };
-}
-
-/** `/api/profile` publishes `displayScore`/`displayTier` as the badge's
- * headline and `scoring` as the interval carrier. There is deliberately no
- * fallback to its `adjustedComposite`: that is the smoothed trend value, not
- * the number on the other badge. */
-function otherHeadline(other: Record<string, unknown>): DrawnHeadline & {
-  scoring: Record<string, unknown> | null;
-} {
-  return {
-    displayScore: typeof other.displayScore === "number" ? other.displayScore : null,
-    displayTier: typeof other.displayTier === "string" ? other.displayTier : null,
-    scoring: isWebMcpRecord(other.scoring) ? other.scoring : null,
-  };
-}
-
 async function readJson(response: Response): Promise<Record<string, unknown> | null> {
   try {
     const body: unknown = await response.json();
@@ -113,24 +84,23 @@ export function SharePageWebMcpTools({
   const tools = useMemo<WebMcpTool[]>(() => {
     if (!webmcpEnabled) return [];
 
-    const headline = drawnHeadline(scoring);
+    const projection = publicScoreProjection(scoring, impact.dimensions.craft);
 
     const getImpactProfile: WebMcpTool = {
       name: "get_impact_profile",
       description:
-        "Return the public impact profile shown in the current page render. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); impact carries the legacy aggregate.",
+        "Return the public impact profile shown in the current page render. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); legacy carries the aggregate snapshot.",
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
       annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: () => JSON.stringify({
         handle,
-        impact,
-        displayScore: headline.displayScore,
-        displayTier: headline.displayTier,
-        scoring,
+        ...projection,
+        legacy: { impact },
+        displayTier: projection.tier,
         stats: publicStats(stats),
         verification,
-        trend,
-        diff,
+        trend: scoring.policyVersion === "v7.2" ? null : trend,
+        diff: scoring.policyVersion === "v7.2" ? null : diff,
         freshness: {
           source: "current page render",
           statsFetchedAt: stats.fetchedAt,
@@ -183,11 +153,13 @@ export function SharePageWebMcpTools({
         if (response.status === 429) {
           return "Badge verification is temporarily rate limited. Please try again later.";
         }
-        if (!response.ok) {
+        if (!response.ok && response.status !== 410) {
           return `Badge verification is unavailable right now (HTTP ${response.status}).`;
         }
         const body = await readJson(response);
         if (!body) return "Badge verification returned an unreadable response.";
+        if (body.version === "v7" || body.version === "v7.2") return JSON.stringify(body);
+        if (response.status === 410) return "Badge verification returned an unreadable revoked response.";
         const publicRecord = isWebMcpRecord(body.data)
           ? Object.fromEntries(
               Object.entries(body.data).filter(([key]) => key !== "confidence"),
@@ -203,6 +175,7 @@ export function SharePageWebMcpTools({
 
     const explainDimension = createExplainDimensionTool({
       impact,
+      scoring,
       stats,
       craftResult,
       t,
@@ -241,37 +214,16 @@ export function SharePageWebMcpTools({
         }
 
         const other = await readJson(response);
-        const otherDimensions = other?.dimensions;
-        if (!other || !isWebMcpRecord(otherDimensions)) {
-          return "The comparison profile returned an unreadable response.";
-        }
-        const otherDrawn = otherHeadline(other);
-        const currentScore = headline.displayScore;
-        const otherScore = otherDrawn.displayScore;
-
-        return JSON.stringify({
-          current: {
-            handle,
-            score: currentScore,
-            tier: headline.displayTier,
-            dimensions: impact.dimensions,
-            scoring,
-          },
-          other: {
-            handle: typeof other.handle === "string" ? other.handle : otherHandle,
-            score: otherScore,
-            tier: otherDrawn.displayTier,
-            dimensions: otherDimensions,
-            scoring: otherDrawn.scoring,
-          },
-          differences: {
-            score: currentScore !== null && otherScore !== null
-              ? otherScore - currentScore
-              : null,
-            dimensions: compareDimensions(impact.dimensions, otherDimensions),
-          },
-          note: HEADLINE_NOTE,
-        });
+        const unavailableComparison = () => JSON.stringify({ current: { handle, ...projection, score: projection.displayScore },
+          other: { handle: otherHandle, score: null, tier: null, scoring: null }, status: "not_comparable", reason: "unavailable", differences: null });
+        if (!other || !isWebMcpRecord(other.scoring)) return unavailableComparison();
+        const otherProjection = readPublicComparison(other);
+        if (!otherProjection) return unavailableComparison();
+        const comparison = comparePublicScores(projection, otherProjection);
+        return JSON.stringify({ ...comparison,
+          current: { handle, ...comparison.current, score: comparison.current.displayScore },
+          other: { handle: typeof other.handle === "string" ? other.handle : otherHandle, ...comparison.other, score: comparison.other.displayScore },
+          note: HEADLINE_NOTE });
       },
     };
 

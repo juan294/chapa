@@ -29,6 +29,8 @@ const {
   mockFetchStats: vi.fn(),
 }));
 
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
+
 vi.mock("@/lib/profile/score-receipt-v7", () => ({
   readScoreReceiptV7: mockReadScoreReceiptV7,
 }));
@@ -150,7 +152,7 @@ const MOCK_CRAFT = {
  * snapshot's smoothed `adjustedComposite`/`tier` so the two can't be confused.
  */
 const MOCK_MATERIALIZED = {
-  displayImpact: { adjustedComposite: 69, tier: "Solid" },
+  displayImpact: { handle: "juan294", dimensions: { delivery: 69, quality: 69, consistency: 69, breadth: 69 }, adjustedComposite: 69, tier: "Solid", archetype: "Builder" },
   // #1311 — the route reads its headline from the resolved model, since that
   // is what the badge draws and what this field is documented to match.
   scoring: {
@@ -224,24 +226,24 @@ describe("GET /api/profile/:handle", () => {
       computedAt: "2026-03-27T10:30:00Z",
       displayScore: 69,
       displayTier: "Solid",
-      scoring: null,
+      policyVersion: "v6",
+      scoring: MOCK_MATERIALIZED.scoring,
     });
   });
 
   // A v7 receipt is projected through the one shared view model, so this
   // payload names the same revision the badge and verification link resolve to.
-  it("projects an issued v7 receipt through the shared view model", async () => {
+  it("keeps an archived v7 receipt out of the selected v6 fallback", async () => {
     const { buildReceiptSnapshotV7 } = await import("@/lib/history/snapshot");
     const { receiptFixtureV7 } = await import("@/lib/history/__fixtures__/receipts-v7");
-    const { receiptViewModel } = await import("@/lib/profile/score-view-model");
     const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 4), null);
     mockReadScoreReceiptV7.mockResolvedValue(snapshot);
 
     const body = await (await GET(makeRequest("juan294"), makeParams("juan294"))).json();
 
-    expect(body.scoring).toEqual(JSON.parse(JSON.stringify(receiptViewModel("juan294", snapshot))));
-    expect(body.scoring.identity.contentHash).toBe(snapshot.receipt.contentHash.value);
-    expect(body.scoring.policyVersion).toBe("v7");
+    expect(body.scoring).toEqual(MOCK_MATERIALIZED.scoring);
+    expect(body.policyVersion).toBe("v6");
+    expect(mockReadScoreReceiptV7).not.toHaveBeenCalled();
   });
 
   // --- Success: profile without craft ---
@@ -440,7 +442,7 @@ describe("GET /api/profile/:handle", () => {
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
 
     expect(resp.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=3600",
+      "no-store",
     );
   });
 
@@ -495,6 +497,7 @@ describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () =>
 
     expect(mockMaterializeDisplayProfile).toHaveBeenCalledWith("juan294", {
       readOnly: true,
+      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6", capturedAt: Date.parse("2026-09-08T10:00:00Z") }),
     });
   });
 

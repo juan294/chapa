@@ -1,3 +1,4 @@
+import { postWriteScore } from "@/lib/profile/post-write-score";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
@@ -161,7 +162,9 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
   // consented subject's v7 receipt is re-issued. Awaited rather than deferred:
   // the invalidation above has already cleared the badge, and issuing after
   // that clear is what makes the next render draw the new revision.
-  await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
+  const issuance = await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
+
+  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
@@ -171,6 +174,12 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
 
   // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
   revalidatePath(`/u/${handle}`);
+
+  if (publishedScore.status !== "legacy") return NextResponse.json({
+    success: true,
+    ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : { policyVersion: "v7.2", displayScore: null, exactScore: null, compositeScore: null, adjustedComposite: null, scoring: null, publication: "pending" }),
+    legacy: { impact: materialized.displayImpact },
+  }, { headers: { "Cache-Control": "no-store" } });
 
   return NextResponse.json({
     stats: materialized.stats,

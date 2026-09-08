@@ -20,3 +20,10 @@ it("expires the report axis without mutating the sealed core or treating zero Cr
   expect(expired.composite).toEqual(current.composite);
   expect(receipt.receipt.craft.status).toBe("scored");
 });
+it("carries the exact public receipt inputs for versioned hypothetical calculations", async () => {
+  const envelope = await observedReceiptFixture();
+  const model = observedReceiptViewModel("alice", { receipt: envelope, trend: null }, Date.parse(envelope.receipt.window.referenceTime));
+  expect(model.observedInputs).toEqual(envelope.receipt.inputs);
+  expect(model.observedInputs?.window.referenceTime).toBe(model.window?.referenceTime);
+  expect(model.identity?.contentHash).toBe(envelope.contentHash.value);
+});

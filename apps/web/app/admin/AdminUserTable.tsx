@@ -51,6 +51,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
           <div className="min-w-0">
             <p className="truncate font-heading text-sm text-text-primary group-hover:text-amber-text transition-colors">
               {user.handle}
+              {user.policyVersion && <span className="ml-2 text-xs text-text-secondary">{user.policyVersion}</span>}
             </p>
             {user.lastSnapshotDate === null ? (
               <p className="text-xs text-text-secondary">no data yet</p>
@@ -100,7 +101,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
       <td className="hidden md:table-cell px-3 py-2.5">
         {user.rawScore != null ? (
           <span className="font-heading text-xs tabular-nums text-text-secondary">
-            {user.rawScore}
+            {user.policyVersion === "v7.2" ? user.exactScore : user.rawScore}
           </span>
         ) : (
           <span className="text-xs text-text-secondary">&mdash;</span>
@@ -117,7 +118,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
               aria-valuenow={user.confidence}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Confidence score"
+              aria-label="Legacy confidence score"
             >
               <div
                 className="h-full rounded-full bg-amber-text"
@@ -209,8 +210,8 @@ export function AdminUserTable({
             <AdminSortableHeader field="archetype" label="Archetype" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden sm:table-cell" />
             <AdminSortableHeader field="tier" label="Tier" sortField={sortField} sortDir={sortDir} onSort={onSort} />
             <AdminSortableHeader field="adjustedComposite" label="Score" sortField={sortField} sortDir={sortDir} onSort={onSort} />
-            <AdminSortableHeader field="rawScore" label="Raw" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
-            <AdminSortableHeader field="confidence" label="Conf" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
+            <AdminSortableHeader field="rawScore" label="Exact / legacy raw" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
+            <AdminSortableHeader field="confidence" label="Legacy confidence" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
             <AdminSortableHeader field="commitsTotal" label="Commits" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
             <AdminSortableHeader field="prsMergedCount" label="PRs" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
             <AdminSortableHeader field="reviewsSubmittedCount" label="Reviews" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />

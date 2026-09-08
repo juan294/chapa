@@ -15,7 +15,7 @@ function sample({ delivery, quality, weeks, projects, categories, total, fully, 
   const craft = calculateReportCraftInputs({ policyVersion: "v7.2", classifierRevision: "cc-outcomes-v7.2", window, reportPeriod: { startInclusive: "2026-09-01T00:00:00.000Z", endExclusive: "2026-09-08T00:00:00.000Z" }, totalSessions: total, outcomes: { fully_achieved: fully, mostly_achieved: mostly, partially_achieved: 0, not_achieved: failed }, unknownSessions: 0, unclassifiedSessions: 0 });
   if (craft.status !== "valid" || craft.result.status !== "scored") throw new Error("Invalid illustrative report");
   const value = (source: { exact: number; displayValue: number }) => ({ kind: "point" as const, value: source.exact, display: source.displayValue });
-  return { illustrative: true, policyVersion: "v7.2", handle: "developer", identity: null, window: null,
+  return { illustrative: true, observedInputs: calculation.inputs, policyVersion: "v7.2", handle: "developer", identity: null, window: null,
     dimensions: { delivery: value(calculation.core.dimensions.delivery), quality: value(calculation.core.dimensions.quality), consistency: value(calculation.core.dimensions.consistency), breadth: value(calculation.core.dimensions.breadth) },
     composite: value(calculation.core.composite), tier: calculation.core.tier, archetype: calculation.core.archetype, craft: null,
     reportCraft: { status: "scored", unlocked: true, report: { reportRef: "00000000-0000-4000-8000-000000000001", supersedesReportRef: null, inputs: craft.inputs, result: craft.result } },

@@ -1,23 +1,16 @@
 import type { ScoreViewModel } from "./score-view-model";
 
-/**
- * The one-sentence description of a score for metadata — JSON-LD today, and
- * anything else that hands a number to a machine rather than a reader.
- *
- * This is the highest-leverage place to get a v7 range right. A search result,
- * a social card and an LLM answer all quote this sentence back, and unlike the
- * badge it has no artwork to qualify it: publishing "Impact Score of 67" while
- * the badge draws "64–73" would put a point claim Chapa does not make into
- * someone else's index, where a later correction cannot reach it.
- *
- * So a range is described as a range, and a range that earned no tier claims
- * no tier. A v6 aggregate keeps its existing sentence, because that is what it
- * has always meant.
- */
+/** One metadata sentence from the same canonical model as the visible badge.
+ * Current points describe recorded evidence; archived ranges retain their
+ * historical meaning and legacy v6 keeps its existing wording. */
 export function describeScoreForMetadata(model: ScoreViewModel | null): string | null {
   if (!model) return null;
 
   const tierSuffix = model.tier ? ` (${model.tier} tier)` : "";
+
+  if (model.policyVersion === "v7.2" && model.composite.kind === "point") {
+    return `Chapa Impact Score of ${model.composite.display}${tierSuffix}, using v7.2 recorded evidence within the declared source scope and window. Coverage limitations are available in the receipt.`;
+  }
 
   if (model.composite.kind === "point") {
     return `Developer with a Chapa Impact Score of ${model.composite.display}${tierSuffix}.`;

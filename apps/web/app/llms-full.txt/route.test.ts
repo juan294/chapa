@@ -118,6 +118,18 @@ describe("GET /llms-full.txt", () => {
     expect(text).not.toContain("sold or shared with third parties");
   });
 
+  it("distinguishes current point scoring from archived ranges and explains unlocked report Craft", async () => {
+    const text = await getLlmsFullTxt(request()).text();
+    expect(text).toContain("v7.2");
+    expect(text).toContain("archived v7.1");
+    expect(text).toContain("100 x (fully + 0.7 x mostly + 0.3 x partially) / total");
+    expect(text).toContain("including a score of 0");
+    expect(text).toContain("69.99");
+    expect(text).not.toContain("optional Craft practice portfolio");
+    expect(text).not.toContain("A range spanning a boundary receives no tier.");
+    expect(text).not.toContain("Two headline pairs, deliberately distinct");
+  });
+
   it("delegates agent-surface scheduling", () => {
     const req = request("GPTBot/1.2 (+https://openai.com/gptbot)");
     getLlmsFullTxt(req);

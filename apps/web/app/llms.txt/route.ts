@@ -12,11 +12,12 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 
 ## Key Concepts
 
-- **Impact Profile**: An observed engineering activity and practices index (0-100) over four core dimensions of equal weight — Delivery, Quality practices, Consistency, and Breadth — computed from the last 365 calendar days of development activity across linked platforms, within a declared evidence scope. It is not a measure of ability, and complete means complete for that declared scope, not all work a person has done. A separate optional Craft practice portfolio is reported beside it and never changes the core.
-- **Dimensions**: Delivery counts distinct project/day buckets containing accepted work. Quality practices counts demonstrated rationale, verification, review-or-correction and outcome follow-up. Consistency counts active ISO weeks. Breadth counts eligible projects and eligible work categories. Craft (optional, separate) records assessed engineering practice: framing, verification and debugging, tool judgment, and accepted outcome. Tool name, token counts, message counts and session counts earn no credit anywhere.
-- **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
-- **Tier System**: Four tiers, classified from the unrounded core score — Emerging (below 30), Solid (below 70), High (below 85), Elite (85 and above). A range spanning a boundary receives no tier.
-- **Evidence completion ranges**: Where source coverage is incomplete, a dimension is published as a range whose bounds contain every admissible completion. This is an evidence-completion range, not a statistical confidence interval, and it says nothing about where a developer's true ability lies. A range that spans a tier boundary receives no tier.
+- **Policy identity**: Read the response's policyVersion. v6 remains the rollout-off policy; v7.2 is the new point policy when enabled and a receipt is available. The archived v7.1 algorithm (machine policy v7) retains its historical evidence-completion ranges and can still be replayed; it is not the current point policy.
+- **Impact Profile**: v7.2 reports an observed engineering activity and practices index (0-100) over four equally weighted core dimensions — Delivery, Quality, Consistency, and Breadth — from the declared 365-calendar-date window. It measures recorded evidence, not personal ability. Coverage limits remain visible without replacing the current point with a range.
+- **Dimensions**: Delivery counts distinct project/day buckets containing accepted work. Quality counts demonstrated rationale, verification, review-or-correction and outcome follow-up. Consistency counts active ISO weeks. Breadth counts eligible projects and work categories. Each core dimension has weight 0.25.
+- **Craft**: A separate report-derived dimension, unlocked on the badge after the first valid Claude Code insights report, including a score of 0. Craft = 100 x (fully + 0.7 x mostly + 0.3 x partially) / total. Failed, unknown and unclassified outcomes earn no credit; unknown outcomes are not proven failures. Craft has zero core weight. Expiry retains the unlocked label with update guidance, never a fabricated zero.
+- **Developer Archetypes**: Existing names remain Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, and Emerging. Current classification uses the existing core rules only when the evidence supports a definitive shape; otherwise it is null. A report does not assign Artificer.
+- **Tier System**: Emerging below 30, Solid below 70, High below 85, Elite from 85, using the unrounded core. The canonical display avoids crossing a tier boundary: for example, an exact value just below 70 displays 69.99 with Solid. All public consumers use the receipt's canonical value; exact arithmetic is supplied separately.
 - **Badge Verification**: Badges marked "Verified metrics" carry an HMAC-SHA256 hash showing the badge was issued by Chapa and has not been modified since. It does not establish that the underlying platform data is accurate; public replay validates arithmetic over the issued aggregates, not private-source truth. Badges marked "Public metrics" make no cryptographic claim.
 
 ## Endpoints
@@ -47,7 +48,7 @@ Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless St
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com
-2. Chapa computes your Impact v6 Profile from public platform data (GitHub, Bitbucket, Codeberg, GitLab).
+2. Chapa computes your profile under the selected policy from public platform data (GitHub, Bitbucket, Codeberg, GitLab). The response and receipt identify that policy.
 3. Embed the badge in your README, portfolio, resume, or LinkedIn:
 
 Markdown:

@@ -18,6 +18,8 @@ The catalog uses these exact JSON Schema objects:
 - `COMPARE`: `{"type":"object","properties":{"other_handle":{"type":"string"}},"required":["other_handle"],"additionalProperties":false}`
 - `HANDLE`: `{"type":"object","properties":{"handle":{"type":"string"}},"required":["handle"],"additionalProperties":false}`
 
+For current `v7.2`, `OBSERVED_SIMULATE_SCORE_INPUT_SCHEMA` in `lib/webmcp/catalog.ts` accepts exactly one of `dimensions` or `counts`. Count keys are `deliveryUnits`, `activeIsoWeeks`, `eligibleProjects`, `eligibleCategories`, and `quality` criteria (`rationale`, `verification`, `review_or_correction`, `outcome_followup`). Each overridden count has finite nonnegative `lower`/`upper` bounds; unknown keys and invalid bounds are rejected. The count calculator validates the exact public baseline before applying changes.
+
 `readOnlyHint: no` means the annotation is omitted because the tool changes page state or opens a human action gate.
 
 ## Tool catalog
@@ -41,9 +43,9 @@ These tools orient and navigate only. They fetch no data and do not wrap the pub
 | `preview_badge` | `EMPTY` | yes | Returns the current configuration, public badge SVG URL, and save status. |
 | `reset_badge_config` | `EMPTY` | no | Runs the visible `/reset` command and returns terminal output plus the reset configuration snapshot. |
 | `save_badge_config` | `EMPTY` | no | Opens an on-page save proposal. It never calls the save API itself. Only a human click on the confirmation control can continue. |
-| `simulate_score` | `SIMULATION` | yes | Merges dimension overrides with the current profile, applies its existing heatmap recency weighting before confidence adjustment, selects the tier, and returns the delta from the current score. Confidence, profile type, and activity timing remain fixed. Solo profiles exclude Quality from the composite; optional Craft remains included. It does not save data. |
-| `suggest_improvements` | `EMPTY` | yes | Runs Chapa's existing insight engine against the current impact profile and returns grounded improvement suggestions. |
-| `explain_dimension` | `DIMENSION` | yes | Uses the shared score-explanation engine to return the selected score, formula, tip, and normalized submetrics. |
+| `simulate_score` | `SIMULATION` or current count scenario | yes | Current `v7.2` uses fixed receipt inputs/window and four 25% core weights. `{ "counts": { "deliveryUnits": { "lower": 12, "upper": 12 } } }` overrides public evidence counts; omitted counts stay fixed. Direct dimension overrides are explicitly hypothetical and make no attainment claim. Craft overrides never change core. Results include `hypothetical`, policy, baseline revision, inputs, exact/display values and scope. Legacy `v6` retains recency/confidence behavior. It never publishes a receipt. |
+| `suggest_improvements` | `EMPTY` | yes | Current scoring describes evidence to document without proficiency labels or promised score gains. Legacy scoring retains its existing insight engine. |
+| `explain_dimension` | `DIMENSION` | yes | Returns selected current points and public observed traces; Craft reports outcome credits, period and coverage without legacy proficiency. The legacy branch retains its existing explanation. |
 
 ### Public profile: `/u/[handle]`
 
@@ -51,11 +53,11 @@ These tools receive the same server-computed public data as the rendered page. V
 
 | Tool | Input | `readOnlyHint` | Behavior |
 | --- | --- | --- | --- |
-| `get_impact_profile` | `EMPTY` | yes | Serializes the redacted impact, key public stats, verification summary, trend, diff, and render-time freshness from page props. `displayScore` and `displayTier` are the headline the badge on the page draws, read from the same resolved score model as the SVG; `scoring` is that model. A v7 evidence range reports `displayScore: null` with the interval in `scoring.composite`. The legacy `impact.adjustedComposite` is kept for compatibility and is never the headline. It makes no request. |
+| `get_impact_profile` | `EMPTY` | yes | Returns canonical `displayScore`, separate `exactScore`, selected dimensions and `exactDimensions`, machine policy, receipt identity, observation window, nullable archetype and explicit report Craft. Valid Craft zero is retained; absent/expired Craft has no numeric value. `legacy.impact` contains compatibility aggregates. Public stats and receipt verification remain separate. It makes no request. |
 | `get_impact_history` | `EMPTY` | yes | Fetches `/api/history/[handle]?include=snapshots,trend` with the tool cancellation signal. It returns friendly messages for missing or rate-limited data. |
-| `verify_badge` | `EMPTY` | yes | If the page has a verification hash, fetches `/api/verify/[hash]` and returns status, record, and `verifyUrl`. Otherwise it reports that the profile has no verification record. |
+| `verify_badge` | `EMPTY` | yes | Fetches the verification API and preserves its top-level versioned envelope, revision, issuance authentication and arithmetic status. HTTP 410 remains revoked, not a generic failure or an authentication claim. Legacy responses retain the public record projection. |
 | `explain_dimension` | `DIMENSION` | yes | Uses the same shared explanation tool as Studio. It operates on the current public page data. |
-| `compare_profiles` | `COMPARE` | yes | Validates the other GitHub handle, fetches `/api/profile/[other_handle]`, and compares it when an existing public Chapa profile is available. Each side's `score` and `tier` are the headline its badge draws: the on-page side from the page's resolved score model, the other side from `/api/profile`'s `displayScore`/`displayTier`. A side whose badge shows an evidence range, or whose live profile could not be materialized, reports `score: null` (with the interval in `scoring`), and `differences.score` is then `null`. Neither side ever falls back to the snapshot's EMA-smoothed `adjustedComposite`, which is not the number on the badge. Dimension differences are other profile minus the on-page profile. A missing profile explains that its owner must sign in to Chapa; rate-limited profiles get a retry-later message. |
+| `compare_profiles` | `COMPARE` | yes | Compares canonical selected values only when machine policy and core observation period agree. Mixed policies, periods, unavailable profiles and non-point evidence return `not_comparable` with `differences: null`. Each side retains exact/display values and receipt context. Different Craft report periods leave core comparable but set `craftComparison` to `not_comparable` and omit Craft deltas. Unknown HTTP fields are never echoed as a scoring model. |
 | `get_embed_snippet` | `EMPTY` | yes | Returns the page's canonical Markdown and HTML embed snippets for the live badge. |
 
 ### Verification page: `/verify/[hash]`

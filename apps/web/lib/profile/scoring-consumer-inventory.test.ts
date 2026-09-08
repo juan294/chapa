@@ -25,7 +25,7 @@ const INVENTORY = "docs/scoring-consumer-inventory.md";
  * this pattern the moment its JSON-LD switched from `adjustedComposite` to the
  * shared model, while still very much publishing a score. */
 const SCORED_SYMBOLS =
-  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|ScoreViewModel|explainReceipt|simulateCoreScore|adjustedComposite|compositeScore|resolveScoreModel|scoreModelFrom|readRenderableReceipt|issueScoreReceiptIfConsented|describeScoreForMetadata)\b/;
+  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|ScoreViewModel|explainReceipt|simulateCoreScore|adjustedComposite|compositeScore|resolveScoreModel|scoreModelFrom|readRenderableReceipt|issueScoreReceiptIfConsented|describeScoreForMetadata|PublicObservedScoringReceipt|ObservedReceiptSnapshot|observedReceiptViewModel|materializeObservedScoreReceipt|publicScoreProjection|comparePublicScores|simulateObservedScore|scoringObservation|dbReadObservedReceipt|resolvePostWriteScore|readObservedScoringHistory)\b/;
 const SCAN_ROOTS = ["apps/web/app", "apps/web/components", "apps/web/lib", "scripts"];
 const NOT_A_CONSUMER = /(\.test\.|\.spec\.|__fixtures__|\/test-helpers\/|\/__mocks__\/)/;
 
@@ -93,3 +93,42 @@ function existsInRepo(path: string): boolean {
     return false;
   }
 }
+
+/** Membership does not establish correctness: run real outward projections
+ * against sealed evidence and conflicting legacy fields in the same assertion. */
+describe("scored-consumer value agreement", () => {
+  it.each([57, 0] as const)("binds SVG, metadata, public data and history to the same receipt with Craft %s", async craft => {
+    const { scoringConsistencyFixture } = await import("./__fixtures__/scoring-consistency");
+    const { publicScoreProjection } = await import("./public-score-projection");
+    const { scoringObservation } = await import("@/lib/history/scoring-observations");
+    const { describeScoreForMetadata } = await import("./score-description");
+    const { renderBadgeSvg } = await import("@/lib/render/BadgeSvg");
+    for (const boundary of [false, true]) {
+      const fixture = await scoringConsistencyFixture({ craft, boundary });
+      const receipt = fixture.envelope.receipt;
+      const data = publicScoreProjection(fixture.model);
+      const observation = scoringObservation(fixture.model)!;
+      const svg = renderBadgeSvg(fixture.stats, fixture.impact, { scoring: fixture.model, disableAnimation: true });
+      const expected = boundary ? 69.99 : 46;
+      expect(receipt.core.composite.displayValue).toBe(expected);
+      expect(data.displayScore).toBe(expected);
+      expect(observation.composite.display).toBe(expected);
+      expect(data.exactScore).toBe(receipt.core.composite.exact);
+      expect(observation.composite.exact).toBe(receipt.core.composite.exact);
+      expect(data.identity?.contentHash).toBe(fixture.envelope.contentHash.value);
+      expect(observation.identity).toEqual(data.identity);
+      expect(observation.window).toEqual(data.window);
+      expect(data.policyVersion).toBe("v7.2");
+      expect(data.dimensions.craft).toBe(craft);
+      expect(observation.craft?.display).toBe(craft);
+      expect(svg).toContain(`data-axis="craft" data-value="${craft}"`);
+      expect(svg).toMatch(new RegExp(`data-element="score"[^>]*>${String(expected).replace(".", "\\.")}<`));
+      expect(describeScoreForMetadata(fixture.model)).toContain(`${expected} (Solid tier)`);
+      expect(data.archetype).toBe(receipt.core.archetype);
+      expect(data.tier).toBe(receipt.core.tier);
+      expect(data).not.toHaveProperty("confidence");
+      expect(data.displayScore).not.toBe(fixture.impact.adjustedComposite);
+      expect(data.dimensions.craft).not.toBe(fixture.impact.dimensions.craft);
+    }
+  });
+});

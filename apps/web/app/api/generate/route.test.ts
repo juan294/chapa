@@ -1,3 +1,4 @@
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -203,7 +204,7 @@ describe("POST /api/generate", () => {
     const res = await POST(makeRequest("chapa_session=abc"));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true, handle: "juan294" });
+    await expect(res.json()).resolves.toEqual({ success: true, handle: "juan294", policyVersion: "v6" });
     expect(mockGetStats).toHaveBeenCalledTimes(2);
     expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
     // Exactly one argument: an explicit `undefined` token would be a
