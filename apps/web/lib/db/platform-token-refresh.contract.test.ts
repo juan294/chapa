@@ -1,8 +1,7 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getServiceClient } from "@/test/contract/invoke";
+import { assertLocalSqlTarget, inspectLocalSql } from "@/test/contract/local-sql";
 import { encryptToken } from "@/lib/auth/github";
 import { getNextauthSecret } from "@/lib/env";
 import { dbGetLinkedPlatformStrict, dbUpsertLinkedPlatform, type StrictLinkedPlatform } from "./user-platforms";
@@ -27,6 +26,7 @@ async function currentLink() {
   return result.link;
 }
 async function cleanup() {
+  assertLocalSqlTarget();
   expect((await getServiceClient().from("user_platforms").delete().eq("handle", owner)).error).toBeNull();
   expect((await getServiceClient().from("scoring_v7_subjects").delete().eq("owner_handle", owner)).error).toBeNull();
 }
@@ -51,15 +51,16 @@ async function attempts(id = link.id) {
   const result = await getServiceClient().from("platform_token_refresh_attempts").select("*").eq("link_id", id);
   expect(result.error).toBeNull(); return result.data!;
 }
-describe("durable refresh barrier (requires reviewed migration046)", () => {
+describe("durable refresh barrier (requires reviewed migrations046/048)", () => {
   it("denies browser roles table access and claim/finish execution", () => {
-    const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
-    if (project !== "chapa-scoring-v7") throw new Error("Owned disposable project required");
     const query = "SELECT p.proname,has_function_privilege('anon',p.oid,'EXECUTE'),has_function_privilege('authenticated',p.oid,'EXECUTE'),has_function_privilege('service_role',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('platform_token_refresh_claim','platform_token_refresh_finish','platform_token_refresh_release') ORDER BY p.proname; SELECT 'table',has_table_privilege('anon','public.platform_token_refresh_attempts','SELECT'),has_table_privilege('authenticated','public.platform_token_refresh_attempts','SELECT'),has_table_privilege('service_role','public.platform_token_refresh_attempts','SELECT'); SELECT 'mutation',has_table_privilege('service_role','public.platform_token_refresh_attempts','INSERT'),has_table_privilege('service_role','public.platform_token_refresh_attempts','UPDATE'),has_table_privilege('service_role','public.platform_token_refresh_attempts','DELETE')";
-    const rows = execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", query], { encoding: "utf8" }).trim().split("\n");
-    expect(rows).toHaveLength(5);
-    for (const row of rows.slice(0, 4)) expect(row.split("|").slice(1)).toEqual(["f", "f", "t"]);
-    expect(rows[4]).toBe("mutation|f|f|f");
+    expect(inspectLocalSql(query).split("\n")).toEqual([
+      "platform_token_refresh_claim|f|f|t",
+      "platform_token_refresh_finish|f|f|t",
+      "platform_token_refresh_release|f|f|t",
+      "table|f|f|t",
+      "mutation|f|f|f",
+    ]);
   });
 
   it("allows one provider HTTP request across two independent module instances, preserving paused success", async () => {
@@ -117,10 +118,72 @@ describe("durable refresh barrier (requires reviewed migration046)", () => {
     expect((await db.rpc("platform_token_refresh_finish", finishArgs(original))).data).toEqual({ status: "stale" });
     expect((await db.rpc("scoring_v7_withdraw_with_receipts", { p_owner: owner, p_actor: owner, p_acknowledged: true })).error).toBeNull();
     expect(await attempts()).toHaveLength(1);
-    expect((await db.rpc("platform_token_refresh_claim", claimArgs(changed))).error).not.toBeNull();
+    expect((await db.from("scoring_v7_subjects").select("owner_handle").eq("owner_handle", owner)).data).toEqual([]);
+    const withdrawnClaim = await db.rpc("platform_token_refresh_claim", claimArgs(changed));
+    expect(withdrawnClaim.error).toBeNull();
+    expect(withdrawnClaim.data).toEqual({ status: "busy" });
     expect((await db.from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-06T12:00:00Z" })).error).toBeNull();
     expect((await db.rpc("platform_token_refresh_claim", claimArgs(changed))).data).toEqual({ status: "busy" });
     expect(Object.keys((await attempts())[0]).sort()).toEqual(["attempt_id", "link_id", "link_version", "started_at"]);
+  });
+
+  it("rejects explicit false consent for both claim and completion without changing tokens or the barrier", async () => {
+    const db = getServiceClient();
+    expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
+    expect((await db.rpc("platform_token_refresh_claim", claimArgs())).error?.message).toContain("Current consent required");
+    expect(await attempts()).toEqual([]);
+    expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: true }).eq("owner_handle", owner)).error).toBeNull();
+    const args = claimArgs();
+    expect((await db.rpc("platform_token_refresh_claim", args)).data.status).toBe("claimed");
+    const barrier = await attempts();
+    expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
+    expect((await db.rpc("platform_token_refresh_finish", finishArgs(args))).error?.message).toContain("Current consent required");
+    expect(await attempts()).toEqual(barrier);
+    expect((await currentLink()).tokens.accessToken).toBe("old-access");
+  });
+
+  it("renews an absent-subject legacy connection through one real provider adapter request", async () => {
+    const db = getServiceClient();
+    expect((await db.from("scoring_v7_subjects").delete().eq("owner_handle", owner)).error).toBeNull();
+    vi.mocked(readSourceAuthorization).mockImplementation(async () => ({ status: "authorized", consentVersion: "legacy-unpublished", link: await currentLink() }));
+    const nativeFetch = globalThis.fetch.bind(globalThis); let calls = 0;
+    vi.stubGlobal("fetch", async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      if (String(url) !== "https://gitlab.com/oauth/token") return nativeFetch(url, init);
+      calls++;
+      return new Response(JSON.stringify({ access_token: "new-access", refresh_token: "same-refresh", token_type: "bearer", expires_in: 3600 }), { status: 200 });
+    });
+    const worker = (await import("../platform/source-refresh")).refreshSourceLink;
+    const renewed = await worker({ status: "authorized", consentVersion: "legacy-unpublished", link }, { owner, provider: "gitlab" }, false);
+    expect(renewed.status).toBe("authorized");
+    expect((await currentLink()).tokens.accessToken).toBe("new-access");
+    expect(await attempts()).toEqual([]);
+    expect((await db.from("scoring_v7_subjects").select("owner_handle").eq("owner_handle", owner)).data).toEqual([]);
+    if (renewed.status !== "authorized") throw new Error("Expected legacy renewal");
+    expect(await worker(renewed, { owner, provider: "gitlab" }, false)).toEqual(renewed);
+    expect(calls).toBe(1);
+  });
+
+  it("does not repeat an ambiguous provider refresh after withdrawal or reconsent", async () => {
+    const db = getServiceClient();
+    const worker = (await import("../platform/source-refresh")).refreshSourceLink;
+    const nativeFetch = globalThis.fetch.bind(globalThis); let calls = 0;
+    vi.stubGlobal("fetch", async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      if (String(url) !== "https://gitlab.com/oauth/token") return nativeFetch(url, init);
+      calls++; throw new Error("Response lost after possible provider execution");
+    });
+    expect(await worker({ status: "authorized", consentVersion: consent, link }, { owner, provider: "gitlab" })).toEqual({ status: "unavailable" });
+    const barrier = await attempts();
+    expect(barrier).toHaveLength(1);
+    expect((await db.rpc("scoring_v7_withdraw_with_receipts", { p_owner: owner, p_actor: owner, p_acknowledged: true })).error).toBeNull();
+    vi.mocked(readSourceAuthorization).mockImplementation(async () => ({ status: "authorized", consentVersion: "legacy-unpublished", link: await currentLink() }));
+    expect(await worker({ status: "authorized", consentVersion: "legacy-unpublished", link }, { owner, provider: "gitlab" }, false)).toEqual({ status: "unavailable" });
+    const reconsent = "2026-09-06T12:00:00Z";
+    expect((await db.from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: reconsent })).error).toBeNull();
+    vi.mocked(readSourceAuthorization).mockImplementation(async () => ({ status: "authorized", consentVersion: reconsent, link: await currentLink() }));
+    expect(await worker({ status: "authorized", consentVersion: reconsent, link }, { owner, provider: "gitlab" })).toEqual({ status: "unavailable" });
+    expect(await attempts()).toEqual(barrier);
+    expect((await currentLink()).tokens.accessToken).toBe("old-access");
+    expect(calls).toBe(1);
   });
 
   it("cascades an explicit disconnect/account parent deletion and fences the replacement", async () => {

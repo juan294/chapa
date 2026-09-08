@@ -73,3 +73,6 @@ export * from "./scoring-aggregation-v7";
 
 export * from "./canonical-json";
 export * from "./score-receipt";
+
+// v7.2 foundation only: historical publication/replay dispatch is unchanged.
+export * from "./scoring-observed";

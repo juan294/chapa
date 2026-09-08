@@ -1,9 +1,8 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createScoringWindow } from "@chapa/shared";
 import { getServiceClient } from "@/test/contract/invoke";
+import { assertLocalSqlTarget, inspectLocalSql } from "@/test/contract/local-sql";
 import { sourceEventFixture } from "./source-context-fixture";
 import { readSourceObservation } from "./source-context";
 import { databaseInstantMicros } from "./source-time";
@@ -17,6 +16,7 @@ const coverage = { source, window, dataThrough: window.referenceTime, status: "c
 const base = () => ({ p_owner: owner, p_actor: owner, p_source: source, p_requested: requested, p_access: "a".repeat(64), p_scope: scope, p_link_id: null, p_link_version: null });
 const append = () => ({ ...base(), p_observation: randomUUID(), p_window: window, p_coverage: coverage, p_payload: { events: [] } });
 async function cleanup() {
+ assertLocalSqlTarget();
  expect((await db().from("user_platforms").delete().eq("handle", owner)).error).toBeNull();
  expect((await db().from("scoring_v7_subjects").delete().eq("owner_handle", owner)).error).toBeNull();
 }
@@ -24,12 +24,13 @@ beforeEach(async () => { await cleanup(); expect((await db().from("scoring_v7_su
 afterEach(cleanup);
 describe("source context RPC draft contracts (requires reviewed migration045)", () => {
  it("denies browser roles all source and token mutation RPCs", () => {
-  const project = readFileSync("supabase/config.toml", "utf8").match(/^project_id = "([\w-]+)"/m)?.[1];
-  if (project !== "chapa-scoring-v7") throw new Error("Owned disposable project required");
   const query = "SELECT p.proname,has_function_privilege('anon',p.oid,'EXECUTE'),has_function_privilege('authenticated',p.oid,'EXECUTE'),has_function_privilege('service_role',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('scoring_v7_append_source','scoring_v7_read_source','scoring_v7_discover_source','scoring_v7_cas_link_tokens') ORDER BY p.proname";
-  const rows = execFileSync("docker", ["exec", `supabase_db_${project}`, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", "-At", "-c", query], { encoding: "utf8" }).trim().split("\n");
-  expect(rows).toHaveLength(4);
-  for (const row of rows) expect(row.split("|").slice(1)).toEqual(["f", "f", "t"]);
+  expect(inspectLocalSql(query).split("\n")).toEqual([
+   "scoring_v7_append_source|f|f|t",
+   "scoring_v7_cas_link_tokens|f|f|t",
+   "scoring_v7_discover_source|f|f|t",
+   "scoring_v7_read_source|f|f|t",
+  ]);
  });
  it("persists a nonempty normalized event and replays it through the private adapter", async () => {
   const event = sourceEventFixture(source, window);
