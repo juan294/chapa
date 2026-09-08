@@ -1,15 +1,15 @@
 # How Chapa Works
 
-This document explains Chapa's Impact v6 Profile calculation, security model, verification flow, multi-platform integration, and the EMU account merge feature. It is the reference for anyone asking "how does this work?" or "how is this secure?"
+This document explains Chapa's current scoring projection, security model, verification flow, multi-platform integration, and the EMU account merge feature. It is the reference for anyone asking "how does this work?" or "how is this secure?"
 
 ---
 
 ## Table of Contents
 
 1. [What Chapa Measures](#what-chapa-measures)
-2. [Impact v6 Profile](#impact-v6-profile)
-3. [Confidence System](#confidence-system)
-4. [Tiers](#tiers)
+2. [Current Impact profile](#current-impact-profile)
+3. [Display and tiers](#display-and-tiers)
+4. [Historical policies](#historical-policies)
 5. [Data Sources and Verification](#data-sources-and-verification)
 6. [Multi-Platform Integration](#multi-platform-integration)
 7. [EMU Account Merge](#emu-account-merge)
@@ -21,184 +21,49 @@ This document explains Chapa's Impact v6 Profile calculation, security model, ve
 
 ## What Chapa Measures
 
-Chapa analyzes a developer's **last 12 months** (365 days) of activity across connected platforms (GitHub, Bitbucket, Codeberg, GitLab) and produces a **multi-dimensional Impact v6 Profile** — four core dimension scores (0-100 each) plus an optional fifth Craft dimension, a developer archetype label, a composite score (0-100), and a tier. An internal **Confidence** rating (50-100) adjusts the final score behind the scenes. The profile reflects the quality and breadth of contributions, not just volume.
+Chapa's current machine policy `v7.2` describes recorded engineering evidence
+within a declared 365-calendar-date source window. It is not a certification of
+ability or a percentile. `v6` remains the rollout-off policy and an explicitly
+labelled fallback where there is no current receipt. Unavailable authority is
+not replaced with a fabricated current score.
 
-### Signals we track
+## Current Impact profile
 
-| Signal | What it measures | Why it matters |
-|--------|-----------------|----------------|
-| **Commits** | Total contributions in 12 months | Baseline activity level |
-| **PR Weight** | Merged pull requests, weighted by size and complexity | Quality of code contributions |
-| **Code Reviews** | Reviews submitted on others' PRs | Collaboration and mentorship |
-| **Issues Closed** | Issues resolved | Problem-solving activity |
-| **Active Days** | Days with at least one contribution | Consistency over time |
-| **Repos Contributed To** | Distinct repositories with 3+ commits | Cross-project breadth (shallow drive-bys excluded) |
-| **Stars** | Total stars across owned repositories | Community recognition signal (used in Breadth dimension) |
-| **Forks** | Total forks across owned repositories | Displayed on badge as a community metric |
-| **Watchers** | Total watchers across owned repositories | Displayed on badge as a community metric |
+Four core dimensions each carry weight0.25: Delivery counts accepted-work
+project/day buckets; Quality counts demonstrated rationale, verification,
+review/correction and outcome follow-up; Consistency counts active ISO weeks;
+Breadth counts eligible projects and categories with work on three dates.
+The formulas and caps are in [Impact v7.2](impact-v7.md).
 
-### What we deliberately ignore for scoring
+Current points credit known qualifying observations. Coverage bounds and source
+limitations remain visible metadata, not a confidence deduction or headline
+range. No recency, solo switch, account-age adjustment, stars or raw line count
+enters the core. Missing evidence is not a judgment of developer ability.
 
-- **Followers** — social metric, not engineering output
-- **Lines of code** — easily gamed; we use it only for confidence heuristics, never for scoring
-- **Private repo names** — we never expose repository names or code content
+Optional Craft is report-derived outcome credit:
+`100 × (fully + 0.7 × mostly + 0.3 × partially) / totalSessions`.
+Recognized failures, unknown outcomes and unclassified sessions earn zero;
+unknowns are not proven failures. A valid report with recognized outcomes
+unlocks the fifth visible axis, including a legitimate Craft 0. No report means
+four axes. Expiry preserves the unlocked label and update guidance without a
+numeric vertex. Craft never changes the four-dimension average.
 
----
+## Display and tiers
 
-## Impact v6 Profile
+Tiers use exact unrounded core values: Emerging below 30, Solid30–<70,
+High70–<85, Elite85–100. Canonical display normally rounds to an integer but
+cannot cross a tier boundary: exact69.99723619005769 displays69.99/Solid.
+Every surface reads that same display; exact arithmetic remains separately
+available. Archetype eligibility retains the original normalized-bound rule;
+when no definitive archetype exists the UI uses a neutral state.
 
-Impact v6 produces a **multi-dimensional Developer Impact Profile**. Instead of one number, developers get four core dimension scores plus an optional fifth Craft dimension, and a developer archetype that describes their contribution shape.
+## Historical policies
 
-### Why multi-dimensional?
-
-AI-assisted development makes traditional volume metrics (commits, LOC, PR counts) increasingly meaningless. A single score that blends everything together hides the difference between a prolific code shipper and a dedicated reviewer. Four independent dimensions let each contribution style shine.
-
-### Normalization
-
-Most raw metrics are transformed using logarithmic normalization to reward genuine contribution while making gaming impractical:
-
-```
-f(x, cap) = ln(1 + min(x, cap)) / ln(1 + cap)
-```
-
-This produces a value between 0 and 1. Pushing 1000 commits does not produce a score 10x higher than 100 commits.
-
-**Caps per signal:**
-
-| Signal | Cap | Rationale |
-|--------|-----|-----------|
-| Commits | 300 | Consistent contribution; diminishing returns beyond ~1/day |
-| PR Weight | 60 | Weighted by complexity, not count; cap prevents inflation |
-| Reviews | 80 | Encourages collaboration without requiring extreme volume |
-| Issues | 40 | Meaningful issue resolution, not ticket churn |
-| Repos | 12 | Cross-project work beyond 12 repos is fully credited |
-| Stars | 150 | Community recognition signal; log-normalized |
-| Forks | 80 | People building on your work; log-normalized |
-
-### The core dimensions (each 0-100)
-
-| Dimension | What it measures | Signals & weights |
-|-----------|-----------------|-------------------|
-| **Delivery** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%), lead time modifier (±5%) |
-| **Quality** | Engineering discipline | **Collaborative:** Reviews (60%), review-to-PR ratio (25%), batch size score (15%). **Solo:** PR description rate (40%), feature branch rate (25%), issue linkage rate (20%), batch size score (15%) |
-| **Consistency** | Reliable, sustained contributions | sqrt(activeDays/365) (45%), heatmap evenness (40%), week coverage (15%) |
-| **Breadth** | Cross-project influence | Repos contributed (40%), inverse top-repo share (25%), docs-only PR ratio (15%), stars (10%), forks (5%) |
-
-Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers are scored on code reviews, while solo developers are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Profile type is determined by review-to-PR ratio — developers with fewer than 15% reviews relative to merged PRs are classified as solo. Solo Quality returns 0 only if you have zero merged PRs.
-
-Delivery includes a **lead time modifier** based on median PR open-to-merge duration: fast merges (≤4h) earn a 5% boost, while slow merges (≥168h) incur a 5% penalty. When lead time data is unavailable, the modifier is neutral (1.0x).
-
-**Batch size score** measures the fraction of merged PRs in the reviewable sweet spot (20–500 lines changed). This replaces the old micro-commit ratio and aligns with research showing that small, reviewable changes are a top code quality signal.
-
-**Week coverage** measures the fraction of weeks with any contribution activity, capturing sustainable cadence without penalizing productive days. Heatmap evenness clips weekly totals at 3× the median before computing the coefficient of variation, preventing a single outlier week from dominating the score.
-
-### Optional fifth dimension: Craft
-
-When a developer imports Claude Code usage insights, a fifth **Craft** dimension is computed from AI tool usage patterns. When Craft data is present:
-
-- The radar chart renders as a **pentagon** (5 axes) instead of a diamond (4 axes)
-- The **Artificer** archetype becomes available (Craft is highest AND >= 70)
-- The composite score averages all 5 dimensions instead of 4
-
-Craft is fully optional — developers without AI tool insights see the standard 4-dimension profile.
-
-### Developer archetypes
-
-Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Quality Champion > Marathoner > Builder.
-
-| Archetype | Rule |
-|-----------|------|
-| **Emerging** | Average < 40 OR no dimension >= 50 |
-| **Balanced** | All dimensions within 15 pts AND average >= 60 |
-| **Artificer** | Craft is highest AND >= 70 *(only when Craft data present)* |
-| **Polymath** | Breadth is highest AND >= 70 |
-| **Quality Champion** | Quality is highest AND >= 70 |
-| **Marathoner** | Consistency is highest AND >= 70 |
-| **Builder** | Delivery is highest AND >= 70 |
-
-### Composite score
-
-The composite score is the average of all dimensions (4 or 5), rounded to an integer:
-
-```
-compositeScore = round(avg(delivery, quality, consistency, breadth [, craft]))
-```
-
-The composite is then adjusted by confidence (see below) and mapped to a tier.
-
-### PR Weight formula
-
-Not all PRs are equal. Each merged PR's weight is calculated as:
-
-```
-rawWeight = 0.5 + 0.25 * ln(1 + filesChanged) + 0.25 * ln(1 + additions + deletions)
-totalChanges = changedFiles + additions + deletions
-sizeMultiplier = min(1, totalChanges / 10)
-weight = rawWeight * sizeMultiplier
-```
-
-- Empty PRs (0 files, 0 lines changed) get weight 0 — prevents inflating scores with trivial PRs
-- Normal PRs (10+ total changes across files and lines) are unaffected (multiplier = 1.0)
-- Maximum weight per PR: 3.0 (prevents a single massive PR from dominating)
-- Total PR weight is capped at 120 across all PRs
-
----
-
-## Confidence System
-
-Confidence (50-100) measures **signal clarity**, not morality. A low confidence score never accuses wrongdoing -- it simply means the data patterns make it harder to assess impact precisely.
-
-### How it works
-
-Confidence starts at 100 and can be reduced by detected patterns:
-
-| Pattern | Penalty | Trigger condition | What it means |
-|---------|---------|-------------------|---------------|
-| Burst activity | -15 | 100+ commits in a 10-minute window | Activity concentrated in short bursts reduces timing confidence |
-| Micro-commits | -10 | 60%+ of commits are very small | Many tiny changes reduce signal clarity |
-| Generated changes | -15 | 20,000+ lines changed AND fewer than 3 reviews | Large volume with limited review suggests possible automation |
-| Low collaboration | -10 | 10+ PRs merged AND 1 or fewer reviews given | Significant output without peer interaction |
-| Single repo focus | -5 | 95%+ of activity in one repo AND only 1 repo | Less cross-project signal (not bad, just less diverse data) |
-| Supplemental data | -5 | Includes merged EMU account data | Data from a linked account that cannot be independently verified |
-| Low activity signal | -10 | Fewer than 30 active days OR fewer than 50 commits | Very limited activity reduces the signal available for scoring |
-| Review volume imbalance | -10 | 50+ reviews AND fewer than 3 merged PRs | High review volume with very few merged changes reduces confidence in the activity mix |
-
-**Confidence floor:** 50. No combination of penalties can push confidence below 50. Note: "Low collaboration" and "Review volume imbalance" are mutually exclusive (one requires ≤ 1 reviews, the other ≥ 50), so the maximum simultaneous penalties is 7.
-
-### How confidence affects the final score
-
-```
-Adjusted Score = Composite Score * (0.85 + 0.15 * (Confidence / 100))
-```
-
-This means:
-- At **confidence 100**: adjusted = composite score (no reduction)
-- At **confidence 50**: adjusted = composite * 0.925 (only 7.5% reduction)
-
-The adjustment is deliberately gentle. Confidence provides transparency, not punishment. A developer with a 75 composite score and 70 confidence gets an adjusted score of 73, not 52.
-
-### Why this matters
-
-Confidence is used to produce the adjusted score (which determines the tier), but it is **not displayed** on the badge or to public share-page visitors. The profile owner can see their confidence percentage and non-accusatory penalty reasons in the share page's "How is my score calculated" panel.
-
-The admin dashboard retains full visibility into confidence values for diagnostic purposes.
-
-**All confidence messaging is non-accusatory.** We never say "you gamed the system" -- we describe patterns like "some activity appears in short bursts, which reduces timing confidence."
-
----
-
-## Tiers
-
-The adjusted score maps to a tier:
-
-| Tier | Score Range | Description |
-|------|-------------|-------------|
-| **Emerging** | 0-39 | Getting started or light activity period |
-| **Solid** | 40-69 | Consistent, meaningful contributions |
-| **High** | 70-84 | Strong impact across multiple signals |
-| **Elite** | 85-100 | Exceptional breadth and depth of contribution |
-
----
+[Impact v6](impact-v6.md) documents legacy aggregation, confidence and tool
+practice scores. The archived machine `v7` / algorithm `v7.1` uses
+completion-range arithmetic and its original Craft portfolio. Existing records
+retain those meanings. Neither is relabelled as current v7.2, and transitions
+are not reported as performance gains or losses.
 
 ## Data Sources and Verification
 
@@ -284,6 +149,10 @@ chapa merge --handle juan294 --emu-handle Juan-GonzalezPonce_avoltagh \
 
 ### How the flow works
 
+The aggregation/score steps in this existing CLI flow describe the legacy v6
+path. Current v7.2 scoring instead uses its accepted evidence ledger and public
+receipt; supplemental statistics alone do not establish qualifying evidence.
+
 ```
 Step 1: User runs CLI on their machine (where they have EMU access)
 
@@ -351,13 +220,13 @@ Step 2: Next badge request merges the data automatically
 > Supabase's `supplemental_stats` table (one row per handle) — Redis (`supplemental:<handle>`,
 > 24h TTL) is only the hot read path checked in step 2 of the next diagram; on a cache miss,
 > `getStats()` falls back to Supabase and rehydrates Redis. This means a missed CLI upload
-> day, or a Redis cache expiry, no longer drops EMU data from scores.
+> day, or a Redis cache expiry, no longer removes that durable legacy stats record.
 >
 > **Partial-fetch protection (#1002):** step 1 ("Fetch primary GitHub stats") is guarded
 > against a degraded fetch. GitHub's contributions API is scoped to the authenticating token,
 > so a request that can't see a user's private-repo merges can return zero merged PRs. Rather
 > than cache that corrupt result, Chapa detects the collapse and serves the last-known-good
-> stats, so the score never drops on a partial fetch.
+> stats for the legacy aggregate. Current receipt coverage remains explicit.
 >
 > **Scoring-data integrity contract (#1004, corrected #1045/#1050):** a further three-boundary
 > defense sits on top of #1002. The fetch boundary rejects internally inconsistent payloads;
@@ -384,12 +253,13 @@ When supplemental data exists, the merge is straightforward:
 
 ### Transparency
 
-When supplemental data is included:
+For legacy v6, when supplemental data is included:
 1. The `hasSupplementalData` flag is set on the merged stats
 2. The confidence system applies a **-5 penalty** (`supplemental_unverified`)
 3. The share page shows the reason: "Includes activity from a linked account that cannot be independently verified"
 
-This is fully transparent to anyone viewing the badge or share page.
+Current v7.2 has no confidence penalty; its declared source coverage and accepted
+aggregate evidence explain what contributes.
 
 ---
 
@@ -436,7 +306,7 @@ The endpoint implements 4 layers of protection:
 | Send a fake GitHub token | Token is verified against `api.github.com/user` |
 | Inject malicious data into Redis | Stats shape is structurally validated before storage |
 | Intercept the EMU token | EMU token never leaves the user's machine |
-| Inflate scores beyond reality | The same caps, normalization, and confidence penalties apply to merged data |
+| Treat uploaded statistics as verified current evidence | Current receipt scoring requires qualifying accepted evidence; replay validates arithmetic, not source truth |
 | Permanently pollute a badge | Supplemental data expires after 24 hours; user must re-upload to maintain |
 
 ### OAuth security
@@ -454,91 +324,65 @@ Since badges are embeddable SVGs, all user-controlled text (handles, display nam
 
 ## Lifetime Metrics & Score History
 
-Chapa captures daily snapshots of each user's metrics and stores them permanently in the Supabase `metrics_snapshots` table. This enables trend tracking, score change analysis, and historical comparisons.
+Legacy daily `metrics_snapshots` remain explicitly v6. Current consented
+observations come from immutable v7.2 receipts and the final winning daily trend
+anchors. APIs and tools expose machine policy, exact/display values, receipt
+revision/content hash, window and optional Craft. Durable EMA remains separate
+from the badge headline and is not re-seeded when a date-filtered slice is read.
 
-### How snapshots are captured
+`GET /api/history/:handle?from=YYYY-MM-DD&to=YYYY-MM-DD&include=snapshots,trend,diff`
+is rate-limited and no-store. A missing current segment may return explicitly
+labelled legacy history; a failed authority read is unavailable. Current public
+history contains only consented public aggregates. Withdrawal/deletion removes
+public access according to the lifecycle policy; downloaded copies cannot be
+recalled.
 
-Snapshots are recorded automatically in three places:
-1. **Cron warm-cache** — a scheduled job that refreshes active users on a round-robin rotation, running hourly (#1010; was daily) to shrink the staleness gap as the user base scales past the 50-handle/run ceiling
-2. **Badge route** — after rendering a badge SVG, a snapshot is captured via `after()`
-3. **Refresh endpoint** — when a manual refresh is triggered
-
-Each snapshot is deduplicated by date (one per user per day). If a user's badge is requested multiple times in one day, only the first snapshot is stored.
-
-### What's in a snapshot
-
-A `MetricsSnapshot` is a compact record (~300 bytes JSON) containing:
-- **Date and timestamp** — when it was captured
-- **13 key stats** — commits, PRs, reviews, issues, active days, repos, lines added/deleted, stars, forks, watchers, top repo share
-- **Explanatory stats** — max commits in a 10-minute window, micro-commit ratio, docs-only PR ratio
-- **Impact scores** — all 4 dimension scores, composite, adjusted composite, confidence
-- **Classification** — archetype, profile type, tier
-- **Confidence penalties** — active penalty flags and their values (omitted when empty)
-
-Snapshots deliberately exclude large or mutable data (heatmap grid, avatar URL, display name) to keep storage compact.
-
-### Querying history
-
-The history API endpoint exposes snapshot data:
-
-```
-GET /api/history/:handle?from=YYYY-MM-DD&to=YYYY-MM-DD&window=7&include=snapshots,trend,diff
-```
-
-- **Public** — no auth required (data is derived from public GitHub activity)
-- **Rate-limited** — 100 requests per IP per 60 seconds
-- **Cached** — 1 hour `s-maxage` with 24 hour `stale-while-revalidate`
-- **`include`** controls what's returned: `snapshots` (the raw data), `trend` (direction analysis), `diff` (comparison of two most recent snapshots)
-
-### Trend analysis
-
-The `computeTrend()` function analyzes recent snapshots to determine direction:
-- **Improving** — average delta per snapshot > +1.0 for adjusted composite
-- **Declining** — average delta per snapshot < -1.0
-- **Stable** — within ±1.0
-
-Trend analysis includes per-dimension direction and value arrays for future sparkline rendering.
-
-### Snapshot diffs
-
-The `compareSnapshots()` function produces structured deltas between two snapshots:
-- Numeric deltas for all stats and dimension scores
-- Categorical change detection for archetype, tier, and profile type
-- Added/removed confidence penalties
-- Human-readable explanations via `explainDiff()`
-
----
+Comparisons expose both contexts. Different machine policies or annual windows
+are not comparable as performance changes. Craft differences additionally
+require compatible report periods. Same-window current revision notifications
+use recorded point values; they do not feed current scores through legacy EMA
+campaign wording. Notification verification uses fixtures, never live sends.
 
 ## Privacy Guarantees
 
-1. **We never access your code.** We query contribution metadata (counts, dates, sizes) only.
-2. **We never expose your tokens.** GitHub OAuth tokens are stored server-side in our database (never in cookies or client-accessible storage). CLI tokens are not stored at all.
-3. **Your EMU token stays on your machine.** The CLI tool uses it locally and uploads only the extracted statistics.
-4. **Private repo names are never exposed.** We track "repos contributed to" as a count, not a list.
-5. **Caches are bounded.** Primary stats and badge responses use a 6-hour cache, last-known-good stats are retained for 7 days, and supplemental data expires after 24 hours. Lifetime metric snapshots are stored permanently, but contain only aggregate scores, stats, and dates — no private repo names, code, or tokens.
-6. **Confidence is fair, not punitive.** Confidence adjustments affect the final score gently (max 7.5% reduction) and are never accusatory. Confidence values are visible to admins for diagnostics but are not shown on developer-facing pages.
+Public current receipts contain numeric aggregates, safe enums, coverage and
+opaque issuance identities. Private repository names/paths, tokens, raw report
+HTML, unknown report labels and raw-body digests are excluded. Evidence access
+is limited to connected, authorized sources and declared consent; public
+arithmetic replay does not independently establish private-source truth.
+Tokens stay on the authorized server/CLI path, never in public score payloads.
 
----
+Image caches use selected-policy namespaces and at most300 seconds response
+freshness, without stale-while-revalidate or stale-if-error. Flag authority lasts
+at most5 seconds. This gives the documented online≤305-second rollback bound;
+it cannot revoke independently downloaded artifacts or control proxies that
+ignore headers. Details: [transition runbook](runbooks/scoring-v7-transition.md).
 
 ## FAQ
 
-**Q: Can I inflate my score by uploading fake EMU stats?**
-A: The same caps and logarithmic normalization apply. Even if you claimed 10,000 commits, the cap of 600 means anything over 600 has zero effect. And the -5 confidence penalty is applied automatically, signaling that part of the data is unverified.
+**Does using no AI tool lower my core?** No. Craft is optional and has zero core
+weight. No report yields four core axes; a scored report adds a separate fifth.
 
-**Q: Why does supplemental data reduce my confidence?**
-A: Because Chapa's server cannot independently verify EMU data (the enterprise API is walled off). The -5 penalty is minimal and the messaging is clear: "Includes activity from a linked account that cannot be independently verified." This is transparency, not punishment.
+**Can a failed-outcome report score zero?** Yes. Recognized failed outcomes
+produce a legitimate measured0. Unknown-only outcomes are insufficient data,
+not proof of failure.
 
-**Q: Does my employer see my Chapa badge?**
-A: No. Signed-in refreshes use your personal OAuth token, while anonymous and scheduled refreshes use Chapa's server token. Your EMU token is used only locally on your machine by the CLI. Your employer's GitHub Enterprise instance is never contacted by Chapa's servers.
+**Does missing source evidence mean poor work?** No. Only known qualifying
+observations receive credit, and coverage limits explain what was available.
 
-**Q: What happens if I don't re-upload supplemental data?**
-A: The supplemental data expires after 24 hours. Your badge will revert to showing only your personal GitHub stats. To maintain combined stats, run the CLI daily (or set up a cron job).
+**Can arbitrary uploaded activity prove a score?** No. Supplemental statistics
+and raw tool usage do not automatically become accepted evidence. Current
+receipts expose the accepted aggregate inputs; replay verifies arithmetic over
+those inputs, not the underlying evidence's truth.
 
-**Q: Why log normalization instead of linear?**
-A: Linear scoring rewards volume -- 200 commits would score 2x higher than 100. Logarithmic normalization means the first 50 commits contribute more marginal value than the next 50. This makes gaming impractical: you can't just "commit more" to get a better score. You need genuine breadth across PRs, reviews, issues, and multiple repos.
+**Why logarithmic normalization?** It reduces marginal credit toward explicit
+caps. Those choices limit some incentives but do not prove immunity to gaming
+or empirical fairness. The unperformed historical pilot is not a passing test.
 
-**Q: What prevents someone from gaming the score?**
-A: Multiple layers. (1) **Log normalization** makes volume-based gaming impractical. (2) **PR size multiplier** means empty/trivial PRs contribute zero weight. (3) **Repo depth threshold** requires 3+ commits per repo to count toward Breadth. (4) **Confidence penalties** detect patterns like review spam, burst commits, and thin activity profiles. (5) **Caps** on every metric mean there's a ceiling — you can't just do more of one thing to inflate your score.
+**What does verification establish?** Issuance authentication and arithmetic
+reproduction are separate statuses. A valid issued receipt is not a certificate
+of source accuracy or personal ability. Historical links retain their policy.
 
-**Q: What are the four dimensions?**
-A: Delivery (shipping code), Quality (engineering discipline — code reviews on teams, PR hygiene when solo), Consistency (sustained activity over time), and Breadth (cross-project influence). An optional fifth dimension, **Craft**, measures AI tool mastery when insights data is available. Each is scored 0-100 independently. Your archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, or Emerging) is derived from which dimension is strongest.
+**When do Studio edits publish?** Edits preview locally until Save. A successful
+Save updates the public badge/share/social preview and reports refresh failures
+separately. Demo changes remain local and do not publish.

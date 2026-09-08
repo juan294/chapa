@@ -4,15 +4,13 @@ import { describe, expect, it } from "vitest";
 import { BEGIN, DOC_PATH, END, workedFiguresTable } from "./generate-impact-v7-doc";
 
 /**
- * The published methodology has to agree with the scorer, so its figures are
- * generated rather than transcribed. This test is what makes that checkable: it
- * fails when the committed table and a fresh generation disagree, which is the
- * only way a stale example gets noticed before a reader finds it.
+ * Archived v7/v7.1 figures remain bound to their unchanged historical scorer.
+ * Current v7.2 methodology is documented separately from that generated block.
  */
 const repoRoot = resolve(__dirname, "../..");
 const doc = readFileSync(join(repoRoot, DOC_PATH), "utf8");
 
-describe("published v7 methodology figures", () => {
+describe("archived v7 methodology figures and current policy scope", () => {
   it("matches a fresh generation from the scorer", () => {
     const start = doc.indexOf(BEGIN);
     const finish = doc.indexOf(END);
@@ -27,11 +25,12 @@ describe("published v7 methodology figures", () => {
 
   it("states the limits the numbers do not carry", () => {
     for (const claim of [
-      "does not certify ability",
-      "evidence-completion range",
-      "not a statistical confidence interval",
-      "never means all work a person has done",
-      "never enters it",
+      "does not certify developer ability",
+      "recorded evidence in a declared source scope",
+      "not percentiles or externally validated mastery thresholds",
+      "Missing or inaccessible evidence does not receive estimated credit",
+      "Craft, confidence, recency and solo/collaborative switches never enter this average",
+      "local conformance tests do not constitute that pilot",
     ]) {
       expect(flowed).toContain(claim);
     }
@@ -39,6 +38,8 @@ describe("published v7 methodology figures", () => {
 
   it("keeps v6 documented separately rather than rewriting it", () => {
     expect(flowed).toContain("impact-v6.md");
-    expect(flowed).toContain("non-replayable legacy status");
+    expect(flowed).toContain("rollout-off policy and an explicitly labelled fallback");
+    expect(flowed).toContain("original immutable receipts, range arithmetic and replay");
+    expect(flowed).toContain("archived range policy, not current v7.2");
   });
 });

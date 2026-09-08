@@ -12,12 +12,17 @@ and it never tags or gates a release by itself.
 It complements, and does not replace:
 
 - **`/pre-launch` + `/remediate`** — static, code-as-written audit. Charters
-  exercise the *deployed candidate's behavior* instead.
+  exercise the fixed candidate's behavior on an explicitly authorized target.
 - **`/release`** — the tagging authority. Charters produce one report the
   release operator may read; they never feed an analyzer and never tag.
 
 Read `docs/release/release-playbook.md` completely for release ordering and
 authorization. This command is a verification tool, not a release procedure.
+
+Local charters use a production-mode loopback candidate with its exact commit,
+full tree and allowlisted build manifest. Production charters require explicit
+production-read authorization. Never create a Vercel Preview or dispatch a
+hosted build for exploration, and never label local evidence as deployed proof.
 
 ## Input
 

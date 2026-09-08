@@ -1,3 +1,4 @@
+import { localCandidateTarget } from "./e2e/helpers/local-candidate";
 import { defineConfig, devices } from "@playwright/test";
 import { vercelBypassStorageStatePath } from "./e2e/helpers/vercel-protection";
 
@@ -7,9 +8,10 @@ const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME?.trim();
 const releaseEnvironment = process.env.EXPECTED_DEPLOYMENT_ENV?.trim();
 const vercelAutomationBypassSecret =
   process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+const isLocalCandidate = localCandidateTarget(releaseEnvironment, process.env.RELEASE_VERIFICATION_MODE?.trim(), baseURL, vercelAutomationBypassSecret);
 const testIgnore = [
   "**/*.test.ts",
-  ...(["preview", "production"].includes(releaseEnvironment ?? "")
+  ...(isLocalCandidate || ["preview", "production"].includes(releaseEnvironment ?? "")
     ? []
     : ["**/release-required.spec.ts"]),
 ];
@@ -57,9 +59,9 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: process.env.CI ? "npx next start --port 3001" : "pnpm run dev",
+          command: isLocalCandidate || process.env.CI ? "npx next start --port 3001" : "pnpm run dev",
           port: 3001,
-          reuseExistingServer: !process.env.CI,
+          reuseExistingServer: !isLocalCandidate && !process.env.CI,
           cwd: __dirname,
         },
       }),

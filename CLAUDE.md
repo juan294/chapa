@@ -1,76 +1,45 @@
 # Chapa — Dev Impact Badge
 
 ## One-liner
-Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v6 Profile** (4–5 dimensions + archetype + confidence) from GitHub activity and optional AI tool insights, with a Creator Studio for badge preview customization, a share page, and one-click sharing.
+Chapa generates a **live, embeddable, animated SVG badge** showing the selected policy's recorded evidence (four core dimensions and optional report-derived Craft), with a Creator Studio for badge preview customization, a share page, and one-click sharing.
+
+This branch implements v7.2; production stays on v6 until a separately authorized
+release and scoring flag change. Local implementation/proof does not authorize
+either production action.
+
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
-2. Compute the **Impact v7 profile** from the last 365 calendar dates
-   (`docs/impact-v7.md`; policy authority is
-   `docs/plans/2026-09-05-scoring-relaunch-phases/policy.md`):
-   - four core dimensions at a fixed 0.25 each — Delivery, Quality practices,
-     Consistency, Breadth — with `N(x,c) = ln(1+min(x,c))/ln(1+c)`
-   - a **separate optional Craft practice portfolio** that is reported beside
-     the core and never enters it; tool name, tokens, lines, files, message and
-     session counts earn zero credit anywhere
-   - incomplete coverage publishes an **evidence-completion range**, not a
-     lower score and not a statistical confidence interval; a range spanning a
-     tier boundary gets no tier, and a non-point dimension set gets no archetype
-   - each revision issues an immutable public receipt that replays offline
-   - **one materializer** (`lib/profile/score-receipt-v7.ts`), **one projection**
-     every consumer renders (`lib/profile/score-view-model.ts`), **one what-if
-     calculator** (`lib/impact/simulate.ts`), and a checked registry of every
-     scored consumer (`docs/scoring-consumer-inventory.md`, enforced by
-     `scoring-consumer-inventory.test.ts` in both directions)
-
-   Legacy **Impact v6** (below) keeps its own semantics and its non-replayable
-   status for existing records; v6 numbers are never explained as v7 arithmetic.
-   Compute **Impact v6 Profile** from last 12 months (365 days):
-   - 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional 5th (Craft), each 0–100
-   - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
-     - Note: "Quality Champion" is the display name; internal code/routes use "guardian" (e.g., `/archetypes/guardian`, `--color-archetype-guardian`)
-   - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
+2. Compute the current **Impact v7.2 observed point profile** over 365 UTC dates.
+   Authority: `docs/plans/2026-09-08-v7-single-score-consistency-phases/policy.md`;
+   explanation: `docs/impact-v7.md`. Four core dimensions have fixed 0.25 weights.
+   Known qualifying counts earn credit; coverage bounds remain metadata, never
+   a displayed current range or confidence deduction. Canonical display never
+   crosses the exact core's 30/70/85 tier boundary (69.997… →69.99/Solid).
+   Craft is separate report outcome credit, zero-weight in the core. A valid
+   scored report unlocks the fifth axis including 0; expiry retains a labelled
+   unavailable spoke with update guidance, not a fake numeric vertex.
+   `lib/profile/score-receipt-observed.ts` publishes strict registered receipts;
+   `lib/profile/score-view-model.ts` projects all scored consumers. APIs, tools,
+   history, emails, dashboard and badge agree on policy/identity/exact/display.
+   The inventory tests prove semantics, not membership alone.
+   Archived machine v7/algorithm v7.1 engines/receipts remain immutable. Legacy v6
+   keeps its own confidence/aggregate semantics when selected or explicitly
+   falling back without a current receipt. Failed authority reads are unavailable.
 
 3. Serve **Creator Studio**: `/studio` (badge customization with 7 visual categories, every one of which renders in the embedded badge).
 4. Serve **embeddable SVG badge**: `/u/:handle/badge.svg`
 5. Serve **share page**: `/u/:handle`
 6. Badge **verification** via HMAC-SHA256 hash (proves badge data hasn't been tampered with).
-7. Caching + rate limit friendliness (daily cache is fine).
+7. Policy-qualified caching and rate limits; image response freshness≤300 seconds.
 8. Minimal analytics (PostHog) for key events.
-9. Show a **landing leaderboard**: the three highest *current* scores, in the
-   strip between navbar and hero, each linking to that public badge.
-   **The number on the board is the number on the badge.** That is not free,
-   because a snapshot deliberately stores the EMA-smoothed composite while the
-   badge draws the fresh `adjustedComposite` (#1001) — a board built straight
-   off snapshots publishes a number the visitor cannot find on the profile it
-   links to. So `getLeaderboard` (`lib/profile/leaderboard.ts`) does it in two
-   steps: `dbGetTopScoredProfiles` picks a candidate pool with one indexed
-   query (each handle's most recent snapshot inside 30 days, so an unscored
-   handle drops out), then each candidate is materialized to read the same
-   live headline `renderBadgeSvg` prints, and the pool is ranked on *those*
-   numbers. A handle that cannot be materialized keeps its stored score rather
-   than vanishing. Candidates come from `metrics_snapshots`, never `users`: a
-   snapshot means a public badge already exists at `/u/:handle`, whereas the
-   signup table records who signed in, which is not ours to publish. That also
-   means a handle nobody registered (a README embed of a stranger's badge) can
-   rank. The landing page is `force-static` with `revalidate = 3600`, so this
-   runs hourly at revalidate, never per request.
-
-   The badge's number is recorded, not recomputed: `metrics_snapshots.headline_score`
-   (migration 047) holds the fresh adjusted composite each capture displayed,
-   beside the smoothed `adjusted_composite` the trend line needs. **A row
-   without a headline is not ranked at all** — the smoothed composite is a
-   different number, and publishing it would contradict the badge the row links
-   to, so the handle waits for its next capture instead of appearing with the
-   wrong score. That means the board is empty until snapshots written after 047
-   exist; `pnpm run recalculate-handles <handle> --apply` fills one in. Any
-   future surface that shows a stored score should read the headline for the
-   same reason. A headline is only the badge's number while no v7 receipt is
-   drawable, so the rule "a v7 evidence range takes no place, and a v7 point
-   ranks on the number the receipt draws" now holds on both paths: each stored
-   candidate is checked against `readRenderableReceipt` (which returns before
-   any query while `scoring_v7_rendering` is off), not only the live-fill
-   candidates (LE-6-4).
+9. Show the top three distinct canonical displayed scores on the landing page.
+   Current v7.2 considers every registered subject with a drawable current
+   receipt, skips unavailable/legacy-only subjects and groups equal scores
+   into one place with alphabetical handles. It never inherits a legacy
+   candidate cutoff or substitutes a smoothed legacy score. The legacy branch
+   retains its separate stored-headline fallback. Landing rendering is dynamic;
+   one captured selection feeds demo and standings, which visibly declare v7.2.
 
 ## Non-goals (current scope)
 - No long-term history charts (lifetime metric snapshots are stored but no UI yet)
@@ -131,7 +100,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
 - GET `/api/health` Health check (Redis dbsize + Supabase query + GitHub API probe + cron heartbeat staleness for warm-cache/sync-audience/process-campaigns/latency-check, rate-limited; returns "skipped" for unconfigured services; #1047 — asserts the server `GITHUB_TOKEN` still carries `repo` scope and returns a distinct `insufficient_scope` status if not, since that token silently losing `repo` would blind every badge to private-repo merges with no other signal)
 - GET `/api/version` Read-only deployment identity (`commitSha` + Vercel
-  environment, no-store); E2E Pro uses it to bind preview and production
+  environment, no-store); local-candidate probes bind the real build separately; E2E Pro binds production
   evidence to the fixed release candidate
 - GET `/api/feature-flags` Public feature flag values
 - GET `/api/insights/:handle` AI tool insights for a user (public, no auth; rate-limited; returns only computed scores, no raw data)
@@ -246,14 +215,19 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
   provider idempotency keys depend on (#1085).
 - **Feature flags**: Async DB-backed flag reads live in `apps/web/lib/feature-flags.ts` (server-only). Synchronous client-safe helpers (`isStudioEnabledSync`, etc.) live in `apps/web/lib/feature-flags-sync.ts` — use the sync module in client components and middleware; use the async module in server actions and API routes. An **absent** flag row is a normal, load-bearing state, not an error: `dbGetFeatureFlag` returns `null` and `checkFlag` falls back to the env var, so the DB read guards `if (!data) return null;` before `parseRow` rather than letting a missing row log a schema-mismatch warning (#1209). Every flag key the app reads now has a seeded row — migration `037` added `insights_integration`, completing `026`'s sweep (#857), which had covered bitbucket/codeberg/gitlab and missed it (#1210).
 - **Rate-limit fail-open (with fail-closed exceptions)**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) allows all requests when Redis is unavailable (fail-open) on public reads — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement, and GitHub's own API limits + CDN caching provide secondary protection. Auth-critical and write routes use `rateLimitStrict` (fail-closed) instead: `/api/auth/session`, `/api/refresh`, and — since #1027 — all platform OAuth connect/callback/disconnect routes (Bitbucket/Codeberg/GitLab), which also share GitHub's single-use replay-consume nonce via a per-platform `chapa_<provider>_oauth_state_store` cookie. See `redis.ts` for the full fail-open rationale.
-- Response headers for badge endpoint (v2.29.2 — split client vs. edge policy, plus a per-handle purge tag):
-  - `Cache-Control: public, max-age=300` — browsers, GitHub's camo proxy
-  - `Vercel-CDN-Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` — Vercel's edge (unchanged 6h policy)
-  - `Vercel-Cache-Tag: badge-<handle lowercased>` — what `invalidateBadgeSvgCacheForHandle` purges
-  - `Cache-Control` is what browsers and GitHub's image proxy see (Vercel strips `s-maxage` from it); the edge policy lives in `Vercel-CDN-Cache-Control`; the tag is what a badge invalidation purges.
+- Badge and OG response freshness is at most300 seconds, capped by elapsed
+  captured-selection age and, for v7.2, UTC day end. No stale-while-revalidate or
+  stale-if-error. Failed flag/receipt authority is labelled unavailable/no-store.
+  Dedicated flag authority bypasses generic maps/Next caches and expires≤5 seconds.
+  Image keys/locks/URLversions include `v6` or `v7.2`; exact receipt manifests
+  and forced before/after-write checks fence raced publication/config/policy changes.
+  Per-handle badge/OG tags and global `scoring-images` support purge; failed
+  purge is reported separately from persisted flag/configuration success.
+  Flag-only rollback converges within≤305 seconds under documented online cache
+  assumptions. See `docs/runbooks/scoring-v7-transition.md`.
 - **OG images: fonts go to resvg as FILES, never as buffers, and the deployed function proves it can draw (#1275)**: resvg drops every `<text>` node it has no font for and logs nothing, so from v2.11.0 to v2.29.4 every social card shipped with no name, score or labels. Two defects stacked: Turbopack collapsed a template-literal `new URL(\`./fonts/${f}\`, import.meta.url)` into ONE asset (2026-04-27 release), and the resvg-js 2.6.2 linux-x64 binary ignores `fontBuffers` (measured in the function: 0 glyph pixels vs 1118 with `fontFiles`; the darwin binary honours it, which is why local renders and mocked tests passed). `lib/render/font-files.ts` resolves the four TTFs with one static `new URL("<literal>", import.meta.url)` per file plus two `process.cwd()`-anchored candidates, prefers the verbatim source copies, and validates each candidate by size and sfnt header. `svgToPng` passes paths, captures a missing font once via `captureServerError`, and runs resvg at `logLevel: "warn"`. `/api/health` reports `fonts` and `rasterizer`: the latter renders a two-word sample inside the function and counts glyph pixels, with a P2 `og_rasterizer_unhealthy` alert (status unaffected). `svg-to-png.raster.test.ts` rasterizes for real. A unit suite that mocks resvg, and a local render on macOS, cannot catch this class of bug. See `docs/decisions/2026-09-03-og-fonts-as-files.md`.
 - The OG image endpoint uses the same split cache policy with its own `Vercel-Cache-Tag: og-<handle lowercased>`. `invalidateBadgeSvgCacheForHandle` clears both locale-specific Redis image keys and both per-handle edge tags, so Studio and profile writes cannot leave social previews stale (#1266).
-- **Badge latency SLO (#974)**: the badge route (`/u/:handle/badge.svg`) has a defined p95 latency budget — **800ms cache-hit**, **4100ms cache-miss** — enforced in `apps/web/lib/monitoring/latency-slo.ts`. Every badge response carries a `Server-Timing` header (`cache;desc="hit"` on warm hits, `cache;desc="cache-timeout"` when a Redis read exceeds its deadline (#1014), `materialize` + `render` breakdown on cold misses; always a `total`) so per-request latency is inspectable. The `/api/cron/latency-check` daily synthetic monitor times the live endpoint, writes its own heartbeat (monitored by `/api/health`, #1018), and raises a P2 `badge_latency_slo_breach` operational alert via `CHAPA_ALERT_WEBHOOK_URL` when the budget is exceeded (or the probe fails). Against this budget: the SVG cache-read deadline is 500ms (#1014, was 250ms — too tight, misclassified genuine hits as misses under Redis tail latency), the render-lock loser's poll budget is ~950ms (#1029, was ~2000ms), the avatar fetch is capped at 1000ms and skips the shared cache write on timeout (#1029/PE-L1), and the durable snapshot persist runs in `after()` rather than blocking the response (#1013). **Materialize deadline + background continuation (#1086)**: on a cold miss where a stale (yesterday's) SVG already exists, the foreground request races the materialize call against a 2200ms `BADGE_MATERIALIZE_DEADLINE_MS` deadline — on timeout it serves the stale SVG with a short-TTL `s-maxage=60` header instead of blocking further, while the original materialize call keeps running via `warmBadgeCacheInBackground` so the next request is warm. `finalizeMaterializedBadge`/`runBadgeSideEffects` are shared between the foreground and background paths so side effects (snapshot persist, cache writes) run exactly once either way. Avatar cache writes now track four outcomes instead of one boolean — success, real-fetch-failed, **permanently absent** (no `avatarUrl` at all, cached for a short `AVATAR_ABSENT_CACHE_TTL_SECONDS` window), and race-timeout (never cached) — so a handle with no avatar (e.g. a README embed) still gets cache population instead of forcing a full materialize+render on every request (#1080/#1088).
+- **Badge latency SLO (#974)**: the badge route (`/u/:handle/badge.svg`) has a defined p95 latency budget — **800ms cache-hit**, **4100ms cache-miss** — enforced in `apps/web/lib/monitoring/latency-slo.ts`. Every badge response carries a `Server-Timing` header (`cache;desc="hit"` on warm hits, `cache;desc="cache-timeout"` when a Redis read exceeds its deadline (#1014), `materialize` + `render` breakdown on cold misses; always a `total`) so per-request latency is inspectable. The `/api/cron/latency-check` daily synthetic monitor times the live endpoint, writes its own heartbeat (monitored by `/api/health`, #1018), and raises a P2 `badge_latency_slo_breach` operational alert via `CHAPA_ALERT_WEBHOOK_URL` when the budget is exceeded (or the probe fails). Against this budget: the SVG cache-read deadline is 500ms (#1014, was 250ms — too tight, misclassified genuine hits as misses under Redis tail latency), the render-lock loser's poll budget is ~950ms (#1029, was ~2000ms), the avatar fetch is capped at 1000ms and skips the shared cache write on timeout (#1029/PE-L1), and the durable snapshot persist runs in `after()` rather than blocking the response (#1013). **Materialize deadline + background continuation (#1086)**: on a legacy-v6 cold miss where a stale (yesterday's) SVG already exists, the foreground request races the materialize call against a 2200ms `BADGE_MATERIALIZE_DEADLINE_MS` deadline — on timeout it serves the stale SVG with a short-TTL `s-maxage=60` header instead of blocking further, while the original materialize call keeps running via `warmBadgeCacheInBackground` so the next request is warm. `finalizeMaterializedBadge`/`runBadgeSideEffects` are shared between the foreground and background paths so side effects (snapshot persist, cache writes) run exactly once either way. Avatar cache writes now track four outcomes instead of one boolean — success, real-fetch-failed, **permanently absent** (no `avatarUrl` at all, cached for a short `AVATAR_ABSENT_CACHE_TTL_SECONDS` window), and race-timeout (never cached) — so a handle with no avatar (e.g. a README embed) still gets cache population instead of forcing a full materialize+render on every request (#1080/#1088).
 
 ## Code ownership areas
 - OAuth: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
@@ -300,20 +274,20 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).
 - `/u/:handle/badge.svg` loads publicly without auth (use cached public stats where possible).
-- Badge shows: heatmap, radar chart (4 or 5 dimensions — pentagon when Craft is present, diamond fallback), archetype label, stars/forks/watchers, Impact tier, adjusted score.
-- `/u/:handle` shows badge + breakdown + embed snippet. Confidence (% + penalty flags) is shown only to the profile owner in the "How is my score calculated" panel; it is hidden from visitors and excluded from public metadata (JSON-LD). Enforced server-side, not just UI-hidden (#1067/#1122): `redactImpactForVisitor()` (`apps/web/lib/profile/public-profile.ts`) strips `confidence`/`confidencePenalties` before the impact object ever crosses into the `"use client"` tree, so a visitor's RSC payload never contains confidence data.
+- Badge shows: heatmap, radar chart (4 or 5 dimensions — pentagon when Craft is present, diamond fallback), archetype label, stars/forks/watchers, Impact tier and canonical selected-policy score.
+- `/u/:handle` shows badge + breakdown + embed snippet. Legacy-v6 confidence (% + penalty flags) is shown only to the profile owner in the "How is my score calculated" panel; it is hidden from visitors and excluded from public metadata (JSON-LD). Enforced server-side, not just UI-hidden (#1067/#1122): `redactImpactForVisitor()` (`apps/web/lib/profile/public-profile.ts`) strips `confidence`/`confidencePenalties` before the impact object ever crosses into the `"use client"` tree, so a visitor's RSC payload never contains confidence data.
 - Caching prevents repeated GitHub API calls for same handle within 24h.
-- Confidence messaging is non-accusatory (never claims wrongdoing).
+- Legacy confidence messaging is non-accusatory; current v7.2 explains recorded evidence/coverage without confidence deductions.
 - Repo contains `docs/impact-v7.md` (current spec truth), `docs/impact-v6.md`, `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
 - Creator Studio at `/studio` allows badge customization (7 visual categories). Saving a config changes the embedded SVG badge and invalidates its cache. The three categories that could never reach an SVG — a hover tilt, a counting animation, a confetti burst on load — were removed in #1191 rather than shown as preview-only decoration.
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
 - Lifetime metric snapshots are recorded automatically (cron, badge route, refresh).
-- Solo profile detection uses review-to-PR ratio threshold (0.15), not binary reviews === 0.
-- Consistency dimension uses week coverage (active weeks / total weeks) instead of inverse burst.
-- Quality dimension uses batch size score (fraction of PRs in 20-500 line sweet spot) instead of inverse micro-commit ratio.
-- Quality dimension never punishes participation in code review: collaborative `computeQuality` returns `max(collaborativeFormula, soloFormula)` so users with strong solo signals don't drop sharply when crossing the 0.15 review-to-PR threshold (the cliff guard, #827).
-- Delivery dimension applies a ±5% lead time modifier based on median PR open-to-merge duration.
+- Legacy v6 only: solo profile detection uses review-to-PR ratio threshold (0.15), not binary reviews === 0.
+- Legacy v6 only: Consistency uses week coverage (active weeks / total weeks) instead of inverse burst.
+- Legacy v6 only: Quality uses batch size score (fraction of PRs in 20-500 line sweet spot) instead of inverse micro-commit ratio.
+- Legacy v6 only: Quality never punishes participation in code review: collaborative `computeQuality` returns `max(collaborativeFormula, soloFormula)` so users with strong solo signals don't drop sharply when crossing the 0.15 review-to-PR threshold (the cliff guard, #827).
+- Legacy v6 only: Delivery applies a ±5% lead time modifier based on median PR open-to-merge duration.
 
 ## Engineering rules
 - Prefer pure functions for scoring & rendering.
@@ -409,7 +383,7 @@ Go directly to these paths -- never search for them.
 
 **`develop` is the default branch. `main` is production only.**
 
-1. All development happens on `develop`
+1. Implement in isolated local branches/worktrees, then merge completed work locally into `develop`
 2. Never commit directly to `main` — it represents what's deployed
 3. Release to production via a `develop` → `main` **merge-commit** PR, following
    `docs/release/release-playbook.md`; PR, merge, and tag approvals are separate.
@@ -422,10 +396,10 @@ Go directly to these paths -- never search for them.
    protected `develop`). A merge commit records the released `develop` commit
    as a parent, advances the shared merge-base, and needs no reconciliation;
    `git log --first-parent main` still reads one line per release. See #1228.
-   Feature PRs into `develop` may still squash.
+   Feature branches stay local; merge completed work locally into `develop`.
 4. Always run checks before committing (pre-commit hooks enforce this)
-5. Always `git pull --rebase` before pushing
-6. Run verification sequentially with `;` or `&&`, never as parallel Bash calls
+5. Before any authorized push inspect remote triggers read-only and prove Preview creation is prevented. An Ignored Build Step that merely skips a created deployment is insufficient; if no documented prevention exists, stop before push. Push only the completed integration branch once.
+6. Run verification sequentially, preserving every command exit status. No remote CI or hosted build debugging loop.
 
 ### Commit Messages
 
@@ -451,7 +425,7 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 
 ## Testing & CI
 - This project uses TDD. Always write tests before or alongside implementation.
-- All PRs must have CI green before merging. Run the full test suite locally before pushing.
+- Finish all applicable CI gates locally (unit, contracts, coverage, types, lint, build and preflight) before any push. Remote checks are admission corroboration after explicit authorization, never experiments.
 - After merging to `develop`, production release work follows
   `docs/release/release-playbook.md`. Do not infer release PR or merge
   authorization from feature completion or green CI.
@@ -483,10 +457,11 @@ Local dev runs `develop`, whose migrations production has not seen, so a local
 stack must never point at the production project: `/api/generate` 502s on the
 missing v7 tables, and any local render would write `svg:`/`stats:` keys into
 the Redis instance production reads. Run the local stack instead
-(`supabase start`, `supabase db reset`) plus an Upstash-compatible Redis, and
-give it production's rows with `pnpm run clone-prod-db <prod-env-file>`
-(`scripts/clone-prod-db.ts`). That copy is destructive locally and refuses any
-non-local target. `.env.local` belongs at `apps/web/.env.local`, not the repo
+(`supabase start`) plus an Upstash-compatible Redis, using synthetic local
+fixtures and run-scoped cleanup. Reset only the disposable local database when
+needed; never point qualification at production secrets. The separate
+`clone-prod-db` maintenance command is not a qualification prerequisite and
+requires explicit data-access authorization before copying real user rows. `.env.local` belongs at `apps/web/.env.local`, not the repo
 root — `next dev` runs from `apps/web` and silently ignores a root-level file.
 
 ## Key Commands
@@ -501,12 +476,12 @@ pnpm run lint           # Check linting
 pnpm run test:watch          # Watch mode
 pnpm run test:coverage       # Coverage report
 pnpm run test:contract:local # Contract suite against local Supabase (run `supabase start` first)
-pnpm run test:e2e -- --grep @release-required # Required deployed selectors
+pnpm run test:e2e -- --grep @release-required # Use explicit local-candidate mode for local build proof
 
 # Release direct-proof commands
 pnpm run release:validate-docs   # Validate the release documentation contract
 pnpm run release:verify-identity # Verify a candidate's deployed identity
-pnpm run release:write-result -- --stage preview --input "$inputPath" --output "quality/evidence/runs/$runId/release-result.json"
+pnpm run release:write-result -- --stage local-candidate --input "$inputPath" --output "quality/evidence/runs/$runId/local-candidate.json"
 
 # Development
 pnpm run dev            # Local dev server (port 3001)

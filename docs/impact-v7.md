@@ -1,144 +1,121 @@
-# Impact v7 — observed engineering activity and practices
+# Impact v7.2 — observed engineering activity and practices
 
-Status: implemented, pending the empirical pilot in
-`docs/plans/2026-09-05-scoring-relaunch-phases/phase-14.md`. The policy this
-document describes is frozen in
-`docs/plans/2026-09-05-scoring-relaunch-phases/policy.md`, which is the
-authority whenever the two disagree.
+The current machine policy is `v7.2`, governed by the frozen
+[September8 policy](plans/2026-09-08-v7-single-score-consistency-phases/policy.md)
+and its [decision record](decisions/2026-09-08-scoring-v7-observed-point-policy.md).
+The earlier machine `v7` / algorithm `v7.1` retains its original immutable
+receipts, range arithmetic and replay. [Legacy v6](impact-v6.md) remains the
+rollout-off policy and an explicitly labelled fallback when no current receipt
+exists. An unavailable authoritative read is not genuine absence.
 
-v6 remains documented in [`impact-v6.md`](impact-v6.md). Its records keep their
-own semantics and their non-replayable legacy status; nothing here rewrites a
-v6 score or presents v6 arithmetic as v7.
+This index describes recorded evidence in a declared source scope. It does not
+certify developer ability, causal impact, architecture, reliability or security.
+Constants are product choices, not percentiles or externally validated mastery
+thresholds. The historical empirical pilot remains unperformed under the
+existing owner decision; local conformance tests do not constitute that pilot.
 
-## What the number is, and what it is not
+## One context and four core dimensions
 
-Chapa reports an **observed engineering activity and practices index** across
-four dimensions, plus a separate optional Craft practice portfolio and
-attributable outcome evidence.
+Capture one reference time. The window includes its UTC date and the preceding
+364 UTC dates, from midnight(referenceDate − 364) to midnight(referenceDate + 1),
+end exclusive. Evidence later than referenceTime is rejected even on the same
+date. This is 365 calendar dates including a partial current day, not 8760 hours.
 
-It does not certify ability, causal business impact, scalable architecture,
-reliability or security. Every constant below — each cap, each tier boundary —
-is a published product choice. No percentile interpretation, calibrated
-confidence percentage or externally validated mastery threshold is claimed.
+Let `N(x,c) = ln(1 + min(x,c)) / ln(1+c)` for the known qualifying count `x`.
 
-"Complete" means complete **for the declared scope**: the connected, consented
-sources, the repositories that were accessible, the discovery strategy used and
-the registered evidence ledger, over the reference window named in the receipt.
-It never means all work a person has done. Unobserved private work stays
-unknown; current source visibility cannot prove the absence of work.
+| Dimension | Exact formula |
+|---|---|
+| Delivery | `D = 100 × N(deliveryUnits,120)` |
+| Quality practices | `Q = 25 × Σ N(criterion,12)` over rationale, verification, review/correction and outcome follow-up |
+| Consistency | `C = 100 × N(activeIsoWeeks,40)` |
+| Breadth | `B = 50 × N(eligibleProjects,4) + 50 × N(eligibleCategories,4)` |
 
-## One clock
+For every coverage state, `core = (D + Q + C + B) / 4`. Each weight is 0.25.
+Craft, confidence, recency and solo/collaborative switches never enter this
+average. Never average rounded dimension displays to recompute the core.
 
-A reference time is captured once, at the orchestrator boundary
-(`apps/web/lib/profile/score-receipt-v7.ts`). The window is the reference UTC
-date and the preceding 364 UTC dates: `startInclusive = midnight(referenceDate
-− 364)`, `endExclusive = midnight(referenceDate + 1)`. Only events with
-`startInclusive <= occurredAt <= referenceTime` qualify, so a future same-day
-event is rejected.
+Delivery counts distinct canonical-project/UTC-day buckets containing
+attributable accepted work. Repeated same-day changes do not add buckets.
+Each Quality criterion counts once per qualifying work item; duplicate
+comments, approvals and reruns do not add credit. Consistency counts active ISO
+weeks, with no weekend, speed, burst or account-age adjustment. A project or
+category needs attributable work on three distinct dates for Breadth.
+Stars, forks, watchers, line magnitude and tool usage have zero scoring weight.
 
-These are 365 calendar dates including a partial current day — not a trailing
-8760-hour interval. Every API response, receipt, snapshot, verification record
-and trend key receives that same context.
+## Points, coverage and canonical display
 
-## The core
+Current points use known qualifying observations. Missing or inaccessible
+evidence does not receive estimated credit and is not a judgment of ability.
+Original bounds, source coverage and exclusions remain receipt metadata;
+they do not turn the current headline into a range or a confidence deduction.
 
-Let `N(x, c) = ln(1 + min(x, c)) / ln(1 + c)`, for bounded finite non-negative
-counts. Arithmetic runs in full precision; only displayed points are rounded.
+Tier uses the unrounded core: Emerging below 30, Solid from 30 to below 70,
+High from 70 to below 85, Elite from 85 through 100. Ordinary display rounds to the
+nearest integer. If that would cross the exact core's tier boundary, use the
+registered canonical two-decimal display. For example, exact
+`69.99723619005769` displays `69.99`, Solid; it never becomes70/High.
+Keep exact and display fields separate and never round the display again.
 
-| Dimension | Formula | Cap |
-| --- | --- | --- |
-| Delivery | `D = 100 · N(deliveryUnits, 120)` | 120 |
-| Quality practices | `Q = 25 · Σ N(criterion, 12)` over four criteria | 12 each |
-| Consistency | `C = 100 · N(activeIsoWeeks, 40)` | 40 |
-| Breadth | `B = 50 · N(eligibleProjects, 4) + 50 · N(eligibleCategories, 4)` | 4 each |
+Archetype eligibility is unchanged: the pinned historical normalization of the
+original count bounds must yield point dimensions. Saturated bounds can agree;
+otherwise the archetype is null. Existing names remain, with no new report
+mastery labels or fabricated archetype-specific coaching.
 
-For complete evidence, `core = (D + Q + C + B) / 4`. The four weights are fixed
-at 0.25. No optional Craft, solo switch, confidence deduction or recency
-multiplier enters that formula.
+## Optional report-derived Craft
 
-**Delivery** counts distinct `(canonicalProjectId, UTC date)` buckets holding at
-least one attributable accepted change. Changed lines and files, the number of
-PRs within the same project and day, tool usage and merge latency all have zero
-effect on D. This bounds same-project, same-day splitting; it does not claim
-immunity to distributing work across dates or projects, and the validation
-report measures that remaining incentive rather than asserting it away.
+`Craft = 100 × (fully + 0.7 × mostly + 0.3 × partially) / totalSessions`.
 
-**Quality practices** counts demonstrated practices, not software correctness
-rates. Each of rationale, verification, review-or-correction and outcome
-follow-up can be satisfied once per work item. Duplicate comments, approval
-clicks, reruns and reuploads add nothing. Absence of inspectable evidence is
-*unknown*, not zero.
+The first valid scored Claude Code insights report unlocks the fifth visible
+axis/card. A positive total and at least one recognized outcome are needed.
+A recognized failed outcome contributes zero and is a legitimate scored result;
+a report of ten recognized failures yields Craft 0 and still unlocks the axis.
+Unknown labels and unclassified sessions remain in the denominator with zero
+credit, but are not described as proven failures. Classified coverage and the
+report period are shown separately.
 
-**Consistency** counts active ISO weeks in UTC. There is no weekend, burst or
-response-speed penalty, and no tenure normalization: identical evidence with
-only the account creation date changed scores identically.
+Example: total 10, fully 4, mostly 2, partially 1, failed 1, unknown 1, unclassified 1
+produces credited 5.7, Craft 57, with 8/10 classified. Craft never changes core 46
+into another core score. No report shows four axes; valid 57 and valid 0 show
+five. Expired/unavailable Craft preserves its unlocked labelled spoke and update
+guidance, without a numeric vertex or fake 0.
 
-**Breadth** requires attributable work on at least three distinct dates for a
-project or a category to be eligible. Stars, forks, watchers, inverse
-repository concentration, changed-line magnitude and nominal language counts
-carry zero weight.
+Selection uses the newest eligible effective report period, then deterministic
+capture/identity ties. It never pools reports or chooses the highest score.
+Same-period replacement requires explicit correction. Older or insufficient
+uploads cannot displace a still-valid scored report. Canonical aggregate
+inputs survive raw-body expiry for replay; raw report labels, hashes and HTML
+stay private. Report Craft does not assign Artificer or assess personal ability.
 
-## Incomplete evidence produces a range, not a lower score
+## Receipt and consumer agreement
 
-Where coverage is incomplete, each monotone count carries a lower bound from
-known qualifying observations and an upper bound from the completions the
-recorded coverage allows. Bounds are derived per component and pushed through
-the same monotone formula, so the published interval contains every admissible
-completion.
+Current strict parsing/sealing lives in `packages/shared/src/score-receipt-observed.ts`;
+registered replay dispatches exact policy/algorithm pairs. Unknown fields,
+unknown pairs, mismatched hashes or inconsistent arithmetic fail closed.
+Receipts contain public numeric aggregates, coverage, constants and trace, not
+private names, locators, tokens or raw report material. Arithmetic replay does
+not establish source truth or issuance authentication; verification reports
+those dimensions separately and preserves superseded/revoked/not-found states.
 
-This is an **evidence-completion range**, not a statistical confidence
-interval. It does not imply that a developer's true ability lies within it.
+The shared `ScoreViewModel` supplies badge, OG, share, Studio, API, tools,
+leaderboard, history and email. Canonical values and receipt revision/content
+hash must agree. Current simulations are explicitly hypothetical under the
+same fixed baseline/window; they publish nothing. Mixed policy or annual-window
+comparisons do not claim an improvement. Current history preserves durable
+policy-segmented EMA independently of displayed points.
 
-A range receives a tier only when its entire interval sits inside one tier;
-otherwise it receives none. For any non-point dimension, no definitive
-archetype is assigned — the UI says insufficient evidence rather than guessing.
+Current source modules: `lib/impact/observed-v7.ts`,
+`lib/insights/report-craft.ts`, `lib/profile/score-receipt-observed.ts`,
+`lib/profile/score-view-model.ts`. See [reproduction](scoring-reproduction.md),
+[consumer inventory](scoring-consumer-inventory.md),
+[flag rollback](runbooks/scoring-v7-transition.md) and
+[local release proof](release/release-playbook.md).
 
-Point tiers use the *unrounded* core against the familiar 30 / 70 / 85
-boundaries, so a core of 69.9 displays as 70 but remains Solid, and the UI
-shows enough precision to distinguish the boundary rather than rounding across
-it.
+## Archived generated v7 / v7.1 figures
 
-## Craft is separate and optional
-
-`K = 25 · (N(framing, 8) + N(verificationDebugging, 8) + N(toolJudgment, 8) +
-N(acceptedOutcome, 8))`, over deduplicated work-item episodes.
-
-Craft is reported **beside** the core and never enters it. An absent, expired
-or withdrawn portfolio changes Craft alone. Tool name, tokens, lines, files,
-messages, entropy, agent count, parallel usage and reply speed receive zero
-automatic credit. Choosing no AI tool, or constraining one, demonstrates
-judgment the same way delegating does — a developer who uses no AI tool at all
-can submit a full practice portfolio.
-
-No eligible portfolio means `not_observed`, never zero. The optional Artificer
-descriptor requires a complete Craft point of at least 60 and at least one
-independently corroborated episode satisfying all four criteria including an
-accepted outcome; it accompanies the core archetype rather than replacing it.
-
-## Receipts and privacy
-
-Each scored revision issues an immutable public receipt carrying every
-aggregate, coverage bound and rubric result needed to replay the arithmetic
-offline (`packages/shared/src/score-receipt.ts`). It excludes private paths,
-repository names, report contents, tokens and evaluator identities; public
-criterion results expose structured status, category, count and safe reason
-codes only.
-
-Public replay validates **arithmetic over the issued aggregates**. It does not
-establish private-source truth, and issuance is not a claim about the accuracy
-of the underlying platform data.
-
-Retractions create new immutable revisions. Existing receipts keep their
-historical arithmetic status and can expose a redacted superseded or retracted
-status without leaking the private reason.
-
-## Worked figures
-
-Every number in the table below is produced by `calculateCoreV7`, the same
-function that scores a real profile, via
-`scripts/scoring/generate-impact-v7-doc.ts`. `scripts/scoring/generate-impact-v7-doc.test.ts` fails
-if the committed table and a fresh generation disagree, so a published example
-cannot drift from the scorer.
+The following generated table is retained byte-for-byte as historical evidence.
+It describes the archived range policy, not current v7.2. Its generator and
+frozen engines remain unchanged. The observed owner fixture separately replays
+exact 46.40250879691149/display 46 while its archived envelope replays46–100.
 
 <!-- worked-figures:begin -->
 Generated from `calculateCoreV7` at reference time `2026-09-01T12:00:00.000Z`.
@@ -149,26 +126,3 @@ Generated from `calculateCoreV7` at reference time `2026-09-01T12:00:00.000Z`.
 | One source incomplete | 61–80 | 54 | 72–81 | 68–78 | 64–73 | none | none |
 | No observed evidence | 0 | 0 | 0 | 0 | 0 | Emerging | Emerging |
 <!-- worked-figures:end -->
-
-Read the middle row against the first. One incomplete source leaves every lower
-bound exactly where it was and raises the upper bounds: missing coverage widens
-the interval, it never lowers the score. That row also earns **no tier and no
-archetype**, because its interval straddles the 70 boundary and the whole
-interval must sit inside one tier before a label is assigned. Saying "somewhere
-between Solid and High" is the honest answer there; picking one would not be.
-
-The last row is a truthful zero — a real result with a real tier, not a failure
-to compute.
-
-## Where this lives in the code
-
-| Concern | Module |
-| --- | --- |
-| Core arithmetic | `apps/web/lib/impact/v7.ts` |
-| Evidence derivation and bounds | `apps/web/lib/impact/v7-evidence.ts` |
-| Craft arithmetic | `apps/web/lib/insights/craft-v7.ts` |
-| Receipt schema, sealing, replay | `packages/shared/src/score-receipt.ts` |
-| One materializer | `apps/web/lib/profile/score-receipt-v7.ts` |
-| One projection consumers render | `apps/web/lib/profile/score-view-model.ts` |
-| Explanation from the receipt's trace | `apps/web/lib/dashboard/receipt-explanation.ts` |
-| Registered scored consumers | `docs/scoring-consumer-inventory.md` |

@@ -1,132 +1,78 @@
-# Scoring v7 — release readiness packet
+# Scoring v7.2 — local qualification and release packet
 
-Date: 2026-09-06. Prepared under S20 (#1315).
+Updated 2026-09-08. This is the active packet for the observed-point policy;
+the September5 research and completed historical reports remain unchanged.
 
-**This packet authorizes nothing.** It records what was built, what was
-verified, and what still blocks relaunch, so the owner can decide with the
-facts in front of them. Release authorization, production migration
-authorization, production recompute authorization and final owner review each
-remain separate and explicit.
+**This packet authorizes nothing.** Implementation, local qualification,
+production release, production migration and production recompute are separate
+facts. Production remains untouched unless the owner explicitly authorizes the
+relevant action.
 
-## Verdict
+## Current status
 
-**Not ready to relaunch.** One blocker is open and it cannot be waived.
+The current policy and owner decisions are recorded in
+[`2026-09-08-v7-single-score-consistency-phases/policy.md`](../plans/2026-09-08-v7-single-score-consistency-phases/policy.md)
+and [`2026-09-08-scoring-v7-observed-point-policy.md`](../decisions/2026-09-08-scoring-v7-observed-point-policy.md).
 
-| | |
-| --- | --- |
-| Implementation | Complete: S01–S17, S19, S20. |
-| Local verification | Complete and green. |
-| Empirical pilot (S18) | **Not started. Blocks relaunch.** |
-| S04 issue-API scope amendment | Awaiting the owner's explicit approval. |
+The earlier empirical pilot was **not performed**. The existing owner decision
+permits this implementation without it; it is neither a passing empirical
+result nor an unresolved request for pilot approval. Arithmetic, replay and
+matched-fixture tests establish conformance to declared rules, not empirical
+fairness, developer ability or external validity. Preserve that limitation.
 
-## What is blocked, and why it stays blocked
+The old packet's S04 approval/pilot blockers and instruction that publication
+lifts the no-Preview rule are superseded. No authorization implicitly lifts the
+standing prohibition on Vercel Preview deployment creation.
 
-The frozen policy requires a retrospective pilot of 24 profiles with at least
-one independent human domain reviewer before relaunch. Nothing has been
-executed. Starting it needs the owner's authorization to review the selected
-public profiles read-only, to approach candidate participants for consenting
-private evidence, and to engage that reviewer.
+## What must agree
 
-The fixtures in `apps/web/lib/impact/v7-fairness.test.ts` do not substitute for
-it. They test this rubric against its own rules — arithmetic conformance, not
-evidence about whether real reviewers can apply the rubric consistently. Calling
-19 passing invariants a pilot would be the exact substitution the policy
-forbids, and the results document says so in its own status table.
+- Machine policy `v7.2` uses four equally weighted observed core points.
+  Craft is report-derived, optional and zero-weight in the core. First valid
+  scored report unlocks the fifth visible axis, including a measured zero.
+- Expired/unavailable Craft retains the unlocked label and update guidance,
+  without a current number or fake zero. Historical aggregate inputs remain
+  replayable while retained under consent.
+- Canonical display, exact arithmetic, tier, archetype eligibility and receipt
+  identity agree across badge, Studio, dashboard, APIs, tools, history, emails
+  and leaderboard. Mixed policy/window comparisons do not claim improvement.
+- Historical machine `v7` / algorithm `v7.1` receipts and engines are unchanged.
+  Legacy `v6` remains explicitly identified when selected or no receipt exists.
+- Receipt-private report labels, body digests, paths and tokens never enter
+  public output. Consent withdrawal/retraction and verification states retain
+  their explicit meaning.
 
-Full status: `docs/research/scoring-v7-validation-results.md`.
+## Local evidence
 
-## What was built
+Qualify the final exact commit and complete Git tree using the schema2
+`local-candidate` procedure in [release-playbook.md](release-playbook.md).
+All named local gates, allowlisted build artifact hashes and production-mode
+loopback probes must actually pass. Prior phase logs under `logs/v7-point/`
+are implementation evidence, not proof of an as-yet-unqualified final tree.
+Do not carry their status forward across a later tracked commit.
 
-| Phase | Delivered | Evidence |
-| --- | --- | --- |
-| S08 | Source evidence bound to the current grant; distributed refresh barrier | `supabase/migrations/046_*.sql`, `docs/research/2026-09-05-platform-refresh-safety.md` |
-| S15 | One materializer, one projection, one what-if calculator, checked consumer registry | `docs/scoring-consumer-inventory.md` |
-| S16 | Explanation from the receipt's own trace; evidence-aware badge labels; owner evidence workflow | `apps/web/lib/dashboard/receipt-explanation.ts` |
-| S17 | v7 methodology with generated figures; bilingual copy; prohibited-claims gate | `docs/impact-v7.md`, `apps/web/lib/i18n/dictionaries/claims.test.ts` |
-| S18 | 19 matched-pair invariants; 16-variant sensitivity analysis | `docs/research/scoring-v7-validation-results.md` |
-| S19 | Additive cache namespace; idempotent dry-run migration; transition runbook | `docs/runbooks/scoring-v7-transition.md` |
+Store local proof, manifests, browser results and review screenshots outside
+the tracked candidate. Do not write an evidence commit after qualification.
+The final packet for an attempt references those files and exact identities;
+it must state any missing local gate rather than fabricating a result.
 
-## Local verification
+## Remote admission remains pending
 
-Run sequentially, never concurrently, against the release candidate:
+Before any later push, inspect remote triggers read-only. A production-only
+Ignored Build Step can still allow a Preview deployment object to be created;
+skipping its build is not prevention. If no documented non-destructive
+prevention is available, stop before push. Do not clear the guard or dispatch
+remote verification to complete this packet.
 
-| Gate | Result |
-| --- | --- |
-| `pnpm run typecheck` | pass |
-| `pnpm run lint` | pass (0 errors) |
-| `pnpm run test` | pass |
-| `pnpm run build` | pass |
-| `pnpm run test:coverage` | pass, all module thresholds met |
-| `pnpm run check:circular` | pass |
-| `pnpm run check:write-registration` | pass |
-| `pnpm run validate:migrations` | pass, 001 → 046 |
-| `pnpm run test:contract:local` | pass, against migrations 001–046 on the disposable project |
-| SVG/PNG raster path | `svg-to-png.raster.test.ts` rasterizes for real, in-suite |
+Only a separately authorized production attempt can provide real production
+migration admission, deployed commit/tree/deployment identity, production
+probe results, and tag/release readback. Local checks cannot impersonate those
+observations. No remote workflow, PR, deployment, message, production migration
+or recompute is part of local qualification.
 
-Logs are under `logs/scoring-v7/`.
+## Operational references
 
-## Reconciling the playbook's Preview requirement with the no-Preview rule
-
-`docs/release/release-playbook.md` §3 requires a Vercel Preview proof bound to
-the exact candidate commit. The frozen policy for this work states that **no
-Vercel preview deployment is permitted**. Both stand; they are not reconciled by
-waiving either.
-
-The resolution is sequencing, not substitution:
-
-1. **During implementation** — the state this packet describes — no Preview is
-   created and the playbook's §3 is not entered. Verification is the local
-   evidence above, which is why every gate is run against the exact candidate
-   tree rather than a deployed artifact.
-2. **At the moment the owner authorizes publication**, the no-Preview
-   constraint is lifted by that authorization and §3 runs unchanged. The
-   playbook's Preview proof is a required check and is never skipped, waived, or
-   replaced by the local evidence.
-
-Local artifact verification is therefore a *precondition* for requesting
-authorization, not a replacement for the Preview proof. Anyone reading this
-packet as permission to skip §3 has read it wrong.
-
-## Remote triggers, audited read-only
-
-A push to `develop` starts these GitHub Actions workflows. This was read from
-`.github/workflows/` and nothing was dispatched:
-
-| Workflow | Trigger on `develop` push |
-| --- | --- |
-| `ci.yml` | yes |
-| `security.yml` | yes (docs paths ignored) |
-| `gitleaks.yml` | yes |
-| `coverage.yml` | yes |
-| `bundle-size.yml` | yes (docs paths ignored) |
-| `knip.yml` | yes (docs paths ignored) |
-| `lighthouse.yml` | no — pull_request only |
-| `release-verification.yml` | no — `workflow_dispatch` only |
-| `nightly-prod-probe.yml` | no — schedule / dispatch only |
-| `claude-review.yml` | no — pull_request / comment only |
-| `validate-merged-pr.yml` | no — `workflow_call` only |
-
-Two consequences the owner should decide on before any push:
-
-- **Six workflows consume paid minutes per push to `develop`.** Three of them
-  ignore documentation-only paths; three do not.
-- **The Vercel Git integration is connected**, confirmed read-only. Since
-  2026-09-06 every project in the team carries a production-only Ignored Build
-  Step, so a push to `develop` creates a preview deployment whose build is
-  skipped and costs no build minutes. A push to `main` still builds and deploys
-  production. See `docs/accepted-risks.md` — the same guard means the Preview
-  proof in `release-playbook.md` §3 needs that setting cleared for the duration
-  of a release. Nothing here dispatches a workflow, opens a PR, sends email or
-  mutates production data.
-
-## What the owner is being asked to decide
-
-1. Authorize (or decline) the S18 pilot: read-only review of selected public
-   profiles, outreach for consenting private evidence, and engagement of an
-   independent human domain reviewer.
-2. Approve (or decline) the S04 issue-API scope amendment.
-3. Separately, when and if the above close: release authorization, production
-   migration authorization and production recompute authorization.
-
-Until 1 and 2 close, relaunch stays blocked. That is the honest state, and it is
-not improved by describing it any other way.
+- [Current scoring spec](../impact-v7.md) and [offline replay](../scoring-reproduction.md)
+- [Scored-consumer agreement](../scoring-consumer-inventory.md)
+- [Flag-only transition/rollback](../runbooks/scoring-v7-transition.md)
+- [Release procedure](release-playbook.md)
+- [Historical empirical status](../research/scoring-v7-validation-results.md)

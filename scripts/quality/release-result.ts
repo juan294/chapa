@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { parseCandidateArtifactManifest, verifyLocalBuildManifest, assertUntrackedEvidenceOutput, type CandidateArtifactManifest } from "./candidate-artifact-manifest";
 import { renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -547,6 +549,125 @@ export function buildFinalResult(input: BuildFinalResultInput): FinalResult {
   });
 }
 
+// Schema2 is additive: the historical schema1 parsers above retain their contract.
+export const LOCAL_GATE_KEYS = ["sourceIdentity", "typecheck", "lint", "unitTests", "contractTests", "coverage", "build", "localProbes", "releaseDocs", "vercelConfig", "circularDependencies", "migrationValidation", "writeRegistration", "licenses", "vulnerabilities", "bundleBudget", "offlineReplay"] as const;
+export const LOCAL_REQUIRED_SCENARIOS = ["deployment.local-candidate-identity", "health.core-dependencies", "profile.public-badge-read", "profile.public-share-read", "profile.share-verification", "locales.en-es", "auth.protected-write-denied"] as const;
+export const PRODUCTION_V2_CHECK_KEYS = ["migrationAdmission", "productionIdentity", "productionProbes", "publicationReadback", "rollbackReadiness"] as const;
+interface LocalCandidate {
+  baselineTag: string; rollbackReference: string; developCommit: string; candidateTreeDigest: string; localUrl: string;
+}
+interface LocalProbes {
+  discovered: number; executed: number; skipped: number; failed: number;
+  required: Record<(typeof LOCAL_REQUIRED_SCENARIOS)[number], CheckStatus>;
+}
+export interface LocalCandidateResult {
+  schemaVersion: 2; stage: "local-candidate"; mode: "local-candidate"; environment: "local"; status: OverallStatus;
+  candidate: LocalCandidate; build: CandidateArtifactManifest; checks: Record<(typeof LOCAL_GATE_KEYS)[number], CheckStatus>;
+  localProbes: LocalProbes; pendingProduction: Record<(typeof PRODUCTION_V2_CHECK_KEYS)[number], "pending">; generatedAt: string;
+}
+export interface FinalResultV2 {
+  schemaVersion: 2; stage: "final"; status: OverallStatus;
+  localCandidate: LocalCandidateResult; localCandidateDigest: string;
+  mainCommit: string; mainTreeDigest: string;
+  deployment: { environment: "production"; id: string; url: string; commit: string; treeDigest: string };
+  checks: Record<(typeof PRODUCTION_V2_CHECK_KEYS)[number], CheckStatus>;
+  tag: TagReference; release: ReleaseReference; readback: Readback; generatedAt: string;
+}
+const LOCAL_INPUT_KEYS = ["schemaVersion", "mode", "environment", "candidate", "build", "checks", "localProbes", "pendingProduction", "generatedAt"] as const;
+const FINAL_V2_INPUT_KEYS = ["schemaVersion", "localCandidate", "mainCommit", "mainTreeDigest", "deployment", "checks", "tag", "release", "readback", "generatedAt"] as const;
+function exactObject(raw: unknown, keys: readonly string[], label: string) {
+  const value = assertPlainObject(raw, label);
+  assertAllowlistedKeys(value, keys, label);
+  for (const key of keys) if (!(key in value)) throw new Error(`${label} is missing required field ${key}`);
+  return value;
+}
+function localUrl(raw: unknown) {
+  const value = assertString(raw, "candidate.localUrl");
+  // Check the original host spelling before URL canonicalization accepts decimal/short IPv4.
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::[1-9][0-9]{0,4})?\/?$/.test(value)) throw new Error("Local target must be an explicit loopback origin without credentials, path, query or fragment");
+  const url = new URL(value);
+  if (url.port && Number(url.port) > 65535) throw new Error("Invalid local target port");
+  return value;
+}
+function count(raw: unknown, label: string) {
+  if (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw < 0) throw new Error(`${label} must be a nonnegative integer`);
+  return raw;
+}
+function localFields(raw: unknown): Omit<LocalCandidateResult, "stage" | "status"> {
+  assertNoForbiddenFieldNames(raw);
+  const value = exactObject(raw, LOCAL_INPUT_KEYS, "local candidate input");
+  if (value.schemaVersion !== 2 || value.mode !== "local-candidate" || value.environment !== "local") throw new Error("Local qualification requires schemaVersion2, local-candidate mode and local environment");
+  const c = exactObject(value.candidate, ["baselineTag", "rollbackReference", "developCommit", "candidateTreeDigest", "localUrl"], "candidate");
+  const candidate = { baselineTag: assertTag(c.baselineTag, "candidate.baselineTag"), rollbackReference: assertTag(c.rollbackReference, "candidate.rollbackReference"),
+    developCommit: assertSha(c.developCommit, "candidate.developCommit"), candidateTreeDigest: assertSha(c.candidateTreeDigest, "candidate.candidateTreeDigest"), localUrl: localUrl(c.localUrl) };
+  const build = parseCandidateArtifactManifest(value.build);
+  if (build.commit !== candidate.developCommit || build.treeDigest !== candidate.candidateTreeDigest) throw new Error("Candidate/build commit/tree identity mismatch");
+  const checks = parseChecks(value.checks, LOCAL_GATE_KEYS, "checks");
+  const p = exactObject(value.localProbes, ["discovered", "executed", "skipped", "failed", "required"], "localProbes");
+  const localProbes = { discovered: count(p.discovered, "localProbes.discovered"), executed: count(p.executed, "localProbes.executed"), skipped: count(p.skipped, "localProbes.skipped"), failed: count(p.failed, "localProbes.failed"), required: parseChecks(p.required, LOCAL_REQUIRED_SCENARIOS, "localProbes.required") };
+  if (localProbes.discovered < LOCAL_REQUIRED_SCENARIOS.length || localProbes.executed !== localProbes.discovered || localProbes.skipped !== 0) throw new Error("Local probes require complete discovery/execution and zero required skips");
+  const failedRequired = Object.values(localProbes.required).filter(status => status === "failed").length;
+  if (localProbes.failed > localProbes.executed || localProbes.failed < failedRequired) throw new Error("localProbes failed count is inconsistent with execution/scenarios");
+  if ((localProbes.failed > 0 ? "failed" : "passed") !== checks.localProbes) throw new Error("localProbes check does not match complete browser status");
+  const pending = exactObject(value.pendingProduction, PRODUCTION_V2_CHECK_KEYS, "pendingProduction");
+  for (const key of PRODUCTION_V2_CHECK_KEYS) if (pending[key] !== "pending") throw new Error(`Production ${key} must remain pending in local proof`);
+  const generatedAt = assertIsoTimestamp(value.generatedAt, "generatedAt");
+  if (Date.parse(generatedAt) < Date.parse(build.builtAt)) throw new Error("Local proof predates its build");
+  return { schemaVersion: 2, mode: "local-candidate", environment: "local", candidate, build, checks, localProbes,
+    pendingProduction: { migrationAdmission: "pending", productionIdentity: "pending", productionProbes: "pending", publicationReadback: "pending", rollbackReadiness: "pending" }, generatedAt };
+}
+export function buildLocalCandidateResult(raw: unknown): LocalCandidateResult {
+  const fields = localFields(raw);
+  return Object.freeze({ ...fields, stage: "local-candidate", status: deriveOverallStatus(fields.checks) });
+}
+export function parseLocalCandidateResult(raw: unknown): LocalCandidateResult {
+  assertNoForbiddenFieldNames(raw);
+  const value = exactObject(raw, [...LOCAL_INPUT_KEYS, "stage", "status"], "local candidate result");
+  if (value.stage !== "local-candidate") throw new Error("Expected local-candidate stage");
+  const { stage: _stage, status, ...input } = value;
+  const result = buildLocalCandidateResult(input);
+  if (assertCheckStatus(status, "status") !== result.status) throw new Error("Local result status mismatch");
+  return result;
+}
+function proofDigest(value: LocalCandidateResult) {
+  return createHash("sha256").update(JSON.stringify(sortKeysDeep(value))).digest("hex");
+}
+export function buildFinalResultV2(raw: unknown): FinalResultV2 {
+  assertNoForbiddenFieldNames(raw);
+  const value = exactObject(raw, FINAL_V2_INPUT_KEYS, "final schema2 input");
+  if (value.schemaVersion !== 2) throw new Error("Final schemaVersion must be2");
+  const localCandidate = parseLocalCandidateResult(value.localCandidate);
+  if (localCandidate.status !== "passed") throw new Error("Final proof requires passed local qualification");
+  const mainCommit = assertSha(value.mainCommit, "mainCommit"), mainTreeDigest = assertSha(value.mainTreeDigest, "mainTreeDigest");
+  if (mainTreeDigest !== localCandidate.candidate.candidateTreeDigest) throw new Error("Main tree differs from exact qualified candidate tree");
+  const d = exactObject(value.deployment, ["environment", "id", "url", "commit", "treeDigest"], "deployment");
+  if (d.environment !== "production") throw new Error("Actual production deployment identity required");
+  const deployment = { environment: "production" as const, id: assertString(d.id, "deployment.id"), url: assertHttpsUrl(d.url, "deployment.url"), commit: assertSha(d.commit, "deployment.commit"), treeDigest: assertSha(d.treeDigest, "deployment.treeDigest") };
+  const url = new URL(deployment.url);
+  if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || url.username || url.password || url.search || url.hash || url.pathname !== "/") throw new Error("Production deployment must identify its actual public origin");
+  if (deployment.commit !== mainCommit || deployment.treeDigest !== mainTreeDigest) throw new Error("Production deployment commit/tree identity mismatch");
+  const checks = parseChecks(value.checks, PRODUCTION_V2_CHECK_KEYS, "checks");
+  const t = exactObject(value.tag, TAG_REFERENCE_KEYS, "tag"), r = exactObject(value.release, RELEASE_REFERENCE_KEYS, "release");
+  const tag = { name: assertTag(t.name, "tag.name"), target: assertSha(t.target, "tag.target") };
+  const release = { tag: assertTag(r.tag, "release.tag"), target: assertTag(r.target, "release.target") };
+  if (tag.target !== mainCommit || release.tag !== tag.name || release.target !== tag.name) throw new Error("Publication tag/release readback identity mismatch");
+  const read = exactObject(value.readback, READBACK_KEYS, "readback");
+  const readback = { tagVerifiedAt: assertIsoTimestamp(read.tagVerifiedAt, "readback.tagVerifiedAt"), releaseVerifiedAt: assertIsoTimestamp(read.releaseVerifiedAt, "readback.releaseVerifiedAt") };
+  const generatedAt = assertIsoTimestamp(value.generatedAt, "generatedAt");
+  if ([localCandidate.generatedAt, readback.tagVerifiedAt, readback.releaseVerifiedAt].some(at => Date.parse(at) > Date.parse(generatedAt))) throw new Error("Final proof predates required readback");
+  return Object.freeze({ schemaVersion: 2, stage: "final", status: deriveOverallStatus(checks), localCandidate, localCandidateDigest: proofDigest(localCandidate), mainCommit, mainTreeDigest, deployment, checks, tag, release, readback, generatedAt });
+}
+export function parseFinalResultV2(raw: unknown): FinalResultV2 {
+  assertNoForbiddenFieldNames(raw);
+  const value = exactObject(raw, [...FINAL_V2_INPUT_KEYS, "stage", "status", "localCandidateDigest"], "final schema2 result");
+  if (value.stage !== "final") throw new Error("Expected final stage");
+  const { stage: _stage, status, localCandidateDigest, ...input } = value;
+  const result = buildFinalResultV2(input);
+  if (result.status !== assertCheckStatus(status, "status")) throw new Error("Final result status mismatch");
+  if (localCandidateDigest !== result.localCandidateDigest) throw new Error("Local candidate proof digest mismatch");
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Writer: an audit receipt, not an analyzer or an authorization decision.
 // ---------------------------------------------------------------------------
@@ -563,11 +684,11 @@ function sortKeysDeep(value: unknown): unknown {
   return value;
 }
 
-function stableStringify(result: PreviewResult | FinalResult): string {
+function stableStringify(result: PreviewResult | FinalResult | LocalCandidateResult | FinalResultV2): string {
   return `${JSON.stringify(sortKeysDeep(result), null, 2)}\n`;
 }
 
-export function writeResult(path: string, result: PreviewResult | FinalResult): void {
+export function writeResult(path: string, result: PreviewResult | FinalResult | LocalCandidateResult | FinalResultV2): void {
   const tempPath = join(dirname(path), `.${Date.now()}-${process.pid}.tmp`);
   writeFileSync(tempPath, stableStringify(result));
   renameSync(tempPath, path);
@@ -593,7 +714,14 @@ export async function main(): Promise<void> {
   const outputPath = argument("--output")!;
   const input = JSON.parse(readFileSync(inputPath, "utf8"));
 
-  const result = stage === "final" ? buildFinalResult(input) : buildPreviewResult(input);
+  if (stage !== "preview" && stage !== "final" && stage !== "local-candidate") throw new Error(`Unknown release result stage ${stage}`);
+  const result = stage === "local-candidate" ? buildLocalCandidateResult(input)
+    : stage === "final" ? input.schemaVersion === 2 ? buildFinalResultV2(input) : buildFinalResult(input) : buildPreviewResult(input);
+  if (result.schemaVersion === 2) {
+    const root = argument("--root", false) ?? process.cwd();
+    assertUntrackedEvidenceOutput(root, outputPath);
+    if (result.stage === "local-candidate") verifyLocalBuildManifest(result.build, root);
+  }
   writeResult(outputPath, result);
 
   if (result.status !== "passed") {

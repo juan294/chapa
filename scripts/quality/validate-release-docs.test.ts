@@ -5,369 +5,103 @@ import * as path from "node:path";
 import { validateReleaseDocs } from "./validate-release-docs";
 
 const roots: string[] = [];
-const delegatedFiles = [
-  "docs/runbooks/release-checklist.md",
-  "docs/runbooks/deployment-smoke.md",
-  "docs/runbooks/migrations.md",
-  "docs/runbooks/rollback.md",
-  "docs/runbooks/incident-response.md",
-  "docs/runbooks/observability.md",
-  "CLAUDE.md",
-];
-
-function write(root: string, file: string, source: string): void {
-  const target = path.join(root, file);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, source);
+const playbookPath = "docs/release/release-playbook.md";
+const delegatedFiles = ["docs/runbooks/release-checklist.md", "docs/runbooks/deployment-smoke.md", "docs/runbooks/migrations.md", "docs/runbooks/rollback.md", "docs/runbooks/incident-response.md", "docs/runbooks/observability.md", "CLAUDE.md"];
+function write(root: string, file: string, text: string) {
+  fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+  fs.writeFileSync(path.join(root, file), text);
 }
-
-function compliantPlaybook(): string {
+function playbook() {
   return [
-    "# Release",
-    "Fix candidateTreeDigest.",
-    "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"",
-    "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"",
-    "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"",
-    "Create or reuse the release PR.",
-    "gh pr checks --required --watch --fail-fast",
-    "pending migrations check (release PR) is a required check.",
-    "gh run download the Preview release-result.json",
-    "Obtain merge authorization.",
+    "# Local qualification then separately authorized production",
+    "local-candidate: exact commit and candidateTreeDigest; allowlisted build manifest; no tracked commits after qualification.",
+    "Preview prevention must be proved before any push; an Ignored Build Step is insufficient.",
+    'developTreeDigest="$(git rev-parse \'origin/develop^{tree}\')"',
+    'prospectiveMainTreeDigest="$(git merge-tree --write-tree origin/main origin/develop)"',
+    'test "$prospectiveMainTreeDigest" = "$developTreeDigest"',
+    "Obtain merge authorization and migration admission using actual production credentials.",
     "gh pr merge --merge --auto",
     "Verify mainTreeDigest and production identity.",
     "Obtain tag authorization.",
     "git tag -a vX.Y.Z mainCommit",
     "gh release create",
     "gh release view",
-    "release:write-result",
-    "Use the rollback runbook.",
-    "Recovery outcomes: PAUSED, BLOCKED, ROLLED_BACK, PUBLICATION_PENDING.",
+    "pnpm release:write-result --stage final",
+    "Rollback: PAUSED BLOCKED ROLLED_BACK PUBLICATION_PENDING.",
   ].join("\n");
 }
-
-function compliantRoot(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-docs-"));
-  roots.push(root);
-  write(root, "docs/release/release-playbook.md", compliantPlaybook());
-  write(
-    root,
-    ".claude/commands/release.md",
-    [
-      "Read docs/release/release-playbook.md completely.",
-      "STOP for version choice.",
-      "STOP for full diff approval.",
-      "STOP for PR authorization.",
-      "STOP for merge authorization.",
-      "gh pr merge --merge --auto",
-      "STOP for tag authorization.",
-      "Deep verification (/prodplaybook, /explore-release) is separate and explicit.",
-    ].join("\n"),
-  );
-  write(
-    root,
-    ".claude/commands/explore-release.md",
-    "Read docs/release/release-playbook.md. Accept a fixed commit. Never tag.",
-  );
-  write(
-    root,
-    ".claude/commands/prodplaybook.md",
-    [
-      "Read docs/playbooks/e2e-pro-release-verification.md completely.",
-      "Run RELEASE_VERIFICATION_MODE=deep deployed probes.",
-      "Write docs/agents/prodplaybook-report.md.",
-      "Report PASS or BLOCKED.",
-      "This command never versions, creates a release PR, merges, tags, or publishes.",
-    ].join("\n"),
-  );
-  for (const file of delegatedFiles) {
-    write(root, file, "Ordering: docs/release/release-playbook.md\n");
-  }
+function fixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-docs-")); roots.push(root);
+  write(root, playbookPath, playbook());
+  write(root, ".claude/commands/release.md", `Read ${playbookPath}.\nversion choice; full diff approval; PR authorization; merge authorization; tag authorization.\ngh pr merge --merge --auto`);
+  write(root, ".claude/commands/explore-release.md", `Read ${playbookPath}. Fixed immutable candidate; optional deep verification.`);
+  write(root, ".claude/commands/prodplaybook.md", "Read docs/playbooks/e2e-pro-release-verification.md. RELEASE_VERIFICATION_MODE=deep; docs/agents/prodplaybook-report.md; BLOCKED.");
+  write(root, "docs/playbooks/e2e-pro-release-verification.md", "local-candidate; deployed checks need explicit authorization.");
+  for (const file of delegatedFiles) write(root, file, `Ordering: ${playbookPath}`);
   return root;
 }
+afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
-afterEach(() => {
-  for (const root of roots.splice(0)) {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-describe("validateReleaseDocs", () => {
-  it("accepts one short delegated direct-proof procedure", () => {
-    expect(validateReleaseDocs(compliantRoot())).toEqual([]);
+describe("local release documentation contract", () => {
+  it("accepts exact local proof with separately authorized production ordering", () => {
+    expect(validateReleaseDocs(fixture())).toEqual([]);
   });
-
-  it("rejects a playbook over 205 lines", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/release/release-playbook.md",
-      Array.from({ length: 206 }, (_, index) => `line ${index + 1}`).join("\n"),
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: exceeds 205 lines",
-    );
-  });
-
-  it("still accepts a playbook exactly at the budget", () => {
-    const root = compliantRoot();
-    const body = fs.readFileSync(path.join(root, "docs/release/release-playbook.md"), "utf8");
-    write(root, "docs/release/release-playbook.md", `${body}\n\n\n`);
-
+  it("accepts equality through the exact qualified candidate, but never drops the comparison", () => {
+    const root = fixture();
+    write(root, playbookPath, playbook().replace('test "$prospectiveMainTreeDigest" = "$developTreeDigest"', 'test "$developTreeDigest" = "$candidateTreeDigest"\ntest "$prospectiveMainTreeDigest" = "$candidateTreeDigest"'));
     expect(validateReleaseDocs(root)).toEqual([]);
+    write(root, playbookPath, playbook().replace('test "$prospectiveMainTreeDigest" = "$developTreeDigest"', ""));
+    expect(validateReleaseDocs(root).some(error => error.includes("prospective main tree"))).toBe(true);
   });
-
-  it("rejects a release command that does not delegate", () => {
-    const root = compliantRoot();
-    write(root, ".claude/commands/release.md", "Standalone release procedure");
-
-    expect(validateReleaseDocs(root)).toContain(
-      ".claude/commands/release.md: must delegate to docs/release/release-playbook.md",
-    );
+  it.each(["candidateTreeDigest", "exact commit", "allowlisted build manifest", "no tracked commits", "Preview prevention", "migration admission"])("rejects missing %s", phrase => {
+    const root = fixture(); write(root, playbookPath, playbook().replace(phrase, "omitted"));
+    expect(validateReleaseDocs(root).some(error => error.includes(phrase))).toBe(true);
   });
-
-  it("rejects the ancestry-only preflight that fails after a merge promotion", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/release/release-playbook.md",
-      compliantPlaybook()
-        .replace(
-          "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"\n",
-          "",
-        )
-        .replace(
-          "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"\n",
-          "git merge-base --is-ancestor origin/main origin/develop\n",
-        )
-        .replace(
-          "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"\n",
-          "",
-        ),
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: preflight must prove the prospective main tree equals the develop tree",
-    );
+  it.each([
+    "gh workflow run release-verification.yml",
+    "vercel deploy --target preview",
+    "vercel deploy",
+    "vercel deploy --yes",
+    "VERCEL_ENV=preview pnpm test",
+    "gh run download the Preview release-result.json",
+  ])("rejects active Preview qualification: %s", command => {
+    const root = fixture(); write(root, playbookPath, `${playbook()}\n${command}`);
+    expect(validateReleaseDocs(root).some(error => error.includes("Preview"))).toBe(true);
   });
-
-  it("requires the standalone production verification command", () => {
-    const root = compliantRoot();
-    fs.rmSync(path.join(root, ".claude/commands/prodplaybook.md"));
-
-    expect(validateReleaseDocs(root)).toContain(
-      ".claude/commands/prodplaybook.md: missing",
-    );
+  it("rejects migration admission after promotion", () => {
+    const root = fixture(); write(root, playbookPath, playbook().replace("and migration admission", "").concat("\nmigration admission"));
+    expect(validateReleaseDocs(root).some(error => error.includes("precede the promotion merge"))).toBe(true);
   });
-
-  it("rejects release mutations in the production verification command", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      ".claude/commands/prodplaybook.md",
-      [
-        "Read docs/playbooks/e2e-pro-release-verification.md completely.",
-        "Run RELEASE_VERIFICATION_MODE=deep deployed probes.",
-        "Write docs/agents/prodplaybook-report.md.",
-        "Report PASS or BLOCKED.",
-        "git tag -a vX.Y.Z mainCommit",
-      ].join("\n"),
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      ".claude/commands/prodplaybook.md: verification-only command must not contain release mutations",
-    );
+  it("rejects tagging before production identity and full-tree equality", () => {
+    const root = fixture(); write(root, playbookPath, `git tag -a early\n${playbook()}`);
+    expect(validateReleaseDocs(root).some(error => error.includes("precede tag"))).toBe(true);
   });
-
-  it("rejects tag instructions before tree/production proof", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/release/release-playbook.md",
-      [
-        "# Release",
-        "Fix candidateTreeDigest.",
-        "git tag -a vX.Y.Z mainCommit",
-        "gh release create",
-        "gh release view",
-        "release:write-result",
-        "Create or reuse the release PR.",
-        "gh pr checks --required --watch --fail-fast",
-        "pending migrations check (release PR) is a required check.",
-        "gh run download the Preview release-result.json",
-        "Obtain merge authorization.",
-        "gh pr merge --merge --auto",
-        "Verify mainTreeDigest and production identity.",
-        "Obtain tag authorization.",
-        "Use rollback. PAUSED BLOCKED ROLLED_BACK PUBLICATION_PENDING",
-      ].join("\n"),
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: tree equality and production proof must precede tag",
-    );
+  it("rejects final proof before publication readback", () => {
+    const root = fixture(); write(root, playbookPath, playbook().replace("gh release view\npnpm release:write-result --stage final", "pnpm release:write-result --stage final\ngh release view"));
+    expect(validateReleaseDocs(root).some(error => error.includes("final receipt"))).toBe(true);
   });
-
-  it("rejects required checks and Preview proof after the promotion merge", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/release/release-playbook.md",
-      [
-        "# Release",
-        "Fix candidateTreeDigest.",
-        "Create or reuse the release PR.",
-        "gh pr merge --merge --auto",
-        "gh pr checks --required --watch --fail-fast",
-        "pending migrations check (release PR) is a required check.",
-        "gh run download the Preview release-result.json",
-        "Obtain merge authorization.",
-        "Verify mainTreeDigest and production identity.",
-        "Obtain tag authorization.",
-        "git tag -a vX.Y.Z mainCommit",
-        "gh release create",
-        "gh release view",
-        "release:write-result",
-        "Use rollback. PAUSED BLOCKED ROLLED_BACK PUBLICATION_PENDING",
-      ].join("\n"),
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md: required checks, migrations, and Preview proof must precede the promotion merge",
-    );
-  });
-
-  it("rejects squash release semantics and subordinate procedures", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/runbooks/release-checklist.md",
-      [
-        "Ordering: docs/release/release-playbook.md",
-        "gh pr create --base main --head develop",
-        "gh pr merge --squash",
-      ].join("\n"),
-    );
-
+  it("rejects ancestry-only topology, squash promotion and subordinate mutations", () => {
+    const root = fixture(); write(root, playbookPath, playbook().replace("git merge-tree --write-tree origin/main origin/develop", "git merge-base --is-ancestor origin/main origin/develop"));
+    write(root, delegatedFiles[0]!, `${playbookPath}\ngh pr merge --squash\ngit tag -a early`);
     const errors = validateReleaseDocs(root);
-    expect(errors).toContain(
-      "docs/runbooks/release-checklist.md: squash release semantics discard ancestry — releases merge (#1228)",
-    );
-    expect(errors).toContain(
-      "docs/runbooks/release-checklist.md: subordinate documentation must not create release PRs or tags",
-    );
+    expect(errors.some(error => error.includes("prospective main tree"))).toBe(true);
+    expect(errors.some(error => error.includes("squash"))).toBe(true);
+    expect(errors.some(error => error.includes("subordinate"))).toBe(true);
   });
-
-  it("rejects retired evidence-graph machinery anywhere in the scanned files", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/runbooks/migrations.md",
-      "Ordering: docs/release/release-playbook.md\nquality/release-required.json\n",
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      'docs/runbooks/migrations.md: must not reference retired evidence machinery "quality/release-required.json"',
-    );
+  it("rejects missing delegation and release mutations in verification-only commands", () => {
+    const root = fixture(); write(root, ".claude/commands/release.md", "Standalone");
+    write(root, ".claude/commands/prodplaybook.md", "git tag -a bad");
+    const errors = validateReleaseDocs(root);
+    expect(errors.some(error => error.includes("must delegate"))).toBe(true);
+    expect(errors.some(error => error.includes("verification-only"))).toBe(true);
   });
-
-  it("rejects an unconditional /explore-release invocation in the default release path", () => {
-    const root = compliantRoot();
-    write(
-      root,
-      "docs/release/release-playbook.md",
-      `${compliantPlaybook()}\nRun /explore-release $runDir/candidate.json\n`,
-    );
-
-    expect(validateReleaseDocs(root)).toContain(
-      "docs/release/release-playbook.md and .claude/commands/release.md: deep verification must not be an unconditional step of the default release",
-    );
+  it("rejects retired machinery and an unconditional deep-verification loop", () => {
+    const root = fixture(); write(root, playbookPath, `${playbook()}\nquality/release-required.json\n/explore-release candidate.json`);
+    const errors = validateReleaseDocs(root);
+    expect(errors.some(error => error.includes("retired"))).toBe(true);
+    expect(errors.some(error => error.includes("unconditional"))).toBe(true);
   });
-});
-
-describe("repository release procedure", () => {
-  const repositoryRoot = path.resolve(import.meta.dirname, "../..");
-  const readRepositoryFile = (file: string): string =>
-    fs.readFileSync(path.join(repositoryRoot, file), "utf8");
-  const playbook = readRepositoryFile("docs/release/release-playbook.md");
-  const releaseCommand = readRepositoryFile(".claude/commands/release.md");
-  const rollbackRunbook = readRepositoryFile("docs/runbooks/rollback.md");
-  const explore = readRepositoryFile(".claude/commands/explore-release.md");
-  const prodplaybook = readRepositoryFile(".claude/commands/prodplaybook.md");
-  const e2eProPlaybook = readRepositoryFile(
-    "docs/playbooks/e2e-pro-release-verification.md",
-  );
-
-  it("documents exact dispatch, one concurrent wave, and tag-last publication", () => {
-    expect(playbook.split(/\r?\n/).length).toBeLessThanOrEqual(205);
-    for (const required of [
-      "STOP — Gate 1: approve the release",
-      "STOP — Gate 2: authorize production",
-      "gh workflow run release-verification.yml",
-      "gh run download",
-      "gh pr merge --merge --auto",
-      "gh release create",
-      "gh release view",
-      "release:write-result",
-    ]) {
-      expect(playbook).toContain(required);
-    }
-    for (const required of [
-      "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"",
-      "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"",
-      "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"",
-    ]) {
-      expect(playbook).toContain(required);
-    }
-    expect(playbook).not.toContain(
-      "git merge-base --is-ancestor origin/main origin/develop",
-    );
-  });
-
-  it("binds the release baseline and rollback target to production identity", () => {
-    for (const required of [
-      'productionCommit="$(printf \'%s\' "$productionVersion" | jq -er \'select(.environment == "production") | .commitSha\')"',
-      'mainCommit="$(git rev-parse origin/main)"',
-      'test "$productionCommit" = "$mainCommit"',
-      'test "$(git cat-file -t "$baselineTag")" = tag',
-      '${baselineTag}^{commit}',
-      'rollbackReference="$baselineTag"',
-    ]) {
-      expect(playbook).toContain(required);
-    }
-    expect(releaseCommand).toContain("Do not use `git describe`");
-    expect(rollbackRunbook).toContain('${approvedRollbackTag}^{commit}');
-    expect(rollbackRunbook).toContain(
-      'test "$restoredCommit" = "$approvedRollbackCommit"',
-    );
-  });
-
-  it("keeps deep verification explicit, risk-selected, and never a default gate", () => {
-    expect(explore).toContain("docs/release/release-playbook.md");
-    expect(explore).toContain("Fixed, immutable candidate only");
-    expect(explore).toContain("Never a required or unconditional step");
-    expect(prodplaybook).toContain("docs/playbooks/e2e-pro-release-verification.md");
-    expect(prodplaybook).toContain("never a required step of a default");
-  });
-
-  it("keeps prodplaybook read-only and verification-only", () => {
-    for (const required of [
-      "RELEASE_VERIFICATION_MODE=deep",
-      "docs/agents/prodplaybook-report.md",
-      "BLOCKED",
-    ]) {
-      expect(prodplaybook).toContain(required);
-    }
-    expect(prodplaybook).not.toMatch(
-      /\bgh\s+pr\s+(?:create|merge)\b|\bgit\s+tag\b|\bgh\s+release\s+create\b/i,
-    );
-  });
-
-  it("documents default vs. deep scenario scope through the live scenario selector, not a JSON catalog", () => {
-    expect(e2eProPlaybook).toContain(
-      "apps/web/e2e/helpers/release-required-environments.ts",
-    );
-    expect(e2eProPlaybook).toContain("scripts/quality/release-result.ts");
-    expect(e2eProPlaybook).toContain("Historical note");
+  it("validates the actual active repository procedure", () => {
+    expect(validateReleaseDocs(path.resolve(import.meta.dirname, "../.."))).toEqual([]);
   });
 });

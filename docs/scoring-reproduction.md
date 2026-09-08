@@ -1,4 +1,10 @@
-# Reproducing an issued v7 score
+# Reproducing registered scoring receipts
+
+Local arithmetic replay is one gate in the [schema2 local-candidate release
+procedure](release/release-playbook.md). It reads local files and does not
+create a deployment, authenticate issuance or prove production readiness.
+The historical empirical pilot remains unperformed under the existing owner
+decision; a successful replay is conformance evidence, not empirical validation.
 
 ## Registered policies
 

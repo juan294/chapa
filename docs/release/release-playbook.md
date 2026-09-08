@@ -1,203 +1,243 @@
 # Chapa Production Release Playbook
 
-This is Chapa's single production-release procedure. `/release` executes it.
-Deep/exhaustive verification lives in `docs/playbooks/e2e-pro-release-verification.md`
-and runs via `/prodplaybook` on request — it never controls this default
-path. Capability detail lives in the linked runbooks.
+This is the active release procedure executed by `/release`. Implementation
+and local qualification authorize no production operation. Deep verification
+via `/prodplaybook` remains explicit and risk-selected.
 
 ## Scope and authorization
 
-- Release topology: `develop` to `main`, **merge commit**, then tag `mainCommit`. Squashing discarded ancestry and cost 40 hand-made back-merges (#1228).
-- Direct commands are authoritative: a required CI check conclusion, a
-  `release-result.json` direct-check status, and a plain identity comparison are
-  the proof. No analyzer decision is layered on top of them.
-- Two stops. **Gate 1 — approve the release**: version choice and full diff
-  approval, together. **Gate 2 — authorize production**: merge authorization
-  and tag authorization, together, granted once up front. Everything after
-  Gate 2 — PR creation, the Preview proof dispatch, the promotion merge, the
-  tag/publish — runs as an already-authorized step, not a fresh stop. Gate 2
-  authorizes release mechanics only: never production data mutation,
-  migrations, crons, messages, environment changes, or a rollback, each of
-  which needs its own explicit authorization.
+Development stays in isolated local branches/worktrees until complete. Run the
+full applicable verification locally and merge completed work locally into
+`develop`. Never push feature branches or use remote PRs, Actions, or hosted
+builds as an implementation loop. Never create a Vercel Preview deployment.
 
-## 1. Prepare, verify, and approve
+Two release gates remain: **Gate 1 — approve the release** covers the concrete
+version choice and complete diff; **Gate 2 — authorize production** covers the
+release PR, merge authorization, tag authorization and publication together.
+Existing explicit authorization persists; do not ask again for an authorized
+step. Neither gate implicitly authorizes migrations, production recompute,
+crons, messages, environment changes or rollback. Those operations require their
+own explicit authorization.
 
-1. Read `CLAUDE.md`, this playbook, and the linked runbooks.
-2. Use an isolated clean release worktree based on current `develop`.
-3. Fetch origin, then prove the next promotion is mergeable and preserves the candidate tree:
-   ```bash
-   developTreeDigest="$(git rev-parse 'origin/develop^{tree}')"
-   prospectiveMainTreeDigest="$(git merge-tree --write-tree origin/main origin/develop)"
-   test "$prospectiveMainTreeDigest" = "$developTreeDigest"
-   ```
-   A conflict or tree mismatch blocks (`BLOCKED`). Branch divergence after a merge promotion is expected; the merge-base advances to the released `develop` commit because that commit is a parent of the promotion.
-4. Bind `baselineTag` to the exact deployed production `main`
-   identity, not `develop` ancestry:
+The release topology remains `develop` to `main`, using a **merge commit**;
+never squash a release PR or delete permanent `develop`. Local-candidate proof
+is schema2. Schema1 results are historical artifacts, not current admission.
 
-   ```bash
-   productionUrl="${productionUrl:-https://chapa.thecreativetoken.com}"
-   productionVersion="$(curl -fsS "$productionUrl/api/version")"
-   productionCommit="$(printf '%s' "$productionVersion" | jq -er 'select(.environment == "production") | .commitSha')"
-   mainCommit="$(git rev-parse origin/main)"
-   test "$productionCommit" = "$mainCommit"
-   baselineTag="$(git for-each-ref --points-at "$mainCommit" --sort=-version:refname --count=1 --format='%(refname:short)' 'refs/tags/v[0-9]*')"
-   test "$(git cat-file -t "$baselineTag")" = tag
-   test "$(git rev-parse "${baselineTag}^{commit}")" = "$mainCommit"
-   rollbackReference="$baselineTag"
-   ```
+## 1. Prepare and freeze the local candidate
 
-   An empty tag or any identity mismatch blocks (`BLOCKED`). Then identify
-   the current version, commits, paths, migrations, version-bearing files,
-   and exact remote refs from `baselineTag..develop`.
-5. Present release type, changes, topology, known risks, and retirement
-   review.
-6. Update version, changelog, and every current version reference.
-7. Run the bounded local release checks sequentially — deliberately smaller
-   than full CI, which runs as exact-head remote admission checks next:
-   ```bash
-   git diff --check
-   pnpm run release:validate-docs
-   pnpm run validate:migrations
-   pnpm run test:contract:local
-   pnpm run build
-   ```
-8. Present the version choice and the complete diff and results together.
-9. **STOP — Gate 1: approve the release.** Version choice and full diff
-   together; approving only one does not satisfy this gate.
+Read `CLAUDE.md`, this playbook, the scoring release packet and relevant
+runbooks. Identify the version, changelog, release diff, migrations, retirement
+review and risk. Finish all tracked changes before qualification, including
+version and documentation changes. Present the reviewable diff and completed
+local qualification results together at Gate 1 after section2.
 
-## 2. Authorize production and push the candidate
+Use the locally available annotated baseline/rollback reference for candidate
+bookkeeping; production matching remains explicitly pending until authorized
+readback. Freeze the exact commit and full source tree in a clean isolated worktree:
 
-1. **STOP — Gate 2: authorize production.** Merge authorization and tag
-   authorization together, before anything below runs.
-2. Commit and push the approved preparation, then fix candidate identity:
-   ```bash
-   developCommit="$(git rev-parse HEAD)"
-   candidateTreeDigest="$(git rev-parse 'HEAD^{tree}')"
-   runId="release-${developCommit:0:12}"
-   runDir="quality/evidence/runs/$runId"
-   ```
-3. Create or reuse the `develop` to `main` release PR immediately after the
-   push; never enable auto-merge yet:
-   ```bash
-   releasePrNumber="$(gh pr create --base main --head develop \
-     --title "Release $releaseTag" --body "$releaseNotes" 2>/dev/null \
-     || gh pr view --json number --jq .number)"
-   headRefOid="$(gh pr view "$releasePrNumber" --json headRefOid --jq .headRefOid)"
-   test "$headRefOid" = "$developCommit"
-   ```
+```bash
+developCommit="$(git rev-parse HEAD)"
+candidateTreeDigest="$(git rev-parse 'HEAD^{tree}')"
+runId="release-${developCommit:0:12}"
+runDir="quality/evidence/runs/$runId"
+```
 
-## 3. One concurrent observation wave
+The worktree must contain no tracked changes. Store proof, reports and the
+allowlisted build manifest outside the tracked candidate, in gitignored
+`quality/evidence/runs/` or an external evidence directory. There must be
+**no tracked commits** after qualification. Any later tracked commit,
+including documentation or evidence, invalidates proof: bind and qualify the
+new exact commit and full tree. Application artifact hashes supplement source
+identity; they never replace it.
 
-> **Scoring v7 (#1315):** until the owner authorizes publication, no Preview is
-> created and this section is not entered — sequencing, not a waiver. See
-> `docs/release/scoring-v7-release-packet.md`.
+## 2. Qualify locally
 
-Resolve the immutable Vercel Preview for `developCommit` before this step;
-protected Previews require `VERCEL_AUTOMATION_BYPASS_SECRET`, missing which
-blocks verification (`BLOCKED`). Then observe two things concurrently — in
-separate terminal sessions or a CI watcher, never by backgrounding a shell
-command in a way that hides its exit status:
+Run gates sequentially against that exact candidate. A failed, absent or
+skipped required gate blocks qualification; fix locally, freeze the resulting
+candidate and rerun affected/full required gates. Do not use remote compute to
+discover whether these checks pass.
 
-- **Required PR checks**, which include `Pending Migrations Check (release
-  PR)`: `gh pr checks "$releasePrNumber" --required --watch --fail-fast`. A
-  missing, skipped, or failed migration result blocks and must be resolved,
-  never waived — the check fails closed when its production read
-  credentials are absent.
-- **Preview proof**, dispatched against the exact candidate:
-  ```bash
-  gh workflow run release-verification.yml \
-    --ref develop \
-    -f baselineTag="$baselineTag" -f developCommit="$developCommit" \
-    -f candidateTreeDigest="$candidateTreeDigest" -f previewUrl="$previewUrl" \
-    -f runId="$runId"
-  verificationRunId="$(gh run list --workflow release-verification.yml \
-    --event workflow_dispatch --json databaseId,headSha,displayTitle \
-    --jq "map(select(.headSha==\"$developCommit\" and .displayTitle==\"Release proof for $developCommit ($runId)\"))[0].databaseId")"
-  gh run watch "$verificationRunId" --exit-status
-  verificationRunAttempt="$(gh api \
-    "repos/{owner}/{repo}/actions/runs/$verificationRunId" --jq .run_attempt)"
-  gh run download "$verificationRunId" \
-    --name "release-result-$runId-$verificationRunAttempt" \
-    --dir "$runDir"
-  ```
+```bash
+git diff --check
+pnpm run typecheck
+pnpm run lint
+pnpm run test:contract:local
+pnpm run test:coverage
+bash scripts/check-craft-propagation.sh
+pnpm run release:validate-docs
+pnpm run check:vercel-config
+pnpm run check:circular
+pnpm run validate:migrations
+pnpm run check:write-registration
+pnpm run check:licenses
+pnpm run check:vulnerabilities
+pnpm exec tsx scripts/quality/candidate-artifact-manifest.ts --root "$candidateRoot" --output "$manifestPath"
+bash scripts/check-bundle-size.sh
+pnpm exec tsx scripts/scoring/reference-calculator.ts packages/shared/src/__fixtures__/observed-owner-envelope.json
+```
 
-Both must finish successfully before step 4. Validate
-`$runDir/release-result.json`: `status == "passed"`, every entry in `checks`
-is `passed`, `candidate.developCommit == source.headSha == developCommit`,
-`source.workflowRunId`/`source.workflowRunAttempt` match the watched run and
-attempt, and `candidate.rollbackReference == baselineTag`. Any mismatch or
-non-passed status is `BLOCKED`.
+`test:coverage` supplies both `unitTests` and `coverage` evidence: it runs the
+full unit suite and operational-script coverage, so do not duplicate a plain
+unit run unless hooks independently require it. The manifest helper performs
+`pnpm run build` once and emits its actual commit/tree/artifact identity; do not
+precede it with a redundant build. The Craft propagation guard and every other
+applicable workflow selection must also pass. Vulnerability tooling may read a
+public advisory feed, but must not upload private source or trigger hosted
+compute; use its supported local database where available.
 
-## 4. Promote
+Use synthetic local fixtures, local Supabase/Redis and explicitly isolated
+credentials. Never populate this proof with real-user reports or secrets.
+Run the required browser scenarios against the production-mode local build in
+explicit `local-candidate` mode; a development server is not build proof.
+Record discovered, executed, skipped and failed counts; every discovered applicable test executes with zero skips or failures.
+`apps/web/e2e/helpers/release-required-environments.ts` is the scenario authority;
+`scripts/quality/release-result.ts` is the strict result authority.
 
-1. Reconfirm PR head still identifies `developCommit`, then merge:
-   ```bash
-   test "$(gh pr view "$releasePrNumber" --json headRefOid --jq .headRefOid)" = "$developCommit"
-   gh pr merge --merge --auto
-   ```
-   Never delete permanent `develop`.
-2. Resolve `mainCommit`; require the promoted tree to equal the candidate
-   tree — the `mainTreeDigest` check:
-   ```bash
-   mainCommit="$(git rev-parse origin/main)"
-   mainTreeDigest="$(git rev-parse "${mainCommit}^{tree}")"
-   test "$mainTreeDigest" = "$candidateTreeDigest"
-   ```
-3. Wait for production `/api/version` to report `mainCommit` and environment
-   `production` — the production identity check. Then run the four default
-   production scenarios directly:
-   ```bash
-   EXPECTED_DEPLOYMENT_COMMIT="$mainCommit" EXPECTED_DEPLOYMENT_ENV=production \
-   RELEASE_VERIFICATION_MODE=default PLAYWRIGHT_BASE_URL="$productionUrl" \
-     pnpm --filter @chapa/web exec playwright test \
-       e2e/release-required.spec.ts --grep @release-required --project=chromium
-   ```
-   A failed or missing production identity or probe means production has
-   already changed: `ROLLED_BACK`-eligible, not `BLOCKED` (see below).
+Schema2 requires these named local checks: `sourceIdentity`, `typecheck`,
+`lint`, `unitTests`, `contractTests`, `coverage`, `build`, `localProbes`,
+`releaseDocs`, `vercelConfig`, `circularDependencies`, `migrationValidation`,
+`writeRegistration`, `licenses`, `vulnerabilities`, `bundleBudget`, and
+`offlineReplay`. Each must actually pass. Build identity binds allowlisted
+artifacts and their digests, excluding env files, raw reports, secret-bearing
+logs and mutable caches. Use a loopback local URL and `environment=local`;
+never invent a Preview environment or label localhost as Preview.
 
-## 5. Tag, publish, and read back
+Build/probe command details are in [deployment-smoke.md](../runbooks/deployment-smoke.md).
+The local input uses `schemaVersion:2`, `mode:"local-candidate"`,
+`environment:"local"`, candidate commit/tree/loopback URL and baseline/rollback
+references; the emitted build manifest; all named `checks`; actual `localProbes`
+`discovered`/`executed`/`skipped`/`failed` counts and scenario results (executed equals discovered; zero failures/skips); `generatedAt`; and `pendingProduction` with
+`migrationAdmission`, `productionIdentity`, `productionProbes`,
+`publicationReadback`, `rollbackReadiness` all `pending`.
 
-1. Only after production identity and all four production scenarios pass,
-   tag and publish:
-   ```bash
-   git tag -a "$releaseTag" "$mainCommit" -m "$releaseTag"
-   git push origin "$releaseTag"
-   gh release create "$releaseTag" --notes-file "$releaseNotesPath"
-   ```
-2. Read back the tag and release before reporting done:
-   ```bash
-   test "$(git rev-parse "${releaseTag}^{commit}")" = "$mainCommit"
-   test "$(gh release view "$releaseTag" --json tagName --jq .tagName)" = "$releaseTag"
-   ```
-3. Write and upload the final `release-result.json` — it adds `mainCommit`,
-   `mainTreeDigest`, the production identity/probe checks, `tag`, `release`,
-   and `readback` to the Preview result:
-   ```bash
-   pnpm run release:write-result -- --stage final \
-     --input "$runDir/final-input.json" --output "$runDir/release-result.json"
-   ```
-   A failure after the tag exists but before this receipt is written and
-   read back is `PUBLICATION_PENDING`, not `BLOCKED`.
-4. Perform read-only post-release checks per `docs/runbooks/release-checklist.md`.
+Write the local result using real gate/probe observations:
+
+```bash
+pnpm run release:write-result -- --stage local-candidate \
+  --input "$runDir/local-input.json" --output "$runDir/local-candidate.json"
+```
+
+Production deployment identity, production migration admission, production
+probes and tag/publication readback remain explicitly pending. Local success
+cannot satisfy them. Do not fabricate GitHub run IDs or downloaded artifacts.
+
+## 3. Inspect triggers before any push
+
+Inspect remote workflow and platform Git-integration triggers read-only.
+**Preview prevention** means proving a push cannot create a Preview deployment.
+An **Ignored Build Step** that skips computation after creating a deployment is
+not that proof. Do not clear it to make a Preview build. If there is no
+documented non-destructive prevention, stop before pushing and identify the
+trigger; no push is authorized merely because local qualification passed.
+
+Only after all local gates pass, Preview creation is prevented, and the remote
+action is explicitly authorized may the completed integration branch be pushed
+once. Do not incrementally push fixes. No workflow dispatch belongs to local
+qualification.
+
+## 4. Authorize and admit production
+
+Gate 2 is explicit production authorization, not an inference from completion.
+Read the actual deployed production identity and remote refs at this stage.
+Production `/api/version` must report `production` and `origin/main`; bind the
+annotated baseline tag and rollback reference to that exact commit, never to
+`git describe` or `develop` ancestry. A missing tag or mismatch blocks.
+
+Require the local proof's commit to equal `origin/develop`, and prove promotion
+preserves the candidate tree:
+
+```bash
+test "$(git rev-parse origin/develop)" = "$developCommit"
+developTreeDigest="$(git rev-parse 'origin/develop^{tree}')"
+prospectiveMainTreeDigest="$(git merge-tree --write-tree origin/main origin/develop)"
+test "$developTreeDigest" = "$candidateTreeDigest"
+test "$prospectiveMainTreeDigest" = "$candidateTreeDigest"
+```
+
+Create or reuse the authorized `develop` to `main` release PR using a body file.
+Do not enable auto-merge before admission. Read exact-head required checks;
+remote checks corroborate the completed local gates and are not a debugging
+loop. Missing, skipped or failed checks block. The production **migration
+admission** check needs real authorized read credentials; a local migration
+result does not substitute. Separately authorize and apply any required
+production migration/recompute before promotion according to its runbook.
+
+## 5. Promote and prove production
+
+Reconfirm PR head and local proof identity, then execute the authorized merge:
+
+```bash
+test "$(gh pr view "$releasePrNumber" --json headRefOid --jq .headRefOid)" = "$developCommit"
+gh pr merge --merge --auto
+```
+
+After the merge and a read-only ref refresh, require full tree identity:
+
+```bash
+mainCommit="$(git rev-parse origin/main)"
+mainTreeDigest="$(git rev-parse "${mainCommit}^{tree}")"
+test "$mainTreeDigest" = "$candidateTreeDigest"
+```
+
+Wait for actual **production identity**: the deployment ID/URL and production
+`/api/version` must identify `mainCommit` in environment `production`. Execute
+the four default production scenarios against that deployment, never against
+the local build:
+
+```bash
+EXPECTED_DEPLOYMENT_COMMIT="$mainCommit" EXPECTED_DEPLOYMENT_ENV=production \
+RELEASE_VERIFICATION_MODE=default PLAYWRIGHT_BASE_URL="$productionUrl" \
+  pnpm --filter @chapa/web exec playwright test \
+    e2e/release-required.spec.ts --grep @release-required --project=chromium
+```
+
+A failure now means production has changed. Record that fact; a separately
+authorized rollback follows `docs/runbooks/rollback.md`. Never declare the
+candidate merely blocked before deployment when it is already deployed.
+
+## 6. Tag, publish and read back
+
+Only after production identity, tree and required probes pass, execute the
+already authorized named tag and publication:
+
+```bash
+git tag -a "$releaseTag" "$mainCommit" -m "$releaseTag"
+git push origin "$releaseTag"
+gh release create "$releaseTag" --notes-file "$releaseNotesPath"
+test "$(git rev-parse "${releaseTag}^{commit}")" = "$mainCommit"
+test "$(gh release view "$releaseTag" --json tagName --jq .tagName)" = "$releaseTag"
+```
+
+Never push all tags. Read back the remote tag target and actual GitHub Release,
+not just local existence. Write schema2 final proof referencing the exact
+local-candidate proof and adding actual production identity, migration
+admission, probes and publication/tag readback:
+
+```bash
+pnpm run release:write-result -- --stage final \
+  --input "$runDir/final-input.json" --output "$runDir/release-result.json"
+```
+
+The final input uses `schemaVersion:2`, the complete `localCandidate` proof,
+`mainCommit`, `mainTreeDigest`, actual `deployment` (`environment:"production"`,
+`id`, HTTPS origin `url`, `commit`, `treeDigest`), the five production `checks`,
+`tag:{name,target}`, `release:{tag,target}`, `readback:{tagVerifiedAt,releaseVerifiedAt}`
+and `generatedAt`. Tag target is the main commit; release target is the tag.
+The writer derives status and the embedded local proof digest.
+
+The final input must explicitly identify schema2. Preserve both proofs outside
+the tracked candidate. No release is complete until final readback passes.
 
 ## Recovery outcomes
 
-Procedural report outcomes only. None authorizes anything on its own.
+| Outcome | Meaning |
+|---|---|
+| `PAUSED` | Observer/provider/credential condition prevents a check; neither candidate nor production changed. Repair that condition and retry the same stage. |
+| `BLOCKED` | Admission, policy, tree, migration or required proof failed before promotion. Changed source needs newly bound local qualification. |
+| `ROLLED_BACK` | Production changed and failed proof, then a separately authorized rollback completed. Do not tag the failed candidate. |
+| `PUBLICATION_PENDING` | Production proof passed but tag, GitHub Release or final readback is incomplete. Resume publication only; never redeploy merely to finish it. |
 
-| Outcome | Meaning | Allowed continuation |
-|---|---|---|
-| `PAUSED` | Candidate and production are unchanged; the failure is in observation, provider state, credentials, or a temporary environment condition. | Repair the observer/provider condition and rerun only the failed stage for the same `developCommit`. |
-| `BLOCKED` | Candidate admission, policy, identity, tree, migration, or direct product proof failed before promotion. | Stop. A source change requires new Gate 1 and Gate 2 approval. |
-| `ROLLED_BACK` | Production changed, post-promotion proof failed, and a separately authorized rollback (`docs/runbooks/rollback.md`) completed. | End the attempt. Do not tag. A new attempt needs new authorization. |
-| `PUBLICATION_PENDING` | Production proof passed, but the tag, GitHub Release, or readback is incomplete. | Inspect remote state and resume publication only; never redeploy a production-proven candidate. |
-
-No automatic redeployment or override exists; each is separately authorized.
-
-## Linked operational detail
-
-- Manual arcs: `docs/runbooks/release-checklist.md`
-- Deployed probes: `docs/runbooks/deployment-smoke.md`
-- Migrations: `docs/runbooks/migrations.md`
-- Rollback: `docs/runbooks/rollback.md`
-- Incidents: `docs/runbooks/incident-response.md`, `docs/runbooks/observability.md`
-- Deep verification (explicit, risk-selected, never a default gate): `docs/playbooks/e2e-pro-release-verification.md` via `/prodplaybook`; `/explore-release` for fresh-context exploration
+No outcome authorizes remote actions. Operational detail:
+`docs/runbooks/release-checklist.md`, `deployment-smoke.md`, `migrations.md`,
+`rollback.md`; current scoring: `docs/release/scoring-v7-release-packet.md` and
+`docs/runbooks/scoring-v7-transition.md`.

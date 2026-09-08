@@ -1,134 +1,78 @@
-# Deployment Smoke Runbook
+# Local-candidate and Production Smoke Runbook
 
-`docs/release/release-playbook.md` owns release ordering and authorization. This
-runbook explains deployed read-only probes, identity, and failure evidence.
+Canonical authority: `docs/release/release-playbook.md`.
+[The release playbook](../release/release-playbook.md) owns ordering and
+authorization. This runbook separates local build evidence from actual
+production observations. It never requests a Vercel Preview deployment.
 
-## Two deployed-smoke contexts
+## Local qualification
 
-### General CI deployment smoke
-
-The `deployment-smoke` job in `.github/workflows/ci.yml` runs
-`apps/web/e2e/smoke.spec.ts` against `DEPLOYMENT_SMOKE_BASE_URL`. It is
-conditional on a configured URL outside production refs and retains Playwright
-failure artifacts.
-
-This general job is useful deployment signal, but a conditional skip is not
-release evidence. It does not authorize a release and cannot substitute for the
-candidate-bound workflow.
-
-### Direct release-required Preview proof
-
-`.github/workflows/release-verification.yml` is one read-only job. It
-receives an immutable `developCommit`, `candidateTreeDigest`, exact Preview
-URL, `baselineTag`, and `runId`, verifies source/tree/baseline identity
-directly, runs `apps/web/e2e/release-required.spec.ts` with:
-
-```text
-EXPECTED_DEPLOYMENT_COMMIT = developCommit
-EXPECTED_DEPLOYMENT_ENV = preview
-RELEASE_VERIFICATION_MODE = default
-PLAYWRIGHT_BASE_URL = exact Preview URL
-```
-
-and writes/uploads one `release-result.json`. An absent URL, absent identity,
-stale preview, wrong environment, missing artifact, cancelled producer, or a
-failed check is blocking.
-
-Production release-required smoke uses `mainCommit`, environment
-`production`, and only the four default production-safe scenarios, run
-directly by `/release` after promotion (`RELEASE_VERIFICATION_MODE=default`).
-`RELEASE_VERIFICATION_MODE=deep` (via `/prodplaybook`, never a default-release
-gate) adds broader scenarios to both environments.
-
-## Identity proof
-
-The first release-required request is `/api/version`.
-
-| Environment | Required body |
-|---|---|
-| Preview | `commitSha` equals `developCommit`; `environment` equals `preview` |
-| Production | `commitSha` equals `mainCommit`; `environment` equals `production` |
-
-The release gate separately proves `mainTreeDigest == candidateTreeDigest`.
-Reachability, a familiar URL, or a green run from another SHA never proves
-candidate identity.
-
-## Required deployed probes
-
-`apps/web/e2e/helpers/release-required-environments.ts` is the single
-executable authority for which of these run at which environment and mode —
-see its `releaseRequiredScenarioIds(environment, mode)`.
-
-| Stable scenario | Assertion | Preview default | Production default | Deep addition |
-|---|---|:-:|:-:|:-:|
-| `deployment.preview-identity` / `deployment.production-identity` | Exact `/api/version` commit and environment | yes | yes | -- |
-| `health.core-dependencies` | `dependencies.redis`, `dependencies.supabase`, and `dependencies.github` are `ok` | yes | yes | -- |
-| `profile.public-badge-read` | Smoke-only badge is HTTP 200, SVG content type, and contains valid SVG markers | yes | yes | -- |
-| `profile.public-share-read` | Smoke-only share page is HTTP 200 and has a visible body | yes | yes | -- |
-| `rollback.readiness` | Baseline tag is annotated and resolves to current production identity | yes | -- | -- |
-| `profile.share-verification` | Share page verification link resolves and renders verified | -- | -- | both |
-| `locales.en-es` | Share page renders correctly in `en` and `es` | -- | -- | both |
-| `auth.github-login-redirect` | Preview login returns a redirect to GitHub | -- | -- | preview only |
-| `auth.protected-write-denied` | Unauthenticated generation request is denied and does not report success | -- | -- | preview only |
-
-The health probe deliberately does not require overall HTTP 200 or
-`status == "ok"`. Overall health also includes cron-heartbeat freshness, which
-describes environment scheduling rather than whether a new deployment's core
-dependencies started correctly. Cron freshness remains visible, alerting, and a
-manual operational readiness arc.
-
-The `?__chapa_smoke=1` public profile and badge paths are read-only. Do not
-replace them with an ordinary profile materialization path for production
-release evidence.
-
-## Reproduce against the exact target
+Use an exact clean commit/full tree and the allowlisted build manifest emitted
+by `scripts/quality/candidate-artifact-manifest.ts`. That helper performs the
+production build; do not first perform a duplicate build merely for this proof.
+Manifests/results belong outside the tracked candidate. Never include env files,
+raw reports, secret-bearing logs or mutable caches.
+The helper refuses implicit Next env files in the repository or app directory.
+Its build process inherits only allowlisted process plumbing, with fixed
+`NODE_ENV=production` and `NEXT_TELEMETRY_DISABLED=1`; app/provider secrets are
+not inherited. Configure synthetic local services separately for the probe server.
 
 ```bash
-cd apps/web
-EXPECTED_DEPLOYMENT_COMMIT="$expectedCommit" \
-EXPECTED_DEPLOYMENT_ENV="$expectedEnvironment" \
-PLAYWRIGHT_BASE_URL="$exactDeploymentUrl" \
-E2E_PRO_RUN_ID="$runId" \
-pnpm exec playwright test e2e/release-required.spec.ts \
-  --grep @release-required
+pnpm exec tsx scripts/quality/candidate-artifact-manifest.ts \
+  --root "$candidateRoot" --output "$manifestPath"
+EXPECTED_DEPLOYMENT_ENV=local RELEASE_VERIFICATION_MODE=local-candidate \
+EXPECTED_DEPLOYMENT_COMMIT="$developCommit" \
+EXPECTED_CANDIDATE_TREE_DIGEST="$candidateTreeDigest" \
+RELEASE_BUILD_MANIFEST="$manifestPath" \
+PLAYWRIGHT_JSON_OUTPUT_NAME="$runDir/release-probes.json" \
+  pnpm --filter @chapa/web exec playwright test \
+    e2e/release-required.spec.ts --grep @release-required --project=chromium
 ```
 
-For the older general smoke suite:
+Use absolute manifest/report paths. Omitting `PLAYWRIGHT_BASE_URL` starts a
+fresh production-mode `next start` server on loopback port3001. An explicit
+base URL must be an exact allowed loopback origin. No development-server
+substitution, `VERCEL_ENV` spoofing or hosted bypass secret is involved.
 
-```bash
-cd apps/web
-PLAYWRIGHT_BASE_URL="$exactDeploymentUrl" \
-DEPLOYMENT_SMOKE_STRICT=true \
-pnpm exec playwright test e2e/smoke.spec.ts
-```
+The seven required local-candidate scenarios are defined by
+`apps/web/e2e/helpers/release-required-environments.ts`; they include source/build
+identity and read-only product behavior. Run the full applicable CI browser
+selection too: seven release probes alone do not qualify the browser gate.
+Record actual `discovered`, `executed`, `skipped` and `failed` counts.
+Every discovered applicable test must execute, with zero skips or failures; a failure anywhere in the full
+applicable browser selection fails `localProbes`, not only a named release probe.
+Do not count deployment-only pending checks as local passes.
+
+## Later authorized production proof
+
+After promotion, actual `/api/version` must report `mainCommit` and environment
+`production`. Verify the real deployment ID/URL and source tree independently;
+local artifact hashes are additional evidence, not a substitute. Run default
+production release probes with `EXPECTED_DEPLOYMENT_ENV=production`,
+`RELEASE_VERIFICATION_MODE=default`, the expected commit and actual production
+URL. Deep mode is separate explicit risk-selected verification.
+
+The executable scenario catalog is authoritative. Production default covers
+identity, core dependencies, public badge and public share. Deep production
+also covers share verification and EN/ES. Required probes use read-only smoke
+paths; never substitute an ordinary materializing profile request just to
+complete production proof.
+
+Dependency health checks read the specific Redis/Supabase/GitHub fields.
+Overall health also includes cron freshness; record that separately. A local
+fixture dependency result cannot establish production credential or scheduling
+readiness. Never invoke cron or change configuration to make a probe pass
+without its explicit authorization.
 
 ## Failure evidence
 
-Record:
+Record expected and observed source/tree/build/deployment identities, exact
+local or production URL, JSON results, screenshots/traces and failed checks.
+A reachability result or familiar hostname is not identity proof. Local evidence
+has no fabricated workflow run/attempt. Actual later workflow observations must
+name the real run and attempt when relevant.
 
-- run ID, expected commit, tree, environment, and exact URL;
-- workflow run and attempt;
-- Playwright JSON result;
-- trace, screenshot, or test output;
-- actual `/api/version` response; and
-- the failed `checks` entry in `release-result.json`.
-
-Do not include secrets, bearer headers, OAuth tokens, service-role keys, or
-personal data. `release-result.json` is the durable receipt (30-day artifact
-retention); it never contains a field name matching `authorization`,
-`cookie`, `secret`, or `token`.
-
-## Common interpretations
-
-| Symptom | Interpretation |
-|---|---|
-| Identity missing or mismatched | Wrong, stale, or not-yet-ready deployment |
-| Core dependency not `ok` | Deployed Redis, Supabase, GitHub, credential, or scope problem |
-| Overall health degraded with core dependencies `ok` | Inspect cron freshness separately; do not relabel it a deployment pass/fail |
-| Badge non-200 or invalid SVG | Public badge path, GitHub, or Redis integration problem |
-| Share non-200 | Public profile SSR or dependency problem |
-| Login does not redirect | GitHub OAuth configuration problem |
-| Protected write does not deny | Authentication or authorization regression |
-
-Changing a deployment URL, secret, variable, or Vercel environment is an
-external configuration action and remains separately authorized.
+No secrets, bearer headers, OAuth tokens, service-role keys or private reports
+belong in proof. Failed or missing required checks remain failed/missing.
+Production migration admission and rollback readiness need real later authorized
+observations; they remain pending in local-candidate proof.

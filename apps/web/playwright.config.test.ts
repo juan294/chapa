@@ -35,6 +35,25 @@ describe("Playwright test discovery", () => {
     expect(config.testIgnore).toContain("**/release-required.spec.ts");
   });
 
+  it("discovers required local-candidate probes and starts production mode without reusing a dev server", async () => {
+    vi.stubEnv("RELEASE_VERIFICATION_MODE", "local-candidate");
+    vi.stubEnv("PLAYWRIGHT_BASE_URL", "");
+    const config = await loadConfig("local");
+    expect(config.testIgnore).toEqual(["**/*.test.ts"]);
+    expect(config.webServer).toMatchObject({ command: "npx next start --port 3001", reuseExistingServer: false });
+    expect(config.globalSetup).toBeUndefined();
+  });
+
+  it.each([
+    { environment: "local", mode: "default", target: "http://localhost:3001" },
+    { environment: "preview", mode: "local-candidate", target: "http://localhost:3001" },
+    { environment: "local", mode: "local-candidate", target: "https://example.com" },
+  ])("fails closed for an invalid explicit local candidate configuration $environment/$mode/$target", async ({ environment, mode, target }) => {
+    vi.stubEnv("RELEASE_VERIFICATION_MODE", mode);
+    vi.stubEnv("PLAYWRIGHT_BASE_URL", target);
+    await expect(loadConfig(environment)).rejects.toThrow(/local|loopback/i);
+  });
+
   it("uses an ephemeral preview-scoped cookie without context-wide headers", async () => {
     vi.stubEnv("E2E_PRO_RUN_ID", "release-test");
     vi.stubEnv("PLAYWRIGHT_BASE_URL", "https://preview.example.com");

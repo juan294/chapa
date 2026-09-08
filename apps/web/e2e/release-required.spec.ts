@@ -1,3 +1,8 @@
+import { verifyServedCandidateArtifact } from "./helpers/local-candidate-artifact";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { verifyLocalBuildManifest } from "../../../scripts/quality/candidate-artifact-manifest";
+import { assertLocalCandidateRuntime, localCandidateTarget } from "./helpers/local-candidate";
 import { expect, test } from "@playwright/test";
 import {
   assertBadgeSvg,
@@ -32,13 +37,35 @@ function requireIdentityInputs(environment: "preview" | "production"): string {
   return expectedCommit!;
 }
 
-test.describe("release-required deployed read-only probes", () => {
+test.describe("release-required read-only probes", () => {
+  if (selectedScenarioIds.has("deployment.local-candidate-identity")) {
+    test("@release-required deployment.local-candidate-identity", async ({ request, baseURL }) => {
+      expect(localCandidateTarget(expectedEnvironment, verificationMode, baseURL ?? "", process.env.VERCEL_AUTOMATION_BYPASS_SECRET)).toBe(true);
+      const manifestPath = process.env.RELEASE_BUILD_MANIFEST?.trim();
+      expect(manifestPath, "RELEASE_BUILD_MANIFEST is required").toBeTruthy();
+      const repoRoot = resolve(import.meta.dirname, "../../..");
+      const manifest = verifyLocalBuildManifest(JSON.parse(readFileSync(manifestPath!, "utf8")), repoRoot);
+      const buildId = readFileSync(resolve(repoRoot, "apps/web/.next/BUILD_ID"), "utf8").trim();
+      expect(buildId).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(manifest.artifacts.some(artifact => artifact.path === `apps/web/.next/static/${buildId}/_buildManifest.js`), "Build-ID-scoped static manifest is required to bind the running server").toBe(true);
+      expect(expectedCommit).toMatch(/^[0-9a-f]{40}$/);
+      expect(process.env.EXPECTED_CANDIDATE_TREE_DIGEST).toMatch(/^[0-9a-f]{40}$/);
+      expect(manifest.commit).toBe(expectedCommit);
+      expect(manifest.treeDigest).toBe(process.env.EXPECTED_CANDIDATE_TREE_DIGEST);
+      const response = await request.get("/api/version", { maxRedirects: 0 });
+      expect(response.status()).toBe(200);
+      expect(response.headers()["cache-control"]).toContain("no-store");
+      assertLocalCandidateRuntime(await response.json());
+      await verifyServedCandidateArtifact(manifest.artifacts, (path, options) => request.get(path, options));
+    });
+  }
+
   if (selectedScenarioIds.has("deployment.production-identity")) {
     test("@release-required deployment.production-identity", async ({ request }) => {
       const commit = requireIdentityInputs("production");
       const response = await request.get("/api/version");
       expect(response.status()).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         commitSha: commit,
         environment: "production",
       });
@@ -51,7 +78,7 @@ test.describe("release-required deployed read-only probes", () => {
       const response = await request.get("/api/version");
       expect(response.status()).toBe(200);
       expect(response.headers()["cache-control"]).toContain("no-store");
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         commitSha: commit,
         environment: "preview",
       });

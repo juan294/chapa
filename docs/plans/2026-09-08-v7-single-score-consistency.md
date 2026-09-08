@@ -121,5 +121,5 @@ The owner authorized implementation after reviewing the proposal and accepting s
 - [x] Phase 5: upload publication, shared selection and image rollback — independent compliance/quality reviews passed; 9,544 full unit tests plus 107 final delta tests, 195 local contracts, typecheck, lint, build, bundle, migration and write-registration checks passed.
 - [x] Phase 6: badge, fifth Craft axis and human explanations — independent reviews, 9,578 unit tests, 195 local contracts, typecheck/lint/build/bundle and real-font raster checks passed; focused interactive acceptance is consolidated in phase9.
 - [x] Phase 7: remaining scored consumers — independent Astra reviews, 9,627 unit tests, 197 local contracts, typecheck/lint/build/bundle, migration and write-registration gates passed. Current values, identity, report periods and legacy isolation are verified.
-- [ ] Phase 8: local release proof and active documentation.
+- [x] Phase 8: local release proof and active documentation — schema2/manifest/local-server identity and no-Preview workflow validated; independent Astra reviews, 9,693 unit tests, typecheck/lint/build/bundle and release-doc/config gates passed. Historical schema1 and frozen scoring artifacts preserved.
 - [ ] Phase 9: final local qualification, manual test handoff, local merge and worktree cleanup.
