@@ -6,7 +6,7 @@ import type { BrowserContext } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY } from '@chapa/shared';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
-import { SCORING_POINT_HANDLES } from "./scoring-point-fixtures";
+import { SCORING_POINT_HANDLES, fixtureStatsBinding } from "./scoring-point-fixtures";
 import { DEMO_STATS } from '../../lib/render/demoData';
 
 export const REDESIGN_OWNERS = ['en', 'es'].flatMap(locale => ['light', 'dark'].flatMap(theme => ['desktop', 'mobile'].map(device => `chapa-redesign-${locale}-${theme}-${device}`)));
@@ -81,7 +81,11 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
     const github: Record<string, unknown> = {};
     for (const handle of REDESIGN_HANDLES) {
       const stats = makeFullStats({ ...DEMO_STATS, handle, displayName: handle, avatarUrl: '', linkedPlatforms: [], linkedPlatformLogins: {}, fetchedAt: new Date().toISOString() });
-      for (const prefix of ['stats:v2:merged:', 'stats:stale:v2:']) cache[`${prefix}${handle}`] = JSON.stringify(stats);
+      const secret = process.env.NEXTAUTH_SECRET, token = process.env.GITHUB_TOKEN;
+      if (!secret || token !== 'redesign-local-fixture') throw new Error('Explicit local fixture secrets/token required for bound stats');
+      const referenceDate = stats.fetchedAt.slice(0, 10);
+      cache[`stats:v3:${handle}`] = JSON.stringify({ binding: fixtureStatsBinding(handle, referenceDate, secret, token), referenceDate, stats });
+      cache[`stats:stale:v2:${handle}`] = JSON.stringify(stats);
       github[handle] = { data: { user: { login: handle, name: handle, avatarUrl: '', contributionsCollection: { contributionCalendar: { totalContributions: 0, weeks: [] }, pullRequestContributions: { totalCount: 0, nodes: [] }, pullRequestReviewContributions: { totalCount: 0 }, issueContributions: { totalCount: 0 } }, repositories: { totalCount: 0, nodes: [] } }, search: { issueCount: 0 } } };
     }
     const today = new Date().toISOString();

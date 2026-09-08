@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { SUPPORTED_LOCALES, DEFAULT_LOCALE, isSupportedLocale, type Locale } from "@/lib/i18n/types";
+import { SUPPORTED_LOCALES, isSupportedLocale, type Locale } from "@/lib/i18n/types";
+import { notFound } from "next/navigation";
 import { DocumentLocaleMarker } from "@/lib/i18n/document-locale";
 
 /**
@@ -45,8 +46,8 @@ export const dynamicParams = false;
  * bare `string` (unlike the page-level `PageProps` types under this same
  * segment, which the sibling `page.tsx` files narrow to `Locale` directly) —
  * so this narrows it explicitly via `isSupportedLocale` rather than casting.
- * The `DEFAULT_LOCALE` fallback branch is unreachable in practice: only
- * `proxy.ts` ever routes here, and only with 'es' or 'en'.
+ * Dynamic pages also require this runtime guard: an unknown top-level path
+ * can reach this segment without passing through the narrow proxy matcher.
  */
 export default async function LocaleSegmentLayout({
   children,
@@ -56,10 +57,10 @@ export default async function LocaleSegmentLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale: rawLocale } = await params;
-  const locale: Locale = isSupportedLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
+  if (!isSupportedLocale(rawLocale)) notFound();
   return (
     <>
-      <DocumentLocaleMarker locale={locale} />
+      <DocumentLocaleMarker locale={rawLocale} />
       {children}
     </>
   );

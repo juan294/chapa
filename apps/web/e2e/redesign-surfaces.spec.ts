@@ -14,6 +14,7 @@ async function command(page: Page, text: string) {
   await input.fill(text); await input.press('Enter');
 }
 async function capture(page: Page, name: string) {
+  await expect(page.getByRole('status', { name: /^(Loading|Cargando)$/ })).toHaveCount(0);
   if (await page.locator('nav').count()) {
     await expect(page.locator('[data-theme-mode]')).toBeVisible();
     await expect(page.getByTestId('navbar-auth-placeholder')).toHaveCount(0);
@@ -135,7 +136,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     expect(await profile.text()).not.toMatch(/"confidence(?:Penalties)?"/);
     await capture(page, `share-${locale}-${theme}-${width}`);
     await page.goto(`/verify/${REDESIGN_VALID_HASH}?lang=${locale}`);
-    await expect(page.locator('h1')).toHaveText(locale === 'en' ? 'Badge verified' : 'Chapa verificada');
+    await expect(page.locator('h1')).toHaveText(locale === 'en' ? 'Legacy verification record' : 'Registro de verificación antiguo');
     await expect(page.getByText('@chapa-redesign-owner')).toBeVisible();
     await capture(page, `verify-${locale}-${theme}-${width}`);
     await page.goto(`/studio?demo=1&lang=${locale}`);

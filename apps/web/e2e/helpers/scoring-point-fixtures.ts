@@ -44,7 +44,7 @@ export async function buildScoringPointSeeds(referenceTime: string) {
 }
 /** The existing fixture session uses the same local-only token as the server.
  * Bind stats to that actual credential/day; never weaken the production cache. */
-function fixtureStatsBinding(handle: string, referenceDate: string, secret: string, token: string) {
+export function fixtureStatsBinding(handle: string, referenceDate: string, secret: string, token: string) {
   const accessContextId = createHmac("sha256", secret).update(canonicalJson({ version: "source-context-v1", owner: handle, requestedSource: { provider: "github", host: "github.com", login: handle }, scope: { discovery: "legacy_upload", repositoryIds: [], eventKinds: [] }, link: null, credential: token })).digest("hex");
   return createHmac("sha256", secret).update(canonicalJson({ version: "stats-cache-binding-v1", accessContextId, links: "unlinked|unlinked|unlinked", referenceDate })).digest("hex");
 }

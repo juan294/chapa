@@ -91,6 +91,12 @@ async function renderHome(locale: "en" | "es" = "en") {
 }
 
 describe("Home page metadata", () => {
+  it("rejects an unknown route segment before translating or rendering the landing", async () => {
+    const { default: Home, generateMetadata } = await import("./page");
+    const props = { params: Promise.resolve({ locale: "nonexistent-page-xyz" }) };
+    await expect(generateMetadata(props)).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK;404");
+    await expect(Home(props)).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK;404");
+  });
   it.each([
     ["en", "Chapa — Developer Impact, Decoded", "Your developer impact"],
     ["es", "Chapa — Impacto de desarrollador, decodificado", "Tu impacto como desarrollador"],

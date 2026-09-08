@@ -25,6 +25,13 @@ async function api(page: Page, handle: string) {
   expect(JSON.stringify(body)).not.toMatch(/SCORING_PRIVATE_SENTINEL|semanticDigest|coreSemanticDigest|confidencePenalties/);
   return body;
 }
+async function settlePublicBadge(page: Page) {
+  await expect(page.locator('svg[data-badge-design]').first()).toBeVisible();
+  await expect(page.locator('svg[data-badge-design] [data-element="score"]').first()).toBeVisible();
+  await expect(page.getByRole("status", { name: /^(Loading|Cargando)$/ })).toHaveCount(0);
+  await expect(page.getByTestId("navbar-auth-placeholder")).toHaveCount(0);
+  await page.evaluate(async () => { await document.fonts.ready; });
+}
 async function servedImage(page: Page) {
   const metadata = await page.locator('meta[property="og:image"]').getAttribute("content");
   expect(metadata).toBeTruthy();
@@ -176,6 +183,7 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     expect(config.data!.config).toEqual({ ...DEFAULT_BADGE_CONFIG, colorPalette: "jade" });
     await currentSurface(page, owner, 0, initial);
     expect((await servedImage(page)).digest).not.toBe(imageBeforePalette.digest);
+    await settlePublicBadge(page);
     await page.screenshot({ path: testInfo.outputPath("scored-zero-saved-palette.png"), fullPage: true });
   } finally {
     await page.goto("/studio?lang=en");
@@ -239,6 +247,7 @@ test("expired Craft retains five labels and boundary69.99 fits EN/ES narrow them
     await page.goto(`/u/chapa-score-expired?lang=${locale}`);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
+    await settlePublicBadge(page);
     const svg = page.locator("svg[data-badge-design]").first();
     await expect(svg.locator('[data-element="score"]')).toHaveText("46");
     await expect(svg.locator('[data-element="craft"]')).toHaveCount(1);
@@ -247,6 +256,7 @@ test("expired Craft retains five labels and boundary69.99 fits EN/ES narrow them
     expect((await api(page, "chapa-score-expired")).craft.status).toBe("expired");
     await page.goto(`/u/chapa-score-boundary?lang=${locale}`);
     await expect(page.locator('svg[data-badge-design] [data-element="score"]').first()).toHaveText("69.99");
+    await settlePublicBadge(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     const boundary = await api(page, "chapa-score-boundary");
     expect(boundary).toMatchObject({ displayScore: 69.99, tier: "Solid" });

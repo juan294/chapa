@@ -110,3 +110,12 @@ it('replays only the declared qualification negative handle with its exact query
   await expect(request('arbitrary-owner')).rejects.toThrow(/Unexpected/);
   await expect(request('this-user-definitely-does-not-exist-xyz123', 'unknown-query')).rejects.toThrow(/Unexpected/);
 });
+
+it('serves the exact historical journey avatar from local fixture bytes only', async () => {
+  const send = vi.fn();
+  const replay = createRedesignFetch({ journeyRunId: 'redesign', avatarPng: Buffer.from('local-avatar').toString('base64'), cache: {}, github: {} }, send);
+  for (const url of ['https://avatars.githubusercontent.com/u/583231', 'https://avatars.githubusercontent.com/u/583231?v=4']) expect(await (await replay(url)).text()).toBe('local-avatar');
+  await expect(replay('https://avatars.githubusercontent.com/u/583232?v=4')).rejects.toThrow(/Unexpected/);
+  await expect(replay('https://avatars.githubusercontent.com/u/583231?v=4', { method: 'POST' })).rejects.toThrow(/Unexpected/);
+  expect(send).not.toHaveBeenCalled();
+});

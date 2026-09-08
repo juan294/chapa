@@ -96,6 +96,11 @@ export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onU
       const handle = headers.get('Authorization')?.match(/^Bearer token-(.+)$/)?.[1];
       if (journeyShape(handle) === 'linked') return Response.json({ values: [], size: 0, pagelen: 10 });
     }
+    // journey.spec.ts uses this historical avatar identifier in its local session.
+    // The fixture bytes are synthetic; no provider image is requested.
+    if (fixtures.journeyRunId === 'redesign' && method === 'GET' && fixtures.avatarPng && ['https://avatars.githubusercontent.com/u/583231', 'https://avatars.githubusercontent.com/u/583231?v=4'].includes(url.href)) {
+      return new Response(Buffer.from(fixtures.avatarPng, 'base64'), { headers: { 'Content-Type': 'image/png' } });
+    }
     if (url.origin === 'https://avatars.githubusercontent.com' && fixtures.github[url.pathname.slice(1)] && fixtures.avatarPng) {
       return new Response(Buffer.from(fixtures.avatarPng, 'base64'), { headers: { 'Content-Type': 'image/png' } });
     }

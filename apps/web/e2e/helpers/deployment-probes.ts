@@ -101,8 +101,9 @@ export async function assertRollbackReadiness(
 /**
  * #1190 — the share page's badge + embed snippet, plus its verification
  * link, must resolve end to end: the inline badge SVG's verification strip
- * links to /verify/{hash}, and that page must render the verified success
- * state (not the not-found or invalid-hash states).
+ * links to /verify/{hash}. This legacy octocat fixture must resolve to the
+ * explicitly labelled legacy record, with matching API identity; current
+ * receipt authenticity is exercised by the scoring-point fixture suite.
  */
 /**
  * Keep the response body when an assertion on it fails, so a transient
@@ -142,13 +143,20 @@ export async function assertShareVerification(
     return hash!;
   });
 
-  const verifyResponse = await request.get(`/verify/${hash}?lang=en`);
+  const apiResponse = await request.get(`/api/verify/${hash}`, { maxRedirects: 0 });
+  expect(apiResponse.status()).toBe(200);
+  expect(await apiResponse.json()).toMatchObject({
+    version: "v6", status: "legacy_record", arithmetic: "replay_unavailable", hash,
+    data: { handle: "octocat" },
+  });
+  const verifyResponse = await request.get(`/verify/${hash}?lang=en`, { maxRedirects: 0 });
   expect(verifyResponse.status()).toBe(200);
   const verifyBody = await verifyResponse.text();
   // #1279 — rendered state, not document substrings: the page also ships
   // its translation dictionary, which names every state it can render.
   await withBodyAttachment("verify-page.html", verifyBody, () => {
-    expect(hasRenderedText(verifyBody, "Badge verified"), "verify page did not render the verified state").toBe(true);
+    expect(hasRenderedText(verifyBody, "Legacy verification record"), "verify page did not render the explicit legacy record state").toBe(true);
+    expect(hasRenderedText(verifyBody, "octocat"), "verify page did not render the linked profile identity").toBe(true);
     expect(hasRenderedText(verifyBody, "Invalid hash"), "verify page rendered the invalid-hash callout").toBe(false);
     expect(hasRenderedText(verifyBody, "Not found"), "verify page rendered the not-found callout").toBe(false);
   });

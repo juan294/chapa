@@ -9,8 +9,9 @@ import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { getServerT } from "@/lib/i18n/server";
-import type { Locale } from "@/lib/i18n/types";
+import { isSupportedLocale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { LandingWebMcpTools } from "@/components/LandingWebMcpTools";
 import { getLeaderboard } from "@/lib/profile/leaderboard";
 
@@ -22,11 +23,12 @@ export const dynamic = "force-dynamic";
 // every page (including this one) must declare its own. `/` is the one
 // place a root-relative canonical is actually correct.
 type HomeProps = {
-  params: Promise<{ locale: Locale }>;
+  params: Promise<{ locale: string }>;
 };
 
 export async function generateMetadata({ params }: HomeProps): Promise<Metadata> {
   const { locale } = await params;
+  if (!isSupportedLocale(locale)) notFound();
   const t = getServerT(locale);
   return {
     title: { absolute: t("meta.defaultTitle") as string },
@@ -39,6 +41,7 @@ export async function generateMetadata({ params }: HomeProps): Promise<Metadata>
 
 export default async function Home({ params }: HomeProps) {
   const { locale } = await params;
+  if (!isSupportedLocale(locale)) notFound();
   const t = getServerT(locale);
   const selection = await readScoringRenderSelection();
   const demoScoring = selection.enabled ? LANDING_OBSERVED_DEMO : undefined;
