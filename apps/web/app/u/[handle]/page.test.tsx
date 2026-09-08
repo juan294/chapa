@@ -1,3 +1,11 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -307,7 +315,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(metadata.openGraph?.images).toEqual([
       {
-        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=ice-terminal-v2-2026-04-17-r7",
+        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=ice-terminal-v2-v6-2026-04-17-r7&lang=es",
         width: 1200,
         height: 630,
         alt: "Chapa de testuser",
@@ -542,6 +550,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: false,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     // #1181 — the call now always also carries a locale-resolved `strings`
     // bundle; see the "badge content and cache key never diverge by locale"
@@ -786,6 +795,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: true,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     expect(mockRenderBadgeSvg).toHaveBeenCalled();
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
@@ -869,7 +879,7 @@ describe("SharePage /u/[handle]", () => {
         expect.any(String),
         FAKE_SVG,
         "testuser",
-        undefined,
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }), configRevision: 7 }),
       );
     });
   });

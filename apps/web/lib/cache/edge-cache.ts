@@ -19,6 +19,8 @@ import { captureServerEvent } from "@/lib/analytics/server-errors";
 
 export type EdgePurgeOutcome = "purged" | "skipped" | "failed";
 
+export const SCORING_IMAGES_EDGE_TAG = "scoring-images";
+
 export const EDGE_PURGE_DEADLINE_MS = 1_500;
 
 /** One tag per handle. Lowercased the same way buildBadgeSvgCacheKey lowercases. */

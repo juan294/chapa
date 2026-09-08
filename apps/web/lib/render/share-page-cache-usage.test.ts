@@ -1,3 +1,11 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 /**
  * #720 — share page must try the badge SVG cache before re-rendering.
@@ -215,7 +223,7 @@ describe("share page (#720) cache-first SVG — real behavior", () => {
       "badge:testuser:2026-05-03",
       '<svg xmlns="http://www.w3.org/2000/svg">FRESH</svg>',
       "testuser",
-      undefined,
+      expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }), receiptIdentity: null }),
     );
   });
 });

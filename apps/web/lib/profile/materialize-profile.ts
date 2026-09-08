@@ -1,3 +1,4 @@
+import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
@@ -56,6 +57,7 @@ export interface MaterializeProfileOptions
   extends Omit<MaterializeImpactStateOptions, "craftResult" | "latestSnapshot"> {
   token?: string;
   readOnly?: boolean;
+  scoringSelection?: ScoringRenderSelection;
   /**
    * #930 — Skip the snapshot lookup entirely. With no prior snapshot,
    * EMA smoothing is skipped and the raw adjusted score passes through.
@@ -69,8 +71,8 @@ export interface MaterializeProfileOptions
 export interface MaterializedProfile extends MaterializedImpactState {
   stats: StatsData;
   /**
-   * What every rendering surface draws (#1311). An issued v7 receipt projects
-   * to `policyVersion: "v7"`; a subject with no receipt gets the v6 aggregate
+   * What every rendering surface draws (#1311). An issued observed receipt projects
+   * to `policyVersion: "v7.2"`; a subject with no receipt gets the v6 aggregate
    * projected into the same shape and labelled `v6`. Resolving it here rather
    * than per surface is what stops the badge, the OG image, the share page and
    * the warm-cache pre-render from disagreeing about one revision.
@@ -177,11 +179,12 @@ export function materializeImpactState(
  */
 export async function materializeDisplayProfile(
   handle: string,
-  options: { token?: string; readOnly?: boolean } = {},
+  options: { token?: string; readOnly?: boolean; scoringSelection?: ScoringRenderSelection } = {},
 ): Promise<MaterializedDisplayProfile | null> {
+  const selection = options.scoringSelection ?? await readScoringRenderSelection();
   const [inputs, receipt] = await Promise.all([
     loadDisplayInputs(handle, options.token, options.readOnly ?? false),
-    readRenderableReceipt(handle),
+    readRenderableReceipt(handle, selection),
   ]);
   if (!inputs || isGitHubUserNotFound(inputs)) return null;
 
@@ -189,7 +192,7 @@ export async function materializeDisplayProfile(
   return {
     stats: inputs.stats,
     ...displayState,
-    scoring: scoreModelFrom(handle, displayState.displayImpact, receipt),
+    scoring: scoreModelFrom(handle, displayState.displayImpact, receipt, selection),
   };
 }
 
@@ -203,6 +206,7 @@ export async function materializeProfile(
   handle: string,
   options: MaterializeProfileOptions = {},
 ): Promise<MaterializedProfile | GitHubUserNotFound | null> {
+  const selection = options.scoringSelection ?? await readScoringRenderSelection();
   // #800 — getStats and the three cache lookups all only need the handle, so
   // they run concurrently. On cache miss for stats, GitHub's GraphQL still
   // dominates; on cache hit, this saves a round-trip vs the previous serial
@@ -219,7 +223,7 @@ export async function materializeProfile(
       // #1311 — the issued v7 receipt, read alongside stats rather than after
       // them. A failed read falls back to the labelled v6 aggregate, which is
       // the same answer this surface gave before a receipt existed.
-      readRenderableReceipt(handle),
+      readRenderableReceipt(handle, selection),
     ]);
 
   const displayInputs =
@@ -254,7 +258,8 @@ export async function materializeProfile(
     scoring: scoreModelFrom(
       handle,
       impactState.displayImpact,
-      receiptSettled.status === "fulfilled" ? receiptSettled.value : null,
+      receiptSettled.status === "fulfilled" ? receiptSettled.value : { unavailable: true },
+      selection,
     ),
   };
 }

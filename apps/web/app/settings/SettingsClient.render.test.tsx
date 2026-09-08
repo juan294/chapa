@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   insightsEnabled: vi.fn(),
   importFile: vi.fn(),
   cooldownActive: vi.fn(),
+  pendingConfirmation: vi.fn(),
+  confirmImport: vi.fn(),
+  cancelImport: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
@@ -39,6 +42,9 @@ vi.mock("@/lib/insights/use-insights-import", () => ({
     cooldownActive: mocks.cooldownActive(),
     cooldownTooltip: mocks.cooldownActive() ? "Available again on Sep 13" : undefined,
     importFile: mocks.importFile,
+    pendingConfirmation: mocks.pendingConfirmation(),
+    confirmImport: mocks.confirmImport,
+    cancelImport: mocks.cancelImport,
   }),
 }));
 vi.mock("@/hooks/useSession", () => ({ clearSessionCache: vi.fn() }));
@@ -71,11 +77,22 @@ beforeEach(() => {
   mocks.toast.mockReturnValue(null);
   mocks.insightsEnabled.mockReturnValue(true);
   mocks.cooldownActive.mockReturnValue(false);
+  mocks.pendingConfirmation.mockReturnValue(null);
   mocks.connections.mockReturnValue([
     connection("bitbucket", { status: { linked: true, remoteLogin: "octo-bb" } }),
     connection("codeberg", { status: { linked: false, remoteLogin: null } }),
     connection("gitlab", { enabled: false }),
   ]);
+});
+
+it("keeps first-publication acknowledgment inside the existing import section", () => {
+  mocks.pendingConfirmation.mockReturnValue("publication");
+  renderSettings();
+  const section = screen.getByTestId("settings-insights");
+  expect(within(section).getByText(/Your derived numerical scores and reproducible receipt will be public/)).toBeDefined();
+  fireEvent.click(within(section).getByRole("button", { name: "Publish and unlock Craft" }));
+  expect(mocks.confirmImport).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("alertdialog")).toBeNull();
 });
 
 function renderSettings() {

@@ -16,12 +16,14 @@ export interface ObservedReceiptManifest {
   readonly contentHash: string;
   /** Private service metadata; never put this digest in public API/cache identities. */
   readonly semanticDigest: string;
+  readonly coreSemanticDigest: string | null;
   readonly trend: ObservedTrendAnchor | null;
   readonly isCurrent: boolean;
 }
 export interface StoredObservedReceipt {
   readonly envelope: HashedObservedScoreReceipt;
   readonly semanticDigest: string;
+  readonly coreSemanticDigest: string | null;
   readonly trend: ObservedTrendAnchor | null;
   readonly isCurrent: boolean;
 }
@@ -36,6 +38,7 @@ function record(value: unknown): Record<string, unknown> {
 function manifest(value: unknown): ObservedReceiptManifest {
   const row = record(value);
   if (typeof row.revisionId !== "string" || row.policyVersion !== "v7.2" || !digest(row.semanticDigest) || !digest(row.contentHash) || typeof row.isCurrent !== "boolean") throw new Error("Invalid observed manifest");
+  if (row.coreSemanticDigest !== undefined && row.coreSemanticDigest !== null && !digest(row.coreSemanticDigest)) throw new Error("Invalid core semantic digest");
   let trend: ObservedTrendAnchor | null = null;
   if (row.trend !== null) {
     const t = record(row.trend);
@@ -43,7 +46,7 @@ function manifest(value: unknown): ObservedReceiptManifest {
       || !score(t.raw_value) || !score(t.value) || !(t.previous_receipt_id === null || typeof t.previous_receipt_id === "string")) throw new Error("Invalid observed trend");
     trend = { policyVersion: "v7.2", referenceDate: t.date, receiptRevisionId: row.revisionId, rawPoint: t.raw_value, unroundedValue: t.value, previousAnchorRevisionId: t.previous_receipt_id };
   }
-  return { revisionId: row.revisionId, policyVersion: "v7.2", contentHash: row.contentHash, semanticDigest: row.semanticDigest, trend, isCurrent: row.isCurrent };
+  return { revisionId: row.revisionId, policyVersion: "v7.2", contentHash: row.contentHash, semanticDigest: row.semanticDigest, coreSemanticDigest: typeof row.coreSemanticDigest === "string" ? row.coreSemanticDigest : null, trend, isCurrent: row.isCurrent };
 }
 async function stored(value: unknown): Promise<StoredObservedReceipt> {
   const row = record(value); const identity = manifest(row);
@@ -53,7 +56,7 @@ async function stored(value: unknown): Promise<StoredObservedReceipt> {
   if (canonicalJson(receipt) !== row.canonicalReceipt || receipt.revisionId !== identity.revisionId || envelope.contentHash.value !== identity.contentHash) throw new Error("Observed receipt identity mismatch");
   const trend = identity.trend;
   if (trend && (receipt.action === "retract" || trend.referenceDate !== receipt.window.referenceDate || Math.abs(trend.rawPoint - receipt.core.composite.exact) > SCORING_OBSERVED_POLICY.numericTolerance)) throw new Error("Observed receipt trend mismatch");
-  return { envelope, semanticDigest: identity.semanticDigest, trend, isCurrent: identity.isCurrent };
+  return { envelope, semanticDigest: identity.semanticDigest, coreSemanticDigest: identity.coreSemanticDigest, trend, isCurrent: identity.isCurrent };
 }
 async function rpc(name: string, args: Record<string, unknown>): Promise<unknown> {
   const db = getSupabase();
@@ -87,14 +90,14 @@ export async function dbReadObservedReceipt(owner: string, revisionId?: string):
 /** Returns the database's authoritative winner, which may differ from the prepared
  * envelope after a concurrent semantic no-op. Success always follows durable commit.
  */
-export async function dbPublishObservedReceipt(owner: string, actor: string, envelope: HashedObservedScoreReceipt, semanticDigest: string): Promise<ObservedReceiptPublication> {
+export async function dbPublishObservedReceipt(owner: string, actor: string, envelope: HashedObservedScoreReceipt, semanticDigest: string, coreSemanticDigest?: string): Promise<ObservedReceiptPublication> {
   try {
-    if (!digest(semanticDigest)) throw new Error("Invalid observed semantic digest");
+    if (!digest(semanticDigest) || (coreSemanticDigest !== undefined && !digest(coreSemanticDigest))) throw new Error("Invalid observed semantic digest");
     const receipt = await verifyObservedScoreReceipt(envelope);
-    const value = record(await rpc("scoring_observed_publish_receipt", { p_owner: owner.toLowerCase(), p_actor: actor.toLowerCase(), p_receipt: receipt, p_canonical: canonicalJson(receipt), p_semantic_digest: semanticDigest }));
+    const value = record(await rpc("scoring_observed_publish_receipt", { p_owner: owner.toLowerCase(), p_actor: actor.toLowerCase(), p_receipt: receipt, p_canonical: canonicalJson(receipt), p_semantic_digest: semanticDigest, p_core_semantic_digest: coreSemanticDigest ?? null }));
     if (value.status !== "inserted" && value.status !== "duplicate") throw new Error("Invalid observed publication result");
     const result = await stored(value);
-    if (result.semanticDigest !== semanticDigest || (value.status === "inserted" && canonicalJson(result.envelope) !== canonicalJson(envelope))) throw new Error("Observed publication identity mismatch");
+    if (result.semanticDigest !== semanticDigest || (coreSemanticDigest !== undefined && result.coreSemanticDigest !== coreSemanticDigest) || (value.status === "inserted" && canonicalJson(result.envelope) !== canonicalJson(envelope))) throw new Error("Observed publication identity mismatch");
     return { status: value.status, ...result };
   } catch { unavailable("publication"); return { status: "failed" }; }
 }

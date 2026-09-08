@@ -1,3 +1,4 @@
+import { readScoringRenderSelection, sameScoringRenderSelection, scoringResponseMaxAge, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
@@ -8,9 +9,10 @@ import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
 import { svgToPng } from "@/lib/render/svg-to-png";
 import { cacheDel, cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
-import { ogImageEdgeCacheTag } from "@/lib/cache/edge-cache";
+import { ogImageEdgeCacheTag, SCORING_IMAGES_EDGE_TAG } from "@/lib/cache/edge-cache";
 import {
   buildOgImageCacheKey,
+  isScoringImageReceiptCurrent,
   buildOgImageCacheVersion,
 } from "@/lib/render/badge-svg-cache";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -25,8 +27,7 @@ import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 
 const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000;
-const OG_EDGE_POLICY = "public, s-maxage=21600, stale-while-revalidate=86400";
-const OG_CLIENT_POLICY = "public, max-age=300";
+const ERROR_CACHE_HEADERS = { "Cache-Control": "private, no-store, max-age=0", "Vercel-CDN-Cache-Control": "no-store" };
 
 type OgImageCacheEntry = {
   version: string;
@@ -42,18 +43,22 @@ function isOgImageCacheEntry(value: unknown): value is OgImageCacheEntry {
   );
 }
 
-function ogImageCacheHeaders(handle: string) {
+function ogImageCacheHeaders(handle: string, selection: ScoringRenderSelection) {
+  const age = scoringResponseMaxAge(selection);
+  if (age === 0) return ogImageNoStoreHeaders(selection);
   return {
     "Content-Type": "image/png",
-    "Cache-Control": OG_CLIENT_POLICY,
-    "Vercel-CDN-Cache-Control": OG_EDGE_POLICY,
-    "Vercel-Cache-Tag": ogImageEdgeCacheTag(handle),
+    "X-Scoring-Selection": selection.machinePolicy,
+    "Cache-Control": `public, max-age=${age}`,
+    "Vercel-CDN-Cache-Control": `public, s-maxage=${age}`,
+    "Vercel-Cache-Tag": `${ogImageEdgeCacheTag(handle)},${SCORING_IMAGES_EDGE_TAG}`,
   };
 }
 
-function ogImageNoStoreHeaders() {
+function ogImageNoStoreHeaders(selection: ScoringRenderSelection) {
   return {
     "Content-Type": "image/png",
+    "X-Scoring-Selection": selection.cacheable ? selection.machinePolicy : "unavailable",
     "Cache-Control": "private, no-store, max-age=0",
     "Vercel-CDN-Cache-Control": "no-store",
   };
@@ -76,21 +81,22 @@ export async function GET(
 
   // Validate handle before any cache/rate-limit work
   if (!isValidHandle(handle)) {
-    return new NextResponse("Invalid handle", { status: 400 });
+    return new NextResponse("Invalid handle", { status: 400, headers: ERROR_CACHE_HEADERS });
   }
 
-  const today = toDateString(new Date());
+  const scoringSelection = await readScoringRenderSelection();
+  const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
   // #1190 — the OG image is credential-less and publicly cacheable, exactly
   // like badge.svg, so locale comes from `?lang=` rather than the cookie
   // chain. It MUST be in the cache key: without it whichever locale rendered
   // first won the day's slot and every other locale was served that PNG.
   const lang = request.nextUrl.searchParams.get("lang");
   const locale: Locale = isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
-  const badgeLocale = resolveBadgeLocale(locale);
-  const ogCacheKey = buildOgImageCacheKey(handle, today, locale);
+  const badgeLocale = resolveBadgeLocale(locale, scoringSelection.machinePolicy);
+  const ogCacheKey = buildOgImageCacheKey(handle, today, locale, scoringSelection.machinePolicy);
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
-  const expectedVersion = configSnapshot.cacheable
-    ? buildOgImageCacheVersion(today, configSnapshot.revision)
+  const expectedVersion = configSnapshot.cacheable && scoringSelection.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision, scoringSelection.machinePolicy)
     : null;
   const requestedVersion = request.nextUrl.searchParams.get("v");
   const publicationVersion =
@@ -109,7 +115,7 @@ export async function GET(
     ) {
       const pngBuffer = Buffer.from(cached.pngBase64, "base64");
       return new NextResponse(pngBuffer, {
-        headers: ogImageCacheHeaders(handle),
+        headers: ogImageCacheHeaders(handle, scoringSelection),
       });
     }
   } catch {
@@ -125,18 +131,19 @@ export async function GET(
       headers: {
         "Content-Type": "text/plain",
         "Retry-After": "60",
+        ...ERROR_CACHE_HEADERS,
       },
     });
   }
 
   try {
-    const materialized = await materializePublicProfile(handle);
+    const materialized = await materializePublicProfile(handle, { scoringSelection });
     // LE-8-2 — GitHub says nobody owns the handle; distinct body, same status.
     if (isGitHubUserNotFound(materialized)) {
-      return new NextResponse("No GitHub user with this handle", { status: 404 });
+      return new NextResponse("No GitHub user with this handle", { status: 404, headers: ERROR_CACHE_HEADERS });
     }
     if (!materialized) {
-      return new NextResponse("Could not load data", { status: 404 });
+      return new NextResponse("Could not load data", { status: 404, headers: ERROR_CACHE_HEADERS });
     }
 
     const avatarDataUri = materialized.stats.avatarUrl
@@ -165,9 +172,13 @@ export async function GET(
       "svgToPng",
     );
 
-    if (publicationVersion === null) {
+    const receiptIdentity = materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null;
+    const beforeWriteReceiptCurrent = await isScoringImageReceiptCurrent(handle, scoringSelection, receiptIdentity);
+    const beforeWriteSelection = await readScoringRenderSelection({ force: true });
+    const beforeWriteConfig = await resolveBadgeConfigSnapshot(handle);
+    if (!beforeWriteReceiptCurrent || materialized.scoring?.freshness === "unavailable" || publicationVersion === null || !sameScoringRenderSelection(scoringSelection, beforeWriteSelection) || !beforeWriteConfig.cacheable || beforeWriteConfig.revision !== configSnapshot.revision) {
       return new NextResponse(Buffer.from(png), {
-        headers: ogImageNoStoreHeaders(),
+        headers: ogImageNoStoreHeaders(materialized.scoring?.freshness === "unavailable" ? { ...scoringSelection, cacheable: false } : scoringSelection),
       });
     }
 
@@ -203,24 +214,26 @@ export async function GET(
     // metadata URL prevents stale values/responses from poisoning the new URL.
     const currentConfigSnapshot = await resolveBadgeConfigSnapshot(handle);
     const currentVersion = currentConfigSnapshot.cacheable
-      ? buildOgImageCacheVersion(today, currentConfigSnapshot.revision)
+      ? buildOgImageCacheVersion(today, currentConfigSnapshot.revision, scoringSelection.machinePolicy)
       : null;
-    if (currentVersion !== publicationVersion) {
+    const afterWriteSelection = await readScoringRenderSelection({ force: true });
+    const afterWriteReceiptCurrent = await isScoringImageReceiptCurrent(handle, scoringSelection, receiptIdentity);
+    if (!afterWriteReceiptCurrent || currentVersion !== publicationVersion || !sameScoringRenderSelection(scoringSelection, afterWriteSelection)) {
       if (cached) await cacheDel(ogCacheKey);
       return new NextResponse(Buffer.from(png), {
-        headers: ogImageNoStoreHeaders(),
+        headers: ogImageNoStoreHeaders({ ...scoringSelection, cacheable: false }),
       });
     }
 
     return new NextResponse(Buffer.from(png), {
-      headers: ogImageCacheHeaders(handle),
+      headers: ogImageCacheHeaders(handle, scoringSelection),
     });
   } catch (e) {
     if (e instanceof TimeoutError) {
       console.error("[og-image] svgToPng timed out after 10s");
-      return new NextResponse("PNG conversion timed out", { status: 504 });
+      return new NextResponse("PNG conversion timed out", { status: 504, headers: ERROR_CACHE_HEADERS });
     }
     console.error("[og-image] failed to generate badge PNG:", e);
-    return new NextResponse("Failed to generate image", { status: 500 });
+    return new NextResponse("Failed to generate image", { status: 500, headers: ERROR_CACHE_HEADERS });
   }
 }

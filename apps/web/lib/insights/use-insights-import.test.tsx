@@ -6,6 +6,9 @@ import { useInsightsImport } from "./use-insights-import";
 vi.mock("@/lib/insights/parser", () => ({
   parseInsightsHtml: vi.fn(() => ({ tool: "claude-code" })),
 }));
+vi.mock("@/lib/insights/report-craft-import", () => ({
+  parseReportCraftHtml: vi.fn(() => ({ schemaVersion: "v7.2", tool: "claude-code", reportPeriod: { start: "2026-09-01", end: "2026-09-07" }, totalSessions: 10, outcomes: [{ label: "Failed", count: 10 }] })),
+}));
 
 const originalLocation = window.location;
 const reload = vi.fn();
@@ -79,5 +82,108 @@ describe("insights notification identity and reload (#1292)", () => {
     view.unmount();
     await act(() => vi.advanceTimersByTimeAsync(10000));
     expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+describe("report-derived Craft import", () => {
+  const published = (score: number) => ({ persisted: true, publication: "published", refreshed: true, scoring: {}, craft: { status: "scored", report: { result: { point: { displayLabel: String(score) } } } } });
+  it("discards a pending acknowledgment after an account or policy change", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: "publication_acknowledgment_required" }), { status: 409 }));
+    const { result, rerender } = renderHook(({ login, policy }) => useInsightsImport(login, policy), { initialProps: { login: "alice", policy: "v7.2" as "v6" | "v7.2" } });
+    await act(() => result.current.importFile(file));
+    expect(result.current.pendingConfirmation).toBe("publication");
+    rerender({ login: "bob", policy: "v6" });
+    expect(result.current.pendingConfirmation).toBeNull();
+    await act(() => result.current.confirmImport());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("allows only one import while the selected file is still being read", async () => {
+    let finish!: (text: string) => void;
+    const slow = { size: 100, text: () => new Promise<string>(resolve => { finish = resolve; }) } as File;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(published(0)), { status: 200 }));
+    const { result } = renderHook(() => useInsightsImport("alice", "v7.2"));
+    let pending!: Promise<void>;
+    await act(async () => { pending = result.current.importFile(slow); });
+    expect(result.current.processing).toBe(true);
+    await act(() => result.current.importFile(file));
+    expect(fetchMock).not.toHaveBeenCalled();
+    await act(async () => { finish("<html>report</html>"); await pending; });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it.each([57, 0])("publishes Craft%s without recalculating or claiming a core increase", async score => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(published(score)), { status: 200 }));
+    const { result } = renderHook(() => useInsightsImport("octocat", "v7.2"));
+    await act(() => result.current.importFile(file));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.current.toast).toMatchObject({ type: "success", message: `Craft: ${score}/100` });
+    expect(result.current.toast?.detail).not.toContain("undefined");
+    expect(result.current.cooldownActive).toBe(false);
+    expect(localStorage.getItem("chapa_insights_last_submitted_octocat")).toBeNull();
+  });
+  it("requests inline publication acknowledgment only when required and retries the same report", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "publication_acknowledgment_required" }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(published(0)), { status: 200 }));
+    const { result } = renderHook(() => useInsightsImport("octocat", "v7.2"));
+    await act(() => result.current.importFile(file));
+    expect(result.current.pendingConfirmation).toBe("publication");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(() => result.current.confirmImport());
+    const first = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string);
+    const second = JSON.parse(fetchMock.mock.calls[1]![1]!.body as string);
+    expect(second.report).toEqual(first.report);
+    expect(first.publicationAcknowledged).not.toBe(true);
+    expect(second.publicationAcknowledged).toBe(true);
+    expect(result.current.pendingConfirmation).toBeNull();
+  });
+  it("requires an explicit same-period replacement and carries its parent identity", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "same_period_requires_explicit_correction", supersedesReportId: "parent" }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(published(57)), { status: 200 }));
+    const { result } = renderHook(() => useInsightsImport("octocat", "v7.2"));
+    await act(() => result.current.importFile(file));
+    expect(result.current.pendingConfirmation).toBe("replacement");
+    await act(() => result.current.confirmImport());
+    expect(JSON.parse(fetchMock.mock.calls[1]![1]!.body as string).supersedesReportId).toBe("parent");
+  });
+  it.each([
+    { persisted: false, publication: "not_published", refreshed: false },
+    { persisted: true, publication: "pending", refreshed: false },
+    { ...published(57), refreshed: false },
+  ])("does not announce success or block retry after partial failure (%j)", async response => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const { result } = renderHook(() => useInsightsImport("octocat", "v7.2"));
+    await act(() => result.current.importFile(file));
+    expect(result.current.toast?.type).not.toBe("success");
+    expect(result.current.cooldownActive).toBe(false);
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(reload).not.toHaveBeenCalled();
+  });
+  it.each(["insufficient", "older", "outside_window"])("does not attribute retained Craft to a newly %s report", async reportSelection => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ ...published(57), reportSelection })));
+    const { result } = renderHook(() => useInsightsImport("octocat", "v7.2"));
+    await act(() => result.current.importFile(file));
+    expect(result.current.toast?.message).toBe("Report saved; your current Craft score is unchanged");
+    expect(result.current.toast?.type).toBe("info");
+  });
+  it("repairs a saved publication using the retained draft without rereading a file", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ persisted: true, publication: "pending", refreshed: false })))
+      .mockResolvedValueOnce(new Response(JSON.stringify(published(57))));
+    const { result } = renderHook(() => useInsightsImport("octocat", "v7.2"));
+    await act(() => result.current.importFile(file));
+    expect(result.current.pendingConfirmation).toBe("retry");
+    await act(() => result.current.confirmImport());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]![1]!.body).toBe(fetchMock.mock.calls[0]![1]!.body);
+    expect(result.current.toast?.type).toBe("success");
+  });
+  it("canceling the inline prompt publishes nothing", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: "publication_acknowledgment_required" }), { status: 409 }));
+    const { result } = renderHook(() => useInsightsImport("octocat", "v7.2"));
+    await act(() => result.current.importFile(file));
+    act(() => result.current.cancelImport());
+    expect(result.current.pendingConfirmation).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

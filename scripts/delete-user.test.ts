@@ -447,6 +447,8 @@ describe("SUPABASE_TABLES", () => {
       "merge_operations.source_handle",
       "merge_operations.target_handle",
       "metrics_snapshots.handle",
+      "report_craft_reports.owner_handle",
+      "report_craft_selection.owner_handle",
       "scoring_observed_current.owner_handle",
       "scoring_v7_assessments.evaluator_handle",
       "scoring_v7_assessments.owner_handle",
@@ -543,4 +545,14 @@ it("reports pending on administrative retry while the first failed receipt cache
   await expect(run(["ann", "--delete"])).rejects.toThrow("receipt cache cleanup pending");
   expect(retained.size).toBe(1);
   expect(retry.calls.some(call => call.url.includes("/DEL/"))).toBe(false);
+});
+
+it("classifies only known policy-scoped image and lock namespaces", () => {
+  for (const namespace of ["badge:v2", "badge-lock:v2", "og-image:v5"]) for (const policy of ["v6", "v7.2"]) {
+    expect(classifyRedisOwnership(`${namespace}:ann:ice-terminal-v2:${policy}:2026-09-08:en`, "ann")).toBe("owned");
+    expect(classifyRedisOwnership(`${namespace}:joann:ann:${policy}:2026-09-08:es`, "ann")).toBe("foreign");
+  }
+  for (const suffix of ["v7.3:2026-09-08:en", "v7.2:private:en", "v7.2:2026-09-08:fr", "v7.2:2026-09-08:en:extra"]) {
+    expect(classifyRedisOwnership(`badge:v2:ann:ice-terminal-v2:${suffix}`, "ann")).toBe("unresolved");
+  }
 });

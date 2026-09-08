@@ -6,6 +6,7 @@ import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { SettingsClient } from "./SettingsClient";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 // Session-gated like /studio, not a public content page (#1223): it reads the
 // session from request headers, so it can never be statically rendered.
@@ -31,6 +32,7 @@ export default async function SettingsPage() {
 
   const locale = await getServerLocale();
   const t = getServerT(locale);
+  const scoringSelection = await readScoringRenderSelection();
 
   return (
     // #1194 — the shell supplies the navbar AND the two locale corrections
@@ -51,6 +53,7 @@ export default async function SettingsPage() {
             login={session.login}
             name={session.name ?? null}
             avatarUrl={session.avatar_url ?? null}
+            scoringPolicy={scoringSelection.machinePolicy}
           />
           {/* Server-rendered: the evidence ledger is owner-only data and must
               never cross into the client tree for anyone else (#1067's rule,

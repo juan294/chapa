@@ -71,6 +71,8 @@ export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; del
     { table: "scoring_v7_raw_artifacts", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "scoring_v7_receipts", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "scoring_v7_trend_anchors", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "report_craft_reports", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "report_craft_selection", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "scoring_observed_current", column: "owner_handle", deletion: "scoring_v7_rpc" },
   ];
 
@@ -133,6 +135,7 @@ export function classifyRedisOwnership(key: string, handle: string, revisionIds:
   else if (fields.length === 5 && fields[0] === "stats" && fields[1] === "v2" && ["github", "gitlab", "bitbucket", "codeberg"].includes(fields[2]!) && fields[4] === "neg") owner = fields[3];
   else if (fields.length === 4 && fields[0] === "sideeffects" && fields[1] === "done" && /^\d{4}-\d{2}-\d{2}$/.test(fields[3]!)) owner = fields[2];
   else if (fields.length === 6 && ((fields[0] === "badge" && fields[1] === "v2") || (fields[0] === "og-image" && fields[1] === "v5"))) owner = fields[2];
+  else if (fields.length === 7 && (((fields[0] === "badge" || fields[0] === "badge-lock") && fields[1] === "v2") || (fields[0] === "og-image" && fields[1] === "v5")) && ["v6", "v7.2"].includes(fields[4]!) && /^\d{4}-\d{2}-\d{2}$/.test(fields[5]!) && ["en", "es"].includes(fields[6]!)) owner = fields[2];
   return owner === undefined ? "unresolved" : owner === handle ? "owned" : "foreign";
 }
 

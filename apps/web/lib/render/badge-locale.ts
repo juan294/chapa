@@ -1,3 +1,4 @@
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { BadgeI18nStrings } from "./BadgeSvg";
@@ -45,7 +46,7 @@ export interface ResolvedBadgeLocale {
   renderLockKey: (handle: string, date: string) => string;
 }
 
-export function resolveBadgeLocale(locale: Locale): ResolvedBadgeLocale {
+export function resolveBadgeLocale(locale: Locale, machinePolicy: ScoringRenderSelection["machinePolicy"] = "v6"): ResolvedBadgeLocale {
   const t = getServerT(locale);
 
   return {
@@ -55,7 +56,7 @@ export function resolveBadgeLocale(locale: Locale): ResolvedBadgeLocale {
     // (#1191 step 6).
     stringsFor: (tier: string | null): BadgeI18nStrings =>
       buildBadgeI18nStrings(t, tier),
-    cacheKey: (handle, date) => buildBadgeSvgCacheKey(handle, date, locale),
-    renderLockKey: (handle, date) => buildBadgeSvgRenderLockKey(handle, date, locale),
+    cacheKey: (handle, date) => buildBadgeSvgCacheKey(handle, date, locale, machinePolicy),
+    renderLockKey: (handle, date) => buildBadgeSvgRenderLockKey(handle, date, locale, machinePolicy),
   };
 }

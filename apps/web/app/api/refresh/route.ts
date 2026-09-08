@@ -1,3 +1,4 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimitStrict } from "@/lib/cache/redis";
@@ -75,7 +76,9 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
+  const scoringSelection = await readScoringRenderSelection();
   const materialized = await materializeOrchestratedProfile(handle, {
+    scoringSelection,
     token,
   });
   if (!materialized) {
@@ -158,7 +161,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
   // consented subject's v7 receipt is re-issued. Awaited rather than deferred:
   // the invalidation above has already cleared the badge, and issuing after
   // that clear is what makes the next render draw the new revision.
-  await issueScoreReceiptIfConsented(handle, token ? { token } : {});
+  await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;

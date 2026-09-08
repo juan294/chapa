@@ -31,3 +31,33 @@ Found: the existing public projection emits historical assessment-chain rows ind
 Chose: add a bounded public-metadata resolver that follows the pinned verdict rules and enforce qualifying-count parity against the actual calculator before sealing. Keep full revision chains in private scoring evidence and semantic identity. Preserve the historical engine bytes.
 
 Why: corrected or retracted assessments must remain publishable without inventing credit, while archived receipts retain their exact algorithm identity.
+
+### Phase 5 — explicit report date admission and current consumer cutover
+
+Plan said: preserve report periods, deterministic report selection, and first-upload publication without recalculating fixed core evidence.
+
+Found: supported HTML reports declare inclusive calendar dates, including the capture day, while replay inputs require nonfuture observation instants. The client parser also preserves original outcome labels that the legacy DTO loses. Switching the common receipt reader exposes historical-only consumers before the later presentation phases.
+
+Chose: use a strict browser-produced versioned numeric DTO with original labels and validate it again on the server. Canonical content deduplication is independent of capture time; persist the first server cutoff, bounded by the declared end, without rejuvenating retries. Rank effective periods and retain explicit same-declared-period correction. Add minimal current projection adapters at the reader cutover; finish presentation and all-consumer acceptance in phases 6–7.
+
+Why: date-only reports need a reproducible admission rule, failure categories must survive parsing, and no intermediate runtime reader may interpret a current point receipt using the archived range contract. Full report HTML stays in the browser; the private canonical numeric import body follows the existing retention rule.
+
+### Phase 5 — frozen core identity survives report-only publication
+
+Plan said: a Craft-only update preserves fixed core evidence, and an unchanged retry or ordinary refresh reuses the same receipt.
+
+Found: recomputing core from mutable retained stores could change a frozen baseline, while hashing the previous combined digest plus new Craft produced a different identity from the next ordinary refresh.
+
+Chose: retain a private core semantic digest separately from the combined core/Craft digest. Report-only publication reuses the durable core payload and this private identity, with an atomic expected-current-revision fence. Ordinary publication uses the same combined digest construction, so unchanged evidence deduplicates while changed private provenance remains significant.
+
+Why: public field equality alone cannot prove private evidence identity, and a report upload must not overwrite a concurrently published newer core. The metadata remains private and does not alter the public receipt schema or archived algorithm bytes.
+
+### Phase 5 — no prior-day current-policy image fallback
+
+Plan said: include policy identity in yesterday fallback and keep responses within a bounded rollback budget.
+
+Found: a prior-day raw image cannot re-evaluate Craft eligibility after the annual window advances; it can show a now-expired point as current even when the underlying receipt has not changed.
+
+Chose: retain prior-day fallback only for legacy policy. Current-policy images use the captured UTC context date; the central selection cache refreshes at midnight and current response freshness also ends at midnight. A late render cannot populate the new date's namespace or renew old eligibility.
+
+Why: a bounded stale score is still a contradictory current Craft state. Redis hits remain available within the current day, while expiry requires a fresh projection. This accepts the origin-work trade without relaxing score correctness.

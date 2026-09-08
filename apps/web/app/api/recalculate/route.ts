@@ -1,3 +1,4 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
@@ -54,7 +55,9 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     );
   }
 
+  const scoringSelection = await readScoringRenderSelection();
   const materialized = await materializeOrchestratedProfile(handle, {
+    scoringSelection,
     token: auth.token,
   });
 
@@ -98,7 +101,7 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
   // #1311 — recalculate exists to make a subject's published numbers current
   // after a scoring change, so a consented subject's receipt is re-issued here
   // for the same reason the snapshot was rewritten above.
-  await issueScoreReceiptIfConsented(handle);
+  await issueScoreReceiptIfConsented(handle, { token: auth.token, scoringSelection });
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;

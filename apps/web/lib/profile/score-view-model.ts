@@ -1,5 +1,6 @@
 import type {
   ClientImpactV6Result,
+  PublicObservedCraft,
   DeveloperArchetype,
   EvidenceReasonCode,
   ImpactTier,
@@ -7,6 +8,8 @@ import type {
   PublicScoringReceipt,
   ScoringScope,
 } from "@chapa/shared";
+import { createScoringWindow } from "@chapa/shared";
+import type { ObservedReceiptSnapshot } from "./score-receipt-observed";
 import type { ReceiptSnapshotV7 } from "@/lib/history/snapshot";
 
 /** One displayed magnitude. A range is an evidence-completion range, never a
@@ -59,7 +62,9 @@ export interface ScoreIdentityView {
  * semantics and must never be labelled or explained as v7 arithmetic.
  */
 export interface ScoreViewModel {
-  readonly policyVersion: "v6" | "v7";
+  readonly policyVersion: "v6" | "v7" | "v7.2";
+  readonly reportCraft?: PublicObservedCraft | null;
+  readonly freshness?: "current" | "stale" | "unavailable";
   readonly handle: string;
   /** Present only for an issued v7 receipt. A v6 aggregate has no receipt identity. */
   readonly identity: ScoreIdentityView | null;
@@ -132,6 +137,29 @@ export function receiptViewModel(handle: string, snapshot: ReceiptSnapshotV7): S
     coverage: receipt.coverage,
     exclusions: receipt.exclusions,
     limitations: receipt.limitations,
+  };
+}
+
+/** Current observed receipts copy canonical points. Expired reports remain
+ * unlocked but have no current point; their old sealed artifact stays intact. */
+export function observedReceiptViewModel(handle: string, snapshot: ObservedReceiptSnapshot, capturedAt = Date.now()): ScoreViewModel {
+  const receipt = snapshot.receipt.receipt;
+  const currentWindow = createScoringWindow(new Date(capturedAt).toISOString());
+  let reportCraft = receipt.craft;
+  if (reportCraft.status === "scored" && reportCraft.report.inputs.reportPeriod.startInclusive < currentWindow.startInclusive) {
+    reportCraft = reportCraft.report.inputs.reportPeriod.endExclusive <= currentWindow.startInclusive
+      ? { status: "expired", unlocked: true, report: null, lastReport: reportCraft.report }
+      : { status: "unavailable", unlocked: true, report: null, lastReport: reportCraft.report, reason: "outside_window" };
+  }
+  return {
+    policyVersion: "v7.2", handle: handle.toLowerCase(),
+    identity: { receiptId: receipt.receiptId, revisionId: receipt.revisionId, revision: receipt.revision, recordedAt: receipt.recordedAt,
+      action: receipt.action, supersedesRevisionId: receipt.supersedesRevisionId, contentHash: snapshot.receipt.contentHash.value },
+    window: { ...receipt.window },
+    dimensions: Object.fromEntries(CORE_DIMENSION_KEYS.map(key => [key, { kind: "point", value: receipt.core.dimensions[key].exact, display: receipt.core.dimensions[key].displayValue }])) as Record<CoreDimensionKey, ScoreValue>,
+    composite: { kind: "point", value: receipt.core.composite.exact, display: receipt.core.composite.displayValue }, tier: receipt.core.tier, archetype: receipt.core.archetype,
+    craft: null, reportCraft, freshness: receipt.window.referenceDate === currentWindow.referenceDate ? "current" : "stale",
+    coverage: receipt.coverage, exclusions: receipt.exclusions, limitations: receipt.limitations,
   };
 }
 

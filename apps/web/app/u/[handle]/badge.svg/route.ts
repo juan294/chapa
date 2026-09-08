@@ -1,3 +1,4 @@
+import { readScoringRenderSelection, sameScoringRenderSelection, scoringResponseMaxAge, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse, after } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { WARM_AMBER } from "@/lib/render/theme";
@@ -21,13 +22,13 @@ import {
 } from "@/lib/cache/redis";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
-  buildBadgeSvgCacheKey,
-  buildBadgeSvgRenderLockKey,
   readBadgeSvgCache,
   readBadgeSvgCacheWithStatus,
   writeBadgeSvgCache,
+  isScoringImageReceiptCurrent,
+  type ScoringImageReceiptIdentity,
 } from "@/lib/render/badge-svg-cache";
-import { badgeEdgeCacheTag } from "@/lib/cache/edge-cache";
+import { badgeEdgeCacheTag, SCORING_IMAGES_EDGE_TAG } from "@/lib/cache/edge-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
@@ -81,6 +82,7 @@ type BadgeRenderResult = {
   svg: string;
   headers: HeadersInit;
   status?: number;
+  selection?: ScoringRenderSelection;
 };
 
 // NOTE: This Map only coalesces concurrent renders within a single serverless
@@ -104,28 +106,14 @@ const inflightBadgeRenders = new Map<string, Promise<BadgeRenderResult>>();
 // `invalidateBadgeSvgCacheForHandle` (lib/render/badge-svg-cache.ts) purges
 // from the edge — the layer a Redis delete alone never reached, which is why
 // a Studio save could leave a stale badge on the README for up to a day.
-const BADGE_EDGE_POLICY = "public, s-maxage=21600, stale-while-revalidate=86400";
-const BADGE_CLIENT_POLICY = "public, max-age=300";
-// Shared by both degraded-fallback response sites below (materialize-deadline
-// fallback and load-error fallback): short-lived on the client too, so a
-// browser or GitHub's camo proxy re-checks soon rather than caching a
-// placeholder for the normal 5-minute window.
-const DEGRADED_CLIENT_POLICY = "public, max-age=60";
-
-function badgeCacheHeaders(
-  handle: string,
-  edgePolicy: string = BADGE_EDGE_POLICY,
-  clientPolicy: string = BADGE_CLIENT_POLICY,
-) {
+function badgeCacheHeaders(handle: string, selection: ScoringRenderSelection, maxAge = 300) {
+  const age = Math.min(maxAge, scoringResponseMaxAge(selection));
   return {
     "Content-Type": "image/svg+xml",
-    "Cache-Control": clientPolicy,
-    "Vercel-CDN-Cache-Control": edgePolicy,
-    "Vercel-Cache-Tag": badgeEdgeCacheTag(handle),
-    // Badge SVG is designed to be embedded in READMEs, iframes, etc.
-    // These headers are set explicitly on the Response object to override the
-    // catch-all frame-ancestors 'none' + X-Frame-Options DENY from next.config.ts,
-    // which Next.js merges into all matching routes (see issue #270).
+    "X-Scoring-Selection": selection.cacheable ? selection.machinePolicy : "unavailable",
+    "Cache-Control": age > 0 ? `public, max-age=${age}` : "private, no-store, max-age=0",
+    "Vercel-CDN-Cache-Control": age > 0 ? `public, s-maxage=${age}` : "no-store",
+    "Vercel-Cache-Tag": `${badgeEdgeCacheTag(handle)},${SCORING_IMAGES_EDGE_TAG}`,
     "Content-Security-Policy": "frame-ancestors *",
     "X-Frame-Options": "ALLOWALL",
   };
@@ -254,6 +242,9 @@ async function persistFinalizedBadgeCache(
     verification: PublicVerificationCode | null;
     avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
     configCacheable: boolean;
+    configRevision: number | null;
+    receiptIdentity: ScoringImageReceiptIdentity | null;
+    scoringSelection: ScoringRenderSelection;
   },
 ): Promise<void> {
   if (options.readOnly || !options.verification || !options.configCacheable) return;
@@ -267,10 +258,11 @@ async function persistFinalizedBadgeCache(
     // outcome policy distinguishes this from transient failure and timeout.
     await writeBadgeSvgCache(options.svgCacheKey, svg, handle, {
       ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+      scoringSelection: options.scoringSelection, configRevision: options.configRevision, receiptIdentity: options.receiptIdentity,
     });
   } else if (options.avatarCachePolicy === "standard") {
     // Covers a real success or a definitive empty result such as 404.
-    await writeBadgeSvgCache(options.svgCacheKey, svg, handle);
+    await writeBadgeSvgCache(options.svgCacheKey, svg, handle, { scoringSelection: options.scoringSelection, configRevision: options.configRevision, receiptIdentity: options.receiptIdentity });
   }
   // else: the avatar fetch timed out or failed transiently. Do not cache;
   // the next request gets a fresh attempt instead of a stale placeholder.
@@ -293,6 +285,7 @@ async function finalizeMaterializedBadge(
      * response to race, and cache warming is its entire purpose.
      */
     deferCacheWrite?: boolean;
+    scoringSelection: ScoringRenderSelection;
   },
 ): Promise<{
   svg: string;
@@ -300,6 +293,7 @@ async function finalizeMaterializedBadge(
   renderMs: number;
   avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy>;
   configCacheable: boolean;
+  configRevision: number | null;
 }> {
   // #1080/#1088 — the avatar step has distinct outcomes, previously
   // conflated into one `avatarResolved` boolean (`avatarDataUri !==
@@ -361,7 +355,10 @@ async function finalizeMaterializedBadge(
       svgCacheKey: options.svgCacheKey,
       verification,
       avatarCachePolicy,
-      configCacheable: configSnapshot.cacheable,
+      configCacheable: configSnapshot.cacheable && materialized.scoring?.freshness !== "unavailable",
+      configRevision: configSnapshot.revision,
+      receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null,
+      scoringSelection: options.scoringSelection,
     });
   }
 
@@ -370,7 +367,8 @@ async function finalizeMaterializedBadge(
     verification,
     renderMs,
     avatarCachePolicy,
-    configCacheable: configSnapshot.cacheable,
+    configCacheable: configSnapshot.cacheable && materialized.scoring?.freshness !== "unavailable",
+    configRevision: configSnapshot.revision,
   };
 }
 
@@ -390,7 +388,7 @@ async function finalizeMaterializedBadge(
 async function warmBadgeCacheInBackground(
   handle: string,
   materializePromise: Promise<MaterializedProfile | GitHubUserNotFound | null>,
-  options: { readOnly: boolean; svgCacheKey: string; locale: Locale },
+  options: { readOnly: boolean; svgCacheKey: string; locale: Locale; scoringSelection: ScoringRenderSelection },
 ): Promise<void> {
   try {
     const materialized = await materializePromise;
@@ -453,7 +451,7 @@ export async function GET(
     const svg = localizedFallbackSvg(handle, locale, "badge.invalidHandle");
     return badgeSvgResponse(
       svg,
-      { "Content-Type": "image/svg+xml" },
+      { "Content-Type": "image/svg+xml", "Cache-Control": "private, no-store, max-age=0", "Vercel-CDN-Cache-Control": "no-store" },
       startedAt,
       [],
       400,
@@ -463,18 +461,19 @@ export async function GET(
   // SVG full-response cache: serve warm-cache badge without any Redis rate-limit
   // overhead (#882 — rate limit moved to cache-MISS branch only).
   const readOnly = request.nextUrl.searchParams.get(READ_ONLY_SMOKE_PARAM) === "1";
-  const today = toDateString(new Date());
+  const scoringSelection = await readScoringRenderSelection();
+  const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
   // #1181 — locale is part of the shared SVG cache key so an es- and
   // en-rendered badge for the same handle/day never collide. Doubles cache
   // cardinality and invalidates every previously-warm key on deploy — a
   // one-off wave of cache-miss (materialize + render) responses against the
   // 4100ms `cacheMiss` SLO budget (`BADGE_LATENCY_SLO_MS.cacheMiss` in
   // lib/monitoring/latency-slo.ts) until the new es/en keys re-warm.
-  const svgCacheKey = buildBadgeSvgCacheKey(handle, today, locale);
+  const svgCacheKey = resolveBadgeLocale(locale, scoringSelection.machinePolicy).cacheKey(handle, today);
   const cacheReadStart = Date.now();
-  const primaryCacheRead = await readBadgeSvgCacheWithStatus(svgCacheKey);
+  const primaryCacheRead = scoringSelection.cacheable ? await readBadgeSvgCacheWithStatus(svgCacheKey) : { svg: null, timedOut: false };
   if (primaryCacheRead.svg) {
-    return badgeSvgResponse(primaryCacheRead.svg, badgeCacheHeaders(handle), startedAt, [
+    return badgeSvgResponse(primaryCacheRead.svg, badgeCacheHeaders(handle, scoringSelection), startedAt, [
       { name: "cache", desc: "hit", durMs: Date.now() - cacheReadStart },
     ]);
   }
@@ -496,6 +495,8 @@ export async function GET(
       headers: {
         "Content-Type": "text/plain",
         "Retry-After": "60",
+        "Cache-Control": "private, no-store, max-age=0",
+        "Vercel-CDN-Cache-Control": "no-store",
       },
     });
   }
@@ -515,7 +516,7 @@ export async function GET(
     const shared = await inflightSvg;
     return badgeSvgResponse(
       shared.svg,
-      shared.headers,
+      { ...shared.headers, ...badgeCacheHeaders(handle, scoringSelection, Math.min(scoringResponseMaxAge(shared.selection ?? scoringSelection), Number(new Headers(shared.headers).get("Cache-Control")?.match(/max-age=(\d+)/)?.[1] ?? 0))) },
       startedAt,
       [...cacheTimeoutMetric, { name: "coalesced", durMs: Date.now() - startedAt }],
       shared.status,
@@ -525,7 +526,7 @@ export async function GET(
   const deferred = createDeferred<BadgeRenderResult>();
   inflightBadgeRenders.set(coalesceKey, deferred.promise);
 
-  const renderLockKey = buildBadgeSvgRenderLockKey(handle, today, locale);
+  const renderLockKey = resolveBadgeLocale(locale, scoringSelection.machinePolicy).renderLockKey(handle, today);
   let gotRenderLock = false;
 
   // Try to get an auth token from session (better rate limits)
@@ -535,7 +536,9 @@ export async function GET(
   try {
     gotRenderLock = await acquireBadgeRenderLock(renderLockKey);
     const yesterday = toDateString(new Date(Date.now() - 86_400_000));
-    const staleCacheKey = buildBadgeSvgCacheKey(handle, yesterday, locale);
+    const staleCacheKey = resolveBadgeLocale(locale, scoringSelection.machinePolicy).cacheKey(handle, yesterday);
+    // Raw SVGs cannot re-evaluate annual eligibility or mark expired Craft.
+    const canUseYesterday = scoringSelection.cacheable && scoringSelection.machinePolicy === "v6";
     // #1086 (PE-H1) — kicked off (not awaited) below, alongside materialize,
     // rather than awaited up front: this Redis read is independent of
     // materialize, so starting it in parallel keeps it off materialize's own
@@ -559,11 +562,12 @@ export async function GET(
       //
       //   2. Poll for today's SVG — shortened schedule for cases where no stale
       //      entry exists (brand-new handle, first badge ever).
-      const staleSvg = await readBadgeSvgCache(staleCacheKey);
+      const staleSvg = canUseYesterday ? await readBadgeSvgCache(staleCacheKey) : null;
       if (staleSvg) {
         const sharedResult = {
           svg: staleSvg,
-          headers: badgeCacheHeaders(handle),
+          headers: badgeCacheHeaders(handle, scoringSelection),
+          selection: scoringSelection,
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
@@ -572,11 +576,12 @@ export async function GET(
         ]);
       }
 
-      const lockedSvg = await waitForBadgeSvgCache(svgCacheKey);
+      const lockedSvg = scoringSelection.cacheable ? await waitForBadgeSvgCache(svgCacheKey) : null;
       if (lockedSvg) {
         const sharedResult = {
           svg: lockedSvg,
-          headers: badgeCacheHeaders(handle),
+          headers: badgeCacheHeaders(handle, scoringSelection),
+          selection: scoringSelection,
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
@@ -589,13 +594,14 @@ export async function GET(
     } else if (!readOnly) {
       // Winner path — kick off the stale-cache read now (not awaited), so it
       // runs concurrently with materialize below instead of in front of it.
-      staleSvgLookup = readBadgeSvgCache(staleCacheKey);
+      staleSvgLookup = canUseYesterday ? readBadgeSvgCache(staleCacheKey) : null;
     }
 
     const materializeStart = Date.now();
     const materializePromise = materializePublicProfile(handle, {
       token,
       readOnly,
+      scoringSelection,
     });
     const staleSvgForDeadlineFallback = staleSvgLookup ? await staleSvgLookup : null;
     let materialized: MaterializedProfile | GitHubUserNotFound | null;
@@ -627,9 +633,10 @@ export async function GET(
           // badge.
           headers: badgeCacheHeaders(
             handle,
-            "public, s-maxage=60, stale-while-revalidate=300",
-            DEGRADED_CLIENT_POLICY,
+            scoringSelection,
+            60,
           ),
+          selection: scoringSelection,
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
 
@@ -637,7 +644,7 @@ export async function GET(
         // for this handle is warm, instead of abandoning it. This mirrors the
         // foreground success path's own after()-deferred side effects.
         after(() =>
-          warmBadgeCacheInBackground(handle, materializePromise, { readOnly, svgCacheKey, locale }),
+          warmBadgeCacheInBackground(handle, materializePromise, { readOnly, svgCacheKey, locale, scoringSelection }),
         );
 
         return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
@@ -665,9 +672,10 @@ export async function GET(
         status: 404,
         headers: badgeCacheHeaders(
           handle,
-          "public, s-maxage=300, stale-while-revalidate=600",
-          DEGRADED_CLIENT_POLICY,
+          scoringSelection,
+          60,
         ),
+        selection: scoringSelection,
       } satisfies BadgeRenderResult;
       deferred.resolve(notFoundResult);
       return badgeSvgResponse(
@@ -683,9 +691,10 @@ export async function GET(
         svg: localizedFallbackSvg(handle, locale, "badge.loadError"),
         headers: badgeCacheHeaders(
           handle,
-          "public, s-maxage=300, stale-while-revalidate=600",
-          DEGRADED_CLIENT_POLICY,
+          scoringSelection,
+          60,
         ),
+        selection: scoringSelection,
       } satisfies BadgeRenderResult;
       deferred.resolve(fallbackResult);
       return badgeSvgResponse(fallbackResult.svg, fallbackResult.headers, startedAt, [
@@ -697,13 +706,13 @@ export async function GET(
     // Re-bind to a `const` now that `materialized` is known non-null — `let`
     // narrowing does not persist into the `after()` closure below.
     const profile = materialized;
-    const { svg, verification, renderMs, avatarCachePolicy, configCacheable } = await finalizeMaterializedBadge(
+    const { svg, verification, renderMs, avatarCachePolicy, configCacheable, configRevision } = await finalizeMaterializedBadge(
       handle,
       profile,
       // #1166 (PE-H2) — the SVG cache write blocked the response for up to
       // 500ms (its own deadline) with nothing in the response depending on
       // it. Defer it into after(), same as the durable side effects below.
-      { readOnly, svgCacheKey, locale, deferCacheWrite: true },
+      { readOnly, svgCacheKey, locale, scoringSelection, deferCacheWrite: true },
     );
 
     // #1013 — the snapshot persist is a durable Supabase write with nothing
@@ -721,6 +730,9 @@ export async function GET(
         verification,
         avatarCachePolicy,
         configCacheable,
+        configRevision,
+        receiptIdentity: profile.scoring?.policyVersion === "v7.2" ? profile.scoring.identity : null,
+        scoringSelection,
       })
         .then(() => runPublicProfileSideEffects(handle, profile, { readOnly, verification }))
         .catch((err) => {
@@ -733,11 +745,16 @@ export async function GET(
     });
 
     // Unknown styling can still render, but must never become the shared badge.
+    const selectionUnchanged = sameScoringRenderSelection(scoringSelection, await readScoringRenderSelection({ force: true }));
+    const latestConfig = await resolveBadgeConfigSnapshot(handle);
+    const configUnchanged = latestConfig.cacheable && latestConfig.revision === configRevision;
+    const receiptUnchanged = await isScoringImageReceiptCurrent(handle, scoringSelection, profile.scoring?.policyVersion === "v7.2" ? profile.scoring.identity : null);
     const successResult = {
       svg,
-      headers: configCacheable
-        ? badgeCacheHeaders(handle)
-        : badgeCacheHeaders(handle, "no-store", "private, no-store, max-age=0"),
+      headers: configCacheable && configUnchanged && selectionUnchanged && receiptUnchanged
+        ? badgeCacheHeaders(handle, scoringSelection)
+        : badgeCacheHeaders(handle, { ...scoringSelection, cacheable: false }, 0),
+      selection: scoringSelection,
     } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return badgeSvgResponse(successResult.svg, successResult.headers, startedAt, [
@@ -749,7 +766,8 @@ export async function GET(
     const fallbackResult = {
       svg: localizedFallbackSvg(handle, locale, "badge.renderError"),
       status: 500,
-      headers: { "Content-Type": "image/svg+xml" },
+      headers: badgeCacheHeaders(handle, { ...scoringSelection, cacheable: false }, 0),
+      selection: scoringSelection,
     } satisfies BadgeRenderResult;
     deferred.resolve(fallbackResult);
 

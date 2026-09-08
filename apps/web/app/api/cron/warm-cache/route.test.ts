@@ -1,3 +1,11 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
 const { mockSweepReceipts } = vi.hoisted(() => ({ mockSweepReceipts: vi.fn(async () => ({ attempted: 0, deleted: 0, failed: 0, cursorSaved: true })) }));
 vi.mock("@/lib/verification/cleanup", () => ({ sweepRevokedReceiptCachesV7: mockSweepReceipts, sweepRetiredSupplementalCachesV7: mockSweepReceipts }));
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
@@ -277,7 +285,7 @@ it("reports raw-retention failures without claiming deletion success", async () 
     expect(body.processedCount).toBe(2);
     expect(body.processedSample).toEqual(["alice", "bob"]);
     expect(body.handles).toBeUndefined();
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice");
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", { scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "alice",
       FAKE_MATERIALIZED,
@@ -695,11 +703,13 @@ it("reports raw-retention failures without claiming deletion success", async () 
         expect.stringContaining("alice"),
         "<svg>rendered</svg>",
         "alice",
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
       );
       expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
         expect.stringContaining("bob"),
         "<svg>rendered</svg>",
         "bob",
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
       );
     });
 
@@ -777,6 +787,7 @@ it("reports raw-retention failures without claiming deletion success", async () 
         expect.any(String),
         "<svg>rendered</svg>",
         expect.any(String),
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
       );
     });
 
@@ -846,6 +857,7 @@ it("reports raw-retention failures without claiming deletion success", async () 
         "alice",
         expect.any(String),
         DEFAULT_LOCALE,
+        "v6",
       );
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         expect.anything(),
@@ -915,6 +927,7 @@ it("reports raw-retention failures without claiming deletion success", async () 
         "alice",
         expect.any(String),
         DEFAULT_LOCALE,
+        "v6",
       );
     });
 

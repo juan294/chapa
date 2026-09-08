@@ -10,15 +10,15 @@ import { resolveBadgeVerification } from "./badge-verification";
 import { receiptViewModel } from "./score-view-model";
 import * as env from "@/lib/env";
 
-vi.mock("@/lib/feature-flags", () => ({ isScoringV7RenderingEnabled: async () => true }));
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: async () => ({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() }) }));
 vi.mock("@/lib/cache/snapshot-cache", () => ({ getCachedReceiptSnapshotV7: async () => null }));
 // The test starts at a real partial write: receipt committed, verification absent.
 // Collection is excluded so retries exercise durable identity and issuance only.
-vi.mock("./score-receipt-v7", async importOriginal => {
-  const actual = await importOriginal<typeof import("./score-receipt-v7")>();
-  return { ...actual, materializeScoreReceiptV7: async (owner: string) => {
-    const snapshot = await actual.readScoreReceiptV7(owner);
-    return snapshot ? { status: "stored", snapshot } : { status: "unavailable", reason: "not_consented" };
+vi.mock("./score-receipt-observed", async importOriginal => {
+  const actual = await importOriginal<typeof import("./score-receipt-observed")>();
+  return { ...actual, materializeObservedScoreReceipt: async (owner: string) => {
+    const stored = await actual.readObservedScoreReceipt(owner);
+    return stored.status === "found" ? { status: "stored", snapshot: { receipt: stored.envelope, trend: stored.trend }, freshness: "current" } : { status: "unavailable", reason: "not_consented" };
   } };
 });
 const owner = "contract-receipt-repair";
@@ -45,8 +45,8 @@ describe("receipt verification repair against durable local state", () => {
     expect((await getReceiptVerificationV7(token))?.status).toBe("revoked");
   });
   it("C15 repairs a partial write on unchanged retry and retains exactly one receipt", async () => {
-    const envelope = await receiptFixtureV7();
-    await dbPublishReceiptV7(owner, owner, envelope);
+    const envelope = await observedReceiptFixture();
+    await dbPublishObservedReceipt(owner, owner, envelope, "b".repeat(64));
     vi.spyOn(env, "getChapaVerificationSecret").mockReturnValueOnce(undefined);
     expect(await issueScoreReceiptIfConsented(owner)).toBe("failed");
     expect((await db().from("scoring_v7_verification").select("receipt_id").eq("receipt_id", envelope.receipt.revisionId)).data).toEqual([]);

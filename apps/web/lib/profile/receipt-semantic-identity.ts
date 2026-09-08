@@ -1,4 +1,4 @@
-import { canonicalJson, canonicalSha256, type EngineeringEvidenceInput, type PublicObservedScoringReceipt } from "@chapa/shared";
+import { canonicalJson, canonicalSha256, type EngineeringEvidenceInput, type PublicObservedCraft, type PublicObservedScoringReceipt } from "@chapa/shared";
 
 /** These normalized-evidence arrays are sets, not ordered policy rules. Sort
  * before projectReceiptEvidence allocates source/work ordinals. Never apply
@@ -44,4 +44,18 @@ export async function receiptSemanticIdentity(receipt: PublicObservedScoringRece
   const { receiptId: _family, revisionId: _revisionId, revision: _revision, supersedesRevisionId: _supersedes, recordedAt: _recordedAt, action: _action, ...semantic } = receipt;
   void _family; void _revisionId; void _revision; void _supersedes; void _recordedAt; void _action;
   return canonicalSha256({ receipt: normalize(semantic), retracted: receipt.action === "retract", evidence: normalize(canonicalizeReceiptEvidence(evidence)), ledger: orderedEvidence(privateLedgerIdentity) });
+}
+
+/** Compose the private core identity with current Craft. The evaluation clock
+ * inside current report inputs is incidental within its recorded UTC date;
+ * genuine report periods and historical lastReport windows remain untouched.
+ */
+export async function observedSemanticIdentity(coreSemanticDigest: string, craft: PublicObservedCraft): Promise<string> {
+  let semanticCraft: unknown = craft;
+  if (craft.status === "scored" || craft.status === "insufficient_report_data") {
+    const { referenceTime, ...window } = craft.report.inputs.window;
+    void referenceTime;
+    semanticCraft = { ...craft, report: { ...craft.report, inputs: { ...craft.report.inputs, window } } };
+  }
+  return canonicalSha256({ coreSemanticDigest, craft: semanticCraft });
 }

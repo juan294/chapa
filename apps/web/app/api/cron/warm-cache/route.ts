@@ -1,3 +1,4 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { sweepRevokedReceiptCachesV7, sweepRetiredSupplementalCachesV7 } from "@/lib/verification/cleanup";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
@@ -458,9 +459,10 @@ async function warmHandle(
     // the warmed SVG a revision behind for a full hour. Non-consented handles
     // skip silently — every handle until its owner opts in — and failures are
     // captured inside the helper rather than failing the warm.
-    await issueScoreReceiptIfConsented(handle);
+    const scoringSelection = await readScoringRenderSelection();
+    await issueScoreReceiptIfConsented(handle, { scoringSelection });
 
-    const materialized = await materializeOrchestratedProfile(handle);
+    const materialized = await materializeOrchestratedProfile(handle, { scoringSelection });
     if (!materialized) {
       void captureServerError({
         route: "/api/cron/warm-cache",
@@ -499,7 +501,7 @@ async function warmHandle(
     // lib/auth/platform-oauth.ts for platform connect/disconnect) already
     // deletes this exact key — verified before landing this skip.
     try {
-      const today = toDateString(new Date());
+      const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
       // #1181 (UX-H3 follow-up) — this cron has no request/cookie context to
       // resolve a per-visitor locale from, so it only ever warms the
       // DEFAULT_LOCALE ('es') badge — the locale most real traffic reads
@@ -512,9 +514,9 @@ async function warmHandle(
       // default while writing it under `buildBadgeSvgCacheKey`'s separately
       // defaulted key, so the hourly pre-warm published an English badge
       // into the Spanish-keyed slot for every handle.
-      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE);
+      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE, scoringSelection.machinePolicy);
       const svgCacheKey = badgeLocale.cacheKey(handle, today);
-      const existingSvg = await readBadgeSvgCache(svgCacheKey);
+      const existingSvg = scoringSelection.cacheable ? await readBadgeSvgCache(svgCacheKey) : null;
 
       if (existingSvg === null) {
         const avatarOutcome = await resolveBadgeAvatar(
@@ -530,7 +532,7 @@ async function warmHandle(
           const configSnapshot = await resolveBadgeConfigSnapshot(handle);
           // Keep profile warming successful when styling storage is unavailable;
           // a fallback design must not overwrite the public SVG cache.
-          if (configSnapshot.cacheable) {
+          if (configSnapshot.cacheable && scoringSelection.cacheable && materialized.scoring?.freshness !== "unavailable") {
             const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
               scoring: materialized.scoring,
               avatarDataUri,
@@ -548,9 +550,10 @@ async function warmHandle(
             if (avatarCachePolicy === "short") {
               await writeBadgeSvgCache(svgCacheKey, svg, handle, {
                 ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+                scoringSelection, configRevision: configSnapshot.revision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null,
               });
             } else {
-              await writeBadgeSvgCache(svgCacheKey, svg, handle);
+              await writeBadgeSvgCache(svgCacheKey, svg, handle, { scoringSelection, configRevision: configSnapshot.revision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null });
             }
             // LE-6-1 — this SVG is the public badge for the rest of the day,
             // and the hash it prints was minted here, by a materialization

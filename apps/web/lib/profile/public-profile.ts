@@ -1,3 +1,4 @@
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
 import type { GitHubUserNotFound } from "@/lib/github/not-found";
 import { captureServerError } from "@/lib/analytics/server-errors";
@@ -44,10 +45,11 @@ export function redactImpactForVisitor(
 
 export async function materializePublicProfile(
   handle: string,
-  options: { token?: string; today?: string; readOnly?: boolean } = {},
+  options: { token?: string; today?: string; readOnly?: boolean; scoringSelection?: ScoringRenderSelection } = {},
 ): Promise<MaterializedProfile | GitHubUserNotFound | null> {
   return materializeProfile(handle, {
     token: options.token,
+    scoringSelection: options.scoringSelection,
     today: options.today,
     readOnly: options.readOnly,
     policy: "public-display",
@@ -66,7 +68,7 @@ export function getPublicProfileVerification(
   // which is the "two answers for one revision" the shared model exists to
   // prevent, arriving from the other direction. A v7 profile is attested by
   // its receipt (see `deriveReceiptVerificationTokenV7`), never by this.
-  if (materialized.scoring?.policyVersion === "v7") return null;
+  if (materialized.scoring && materialized.scoring.policyVersion !== "v6") return null;
 
   // #1003 — Never attest a verification record from stats that look
   // incomplete (e.g. served from an old poisoned `stats:stale` entry). This
@@ -229,7 +231,7 @@ export async function deferProfileCacheWork(
   // by a legacy row (#1311), so its token must not land in
   // `verification_records` under the receipt token either.
   const verification =
-    materialized.scoring?.policyVersion === "v7"
+    materialized.scoring && materialized.scoring.policyVersion !== "v6"
       ? null
       : options.verification !== undefined
         ? options.verification

@@ -146,7 +146,6 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/lib/feature-flags.ts` | `apps/web/lib/feature-flags.test.ts` |
 
 ### global command bar
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createScoringWindow, type EngineeringEvidenceInput, type PublicObservedScoringReceipt } from "@chapa/shared";
-import { canonicalizeReceiptEvidence, receiptSemanticIdentity } from "./receipt-semantic-identity";
+import { createScoringWindow, type EngineeringEvidenceInput, type PublicObservedCraft, type PublicObservedScoringReceipt } from "@chapa/shared";
+import { canonicalizeReceiptEvidence, observedSemanticIdentity, receiptSemanticIdentity } from "./receipt-semantic-identity";
 
 const time = "2026-09-08T10:00:00.000Z";
 function payload(referenceTime = time) {
@@ -47,4 +47,16 @@ describe("observed receipt semantic identity", () => {
     expect(await receiptSemanticIdentity(payload(), shuffled)).toBe(await receiptSemanticIdentity(payload(), original));
     expect(await receiptSemanticIdentity(payload("2026-09-09T10:00:00.000Z"), evidence())).not.toBe(await receiptSemanticIdentity(payload(), evidence()));
   });
+});
+
+it("normalizes only the current Craft evaluation clock, retaining real period and historical context", async () => {
+  const current = (clock: string, end = time) => ({ status: "scored", unlocked: true, report: { inputs: { window: createScoringWindow(clock), reportPeriod: { startInclusive: "2026-09-01T00:00:00.000Z", endExclusive: end } } } }) as unknown as PublicObservedCraft;
+  const first = current(time), later = current("2026-09-08T11:00:00.000Z");
+  const digest = await observedSemanticIdentity("core-a", first);
+  expect(await observedSemanticIdentity("core-a", later)).toBe(digest);
+  expect(await observedSemanticIdentity("core-b", first)).not.toBe(digest);
+  expect(await observedSemanticIdentity("core-a", current(time, "2026-09-08T09:00:00.000Z"))).not.toBe(digest);
+  expect(await observedSemanticIdentity("core-a", current("2026-09-09T10:00:00.000Z"))).not.toBe(digest);
+  const expired = (craft: PublicObservedCraft) => ({ status: "expired", unlocked: true, report: null, lastReport: craft.report }) as PublicObservedCraft;
+  expect(await observedSemanticIdentity("core-a", expired(first))).not.toBe(await observedSemanticIdentity("core-a", expired(later)));
 });

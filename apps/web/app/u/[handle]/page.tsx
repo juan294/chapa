@@ -1,3 +1,5 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { Suspense } from "react";
 import { after } from "next/server";
 import { headers } from "next/headers";
@@ -29,7 +31,6 @@ import { CommandBarHint } from "@/components/CommandBarHint";
 import Link from "next/link";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
-  getPublicProfileVerification,
   materializePublicProfile,
   redactImpactForVisitor,
   runPublicProfileSideEffects,
@@ -52,7 +53,7 @@ import { tArray } from "@/lib/i18n/typed-accessors";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageHeader } from "./SharePageHeader";
 import { describeScoreForMetadata } from "@/lib/profile/score-description";
-import { readRenderableReceipt } from "@/lib/profile/score-model";
+import { readScoreReceiptV7 } from "@/lib/profile/score-receipt-v7";
 import { explainReceipt } from "@/lib/dashboard/receipt-explanation";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
@@ -90,12 +91,13 @@ export async function generateMetadata({
   // The date and durable Studio revision make each rendered configuration a
   // distinct CDN URL. This prevents an in-flight pre-save response from
   // refilling the URL advertised after that save.
-  const today = toDateString(new Date());
+  const scoringSelection = await readScoringRenderSelection();
+  const today = toDateString(new Date(scoringSelection.capturedAt));
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
-  const ogVersion = configSnapshot.cacheable
-    ? buildOgImageCacheVersion(today, configSnapshot.revision)
-    : `${buildOgImageCacheVersion(today, null)}-uncached`;
-  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${ogVersion}`;
+  const ogVersion = configSnapshot.cacheable && scoringSelection.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision, scoringSelection.machinePolicy)
+    : `${buildOgImageCacheVersion(today, null, scoringSelection.machinePolicy)}-uncached`;
+  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${ogVersion}&lang=${locale}`;
   return {
     title: `@${interpolate(t("sharePage.metadataTitle") as string, { handle })}`,
     description: interpolate(t("sharePage.metadataDescription") as string, { handle }),
@@ -218,7 +220,8 @@ export async function SharePageContent({
   // below — computing the date once and reusing it (rather than recomputing
   // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
   // race where a request could read one day's key and write another.
-  const today = toDateString(new Date());
+  const scoringSelection = await readScoringRenderSelection();
+  const today = toDateString(new Date(scoringSelection.capturedAt));
   // #1181 (UX-H3 follow-up) — the cache key and the rendered content below
   // MUST come from the same resolved locale, never independent defaults.
   // `resolveBadgeLocale` (not `buildBadgeSvgCacheKey` directly) is the only
@@ -228,14 +231,14 @@ export async function SharePageContent({
   // this fixed — content defaulted to English while the key defaulted to
   // DEFAULT_LOCALE/Spanish, so the majority Spanish-locale traffic was
   // served an English badge).
-  const badgeLocale = resolveBadgeLocale(locale);
+  const badgeLocale = resolveBadgeLocale(locale, scoringSelection.machinePolicy);
   const svgCacheKey = badgeLocale.cacheKey(handle, today);
   const [session, materialization, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
-    materializePublicProfile(handle, { readOnly }),
+    materializePublicProfile(handle, { readOnly, scoringSelection }),
     getTrendData(handle).catch(() => ({ trend: null, diff: null })),
     isWebmcpEnabled(),
-    readBadgeSvgCache(svgCacheKey),
+    scoringSelection.cacheable ? readBadgeSvgCache(svgCacheKey) : Promise.resolve(null),
   ]);
   // LE-8-2 — GitHub answered that nobody owns this handle. Not the empty
   // "try later" state, which is reserved for `null` (an outage or a rate
@@ -254,7 +257,7 @@ export async function SharePageContent({
   const impact = materialized?.displayImpact ?? null;
   const craftResult = materialized?.craftResult ?? null;
   const verification = materialized
-    ? getPublicProfileVerification(materialized)
+    ? await resolveBadgeVerification(materialized)
     : null;
 
   // #720 — try the shared SVG cache first (read kicked off above, alongside
@@ -264,6 +267,7 @@ export async function SharePageContent({
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
   let configCacheable = false;
+  let configRevision: number | null = null;
   let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
 
   if (!cachedSvg && stats && impact) {
@@ -282,7 +286,8 @@ export async function SharePageContent({
       avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
     }
     const configSnapshot = await resolveBadgeConfigSnapshot(handle);
-    configCacheable = configSnapshot.cacheable;
+    configCacheable = configSnapshot.cacheable && materialized?.scoring?.freshness !== "unavailable";
+    configRevision = configSnapshot.revision;
     inlineSvg = renderBadgeSvg(stats, impact, {
       // `impact` is non-null here only because `materialized` was; the optional
       // read keeps the compiler honest and falls back to the same legacy model.
@@ -334,13 +339,13 @@ export async function SharePageContent({
       cacheEligible && avatarCachePolicy === "short"
         ? AVATAR_ABSENT_CACHE_TTL_SECONDS
         : undefined;
-    after(() => {
+    after(async () => {
       if (svgToCache) {
-        void writeBadgeSvgCache(
+        await writeBadgeSvgCache(
           svgCacheKey,
           svgToCache,
           handle,
-          svgCacheTtlSeconds !== undefined ? { ttlSeconds: svgCacheTtlSeconds } : undefined,
+          { ttlSeconds: svgCacheTtlSeconds, scoringSelection, configRevision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null },
         );
       }
       return runPublicProfileSideEffects(handle, materialized, { verification })
@@ -387,8 +392,11 @@ export async function SharePageContent({
   // #1311 — a v7 subject's breakdown is the receipt's own arithmetic. Resolved
   // here rather than in the client tree: `explainReceipt` reads the sealed
   // receipt, and the projection it returns is what crosses the boundary.
-  const receiptExplanation = materialized?.scoring?.policyVersion === "v7"
-    ? await readRenderableReceipt(handle).then(snapshot => (snapshot ? explainReceipt(snapshot) : null))
+  const historicalIdentity = materialized?.scoring?.policyVersion === "v7" ? materialized.scoring.identity : null;
+  const receiptExplanation = historicalIdentity
+    ? await readScoreReceiptV7(handle, historicalIdentity.revisionId).then(snapshot =>
+        snapshot && snapshot.receipt.receipt.revisionId === historicalIdentity.revisionId
+          && snapshot.receipt.contentHash.value === historicalIdentity.contentHash ? explainReceipt(snapshot) : null)
     : null;
 
   const personJsonLd = {

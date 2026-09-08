@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ImpactV6Result } from "@chapa/shared";
-import { legacyViewModel, receiptViewModel, renderableScore } from "./score-view-model";
-import { buildReceiptSnapshotV7 } from "@/lib/history/snapshot";
-import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
+import { legacyViewModel, observedReceiptViewModel, renderableScore } from "./score-view-model";
+import { observedReceiptFixture } from "@/lib/history/__fixtures__/receipts-observed";
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbGetTopScoredProfiles: vi.fn(),
@@ -193,10 +192,10 @@ describe("a v7 evidence range takes no place", () => {
  * draw and ranks on that, or not at all.
  */
 describe("a stored headline is checked against the receipt the badge draws", () => {
-  it("gives a range subject's place to the next candidate", async () => {
+  it("gives an unavailable subject's place to the next candidate", async () => {
     // A range with a tier: the composite kind decides, not the tier alone.
-    const ranged = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 8, undefined, true), null);
-    expect(ranged.receipt.receipt.core.composite.kind).toBe("range");
+    const ranged = { unavailable: true } as const;
+
     mockRecorded.mockResolvedValue([entry("juan294", 79), entry("c", 70)]);
     mockReceipt.mockImplementation(async (handle) => (handle === "juan294" ? ranged : null));
 
@@ -205,13 +204,12 @@ describe("a stored headline is checked against the receipt the badge draws", () 
     expect(board).toEqual([{ rank: 1, score: 70, tier: "High", handles: ["c"] }]);
     // Neither the stale stored headline nor either bound of the range reaches
     // the board.
-    const drawn = renderableScore(receiptViewModel("juan294", ranged));
-    for (const number of [79, drawn.composite]) expect(JSON.stringify(board)).not.toContain(String(number));
+    expect(JSON.stringify(board)).not.toContain("79");
     expect(mockMaterialize).not.toHaveBeenCalled();
   });
 
-  it("does not re-fetch a dropped range subject on the live-fill path", async () => {
-    const ranged = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 8, undefined, true), null);
+  it("does not re-fetch a unavailable subject on the live-fill path", async () => {
+    const ranged = { unavailable: true } as const;
     mockRecorded.mockResolvedValue([entry("juan294", 79)]);
     mockReceipt.mockImplementation(async (handle) => (handle === "juan294" ? ranged : null));
     mockCandidates.mockResolvedValue(["juan294", "d"]);
@@ -225,18 +223,18 @@ describe("a stored headline is checked against the receipt the badge draws", () 
   });
 
   it("ranks a point subject on the number the receipt draws, not the stored headline", async () => {
-    const pointed = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 12), null);
-    const drawn = renderableScore(receiptViewModel("juan294", pointed));
-    expect(drawn.composite).toBe(81);
-    expect(drawn.tier).toBe("High");
+    const pointed = { receipt: await observedReceiptFixture(), trend: null };
+    const drawn = renderableScore(observedReceiptViewModel("juan294", pointed));
+    expect(drawn.composite).toBe(46);
+    expect(drawn.tier).toBe("Solid");
     mockRecorded.mockResolvedValue([entry("juan294", 79), entry("c", 70)]);
     mockReceipt.mockImplementation(async (handle) => (handle === "juan294" ? pointed : null));
 
     const board = await getLeaderboard(2);
 
     expect(board).toEqual([
-      { rank: 1, score: 81, tier: "High", handles: ["juan294"] },
-      { rank: 2, score: 70, tier: "High", handles: ["c"] },
+      { rank: 1, score: 70, tier: "High", handles: ["c"] },
+      { rank: 2, score: 46, tier: "Solid", handles: ["juan294"] },
     ]);
   });
 

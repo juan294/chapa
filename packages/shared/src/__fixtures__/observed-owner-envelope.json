@@ -4,12 +4,12 @@
     "algorithm": {
       "algorithmDigest": {
         "algorithm": "SHA-256",
-        "value": "03a29d65a690676b9a6b25993a07869c96b37d67cd7a759b0359f364b20d2b0d"
+        "value": "28d8fd32805421bf71bd818c09e101f4881c8934c614e857650ecc436d963087"
       },
       "algorithmId": "chapa-impact-v7",
       "policyDigest": {
         "algorithm": "SHA-256",
-        "value": "e17a55d83c99256b4e490edef995c1f117d771380ee79159a469a2b16579fd50"
+        "value": "7681a2cbfdb1a9496dd94e1f4d3bbc7037d9b78ea8837b3bad4ce447c21edde7"
       },
       "revision": "v7.2"
     },
@@ -355,6 +355,6 @@
   },
   "contentHash": {
     "algorithm": "SHA-256",
-    "value": "50afab251838e5442d0eb377326e78e8f6429d49c6be0dfc030d3bc12b06a767"
+    "value": "c5f8b6e7185ea31343a96209575f97fc8f0fc2c9961333d7388c7cab72d53fb7"
   }
 }

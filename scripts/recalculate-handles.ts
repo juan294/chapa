@@ -185,8 +185,8 @@ export { BADGE_RENDER_VARIANT };
  * `apps/web/lib/render/badge-svg-cache.ts:84`. The key is locale-scoped
  * (#1181) — a handle has one entry per locale per day.
  */
-export function badgeSvgCacheKey(handle: string, date: string, locale: Locale): string {
-  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${date}:${locale}`;
+export function badgeSvgCacheKey(handle: string, date: string, locale: Locale, machinePolicy: "v6" | "v7.2" = "v6"): string {
+  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${machinePolicy}:${date}:${locale}`;
 }
 
 /** Today's date in the same `YYYY-MM-DD` UTC form `public-profile.ts` uses for the day guard/snapshot date. */
@@ -204,7 +204,7 @@ export interface Footprint {
   mergedKey: string;
   /** The cached EMA prior — deleted so smoothing doesn't blend a stale prior. */
   snapshotKey: string;
-  /** Today's badge SVG cache entry, one per supported locale. */
+  /** SVG/PNG entries for both policies/locales, today and yesterday. */
   badgeKeys: string[];
   /** The dirty marker — SET, never deleted. */
   dirtyKey: string;
@@ -221,7 +221,12 @@ export function computeFootprint(handle: string, baseUrl: string, today: string)
     handle,
     mergedKey: mergedStatsKey(handle),
     snapshotKey: snapshotKey(handle),
-    badgeKeys: SUPPORTED_LOCALES.map((locale) => badgeSvgCacheKey(handle, today, locale)),
+    badgeKeys: [today, new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)].flatMap(date =>
+      (["v6", "v7.2"] as const).flatMap(policy => SUPPORTED_LOCALES.flatMap(locale => {
+        const svgKey = badgeSvgCacheKey(handle, date, locale, policy);
+        return [svgKey, svgKey.replace(/^badge:v2:/, "og-image:v5:")];
+      })),
+    ),
     dirtyKey: dirtyStatsKey(handle),
     dirtyTtlSeconds: DIRTY_STATS_TTL_SECONDS,
     triggerUrl: badgeUrl(baseUrl, handle),

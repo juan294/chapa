@@ -118,7 +118,7 @@ The owner authorized implementation after reviewing the proposal and accepting s
 - [x] Phase 2: observed-core calculator — targeted arithmetic/evidence regressions and independent review passed; combined local gates with phases 3–4 passed.
 - [x] Phase 3: report-derived Craft calculator/selection — 43 targeted tests and independent review passed; combined local gates passed.
 - [x] Phase 4: strict receipts, independent replay, durable lineage and verification recovery — independent review/fix loops completed; 9,483 unit tests and 181 local contracts passed, plus typecheck, lint, build, bundle and migration checks.
-- [ ] Phase 5: upload publication, shared selection and image rollback.
+- [x] Phase 5: upload publication, shared selection and image rollback — independent compliance/quality reviews passed; 9,544 full unit tests plus 107 final delta tests, 195 local contracts, typecheck, lint, build, bundle, migration and write-registration checks passed.
 - [ ] Phase 6: badge, fifth Craft axis and human explanations.
 - [ ] Phase 7: remaining scored consumers.
 - [ ] Phase 8: local release proof and active documentation.

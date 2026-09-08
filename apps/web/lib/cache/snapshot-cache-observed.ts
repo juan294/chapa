@@ -45,5 +45,5 @@ export async function getCachedObservedReceipt(owner: string, revisionId?: strin
     await remove(key);
     return { status: "unavailable" };
   }
-  return { status: "found", envelope, semanticDigest: current.manifest.semanticDigest, trend, isCurrent: current.manifest.isCurrent };
+  return { status: "found", envelope, semanticDigest: current.manifest.semanticDigest, coreSemanticDigest: current.manifest.coreSemanticDigest, trend, isCurrent: current.manifest.isCurrent };
 }

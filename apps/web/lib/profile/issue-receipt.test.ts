@@ -1,26 +1,27 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-vi.mock("./score-receipt-v7", () => ({ materializeScoreReceiptV7: vi.fn() }));
+vi.mock("./score-receipt-observed", () => ({ materializeObservedScoreReceipt: vi.fn() }));
+vi.mock("@/lib/db/report-craft", () => ({ dbReadReportCraft: vi.fn(), dbPublishObservedReceiptWithReport: vi.fn() }));
 const issueReceiptVerificationV7 = vi.fn();
 vi.mock("@/lib/verification/store", () => ({ issueReceiptVerificationV7: (...a: unknown[]) => issueReceiptVerificationV7(...a) }));
-const isScoringV7RenderingEnabled = vi.fn();
-vi.mock("@/lib/feature-flags", () => ({ isScoringV7RenderingEnabled: () => isScoringV7RenderingEnabled() }));
+const readScoringRenderSelection = vi.fn();
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: () => readScoringRenderSelection() }));
 const captureServerError = vi.fn();
 vi.mock("@/lib/analytics/server-errors", () => ({ captureServerError: (...a: unknown[]) => captureServerError(...a) }));
 
-import { materializeScoreReceiptV7 } from "./score-receipt-v7";
+import { materializeObservedScoreReceipt } from "./score-receipt-observed";
 import { issueScoreReceiptIfConsented } from "./issue-receipt";
 
 beforeEach(() => {
-  vi.mocked(materializeScoreReceiptV7).mockReset();
+  vi.mocked(materializeObservedScoreReceipt).mockReset();
   captureServerError.mockReset();
-  isScoringV7RenderingEnabled.mockReset().mockResolvedValue(true);
+  readScoringRenderSelection.mockReset().mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
   issueReceiptVerificationV7.mockReset().mockResolvedValue("v7.token");
 });
 
 describe("issueScoreReceiptIfConsented", () => {
   it("reports an issued receipt", async () => {
-    vi.mocked(materializeScoreReceiptV7).mockResolvedValue({ status: "issued", snapshot: { receipt: { receipt: {} } } as never, publication: "inserted" });
+    vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "issued", snapshot: { receipt: { receipt: {} } } as never, publication: "inserted", isCurrent: true, freshness: "current" });
     expect(await issueScoreReceiptIfConsented("alice")).toBe("issued");
     // The receipt and the link that resolves it are issued together.
     expect(issueReceiptVerificationV7).toHaveBeenCalledOnce();
@@ -28,19 +29,19 @@ describe("issueScoreReceiptIfConsented", () => {
   });
 
   it("stays silent for a subject who has not consented to publication", async () => {
-    vi.mocked(materializeScoreReceiptV7).mockResolvedValue({ status: "unavailable", reason: "not_consented" });
+    vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "unavailable", reason: "not_consented" });
     expect(await issueScoreReceiptIfConsented("alice")).toBe("skipped");
     expect(captureServerError).not.toHaveBeenCalled();
   });
 
   it("captures a storage failure, because a failed durable write must stay observable", async () => {
-    vi.mocked(materializeScoreReceiptV7).mockResolvedValue({ status: "unavailable", reason: "storage_error" });
+    vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "unavailable", reason: "storage_error" });
     expect(await issueScoreReceiptIfConsented("alice")).toBe("failed");
     expect(captureServerError).toHaveBeenCalledOnce();
   });
 
   it("never lets a thrown error escape into the caller's response", async () => {
-    vi.mocked(materializeScoreReceiptV7).mockRejectedValue(new Error("boom"));
+    vi.mocked(materializeObservedScoreReceipt).mockRejectedValue(new Error("boom"));
     expect(await issueScoreReceiptIfConsented("alice")).toBe("failed");
     expect(captureServerError).toHaveBeenCalledOnce();
   });
@@ -48,19 +49,19 @@ describe("issueScoreReceiptIfConsented", () => {
 
 describe("the scoring_v7_rendering gate", () => {
   it("mints nothing while the flag is off", async () => {
-    isScoringV7RenderingEnabled.mockResolvedValue(false);
+    readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
 
     expect(await issueScoreReceiptIfConsented("alice")).toBe("skipped");
-    expect(materializeScoreReceiptV7).not.toHaveBeenCalled();
+    expect(materializeObservedScoreReceipt).not.toHaveBeenCalled();
   });
 });
 
 describe("the receipt and its verification link are one act", () => {
   it("repairs an unchanged durable receipt after verification failed, without issuing another revision", async () => {
     const snapshot = { receipt: { receipt: { revisionId: "same-revision" } } } as never;
-    vi.mocked(materializeScoreReceiptV7)
-      .mockResolvedValueOnce({ status: "issued", snapshot, publication: "inserted" })
-      .mockResolvedValueOnce({ status: "stored", snapshot });
+    vi.mocked(materializeObservedScoreReceipt)
+      .mockResolvedValueOnce({ status: "issued", snapshot, publication: "inserted", isCurrent: true, freshness: "current" })
+      .mockResolvedValueOnce({ status: "stored", freshness: "current", snapshot });
     issueReceiptVerificationV7.mockRejectedValueOnce(new Error("temporary signing failure"));
     expect(await issueScoreReceiptIfConsented("alice")).toBe("failed");
     expect(await issueScoreReceiptIfConsented("alice")).toBe("skipped");
@@ -69,14 +70,14 @@ describe("the receipt and its verification link are one act", () => {
   });
 
   it("keeps repair failure observable, including withdrawal during repair", async () => {
-    vi.mocked(materializeScoreReceiptV7).mockResolvedValue({ status: "stored", snapshot: { receipt: {} } as never });
+    vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "stored", freshness: "current", snapshot: { receipt: {} } as never });
     issueReceiptVerificationV7.mockRejectedValue(new Error("Publication withdrawn"));
     expect(await issueScoreReceiptIfConsented("alice")).toBe("failed");
     expect(captureServerError).toHaveBeenCalledOnce();
   });
 
   it("reports failure, and captures it, when the receipt issues but its link does not", async () => {
-    vi.mocked(materializeScoreReceiptV7).mockResolvedValue({ status: "issued", snapshot: { receipt: { receipt: {} } } as never, publication: "inserted" });
+    vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "issued", snapshot: { receipt: { receipt: {} } } as never, publication: "inserted", isCurrent: true, freshness: "current" });
     issueReceiptVerificationV7.mockRejectedValue(new Error("signing key unavailable"));
 
     // Not "issued": a receipt whose /verify link answers "not found" is a

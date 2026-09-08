@@ -1,3 +1,11 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -190,6 +198,71 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockCacheDel.mockResolvedValue(undefined);
   });
 
+  it("switches prewarmed SVG namespaces off and back on for both locales without re-materializing", async () => {
+    mockCacheGet.mockImplementation(async (key: string) => key.includes(":v7.2:") ? "<svg>current</svg>" : "<svg>legacy</svg>");
+    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
+      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy: enabled ? "v7.2" : "v6", cacheable: true, capturedAt: Date.now() });
+      const request = new NextRequest(`https://chapa.thecreativetoken.com/u/testuser/badge.svg?lang=${locale}`);
+      const response = await GET(request, { params: Promise.resolve({ handle: "testuser" }) });
+      expect(await response.text()).toBe(enabled ? "<svg>current</svg>" : "<svg>legacy</svg>");
+      expect(mockCacheGet).toHaveBeenLastCalledWith(expect.stringMatching(new RegExp(`:${enabled ? "v7\\.2" : "v6"}:.*:${locale}$`)));
+    }
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+  });
+
+  it("uses yesterday only for legacy policy; current policy re-evaluates expired Craft", async () => {
+    const yesterday = toDateString(new Date(Date.now() - 86_400_000));
+    // The current lock-holder can finish today's eligibility-aware render.
+    // Yesterday's raw SVG still claims Craft57 and cannot be reused as current.
+    mockCacheSetNx.mockResolvedValue(false);
+    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
+      const machinePolicy = enabled ? "v7.2" : "v6";
+      let todayReads = 0;
+      mockCacheGet.mockClear();
+      mockCacheGet.mockImplementation(async (key: string) => {
+        if (key.includes(`:${yesterday}:`)) return enabled ? "<svg>expired Craft57</svg>" : "<svg>legacy</svg>";
+        return ++todayReads > 1 ? "<svg>Craft expired, update insights</svg>" : null;
+      });
+      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy, cacheable: true, capturedAt: Date.now() });
+      const response = await GET(new NextRequest(`https://chapa.thecreativetoken.com/u/testuser/badge.svg?lang=${locale}`), { params: Promise.resolve({ handle: "testuser" }) });
+      expect(await response.text()).toBe(enabled ? "<svg>Craft expired, update insights</svg>" : "<svg>legacy</svg>");
+      if (enabled) expect(mockCacheGet.mock.calls.some(([key]) => String(key).includes(`:${yesterday}:`))).toBe(false);
+      else expect(mockCacheGet).toHaveBeenLastCalledWith(expect.stringContaining(`:v6:${yesterday}:${locale}`));
+      expect(mockCacheSetNx.mock.calls.at(-1)?.[0]).toContain(`:${machinePolicy}:`);
+    }
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+  });
+
+  it("ignores a warm namespace when the selection lookup fails", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: false, capturedAt: Date.now() });
+    mockCacheGet.mockResolvedValue("<svg>must not use</svg>");
+    const response = await GET(...makeRequest("testuser"));
+    expect(await response.text()).toBe(FAKE_SVG);
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(response.headers.get("X-Scoring-Selection")).toBe("unavailable");
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("does not publish deferred SVG bytes after the scoring flag changes", async () => {
+    const captured = { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() };
+    mockReadScoringSelection.mockResolvedValue(captured);
+    await GET(...makeRequest("testuser"));
+    mockReadScoringSelection.mockResolvedValue({ ...captured, enabled: true, machinePolicy: "v7.2" });
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", expect.objectContaining({ scoringSelection: captured }));
+  });
+
+  it("reads the selected policy namespace before a warm SVG hit", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+    mockCacheGet.mockResolvedValue(FAKE_SVG);
+    const response = await GET(...makeRequest("testuser"));
+    expect(mockCacheGet).toHaveBeenCalledWith(expect.stringContaining(":v7.2:"));
+    expect(response.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
+    expect(response.headers.get("Vercel-CDN-Cache-Control")).not.toMatch(/stale-/);
+  });
+
   it.each(["unavailable", "invalid"])("#1289 renders %s config fallback without publishing it", async (status) => {
     mockDbGetStudioConfig.mockResolvedValue({ status });
     const response = await GET(...makeRequest("testuser"));
@@ -209,11 +282,14 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockCacheSet).not.toHaveBeenCalled();
     mockAfter.mockClear();
     const custom = {...DEFAULT_BADGE_CONFIG, border: "none"};
-    mockDbGetStudioConfig.mockResolvedValueOnce({status: "found", config: custom, revision: 7});
+    mockDbGetStudioConfig.mockResolvedValue({status: "found", config: custom, revision: 7});
     const response = await GET(...makeRequest("testuser"));
     await flushAfterCallbacks();
     expect(mockCacheSet).toHaveBeenCalledTimes(1);
-    expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
+    const maxAge = Number(response.headers.get("Cache-Control")?.match(/^public, max-age=(\d+)$/)?.[1]);
+    expect(Number.isInteger(maxAge)).toBe(true);
+    expect(maxAge).toBeGreaterThanOrEqual(0);
+    expect(maxAge).toBeLessThanOrEqual(300);
     expect(mockRenderBadgeSvg).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({config: custom}));
     mockAfter.mockClear();
     await GET(...makeRequest("testuser"));
@@ -277,6 +353,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
       readOnly: false,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
   });
 
@@ -371,6 +448,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: undefined,
       readOnly: true,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     // Read-only is threaded through; the shared sequence writes nothing for it.
     expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
@@ -471,9 +549,9 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=600",
+      "public, s-maxage=60",
     );
-    expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
   });
 
 
@@ -506,9 +584,9 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
       expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-        "public, s-maxage=300, stale-while-revalidate=600",
+        "public, s-maxage=60",
       );
-      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-ghost");
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-ghost,scoring-images");
     });
 
     it("localizes the not-found SVG from ?lang=", async () => {
@@ -793,9 +871,9 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
       expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-        "public, s-maxage=21600, stale-while-revalidate=86400",
+        "public, s-maxage=300",
       );
-      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
     });
 
     it("PE-M1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
@@ -842,9 +920,9 @@ describe("GET /u/[handle]/badge.svg", () => {
 
       expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
       expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-        "public, s-maxage=21600, stale-while-revalidate=86400",
+        "public, s-maxage=300",
       );
-      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
     });
 
     it("acquires and releases a versioned render lock on cold-cache renders", async () => {
@@ -1155,9 +1233,9 @@ describe("GET /u/[handle]/badge.svg", () => {
         const edgeControl = res.headers.get("Vercel-CDN-Cache-Control");
         expect(edgeControl).toMatch(/s-maxage=\d+/);
         expect(edgeControl).not.toBe(
-          "public, s-maxage=21600, stale-while-revalidate=86400",
+          "public, s-maxage=300",
         );
-        expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+        expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
         // The full render pipeline has not run yet — we returned before
         // materialize settled.
         expect(mockRenderBadgeSvg).not.toHaveBeenCalled();

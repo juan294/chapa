@@ -1,3 +1,4 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit } from "@/lib/cache/redis";
@@ -112,7 +113,8 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // #1311 — first badge generation is where a consented subject acquires their
   // first v7 receipt, so the badge they are about to see is the issued revision
   // rather than a legacy aggregate that a later refresh would silently replace.
-  await issueScoreReceiptIfConsented(handle, token ? { token } : {});
+  const scoringSelection = await readScoringRenderSelection();
+  await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
 
   // LE-5-1 — the stats cache row is bound to the credential that fetched it
   // (source-context hashes the token into accessContextId), and the share

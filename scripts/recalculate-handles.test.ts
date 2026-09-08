@@ -87,10 +87,10 @@ describe("key builders", () => {
 
   it("builds the locale-scoped badge SVG cache key", () => {
     expect(badgeSvgCacheKey("juan294", "2026-08-28", "es")).toBe(
-      "badge:v2:juan294:ice-terminal-v2:2026-08-28:es",
+      "badge:v2:juan294:ice-terminal-v2:v6:2026-08-28:es",
     );
     expect(badgeSvgCacheKey("juan294", "2026-08-28", "en")).toBe(
-      "badge:v2:juan294:ice-terminal-v2:2026-08-28:en",
+      "badge:v2:juan294:ice-terminal-v2:v6:2026-08-28:en",
     );
   });
 
@@ -110,14 +110,15 @@ describe("computeFootprint", () => {
   it("is pure and includes one badge key per supported locale, never the baseline in a mutating slot", () => {
     const footprint = computeFootprint("juan294", "https://chapa.thecreativetoken.com", "2026-08-28");
 
+    expect(footprint.badgeKeys).toHaveLength(16);
     expect(footprint).toEqual({
       handle: "juan294",
       mergedKey: "stats:v2:merged:juan294",
       snapshotKey: "snapshot:v2:latest:juan294",
-      badgeKeys: [
-        "badge:v2:juan294:ice-terminal-v2:2026-08-28:en",
-        "badge:v2:juan294:ice-terminal-v2:2026-08-28:es",
-      ],
+      badgeKeys: expect.arrayContaining([
+        "badge:v2:juan294:ice-terminal-v2:v6:2026-08-28:en",
+        "og-image:v5:juan294:ice-terminal-v2:v7.2:2026-08-27:es",
+      ]),
       dirtyKey: "stats:dirty:juan294",
       dirtyTtlSeconds: 3600,
       triggerUrl: "https://chapa.thecreativetoken.com/u/juan294/badge.svg",
@@ -291,14 +292,12 @@ describe("recalculateHandle — apply mode (apply: true)", () => {
       { verifyAttempts: 1 },
     );
 
-    expect(result.deletedRedisKeys.sort()).toEqual(
-      [
-        "stats:v2:merged:juan294",
-        "snapshot:v2:latest:juan294",
-        "badge:v2:juan294:ice-terminal-v2:2026-08-28:en",
-        "badge:v2:juan294:ice-terminal-v2:2026-08-28:es",
-      ].sort(),
-    );
+    expect(result.deletedRedisKeys).toHaveLength(18);
+    expect(result.deletedRedisKeys).toEqual(expect.arrayContaining([
+      "stats:v2:merged:juan294", "snapshot:v2:latest:juan294",
+      "badge:v2:juan294:ice-terminal-v2:v6:2026-08-28:en",
+      "og-image:v5:juan294:ice-terminal-v2:v7.2:2026-08-27:es",
+    ]));
 
     // The protected baseline is NEVER deleted, in this or any other test.
     expect(calls.some((c) => c.url.includes("stats%3Astale%3Av2%3Ajuan294"))).toBe(false);

@@ -1,3 +1,5 @@
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { verifyAdminSecret } from "@/lib/auth/admin";
@@ -52,6 +54,8 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       { status: 429, headers: { "Retry-After": "3600" } },
     );
   }
+
+  const scoringSelection = await readScoringRenderSelection();
 
   // Optional cursor: ?after=<handle> continues an all-user page or resumes a
   // time-limited run (BE-H7). The database applies this unique keyset cursor
@@ -141,6 +145,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       batch.map(async (handle) => {
         try {
           const materialized = await materializeOrchestratedProfile(handle, {
+            scoringSelection,
             // #930 — Admin recalculates must bypass the EMA same-day lock.
             // A stored today-snapshot may contain wrong data (e.g. from a
             // timed-out platform fetch); ignoring it ensures the fresh score
@@ -157,6 +162,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
+            await issueScoreReceiptIfConsented(handle, { scoringSelection });
             await invalidateProfileReadModels(handle, {
               stats: true,
               badgeSvg: true,

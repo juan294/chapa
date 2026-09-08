@@ -1,5 +1,5 @@
 import "server-only";
-import { receiptViewModel, renderableScore, type ScoreViewModel } from "./score-view-model";
+import { observedReceiptViewModel, renderableScore, type ScoreViewModel } from "./score-view-model";
 import { dbGetScoredCandidates, dbGetTopScoredProfiles, type TopScoredProfile } from "@/lib/db/snapshots";
 import { dbGetAllUserHandles } from "@/lib/db/users";
 import { materializeDisplayProfile } from "./materialize-profile";
@@ -104,9 +104,8 @@ export async function getLeaderboard(places = 3): Promise<LeaderboardPlace[]> {
 /**
  * What the badge draws for a stored candidate once a receipt exists: the
  * receipt's point, `"unplaceable"` for a range, or `null` while no receipt is
- * drawable and the stored headline is still the badge's number. A read that
- * fails is treated like no receipt: the stored number stands rather than the
- * place going empty on a transient error.
+ * drawable and the stored headline is still the badge's number. A failed read is unplaceable: an old aggregate cannot stand in for an
+ * unavailable current receipt.
  */
 async function drawnForStored(
   entry: TopScoredProfile,
@@ -115,9 +114,10 @@ async function drawnForStored(
   try {
     receipt = await readRenderableReceipt(entry.handle);
   } catch {
-    return null;
+    return "unplaceable";
   }
-  return receipt ? placeable(receiptViewModel(entry.handle, receipt)) : null;
+  if (receipt && "unavailable" in receipt) return "unplaceable";
+  return receipt ? placeable(observedReceiptViewModel(entry.handle, receipt)) : null;
 }
 
 /**

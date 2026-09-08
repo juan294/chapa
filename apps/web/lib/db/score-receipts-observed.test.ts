@@ -15,6 +15,13 @@ describe("observed receipt storage adapter", () => {
     expect(result).toMatchObject({ status: "duplicate", envelope: winner, isCurrent: true });
     expect(rpc).toHaveBeenCalledWith("scoring_observed_publish_receipt", expect.objectContaining({ p_owner: "owner", p_actor: "owner", p_semantic_digest: "a".repeat(64) }));
   });
+  it("binds private core semantic metadata to the durable winner", async () => {
+    const candidate = await observedReceiptFixture();
+    rpc.mockResolvedValueOnce({ data: { ...stored(candidate), coreSemanticDigest: "c".repeat(64), status: "inserted" }, error: null });
+    expect(await dbPublishObservedReceipt("owner", "owner", candidate, "a".repeat(64), "c".repeat(64))).toMatchObject({ status: "inserted", coreSemanticDigest: "c".repeat(64) });
+    rpc.mockResolvedValueOnce({ data: { ...stored(candidate), coreSemanticDigest: "d".repeat(64), status: "duplicate" }, error: null });
+    expect(await dbPublishObservedReceipt("owner", "owner", candidate, "a".repeat(64), "c".repeat(64))).toEqual({ status: "failed" });
+  });
   it("reads only the observed policy RPC and exact requested revision", async () => {
     const winner = await observedReceiptFixture();
     rpc.mockResolvedValue({ data: stored(winner), error: null });
