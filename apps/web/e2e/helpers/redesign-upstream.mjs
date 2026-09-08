@@ -61,6 +61,12 @@ export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onU
     if (['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) return localFetch(input, { ...init, redirect: 'error' });
     const body = init?.body ?? (input instanceof Request ? await input.clone().text() : undefined);
     const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    if (fixtures.qualificationHealth === true && method === 'GET' && url.href === 'https://api.github.com/rate_limit') {
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      if (headers.get('Authorization') === 'token redesign-local-fixture' && headers.get('User-Agent') === 'chapa-health-check') {
+        return Response.json({ rate: { remaining: 5000, limit: 5000 } }, { headers: { 'x-oauth-scopes': 'repo' } });
+      }
+    }
     if (url.origin === 'https://redesign.upstash.invalid') {
       const commands = JSON.parse(String(body));
       const pipeline = url.pathname === '/pipeline' || url.pathname === '/multi-exec';
@@ -74,6 +80,9 @@ export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onU
     }
     if (url.href === 'https://api.github.com/graphql') {
       const request = JSON.parse(String(body));
+      if (fixtures.qualificationHealth === true && method === 'POST' && request.variables?.login === 'this-user-definitely-does-not-exist-xyz123' && request.query === fixtures.contributionQuery && fixtures.contributionQuery) {
+        return Response.json({ data: { user: null } });
+      }
       const response = fixtures.github[request.variables?.login];
       if (response && request.query === fixtures.contributionQuery && fixtures.contributionQuery) return Response.json(response);
       if (method === 'POST' && journeyShape(request.variables?.login) && request.query === fixtures.contributionQuery && fixtures.contributionQuery) {

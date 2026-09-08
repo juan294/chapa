@@ -1,4 +1,5 @@
 export interface RedesignUpstreamFixtures {
+  qualificationHealth?: boolean;
   journeyRunId?: 'redesign';
   avatarPng?: string;
   contributionQuery?: string;

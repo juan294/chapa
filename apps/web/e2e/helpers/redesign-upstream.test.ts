@@ -88,3 +88,25 @@ describe('redesign test-process upstream boundary', () => {
   });
 
 });
+
+it('replays only the explicit synthetic qualification GitHub health request', async () => {
+  const local = vi.fn();
+  const replay = createRedesignFetch({ cache: {}, github: {}, qualificationHealth: true }, local);
+  const headers = { Authorization: 'token redesign-local-fixture', 'User-Agent': 'chapa-health-check' };
+  const result = await replay('https://api.github.com/rate_limit', { headers });
+  expect(await result.json()).toEqual({ rate: { remaining: 5000, limit: 5000 } });
+  expect(result.headers.get('x-oauth-scopes')).toBe('repo');
+  await expect(replay('https://api.github.com/rate_limit', { method: 'POST', headers })).rejects.toThrow('Unexpected redesign upstream');
+  await expect(replay('https://api.github.com/rate_limit', { headers: { Authorization: 'token real' } })).rejects.toThrow('Unexpected redesign upstream');
+  const disabled = createRedesignFetch({ cache: {}, github: {} }, local);
+  await expect(disabled('https://api.github.com/rate_limit', { headers })).rejects.toThrow('Unexpected redesign upstream');
+  expect(local).not.toHaveBeenCalled();
+});
+
+it('replays only the declared qualification negative handle with its exact query', async () => {
+  const replay = createRedesignFetch({ qualificationHealth: true, contributionQuery: CONTRIBUTION_QUERY, github: {}, cache: {} });
+  const request = (login: string, query = CONTRIBUTION_QUERY) => replay('https://api.github.com/graphql', { method: 'POST', body: JSON.stringify({ query, variables: { login } }) });
+  expect(await (await request('this-user-definitely-does-not-exist-xyz123')).json()).toEqual({ data: { user: null } });
+  await expect(request('arbitrary-owner')).rejects.toThrow(/Unexpected/);
+  await expect(request('this-user-definitely-does-not-exist-xyz123', 'unknown-query')).rejects.toThrow(/Unexpected/);
+});

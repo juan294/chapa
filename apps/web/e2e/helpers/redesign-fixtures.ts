@@ -6,6 +6,7 @@ import type { BrowserContext } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY } from '@chapa/shared';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
+import { SCORING_POINT_HANDLES } from "./scoring-point-fixtures";
 import { DEMO_STATS } from '../../lib/render/demoData';
 
 export const REDESIGN_OWNERS = ['en', 'es'].flatMap(locale => ['light', 'dark'].flatMap(theme => ['desktop', 'mobile'].map(device => `chapa-redesign-${locale}-${theme}-${device}`)));
@@ -22,7 +23,7 @@ export function assertLocalFixtureTarget(url: string): void {
 
 export async function setRedesignSession(context: BrowserContext, baseURL: string, handle: string): Promise<void> {
   assertLocalFixtureTarget(baseURL);
-  if (!(REDESIGN_HANDLES as readonly string[]).includes(handle)) throw new Error('Unknown redesign session');
+  if (!([...REDESIGN_HANDLES, ...SCORING_POINT_HANDLES] as readonly string[]).includes(handle)) throw new Error('Unknown redesign session');
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error('Local session secret required');
   const iv = randomBytes(12);

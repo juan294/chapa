@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const evidence = resolve(__dirname, '../../../docs/plans/2026-09-05-chapa-redesign-phases/evidence/phase5/reflow');
+const evidence = resolve(process.env.REDESIGN_EVIDENCE_DIR ?? resolve(__dirname, "../../../logs/v7-point/browser/redesign"), "reflow");
 for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as const) {
   test(`${locale}/${theme}: landing reflows at tablet and 320px with keyboard access`, async ({ page }, testInfo) => {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });

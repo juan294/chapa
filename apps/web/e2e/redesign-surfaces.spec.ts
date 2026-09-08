@@ -8,7 +8,7 @@ import { REDESIGN_VALID_HASH, setRedesignSession, redesignFixtureClient } from '
 // These checks require the explicit disposable bootstrap and server-only replay.
 // The final local gate enables them; ordinary unseeded CI does not claim them.
 test.skip(process.env.REDESIGN_DISPOSABLE_PROJECT !== 'chapa-redesign', 'requires disposable local redesign fixtures');
-const evidence = resolve(__dirname, '../../../docs/plans/2026-09-05-chapa-redesign-phases/evidence/phase4/surfaces');
+const evidence = resolve(process.env.REDESIGN_EVIDENCE_DIR ?? resolve(__dirname, "../../../logs/v7-point/browser/redesign"), "surfaces");
 async function command(page: Page, text: string) {
   const input = page.locator('#terminal-command-input');
   await input.fill(text); await input.press('Enter');

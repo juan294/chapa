@@ -43,7 +43,7 @@ test.describe("release-required read-only probes", () => {
       expect(localCandidateTarget(expectedEnvironment, verificationMode, baseURL ?? "", process.env.VERCEL_AUTOMATION_BYPASS_SECRET)).toBe(true);
       const manifestPath = process.env.RELEASE_BUILD_MANIFEST?.trim();
       expect(manifestPath, "RELEASE_BUILD_MANIFEST is required").toBeTruthy();
-      const repoRoot = resolve(import.meta.dirname, "../../..");
+      const repoRoot = resolve(__dirname, "../../..");
       const manifest = verifyLocalBuildManifest(JSON.parse(readFileSync(manifestPath!, "utf8")), repoRoot);
       const buildId = readFileSync(resolve(repoRoot, "apps/web/.next/BUILD_ID"), "utf8").trim();
       expect(buildId).toMatch(/^[A-Za-z0-9_-]+$/);

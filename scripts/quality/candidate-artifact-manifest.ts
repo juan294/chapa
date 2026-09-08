@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { lstatSync, existsSync, readFileSync, readdirSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const SHA = /^[a-f0-9]{40}$/, DIGEST = /^[a-f0-9]{64}$/;
 export const REQUIRED_BUILD_ARTIFACTS = ["apps/web/.next/BUILD_ID", "apps/web/.next/build-manifest.json", "apps/web/.next/routes-manifest.json", "apps/web/.next/server/app-paths-manifest.json"] as const;
@@ -112,7 +111,7 @@ export function runLocalCandidateBuild(root: string, output: string): CandidateA
   writeFileSync(temp, `${JSON.stringify(result, null, 2)}\n`); renameSync(temp, resolve(output));
   return result;
 }
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
   try {
     const rootAt = process.argv.indexOf("--root"), outputAt = process.argv.indexOf("--output");
     if (rootAt < 0 || outputAt < 0 || !process.argv[rootAt + 1] || !process.argv[outputAt + 1]) throw new Error("Usage: candidate-artifact-manifest.ts --root ROOT --output MANIFEST");
