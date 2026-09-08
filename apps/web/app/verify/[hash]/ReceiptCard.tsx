@@ -1,9 +1,17 @@
-import type { ScoreBounds } from "@chapa/shared";
+import type { PointResult, RegisteredScoringReceipt, ScoreBounds } from "@chapa/shared";
 import { StatusCallout } from "@/components/StatusCallout";
 import type { ReceiptVerificationV7 } from "@/lib/verification/types";
 
-function score(value: ScoreBounds) {
+function score(value: ScoreBounds | PointResult) {
   return value.kind === "point" ? String(value.displayValue) : `${value.displayLower}–${value.displayUpper}`;
+}
+
+function craftScore(receipt: RegisteredScoringReceipt, text: (key: string) => string): string {
+  if (receipt.policyVersion === "v7.2") {
+    if (receipt.craft.status === "scored") return receipt.craft.report.result.point.displayLabel;
+    return text(receipt.craft.status === "no_report" ? "craftAbsent" : "unavailableTitle");
+  }
+  return receipt.craft === null ? text("craftAbsent") : receipt.craft.result.status === "not_observed" ? text("craftUnobserved") : score(receipt.craft.result.composite);
 }
 
 /** Only the consent-checked, strictly allowlisted public receipt reaches this view. */
@@ -38,7 +46,7 @@ export function ReceiptCard({ token, result, t }: {
       {receipt.core.composite.kind === "range" && <p className="mb-6 text-pretty text-sm text-text-secondary">{text("range")}</p>}
       <section className="mb-6 border-t border-stroke pt-4">
         <h2 className="mb-2 text-balance font-heading text-sm text-text-primary">{text("craft")}</h2>
-        <p className="text-sm text-text-primary">{receipt.craft === null ? text("craftAbsent") : receipt.craft.result.status === "not_observed" ? text("craftUnobserved") : score(receipt.craft.result.composite)}</p>
+        <p className="text-sm text-text-primary">{craftScore(receipt, text)}</p>
       </section>
       <p className="mb-3 text-pretty text-sm leading-relaxed text-text-secondary">{text("source")}</p>
       <p className="mb-4 text-pretty text-sm leading-relaxed text-text-secondary">{text("svg")}</p>

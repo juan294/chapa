@@ -59,7 +59,7 @@ interface CollectedEvidence {
  * incomplete coverage, because dropping it would narrow the evidence range by
  * hiding a source rather than by observing more.
  */
-async function collectSources(
+export async function collectSources(
   owner: string,
   window: ScoringWindow,
   options: ReceiptMaterializationOptions,

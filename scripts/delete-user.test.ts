@@ -94,7 +94,7 @@ function makeFakeFetch(opts: FakeFetchOptions) {
     if (url.startsWith(SUPA_URL)) {
       const table = tableFromUrl(url);
       if (method === "HEAD") {
-        const count = scoringDeleted && table.startsWith("scoring_v7_") ? 0 : opts.supaCounts?.[table] ?? 0;
+        const count = scoringDeleted && SUPABASE_TABLES.some(row => row.table === table && row.deletion === "scoring_v7_rpc") ? 0 : opts.supaCounts?.[table] ?? 0;
         return {
           ok: true,
           status: 200,
@@ -447,6 +447,7 @@ describe("SUPABASE_TABLES", () => {
       "merge_operations.source_handle",
       "merge_operations.target_handle",
       "metrics_snapshots.handle",
+      "scoring_observed_current.owner_handle",
       "scoring_v7_assessments.evaluator_handle",
       "scoring_v7_assessments.owner_handle",
       "scoring_v7_evidence.owner_handle",
@@ -509,7 +510,7 @@ describe("exact Redis deletion ownership", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     await expect(run(["ann", "--delete"])).rejects.toThrow("Deletion incomplete: 1 unresolved");
     const deleted = calls.filter(call => call.url.startsWith(`${REDIS_URL}/DEL/`)).map(call => decodeURIComponent(call.url));
-    expect(deleted).toEqual([`${REDIS_URL}/DEL/stats:v2:merged:ann`, `${REDIS_URL}/DEL/snapshot:v7:receipt:${id}`]);
+    expect(deleted).toEqual([`${REDIS_URL}/DEL/stats:v2:merged:ann`, `${REDIS_URL}/DEL/snapshot:v7:receipt:${id}`, `${REDIS_URL}/DEL/snapshot:v7.2:receipt:${id}`]);
     expect(JSON.stringify(vi.mocked(console.log).mock.calls)).not.toContain("ann-private");
   });
   it("does not claim completion after cache transport failure", async () => {
@@ -536,7 +537,7 @@ it("reports pending on administrative retry while the first failed receipt cache
   const first = makeFakeFetch({ receiptIds: [id], redisDeleteFails: true, redisKeys: retained });
   vi.stubGlobal("fetch", first.fetchMock);
   vi.spyOn(console, "log").mockImplementation(() => {});
-  await expect(run(["ann", "--delete"])).rejects.toThrow("1 failed cache removal");
+  await expect(run(["ann", "--delete"])).rejects.toThrow("2 failed cache removal");
   const retry = makeFakeFetch({ receiptIds: [], redisKeys: retained });
   vi.stubGlobal("fetch", retry.fetchMock);
   await expect(run(["ann", "--delete"])).rejects.toThrow("receipt cache cleanup pending");

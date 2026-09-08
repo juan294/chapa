@@ -30,7 +30,7 @@ export async function issueScoreReceiptIfConsented(
 
   try {
     const result = await materializeScoreReceiptV7(handle, options);
-    if (result.status === "issued") {
+    if (result.status === "issued" || result.status === "stored") {
       // The receipt and the link that resolves it are one act. Issuing the
       // receipt without recording its verification would put a derived token
       // on the badge that `/verify` answers "not found" to.
@@ -43,7 +43,7 @@ export async function issueScoreReceiptIfConsented(
         void captureServerError({ route: "issue-score-receipt-v7", statusCode: 500, error });
         return "failed";
       }
-      return "issued";
+      return result.status === "issued" ? "issued" : "skipped";
     }
     if (result.status === "unavailable" && result.reason === "storage_error") {
       void captureServerError({

@@ -15,8 +15,9 @@ it("cycles tombstones again so a delayed cache write is swept on a later pass", 
   mocks.rpc.mockResolvedValueOnce([id]).mockResolvedValueOnce([]).mockResolvedValueOnce([id]);
   mocks.del.mockResolvedValue(true);
   await sweepRevokedReceiptCachesV7(); await sweepRevokedReceiptCachesV7(); await sweepRevokedReceiptCachesV7();
-  expect(mocks.del).toHaveBeenCalledTimes(2);
+  expect(mocks.del).toHaveBeenCalledTimes(4);
   expect(mocks.del).toHaveBeenCalledWith(`snapshot:v7:receipt:${id}`);
+  expect(mocks.del).toHaveBeenCalledWith(`snapshot:v7.2:receipt:${id}`);
   expect(mocks.set).toHaveBeenNthCalledWith(2, "scoring:v7:revocation-sweep-cursor", null, 0);
 });
 
@@ -30,12 +31,22 @@ it("awaits captured receipt and private-copy deletion after durable withdrawal",
   expect(settled).toBe(false);
   finish(true);
   expect(await pending).toMatchObject({ withdrawn: true, cleanup: { complete: true } });
-  expect(mocks.del.mock.calls.map(([key]) => key)).toEqual([`snapshot:v7:receipt:${id}`, "supplemental:v7:owner"]);
+  expect(mocks.del.mock.calls.map(([key]) => key)).toEqual([`snapshot:v7:receipt:${id}`, `snapshot:v7.2:receipt:${id}`, "supplemental:v7:owner"]);
 });
 it("reports private cleanup failure without claiming withdrawal failed", async () => {
   mocks.rpc.mockResolvedValue([id]);
-  mocks.del.mockResolvedValueOnce(false).mockRejectedValueOnce(new Error("private failure")).mockResolvedValueOnce(true);
+  mocks.del.mockImplementation(async (key: string) => {
+    if (key.startsWith("supplemental:")) throw new Error("private failure");
+    return false;
+  });
   expect(await withdrawReceiptPublicationV7("owner", "owner", true)).toEqual({ success: false, withdrawn: true, cleanup: { complete: false, status: "failed", receipts: { attempted: 1, deleted: 0, failed: 1 }, privateCopies: { attempted: 1, deleted: 0, failed: 1 } } });
+});
+
+it("cannot advance the tombstone cursor when only the current-policy copy failed to purge", async () => {
+  mocks.rpc.mockResolvedValue([id]);
+  mocks.del.mockImplementation(async key => key !== `snapshot:v7.2:receipt:${id}`);
+  expect(await sweepRevokedReceiptCachesV7()).toEqual({ attempted: 1, deleted: 0, failed: 1, cursorSaved: false });
+  expect(mocks.set).not.toHaveBeenCalled();
 });
 
 it("cannot confirm an earlier failed receipt deletion from an empty retry batch", async () => {

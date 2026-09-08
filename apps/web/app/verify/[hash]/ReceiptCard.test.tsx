@@ -3,6 +3,7 @@ import { afterEach, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { sealScoreReceipt, type CraftScoringInputs } from "@chapa/shared";
 import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
+import { observedReceiptFixture } from "@/lib/history/__fixtures__/receipts-observed";
 import { calculateCraftV7 } from "@/lib/insights/craft-v7";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
@@ -12,6 +13,14 @@ import { ReceiptCard } from "./ReceiptCard";
 afterEach(cleanup);
 const token = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
 const t = (key: string) => resolveTranslation(key, en);
+it("renders a current observed receipt point while preserving historical receipt support", async () => {
+  const envelope = await observedReceiptFixture();
+  const result = { ...await record(), envelope };
+  render(<ReceiptCard token={token} result={result} t={t} />);
+  expect(screen.getByText("46")).toBeDefined();
+  expect(screen.getByText("Craft was not included")).toBeDefined();
+  expect(screen.queryByText(/not a statistical confidence interval/)).toBeNull();
+});
 async function record(episodes: number | null = null, range = false): Promise<Exclude<ReceiptVerificationV7, { status: "revoked" }>> {
   let envelope = await receiptFixtureV7("2026-09-01", 4, undefined, range);
   if (episodes !== null) {

@@ -71,6 +71,7 @@ export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; del
     { table: "scoring_v7_raw_artifacts", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "scoring_v7_receipts", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "scoring_v7_trend_anchors", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    { table: "scoring_observed_current", column: "owner_handle", deletion: "scoring_v7_rpc" },
   ];
 
 export interface Args {
@@ -116,9 +117,13 @@ export function redisScanPattern(handle: string): string {
   return `*${handle}*`;
 }
 
+function receiptCacheKeys(revisionId: string): string[] {
+  return ["v7", "v7.2"].map(policy => `snapshot:${policy}:receipt:${revisionId}`);
+}
+
 /** A SCAN substring is discovery only; ownership follows an explicit namespace schema. */
 export function classifyRedisOwnership(key: string, handle: string, revisionIds: readonly string[] = []): "owned" | "foreign" | "unresolved" {
-  if (revisionIds.some(id => key === `snapshot:v7:receipt:${id}`)) return "owned";
+  if (revisionIds.some(id => receiptCacheKeys(id).includes(key))) return "owned";
   const fields = key.split(":");
   let owner: string | undefined;
   if (fields.length === 2 && ["avatar", "history", "supplemental", "score-bump", "verify-handle"].includes(fields[0]!)) owner = fields[1];
@@ -282,7 +287,7 @@ export async function run(rawArgs: string[]): Promise<void> {
   console.log("\n--- Redis (Upstash) ---");
   const pattern = redisScanPattern(handle);
   const discovered = await scanAllKeys(cfg, pattern);
-  const keys = [...new Set([...discovered.filter(key => classifyRedisOwnership(key, handle, revisionIds) === "owned"), ...revisionIds.map(id => `snapshot:v7:receipt:${id}`)])];
+  const keys = [...new Set([...discovered.filter(key => classifyRedisOwnership(key, handle, revisionIds) === "owned"), ...revisionIds.flatMap(receiptCacheKeys)])];
   const unresolved = discovered.filter(key => classifyRedisOwnership(key, handle, revisionIds) === "unresolved").length;
   console.log(`  Found ${keys.length} key(s) with proven ownership; ${unresolved} unresolved namespace match(es).`);
   // Never print keys: unknown namespaces may embed private project names or tokens.

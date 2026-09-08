@@ -1,7 +1,7 @@
 import "server-only";
-import { sealScoreReceipt } from "@chapa/shared";
+import { sealRegisteredScoreReceipt } from "@chapa/shared";
 import { getChapaVerificationSecret } from "@/lib/env";
-import type { ReceiptSnapshotV7 } from "@/lib/history/snapshot";
+import type { RegisteredScoreEnvelope } from "@chapa/shared";
 import { signReceiptV7 } from "./hmac";
 
 /**
@@ -17,12 +17,12 @@ import { signReceiptV7 } from "./hmac";
  * attestation nobody can check.
  */
 export async function deriveReceiptVerificationTokenV7(
-  snapshot: ReceiptSnapshotV7,
+  snapshot: { readonly receipt: RegisteredScoreEnvelope },
 ): Promise<string | null> {
   const secret = getChapaVerificationSecret();
   if (!secret) return null;
   try {
-    return await signReceiptV7(await sealScoreReceipt(snapshot.receipt.receipt), secret);
+    return await signReceiptV7(await sealRegisteredScoreReceipt(snapshot.receipt.receipt), secret);
   } catch {
     // A receipt that will not re-seal cannot be attested. The badge renders
     // without a strip rather than carrying a token that resolves to nothing.

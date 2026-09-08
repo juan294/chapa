@@ -1,5 +1,21 @@
 # Reproducing an issued v7 score
 
+## Registered policies
+
+The CLI dispatches exact registered policy/algorithm pairs: historical `v7` / `v7.1`, and observed-point `v7.2` / `v7.2`. Unknown pairs or changed artifact digests fail closed. The existing `parsePublicScoreReceipt`, `sealScoreReceipt` and `verifyScoreReceipt` APIs remain historical and narrow. Current receipts use `parseObservedScoreReceipt`, `sealObservedScoreReceipt` and `verifyObservedScoreReceipt`; cross-version verification uses the explicitly named registered APIs.
+
+The current policy reports one point from four fixed equally weighted observed dimensions. Craft is a separate report-derived outcome calculation; it never enters the core average. `scripts/scoring/reference-calculator-v7-observed.ts` independently reproduces every scalar, original-bound archetype eligibility, outcome contribution, coverage, exact point and canonical display label. It imports no production calculator. The separately frozen `packages/shared/src/__fixtures__/observed-owner-envelope.json` reproduces exact46.40250879691149/display46 while the historical archived envelope still reproduces46–100.
+
+Current ordinary displays round to the nearest integer. If core rounding crosses an unrounded tier boundary30/70/85, the display truncates to two decimals and is capped at boundary−0.01 to account for binary64 multiplication rounding a predecessor onto the boundary. The exact value remains separately available. Display values/labels, count inputs and constants compare exactly; calculated internal values permit absolute error at most1e-10. This tolerance never changes canonical bytes or hashes.
+
+`score-receipt-observed-artifacts.ts` lists the exact ordered UTF-8 source files whose bytes concatenate without separators into the current algorithm digest. This includes the observed engine, historical eligibility engine, evidence derivation/aggregation, report classifier/calculator/selection, shared policy/validation/window dependencies, serialization, and the current strict parser. Its identity module is excluded to avoid self-reference. The current policy digest binds the September8 policy document. Tests verify actual file bytes against both digests. These current artifacts must remain immutable once receipts publish; subsequent changes require another registered revision.
+
+Current public Craft contains canonical aggregate inputs, a scored/insufficient result, and, for scored reports, an opaque public report UUID with explicit replacement linkage. Raw report hashes, labels, HTML and private locators are absent. Expired Craft retains its **original** report inputs/window and result in `lastReport`, with no current numerical vertex. Replay checks the old arithmetic against that old window and validates expiry against the current receipt context. Raw-body expiry therefore cannot destroy numerical replay. A legitimate scored0 remains distinct from insufficient data, no report, expiry and unavailability.
+
+Current evidence collections are canonicalized before receipt-local ordinal allocation by the materializer. Incidental ID allocation and caller clock copies do not change semantic identity; genuine source data-through times, coverage, report identity/period and changed observations do. These semantic rules govern durable no-op selection, while the immutable content hash still covers the entire issued payload exactly.
+
+The sections below describe the preserved historical `v7` / `v7.1` contract unless explicitly stated otherwise.
+
 A public v7 receipt reproduces arithmetic over issued counts and evidence-completion bounds. It does not prove private-source truth, reviewer independence, developer ability or causal impact. Constants are declared product choices; empirical evaluation remains pending.
 
 From this repository, with dependencies already installed, run:

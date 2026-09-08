@@ -24,7 +24,7 @@ This is the shared test contract for all phases. Implement named fixtures/tests 
 | C06 | Report57/repetition | Formula57, coverage8/10; proportional duplicate-sized sample same score; no volume/tool/speed credit | Phase3 calculator tests |
 | C07 | Visual Craft unlock | Before report four axes; successful valid report five axes/fifth card; measured0 also unlocks; core unchanged | Phases5/6/9 real upload/render |
 | C08 | Invalid/unknown/empty | Impossible totals rejected; no recognized outcome => insufficient; never fabricate0 or overwrite good current report | Phases3/5 |
-| C09 | Overlap/age/selection | Never sum overlapping aggregates or rejuvenate with upload time; older report cannot win; explicit same-period correction | Phases3/5 DB race |
+| C09 | Overlap/age/selection | Never sum overlapping aggregates or rejuvenate with upload time; older report cannot win even if current candidate history is incomplete; explicit same-period correction supports insufficient ancestors without erasing a good score | Phases3/5 DB race |
 | C10 | Expiry/raw retention | Replay inputs survive raw-body purge; expiry retains exactly five labelled spokes in unlocked-but-unavailable state, no numeric Craft vertex; no stale current point/fake0 | Phases3/5/6 |
 | C11 | Strict version replay | Historical digests preserved, new discriminant strict; reject tampering/extra fields/unknown policy/current score ranges | Phase4 schema+offline CLI |
 | C12 | Semantic no-op | Exact same evidence/order-independent source sets preserve envelope; changed exclusion/provenance/report revises even with same score | Phase4 materializer+contract |

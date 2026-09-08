@@ -1,5 +1,6 @@
 /** Independent arithmetic implementation. Imports contracts/serialization only, never production calculators. */
-import { verifyScoreReceipt, type CoreScoringInputs, type CraftScoringInputs, type CoreScoringResult, type CraftV7Result, type ScoreBounds, type CountBounds, type CoreDimension, type CoreCalculationTrace, type CraftCalculationTrace, type NormalizationTrace, type ExactNumericBounds } from "@chapa/shared";
+import { verifyRegisteredScoreReceipt, type CoreScoringInputs, type CraftScoringInputs, type CoreScoringResult, type CraftV7Result, type ScoreBounds, type CountBounds, type CoreDimension, type CoreCalculationTrace, type CraftCalculationTrace, type NormalizationTrace, type ExactNumericBounds } from "@chapa/shared";
+import { replayObservedCalculation } from "./reference-calculator-v7-observed";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -78,7 +79,8 @@ export function assertReferenceParity(actual: unknown, expected: unknown, key = 
   throw new RangeError("Receipt arithmetic mismatch");
 }
 export async function replayReceipt(value: unknown) {
-  const receipt = await verifyScoreReceipt(value);
+  const receipt = await verifyRegisteredScoreReceipt(value);
+  if (receipt.policyVersion === "v7.2") return replayObservedCalculation(receipt);
   const calculated = referenceCalculate(receipt.inputs, receipt.craft?.inputs ?? null);
   assertReferenceParity(receipt.core, calculated.core);
   assertReferenceParity(receipt.calculation.core, calculated.coreTrace);

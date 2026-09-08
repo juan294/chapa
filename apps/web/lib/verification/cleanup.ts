@@ -1,6 +1,7 @@
 import "server-only";
 import { cacheDel, cacheGet, cacheSet, purgeRetiredSupplementalV7CacheBatch } from "@/lib/cache/redis";
 import { buildReceiptSnapshotKeyV7 } from "@/lib/cache/snapshot-cache";
+import { buildObservedReceiptKey } from "@/lib/cache/snapshot-cache-observed";
 import { dbVerificationRpcV7 } from "@/lib/db/verification";
 const CURSOR_KEY = "scoring:v7:revocation-sweep-cursor";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -12,7 +13,11 @@ export async function deleteReceiptCachesV7(revisions: readonly string[]) {
   const ids = receiptRevisionIdsV7(revisions);
   let deleted = 0;
   for (const id of ids) {
-    try { if (await cacheDel(buildReceiptSnapshotKeyV7(id))) deleted++; } catch { /* Retry from durable tombstones. */ }
+    let complete = true;
+    for (const key of [buildReceiptSnapshotKeyV7(id), buildObservedReceiptKey(id)]) {
+      try { if (!(await cacheDel(key))) complete = false; } catch { complete = false; }
+    }
+    if (complete) deleted++;
   }
   return { attempted: ids.length, deleted, failed: ids.length - deleted };
 }

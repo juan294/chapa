@@ -40,5 +40,5 @@ export type ReceiptVerificationV7 =
       keyVersion: string;
       arithmetic: "offline_replay_available";
       sourceEvidence: "not_verified";
-      envelope: Awaited<ReturnType<typeof import("@chapa/shared").sealScoreReceipt>>;
+      envelope: Awaited<ReturnType<typeof import("@chapa/shared").sealRegisteredScoreReceipt>>;
     };

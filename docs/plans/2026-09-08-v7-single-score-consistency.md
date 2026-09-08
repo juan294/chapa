@@ -1,6 +1,6 @@
 # Impact v7: one reproducible score and consistent presentation
 
-Date: 2026-09-08. Status: owner authorized `/implement` on 2026-09-08; phase 1 complete locally; phases 2–9 pending. No remote action authorized. Planning baseline: local `develop` at `0c75fdc46705c7bdf0539e7d9027e11f76172d15`. Research: [pre-launch evidence audit](../research/2026-09-08-prelaunch-evidence-audit.md). Workflow: `.claude/commands/plan.md`. Planning/review agents: GPT-6 Astra only, as requested.
+Date: 2026-09-08. Status: owner authorized `/implement` on 2026-09-08; phase 1 complete locally; owner authorized continuous implementation of phases 2–9, local develop merge and worktree cleanup. No remote action authorized. Planning baseline: local `develop` at `0c75fdc46705c7bdf0539e7d9027e11f76172d15`. Research: [pre-launch evidence audit](../research/2026-09-08-prelaunch-evidence-audit.md). Workflow: `.claude/commands/plan.md`. Planning/review agents: GPT-6 Astra only, as requested.
 
 ## What the owner has decided
 
@@ -74,7 +74,7 @@ Only 2/3 are batch-eligible: their new pure calculator/test files are disjoint a
 
 ## Verification and git discipline
 
-Implementation uses isolated local worktrees/temporary branches. Follow implement → review → fix → dedicated simplification review → verification. Use only GPT-6 Astra for implementation/review delegation. Stop after each phase unless the owner explicitly authorizes continuing.
+Implementation uses isolated local worktrees/temporary branches. Follow implement → review → fix → dedicated simplification review → verification. Use only GPT-6 Astra for implementation/review delegation. The owner explicitly authorized continuing through all remaining phases without stopping, then merging locally into develop and cleaning up the worktrees. Keep review and verification gates between phases.
 
 At every phase run applicable targeted red/green regressions, then sequential typecheck, lint and the repository's unit/script suite; run local contracts whenever shared receipt, migration, RPC or durable-write behavior changes. Do not retry unrelated browser matrices per phase. After phases 2/3 in parallel, root runs combined gates once after local integration. Add coverage/build checks earlier if that phase specifically changes their contract.
 
@@ -115,4 +115,11 @@ The owner authorized implementation after reviewing the proposal and accepting s
 ## Implementation progress
 
 - [x] Phase 1: policy/shared contracts and local harness — Astra-reviewed and verified in `/Users/juan/code/chapa-v7-point`, local `feature/v7-point-consistency`. No runtime switch. Local report: `docs/agents/v7-point-phase1-report.md` in that worktree.
-- [ ] Phases 2–9: pending their dependency and phase gates.
+- [x] Phase 2: observed-core calculator — targeted arithmetic/evidence regressions and independent review passed; combined local gates with phases 3–4 passed.
+- [x] Phase 3: report-derived Craft calculator/selection — 43 targeted tests and independent review passed; combined local gates passed.
+- [x] Phase 4: strict receipts, independent replay, durable lineage and verification recovery — independent review/fix loops completed; 9,483 unit tests and 181 local contracts passed, plus typecheck, lint, build, bundle and migration checks.
+- [ ] Phase 5: upload publication, shared selection and image rollback.
+- [ ] Phase 6: badge, fifth Craft axis and human explanations.
+- [ ] Phase 7: remaining scored consumers.
+- [ ] Phase 8: local release proof and active documentation.
+- [ ] Phase 9: final local qualification, manual test handoff, local merge and worktree cleanup.

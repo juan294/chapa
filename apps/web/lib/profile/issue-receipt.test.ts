@@ -56,6 +56,25 @@ describe("the scoring_v7_rendering gate", () => {
 });
 
 describe("the receipt and its verification link are one act", () => {
+  it("repairs an unchanged durable receipt after verification failed, without issuing another revision", async () => {
+    const snapshot = { receipt: { receipt: { revisionId: "same-revision" } } } as never;
+    vi.mocked(materializeScoreReceiptV7)
+      .mockResolvedValueOnce({ status: "issued", snapshot, publication: "inserted" })
+      .mockResolvedValueOnce({ status: "stored", snapshot });
+    issueReceiptVerificationV7.mockRejectedValueOnce(new Error("temporary signing failure"));
+    expect(await issueScoreReceiptIfConsented("alice")).toBe("failed");
+    expect(await issueScoreReceiptIfConsented("alice")).toBe("skipped");
+    expect(issueReceiptVerificationV7).toHaveBeenCalledTimes(2);
+    expect(issueReceiptVerificationV7.mock.calls[0]).toEqual(issueReceiptVerificationV7.mock.calls[1]);
+  });
+
+  it("keeps repair failure observable, including withdrawal during repair", async () => {
+    vi.mocked(materializeScoreReceiptV7).mockResolvedValue({ status: "stored", snapshot: { receipt: {} } as never });
+    issueReceiptVerificationV7.mockRejectedValue(new Error("Publication withdrawn"));
+    expect(await issueScoreReceiptIfConsented("alice")).toBe("failed");
+    expect(captureServerError).toHaveBeenCalledOnce();
+  });
+
   it("reports failure, and captures it, when the receipt issues but its link does not", async () => {
     vi.mocked(materializeScoreReceiptV7).mockResolvedValue({ status: "issued", snapshot: { receipt: { receipt: {} } } as never, publication: "inserted" });
     issueReceiptVerificationV7.mockRejectedValue(new Error("signing key unavailable"));

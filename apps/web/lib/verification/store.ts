@@ -34,7 +34,7 @@ export async function getVerificationRecord(
 }
 
 // V7 receipts have durable immutable issuance; legacy fail-open semantics above do not apply.
-import { canonicalJson, sealScoreReceipt, verifyScoreReceipt } from "@chapa/shared";
+import { canonicalJson, sealRegisteredScoreReceipt, verifyRegisteredScoreReceipt } from "@chapa/shared";
 import { dbVerificationRpcV7 } from "@/lib/db/verification";
 import { getChapaVerificationSecret } from "@/lib/env";
 import { authenticateReceiptV7, signReceiptV7 } from "./hmac";
@@ -42,8 +42,8 @@ import { parseVerificationTokenV7, VERIFICATION_V7_KEY_VERSION } from "./constan
 import type { ReceiptVerificationV7 } from "./types";
 
 export async function issueReceiptVerificationV7(owner: string, actor: string, envelope: unknown): Promise<string> {
-  const receipt = await verifyScoreReceipt(envelope);
-  const detached = await sealScoreReceipt(receipt);
+  const receipt = await verifyRegisteredScoreReceipt(envelope);
+  const detached = await sealRegisteredScoreReceipt(receipt);
   const secret = getChapaVerificationSecret();
   if (!secret) throw new Error("Receipt signing key unavailable");
   const token = await signReceiptV7(detached, secret);
@@ -70,7 +70,7 @@ export async function getReceiptVerificationV7(token: string): Promise<ReceiptVe
   if (typeof raw !== "object" || !raw || !("status" in raw)) throw new Error("Invalid receipt verification record");
   if (raw.status === "revoked") return revoked();
   if (!("canonical" in raw) || typeof raw.canonical !== "string" || !("keyVersion" in raw) || typeof raw.keyVersion !== "string" || !["current", "superseded", "retracted"].includes(String(raw.status))) throw new Error("Invalid receipt verification record");
-  const envelope = await sealScoreReceipt(JSON.parse(raw.canonical));
+  const envelope = await sealRegisteredScoreReceipt(JSON.parse(raw.canonical));
   if (canonicalJson(envelope.receipt) !== raw.canonical || envelope.receipt.revisionId !== parsed.revisionId) throw new Error("Invalid receipt verification record");
   const secret = raw.keyVersion === VERIFICATION_V7_KEY_VERSION ? getChapaVerificationSecret() : null;
   const signatureAuthenticated = await authenticateReceiptV7(token, envelope, secret ?? null);

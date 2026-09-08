@@ -5,6 +5,7 @@ import { getReceiptVerificationV7 } from "@/lib/verification/store";
 import { readRenderableReceipt } from "./score-model";
 import { resolveBadgeVerification } from "./badge-verification";
 import { issueScoreReceiptIfConsented } from "./issue-receipt";
+import { receiptViewModel } from "./score-view-model";
 
 /**
  * The v7 path with `scoring_v7_rendering` ON, against real persistence (#1320).
@@ -66,7 +67,7 @@ describe("the v7 path with rendering enabled", () => {
       stats: { handle: owner },
       displayImpact: {},
       statsComplete: true,
-      scoring: { policyVersion: "v7" },
+      scoring: receiptViewModel(owner, snapshot!),
     } as never);
     expect(verification?.hash).toMatch(/^v7\./);
 
@@ -91,9 +92,10 @@ describe("the v7 path with rendering enabled", () => {
 
   it("stops attesting once publication is withdrawn", async () => {
     expect(await issueScoreReceiptIfConsented(owner)).toBe("issued");
+    const snapshot = await readRenderableReceipt(owner);
     const verification = await resolveBadgeVerification({
       stats: { handle: owner }, displayImpact: {}, statsComplete: true,
-      scoring: { policyVersion: "v7" },
+      scoring: receiptViewModel(owner, snapshot!),
     } as never);
     expect(verification).not.toBeNull();
 
