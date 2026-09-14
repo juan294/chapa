@@ -21,6 +21,7 @@
     "BitbucketIcon": "components/icons/BitbucketIcon.tsx",
     "CodebergIcon": "components/icons/CodebergIcon.tsx",
     "CopyIcon": "components/icons/CopyIcon.tsx",
+    "ChapaBadgeIcon": "components/icons/ChapaBadgeIcon.tsx",
     "SectionHeader": "components/SectionHeader.tsx",
     "ContentPageHeader": "components/content/ContentPageHeader.tsx",
     "OnThisPageIndex": "components/content/OnThisPageIndex.tsx"
@@ -30,7 +31,7 @@
     "ConfirmDialog": "open: boolean;\n  title: string;\n  description: string;\n  confirmLabel?: string;\n  cancelLabel?: string;\n  variant?: \"destructive\" | \"default\";\n  loading?: boolean;\n  onConfirm: () => void;\n  onCancel: () => void;",
     "LoginCtaButton": "label: string;\n  pendingLabel: string;\n  size?: \"sm\" | \"lg\";",
     "LiteYouTubeEmbed": "/** YouTube video ID (the part after v= in the URL) */\n  videoId: string;\n  /** Accessible title for the iframe and play button */\n  title: string;",
-    "InsightCard": "insight: {\n    id: string;\n    type: \"trend\" | \"tip\" | \"achievement\" | \"next-tier\";\n    icon: \"trending-up\" | \"trending-down\" | \"target\" | \"trophy\" | \"lightbulb\" | \"arrow-up\";\n    headline: string;\n    body: string;\n    dimension?: \"delivery\" | \"quality\" | \"consistency\" | \"breadth\" | \"craft\";\n  };\n  animationDelay?: number;",
+    "InsightCard": "insight: {\n    id: string;\n    priority: number;\n    nextTierMeta?: { gap: number; nextTierKey: \"Emerging\" | \"Solid\" | \"High\" | \"Elite\"; currentIndex: number; nextIndex: number; tierLabels: string[]; };\n    archetypeName?: string;\n    type: \"trend\" | \"tip\" | \"achievement\" | \"next-tier\";\n    icon: \"trending-up\" | \"trending-down\" | \"target\" | \"trophy\" | \"lightbulb\" | \"arrow-up\";\n    headline: string;\n    body: string;\n    dimension?: \"delivery\" | \"quality\" | \"consistency\" | \"breadth\" | \"craft\";\n  };\n  animationDelay?: number;",
     "Sparkline": "values: { date: string; value: number }[];\n  width?: number;\n  height?: number;\n  color: string;\n  className?: string;",
     "ClaudeCodeStar": "/** Decorative mark; takes no props. */",
     "GitHubIcon": "className?: string;",
@@ -38,9 +39,10 @@
     "BitbucketIcon": "className?: string;",
     "CodebergIcon": "className?: string;",
     "CopyIcon": "className?: string;",
+    "ChapaBadgeIcon": "/** Chapa shield + chevron in currentColor. Decorative, always aria-hidden. Any SVG attribute is spread onto the root. */\n  className?: string;",
     "SectionHeader": "/** The command, without the `%` prefix. For example `chapa features`. */\n  command: string;\n  /** Right-aligned meta, e.g. \"exit 0 \\u00b7 5 results\". */\n  meta?: React.ReactNode;\n  /** Rendered as the accessible heading for the section (visually hidden). */\n  title?: string;\n  className?: string;",
     "ContentPageHeader": "/** The command, without the `%` prefix. For example `chapa explain --scoring`. */\n  command: string;\n  /** Accepts a node so a page can highlight part of its own title. */\n  title: React.ReactNode;\n  intro?: React.ReactNode;",
-    "OnThisPageIndex": "items: { id: string; label: string }[];"
+    "OnThisPageIndex": "heading: string;\n  items: { id: string; label: string }[];"
   },
   "overrides": {
     "Sparkline": {

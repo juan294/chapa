@@ -1,3 +1,12 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 /**
  * #720 — share page must try the badge SVG cache before re-rendering.
  *
@@ -19,11 +28,15 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
+vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
+
 const {
   mockMaterializePublicProfile,
   mockGetPublicProfileVerification,
   mockPersistProfileSnapshot,
   mockDeferProfileCacheWork,
+  mockRunPublicProfileSideEffects,
   mockRedactImpactForVisitor,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -38,6 +51,7 @@ const {
   mockGetPublicProfileVerification: vi.fn(),
   mockPersistProfileSnapshot: vi.fn(),
   mockDeferProfileCacheWork: vi.fn(),
+  mockRunPublicProfileSideEffects: vi.fn(),
   mockRedactImpactForVisitor: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -67,6 +81,8 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+  runPublicProfileSideEffects: (...args: unknown[]) =>
+    mockRunPublicProfileSideEffects(...args),
   redactImpactForVisitor: (...args: unknown[]) =>
     mockRedactImpactForVisitor(...args),
 }));
@@ -144,6 +160,7 @@ const FAKE_MATERIALIZED = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
   mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
   mockGetPublicProfileVerification.mockReturnValue({
     hash: "abc12345",
@@ -151,6 +168,7 @@ beforeEach(() => {
   });
   mockPersistProfileSnapshot.mockResolvedValue(true);
   mockDeferProfileCacheWork.mockResolvedValue(undefined);
+  mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
   mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
   mockRenderBadgeSvg.mockReturnValue(
     '<svg xmlns="http://www.w3.org/2000/svg">FRESH</svg>',
@@ -164,6 +182,19 @@ beforeEach(() => {
 });
 
 describe("share page (#720) cache-first SVG — real behavior", () => {
+  it("#1289 leaves unknown config uncached then heals on recovery", async () => {
+    mockDbGetStudioConfig.mockResolvedValueOnce({status: "unavailable"});
+    await SharePageContent({handle: "testuser"});
+    await flushAfterCallbacks();
+    expect(mockRenderBadgeSvg).toHaveBeenCalled();
+    expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    mockAfter.mockClear();
+    mockDbGetStudioConfig.mockResolvedValue({status: "found", config: DEFAULT_BADGE_CONFIG, revision: 2});
+    await SharePageContent({handle: "testuser"});
+    await flushAfterCallbacks();
+    expect(mockWriteBadgeSvgCache).toHaveBeenCalledTimes(1);
+  });
+
   it("skips renderBadgeSvg entirely on a cache hit", async () => {
     mockReadBadgeSvgCache.mockResolvedValue(
       '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>',
@@ -173,6 +204,7 @@ describe("share page (#720) cache-first SVG — real behavior", () => {
 
     expect(mockReadBadgeSvgCache).toHaveBeenCalled();
     expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    expect(mockDbGetStudioConfig).not.toHaveBeenCalled();
 
     await flushAfterCallbacks();
     expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
@@ -191,7 +223,7 @@ describe("share page (#720) cache-first SVG — real behavior", () => {
       "badge:testuser:2026-05-03",
       '<svg xmlns="http://www.w3.org/2000/svg">FRESH</svg>',
       "testuser",
-      undefined,
+      expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }), receiptIdentity: null }),
     );
   });
 });

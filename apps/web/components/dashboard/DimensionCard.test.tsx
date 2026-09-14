@@ -376,12 +376,12 @@ describe("DimensionCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // Phase 5 — shadow-card replaces border for card elevation
+  // Redesign — neutral rules distinguish dense dashboard cards
   // ----------------------------------------------------------------
-  it("uses shadow-card instead of border for card elevation", () => {
+  it("uses a neutral boundary for the dimension card", () => {
     render(<DimensionCard dimension="delivery" score={85} stats={mockStats} />);
     const article = screen.getByRole("article");
-    expect(article.className).toContain("shadow-card");
+    expect(article.className).toContain("border-stroke");
   });
 
   // ----------------------------------------------------------------
@@ -412,7 +412,7 @@ describe("DimensionCard", () => {
 
     const toggleButton = container.querySelector("button[aria-expanded]") as HTMLButtonElement;
     expect(toggleButton).not.toBeNull();
-    expect(toggleButton!.getAttribute("aria-label")).toBe("Toggle Delivery breakdown");
+    expect(toggleButton!.getAttribute("aria-label")).toMatch(/^Toggle Delivery breakdown: /);
   });
 
   it("toggle button aria-label uses correct dimension name for quality", () => {
@@ -421,7 +421,7 @@ describe("DimensionCard", () => {
     );
 
     const toggleButton = container.querySelector("button[aria-expanded]") as HTMLButtonElement;
-    expect(toggleButton!.getAttribute("aria-label")).toBe("Toggle Quality breakdown");
+    expect(toggleButton!.getAttribute("aria-label")).toMatch(/^Toggle Quality breakdown: /);
   });
 
   // ----------------------------------------------------------------

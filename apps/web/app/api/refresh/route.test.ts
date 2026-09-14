@@ -1,3 +1,4 @@
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { POST } from "./route";
@@ -9,6 +10,7 @@ const {
   mockRateLimitStrict,
   mockIsValidHandle,
   mockCaptureServerError,
+  mockFindUnusableSourceLinks,
   mockRevalidatePath,
   mockUpdateCraftCache,
   mockInvalidateProfileReadModels,
@@ -24,6 +26,7 @@ const {
   mockRateLimitStrict: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockFindUnusableSourceLinks: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockUpdateCraftCache: vi.fn(),
   mockInvalidateProfileReadModels: vi.fn(),
@@ -62,6 +65,13 @@ vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
+// The route issues a v7 receipt behind `scoring_v7_rendering`. Mocking the
+// flag module keeps this route test off the DB-backed flag machinery (and its
+// `unstable_cache`) and states the gate's position explicitly instead.
+vi.mock("@/lib/feature-flags", () => ({
+  isScoringV7RenderingEnabled: () => Promise.resolve(false),
+}));
+
 vi.mock("@/lib/cache/craft-cache", () => ({
   updateCraftCache: (...args: unknown[]) => mockUpdateCraftCache(...args),
 }));
@@ -71,6 +81,10 @@ vi.mock("@/lib/profile/orchestrated-profile", () => ({
     mockMaterializeOrchestratedProfile(...args),
   persistOrchestratedSnapshot: (...args: unknown[]) =>
     mockPersistOrchestratedSnapshot(...args),
+}));
+
+vi.mock("@/lib/platform/source-diagnostics", () => ({
+  findUnusableSourceLinks: (...args: unknown[]) => mockFindUnusableSourceLinks(...args),
 }));
 
 vi.mock("@/lib/auth/github-session-token", () => ({
@@ -142,6 +156,7 @@ describe("POST /api/refresh", () => {
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     mockCacheDel.mockResolvedValue(undefined);
+    mockFindUnusableSourceLinks.mockResolvedValue([]);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     mockUpdateCraftCache.mockResolvedValue(undefined);
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
@@ -217,8 +232,10 @@ describe("POST /api/refresh", () => {
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
       stats: true,
     });
+    expect(issueScoreReceiptIfConsented).toHaveBeenCalledWith("testuser", expect.objectContaining({ scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } }));
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
+      scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 },
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "testuser",
@@ -337,6 +354,20 @@ describe("POST /api/refresh", () => {
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
+  // Same rule as /api/generate: a dead platform connection is the user's to
+  // fix, and "try again later" sends them in a circle.
+  it("names an expired connection with a 409 instead of a blank 502", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue(null);
+    mockFindUnusableSourceLinks.mockResolvedValue(["bitbucket"]);
+
+    const res = await POST(makeRequest("testuser"));
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.staleSources).toEqual(["bitbucket"]);
+    expect(mockCaptureServerError).not.toHaveBeenCalled();
+  });
+
   it("returns 401 when no GitHub token is stored for the session", async () => {
     mockGetSessionGitHubToken.mockResolvedValue(null);
 
@@ -406,3 +437,6 @@ describe("POST /api/refresh", () => {
     await expect(POST(makeRequest("testuser"))).rejects.toThrow("unexpected boom");
   });
 });
+
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));
+vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceiptIfConsented: vi.fn(async () => "skipped") }));

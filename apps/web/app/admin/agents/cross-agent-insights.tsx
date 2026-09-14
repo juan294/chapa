@@ -38,7 +38,7 @@ function inlineFormat(text: string): string {
   // doesn't interfere with the regex patterns.
   return escapeHtml(text)
     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-    .replace(/`(.+?)`/g, '<code class="bg-stroke/50 px-1 rounded text-amber text-xs">$1</code>');
+    .replace(/`(.+?)`/g, '<code class="bg-purple-tint px-1 rounded-[3px] text-amber-text text-xs">$1</code>');
 }
 
 export function CrossAgentInsights({ entries }: CrossAgentInsightsProps) {
@@ -56,7 +56,7 @@ export function CrossAgentInsights({ entries }: CrossAgentInsightsProps) {
 
   if (agentKeys.length === 0) {
     return (
-      <div className="rounded-xl border border-stroke bg-card p-4">
+      <div className="rounded-[3px] border border-stroke bg-card p-4">
         <p className="font-heading text-sm text-text-secondary">
           <span className="text-terminal-dim">$</span> agents/insights — No
           shared context available yet. Run an agent to generate insights.
@@ -68,9 +68,9 @@ export function CrossAgentInsights({ entries }: CrossAgentInsightsProps) {
   const entry = latestByAgent.get(selected);
 
   return (
-    <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+    <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
       {/* Agent pills */}
-      <div className="flex gap-2 border-b border-stroke px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-stroke px-4 py-3">
         <span className="font-heading text-xs text-terminal-dim mr-1">
           $ agents/insights
         </span>
@@ -78,10 +78,10 @@ export function CrossAgentInsights({ entries }: CrossAgentInsightsProps) {
           <button
             key={key}
             onClick={() => setSelected(key)}
-            className={`rounded-md px-2.5 py-1 text-xs font-heading transition-colors ${
+            className={`min-h-11 rounded-[3px] px-2.5 py-1 text-xs font-heading transition-colors ${
               selected === key
-                ? "bg-amber text-white"
-                : "bg-stroke/50 text-text-secondary hover:text-text-primary"
+                ? "bg-action text-action-text"
+                : "bg-purple-tint text-text-secondary hover:text-text-primary"
             }`}
           >
             {key.replace(/_/g, " ")}

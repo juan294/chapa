@@ -1,0 +1,250 @@
+[
+  {
+    "locale": "en",
+    "theme": "light",
+    "width": 1440,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "en",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  },
+  {
+    "locale": "en",
+    "theme": "light",
+    "width": 390,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "en",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  },
+  {
+    "locale": "en",
+    "theme": "dark",
+    "width": 1440,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "en",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  },
+  {
+    "locale": "en",
+    "theme": "dark",
+    "width": 390,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "en",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  },
+  {
+    "locale": "es",
+    "theme": "light",
+    "width": 1440,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "es",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  },
+  {
+    "locale": "es",
+    "theme": "light",
+    "width": 390,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "es",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  },
+  {
+    "locale": "es",
+    "theme": "dark",
+    "width": 1440,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "es",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  },
+  {
+    "locale": "es",
+    "theme": "dark",
+    "width": 390,
+    "fonts": {
+      "Plus Jakarta Sans": {
+        "loaded": 1,
+        "check": true
+      },
+      "JetBrains Mono": {
+        "loaded": 1,
+        "check": true
+      },
+      "Manrope": {
+        "family": "\"Manrope\"",
+        "loaded": 1,
+        "check": true
+      },
+      "Barlow Condensed": {
+        "family": "\"Barlow Condensed\"",
+        "loaded": 1,
+        "check": true
+      }
+    },
+    "displayFamily": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+    "lang": "es",
+    "overflow": false,
+    "heading": "\"Barlow Condensed\", \"Barlow Condensed Fallback\", sans-serif",
+    "score": "92"
+  }
+]

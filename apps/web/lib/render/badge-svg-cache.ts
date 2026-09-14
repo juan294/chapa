@@ -1,9 +1,12 @@
+import { dbObservedReceiptManifest } from "@/lib/db/score-receipts-observed";
 /**
  * Shared full-response SVG cache for the badge — read by both the
  * `/u/[handle]/badge.svg` route and the share page (#720). Centralizing
  * the key format here ensures both paths point at the same Redis slot and
  * one cannot drift away from the other.
  */
+import { readScoringRenderSelection, sameScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { resolveBadgeConfigSnapshot } from "./badge-config";
 import { cacheDel, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { TimeoutError, withTimeout } from "@/lib/async/with-timeout";
@@ -87,8 +90,9 @@ export function buildBadgeSvgCacheKey(
   handle: string,
   date: string,
   locale: Locale = DEFAULT_LOCALE,
+  machinePolicy: ScoringRenderSelection["machinePolicy"] = "v6",
 ): string {
-  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${date}:${locale}`;
+  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${machinePolicy}:${date}:${locale}`;
 }
 
 /**
@@ -102,26 +106,28 @@ export function buildOgImageCacheKey(
   handle: string,
   date: string,
   locale: Locale = DEFAULT_LOCALE,
+  machinePolicy: ScoringRenderSelection["machinePolicy"] = "v6",
 ): string {
-  // v4: #1275 — every v3 value was rendered without text; a new prefix
-  // guarantees none of them is served after the fix deploys.
-  return `og-image:v4:${handle.toLowerCase()}:${date}:${locale}`;
+  // A layout version changes PNG bytes just as it changes the inline SVG.
+  return `og-image:v5:${handle.toLowerCase()}:${BADGE_RENDER_VARIANT}:${machinePolicy}:${date}:${locale}`;
 }
 
 /** Version shared by the OG metadata URL and its revision-fenced Redis value. */
 export function buildOgImageCacheVersion(
   date: string,
   revision: number | null,
+  machinePolicy: ScoringRenderSelection["machinePolicy"] = "v6",
 ): string {
-  return `${date}-${revision === null ? "default" : `r${revision}`}`;
+  return `${BADGE_RENDER_VARIANT}-${machinePolicy}-${date}-${revision === null ? "default" : `r${revision}`}`;
 }
 
 export function buildBadgeSvgRenderLockKey(
   handle: string,
   date: string,
   locale: Locale = DEFAULT_LOCALE,
+  machinePolicy: ScoringRenderSelection["machinePolicy"] = "v6",
 ): string {
-  return buildBadgeSvgCacheKey(handle, date, locale).replace(/^badge:/, "badge-lock:");
+  return buildBadgeSvgCacheKey(handle, date, locale, machinePolicy).replace(/^badge:/, "badge-lock:");
 }
 
 async function withCacheFallback<T>(
@@ -182,6 +188,25 @@ export async function readBadgeSvgCacheWithStatus(
   }
 }
 
+export type ScoringImageReceiptIdentity = { readonly revisionId: string; readonly contentHash: string };
+
+/** Fence both an existing observed receipt and a genuine no-receipt fallback
+ * against report publication or withdrawal while rendering. */
+export async function isScoringImageReceiptCurrent(
+  handle: string,
+  selection: ScoringRenderSelection,
+  identity: ScoringImageReceiptIdentity | null,
+): Promise<boolean> {
+  if (!selection.cacheable) return false;
+  if (selection.machinePolicy === "v6") return true;
+  try {
+    const current = await withTimeout(dbObservedReceiptManifest(handle), CACHE_DEADLINE_MS, "image receipt fence");
+    return identity === null ? current.status === "missing" : current.status === "found"
+      && current.manifest.isCurrent && current.manifest.revisionId === identity.revisionId
+      && current.manifest.contentHash === identity.contentHash;
+  } catch { return false; }
+}
+
 /**
  * Write the rendered SVG to the badge cache.
  *
@@ -201,15 +226,31 @@ export async function writeBadgeSvgCache(
   key: string,
   svg: string,
   handle: string,
-  options?: { ttlSeconds?: number },
+  options: { ttlSeconds?: number; scoringSelection: ScoringRenderSelection; configRevision?: number | null; receiptIdentity?: ScoringImageReceiptIdentity | null },
 ): Promise<boolean> {
-  const ttl =
-    options?.ttlSeconds ?? CACHE_TTL_BASE_SECONDS + handleCacheJitterSeconds(handle);
-  return withCacheFallback(
-    cacheSet(key, svg, ttl),
-    false,
-    "badge cache write",
-  );
+  const selection = options.scoringSelection;
+  const current = async () => {
+    if (!sameScoringRenderSelection(selection, await readScoringRenderSelection({ force: true }))) return false;
+    if (!await isScoringImageReceiptCurrent(handle, selection, options.receiptIdentity ?? null)) return false;
+    if ("configRevision" in options) {
+      const config = await resolveBadgeConfigSnapshot(handle);
+      if (!config.cacheable || config.revision !== options.configRevision) return false;
+    }
+    return true;
+  };
+  if (!await current()) return false;
+  const ttl = options.ttlSeconds ?? CACHE_TTL_BASE_SECONDS + handleCacheJitterSeconds(handle);
+  // Keep the fence attached to the underlying write, even if the foreground
+  // deadline expires: a late Redis completion must not escape invalidation.
+  const publication = (async () => {
+    const written = await cacheSet(key, svg, ttl);
+    if (!await current()) {
+      await cacheDel(key);
+      return false;
+    }
+    return written;
+  })();
+  return withCacheFallback(publication, false, "badge cache write");
 }
 
 export interface BadgeInvalidationResult {
@@ -231,23 +272,9 @@ export function isBadgeCacheRefreshed(result: BadgeInvalidationResult): boolean 
 }
 
 /**
- * Drop every locale's rendered SVG and OG image for a handle, for today, in
- * both cache layers.
- *
- * The badge cache key carries handle/variant/date/locale but nothing about the
- * inputs, so anything that changes what the badge should look like has to say
- * so explicitly. Three things do: linking or unlinking a platform (#856),
- * saving a Studio configuration (#1191), and any of the five
- * `invalidateProfileReadModels` callers that pass `badgeSvg: true` (refresh,
- * recalculate, insights, supplemental, bulk-recalculate — via
- * `lib/profile/post-write-invalidation.ts`).
- *
- * Every locale is cleared because there is one entry per locale (#1190) and the
- * caller has no idea which ones exist. Clearing Redis alone left a Studio save
- * invisible on Vercel's edge (and therefore on the README) for up to a day
- * (#1191 hotfix, v2.29.2): the edge caches the badge response per URL/PoP for
- * 6h+swr independently of this key, so the per-handle `Vercel-Cache-Tag` the
- * badge route sets is purged here too, via `purgeEdgeCacheTag`.
+ * Clear today's and yesterday's SVG/PNG slots for both machine policies and
+ * every locale, then purge both per-handle edge tags. Yesterday must be cleared
+ * because render-lock losers can serve it. Active locks are left intact.
  */
 export async function invalidateBadgeSvgCacheForHandle(
   handle: string,
@@ -255,10 +282,12 @@ export async function invalidateBadgeSvgCacheForHandle(
 ): Promise<BadgeInvalidationResult> {
   const [redisOutcomes, edgeOutcomes] = await Promise.all([
     Promise.all(
-      SUPPORTED_LOCALES.flatMap((locale) => [
-        cacheDel(buildBadgeSvgCacheKey(handle, date, locale)),
-        cacheDel(buildOgImageCacheKey(handle, date, locale)),
-      ]),
+      [date, new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)].flatMap(day =>
+        (["v6", "v7.2"] as const).flatMap(policy => SUPPORTED_LOCALES.flatMap(locale => [
+          cacheDel(buildBadgeSvgCacheKey(handle, day, locale, policy)),
+          cacheDel(buildOgImageCacheKey(handle, day, locale, policy)),
+        ])),
+      ),
     ),
     Promise.all([
       purgeEdgeCacheTag(badgeEdgeCacheTag(handle)),

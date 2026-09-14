@@ -1,0 +1,252 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <style>
+      @keyframes pulse-glow {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+      @keyframes ring-draw {
+        from { stroke-dashoffset: 289.03; }
+        to   { stroke-dashoffset: 52.02; }
+      }
+      .badge-score-pulse {
+        animation: pulse-glow 3s ease-in-out infinite;
+      }
+      /* #1168 UX-M6 — pulse-glow runs infinitely on other people's READMEs
+         forever; ring-draw is a one-shot reveal (1.2s, "both" fill) and is
+         intentionally left untouched. This rule must come AFTER the base
+         .badge-score-pulse rule above so equal-specificity cascade order
+         (not !important) is what wins under reduced motion. */
+      @media (prefers-reduced-motion: reduce) {
+        .badge-score-pulse {
+          animation: none;
+        }
+      }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" rx="20" fill="#0C0D14"/>
+  <rect x="1" y="1" width="1198" height="628" rx="19" fill="none" stroke="rgba(27, 208, 147, 0.12)" stroke-width="2"/>
+
+  <!-- ─── Header row ─────────────────────────────────────── -->
+  <!-- Avatar (circular clip) -->
+  <defs>
+    <clipPath id="avatar-clip">
+      <circle cx="90" cy="80" r="30"/>
+    </clipPath>
+  </defs>
+  <circle cx="90" cy="80" r="30" fill="rgba(27, 208, 147, 0.1)" stroke="rgba(27, 208, 147, 0.25)" stroke-width="2"/>
+  <g transform="translate(76, 66)">
+    <path d="M14 0.875L25.375 5.25L25.375 13.125C25.375 20.125 20.125 25.375 14 27.125C7.875 25.375 2.625 20.125 2.625 13.125L2.625 5.25Z" fill="none" stroke="#9AA4B2" stroke-width="1.3" opacity="0.5"/>
+    <path d="M8.75 17.5L14 10.5L19.25 17.5" fill="none" stroke="#1BD093" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+  </g>
+
+  <!-- Handle -->
+  <text x="132" y="74" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="#E6EDF3">Bertram Gilfoyle</text>
+  <!-- Verified icon (shield + checkmark) appears only with a real seal. -->
+  
+  <text x="132" y="100" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="#9AA4B2">Simulated metrics</text>
+
+  <!-- Chapa_ logo (top-right) -->
+  <text x="1140" y="82" font-family="'JetBrains Mono', monospace" font-size="22" fill="#9AA4B2" opacity="0.7" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="#1BD093">_</tspan></text>
+
+  <!-- ─── Archetype + metric pills row (above heatmap) ────── -->
+  <!-- Archetype pill with code-brackets icon -->
+  <g transform="translate(60, 143)">
+    <rect width="124" height="34" rx="17" fill="rgba(27, 208, 147, 0.1)" stroke="rgba(27, 208, 147, 0.25)" stroke-width="1"/>
+    <g transform="translate(14, 8)">
+      <path d="M8 2L3 8.5L8 15" fill="none" stroke="#009F6D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M14 2L19 8.5L14 15" fill="none" stroke="#009F6D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="75" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="#009F6D" text-anchor="middle">Builder</text>
+  </g>
+  <!-- · separator -->
+  <text x="198" y="165" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2" opacity="0.4">·</text>
+  <!-- Repos pill -->
+  <g transform="translate(212, 143)">
+    <rect width="96.5" height="34" rx="17" fill="rgba(27, 208, 147, 0.06)" stroke="rgba(27, 208, 147, 0.15)" stroke-width="1"/>
+    <g transform="translate(12, 9)" opacity="0.7">
+      <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3zm6 0v10M2 8h12" fill="none" stroke="#9AA4B2" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="34" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="#9AA4B2">9 Repos</text>
+  </g>
+  <!-- · separator -->
+  <text x="322.5" y="165" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2" opacity="0.4">·</text>
+  <!-- Watch pill -->
+  <g transform="translate(336.5, 143)">
+    <rect width="104" height="34" rx="17" fill="rgba(27, 208, 147, 0.06)" stroke="rgba(27, 208, 147, 0.15)" stroke-width="1"/>
+    <g transform="translate(12, 9)">
+      <path d="M1 7.5C1 7.5 3.5 2.5 8 2.5S15 7.5 15 7.5S12.5 12.5 8 12.5S1 7.5 1 7.5Z" fill="none" stroke="#9AA4B2" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+      <circle cx="8" cy="7.5" r="2.5" fill="none" stroke="#9AA4B2" stroke-width="1.3" opacity="0.7"/>
+    </g>
+    <text x="34" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="#9AA4B2">89 Watch</text>
+  </g>
+  <!-- · separator -->
+  <text x="454.5" y="165" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2" opacity="0.4">·</text>
+  <!-- Fork pill -->
+  <g transform="translate(468.5, 143)">
+    <rect width="96.5" height="34" rx="17" fill="rgba(27, 208, 147, 0.06)" stroke="rgba(27, 208, 147, 0.15)" stroke-width="1"/>
+    <g transform="translate(12, 9)" opacity="0.7">
+      <path d="M6 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM6 11a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM14 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM4 5v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V5" fill="none" stroke="#9AA4B2" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="scale(0.95)"/>
+    </g>
+    <text x="34" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="#9AA4B2">40 Fork</text>
+  </g>
+  <!-- · separator -->
+  <text x="579" y="165" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2" opacity="0.4">·</text>
+  <!-- Star pill -->
+  <g transform="translate(593, 143)">
+    <rect width="104.5" height="34" rx="17" fill="rgba(27, 208, 147, 0.06)" stroke="rgba(27, 208, 147, 0.15)" stroke-width="1"/>
+    <text x="12" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="#9AA4B2"><tspan fill="#1BD093">★</tspan> 1.2k Star</text>
+  </g>
+
+  <!-- ─── Two-column body ────────────────────────────────── -->
+
+  <!-- Left: heatmap -->
+  <rect x="60" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0ms" fill="freeze"/></rect>
+    <rect x="60" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0ms" fill="freeze"/></rect>
+    <rect x="60" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0ms" fill="freeze"/></rect>
+    <rect x="60" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0ms" fill="freeze"/></rect>
+    <rect x="60" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0ms" fill="freeze"/></rect>
+    <rect x="60" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0ms" fill="freeze"/></rect>
+    <rect x="60" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="0ms" fill="freeze"/></rect>
+    <rect x="109" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="60ms" fill="freeze"/></rect>
+    <rect x="109" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="60ms" fill="freeze"/></rect>
+    <rect x="109" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="60ms" fill="freeze"/></rect>
+    <rect x="109" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="60ms" fill="freeze"/></rect>
+    <rect x="109" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="60ms" fill="freeze"/></rect>
+    <rect x="109" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="60ms" fill="freeze"/></rect>
+    <rect x="109" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="60ms" fill="freeze"/></rect>
+    <rect x="158" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="120ms" fill="freeze"/></rect>
+    <rect x="158" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="120ms" fill="freeze"/></rect>
+    <rect x="158" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="120ms" fill="freeze"/></rect>
+    <rect x="158" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="120ms" fill="freeze"/></rect>
+    <rect x="158" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="120ms" fill="freeze"/></rect>
+    <rect x="158" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="120ms" fill="freeze"/></rect>
+    <rect x="158" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="120ms" fill="freeze"/></rect>
+    <rect x="207" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="180ms" fill="freeze"/></rect>
+    <rect x="207" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="180ms" fill="freeze"/></rect>
+    <rect x="207" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="180ms" fill="freeze"/></rect>
+    <rect x="207" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="180ms" fill="freeze"/></rect>
+    <rect x="207" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="180ms" fill="freeze"/></rect>
+    <rect x="207" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="180ms" fill="freeze"/></rect>
+    <rect x="207" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="180ms" fill="freeze"/></rect>
+    <rect x="256" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="240ms" fill="freeze"/></rect>
+    <rect x="256" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="240ms" fill="freeze"/></rect>
+    <rect x="256" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="240ms" fill="freeze"/></rect>
+    <rect x="256" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="240ms" fill="freeze"/></rect>
+    <rect x="256" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="240ms" fill="freeze"/></rect>
+    <rect x="256" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="240ms" fill="freeze"/></rect>
+    <rect x="256" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="240ms" fill="freeze"/></rect>
+    <rect x="305" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="300ms" fill="freeze"/></rect>
+    <rect x="305" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="300ms" fill="freeze"/></rect>
+    <rect x="305" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="300ms" fill="freeze"/></rect>
+    <rect x="305" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="300ms" fill="freeze"/></rect>
+    <rect x="305" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="300ms" fill="freeze"/></rect>
+    <rect x="305" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="300ms" fill="freeze"/></rect>
+    <rect x="305" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="300ms" fill="freeze"/></rect>
+    <rect x="354" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="360ms" fill="freeze"/></rect>
+    <rect x="354" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="360ms" fill="freeze"/></rect>
+    <rect x="354" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="360ms" fill="freeze"/></rect>
+    <rect x="354" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="360ms" fill="freeze"/></rect>
+    <rect x="354" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="360ms" fill="freeze"/></rect>
+    <rect x="354" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="360ms" fill="freeze"/></rect>
+    <rect x="354" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="360ms" fill="freeze"/></rect>
+    <rect x="403" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="420ms" fill="freeze"/></rect>
+    <rect x="403" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="420ms" fill="freeze"/></rect>
+    <rect x="403" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="420ms" fill="freeze"/></rect>
+    <rect x="403" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="420ms" fill="freeze"/></rect>
+    <rect x="403" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="420ms" fill="freeze"/></rect>
+    <rect x="403" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="420ms" fill="freeze"/></rect>
+    <rect x="403" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="420ms" fill="freeze"/></rect>
+    <rect x="452" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="480ms" fill="freeze"/></rect>
+    <rect x="452" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="480ms" fill="freeze"/></rect>
+    <rect x="452" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="480ms" fill="freeze"/></rect>
+    <rect x="452" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="480ms" fill="freeze"/></rect>
+    <rect x="452" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="480ms" fill="freeze"/></rect>
+    <rect x="452" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="480ms" fill="freeze"/></rect>
+    <rect x="452" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="480ms" fill="freeze"/></rect>
+    <rect x="501" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="540ms" fill="freeze"/></rect>
+    <rect x="501" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="540ms" fill="freeze"/></rect>
+    <rect x="501" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="540ms" fill="freeze"/></rect>
+    <rect x="501" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="540ms" fill="freeze"/></rect>
+    <rect x="501" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="540ms" fill="freeze"/></rect>
+    <rect x="501" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="540ms" fill="freeze"/></rect>
+    <rect x="501" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="540ms" fill="freeze"/></rect>
+    <rect x="550" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="600ms" fill="freeze"/></rect>
+    <rect x="550" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="600ms" fill="freeze"/></rect>
+    <rect x="550" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="600ms" fill="freeze"/></rect>
+    <rect x="550" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="600ms" fill="freeze"/></rect>
+    <rect x="550" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="600ms" fill="freeze"/></rect>
+    <rect x="550" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="600ms" fill="freeze"/></rect>
+    <rect x="550" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="600ms" fill="freeze"/></rect>
+    <rect x="599" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="660ms" fill="freeze"/></rect>
+    <rect x="599" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="660ms" fill="freeze"/></rect>
+    <rect x="599" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="660ms" fill="freeze"/></rect>
+    <rect x="599" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="660ms" fill="freeze"/></rect>
+    <rect x="599" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="660ms" fill="freeze"/></rect>
+    <rect x="599" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="660ms" fill="freeze"/></rect>
+    <rect x="599" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="660ms" fill="freeze"/></rect>
+    <rect x="648" y="190" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="720ms" fill="freeze"/></rect>
+    <rect x="648" y="239" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="720ms" fill="freeze"/></rect>
+    <rect x="648" y="288" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.92)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="720ms" fill="freeze"/></rect>
+    <rect x="648" y="337" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.68)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="720ms" fill="freeze"/></rect>
+    <rect x="648" y="386" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.48)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="720ms" fill="freeze"/></rect>
+    <rect x="648" y="435" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.3)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="720ms" fill="freeze"/></rect>
+    <rect x="648" y="484" width="44" height="44" rx="4" fill="rgba(27, 208, 147, 0.12)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="720ms" fill="freeze"/></rect>
+
+  <!-- Right: radar chart -->
+  <g>
+    <polygon points="930,254 950,268 942,292 918,292 910,268" fill="none" stroke="#1BD093" stroke-width="1" opacity="0.2"/>
+    <polygon points="930,233 970,262 955,309 905,309 890,262" fill="none" stroke="#1BD093" stroke-width="1" opacity="0.2"/>
+    <polygon points="930,211 991,255 967,327 893,327 869,255" fill="none" stroke="#1BD093" stroke-width="1" opacity="0.2"/>
+    <polygon points="930,190 1011,249 980,344 880,344 849,249" fill="none" stroke="#1BD093" stroke-width="2" opacity="0.5"/>
+    <line x1="930" y1="275" x2="930" y2="190" stroke="#1BD093" stroke-width="0.8" opacity="0.2"/>
+    <line x1="930" y1="275" x2="1011" y2="249" stroke="#1BD093" stroke-width="0.8" opacity="0.2"/>
+    <line x1="930" y1="275" x2="980" y2="344" stroke="#1BD093" stroke-width="0.8" opacity="0.2"/>
+    <line x1="930" y1="275" x2="880" y2="344" stroke="#1BD093" stroke-width="0.8" opacity="0.2"/>
+    <line x1="930" y1="275" x2="849" y2="249" stroke="#1BD093" stroke-width="0.8" opacity="0.2"/>
+    <polygon points="930,200 988,256 970,330 898,320 872,256" fill="#1BD093" fill-opacity="0.15" stroke="#1BD093" stroke-width="2" stroke-opacity="0.8"/>
+    <circle cx="930" cy="200" r="4" fill="#1BD093" stroke="#0C0D14" stroke-width="2"/>
+    <circle cx="988" cy="256" r="4" fill="#1BD093" stroke="#0C0D14" stroke-width="2"/>
+    <circle cx="970" cy="330" r="4" fill="#1BD093" stroke="#0C0D14" stroke-width="2"/>
+    <circle cx="898" cy="320" r="4" fill="#1BD093" stroke="#0C0D14" stroke-width="2"/>
+    <circle cx="872" cy="256" r="4" fill="#1BD093" stroke="#0C0D14" stroke-width="2"/>
+    <text x="930" y="166" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="#9AA4B2" text-anchor="middle">Delivery</text>
+    <text x="1034" y="239" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="#9AA4B2" text-anchor="start">Quality</text>
+    <text x="996" y="374" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="#9AA4B2" text-anchor="start">Consistency</text>
+    <text x="864" y="374" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="#9AA4B2" text-anchor="end">Breadth</text>
+    <text x="826" y="239" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="#9AA4B2" text-anchor="end">Craft</text>
+  </g>
+
+  <!-- ─── Hero composite score ring (right column) ────────── -->
+  <!-- Ring track (background) -->
+  <circle cx="930" cy="460" r="46" fill="none" stroke="rgba(27, 208, 147, 0.1)" stroke-width="4"/>
+  <!-- Ring arc (foreground, tier-colored, animates from 0 to score) -->
+  <circle cx="930" cy="460" r="46" fill="none" stroke="#65E7B0" stroke-width="4" stroke-dasharray="289.03" stroke-dashoffset="52.02" stroke-linecap="round" transform="rotate(-90 930 460)" style="animation: ring-draw 1.2s ease-out 0.5s both"/>
+  <!-- Score number (centered inside ring) -->
+  <text class="badge-score-pulse" x="930" y="460" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="#E6EDF3" text-anchor="middle" dominant-baseline="central">82</text>
+  <!-- Tier label (always visible below ring) -->
+  <text x="930" y="530" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#65E7B0" text-anchor="middle">High</text>
+
+  <!-- ─── Footer ─────────────────────────────────────────── -->
+  <!-- Divider line -->
+  <line x1="60" y1="560" x2="1140" y2="560" stroke="rgba(27, 208, 147, 0.12)" stroke-width="1"/>
+
+  <!-- Branding: left = GitHub, right = domain -->
+  
+    <rect x="60" y="580" width="136" height="30" rx="15" fill="rgba(27, 208, 147, 0.08)" stroke="rgba(27, 208, 147, 0.15)" stroke-width="1"/>
+    <g transform="translate(70, 585)"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" fill="#9AA4B2" opacity="0.8" transform="scale(0.8333)"/></g>
+    <g transform="translate(102, 585)"><path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z" fill="#9AA4B2" opacity="0.8" transform="scale(0.8333)"/></g>
+    <g transform="translate(134, 585)"><path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" fill="#9AA4B2" opacity="0.8" transform="scale(0.8333)"/></g>
+    <g transform="translate(166, 585)"><path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0539.8585.8585 0 0 0-.3362.405L.4332 9.5065l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.0301.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.462-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z" fill="#9AA4B2" opacity="0.8" transform="scale(0.8333)"/></g>
+    <text x="208" y="599" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2"><tspan opacity="0.5">Forged from </tspan><tspan opacity="0.9">purpose</tspan><tspan opacity="0.5">. Driven by </tspan><tspan opacity="0.9">curiosity</tspan><tspan opacity="0.5">.</tspan></text>
+    <text x="1140" y="599" font-family="'JetBrains Mono', monospace" font-size="17" fill="#9AA4B2" opacity="0.8" text-anchor="end">chapa.thecreativetoken.com</text>
+
+  <!-- Verification seal (right edge) -->
+  <g aria-label="Sample badge indicator">
+  <line x1="1145" y1="30" x2="1145" y2="600" stroke="#E05A47" stroke-width="1" opacity="0.15"/>
+  <!-- #1168 UX-H4: same legibility fix as the real strip (14px/0.9 opacity). -->
+  <text transform="rotate(-90 1168 315)" x="1168" y="315" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="#E05A47" opacity="0.9" text-anchor="middle" letter-spacing="2">SAMPLE · NOT A REAL BADGE · FOR ILLUSTRATION ONLY</text>
+</g>
+</svg>

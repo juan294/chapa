@@ -93,29 +93,29 @@ export function TerminalDisplay({ agentKey, onClose }: TerminalDisplayProps) {
 
   const statusColor =
     status === "running"
-      ? "text-amber"
+      ? "text-forest-warn"
       : status === "completed"
-        ? "text-terminal-green"
-        : "text-terminal-red";
+        ? "text-forest-ok"
+        : "text-forest-err";
 
   return (
-    <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+    <div className="rounded-[3px] border border-forest-line bg-forest text-forest-text overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-stroke px-4 py-2">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-forest-line px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Terminal dots */}
           <div className="flex gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-terminal-red/60" />
-            <span className="h-2.5 w-2.5 rounded-full bg-terminal-yellow/60" />
-            <span className="h-2.5 w-2.5 rounded-full bg-terminal-green/60" />
+            <span className="h-2.5 w-2.5 rounded-full bg-forest-err" />
+            <span className="h-2.5 w-2.5 rounded-full bg-forest-warn" />
+            <span className="h-2.5 w-2.5 rounded-full bg-forest-ok" />
           </div>
-          <span className="font-heading text-xs text-text-secondary">
+          <span className="font-heading text-xs text-forest-dim">
             {agentKey}
           </span>
           <span className={`font-heading text-xs ${statusColor}`}>
             {status}
           </span>
-          <span className="font-heading text-xs text-text-secondary/60">
+          <span className="font-heading text-xs text-forest-dim">
             {elapsed}
           </span>
         </div>
@@ -125,14 +125,14 @@ export function TerminalDisplay({ agentKey, onClose }: TerminalDisplayProps) {
               const text = lines.map((l) => l.text).join("\n");
               navigator.clipboard.writeText(text);
             }}
-            className="rounded px-2 py-1 text-xs font-heading text-text-secondary hover:text-text-primary transition-colors"
+            className="min-h-11 rounded-[3px] px-2 py-1 focus-visible:outline-forest-text! text-xs font-heading text-forest-dim hover:text-forest-text transition-colors"
             aria-label="Copy logs"
           >
             Copy
           </button>
           <button
             onClick={onClose}
-            className="rounded px-2 py-1 text-xs font-heading text-text-secondary hover:text-text-primary transition-colors"
+            className="min-h-11 rounded-[3px] px-2 py-1 focus-visible:outline-forest-text! text-xs font-heading text-forest-dim hover:text-forest-text transition-colors"
             aria-label="Close terminal"
           >
             Close
@@ -146,20 +146,20 @@ export function TerminalDisplay({ agentKey, onClose }: TerminalDisplayProps) {
         className="max-h-80 overflow-y-auto p-4 font-heading text-xs leading-relaxed"
       >
         {lines.length === 0 ? (
-          <p className="text-text-secondary animate-pulse">
+          <p className="text-forest-dim animate-pulse">
             Waiting for output...
           </p>
         ) : (
           lines.map((line, i) => (
-            <div key={i} className="flex gap-2">
-              <span className="shrink-0 text-text-secondary/40 select-none">
+            <div key={i} className="flex gap-2 break-all">
+              <span className="shrink-0 text-forest-dim select-none">
                 {new Date(line.timestamp).toLocaleTimeString()}
               </span>
               <span
                 className={
                   line.stream === "stderr"
-                    ? "text-terminal-red"
-                    : "text-text-primary"
+                    ? "text-forest-err"
+                    : "text-forest-text"
                 }
               >
                 {line.text}

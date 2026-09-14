@@ -71,6 +71,7 @@ describe("POST /api/recalculate contract", () => {
     expect(bodyAsRecord(response).success).toBe(true);
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
       token: "contract-token",
+      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6" }),
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "octocat",

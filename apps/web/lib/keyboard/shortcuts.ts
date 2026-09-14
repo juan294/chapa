@@ -94,7 +94,8 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Focus command bar",
     scope: "navigation",
     keys: ["/"],
-    combos: [{ key: "/" }],
+    altKeys: ["⌘", "K"],
+    combos: [{ key: "/" }, { key: "k", mod: true }],
   },
 
   /* ── Share page ──────────────────────────────────────────────── */
@@ -142,13 +143,7 @@ export const SHORTCUTS: Shortcut[] = [
     keys: ["⇧", "⌘", "P"],
     combos: [{ key: "p", mod: true, shift: true }],
   },
-  {
-    id: "focus-terminal",
-    label: "Focus terminal",
-    scope: "studio",
-    keys: ["⌘", "K"],
-    combos: [{ key: "k", mod: true }],
-  },
+
 ];
 
 /* ------------------------------------------------------------------ */

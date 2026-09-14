@@ -515,7 +515,7 @@ describe("createCallbackHandler", () => {
   it("invalidates stats cache on success", async () => {
     await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
   });
@@ -726,7 +726,7 @@ describe("createDisconnectHandler", () => {
   it("invalidates stats cache on success", async () => {
     await POST(makeRequest());
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
   });
@@ -767,7 +767,7 @@ describe("createDisconnectHandler", () => {
 
     await POST(makeRequest());
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
     expect(mockCacheDel).toHaveBeenCalledWith("supplemental:testuser");
@@ -891,5 +891,18 @@ describe("badge SVG invalidation covers every locale (#1190)", () => {
     // Studio save path and this one share one implementation rather than
     // drifting apart. What must stay true here is that this path delegates.
     expect(source).toContain("invalidateBadgeSvgCacheForHandle");
+  });
+});
+
+// The OAuth round trip used to always land on the share page, so linking a
+// second platform from /settings meant navigating back and starting over.
+describe("connect returnTo", () => {
+  it("only accepts a same-origin path", async () => {
+    const { __test } = await import("./platform-oauth");
+    expect(__test.safeReturnPath("/settings", "/u/juan294")).toBe("/settings");
+    expect(__test.safeReturnPath("//evil.example", "/u/juan294")).toBe("/u/juan294");
+    expect(__test.safeReturnPath("https://evil.example", "/u/juan294")).toBe("/u/juan294");
+    expect(__test.safeReturnPath(null, "/u/juan294")).toBe("/u/juan294");
+    expect(__test.safeReturnPath("", "/u/juan294")).toBe("/u/juan294");
   });
 });

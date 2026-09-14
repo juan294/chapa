@@ -572,3 +572,21 @@ export async function cacheIncr(
 export function _resetClient(): void {
   _redis = undefined;
 }
+
+/** Fixed retired namespace only. No private payloads or key names leave this helper. */
+export async function purgeRetiredSupplementalV7CacheBatch(cursor: string) {
+  if (!/^\d+$/.test(cursor)) throw new Error("Invalid retired-cache cursor");
+  const redis = getRedis();
+  if (!redis) return { attempted: 0, deleted: 0, failed: 0, nextCursor: "0" };
+  try {
+    const [next, keys] = await redis.scan(cursor, { match: "supplemental:v7:*", count: 100 });
+    if (!Array.isArray(keys) || keys.length > 1000 || !/^\d+$/.test(String(next))) throw new Error("Invalid retired-cache batch");
+    let deleted = 0;
+    for (const key of keys) {
+      if (typeof key !== "string" || !/^supplemental:v7:[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/.test(key)) continue;
+      try { await redis.del(key); deleted++; } catch { /* Leave cursor unchanged for retry. */ }
+    }
+    const failed = keys.length - deleted;
+    return { attempted: keys.length, deleted, failed, nextCursor: failed ? cursor : String(next) };
+  } catch { throw new Error("Retired supplemental cache sweep unavailable"); }
+}

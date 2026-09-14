@@ -22,8 +22,8 @@ describe("AdminTableSkeleton — render tests", () => {
 
     it("renders a search bar shimmer area", () => {
       const { container } = render(<AdminTableSkeleton />);
-      // The search bar shimmer is inside a rounded-xl card container
-      const cards = container.querySelectorAll(".rounded-xl.border");
+      // The search bar shimmer is inside a restrained-corner card container
+      const cards = container.querySelectorAll('[class~="rounded-[3px]"].border');
       // 5 stat cards + 1 table card container
       expect(cards.length).toBeGreaterThanOrEqual(6);
     });

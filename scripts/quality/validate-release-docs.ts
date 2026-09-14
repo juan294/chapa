@@ -74,12 +74,20 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   const exploreCommand = read(root, EXPLORE_COMMAND, errors);
   const prodplaybookCommand = read(root, PRODPLAYBOOK_COMMAND, errors);
 
-  if (playbook && lineCount(playbook) > 200) {
-    errors.push(`${PLAYBOOK}: exceeds 200 lines`);
+  // One concise authority; subordinate runbooks delegate ordering here.
+  if (playbook && lineCount(playbook) > 260) {
+    errors.push(`${PLAYBOOK}: exceeds 260 lines`);
   }
 
   for (const stage of [
+    "local-candidate",
+    "exact commit",
     "candidateTreeDigest",
+    "allowlisted build manifest",
+    "no tracked commits",
+    "Preview prevention",
+    "Ignored Build Step",
+    "migration admission",
     "merge authorization",
     "mainTreeDigest",
     "production identity",
@@ -98,9 +106,12 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
   const topologyProof = [
     "developTreeDigest=\"$(git rev-parse 'origin/develop^{tree}')\"",
     "prospectiveMainTreeDigest=\"$(git merge-tree --write-tree origin/main origin/develop)\"",
-    "test \"$prospectiveMainTreeDigest\" = \"$developTreeDigest\"",
   ];
+  const directEquality = playbook.includes('test "$prospectiveMainTreeDigest" = "$developTreeDigest"');
+  const candidateEquality = playbook.includes('test "$developTreeDigest" = "$candidateTreeDigest"')
+    && playbook.includes('test "$prospectiveMainTreeDigest" = "$candidateTreeDigest"');
   if (
+    (!directEquality && !candidateEquality) ||
     topologyProof.some((instruction) => !playbook.includes(instruction)) ||
     playbook.includes("git merge-base --is-ancestor origin/main origin/develop")
   ) {
@@ -109,31 +120,12 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
     );
   }
 
-  const releasePrCreationIndex = lowerPlaybook.indexOf("create or reuse the");
-  const requiredChecksWaitIndex = lowerPlaybook.indexOf("gh pr checks");
-  if (
-    releasePrCreationIndex < 0 ||
-    requiredChecksWaitIndex < 0 ||
-    releasePrCreationIndex > requiredChecksWaitIndex
-  ) {
-    errors.push(
-      `${PLAYBOOK}: release PR creation must precede the concurrent required-check and Preview wait`,
-    );
-  }
-
-  const previewResultIndex = lowerPlaybook.indexOf("gh run download");
-  const migrationsCheckIndex = lowerPlaybook.indexOf("pending migrations check (release");
+  const localProofIndex = lowerPlaybook.indexOf("local-candidate");
+  const migrationsCheckIndex = lowerPlaybook.indexOf("migration admission");
   const promoteMergeIndex = lowerPlaybook.indexOf("gh pr merge --merge --auto");
-  if (
-    previewResultIndex < 0 ||
-    migrationsCheckIndex < 0 ||
-    promoteMergeIndex < 0 ||
-    previewResultIndex > promoteMergeIndex ||
-    migrationsCheckIndex > promoteMergeIndex
-  ) {
-    errors.push(
-      `${PLAYBOOK}: required checks, migrations, and Preview proof must precede the promotion merge`,
-    );
+  if (localProofIndex < 0 || migrationsCheckIndex < 0 || promoteMergeIndex < 0
+      || localProofIndex > promoteMergeIndex || migrationsCheckIndex > promoteMergeIndex) {
+    errors.push(`${PLAYBOOK}: local qualification and migration admission must precede the promotion merge`);
   }
 
   const mainTreeIndex = lowerPlaybook.indexOf("maintreedigest");
@@ -151,7 +143,7 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
 
   const releaseCreateIndex = lowerPlaybook.indexOf("gh release create");
   const releaseReadbackIndex = lowerPlaybook.indexOf("gh release view");
-  const finalReceiptIndex = lowerPlaybook.indexOf("release:write-result");
+  const finalReceiptIndex = lowerPlaybook.lastIndexOf("release:write-result");
   if (
     tagIndex < 0 ||
     releaseCreateIndex < 0 ||
@@ -162,7 +154,7 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
     releaseReadbackIndex > finalReceiptIndex
   ) {
     errors.push(
-      `${PLAYBOOK}: tag must precede GitHub Release readback, which must precede the final receipt upload`,
+      `${PLAYBOOK}: tag must precede GitHub Release readback, which must precede the final receipt`,
     );
   }
 
@@ -223,6 +215,7 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
     EXPLORE_COMMAND,
     PRODPLAYBOOK_COMMAND,
     PLAYBOOK,
+    E2E_PLAYBOOK,
     ...DELEGATED_FILES,
   ];
   for (const file of scannedFiles) {
@@ -249,6 +242,18 @@ export function validateReleaseDocs(root = process.cwd()): string[] {
       );
     }
     rejectRetiredTerms(source, file, errors);
+    // These executable paths create/use a hosted Preview as qualification.
+    // Merely explaining why Preview is prohibited remains permitted.
+    const previewCommands = [
+      /\bgh\s+workflow\s+run\s+release-verification(?:\.yml)?\b/i,
+      /\bvercel\s+(?:deploy\s+)?--target[=\s]+preview\b/i,
+      /\bvercel\s+deploy\b(?![^\n]*(?:--prod\b|--target[=\s]+production\b))/i,
+      /\bVERCEL_ENV\s*=\s*["']?preview\b/,
+      /\bgh\s+run\s+download[^\n]*\bPreview\b/i,
+    ];
+    if (previewCommands.some(pattern => pattern.test(source))) {
+      errors.push(`${file}: active Preview qualification commands are prohibited`);
+    }
   }
 
   for (const file of DELEGATED_FILES) {

@@ -99,6 +99,7 @@ describe("POST /api/refresh contract", () => {
     expect(bodyAsRecord(response).stats).toMatchObject({ handle: "octocat" });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
       token: "oauth-contract-token",
+      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6" }),
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "octocat",

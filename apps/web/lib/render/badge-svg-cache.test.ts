@@ -1,3 +1,8 @@
+const { cacheTestSelection } = vi.hoisted(() => ({ cacheTestSelection: { enabled: false, machinePolicy: "v6" as const, cacheable: true, capturedAt: 0 } }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: async () => cacheTestSelection,
+}));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@/lib/i18n/types";
@@ -54,9 +59,9 @@ describe("badge-svg-cache", () => {
       const key = buildBadgeSvgCacheKey("Octocat", "2026-05-01");
       // #1225 bumped this from "warm-amber-v3": converging the badge onto the
       // Jade palette changed the rendered bytes, so every cached SVG must miss.
-      expect(BADGE_RENDER_VARIANT).toBe("jade-v1");
+      expect(BADGE_RENDER_VARIANT).toBe("ice-terminal-v2");
       expect(key).toBe(
-        `badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:${DEFAULT_LOCALE}`,
+        `badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:${DEFAULT_LOCALE}`,
       );
     });
 
@@ -70,7 +75,7 @@ describe("badge-svg-cache", () => {
       const es = buildBadgeSvgCacheKey("octocat", "2026-05-01", "es");
       const en = buildBadgeSvgCacheKey("octocat", "2026-05-01", "en");
       expect(es).not.toBe(en);
-      expect(en).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:en`);
+      expect(en).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:en`);
     });
 
     it("lowercases the handle so case variants share a cache slot", () => {
@@ -79,21 +84,30 @@ describe("badge-svg-cache", () => {
       expect(a).toBe(b);
     });
 
+    it("versions and locale-separates OG Redis slots with the renderer", () => {
+      expect(buildOgImageCacheKey("Octocat", "2026-05-01", "es")).toBe(
+        "og-image:v5:octocat:ice-terminal-v2:v6:2026-05-01:es",
+      );
+      expect(buildOgImageCacheKey("Octocat", "2026-05-01", "en")).not.toBe(
+        buildOgImageCacheKey("Octocat", "2026-05-01", "es"),
+      );
+    });
+
     it("versions OG image publication by date and Studio revision", () => {
-      expect(buildOgImageCacheVersion("2026-05-01", 42)).toBe("2026-05-01-r42");
+      expect(buildOgImageCacheVersion("2026-05-01", 42)).toBe("ice-terminal-v2-v6-2026-05-01-r42");
       expect(buildOgImageCacheVersion("2026-05-01", null)).toBe(
-        "2026-05-01-default",
+        "ice-terminal-v2-v6-2026-05-01-default",
       );
     });
 
     it("uses the same identity for the cross-instance render lock, including locale", () => {
       expect(buildBadgeSvgRenderLockKey("Octocat", "2026-05-01")).toBe(
-        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:${DEFAULT_LOCALE}`,
+        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:${DEFAULT_LOCALE}`,
       );
       // Explicitly the non-default locale, so this stays a real assertion
       // whichever way DEFAULT_LOCALE points.
       expect(buildBadgeSvgRenderLockKey("Octocat", "2026-05-01", "es")).toBe(
-        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:2026-05-01:es`,
+        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:es`,
       );
     });
   });
@@ -186,6 +200,7 @@ describe("badge-svg-cache", () => {
         "badge:v2:octocat:warm-amber:2026-05-01",
         "<svg>fresh</svg>",
         "octocat",
+        { scoringSelection: cacheTestSelection },
       );
       const ttl = cacheSet.mock.calls[0]![2] as number;
       expect(ttl).toBeGreaterThanOrEqual(86400);
@@ -202,6 +217,7 @@ describe("badge-svg-cache", () => {
         "badge:v2:octocat:warm-amber:2026-05-01",
         "<svg>fresh</svg>",
         "octocat",
+        { scoringSelection: cacheTestSelection },
       );
       const ttl = cacheSet.mock.calls[0]![2] as number;
       expect(ttl).toBeLessThanOrEqual(86400 + 7200);
@@ -210,7 +226,7 @@ describe("badge-svg-cache", () => {
     it("does not throw when Redis errors", async () => {
       cacheSet.mockRejectedValueOnce(new Error("redis down"));
       await expect(
-        writeBadgeSvgCache("k", "<svg/>", "testuser"),
+        writeBadgeSvgCache("k", "<svg/>", "testuser", { scoringSelection: cacheTestSelection }),
       ).resolves.not.toThrow();
     });
 
@@ -227,7 +243,7 @@ describe("badge-svg-cache", () => {
           "badge:v2:octocat:warm-amber:2026-05-01",
           "<svg>placeholder</svg>",
           "octocat",
-          { ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS },
+          { ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS, scoringSelection: cacheTestSelection },
         );
 
         expect(cacheSet).toHaveBeenCalledWith(
@@ -248,6 +264,7 @@ describe("badge-svg-cache", () => {
           "badge:v2:octocat:warm-amber:2026-05-01",
           "<svg>fresh</svg>",
           "octocat",
+          { scoringSelection: cacheTestSelection },
         );
         const ttl = cacheSet.mock.calls[0]![2] as number;
         expect(ttl).toBeGreaterThanOrEqual(86400);
@@ -281,8 +298,8 @@ describe("badge-svg-cache", () => {
     it("two different handles get different effective TTLs when written to cache (PE-S1)", async () => {
       cacheSet.mockResolvedValue(true);
 
-      await writeBadgeSvgCache("k1", "<svg/>", "alice");
-      await writeBadgeSvgCache("k2", "<svg/>", "zz-different-hash-zz");
+      await writeBadgeSvgCache("k1", "<svg/>", "alice", { scoringSelection: cacheTestSelection });
+      await writeBadgeSvgCache("k2", "<svg/>", "zz-different-hash-zz", { scoringSelection: cacheTestSelection });
 
       const ttl1 = cacheSet.mock.calls[0]![2] as number;
       const ttl2 = cacheSet.mock.calls[1]![2] as number;
@@ -308,7 +325,7 @@ describe("invalidateBadgeSvgCacheForHandle (#1191, #1266)", () => {
     await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
 
     const deleted = cacheDel.mock.calls.map(([key]) => key);
-    expect(deleted).toHaveLength(SUPPORTED_LOCALES.length * 2);
+    expect(deleted).toHaveLength(SUPPORTED_LOCALES.length * 8);
     for (const locale of SUPPORTED_LOCALES) {
       expect(deleted).toContain(
         buildBadgeSvgCacheKey("Octocat", "2026-08-30", locale),

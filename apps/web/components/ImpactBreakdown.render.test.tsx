@@ -278,7 +278,10 @@ describe("getArchetypeProfile — Artificer archetype", () => {
       dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 30, craft: 92 },
     };
     const result = getArchetypeProfile(impact, tEn);
-    expect(result).toContain("defined by craft");
+    // v7 (#1312): Artificer is an optional Craft descriptor beside the core
+    // archetype, not a dominant dimension, and it describes recorded practice.
+    expect(result).toContain("optional Craft descriptor");
+    expect(result).toContain("not proven ability");
     // Weakest is breadth (30)
     expect(result).toContain("Breadth");
   });
@@ -457,3 +460,17 @@ describe("DataSources — supplemental source (#1220)", () => {
   });
 });
 
+
+/**
+ * On /u/:handle the data-sources block is the first heading after the page
+ * h1, and it is a peer of the "Impact breakdown" and "Embed badge" h2s that
+ * follow it, styled identically. An h3 there skipped a level, which
+ * Lighthouse's heading-order audit flagged (LE-8-3).
+ */
+describe("DataSources — heading level (LE-8-3)", () => {
+  it("titles the block with an h2, the same level as its sibling share-page sections", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    const heading = screen.getByRole("heading", { name: /data sources/i });
+    expect(heading.tagName).toBe("H2");
+  });
+});

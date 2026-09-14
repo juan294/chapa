@@ -227,6 +227,19 @@ describe("dbGetStudioConfig", () => {
     });
   });
 
+  it("reads pre-palette persisted rows as Jade without mutating them", async () => {
+    const legacy = Object.fromEntries(Object.entries(config).filter(([key]) => key !== "colorPalette"));
+    const stored = Object.freeze({ ...legacy, interaction: "tilt-3d" });
+    terminalResolve = {
+      data: { handle: "juan294", config: stored, revision: 42, updated_at: "2026-08-31T13:15:00Z" }, error: null,
+    };
+    expect(await dbGetStudioConfig("juan294")).toEqual({
+      status: "found", config: { ...legacy, colorPalette: "jade" }, revision: 42,
+    });
+    expect(stored).not.toHaveProperty("colorPalette");
+    expect(stored).toHaveProperty("interaction", "tilt-3d");
+  });
+
   it("loads a row saved before palette was renamed to colorPalette", async () => {
     terminalResolve = {
       data: {

@@ -414,9 +414,11 @@ describe("UserMenu — sign out (runtime)", () => {
     expect(form!.getAttribute("action")).toBe("/api/auth/logout");
   });
 
-  // Phase 3 — avatar images use img-outline class
-  it("avatar images use img-outline class for visual boundary", () => {
-    expect(SOURCE).toContain("img-outline");
+  // The outline read as a bright ring around the navbar avatar, which the
+  // border and card background already separate well enough. `.img-outline`
+  // still applies on /settings and /admin, where avatars sit on flat lists.
+  it("draws no outline ring on the menu avatars", () => {
+    expect(SOURCE).not.toContain("img-outline");
   });
 
   // Phase 7 — exit animation for dropdown

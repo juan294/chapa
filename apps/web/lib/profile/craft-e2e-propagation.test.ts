@@ -87,6 +87,8 @@ import {
 } from "./orchestrated-profile";
 import { materializePublicProfile } from "./public-profile";
 import { materializeProfile } from "./materialize-profile";
+import { expectFound } from "@/lib/test-helpers/found";
+import { isGitHubUserNotFound } from "@/lib/github/not-found";
 
 // ---------------------------------------------------------------------------
 // Fixtures: realistic insights and stats so the real scoring formulas produce
@@ -211,39 +213,36 @@ describe("end-to-end craft propagation through every impact-computing endpoint (
   //    here, all six endpoints inherit the behavior.
   // -------------------------------------------------------------------------
   it("materializeProfile attaches craft from the cache to every materialized output", async () => {
-    const result = await materializeProfile("alice");
+    const result = expectFound(await materializeProfile("alice"));
 
-    expect(result).not.toBeNull();
     const expectedCraft = craftFromInsights().craftScore;
-    expect(result!.craftResult?.craftScore).toBe(expectedCraft);
-    expect(result!.rawImpact.dimensions.craft).toBe(expectedCraft);
-    expect(result!.displayImpact.dimensions.craft).toBe(expectedCraft);
+    expect(result.craftResult?.craftScore).toBe(expectedCraft);
+    expect(result.rawImpact.dimensions.craft).toBe(expectedCraft);
+    expect(result.displayImpact.dimensions.craft).toBe(expectedCraft);
     expect(result!.snapshot.craft).toBe(expectedCraft);
   });
 
   it("materializeProfile drops craft when no insights exist for the handle", async () => {
     mockGetCachedCraftScore.mockResolvedValueOnce(null);
 
-    const result = await materializeProfile("anon");
+    const result = expectFound(await materializeProfile("anon"));
 
-    expect(result).not.toBeNull();
-    expect(result!.craftResult).toBeNull();
-    expect(result!.rawImpact.dimensions.craft).toBeUndefined();
-    expect(result!.displayImpact.dimensions.craft).toBeUndefined();
-    expect(result!.snapshot.craft).toBeUndefined();
+    expect(result.craftResult).toBeNull();
+    expect(result.rawImpact.dimensions.craft).toBeUndefined();
+    expect(result.displayImpact.dimensions.craft).toBeUndefined();
+    expect(result.snapshot.craft).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------
   // 3. Public read paths — badge.svg + share page → materializePublicProfile.
   // -------------------------------------------------------------------------
   it("materializePublicProfile (badge.svg + share page) produces craft", async () => {
-    const result = await materializePublicProfile("alice");
+    const result = expectFound(await materializePublicProfile("alice"));
 
-    expect(result).not.toBeNull();
-    expect(result!.craftResult?.craftScore).toBe(
+    expect(result.craftResult?.craftScore).toBe(
       craftFromInsights().craftScore,
     );
-    expect(result!.displayImpact.dimensions.craft).toBe(
+    expect(result.displayImpact.dimensions.craft).toBe(
       craftFromInsights().craftScore,
     );
   });
@@ -345,7 +344,7 @@ describe("end-to-end craft propagation through every impact-computing endpoint (
         label: "materializePublicProfile (badge.svg + /u/[handle])",
         run: async () => {
           const r = await materializePublicProfile("alice");
-          return r ? { craft: r.displayImpact.dimensions.craft } : null;
+          return r && !isGitHubUserNotFound(r) ? { craft: r.displayImpact.dimensions.craft } : null;
         },
       },
       {

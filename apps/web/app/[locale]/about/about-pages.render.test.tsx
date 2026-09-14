@@ -227,7 +227,7 @@ vi.mock("@/lib/i18n/server", () => ({
       "common.tryAgain": "Try again",
       "common.goHome": "Go home",
       "landing.footer.tagline": "Built for developers, by developers.",
-      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.poweredBy": "Import your work from",
       "landing.footer.about": "About",
       "landing.footer.scoring": "Scoring",
       "landing.footer.terms": "Terms",

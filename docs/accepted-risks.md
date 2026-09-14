@@ -244,7 +244,29 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Historical production-only build guard and current Preview prohibition
+
+The 2026-09-06 configuration used an Ignored Build Step to skip non-production
+builds. That guard still allowed a Preview deployment object to be created,
+so it does not satisfy the standing prohibition on Preview creation.
+
+The earlier instruction to clear the guard for a release is superseded by
+[the current release playbook](release/release-playbook.md). Qualification is
+local schema2 proof. Before any later authorized push, inspect actual remote
+triggers read-only and prove documented non-destructive Preview prevention.
+If that prevention is not available, stop before push; do not alter the guard
+or create a deployment to discover what happens. This note records a prior
+configuration and does not assert current remote state or authorize a change.
+
+
 ## Profile type threshold boundary (0.15 review-to-PR ratio)
+
+> **Superseded for v7 (#1312).** v7 has no solo/collaborative switch: Quality
+> practices is one of four fixed dimensions at 0.25 each, counted from
+> demonstrated rationale, verification, review-or-correction and outcome
+> follow-up, and it is never excluded from the composite. This entry remains as
+> the accurate record of v6 behaviour, which v6 records still carry. See
+> `docs/impact-v7.md`.
 
 - **Risk:** A developer with exactly 15% review rate sits on the solo/collaborative boundary. Crossing the threshold changes which Quality formula is used and whether Quality is included in the composite.
 - **Mitigation:** The threshold is intentionally conservative (solo-favoring) because the collaborative path has a much stronger impact on scores. Edge cases near the boundary will see modest score changes when crossing. The threshold (0.15) is a shared constant (`SOLO_REVIEW_RATIO_THRESHOLD`) that can be tuned.
@@ -254,6 +276,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 ---
 
 ## Per-platform quality-signal availability
+
+> **Superseded for v7 (#1312).** v7 does not silently absorb a source gap into
+> a lower score. A connected source that could not be fully read stays in scope
+> with its own incomplete coverage, and the affected dimensions publish an
+> evidence-completion range whose bounds contain every admissible completion.
+> The gap is disclosed in the receipt rather than mitigated by a panel note.
+> This entry remains as the accurate record of v6 behaviour.
 
 - **Risk:** PR-description, feature-branch, issue-linkage, batch-size, and lead-time signals are computed only from GitHub. GitLab, Bitbucket, and Codeberg do not expose them, so a profile whose merged work is mostly on those platforms has a Quality dimension based on limited data. For solo profiles, Quality is display-only and excluded from the composite.
 - **Mitigation:** The share-page "How is my score calculated" panel states this per platform. Quality is never counted in the solo composite, so the gap does not depress the headline score for solo developers.
@@ -325,6 +354,40 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Accepted:** 2026-07-16
 
 ---
+
+## AI insights parser chunk exceeds the per-file bundle budget (2026-09-07)
+
+**Risk:** One client JS chunk is 368 KB against a documented 350 KB per-file
+budget, and `scripts/check-bundle-size.sh` exempts it explicitly.
+
+**Why it is accepted:** The chunk is the AI insights report parser, reached
+only through a dynamic import:
+
+`use-insights-import.ts:133` -> `lib/insights/parser` -> `lib/insights/report-v7`
+-> `zod`
+
+It is therefore fetched when someone imports an insights report, and never as
+part of loading a page. The budget exists to stop pages getting heavy; this
+chunk does not make any page heavier. Every other client chunk is well under
+the ceiling (next largest 227 KB, then 125 KB).
+
+Raising the budget to 400 KB for everything would have hidden a future genuine
+380 KB page chunk, which is the failure the budget exists to catch. Splitting
+or replacing the zod schema is real work on a validation path and buys nothing
+a reader would notice.
+
+**Bounded how:** The exemption is not a filename allowlist — Turbopack chunk
+names are content hashes and would drift on every change. The chunk is
+identified by a stable literal from the insights schema, only one chunk may be
+exempted, and it must still stay under a separate 400 KB ceiling. Both bounds
+are covered: a different over-budget chunk fails, and the exempt chunk fails
+once it passes its own ceiling.
+
+**Revisit if:** the parser grows toward 400 KB, the insights import stops being
+dynamically loaded, or a second chunk needs the same treatment — a second
+exception means the rule, not the chunk, is wrong.
+
+**Refs:** [#1319](https://github.com/juan294/chapa/issues/1319)
 
 ## Review schedule
 

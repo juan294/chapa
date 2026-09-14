@@ -113,5 +113,6 @@ test.describe("Smoke tests — core routes", () => {
     const response = await page.goto("/nonexistent-page-xyz");
     expect(response).not.toBeNull();
     expect(response!.status()).toBe(404);
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible();
   });
 });

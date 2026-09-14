@@ -1,3 +1,6 @@
+import { postWriteScore } from "@/lib/profile/post-write-score";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { verifyAdminSecret } from "@/lib/auth/admin";
@@ -52,6 +55,9 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       { status: 429, headers: { "Retry-After": "3600" } },
     );
   }
+
+  const scoringSelection = await readScoringRenderSelection();
+  const publications: { handle: string; result: Awaited<ReturnType<typeof postWriteScore>> }[] = [];
 
   // Optional cursor: ?after=<handle> continues an all-user page or resumes a
   // time-limited run (BE-H7). The database applies this unique keyset cursor
@@ -125,6 +131,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
         {
           partial: true,
           completed,
+          ...(scoringSelection.enabled && { publications }),
           pending: handles.filter((h) => !completedSet.has(h)),
           recalculated,
           failed: errors.length,
@@ -141,6 +148,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       batch.map(async (handle) => {
         try {
           const materialized = await materializeOrchestratedProfile(handle, {
+            scoringSelection,
             // #930 — Admin recalculates must bypass the EMA same-day lock.
             // A stored today-snapshot may contain wrong data (e.g. from a
             // timed-out platform fetch); ignoring it ensures the fresh score
@@ -157,6 +165,8 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
+            const issuance = await issueScoreReceiptIfConsented(handle, { scoringSelection });
+            publications.push({ handle, result: await postWriteScore(handle, scoringSelection, issuance) });
             await invalidateProfileReadModels(handle, {
               stats: true,
               badgeSvg: true,
@@ -192,6 +202,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     {
       partial: hasMore,
       completed,
+      ...(scoringSelection.enabled && { publications }),
       recalculated,
       failed: errors.length,
       total: totalAvailable,

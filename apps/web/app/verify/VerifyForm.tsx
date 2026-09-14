@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTranslation } from "@/lib/i18n";
-import { VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
+import { VERIFICATION_CODE_PATTERN, VERIFICATION_CODE_MAX_LENGTH } from "@/lib/verification/constants";
 
 export function VerifyForm() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export function VerifyForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = hash.trim().toLowerCase();
-    if (!VERIFICATION_HASH_PATTERN.test(trimmed)) {
+    if (!VERIFICATION_CODE_PATTERN.test(trimmed)) {
       setError(t('verifyForm.invalidHash') as string);
       return;
     }
@@ -39,12 +39,12 @@ export function VerifyForm() {
             setError("");
           }}
           placeholder="a1b2c3d4e5f6a7b8"
-          maxLength={32}
+          maxLength={VERIFICATION_CODE_MAX_LENGTH}
           autoComplete="off"
           spellCheck={false}
           aria-invalid={!!error}
           aria-describedby={error ? "hash-input-error" : undefined}
-          className="w-full rounded-lg border border-stroke bg-card px-4 py-3 font-heading text-lg tracking-widest text-text-primary placeholder:text-text-secondary/30 focus:border-complement/40 focus-visible:outline-none focus:ring-1 focus:ring-complement/50 transition-colors"
+          className="w-full rounded-[3px] border border-text-primary bg-card px-4 py-3 font-heading text-lg tracking-widest text-text-primary placeholder:text-text-secondary focus:border-complement-text focus-visible:outline-complement-text! transition-colors"
         />
         {error && (
           <p id="hash-input-error" role="alert" className="mt-2 text-sm text-terminal-red">{error}</p>
@@ -53,10 +53,7 @@ export function VerifyForm() {
 
       <button
         type="submit"
-        // White text on a solid bg-complement fill measures 2.54:1, below AA.
-        // bg-complement-dark is the darker step of the same ramp (~5.49:1),
-        // and hover moves to the base rather than to the lighter step.
-        className="group inline-flex min-h-[46px] items-center gap-2.5 rounded-lg bg-complement-dark px-6 text-sm font-semibold text-white transition-all hover:bg-complement hover:shadow-xl hover:shadow-complement/25"
+        className="group inline-flex min-h-[46px] items-center gap-2.5 rounded-[3px] border border-complement-text bg-card px-6 font-heading text-sm font-semibold text-complement-text transition-colors hover:bg-purple-tint focus-visible:outline-complement-text!"
       >
         {t('verifyForm.submit') as string}
         <svg

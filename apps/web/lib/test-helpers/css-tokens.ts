@@ -74,8 +74,9 @@ function splitTopLevel(args: string): string[] {
   return parts;
 }
 
-export const LIGHT_SURFACES = ["#f7fbf8", "#edf6f0"] as const;
-export const DARK_SURFACES = ["#08170f", "#0f2419"] as const;
+const SURFACE_TOKENS = ["--color-bg", "--color-card", "--color-hero-band"];
+export const LIGHT_SURFACES = SURFACE_TOKENS.map((token) => themedTokenValue(token).light);
+export const DARK_SURFACES = SURFACE_TOKENS.map((token) => themedTokenValue(token).dark);
 
 function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
   const h = (H * Math.PI) / 180;
@@ -95,23 +96,39 @@ function oklchToRgb(L: number, C: number, H: number): [number, number, number] {
   }) as [number, number, number];
 }
 
-/**
- * Parse a hex or oklch() color. Alpha is ignored: every token measured here is
- * opaque text, and a translucent one would need its backdrop composited first.
- */
-export function parseColor(value: string): [number, number, number] {
-  const oklch = value
-    .trim()
-    .match(/^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/i);
+type Rgb = [number, number, number];
+
+/** Parse the authored formats, retaining alpha for actual-backdrop checks. */
+function parseRgba(value: string): { rgb: Rgb; alpha: number } {
+  const oklch = value.trim().match(/^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+)(%)?)?\s*\)$/i);
   if (oklch) {
-    return oklchToRgb(Number(oklch[1]), Number(oklch[2]), Number(oklch[3]));
+    return {
+      rgb: oklchToRgb(Number(oklch[1]), Number(oklch[2]), Number(oklch[3])),
+      alpha: oklch[4] === undefined ? 1 : Number(oklch[4]) / (oklch[5] ? 100 : 1),
+    };
   }
-  const clean = value.trim().replace("#", "");
-  return [
-    parseInt(clean.slice(0, 2), 16),
-    parseInt(clean.slice(2, 4), 16),
-    parseInt(clean.slice(4, 6), 16),
-  ];
+  const hex = value.trim().match(/^#([a-f\d]{6})([a-f\d]{2})?$/i);
+  if (!hex) throw new Error(`Unsupported color: ${value}`);
+  return {
+    rgb: [0, 2, 4].map((at) => parseInt(hex[1]!.slice(at, at + 2), 16)) as Rgb,
+    alpha: hex[2] === undefined ? 1 : parseInt(hex[2], 16) / 255,
+  };
+}
+
+export function parseColor(value: string): Rgb {
+  const color = parseRgba(value);
+  if (color.alpha !== 1) throw new Error(`Alpha color requires a backdrop: ${value}`);
+  return color.rgb;
+}
+
+/** CSS alpha compositing happens in sRGB before relative luminance. */
+export function compositeColor(value: string, backdrop: string, opacity = 1): string {
+  const { rgb, alpha } = parseRgba(value);
+  const ground = parseColor(backdrop);
+  const coverage = alpha * opacity;
+  return "#" + rgb.map((channel, index) =>
+    Math.round(channel * coverage + ground[index]! * (1 - coverage)).toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 function relativeLuminance([r, g, b]: [number, number, number]): number {
@@ -122,9 +139,11 @@ function relativeLuminance([r, g, b]: [number, number, number]): number {
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
-export function contrastRatio(a: string, b: string): number {
-  const lumA = relativeLuminance(parseColor(a));
-  const lumB = relativeLuminance(parseColor(b));
+export function contrastRatio(a: string, b: string, backdrop?: string): number {
+  const background = backdrop ? compositeColor(b, backdrop) : b;
+  const foreground = compositeColor(a, background);
+  const lumA = relativeLuminance(parseColor(foreground));
+  const lumB = relativeLuminance(parseColor(background));
   return (
     (Math.max(lumA, lumB) + 0.05) / (Math.min(lumA, lumB) + 0.05)
   );

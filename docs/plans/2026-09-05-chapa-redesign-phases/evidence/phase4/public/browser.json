@@ -1,0 +1,3349 @@
+{
+  "startedAt": "2026-09-05T11:49:35.417Z",
+  "baseURL": "http://127.0.0.1:3001",
+  "canonicalContentRoutes": [
+    "/",
+    "/about",
+    "/about/scoring",
+    "/about/verification",
+    "/privacy",
+    "/terms",
+    "/archetypes/builder",
+    "/archetypes/guardian",
+    "/archetypes/marathoner",
+    "/archetypes/polymath",
+    "/archetypes/artificer",
+    "/archetypes/balanced",
+    "/archetypes/emerging"
+  ],
+  "fixtureScope": "Public signed-out local build. Browser-only POST /api/generate returns401; no authenticated or valid-record coverage claimed here.",
+  "cases": [
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "About Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "about-en-light-1440.png",
+        "about-en-light-1440-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-en-light-1440.png",
+        "scoring-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Badge Verification_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-en-light-1440.png",
+        "verification-explainer-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Quality Champion_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-en-light-1440.png",
+        "archetype-long-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Privacy Policy_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-en-light-1440.png",
+        "privacy-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Terms of Service_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "terms-en-light-1440.png",
+        "terms-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verify a badge_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-en-light-1440.png",
+        "verify-invalid-form-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Invalid hash",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-en-light-1440.png",
+        "verify-invalid-hash-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Authorize Chapa CLI",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-en-light-1440.png",
+        "cli-missing-session-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-en-light-1440.png",
+        "coming-soon-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generating badge for @chapa-e2e-release-locale",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-en-light-1440.png",
+        "generating-local-error-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-en-light-1440.png",
+        "not-found-en-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "About Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "about-en-light-390.png",
+        "about-en-light-390-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatternPenaltyTriggerWhat it meansBurst activity-15100+ contributions in a single dayExtre"
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "What it means"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "Extreme daily spikes reduce timing confidence"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Micro-commits-1060%+ of commits are very smallMany tiny changes reduce signal clarity"
+        }
+      ],
+      "screenshots": [
+        "scoring-en-light-390.png",
+        "scoring-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Badge Verification_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-en-light-390.png",
+        "verification-explainer-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Quality Champion_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-en-light-390.png",
+        "archetype-long-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Privacy Policy_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-en-light-390.png",
+        "privacy-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Terms of Service_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "terms-en-light-390.png",
+        "terms-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verify a badge_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-en-light-390.png",
+        "verify-invalid-form-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Invalid hash",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-en-light-390.png",
+        "verify-invalid-hash-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Authorize Chapa CLI",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-en-light-390.png",
+        "cli-missing-session-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-en-light-390.png",
+        "coming-soon-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generating badge for @chapa-e2e-release-locale",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-en-light-390.png",
+        "generating-local-error-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "en",
+      "theme": "light",
+      "width": 390,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-en-light-390.png",
+        "not-found-en-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "About Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "about-en-dark-1440.png",
+        "about-en-dark-1440-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-en-dark-1440.png",
+        "scoring-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Badge Verification_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-en-dark-1440.png",
+        "verification-explainer-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Quality Champion_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-en-dark-1440.png",
+        "archetype-long-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Privacy Policy_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-en-dark-1440.png",
+        "privacy-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Terms of Service_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "terms-en-dark-1440.png",
+        "terms-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verify a badge_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-en-dark-1440.png",
+        "verify-invalid-form-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Invalid hash",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-en-dark-1440.png",
+        "verify-invalid-hash-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Authorize Chapa CLI",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-en-dark-1440.png",
+        "cli-missing-session-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-en-dark-1440.png",
+        "coming-soon-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generating badge for @chapa-e2e-release-locale",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-en-dark-1440.png",
+        "generating-local-error-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "en",
+      "theme": "dark",
+      "width": 1440,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-en-dark-1440.png",
+        "not-found-en-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "About Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "about-en-dark-390.png",
+        "about-en-dark-390-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Scoring Methodology_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatternPenaltyTriggerWhat it meansBurst activity-15100+ contributions in a single dayExtre"
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatternPenaltyTriggerWhat it means"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "What it means"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Burst activity-15100+ contributions in a single dayExtreme daily spikes reduce timing conf"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "Extreme daily spikes reduce timing confidence"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Micro-commits-1060%+ of commits are very smallMany tiny changes reduce signal clarity"
+        }
+      ],
+      "screenshots": [
+        "scoring-en-dark-390.png",
+        "scoring-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Badge Verification_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-en-dark-390.png",
+        "verification-explainer-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Quality Champion_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-en-dark-390.png",
+        "archetype-long-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Privacy Policy_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-en-dark-390.png",
+        "privacy-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Terms of Service_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "terms-en-dark-390.png",
+        "terms-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verify a badge_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-en-dark-390.png",
+        "verify-invalid-form-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Invalid hash",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-en-dark-390.png",
+        "verify-invalid-hash-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Authorize Chapa CLI",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-en-dark-390.png",
+        "cli-missing-session-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-en-dark-390.png",
+        "coming-soon-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generating badge for @chapa-e2e-release-locale",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-en-dark-390.png",
+        "generating-local-error-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "en",
+      "theme": "dark",
+      "width": 390,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-en-dark-390.png",
+        "not-found-en-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Acerca de Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "about-es-light-1440.png",
+        "about-es-light-1440-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-es-light-1440.png",
+        "scoring-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificación de Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-es-light-1440.png",
+        "verification-explainer-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Quality Champion_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-es-light-1440.png",
+        "archetype-long-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Política de privacidad_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-es-light-1440.png",
+        "privacy-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Términos del servicio_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "terms-es-light-1440.png",
+        "terms-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificar una Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-es-light-1440.png",
+        "verify-invalid-form-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Hash inválido",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-es-light-1440.png",
+        "verify-invalid-hash-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Autorizar CLI de Chapa",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-es-light-1440.png",
+        "cli-missing-session-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-es-light-1440.png",
+        "coming-soon-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generando Chapa para @chapa-e2e-release-locale",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-es-light-1440.png",
+        "generating-local-error-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-es-light-1440.png",
+        "not-found-es-light-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Acerca de Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "about-es-light-390.png",
+        "about-es-light-390-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatrónPenalizaciónDesencadenanteQué significaActividad en ráfaga-15100+ contribuciones en "
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Desencadenante"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Qué significa"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "100+ contribuciones en un solo día"
+        }
+      ],
+      "screenshots": [
+        "scoring-es-light-390.png",
+        "scoring-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificación de Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-es-light-390.png",
+        "verification-explainer-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Quality Champion_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-es-light-390.png",
+        "archetype-long-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Política de privacidad_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-es-light-390.png",
+        "privacy-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Términos del servicio_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "terms-es-light-390.png",
+        "terms-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificar una Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-es-light-390.png",
+        "verify-invalid-form-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Hash inválido",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-es-light-390.png",
+        "verify-invalid-hash-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Autorizar CLI de Chapa",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-es-light-390.png",
+        "cli-missing-session-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-es-light-390.png",
+        "coming-soon-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generando Chapa para @chapa-e2e-release-locale",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-es-light-390.png",
+        "generating-local-error-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "es",
+      "theme": "light",
+      "width": 390,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-es-light-390.png",
+        "not-found-es-light-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Acerca de Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "about-es-dark-1440.png",
+        "about-es-dark-1440-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1024,
+      "mainScrollWidth": 1024,
+      "mainClientWidth": 1024,
+      "overflowing": [],
+      "screenshots": [
+        "scoring-es-dark-1440.png",
+        "scoring-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificación de Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-es-dark-1440.png",
+        "verification-explainer-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Quality Champion_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-es-dark-1440.png",
+        "archetype-long-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Política de privacidad_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-es-dark-1440.png",
+        "privacy-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Términos del servicio_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": [],
+      "screenshots": [
+        "terms-es-dark-1440.png",
+        "terms-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificar una Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-es-dark-1440.png",
+        "verify-invalid-form-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Hash inválido",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 672,
+      "mainScrollWidth": 672,
+      "mainClientWidth": 672,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-es-dark-1440.png",
+        "verify-invalid-hash-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Autorizar CLI de Chapa",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-es-dark-1440.png",
+        "cli-missing-session-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-es-dark-1440.png",
+        "coming-soon-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generando Chapa para @chapa-e2e-release-locale",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-es-dark-1440.png",
+        "generating-local-error-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "es",
+      "theme": "dark",
+      "width": 1440,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 1440,
+      "mainScrollWidth": 1440,
+      "mainClientWidth": 1440,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-es-dark-1440.png",
+        "not-found-es-dark-1440-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "about",
+      "path": "/about",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Acerca de Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "about-es-dark-390.png",
+        "about-es-dark-390-full.png"
+      ],
+      "blockedExternal": []
+    },
+    {
+      "id": "scoring",
+      "path": "/about/scoring",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/scoring?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Metodología de puntuación_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [
+        {
+          "tag": "TABLE",
+          "class": "w-full text-sm border-collapse",
+          "text": "PatrónPenalizaciónDesencadenanteQué significaActividad en ráfaga-15100+ contribuciones en "
+        },
+        {
+          "tag": "THEAD",
+          "class": "",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke",
+          "text": "PatrónPenalizaciónDesencadenanteQué significa"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Desencadenante"
+        },
+        {
+          "tag": "TH",
+          "class": "text-left py-2 px-3 font-heading text-text-primary font-medium",
+          "text": "Qué significa"
+        },
+        {
+          "tag": "TBODY",
+          "class": "",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TR",
+          "class": "border-b border-stroke/50",
+          "text": "Actividad en ráfaga-15100+ contribuciones en un solo díaLas ráfagas diarias extremas reduc"
+        },
+        {
+          "tag": "TD",
+          "class": "py-2 px-3 text-text-secondary",
+          "text": "100+ contribuciones en un solo día"
+        }
+      ],
+      "screenshots": [
+        "scoring-es-dark-390.png",
+        "scoring-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verification-explainer",
+      "path": "/about/verification",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/about/verification?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificación de Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verification-explainer-es-dark-390.png",
+        "verification-explainer-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "archetype-long",
+      "path": "/archetypes/guardian",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Quality Champion_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "archetype-long-es-dark-390.png",
+        "archetype-long-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "privacy",
+      "path": "/privacy",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/privacy?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Política de privacidad_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "privacy-es-dark-390.png",
+        "privacy-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "terms",
+      "path": "/terms",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/terms?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Términos del servicio_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "terms-es-dark-390.png",
+        "terms-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-form",
+      "path": "/verify",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "invalid-form",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Verificar una Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-form-es-dark-390.png",
+        "verify-invalid-form-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "verify-invalid-hash",
+      "path": "/verify/not-a-hash",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "normal",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/verify/not-a-hash?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Hash inválido",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "verify-invalid-hash-es-dark-390.png",
+        "verify-invalid-hash-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "cli-missing-session",
+      "path": "/cli/authorize",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "missing-session",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/cli/authorize?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Autorizar CLI de Chapa",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "cli-missing-session-es-dark-390.png",
+        "cli-missing-session-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "coming-soon",
+      "path": "/coming-soon",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "coming-soon",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/coming-soon?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Chapa_",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "coming-soon-es-dark-390.png",
+        "coming-soon-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "generating-local-error",
+      "path": "/generating/chapa-e2e-release-locale",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "generation401",
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/generating/chapa-e2e-release-locale?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "Generando Chapa para @chapa-e2e-release-locale",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "generating-local-error-es-dark-390.png",
+        "generating-local-error-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    },
+    {
+      "id": "not-found",
+      "path": "/chapa-redesign-missing-public-route",
+      "locale": "es",
+      "theme": "dark",
+      "width": 390,
+      "state": "not-found",
+      "status": "passed",
+      "httpStatus": 404,
+      "finalURL": "http://127.0.0.1:3001/chapa-redesign-missing-public-route?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "404",
+      "pageWidth": 390,
+      "viewportWidth": 390,
+      "mainWidth": 390,
+      "mainScrollWidth": 390,
+      "mainClientWidth": 390,
+      "overflowing": [],
+      "screenshots": [
+        "not-found-es-dark-390.png",
+        "not-found-es-dark-390-full.png"
+      ],
+      "blockedExternal": [
+        "https://i.ytimg.com/vi/wcXXGn3JYyw/hqdefault.jpg"
+      ]
+    }
+  ],
+  "archetypeSmoke": [
+    {
+      "path": "/archetypes/builder",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/builder?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Builder_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/guardian",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Quality Champion_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/marathoner",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/marathoner?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Marathoner_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/polymath",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/polymath?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Polymath_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/artificer",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/artificer?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Artificer_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/balanced",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/balanced?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Balanced_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/emerging",
+      "locale": "en",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/emerging?lang=en",
+      "lang": "en",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "The Emerging_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/builder",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/builder?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Builder_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/guardian",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/guardian?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Quality Champion_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/marathoner",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/marathoner?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Marathoner_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/polymath",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/polymath?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Polymath_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/artificer",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/artificer?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Artificer_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/balanced",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/balanced?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Balanced_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    },
+    {
+      "path": "/archetypes/emerging",
+      "locale": "es",
+      "theme": "light",
+      "width": 1440,
+      "status": "passed",
+      "httpStatus": 200,
+      "finalURL": "http://127.0.0.1:3001/archetypes/emerging?lang=es",
+      "lang": "es",
+      "bodyFamily": "Manrope, \"Manrope Fallback\", system-ui, sans-serif",
+      "headingFamily": "\"JetBrains Mono\", \"JetBrains Mono Fallback\", \"Courier New\", monospace",
+      "bodyFontFaces": 2,
+      "headingFontFaces": 2,
+      "heading": "El Emerging_",
+      "pageWidth": 1440,
+      "viewportWidth": 1440,
+      "mainWidth": 768,
+      "mainScrollWidth": 768,
+      "mainClientWidth": 768,
+      "overflowing": []
+    }
+  ],
+  "failures": [],
+  "finishedAt": "2026-09-05T11:50:13.991Z",
+  "passed": true
+}

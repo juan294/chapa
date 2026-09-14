@@ -64,3 +64,12 @@ describe("BadgeConfig schema after the preview-only drop (#1191)", () => {
     }
   });
 });
+
+
+describe("Ice default with additive palette compatibility", () => {
+  it("uses Ice for new and reset configs without adding a category", () => {
+    expect(DEFAULT_BADGE_CONFIG.colorPalette).toBe("ice");
+    expect(Object.keys(DEFAULT_BADGE_CONFIG)).toHaveLength(7);
+    expect(BADGE_CONFIG_OPTIONS.colorPalette).toEqual(["ice", "jade", "indigo", "amber", "crimson", "mono"]);
+  });
+});

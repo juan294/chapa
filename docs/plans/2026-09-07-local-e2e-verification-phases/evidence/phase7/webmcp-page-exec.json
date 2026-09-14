@@ -1,0 +1,35 @@
+{
+  "profileToolsAfter": 6,
+  "profile": {
+    "objArgs_get_impact_profile": "ERR UnknownError: Failed to parse input arguments",
+    "strArgs_get_impact_profile": "{\"handle\":\"juan294\",\"impact\":{\"handle\":\"juan294\",\"profileType\":\"solo\",\"dimensions\":{\"delivery\":100,\"quality\":74,\"consistency\":67,\"breadth\":71,\"craft\":83},\"archetype\":\"Builder\",\"compositeScore\":80,\"adjustedComposite\":80,\"",
+    "get_impact_history": "{\"handle\":\"juan294\",\"snapshots\":[{\"date\":\"2026-02-15\",\"capturedAt\":\"2026-02-15T08:37:30.816+00:00\",\"commitsTotal\":2508,\"prsMergedCount\":32,\"prsMergedWeight\":74.9571,\"reviewsSubmittedCount\":0,\"issuesClosedCount\":381,\"repo",
+    "compare_profiles": "{\"current\":{\"handle\":\"juan294\",\"score\":80,\"tier\":\"High\",\"dimensions\":{\"delivery\":100,\"quality\":74,\"consistency\":67,\"breadth\":71,\"craft\":83}},\"other\":{\"handle\":\"octocat\",\"score\":0,\"tier\":\"Emerging\",\"dimensions\":{\"delivery",
+    "explain_dimension": "{\"dimension\":\"consistency\",\"score\":67,\"tip\":\"Measures sustained engagement: active days, even weekly distribution, and low burst patterns. High score = reliable daily contributor.\",\"formula\":\"45% active-day curve + 40% h",
+    "explain_dimension_craft": "{\"dimension\":\"craft\",\"score\":83,\"tip\":\"An optional, separately reported practice portfolio: how you framed the problem, how you verified it, the judgment behind using or not using a tool, and whether the outcome was acce",
+    "explain_dimension_bad": "Invalid input for explain_dimension: dimension must be a known dimension.",
+    "get_embed_snippet": "{\"handle\":\"juan294\",\"markdown\":\"![Chapa Badge of juan294](https://chapa.thecreativetoken.com/u/juan294/badge.svg)\",\"html\":\"<img src=\\\"https://chapa.thecreativetoken.com/u/juan294/badge.svg\\\" alt=\\\"Chapa Badge of juan294\\",
+    "verify_badge": "This badge's verification record could not be found.",
+    "schemas": {
+      "compare_profiles": "\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"other_handle\\\":{\\\"type\\\":\\\"string\\\"}},\\\"required\\\":[\\\"other_handle\\\"],\\\"additionalProperties\\\":false}\"",
+      "explain_dimension": "\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"dimension\\\":{\\\"type\\\":\\\"string\\\",\\\"enum\\\":[\\\"delivery\\\",\\\"quality\\\",\\\"consistency\\\",\\\"breadth\\\",\\\"craft\\\"]}},\\\"required\\",
+      "get_embed_snippet": "\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{},\\\"additionalProperties\\\":false}\"",
+      "get_impact_history": "\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{},\\\"additionalProperties\\\":false}\"",
+      "get_impact_profile": "\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{},\\\"additionalProperties\\\":false}\"",
+      "verify_badge": "\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{},\\\"additionalProperties\\\":false}\""
+    }
+  },
+  "studioToolsAfter": 9,
+  "studio": {
+    "list_style_options": "{\"categories\":[{\"key\":\"background\",\"alias\":\"bg\",\"label\":\"Background\",\"options\":[{\"value\":\"solid\",\"label\":\"Solid Dark\",\"description\":\"Clean dark background\"},{\"value\":\"aurora\",\"label\":\"Aurora Glow\",\"description\":\"Animated",
+    "apply_badge_style": "colorPalette → indigo\n{\"config\":{\"background\":\"solid\",\"cardStyle\":\"flat\",\"border\":\"solid-amber\",\"scoreEffect\":\"standard\",\"heatmapAnimation\":\"fade-in\",\"tierTreatment\":\"standard\",\"colorPalette\":\"indigo\"}}",
+    "preview_badge": "{\"config\":{\"background\":\"solid\",\"cardStyle\":\"flat\",\"border\":\"solid-amber\",\"scoreEffect\":\"standard\",\"heatmapAnimation\":\"fade-in\",\"tierTreatment\":\"standard\",\"colorPalette\":\"indigo\"},\"badgeSvgUrl\":\"http://localhost:3001/u/d",
+    "simulate_score": "Invalid input for simulate_score: dimensions must be an object.",
+    "suggest_improvements": "[{\"id\":\"tip-breadth\",\"type\":\"tip\",\"icon\":\"lightbulb\",\"headline\":\"Grow your Breadth\",\"body\":\"To strengthen Breadth, contribute to repos outside your main project — opening issues, submitting PRs, or reviewing code in othe",
+    "apply_preset": "Invalid input for apply_preset: name must be a known preset.",
+    "save_badge_config": "Save proposed — the user must confirm on-page.",
+    "reset_badge_config": "Configuration reset to defaults.\n{\"config\":{\"background\":\"solid\",\"cardStyle\":\"flat\",\"border\":\"solid-amber\",\"scoreEffect\":\"standard\",\"heatmapAnimation\":\"fade-in\",\"tierTreatment\":\"standard\",\"colorPalette\":\"ice\"}}",
+    "summary": "bg=solid  ·  card=flat  ·  border=solid-amber  ·  score=standard  ·  heatmap=fade-in  ·  tier=standard  ·  palette=ice",
+    "schemas": "{\"apply_badge_style\":\"\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"object\\\\\\\",\\\\\\\"properties\\\\\\\":{\\\\\\\"category\\\\\\\":{\\\\\\\"type\\\\\\\":\\\\\\\"string\\\\\\\"},\\\\\\\"value\\\\\\\":{\\\\\\\"type\\\\\\\":\\\\\\\"string\\\\\\\"}},\\\\\\\"required\\\\\\\":[\",\"apply_preset\":\"\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"object\\\\\\\",\\\\\\\"properties\\\\\\\":{\\\\\\\"name\\\\\\\":{\\\\\\\"type\\\\\\\":\\\\\\\"string\\\\\\\",\\\\\\\"enum\\\\\\\":[\\\\\\\"minimal\\\\\\\",\\\\\\\"premium\\\\\\\",\\\\\\\"holographic\\\\\\\",\\\\\\\"\",\"explain_dimension\":\"\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"object\\\\\\\",\\\\\\\"properties\\\\\\\":{\\\\\\\"dimension\\\\\\\":{\\\\\\\"type\\\\\\\":\\\\\\\"string\\\\\\\",\\\\\\\"enum\\\\\\\":[\\\\\\\"delivery\\\\\\\",\\\\\\\"quality\\\\\\\",\\\\\\\"consistenc\",\"list_style_options\":\"\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"object\\\\\\\",\\\\\\\"properties\\\\\\\":{},\\\\\\\"additionalProperties\\\\\\\":false}\\\"\",\"preview_badge\":\"\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"object\\\\\\\",\\\\\\\"properties\\\\\\\":{},\\\\\\\"additionalProperties\\\\\\\":false}\\\"\",\"reset_badge_config\":\"\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"object\\\\\\\",\\\\\\\"properties\\\\\\\":{},\\\\\\\"additionalProperties\\\\\\\":false}\\\"\",\"save_badge_con"
+  }
+}

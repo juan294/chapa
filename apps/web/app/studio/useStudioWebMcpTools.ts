@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import {
   DIMENSION_KEYS,
-  SOLO_DIMENSION_KEYS,
   type BadgeConfig,
   type CraftResult,
   type DimensionScores,
@@ -17,10 +16,8 @@ import {
 import { generateInsights } from "@/lib/dashboard/generate-insights";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { getBaseUrl } from "@/lib/env";
-import {
-  computeAdjustedScore,
-  getTier,
-} from "@/lib/impact/utils";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { simulateCoreScore, simulateObservedScore, type ObservedScenario } from "@/lib/impact/simulate";
 import { useTranslation } from "@/lib/i18n";
 import {
   invalidInput,
@@ -28,6 +25,7 @@ import {
 } from "@/lib/webmcp/use-model-context-tools";
 import {
   createExplainDimensionTool,
+  observedImprovementSuggestions,
   isWebMcpRecord,
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_ANNOTATIONS,
@@ -39,6 +37,7 @@ import {
   STUDIO_CATEGORIES,
 } from "./studio-options";
 import type { StudioCommandAction } from "./useStudioCommands";
+import { OBSERVED_SIMULATE_SCORE_INPUT_SCHEMA } from "@/lib/webmcp/catalog";
 import { getStudioCommandConfig } from "./studio-command-config";
 
 export type StudioSaveStatus = "dirty" | "saving" | "saved" | "error";
@@ -48,6 +47,7 @@ export interface UseStudioWebMcpToolsOptions {
   enabled: boolean;
   stats: StatsData;
   impact: ImpactV6Result;
+  scoring?: ScoreViewModel;
   craftResult?: CraftResult | null;
   handle: string;
   saveStatus: StudioSaveStatus;
@@ -139,6 +139,7 @@ export function useStudioWebMcpTools({
   enabled,
   stats,
   impact,
+  scoring,
   craftResult = null,
   handle,
   saveStatus,
@@ -266,37 +267,23 @@ export function useStudioWebMcpTools({
       },
       {
         name: "simulate_score",
-        description: "Simulate an impact score from dimension overrides without saving data.",
-        inputSchema: SIMULATE_SCORE_INPUT_SCHEMA,
+        description: "Simulate a hypothetical score using the selected policy and fixed receipt context. Current evidence-count or direct-dimension scenarios never publish evidence; Craft stays separate from core.",
+        inputSchema: scoring?.policyVersion === "v7.2" ? OBSERVED_SIMULATE_SCORE_INPUT_SCHEMA : SIMULATE_SCORE_INPUT_SCHEMA,
         annotations: readOnly,
         execute: (inputs) => {
           if (!isWebMcpRecord(inputs)) {
             return invalidInput("simulate_score", "input must be an object");
           }
+          if (scoring?.policyVersion === "v7.2") {
+            try { return JSON.stringify(simulateObservedScore(scoring, inputs as ObservedScenario)); }
+            catch (error) { return invalidInput("simulate_score", error instanceof Error ? error.message : "Invalid scenario"); }
+          }
+          if (scoring && scoring.policyVersion !== "v6") return invalidInput("simulate_score", "Historical evidence ranges have no current simulation");
           const overrides = parseDimensionOverrides(inputs);
           if (typeof overrides === "string") return overrides;
 
-          const dimensions: DimensionScores = {
-            ...impact.dimensions,
-            ...overrides,
-          };
-          const dimensionKeys = impact.profileType === "solo"
-            ? SOLO_DIMENSION_KEYS
-            : DIMENSION_KEYS;
-          const activeScores = dimensionKeys
-            .map((dimension) => dimensions[dimension])
-            .filter((score): score is number => score !== undefined);
-          const composite = Math.round(
-            activeScores.reduce((sum, score) => sum + score, 0) /
-              activeScores.length,
-          );
-          const adjusted = computeAdjustedScore(composite, impact.confidence);
-          return JSON.stringify({
-            composite,
-            adjusted,
-            tier: getTier(adjusted),
-            deltaVsCurrent: adjusted - impact.adjustedComposite,
-          });
+          // One shared calculator; the tool must not restate the pipeline.
+          return JSON.stringify(simulateCoreScore(impact, stats.heatmapData, overrides));
         },
       },
       {
@@ -304,15 +291,16 @@ export function useStudioWebMcpTools({
         description: "Return grounded improvement suggestions for the current impact profile.",
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: readOnly,
-        execute: () => JSON.stringify(generateInsights(impact, null, null, t)),
+        execute: () => JSON.stringify(scoring?.policyVersion === "v7.2" ? observedImprovementSuggestions(scoring) : generateInsights(impact, null, null, t)),
       },
-      createExplainDimensionTool({ impact, stats, craftResult, t, annotations: readOnly }),
+      createExplainDimensionTool({ impact, scoring, stats, craftResult, t, annotations: readOnly }),
     ];
   }, [
     config,
     enabled,
     stats,
     impact,
+    scoring,
     craftResult,
     handle,
     saveStatus,

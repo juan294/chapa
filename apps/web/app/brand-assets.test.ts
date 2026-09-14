@@ -4,8 +4,8 @@ import { inflateSync } from "node:zlib";
 import path from "node:path";
 
 /**
- * The Jade palette (#1206) converted the app, and #1225 converted the badge
- * SVG, but the six served brand assets kept the retired violet until #1229.
+ * Served brand assets follow the application ink/vermilion identity.
+ * Historical Jade and violet belong to selectable badges, not these assets.
  * They are static files, so nothing else in the test suite reads them and a
  * revert would be invisible until someone looked at a browser tab.
  *
@@ -38,8 +38,8 @@ const RETIRED_VIOLET_LITERALS = [
   "139, 92, 246",
 ];
 
-/** The dark half of `--color-amber`, the same literal `icon.tsx` renders. */
-const JADE_ACCENT = "#1BD093";
+/** Approved static icon accent, independent of the selected badge palette. */
+const BRAND_ACCENT = "#ED4930";
 
 const TEXT_ASSETS = [
   "public/favicon.svg",
@@ -172,11 +172,18 @@ const isViolet = ({ r, g, b, a }: { r: number; g: number; b: number; a: number }
 const isJade = ({ g, r, b, a }: { r: number; g: number; b: number; a: number }) =>
   a > 0 && g > r + 40 && g > b + 20 && g > 120;
 
-describe("served brand assets use the Jade palette", () => {
+const isVermilion = ({ r, g, b, a }: { r: number; g: number; b: number; a: number }) =>
+  a > 0 && r > g + 80 && r > b + 100 && r > 160;
+
+const isInk = ({ r, g, b, a }: { r: number; g: number; b: number; a: number }) =>
+  a === 255 && r === 12 && g === 20 && b === 27;
+
+describe("served brand assets use the ink/vermilion palette", () => {
   describe.each(TEXT_ASSETS)("%s", (relative) => {
     it("contains no retired violet literal", () => {
       const source = readText(relative).toUpperCase();
 
+      expect(source).not.toContain("#1BD093");
       for (const violet of RETIRED_VIOLET_LITERALS) {
         expect(source).not.toContain(violet.toUpperCase());
       }
@@ -184,16 +191,16 @@ describe("served brand assets use the Jade palette", () => {
   });
 
   describe.each(ACCENTED_SVGS)("%s", (relative) => {
-    it("carries the Jade accent", () => {
-      expect(readText(relative).toUpperCase()).toContain(JADE_ACCENT);
+    it("carries the vermilion accent", () => {
+      expect(readText(relative).toUpperCase()).toContain(BRAND_ACCENT);
     });
   });
 
-  it("site.webmanifest declares the Jade theme on the forest ground", () => {
+  it("site.webmanifest declares vermilion on the ink ground", () => {
     const manifest = JSON.parse(readText("public/site.webmanifest"));
 
-    expect(manifest.theme_color.toUpperCase()).toBe(JADE_ACCENT);
-    expect(manifest.background_color.toLowerCase()).toBe("#08170f");
+    expect(manifest.theme_color.toUpperCase()).toBe(BRAND_ACCENT);
+    expect(manifest.background_color.toLowerCase()).toBe("#0c141b");
   });
 
   describe.each(["app/favicon.ico", "public/logo-512.png"] as const)(
@@ -204,15 +211,22 @@ describe("served brand assets use the Jade palette", () => {
         const images = relative.endsWith(".ico")
           ? pngsInsideIco(buffer)
           : [buffer];
-        return images.flatMap(decodePngPixels);
+        return images.map(decodePngPixels);
       };
 
       it("has no violet pixels", () => {
-        expect(pixels().filter(isViolet)).toHaveLength(0);
+        for (const image of pixels()) expect(image.filter(isViolet)).toHaveLength(0);
       });
 
-      it("has jade pixels", () => {
-        expect(pixels().filter(isJade).length).toBeGreaterThan(0);
+      it("has vermilion and ink pixels in every embedded size", () => {
+        for (const image of pixels()) {
+          expect(image.filter(isVermilion).length).toBeGreaterThan(0);
+          expect(image.filter(isInk).length).toBeGreaterThan(0);
+        }
+      });
+
+      it("has no retired Jade pixels", () => {
+        for (const image of pixels()) expect(image.filter(isJade)).toHaveLength(0);
       });
     },
   );

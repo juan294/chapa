@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "runId": "redesign",
+  "fixtureIds": [
+    "chapa-e2e-redesign-1-0-mobil-craft",
+    "chapa-e2e-redesign-1-0-mobil-plain",
+    "chapa-e2e-redesign-1-0-mobil-linked"
+  ],
+  "results": [
+    {
+      "scenarioId": "studio.config-persistence",
+      "environment": "local-contract",
+      "status": "passed",
+      "startedAt": "2026-09-05T12:40:06.559Z",
+      "finishedAt": "2026-09-05T12:40:07.120Z",
+      "runner": "playwright",
+      "evidence": {
+        "ui": [
+          "playwright:full-impact-journey"
+        ],
+        "http": [
+          "release-evidence.json#cleanup"
+        ],
+        "datastore": [
+          "release-evidence.json#cleanup"
+        ],
+        "cleanup": [
+          "release-evidence.json#cleanup"
+        ]
+      },
+      "fixtures": [
+        {
+          "id": "redesign-mobile-studio",
+          "cleanupStatus": "removed",
+          "residueEvidence": "release-evidence.json#cleanup"
+        }
+      ]
+    },
+    {
+      "scenarioId": "profile.snapshot-integrity",
+      "environment": "local-contract",
+      "status": "passed",
+      "startedAt": "2026-09-05T12:40:06.559Z",
+      "finishedAt": "2026-09-05T12:40:07.120Z",
+      "runner": "playwright",
+      "evidence": {
+        "http": [
+          "release-evidence.json#cleanup"
+        ],
+        "datastore": [
+          "release-evidence.json#cleanup"
+        ],
+        "cleanup": [
+          "release-evidence.json#cleanup"
+        ]
+      },
+      "fixtures": [
+        {
+          "id": "redesign-mobile-snapshot",
+          "cleanupStatus": "removed",
+          "residueEvidence": "release-evidence.json#cleanup"
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "status": "removed",
+    "remainingCount": 0,
+    "featureFlagsRestored": true,
+    "errors": []
+  }
+}

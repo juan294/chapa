@@ -417,3 +417,34 @@ function formatDelta(n: number): string {
   const sign = n > 0 ? "+" : "";
   return `${sign}${Math.round(n)}`;
 }
+
+/** Receipt revision notice. Keeps current point semantics separate from legacy
+ * campaign templates that describe rounded EMA gains as performance jumps. */
+export async function notifyObservedScoreChange(handle: string, comparison: import("@/lib/history/scoring-observations").ScoringComparison): Promise<boolean> {
+  const { isSignificantScoringChange } = await import("@/lib/history/significant-change");
+  const identity = comparison.current.identity;
+  if (comparison.status !== "comparable" || !isSignificantScoringChange(comparison).significant || !identity) return false;
+  try {
+    if (!(await dbGetFeatureFlag("score_notifications"))?.enabled) return false;
+    const lowerHandle = handle.toLowerCase();
+    const user = await dbGetUserEmail(lowerHandle);
+    if (!user?.emailNotifications) return false;
+    const key = `score-bump:${lowerHandle}`;
+    if (await cacheGet<boolean>(key)) return false;
+    const resend = getResend();
+    if (!resend) return false;
+    const { current, previous } = comparison;
+    const text = [`CHAPA — Recorded score updated`, `Handle: ${lowerHandle}`, `Policy: ${current.policyVersion}`,
+      `Previous score: ${previous.composite.display}`, `Current score: ${current.composite.display}`, `Exact current score: ${current.composite.exact}`,
+      `Tier: ${current.tier ?? "Unassigned"}`, `Archetype: ${current.archetype ?? "Unassigned"}`,
+      `Revision: ${identity.revisionId}`, `Content hash: ${identity.contentHash}`,
+      `Window: ${current.window?.startInclusive} to ${current.window?.endExclusive}`,
+      "This compares recorded evidence in the same scoring window.",
+      `${getBaseUrl()}/u/${lowerHandle}`, `Unsubscribe: ${buildUnsubscribeUrl(lowerHandle)}`].join("\n");
+    const { error } = await withTimeout(resend.emails.send({ from: EMAIL_FROM, to: [user.email], subject: `${lowerHandle}: recorded ${current.policyVersion} score updated`,
+      text, html: `<pre style="white-space:pre-wrap">${escapeHtml(text)}</pre>` }), EMAIL_SEND_TIMEOUT_MS, "notifyObservedScoreChange");
+    if (error) return false;
+    await cacheSet(key, true, DEDUP_TTL);
+    return true;
+  } catch { return false; }
+}

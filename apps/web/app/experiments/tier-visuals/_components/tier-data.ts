@@ -17,7 +17,7 @@ export interface TierData {
 export const TIERS: TierData[] = [
   {
     tier: "Emerging",
-    score: 32,
+    score: 22,
     handle: "@newdev",
     stars: "12",
     forks: 2,

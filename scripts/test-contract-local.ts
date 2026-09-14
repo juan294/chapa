@@ -110,7 +110,10 @@ export function main(): never {
 
   const result = spawnSync(
     "pnpm",
-    ["exec", "vitest", "run", "-c", "vitest.config.contract.ts"],
+    // Forward any extra CLI arguments as vitest filters, so one contract file
+    // can be run in isolation while diagnosing a seam. Running the whole suite
+    // remains the default.
+    ["exec", "vitest", "run", "-c", "vitest.config.contract.ts", ...process.argv.slice(2)],
     { stdio: "inherit", env },
   );
 

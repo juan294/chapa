@@ -1,4 +1,19 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+async function expectLandingLocale(page: Page, locale: "en" | "es") {
+  await expect(page.locator("html")).toHaveAttribute("lang", locale);
+  // Streaming navigation may temporarily retain the outgoing hidden page.
+  const hero = page.locator("main #hero:visible");
+  await expect(hero).toHaveCount(1);
+  const heading = hero.getByRole("heading", { level: 1 });
+  await expect(heading).toHaveCount(1);
+  await expect(heading).toBeVisible();
+  await expect(heading).toContainText(locale === "en" ? "GOOD WORK" : "EL BUEN TRABAJO");
+  const cta = hero.getByRole("link", { name: locale === "en" ? "Open the Creator Studio ↗" : "Abre el Estudio de Creación ↗", exact: true });
+  await expect(cta).toHaveCount(1);
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute("href", "/studio");
+}
 
 test.describe("Landing page — sections and content", () => {
   test.beforeEach(async ({ page }) => {
@@ -8,33 +23,21 @@ test.describe("Landing page — sections and content", () => {
   test("hero section renders with h1 heading", async ({ page }) => {
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Impacto de desarrollador");
+    await expect(h1).toContainText("EL BUEN TRABAJO");
   });
 
-  test("hero has CTA linking to GitHub login", async ({ page }) => {
+  test("hero has CTA linking to Creator Studio", async ({ page }) => {
     // The main/hero area has the primary badge CTA (not the nav login).
-    const cta = page.locator('main a[href="/api/auth/login"]').first();
+    const cta = page.locator('main a[href="/studio"]').first();
     await expect(cta).toBeVisible();
-    await expect(cta).toContainText("Consigue tu Chapa");
+    await expect(cta).toContainText("Abre el Estudio de Creación");
   });
 
-  test("feature cards render (all 5 features)", async ({ page }) => {
+  test("explorer exposes all seven archetypes with one selected tab", async ({ page }) => {
     const features = page.locator("#features");
-    await expect(features).toBeAttached();
-
-    // Check for known feature titles (exact match to avoid ambiguity)
-    await expect(
-      page.getByText("MULTIDIMENSIONAL", { exact: true })
-    ).toBeVisible();
-    await expect(
-      page.getByText("ARQUETIPO DE DESARROLLADOR", { exact: true })
-    ).toBeVisible();
-    await expect(
-      page.getByText("MÉTRICAS VERIFICADAS", { exact: true })
-    ).toBeVisible();
-    await expect(
-      page.getByText("EMBEBIDO EN UN CLIC", { exact: true })
-    ).toBeVisible();
+    await expect(features.getByRole("tab")).toHaveCount(7);
+    await expect(features.getByRole("tab", { selected: true })).toHaveCount(1);
+    await expect(features.getByRole("tabpanel")).toBeAttached();
   });
 
   test('"How it Works" section shows 3 steps', async ({ page }) => {
@@ -97,31 +100,25 @@ test.describe("Landing page — sections and content", () => {
     await page.getByRole("option", { name: "English" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("h1")).toContainText("Developer impact");
-    await expect(
-      page.locator('main a[href="/api/auth/login"]').first()
-    ).toContainText("Get your badge");
+    await expectLandingLocale(page, "en");
 
     await page.getByRole("button", { name: "EN", exact: true }).click();
     await page.getByRole("option", { name: "Español" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("h1")).toContainText("Impacto de desarrollador");
-    await expect(
-      page.locator('main a[href="/api/auth/login"]').first()
-    ).toContainText("Consigue tu Chapa");
+    await expectLandingLocale(page, "es");
   });
 
   test("switching from a directly visited locale route returns to the canonical URL", async ({
     page,
   }) => {
     await page.goto("/es");
-    await expect(page.locator("h1")).toContainText("Impacto de desarrollador");
+    await expectLandingLocale(page, "es");
 
     await page.getByRole("button", { name: "ES", exact: true }).click();
     await page.getByRole("option", { name: "English" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.locator("h1")).toContainText("Developer impact");
+    await expectLandingLocale(page, "en");
   });
 });

@@ -1,3 +1,5 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "./route";
 import { NextRequest } from "next/server";
@@ -53,6 +55,7 @@ function makeRequest(handle: string, params?: Record<string, string>): NextReque
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
   vi.mocked(isValidHandle).mockReturnValue(true);
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 100 });
   mockGetSnapshots.mockResolvedValue([]);
@@ -222,8 +225,8 @@ describe("GET /api/history/[handle]", () => {
 
     const res = await GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) });
 
-    expect(res.headers.get("Cache-Control")).toContain("s-maxage=3600");
-    expect(res.headers.get("Cache-Control")).toContain("stale-while-revalidate=86400");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Cache-Control")).not.toContain("stale-while-revalidate");
   });
 
   it("returns empty snapshots array when no data exists", async () => {

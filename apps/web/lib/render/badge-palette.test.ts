@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { contrastRatio as contrast, compositeColor } from "../test-helpers/css-tokens";
+import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 import { BADGE_CONFIG_OPTIONS, type BadgePalette } from "@chapa/shared";
 import { badgeTheme, WARM_AMBER, getArchetypeColor } from "./theme";
 
@@ -28,26 +30,12 @@ const RENDER_PATH_FILES = [
 const REPO_ROOT = resolve(__dirname, "../../../..");
 const PALETTES = BADGE_CONFIG_OPTIONS.colorPalette;
 
-/** sRGB relative luminance, per WCAG 2.x. */
-function luminance(hex: string): number {
-  const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const [r, g, b] = channels.map((c) =>
-    c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
-  );
-  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
-}
-
-function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi! + 0.05) / (lo! + 0.05);
-}
-
 describe("the badge palettes (#1225, #1242)", () => {
-  it("keeps jade as the default, at the app's dark-half jade token", () => {
+  it("makes Ice the default while preserving the historical Jade palette", () => {
     // globals.css: --color-amber dark half is oklch(.76 .16 163) -> #1BD093.
     // The badge always renders dark, so it takes the dark half.
-    expect(WARM_AMBER).toBe(badgeTheme("jade"));
-    expect(badgeTheme().accent).toBe("#1BD093");
+    expect(WARM_AMBER).toBe(badgeTheme("ice"));
+    expect(badgeTheme().accent).toBe("#BAD9E8");
     expect(badgeTheme("jade").accentRgb).toBe("27, 208, 147");
     expect(badgeTheme("jade").bg).toBe("#0C0D14");
     expect(badgeTheme("jade").card).toBe("#13141E");
@@ -56,7 +44,7 @@ describe("the badge palettes (#1225, #1242)", () => {
   it.each(PALETTES)("derives every %s tint from that palette's one accent", (palette) => {
     const theme = badgeTheme(palette);
     expect(theme.tint(0.12)).toBe(`rgba(${theme.accentRgb}, 0.12)`);
-    expect(theme.stroke).toBe(theme.tint(0.12));
+    expect(theme.stroke).toBe(theme.tint(palette === "ice" ? 0.22 : 0.12));
     for (const step of theme.heatmap) {
       expect(step).toContain(theme.accentRgb);
     }
@@ -69,8 +57,8 @@ describe("the badge palettes (#1225, #1242)", () => {
     expect(grounds.size).toBe(PALETTES.length);
   });
 
-  it("falls back to jade for an id that escaped validation, rather than throwing", () => {
-    expect(badgeTheme("chartreuse" as BadgePalette)).toBe(badgeTheme("jade"));
+  it("falls back to Ice for an id that escaped validation, rather than throwing", () => {
+    expect(badgeTheme("chartreuse" as BadgePalette)).toBe(badgeTheme("ice"));
   });
 
   it.each(PALETTES)("clears AA for the %s accent and text on its own ground", (palette) => {
@@ -133,5 +121,16 @@ describe("the badge palettes (#1225, #1242)", () => {
     );
     expect(source).toContain("#E05A47");
     expect(PALETTES.map((p) => badgeTheme(p).accent)).not.toContain("#E05A47");
+  });
+});
+
+
+describe("actual Ice Terminal text surfaces", () => {
+  it.each(PALETTES)("keeps %s metrics, footer and seal readable on their painted surfaces", (palette) => {
+    const t = badgeTheme(palette);
+    const metricGround = compositeColor(t.accent, t.bg, .06);
+    expect(contrast(t.textSecondary, metricGround)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(compositeColor(t.textSecondary, t.bg, .85), t.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(VERIFICATION_CORAL, t.bg)).toBeGreaterThanOrEqual(4.5);
   });
 });

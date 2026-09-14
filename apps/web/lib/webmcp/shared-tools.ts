@@ -11,6 +11,9 @@ import {
 import type { DimensionKey } from "@/lib/dashboard/dimension-sub-metrics";
 import type { LanguageContextValue } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { publicScoreProjection } from "@/lib/profile/public-score-projection";
+import { calculateObservedCoreV7 } from "@/lib/impact/observed-v7";
 import { invalidInput } from "./errors";
 
 export interface WebMcpToolAnnotations {
@@ -37,6 +40,7 @@ export interface WebMcpTool {
 type Translate = LanguageContextValue["t"];
 
 interface ExplainDimensionToolOptions {
+  scoring?: ScoreViewModel | null;
   impact: ClientImpactV6Result;
   stats: StatsData;
   craftResult?: CraftResult | null;
@@ -113,6 +117,7 @@ export function isWebMcpRecord(
 
 export function createExplainDimensionTool({
   impact,
+  scoring,
   stats,
   craftResult = null,
   t,
@@ -135,6 +140,7 @@ export function createExplainDimensionTool({
       }
 
       const key = dimension as DimensionKey;
+      if (scoring?.policyVersion === "v7.2") return JSON.stringify(explainObservedDimension(scoring, key));
       const dimensionExplanation = buildDimensionExplanation(
         impact,
         stats,
@@ -161,4 +167,21 @@ export function createExplainDimensionTool({
       });
     },
   };
+}
+
+/** Same public current-policy explanation for remote and in-page tools. */
+export function explainObservedDimension(model: ScoreViewModel, key: DimensionKey) {
+  const projection = publicScoreProjection(model);
+  const calculation = model.observedInputs ? calculateObservedCoreV7(model.observedInputs) : null;
+  return { policyVersion: model.policyVersion, identity: model.identity, window: model.window,
+    dimension: key, score: projection.dimensions[key] ?? null, exactScore: projection.exactDimensions[key] ?? null,
+    ...(key === "craft" ? { craft: projection.craft, formula: "100 × credited report sessions / total report sessions; separate from core" }
+      : { inputs: model.observedInputs ?? null, trace: calculation?.trace[key] ?? null, weight: 0.25,
+        note: "Recorded qualifying observations only. Missing observations are not a judgment of ability." }) };
+}
+export function observedImprovementSuggestions(model: ScoreViewModel) {
+  return { policyVersion: model.policyVersion, identity: model.identity, window: model.window,
+    suggestions: ["Document supporting evidence for work already done. Missing observations do not measure your ability.",
+      "Craft is a separate report-derived estimate and does not raise the core score."],
+    counts: model.observedInputs?.counts ?? null };
 }

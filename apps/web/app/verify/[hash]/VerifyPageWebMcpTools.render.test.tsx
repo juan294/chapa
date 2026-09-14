@@ -53,6 +53,7 @@ async function execute(tool: WebMcpTool): Promise<string> {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
   mocks.webmcpEnabled = true;
 });
 
@@ -116,6 +117,7 @@ describe("VerifyPageWebMcpTools", () => {
     if (!tool) throw new Error("Missing get_verification_record tool");
 
     expect(JSON.parse(await execute(tool))).toEqual({
+      version: "v6",
       hash,
       record: expect.not.objectContaining({ confidence: expect.anything() }),
     });
@@ -143,7 +145,7 @@ describe("VerifyPageWebMcpTools", () => {
 
     expect(explanation.algorithm).toBe("HMAC-SHA256");
     expect(explanation.codeFormat).toBe(
-      "Verified legacy 16-character verification code.",
+      "Legacy 16-character verification code; lookup does not replay the complete signed payload.",
     );
     expect(explanation.howItWorks).toContain("secret key");
     expect(explanation.proves.join(" ")).toMatch(/Chapa|changing|different/i);
@@ -159,16 +161,16 @@ describe("VerifyPageWebMcpTools", () => {
   });
 
   it.each([
-    [8, "a1b2c3d4", "Verified legacy 8-character verification code."],
+    [8, "a1b2c3d4", "Legacy 8-character verification code; lookup does not replay the complete signed payload."],
     [
       16,
       "a1b2c3d4e5f6a7b8",
-      "Verified legacy 16-character verification code.",
+      "Legacy 16-character verification code; lookup does not replay the complete signed payload.",
     ],
     [
       32,
       "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-      "Current 32-character verification code.",
+      "Legacy 32-character verification code; lookup does not replay the complete signed payload.",
     ],
   ])("describes the supported %i-character format", async (_length, code, format) => {
     render(<VerifyPageWebMcpTools hash={code} record={record} />);
@@ -181,4 +183,20 @@ describe("VerifyPageWebMcpTools", () => {
       codeFormat: format,
     });
   });
+});
+
+
+it("rechecks current v7 authorization when an agent requests the displayed record", async () => {
+  const token = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ version: "v7", status: "revoked", signatureAuthenticated: false }), { status: 410, headers: { "Content-Type": "application/json" } }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<VerifyPageWebMcpTools hash={token} version="v7" />);
+  const tools = registeredTools();
+  const get = tools.find(tool => tool.name === "get_verification_record")!;
+  expect(JSON.parse(await execute(get))).toMatchObject({ version: "v7", status: "revoked", signatureAuthenticated: false });
+  expect(fetchMock).toHaveBeenCalledWith(`/api/verify/${token}`, expect.objectContaining({ cache: "no-store" }));
+  const explain = tools.find(tool => tool.name === "explain_verification")!;
+  const result = JSON.parse(await execute(explain));
+  expect(result.howItWorks).toContain("complete canonical receipt");
+  expect(result.doesNotProve.join(" ")).toMatch(/SVG/);
 });

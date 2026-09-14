@@ -7,7 +7,8 @@ const PALETTE_LABELS: Record<
   BadgePalette,
   { label: string; description: string }
 > = {
-  jade: { label: "Jade", description: "Chapa default" },
+  ice: { label: "Ice Terminal", description: "Ice blue on ink; Chapa default" },
+  jade: { label: "Jade", description: "Jade green on charcoal" },
   indigo: { label: "Indigo Night", description: "Violet-blue on deep navy" },
   amber: { label: "Amber Forge", description: "Warm gold on charcoal" },
   crimson: { label: "Crimson", description: "Rose on oxblood" },

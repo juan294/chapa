@@ -37,7 +37,7 @@ vi.mock("@/lib/i18n/server", () => ({
         "Privacy Policy for Chapa. Learn how we handle your developer data, session storage, and analytics.",
       "legal.privacy.metadataOgTitle": "Privacy Policy — Chapa",
       "landing.footer.tagline": "Built for developers, by developers.",
-      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.poweredBy": "Import your work from",
       "landing.footer.about": "About",
       "landing.footer.scoring": "Scoring",
       "landing.footer.terms": "Terms",

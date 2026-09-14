@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { getServiceClient } from "@/test/contract/invoke";
 import {
   dbGetAllUserHandles,
+  dbUpsertUser,
   dbGetUserHandlePage,
   dbGetUsers,
   dbGetUsersWithEmail,
@@ -32,6 +33,17 @@ describe("user accessors past the 1000-row max_rows cap (contract)", () => {
     const db = getServiceClient();
     await db.from("users").delete().like("handle", `${HANDLE_PREFIX}%`);
     await db.from("users").delete().eq("handle", EMU_SOURCE_HANDLE);
+  });
+
+  it("reports committed registration and preserves profile updates (#1288)", async () => {
+    const handle = `${HANDLE_PREFIX}registry`;
+    expect(await dbUpsertUser(handle.toUpperCase(), { email: "registry@example.com", displayName: "First" })).toBe(true);
+    expect(await dbUpsertUser(handle, { displayName: "Updated" })).toBe(true);
+    const { data, error } = await getServiceClient().from("users")
+      .select("handle,email,display_name").eq("handle", handle).single();
+    expect(error).toBeNull();
+    expect(data).toEqual({ handle, email: "registry@example.com", display_name: "Updated" });
+    await getServiceClient().from("users").delete().eq("handle", handle);
   });
 
   it("excludes an EMU source row from the primary warm-cache registry", async () => {

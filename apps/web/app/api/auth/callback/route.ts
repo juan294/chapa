@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse, after } from "next/server";
 import {
   exchangeCodeForToken,
   fetchGitHubUser,
@@ -158,19 +158,26 @@ export const GET = withErrorCapture("/api/auth/callback", async (request: NextRe
     return NextResponse.redirect(new URL("/?error=session_storage", request.url));
   }
 
-  // Capture email and profile, register user (fire-and-forget, non-blocking)
+  // Keep login available while registration runs within the function lifetime.
+  // OAuth is the only registry writer; render paths deliberately cannot heal
+  // a missing row, so both resolved DB failures and rejections are observed.
   const email = await fetchGitHubUserEmail(token).catch(() => null);
-  void dbUpsertUser(user.login, {
-    email: email ?? undefined,
-    displayName: user.name ?? null,
-    avatarUrl: user.avatar_url ?? null,
-  }).catch((err: unknown) => {
-    void captureServerError({
-      route: "/api/auth/callback",
-      statusCode: 500,
-      error: err,
-      requestId,
-    });
+  after(async () => {
+    try {
+      const registered = await dbUpsertUser(user.login, {
+        email: email ?? undefined,
+        displayName: user.name ?? null,
+        avatarUrl: user.avatar_url ?? null,
+      });
+      if (!registered) throw new Error("GitHub user registration failed");
+    } catch (error) {
+      await captureServerError({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error,
+        requestId,
+      });
+    }
   });
 
   // Sync to Resend audience (fire-and-forget, non-blocking)

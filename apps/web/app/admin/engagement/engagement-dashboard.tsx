@@ -94,7 +94,7 @@ export function EngagementDashboard() {
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-stroke border-t-amber" />
         <p className="font-heading text-sm text-text-secondary">
-          <span className="text-amber">$</span> loading engagement data...
+          <span className="text-amber-text">$</span> loading engagement data...
         </p>
       </div>
     );
@@ -107,9 +107,9 @@ export function EngagementDashboard() {
   if (error) {
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
-        <div className="rounded-xl border border-terminal-red/20 bg-terminal-red/5 p-6">
+        <div className="rounded-[3px] border border-terminal-red/20 bg-terminal-red/5 p-6">
           <p className="font-heading text-sm text-terminal-red">
-            <span className="text-terminal-red/50">ERR</span> {error}
+            <span className="text-terminal-red">ERR</span> {error}
           </p>
           <button
             onClick={() => {
@@ -117,7 +117,7 @@ export function EngagementDashboard() {
               setLoading(true);
               fetchFlags();
             }}
-            className="mt-4 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+            className="mt-4 min-h-11 rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text hover:bg-action-hover"
           >
             Retry
           </button>
@@ -135,7 +135,7 @@ export function EngagementDashboard() {
       {/* Header */}
       <div>
         <h2 className="font-heading text-lg tracking-tight text-text-primary">
-          <span className="text-amber">$</span> engagement
+          <span className="text-amber-text">$</span> engagement
           <span className="text-text-secondary">/</span>notifications
         </h2>
         <p className="mt-1 text-sm text-text-secondary">
@@ -145,7 +145,7 @@ export function EngagementDashboard() {
       </div>
 
       {/* Toggles table */}
-      <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+      <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stroke">
@@ -197,7 +197,7 @@ export function EngagementDashboard() {
       </div>
 
       {/* Score bump email template card */}
-      <div className="rounded-xl border border-stroke bg-card p-4 mt-6 space-y-3">
+      <div className="rounded-[3px] border border-stroke bg-card p-4 mt-6 space-y-3">
         <h3 className="font-heading text-sm text-text-secondary">
           Score Bump Email Template
         </h3>

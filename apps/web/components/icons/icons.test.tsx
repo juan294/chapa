@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import {
   GitHubIcon,
+  ChapaBadgeIcon,
   CopyIcon,
   BitbucketIcon,
   CodebergIcon,
@@ -10,6 +11,25 @@ import {
 } from "./index";
 
 describe("shared icons", () => {
+  describe("ChapaBadgeIcon", () => {
+    it("renders the shield and chevron as strokes, aria-hidden", () => {
+      const { container } = render(<ChapaBadgeIcon />);
+      const svg = container.querySelector("svg");
+      expect(svg?.getAttribute("viewBox")).toBe("0 0 32 32");
+      expect(svg?.getAttribute("stroke")).toBe("currentColor");
+      expect(svg?.getAttribute("aria-hidden")).toBe("true");
+      const paths = svg?.querySelectorAll("path") ?? [];
+      expect(paths).toHaveLength(2);
+      // Same shield outline as public/favicon.svg, so the mark stays one mark.
+      expect(paths[0]?.getAttribute("d")).toContain("M16 4 L26 8");
+    });
+
+    it("forwards a className to the svg element", () => {
+      const { container } = render(<ChapaBadgeIcon className="h-4 w-4" />);
+      expect(container.querySelector("svg")?.getAttribute("class")).toBe("h-4 w-4");
+    });
+  });
+
   describe("GitHubIcon", () => {
     it("renders an svg with the octocat fill path and aria-hidden", () => {
       const { container } = render(<GitHubIcon />);

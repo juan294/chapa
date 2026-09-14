@@ -35,6 +35,9 @@ does not maintain a separate catalog.
 
 ## Authorization and safety
 
+No Vercel Preview is created. Local-candidate qualification uses the separate
+schema2 release path; it never counts as actual production verification.
+
 This invocation authorizes:
 
 - read-only repository, GitHub, CI, deployment, and production inspection;
@@ -86,7 +89,7 @@ RELEASE_VERIFICATION_MODE=deep PLAYWRIGHT_BASE_URL="https://chapa.thecreativetok
 
 Deep production adds `profile.share-verification` and `locales.en-es` to the
 four default checks. Reconfirm `/api/version` immediately before probing. Do
-not convert preview, local, or historical evidence into a current production
+not convert local-candidate or historical evidence into a current production
 observation. An absent target, wrong identity, degraded dependency,
 unexpected write, or stale response is **BLOCKED**.
 

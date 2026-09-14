@@ -136,7 +136,11 @@ export function withDefaultBadgeConfigKeys(value: unknown): unknown {
   const stored = value as Record<string, unknown>;
   const filled: Record<string, unknown> = { ...stored };
   for (const key of BADGE_CONFIG_KEYS) {
-    if (!(key in stored)) filled[key] = DEFAULT_BADGE_CONFIG[key];
+    if (!(key in stored)) {
+      // Stored rows without a palette predate Ice: preserve their original
+      // Jade appearance. New/no-row/reset configs use DEFAULT_BADGE_CONFIG.
+      filled[key] = key === "colorPalette" ? "jade" : DEFAULT_BADGE_CONFIG[key];
+    }
   }
   return filled;
 }

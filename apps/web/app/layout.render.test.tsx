@@ -9,6 +9,8 @@ import { DOCUMENT_LOCALE_BOOTSTRAP } from "@/lib/i18n/document-locale-bootstrap"
 
 vi.mock("next/font/google", () => ({
   JetBrains_Mono: () => ({ variable: "font-jetbrains" }),
+  Manrope: () => ({ variable: "font-manrope" }),
+  Barlow_Condensed: () => ({ variable: "font-barlow" }),
   Plus_Jakarta_Sans: () => ({ variable: "font-jakarta" }),
 }));
 
@@ -108,6 +110,12 @@ describe("RootLayout render", () => {
     // Root-level copy sits outside per-page locale providers. Both supported
     // labels are present and CSS selects the one matching <html lang> after a
     // locale-segmented page synchronizes the document language.
+    expect(document.documentElement.className).toContain("font-manrope");
+    expect(document.documentElement.className).toContain("font-barlow");
+    expect(document.documentElement.className).toContain("font-jakarta");
+    const skipLink = screen.getByText("Skip to main content").closest("a")!;
+    expect(skipLink.className).toContain("focus:bg-action");
+    expect(skipLink.className).toContain("focus:text-action-text");
     const spanishSkip = screen.getByText("Saltar al contenido principal");
     const englishSkip = screen.getByText("Skip to main content");
     expect(spanishSkip.getAttribute("lang")).toBe("es");

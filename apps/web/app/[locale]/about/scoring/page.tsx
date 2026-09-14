@@ -1,13 +1,14 @@
+import { cache } from "react";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { ScoringMethodologyContent } from "./ScoringMethodologyContent";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
 
-// #1023 (FE-H1) — statically generated for BOTH locales (see
-// app/[locale]/layout.tsx generateStaticParams). Canonical, public URL stays
-// `/about/scoring`; proxy.ts rewrites the unprefixed request here.
-export const dynamic = "force-static";
-export const revalidate = 3600;
+// Policy selection must stay live; an hour-long static page could describe
+// archived arithmetic beside a current observed profile.
+export const dynamic = "force-dynamic";
+const selectedPolicy = cache(() => readScoringRenderSelection());
 
 export async function generateMetadata({
   params,
@@ -16,17 +17,20 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = getServerT(locale);
+  const selection = await selectedPolicy();
+  const observedTitle = t("about.scoringObserved.metadataTitle") as string;
+  const observedDescription = t("about.scoringObserved.metadataDescription") as string;
   return {
-    title: t('about.scoring.metadataTitle') as string,
-    description: t('about.scoring.metadataDescription') as string,
+    title: selection.enabled ? observedTitle : t('about.scoring.metadataTitle') as string,
+    description: selection.enabled ? observedDescription : t('about.scoring.metadataDescription') as string,
     openGraph: {
-      title: t('about.scoring.ogTitle') as string,
-      description: t('about.scoring.ogDescription') as string,
+      title: selection.enabled ? observedTitle : t('about.scoring.ogTitle') as string,
+      description: selection.enabled ? observedDescription : t('about.scoring.ogDescription') as string,
     },
     twitter: {
       card: "summary",
-      title: t('about.scoring.twitterTitle') as string,
-      description: t('about.scoring.twitterDescription') as string,
+      title: selection.enabled ? observedTitle : t('about.scoring.twitterTitle') as string,
+      description: selection.enabled ? observedDescription : t('about.scoring.twitterDescription') as string,
     },
     alternates: {
       canonical: "/about/scoring",
@@ -41,5 +45,6 @@ export default async function ScoringMethodologyPage({
 }) {
   const { locale } = await params;
   const t = getServerT(locale);
-  return <ScoringMethodologyContent t={t} />;
+  const selection = await selectedPolicy();
+  return <ScoringMethodologyContent t={t} observed={selection.enabled} />;
 }

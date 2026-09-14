@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import {
   renderDemoVerificationStrip,
@@ -9,19 +8,9 @@ describe("renderVerificationStrip", () => {
   const hash = "abc12345";
   const date = "2025-06-15";
 
-  it("preserves the exact real and sample SVG bytes after metadata extraction", () => {
-    // #1168 UX-H4 — these digests intentionally changed: font-size 11→14 and
-    // opacity 0.50→0.9 (plus font-weight 500) on both strips for legibility.
-    // This snapshot pins the new bytes; it is not a behavioral invariant.
-    const digest = (svg: string) =>
-      createHash("sha256").update(svg).digest("hex");
-
-    expect(digest(renderVerificationStrip(hash, date))).toBe(
-      "bfe965ab3e196818e577a2db1f9f81e41153aa075fcaac5632c39d69564d4c5e",
-    );
-    expect(digest(renderDemoVerificationStrip())).toBe(
-      "f7d9fee55bb35bc930540d6978358f731ccd904f6630a544c19773da9a435745",
-    );
+  it("uses fully opaque verification and sample text without changing the coral", () => {
+    expect(renderVerificationStrip(hash, date)).toContain('opacity="1" text-anchor="middle"');
+    expect(renderDemoVerificationStrip()).toContain('opacity="1" text-anchor="middle"');
   });
 
   it("returns an SVG <g> element", () => {
@@ -192,5 +181,26 @@ describe("renderDemoVerificationStrip", () => {
     const match = svg.match(/opacity="([0-9.]+)"[^>]*>SAMPLE/);
     expect(match).not.toBeNull();
     expect(parseFloat(match![1]!)).toBeGreaterThanOrEqual(0.85);
+  });
+});
+
+
+describe("receipt verification reference layout", () => {
+  const revision = "12345678-1234-4123-8123-123456789abc";
+  const signature = "abcdef01".repeat(8);
+  const token = `v7.${revision}.${signature}`;
+  it.each(["VERIFIED", "VERIFICADO"])("keeps %s receipt reference within the 570px strip and links the full token", label => {
+    const svg = renderVerificationStrip(token, "2026-09-08", label);
+    expect(svg).toContain(`href="https://chapa.thecreativetoken.com/verify/${token}"`);
+    const visible = svg.match(/<text[^>]*>([^<]+)<\/text>/)![1]!;
+    expect(visible).toBe(`${label} · v7.12345678.abcdef01 · 2026-09-08`);
+    // JetBrains Mono advances 0.6em per glyph; reserve the existing 2px tracking.
+    expect(visible.length * (14 * 0.6 + 2)).toBeLessThan(570);
+    expect(svg).toContain('font-size="14"');
+  });
+  it.each(["abc12345", "abcdef0123456789", "abcdef01".repeat(4), "v7.not-a-receipt.signature"])("preserves the full historical or unrecognized reference %s", hash => {
+    const svg = renderVerificationStrip(hash, "2026-09-08");
+    expect(svg).toContain(`>VERIFIED · ${hash} · 2026-09-08</text>`);
+    expect(svg).toContain(`href="https://chapa.thecreativetoken.com/verify/${hash}"`);
   });
 });

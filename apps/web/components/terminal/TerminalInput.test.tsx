@@ -109,6 +109,19 @@ describe("TerminalInput", () => {
     });
   });
 
+  it("fills controlled input, updates suggestions and focuses without submitting", () => {
+    const ref = createRef<TerminalInputHandle>();
+    const onSubmit = vi.fn();
+    const onPartialChange = vi.fn();
+    render(<TerminalInput ref={ref} onSubmit={onSubmit} onPartialChange={onPartialChange} />);
+    act(() => ref.current!.fill("/dimensions craft"));
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    expect(input.value).toBe("/dimensions craft");
+    expect(document.activeElement).toBe(input);
+    expect(onPartialChange).toHaveBeenCalledWith("/dimensions craft");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   describe("imperative handle (#283)", () => {
     it("exposes clear() and focus() methods via the forwarded ref", () => {
       const onSubmit = vi.fn();

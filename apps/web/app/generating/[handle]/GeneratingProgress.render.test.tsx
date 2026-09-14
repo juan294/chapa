@@ -216,6 +216,36 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  // LE-5-2 — the share page's owner cache warm posts /api/refresh on the
+  // visit that follows this redirect. /api/generate just made that exact
+  // session-token fetch, so the warm is recorded as done before the redirect
+  // and the visit does not spend one of the five hourly refreshes.
+  it("marks the owner cache warm as done before redirecting", async () => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(sessionStorage.getItem("chapa:refreshed:testuser")).toBe("1");
+    vi.unstubAllGlobals();
+  });
+
+  it("does not mark the owner cache warm when generation fails", async () => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502 }));
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(sessionStorage.getItem("chapa:refreshed:testuser")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it("surfaces an error state instead of hanging forever when the request never settles (#1108)", async () => {
     // A fetch that never resolves and never rejects — simulates a stalled
     // network request. Without a timeout, hasError/catch would never fire.
@@ -228,9 +258,16 @@ describe("GeneratingProgress", () => {
     });
     expect(screen.queryByRole("alert")).toBeNull();
 
-    // Advance past the ~45s timeout ceiling.
+    // Still pinned just short of the ceiling — 60s since #1283, which made
+    // room for two sequential server-side fetch attempts.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(40_000);
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Advance past the 60s timeout ceiling.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
     });
 
     expect(screen.getByRole("alert")).toBeDefined();
@@ -285,6 +322,48 @@ describe("GeneratingProgress", () => {
 
     // The old same-URL retry (which cannot re-authenticate) must be gone.
     expect(screen.queryByText("Try again")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  // A connection the user has to repair: retrying the same URL can never fix
+  // it, so the message names the platform and points at /settings.
+  it("names the expired connection on a 409 and links to settings", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ staleSources: ["bitbucket", "gitlab"] }),
+      }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(
+      screen.getByText(
+        "Your Bitbucket, GitLab connection expired, so your profile cannot be completed without it. Reconnect it, then try again.",
+      ),
+    ).toBeDefined();
+    expect(screen.getByText("Reconnect it").closest("a")?.getAttribute("href")).toBe("/settings");
+    expect(screen.queryByText("Try again")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("degrades to the generic message when a 409 body carries no sources", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 409, json: () => Promise.reject(new Error("no body")) }),
+    );
+    render(<GeneratingProgress handle="testuser" />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByText("Something went wrong generating your badge.")).toBeDefined();
     vi.unstubAllGlobals();
   });
 

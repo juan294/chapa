@@ -72,7 +72,7 @@ describe("AgentTogglesTable", () => {
     it("uses card styling for the table container and border-stroke row dividers", () => {
       const { container } = render(<AgentTogglesTable {...defaultProps} />);
       const root = container.firstElementChild;
-      expect(root?.className).toContain("rounded-xl");
+      expect(root?.className).toContain("rounded-[3px]");
       expect(root?.className).toContain("border-stroke");
       expect(root?.className).toContain("bg-card");
 

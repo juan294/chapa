@@ -22,7 +22,7 @@ export default defineConfig({
         "apps/web/lib/**",
         "apps/web/app/**",
         "apps/web/components/**",
-        "packages/shared/**",
+        "packages/shared/src/**",
       ],
       exclude: [
         "**/*.test.*",
@@ -33,7 +33,6 @@ export default defineConfig({
         "**/fonts/**",
         // Type-only modules: no runtime behaviour to measure
         "packages/shared/src/types.ts",
-        "packages/shared/src/stats-schema.ts",
         // i18n dictionaries: pure data, no branching logic
         "apps/web/lib/i18n/dictionaries/**",
         // Index re-exports: just re-export other modules

@@ -1,0 +1,29 @@
+v7 transition rehearsal — 2 handle(s)
+
+reads: 4  writes: 4  invalidations: 4  recomputes: 2
+
+Data access scope:
+  - read: scoring_v7 evidence ledger and Craft portfolio for the named handles only
+  - read: stored source observations for the named handles only
+  - write: new scoring_v7 receipt revisions (additive; no existing revision is modified)
+  - invalidate: today's badge SVG cache entries for the named handles
+  - never: v6 snapshots, v6 stats caches, metrics_snapshots rows, existing verification records
+
+juan294:
+  read        engineering evidence ledger for juan294
+  read        connected source observations for juan294
+  write       scoring_v7_receipts row for juan294 (new revision, additive)
+  write       receipt:v7:juan294
+  invalidate  badge:v2:juan294:ice-terminal-v2:<today>:en
+  invalidate  badge:v2:juan294:ice-terminal-v2:<today>:es
+  preserved   5 keys untouched
+octocat:
+  read        engineering evidence ledger for octocat
+  read        connected source observations for octocat
+  write       scoring_v7_receipts row for octocat (new revision, additive)
+  write       receipt:v7:octocat
+  invalidate  badge:v2:octocat:ice-terminal-v2:<today>:en
+  invalidate  badge:v2:octocat:ice-terminal-v2:<today>:es
+  preserved   5 keys untouched
+
+Dry run: nothing was read, written or invalidated.

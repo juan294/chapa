@@ -1,3 +1,5 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -72,6 +74,7 @@ const LATEST_UPLOADED_CRAFT = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
   mockIsValidHandle.mockReturnValue(true);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
   mockDbGet.mockResolvedValue(null);
@@ -235,13 +238,13 @@ describe("GET /api/insights/:handle", () => {
     expect(resp.headers.get("content-type")).toContain("application/json");
   });
 
-  it("response body has only craftScore key", async () => {
+  it("response identifies its legacy policy alongside craftScore", async () => {
     mockDbGet.mockResolvedValue(STORED_CRAFT);
 
     const resp = await GET(makeRequest("testuser"), makeParams("testuser"));
 
     const body = await resp.json();
-    expect(Object.keys(body)).toEqual(["craftScore"]);
+    expect(Object.keys(body)).toEqual(["policyVersion", "craftScore"]);
   });
 
   // --- Error handling ---

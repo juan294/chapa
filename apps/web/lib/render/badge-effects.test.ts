@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { DEFAULT_BADGE_CONFIG, type BadgeConfig } from "@chapa/shared";
 import { renderBadgeSvg } from "./BadgeSvg";
@@ -20,7 +21,7 @@ function hash(svg: string): string {
 
 /**
  * The default badge is pinned byte-for-byte. Every cached badge and every
- * embedded README image is keyed on handle/day/locale, not on content, so a
+ * embedded README image is keyed on handle/variant/day/locale, not on content, so a
  * single changed byte in the default path silently changes what thousands of
  * already-published images look like.
  *
@@ -41,13 +42,13 @@ function hash(svg: string): string {
  * DOM badge; once #1191 made Studio render this very SVG, "jade in Studio,
  * violet in the README" stopped being tenable.
  */
-describe("default config renders the jade-v1 badge byte-for-byte", () => {
+describe("historical jade-v1 artifact and current default equivalence", () => {
   it.each([
-    ["plain", {}, "66c85c46c97e1d53", 30284],
-    ["branding + demo", { includeBranding: true, demoMode: true }, "efc776305828e5e9", 30768],
-    ["animation disabled", { disableAnimation: true }, "35bdf419ee91e335", 21891],
-  ] as const)("%s", (_label, options, expectedHash, expectedLength) => {
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, options);
+    ["plain", "66c85c46c97e1d53", 30284],
+    ["demo", "efc776305828e5e9", 30768],
+    ["static", "35bdf419ee91e335", 21891],
+  ] as const)("%s", (label, expectedHash, expectedLength) => {
+    const svg = readFileSync(new URL(`../../../../docs/design/chapa-redesign-reference/jade-v1-production/${label}.svg`, import.meta.url), "utf8");
     expect(svg.length).toBe(expectedLength);
     expect(hash(svg)).toBe(expectedHash);
   });
@@ -62,12 +63,25 @@ describe("default config renders the jade-v1 badge byte-for-byte", () => {
   });
 });
 
+// Reviewed Ice outputs are a deliberate version event; retain historical locks above.
+describe("ice-terminal-v2 reviewed artifacts", () => {
+  it.each([
+    ["plain", {}, "4143f1e597290e31", 31474],
+    ["demo", { includeBranding: true, demoMode: true }, "1659164367794bde", 32018],
+    ["static", { disableAnimation: true }, "195af3bda05a9233", 23003],
+  ] as const)("%s", (_label, options, expectedHash, expectedLength) => {
+    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, options);
+    expect(svg.length).toBe(expectedLength);
+    expect(hash(svg)).toBe(expectedHash);
+  });
+});
+
 describe("renderBorderEffect (#1191)", () => {
-  it("emits the legacy border rect for the default value", () => {
+  it("emits the versioned three-pixel frame for the default value", () => {
     const { defs, markup } = renderBorderEffect("solid-amber", ctx);
     expect(defs).toBe("");
     expect(markup).toBe(
-      `<rect x="1" y="1" width="1198" height="628" rx="19" fill="none" stroke="${WARM_AMBER.tint(0.12)}" stroke-width="2"/>`,
+      `<rect x="1" y="1" width="1198" height="628" rx="3" fill="none" stroke="${WARM_AMBER.stroke}" stroke-width="2"/>`,
     );
   });
 
@@ -83,9 +97,9 @@ describe("renderBorderEffect (#1191)", () => {
       config: { ...DEFAULT_BADGE_CONFIG, border: "none" },
     });
     expect(without).not.toBe(withBorder);
-    expect(without).not.toContain('rx="19" fill="none"');
+    expect(without).not.toContain('rx="3" fill="none"');
     // The background rect is untouched — only the border went away.
-    expect(without).toContain('<rect width="1200" height="630" rx="20"');
+    expect(without).toContain('<rect width="1200" height="630" rx="4"');
   });
 
   it("paints a gradient border, animated by default", () => {
@@ -255,7 +269,7 @@ describe("a palette recolours the artifact (#1242)", () => {
 
   it("leaves the archetype colour alone — it is a signal, not decoration", () => {
     const builder = getArchetypeColor(DEMO_IMPACT.archetype);
-    for (const palette of ["jade", "indigo", "amber", "crimson", "mono"] as const) {
+    for (const palette of ["ice", "jade", "indigo", "amber", "crimson", "mono"] as const) {
       expect(render(palette)).toContain(builder);
     }
   });
@@ -263,7 +277,7 @@ describe("a palette recolours the artifact (#1242)", () => {
   it("never lets a palette claim the verification coral", () => {
     // The strip carries the badge's one "verified" colour (#1168/#1183), so it
     // must render the same coral whatever the palette is.
-    for (const palette of ["jade", "indigo", "amber", "crimson", "mono"] as const) {
+    for (const palette of ["ice", "jade", "indigo", "amber", "crimson", "mono"] as const) {
       const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
         demoMode: true,
         config: { ...DEFAULT_BADGE_CONFIG, colorPalette: palette },

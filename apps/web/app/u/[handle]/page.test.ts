@@ -37,8 +37,13 @@ describe("SharePage — non-renderable architecture checks", () => {
     });
 
     it("resolves config only after the cached-SVG check, never before it", () => {
-      const cacheCheck = SOURCE.indexOf("!cachedSvg");
-      const configRead = SOURCE.indexOf("resolveBadgeConfig(handle)");
+      // Metadata separately resolves the OG revision; this constraint owns
+      // only the inline SVG render path inside SharePageContent.
+      const contentStart = SOURCE.indexOf("export async function SharePageContent");
+      expect(contentStart).toBeGreaterThan(-1);
+      const content = SOURCE.slice(contentStart);
+      const cacheCheck = content.indexOf("!cachedSvg");
+      const configRead = content.indexOf("resolveBadgeConfigSnapshot(handle)");
       expect(cacheCheck).toBeGreaterThan(-1);
       expect(configRead).toBeGreaterThan(cacheCheck);
     });

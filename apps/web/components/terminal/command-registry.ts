@@ -222,51 +222,18 @@ export function createNavigationCommands(options?: {
   isAdmin?: boolean;
   studioEnabled?: boolean;
   descriptions?: CommandDescriptions;
+  messages?: CommandDescriptions;
+  additionalCommands?: CommandDef[];
 }): CommandDef[] {
   const studioEnabled = options?.studioEnabled ?? isStudioEnabledSync();
   const isAdmin = options?.isAdmin ?? false;
   const d = options?.descriptions ?? {};
 
-  const helpLines: OutputLine[] = [
-    makeLine("system", "Available commands:"),
-    makeLine("info", `  /help              ${d.help ?? "List available commands"}`),
-    makeLine("info", `  /home              ${d.home ?? "Go to home page"}`),
-    ...(studioEnabled
-      ? [makeLine("info", `  /studio            ${d.studio ?? "Open Creator Studio"}`)]
-      : []),
-    makeLine("info", `  /login             ${d.login ?? "Sign in with GitHub"}`),
-    makeLine("info", `  /badge <handle>    ${d.badge ?? "View a developer badge"}`),
-    makeLine("info", `  /about             ${d.about ?? "About Chapa"}`),
-    makeLine("info", `  /scoring           ${d.scoring ?? "Scoring methodology"}`),
-    makeLine("info", `  /terms             ${d.terms ?? "Terms of Service"}`),
-    makeLine("info", `  /privacy           ${d.privacy ?? "Privacy Policy"}`),
-    makeLine("dim", ""),
-    makeLine("system", "Archetypes:"),
-    makeLine("info", `  /builder           ${d.builder ?? "The Builder archetype"}`),
-    makeLine("info", `  /guardian           ${d.guardian ?? "The Quality Champion archetype"}`),
-    makeLine("info", `  /marathoner        ${d.marathoner ?? "The Marathoner archetype"}`),
-    makeLine("info", `  /polymath          ${d.polymath ?? "The Polymath archetype"}`),
-    makeLine("info", `  /balanced          ${d.balanced ?? "The Balanced archetype"}`),
-    makeLine("info", `  /emerging          ${d.emerging ?? "The Emerging archetype"}`),
-    ...(isAdmin
-      ? [
-          makeLine("dim", ""),
-          makeLine("system", "Admin:"),
-          makeLine("info", `  /admin             ${d.admin ?? "Navigate to admin dashboard"}`),
-          makeLine("info", `  /refresh           ${d.refresh ?? "Refresh dashboard data"}`),
-          makeLine("info", `  /sort <field> [asc|desc]  ${d.sort ?? "Sort table by field"}`),
-          makeLine("info", `  /users             ${d.users ?? "Switch to users tab"}`),
-          makeLine("info", `  /agents            ${d.agents ?? "Switch to agents tab"}`),
-          makeLine("info", `  /run <agent_key>   ${d.run ?? "Run an agent manually"}`),
-        ]
-      : []),
-  ];
-
   const commands: CommandDef[] = [
     {
       name: "/help",
       description: d.help ?? "List available commands",
-      execute: () => ({ lines: helpLines }),
+      execute: () => ({ lines: [makeLine("system", options?.messages?.helpHeading ?? "Available commands:"), ...commands.map(command => makeLine("info", `${command.usage ?? command.name}  ${command.description}`))] }),
     },
     {
       name: "/home",
@@ -394,9 +361,25 @@ export function createNavigationCommands(options?: {
         action: { type: "navigate", path: "/archetypes/emerging" },
       }),
     },
+    ...([['verify', '/verify', 'Verify a badge'], ['artificer', '/archetypes/artificer', 'The Artificer archetype']] as const).map(([name, path, description]): CommandDef => ({
+      name: `/${name}`, description: d[name] ?? description,
+      execute: () => ({ lines: [makeLine("system", d[name] ?? description)], action: {type: "navigate", path} }),
+    })),
+    {name: "/clear", description: d.clear ?? "Clear terminal output", execute: () => ({lines: [], action: {type: "clear"}})},
     ...(isAdmin ? createAdminCommands({ descriptions: d }) : []),
+    ...(options?.additionalCommands ?? []),
   ];
 
+  // Navigation feedback shares the localized registry label; command routing stays intact.
+  if (options?.messages) {
+    return commands.map(command => ({...command, execute: args => {
+        const result = command.execute(args);
+        if (result.action?.type === "navigate") return {...result, lines: [makeLine("system", command.description)]};
+        if (command.name === "/badge" && !args.length) return {lines: [makeLine("error", `${options.messages?.usage ?? "Usage:"} ${command.usage}`)]};
+        return result;
+      },
+    }));
+  }
   return commands;
 }
 
@@ -414,12 +397,13 @@ export function parseCommand(input: string): { name: string; args: string[] } | 
 export function executeCommand<TAction extends CommandAction = CommandAction>(
   input: string,
   commands: CommandDef<TAction>[],
+  messages?: CommandDescriptions,
 ): CommandResult<TAction> {
   const parsed = parseCommand(input);
 
   if (!parsed) {
     return {
-      lines: [makeLine("error", `Unknown input. Type /help for commands.`)],
+      lines: [makeLine("error", messages?.unknownInput ?? `Unknown input. Type /help for commands.`)],
     };
   }
 
@@ -431,7 +415,7 @@ export function executeCommand<TAction extends CommandAction = CommandAction>(
 
   if (!cmd) {
     return {
-      lines: [makeLine("error", `Unknown command: ${parsed.name}. Type /help.`)],
+      lines: [makeLine("error", messages?.unknownCommand?.replace("{command}", parsed.name) ?? `Unknown command: ${parsed.name}. Type /help.`)],
     };
   }
 

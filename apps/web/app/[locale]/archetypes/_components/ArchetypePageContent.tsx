@@ -9,13 +9,13 @@ export type ArchetypeKey = 'builder' | 'guardian' | 'marathoner' | 'polymath' | 
 type TFunction = (key: string) => unknown;
 
 const ACCENT_CLASS: Record<ArchetypeKey, string> = {
-  builder: 'text-archetype-builder',
-  guardian: 'text-archetype-guardian',
-  marathoner: 'text-archetype-marathoner',
-  polymath: 'text-archetype-polymath',
-  artificer: 'text-archetype-artificer',
-  balanced: 'text-archetype-balanced',
-  emerging: 'text-archetype-emerging',
+  builder: 'text-archetype-builder-text',
+  guardian: 'text-archetype-guardian-text',
+  marathoner: 'text-archetype-marathoner-text',
+  polymath: 'text-archetype-polymath-text',
+  artificer: 'text-archetype-artificer-text',
+  balanced: 'text-archetype-balanced-text',
+  emerging: 'text-archetype-emerging-text',
 };
 
 interface Props {
@@ -85,7 +85,7 @@ export function ArchetypePageContent({ archetypeKey, badgeSvg, t }: Props) {
           />
           <div className="pl-4 border-l border-stroke space-y-8">
             <div
-              className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              className="rounded-[3px] shadow-card overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
               role="img"
               aria-label={t(`${ns}.badgeAriaLabel`) as string}
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
@@ -136,10 +136,10 @@ export function ArchetypePageContent({ archetypeKey, badgeSvg, t }: Props) {
               {radarEssay.map((p, i) => <p key={i}>{p}</p>)}
             </div>
             <div className="pt-4 flex flex-wrap items-center justify-between gap-4">
-              <Link href="/#features" className="font-heading text-sm text-amber hover:text-amber-light transition-colors">
+              <Link href="/#features" className="font-heading text-sm text-amber-text hover:text-text-primary transition-colors">
                 {t(`${ns}.backLink`) as string}
               </Link>
-              <Link href="/about/scoring" className="font-heading text-sm text-text-secondary hover:text-amber transition-colors">
+              <Link href="/about/scoring" className="font-heading text-sm text-text-secondary hover:text-amber-text transition-colors">
                 {t(`${ns}.methodologyLink`) as string}
               </Link>
             </div>

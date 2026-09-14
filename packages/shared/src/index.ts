@@ -63,3 +63,18 @@ export {
   CLIENT_INJECTED_KEYS,
   MERGE_EXPECTED_KEYS,
 } from "./stats-schema";
+
+// v7 is additive: legacy v6 exports above retain their stored meanings.
+export * from "./scoring-window";
+export * from "./scoring-evidence";
+export { createCoreScoringInputs } from "./stats-schema";
+
+export * from "./scoring-aggregation-v7";
+
+export * from "./canonical-json";
+export * from "./score-receipt";
+
+// v7.2 foundation only: historical publication/replay dispatch is unchanged.
+export * from "./scoring-observed";
+export * from "./score-receipt-observed";
+export * from "./score-receipt-registry";

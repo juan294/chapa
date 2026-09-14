@@ -10,10 +10,11 @@ import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import type { TrendSummary } from "@/lib/history/trend";
 import { useTranslation } from "@/lib/i18n";
+import { publicScoreProjection, comparePublicScores, readPublicComparison } from "@/lib/profile/public-score-projection";
+import { type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { isValidHandle } from "@/lib/validation";
 import {
   COMPARE_PROFILES_INPUT_SCHEMA,
-  compareDimensions,
   publicStats,
 } from "@/lib/webmcp/catalog";
 import {
@@ -36,6 +37,14 @@ interface PublicVerification {
 interface SharePageWebMcpToolsProps {
   handle: string;
   impact: ClientImpactV6Result;
+  /**
+   * The resolved score model the badge on this page draws from. `impact` is
+   * the v6 aggregate and today carries the same number, but under the v7
+   * receipt the badge draws this projection, so it is the only source a tool
+   * may publish as the score (#1001/#1311, LE-7-1). It is a public projection:
+   * nothing owner-only (confidence, penalties) lives on it.
+   */
+  scoring: ScoreViewModel;
   stats: StatsData;
   verification: PublicVerification | null;
   trend: TrendSummary | null;
@@ -44,6 +53,9 @@ interface SharePageWebMcpToolsProps {
   embedMarkdown: string;
   embedHtml: string;
 }
+
+const HEADLINE_NOTE =
+  "score and tier are the headline the badge draws; null when the badge shows an evidence range or the live profile could not be materialized. The stored trend snapshot's smoothed composite is never reported as the score.";
 
 async function readJson(response: Response): Promise<Record<string, unknown> | null> {
   try {
@@ -57,6 +69,7 @@ async function readJson(response: Response): Promise<Record<string, unknown> | n
 export function SharePageWebMcpTools({
   handle,
   impact,
+  scoring,
   stats,
   verification,
   trend,
@@ -71,23 +84,29 @@ export function SharePageWebMcpTools({
   const tools = useMemo<WebMcpTool[]>(() => {
     if (!webmcpEnabled) return [];
 
+    const projection = publicScoreProjection(scoring, impact.dimensions.craft);
+
     const getImpactProfile: WebMcpTool = {
       name: "get_impact_profile",
-      description: "Return the public impact profile shown in the current page render.",
+      description:
+        "Return the public impact profile shown in the current page render. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); legacy carries the aggregate snapshot.",
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
       annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: () => JSON.stringify({
         handle,
-        impact,
+        ...projection,
+        legacy: { impact },
+        displayTier: projection.tier,
         stats: publicStats(stats),
         verification,
-        trend,
-        diff,
+        trend: scoring.policyVersion === "v7.2" ? null : trend,
+        diff: scoring.policyVersion === "v7.2" ? null : diff,
         freshness: {
           source: "current page render",
           statsFetchedAt: stats.fetchedAt,
           impactComputedAt: impact.computedAt,
         },
+        note: HEADLINE_NOTE,
       }),
     };
 
@@ -134,11 +153,13 @@ export function SharePageWebMcpTools({
         if (response.status === 429) {
           return "Badge verification is temporarily rate limited. Please try again later.";
         }
-        if (!response.ok) {
+        if (!response.ok && response.status !== 410) {
           return `Badge verification is unavailable right now (HTTP ${response.status}).`;
         }
         const body = await readJson(response);
         if (!body) return "Badge verification returned an unreadable response.";
+        if (body.version === "v7" || body.version === "v7.2") return JSON.stringify(body);
+        if (response.status === 410) return "Badge verification returned an unreadable revoked response.";
         const publicRecord = isWebMcpRecord(body.data)
           ? Object.fromEntries(
               Object.entries(body.data).filter(([key]) => key !== "confidence"),
@@ -154,6 +175,7 @@ export function SharePageWebMcpTools({
 
     const explainDimension = createExplainDimensionTool({
       impact,
+      scoring,
       stats,
       craftResult,
       t,
@@ -192,38 +214,16 @@ export function SharePageWebMcpTools({
         }
 
         const other = await readJson(response);
-        const otherDimensions = other?.dimensions;
-        const otherScore = typeof other?.displayScore === "number"
-          ? other.displayScore
-          : other?.adjustedComposite;
-        if (
-          !other ||
-          !isWebMcpRecord(otherDimensions) ||
-          typeof otherScore !== "number"
-        ) {
-          return "The comparison profile returned an unreadable response.";
-        }
-
-        return JSON.stringify({
-          current: {
-            handle,
-            score: impact.adjustedComposite,
-            tier: impact.tier,
-            dimensions: impact.dimensions,
-          },
-          other: {
-            handle: typeof other.handle === "string" ? other.handle : otherHandle,
-            score: otherScore,
-            tier: typeof other.displayTier === "string"
-              ? other.displayTier
-              : other.tier,
-            dimensions: otherDimensions,
-          },
-          differences: {
-            score: otherScore - impact.adjustedComposite,
-            dimensions: compareDimensions(impact.dimensions, otherDimensions),
-          },
-        });
+        const unavailableComparison = () => JSON.stringify({ current: { handle, ...projection, score: projection.displayScore },
+          other: { handle: otherHandle, score: null, tier: null, scoring: null }, status: "not_comparable", reason: "unavailable", differences: null });
+        if (!other || !isWebMcpRecord(other.scoring)) return unavailableComparison();
+        const otherProjection = readPublicComparison(other);
+        if (!otherProjection) return unavailableComparison();
+        const comparison = comparePublicScores(projection, otherProjection);
+        return JSON.stringify({ ...comparison,
+          current: { handle, ...comparison.current, score: comparison.current.displayScore },
+          other: { handle: typeof other.handle === "string" ? other.handle : otherHandle, ...comparison.other, score: comparison.other.displayScore },
+          note: HEADLINE_NOTE });
       },
     };
 
@@ -257,6 +257,7 @@ export function SharePageWebMcpTools({
     embedMarkdown,
     handle,
     impact,
+    scoring,
     stats,
     t,
     trend,

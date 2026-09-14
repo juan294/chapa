@@ -31,27 +31,22 @@ executable authority for which deployed scenarios exist at which mode, and
 `scripts/quality/release-result.ts` is the single compact-result contract
 both the default release path and deep verification write results through.
 
-## Default vs. deep
+## Local qualification vs. production verification
 
-| | Default (`/release`) | Deep (`/prodplaybook`, `RELEASE_VERIFICATION_MODE=deep`) |
-|---|---|---|
-| Preview scenarios | identity, core dependencies, public badge, public share, rollback readiness | + login redirect, protected-write-denied, share verification, `en`/`es` locale |
-| Production scenarios | identity, core dependencies, public badge, public share | + share verification, `en`/`es` locale |
-| Exploratory charters | not run | run when requested or risk-selected |
-| Result | one `release-result.json` per stage (Preview, final) | one `docs/agents/prodplaybook-report.md` per invocation |
-| Controls release mechanics | yes | no — advisory only |
+| Context | Required meaning |
+|---|---|
+| Local-candidate | Exact clean source/tree, allowlisted production build, loopback probes and full applicable local gates. Zero required skips. No hosted deployment or workflow dispatch. |
+| Authorized production default | Actual production identity, core dependencies, public badge/share; real migration admission before promotion and publication readback afterward. |
+| Explicit deep production | Default production observations plus share verification, EN/ES and risk-selected charters. |
+| Result | Schema2 local-candidate and final proofs outside the tracked candidate; a separate deep report for an explicit deep invocation. |
+
+No local result is presented as production proof. No Vercel Preview deployment
+is required or permitted. An Ignored Build Step that skips computation after
+creating one does not satisfy the pre-push prevention requirement.
 
 ## Historical note
 
-This document previously described a much larger evidence-graph
-architecture: a JSON requiredness catalog (`quality/release-required.json`),
-five JSON schemas, CI evidence producers/importers/mergers, a pre-merge and a
-final analyzer, and a rendered `release-report.md` — plus mandatory
-eight-maneuver exploratory charters feeding that analyzer as blocking input.
-That machinery duplicated the plain facts it was reconstructing (an exact CI
-check conclusion, a deployed identity match) through several serial import
-and aggregation stages, and was retired in favor of the direct-proof design
-above (`docs/plans/2026-08-29-direct-proof-release-pipeline.md`). Completed
-release reports and research from before that date remain historically
-accurate for the release they describe; they are not upgraded retroactively
-and are not a live specification.
+Earlier release procedures and schema1 proofs remain historical evidence. Their
+retired architecture is documented in
+`docs/plans/2026-08-29-direct-proof-release-pipeline.md`; it is not an active
+qualification path. Current ordering is exclusively the release playbook.

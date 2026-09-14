@@ -1,0 +1,12 @@
+{
+  "status": "local design proposal; not published",
+  "candidate": "ice-terminal-v2-proposal",
+  "baseline": "jade-v1",
+  "baselineCommit": "c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d",
+  "sourceRenderer": "apps/web/lib/render/BadgeSvg.tsx",
+  "baselineSourceSha256": "08426e623667adcd3c911b70ce1d7ccb42b0728965fc6fbd7212d96448bac064",
+  "svgExports": {
+    "jade-v1.svg": "e1496b200cff5035cdd7e8e824c31e765236b6cb2536d6e1599cb3ec9b2eacb9",
+    "ice-terminal-v2-proposal.svg": "763c530535862f7fb913b77648253184a03ad2785ea82eb681e7de2bfb06844f"
+  }
+}

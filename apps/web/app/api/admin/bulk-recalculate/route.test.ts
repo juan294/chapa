@@ -143,6 +143,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockDbGetUserHandlePage).toHaveBeenCalledWith({ limit: 101 });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
       ignoreSnapshot: true,
+      scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 },
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "alice",
@@ -190,12 +191,12 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       1,
       "mona",
-      { ignoreSnapshot: true },
+      { ignoreSnapshot: true, scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } },
     );
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       2,
       "zara",
-      { ignoreSnapshot: true },
+      { ignoreSnapshot: true, scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } },
     );
   });
 
@@ -619,3 +620,6 @@ describe("POST /api/admin/bulk-recalculate", () => {
     });
   });
 });
+
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));
+vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceiptIfConsented: vi.fn(async () => "skipped") }));

@@ -42,7 +42,7 @@ vi.mock("@/lib/webmcp/server-tools", async (importOriginal) => {
       description: `Read tool ${index}`,
       inputSchema: {
         type: "object",
-        properties: index === 0 ? {} : { handle: { type: "string" } },
+        properties: index === 0 ? {} : name === "verify_badge" ? { hash: { type: "string" } } : { handle: { type: "string" } },
         additionalProperties: false,
       },
       annotations: {
@@ -92,6 +92,7 @@ describe("/api/mcp", () => {
     const response = await POST(request({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
 
     expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual(expect.objectContaining({
       error: expect.any(String),
       hint: expect.any(String),
@@ -104,6 +105,7 @@ describe("/api/mcp", () => {
     const response = await POST(request({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
 
     expect(response.status).toBe(429);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("retry-after")).toBe("60");
     expect(mocks.rateLimit).toHaveBeenCalledWith("ratelimit:mcp:1.2.3.4", 60, 60);
   });
@@ -193,6 +195,28 @@ describe("/api/mcp", () => {
     });
   });
 
+  it("never stores a v7 verification response transported through the real MCP handler", async () => {
+    const hash = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
+    const verification = { version: "v7", status: "revoked", signatureAuthenticated: false };
+    mocks.execute.mockResolvedValueOnce(JSON.stringify(verification));
+    const response = await POST(request({ jsonrpc: "2.0", id: 7, method: "tools/call",
+      params: { name: "verify_badge", arguments: { hash } } }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await jsonRpc(response);
+    const result = body.result as { content: Array<{ text: string }> };
+    expect(JSON.parse(result.content[0]!.text)).toEqual(verification);
+    expect(mocks.execute).toHaveBeenCalledWith({ hash });
+  });
+
+  it("returns a content-free no-store error when dispatch fails", async () => {
+    mocks.enabled.mockRejectedValueOnce(new Error("private upstream detail"));
+    const response = await POST(request({ jsonrpc: "2.0", id: 8, method: "tools/list" }));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.text()).not.toContain("private upstream detail");
+  });
+
   it("classifies recovery strings as invalid input", async () => {
     mocks.execute.mockResolvedValueOnce(
       "Invalid input for find_profile: handle must be a public GitHub handle.",
@@ -240,6 +264,7 @@ describe("/api/mcp", () => {
     for (const handler of [GET, DELETE]) {
       const response = await handler();
       expect(response.status).toBe(405);
+      expect(response.headers.get("cache-control")).toBe("no-store");
       expect(response.headers.get("allow")).toBe("POST");
       await expect(response.json()).resolves.toEqual(expect.objectContaining({
         error: expect.any(String),

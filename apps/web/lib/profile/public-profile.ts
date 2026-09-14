@@ -1,4 +1,7 @@
+import { resolveScoreModel } from "./score-model";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import type { ImpactV6Result, PublicImpactV6Result } from "@chapa/shared";
+import type { GitHubUserNotFound } from "@/lib/github/not-found";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { cacheDel, cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
@@ -43,10 +46,11 @@ export function redactImpactForVisitor(
 
 export async function materializePublicProfile(
   handle: string,
-  options: { token?: string; today?: string; readOnly?: boolean } = {},
-): Promise<MaterializedProfile | null> {
+  options: { token?: string; today?: string; readOnly?: boolean; scoringSelection?: ScoringRenderSelection } = {},
+): Promise<MaterializedProfile | GitHubUserNotFound | null> {
   return materializeProfile(handle, {
     token: options.token,
+    scoringSelection: options.scoringSelection,
     today: options.today,
     readOnly: options.readOnly,
     policy: "public-display",
@@ -57,8 +61,16 @@ export function getPublicProfileVerification(
   materialized: Pick<
     MaterializedProfile,
     "stats" | "displayImpact" | "statsComplete"
-  >,
+  > & { scoring?: MaterializedProfile["scoring"] },
 ): PublicVerificationCode | null {
+  // #1311 — a v6 HMAC attests v6 dimensions, tier, archetype and confidence.
+  // Issuing one for a profile whose badge draws a v7 receipt would put a
+  // verification link on that badge resolving to a different set of numbers,
+  // which is the "two answers for one revision" the shared model exists to
+  // prevent, arriving from the other direction. A v7 profile is attested by
+  // its receipt (see `deriveReceiptVerificationTokenV7`), never by this.
+  if (materialized.scoring && materialized.scoring.policyVersion !== "v6") return null;
+
   // #1003 — Never attest a verification record from stats that look
   // incomplete (e.g. served from an old poisoned `stats:stale` entry). This
   // single gate covers all four call sites: the three route call sites and
@@ -92,6 +104,22 @@ function buildVerificationRecord(
   };
 }
 
+/**
+ * The durable side effects that follow a rendered badge or share page: the
+ * badge route (foreground and background continuation) and the share page
+ * both run exactly this sequence inside `after()`.
+ *
+ * LE-6-1 — `verification` is the code the artifact was rendered with, and it
+ * is stored on EVERY render, not only on the first render of the day. The
+ * snapshot write is deduplicated by a once-per-day guard, and this sequence
+ * used to stop dead when that guard said "exists". But a hash moves whenever
+ * the stats behind it move (a refetch after the 6h stats TTL, a fetch under a
+ * different token scope, a refresh, a recalculate), and each later render
+ * that day printed a new hash into a 24h-cached SVG that no row backed —
+ * `/verify/<hash>` answered 404 for the number on the badge. The snapshot,
+ * telemetry and profile-refresh writes stay once per day; the record for
+ * the hash that was just published does not.
+ */
 export async function runPublicProfileSideEffects(
   handle: string,
   materialized: MaterializedProfile,
@@ -99,6 +127,7 @@ export async function runPublicProfileSideEffects(
     verification?: PublicVerificationCode | null;
     readOnly?: boolean;
     sendFirstBadgeNotification?: boolean;
+    scoringSelection?: ScoringRenderSelection;
   } = {},
 ): Promise<void> {
   if (options.readOnly) return;
@@ -107,15 +136,15 @@ export async function runPublicProfileSideEffects(
     readOnly: options.readOnly,
   });
 
-  // The SETNX dedup guard returning "exists" means deferred work already ran
-  // earlier today for this handle — skip re-running it. Incomplete stats
-  // (#1003) also skip persistence but are NOT a dedup case: the badge still
-  // rendered for a real visitor, so telemetry/notifications should still run
-  // once for this view. The verification record is separately gated inside
-  // getPublicProfileVerification, so it stays skipped either way.
-  if (!persisted && materialized.statsComplete) return;
-
-  await deferProfileCacheWork(handle, materialized, options);
+  // `persisted` is false for the same-day dedup (work already ran today) and
+  // for incomplete stats (#1003). Either way only the verification record for
+  // the artifact just rendered may still be written — and for incomplete
+  // stats `getPublicProfileVerification` has already refused to mint one, so
+  // nothing is written at all.
+  await deferProfileCacheWork(handle, materialized, {
+    ...options,
+    verificationOnly: !persisted,
+  });
 }
 
 export async function persistProfileSnapshot(
@@ -192,13 +221,24 @@ export async function deferProfileCacheWork(
     verification?: PublicVerificationCode | null;
     readOnly?: boolean;
     sendFirstBadgeNotification?: boolean;
+    scoringSelection?: ScoringRenderSelection;
     verificationOnly?: boolean;
   } = {},
 ): Promise<void> {
   if (options.readOnly) return;
 
-  const verification = options.verification ??
-    getPublicProfileVerification(materialized);
+  // One mint per artifact: a caller that resolved the verification — to a
+  // code or to null — is never second-guessed here, so the stored hash is the
+  // printed hash. Only a caller that resolved nothing gets one minted for it.
+  // A v7 model is attested by its receipt (`resolveBadgeVerification`), never
+  // by a legacy row (#1311), so its token must not land in
+  // `verification_records` under the receipt token either.
+  const verification =
+    materialized.scoring && materialized.scoring.policyVersion !== "v6"
+      ? null
+      : options.verification !== undefined
+        ? options.verification
+        : getPublicProfileVerification(materialized);
   const ops: Promise<unknown>[] = [];
 
   if (verification) {
@@ -221,7 +261,12 @@ export async function deferProfileCacheWork(
 
   ops.push(trackBadgeGenerated(handle));
   if (options.sendFirstBadgeNotification) {
-    ops.push(notifyFirstBadge(handle, materialized.displayImpact));
+    // If issuance/repair occurred after initial materialization, resolve the
+    // published current receipt using the caller's captured selection.
+    const scoring = options.scoringSelection
+      ? await resolveScoreModel(handle, materialized.displayImpact, options.scoringSelection)
+      : materialized.scoring;
+    if (options.scoringSelection?.cacheable !== false) ops.push(notifyFirstBadge(handle, materialized.displayImpact, scoring));
   }
 
   if (materialized.stats.displayName || materialized.stats.avatarUrl) {

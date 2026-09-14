@@ -3,6 +3,9 @@
 // ---------------------------------------------------------------------------
 
 export interface AdminUser {
+  policyVersion?: "v6" | "v7.2";
+  exactScore?: number | null;
+  identity?: { revisionId: string; contentHash: string } | null;
   handle: string;
   displayName: string | null;
   avatarUrl: string | null;
@@ -59,16 +62,17 @@ export const TIER_ORDER: Record<string, number> = {
 };
 
 export const ARCHETYPE_COLOR: Record<string, string> = {
-  Builder: "text-archetype-builder",
-  "Quality Champion": "text-archetype-guardian",
-  Marathoner: "text-archetype-marathoner",
-  Polymath: "text-archetype-polymath",
-  Balanced: "text-archetype-balanced",
-  Emerging: "text-archetype-emerging",
+  Builder: "text-archetype-builder-text",
+  "Quality Champion": "text-archetype-guardian-text",
+  Marathoner: "text-archetype-marathoner-text",
+  Polymath: "text-archetype-polymath-text",
+  Balanced: "text-archetype-balanced-text",
+  Emerging: "text-archetype-emerging-text",
+  Artificer: "text-archetype-artificer-text",
 };
 
 export const TIER_COLOR: Record<string, string> = {
-  Elite: "text-amber",
+  Elite: "text-amber-text",
   High: "text-terminal-green",
   Solid: "text-text-primary",
   Emerging: "text-text-secondary",
@@ -78,7 +82,7 @@ export function tierBadgeClasses(tier: string): string {
   const base = "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium font-heading";
   switch (tier) {
     case "Elite":
-      return `${base} bg-amber/10 text-amber`;
+      return `${base} bg-amber/10 text-amber-text`;
     case "High":
       return `${base} bg-terminal-green/10 text-terminal-green`;
     case "Solid":
@@ -99,4 +103,3 @@ export function formatDate(iso: string): string {
   if (diffD < 7) return `${diffD}d ago`;
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
-

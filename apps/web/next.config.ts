@@ -25,6 +25,9 @@ function buildCsp(frameAncestors: string): string {
     // In production, Next.js does not require eval.
     ...(isDev ? ["'unsafe-eval'"] : []),
     "blob:",
+    // posthog-js loads its `array` bundle and remote config from the assets
+    // host (LE-8-5); the ingestion host in connect-src is not enough.
+    "https://eu-assets.i.posthog.com",
   ].join(" ");
 
   return [
@@ -38,7 +41,10 @@ function buildCsp(frameAncestors: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://avatars.githubusercontent.com https://i.ytimg.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://eu.i.posthog.com https://api.github.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
+    // posthog-js pulls its remote config and the `array` bundle from the
+    // assets host, not the ingestion host; without eu-assets the browser logs
+    // two CSP violations per page and remote config never loads (LE-8-5).
+    "connect-src 'self' https://eu.i.posthog.com https://eu-assets.i.posthog.com https://api.github.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
     "frame-src https://www.youtube-nocookie.com",
     `frame-ancestors ${frameAncestors}`,
   ].join("; ");

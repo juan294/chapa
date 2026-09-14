@@ -262,6 +262,13 @@ export function getInsightsEnabledEnv(): string | undefined {
   return clean(process.env.NEXT_PUBLIC_INSIGHTS_ENABLED);
 }
 
+/** Raw `SCORING_V7_RENDERING_ENABLED` value — server-only fallback for the v7
+ *  render/issue cutover. Server-only on purpose: which policy version a badge
+ *  draws is not a browser concern, and nothing client-side may branch on it. */
+export function getScoringV7RenderingEnabledEnv(): string | undefined {
+  return readTrimmed("SCORING_V7_RENDERING_ENABLED");
+}
+
 /** Raw `MCP_SERVER_ENABLED` value — server-only fallback for the remote MCP endpoint. */
 export function getMcpServerEnabledEnv(): string | undefined {
   return readTrimmed("MCP_SERVER_ENABLED");

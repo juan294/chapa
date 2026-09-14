@@ -2,6 +2,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { InsightCard } from "./InsightCard";
+import { compositeColor, contrastRatio, themedTokenValue } from "@/lib/test-helpers/css-tokens";
 
 afterEach(cleanup);
 
@@ -181,15 +182,16 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 6. Trend card with dimension uses dimension color on icon
+  // 6. Trend card keeps dimension tint with a readable glyph
   // ----------------------------------------------------------------
-  it("trend card with dimension uses dimension color on icon", () => {
+  it("trend card keeps dimension tint with a readable glyph", () => {
     const { container } = render(
       <InsightCard insight={trendDimensionInsight} />,
     );
     const iconBox = container.querySelector("[data-testid='trend-icon']") as HTMLElement;
     const iconWrapper = iconBox.querySelector("div:last-child") as HTMLElement;
-    expect(iconWrapper.style.color).toBe("var(--color-dimension-quality)");
+    expect(iconWrapper.style.color).toBe("var(--color-text-primary)");
+    expect((iconBox.querySelector(".absolute") as HTMLElement).style.backgroundColor).toBe("var(--color-dimension-quality)");
   });
 
   // ----------------------------------------------------------------
@@ -204,9 +206,9 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 8. Archetype card applies archetype color on icon and headline
+  // 8. Archetype card retains its tint and uses the text-safe headline role
   // ----------------------------------------------------------------
-  it("archetype card applies archetype color on icon and headline", () => {
+  it("archetype card retains its tint and uses the text-safe headline role", () => {
     const { container } = render(
       <InsightCard insight={tipNoDimensionInsight} />,
     );
@@ -215,9 +217,35 @@ describe("InsightCard", () => {
     expect(iconBox).toBeTruthy();
     const tint = iconBox.querySelector(".absolute") as HTMLElement;
     expect(tint.style.backgroundColor).toBe("var(--color-archetype-builder)");
-    // Headline uses archetype color
+    // Headline uses the text-safe role for the same archetype hue
     const headline = container.querySelector("p.font-heading") as HTMLElement;
-    expect(headline.style.color).toBe("var(--color-archetype-builder)");
+    expect(headline.style.color).toBe("var(--color-archetype-builder-text)");
+  });
+
+  it.each(["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging", "Artificer", "Unknown", undefined])("keeps %s archetype text and tinted glyph readable in both themes", (archetypeName) => {
+    const { container } = render(<InsightCard insight={{ ...tipNoDimensionInsight, archetypeName }} />);
+    const headline = screen.getByText(tipNoDimensionInsight.headline);
+    const icon = container.querySelector("[data-testid='archetype-icon']")!;
+    const tint = icon.querySelector<HTMLElement>(".absolute")!;
+    const glyph = icon.querySelector<HTMLElement>("div:last-child")!;
+    const resolve = (value: string, theme: "light" | "dark") => themedTokenValue(value.slice(4, -1))[theme];
+    for (const theme of ["light", "dark"] as const) {
+      const card = themedTokenValue("--color-card")[theme];
+      expect(contrastRatio(resolve(headline.style.color, theme), card)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(resolve(glyph.style.color, theme), compositeColor(resolve(tint.style.backgroundColor, theme), card, 0.15))).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it.each(["delivery", "quality", "consistency", "breadth", "craft"] as const)("keeps the %s trend glyph readable on its dimension tint", (dimension) => {
+    const { container } = render(<InsightCard insight={{ ...trendDimensionInsight, dimension }} />);
+    const icon = container.querySelector("[data-testid='trend-icon']")!;
+    const tint = icon.querySelector<HTMLElement>(".absolute")!;
+    const glyph = icon.querySelector<HTMLElement>("div:last-child")!;
+    for (const theme of ["light", "dark"] as const) {
+      const color = themedTokenValue(glyph.style.color.slice(4, -1))[theme];
+      const background = compositeColor(themedTokenValue(tint.style.backgroundColor.slice(4, -1))[theme], themedTokenValue("--color-card")[theme], 0.15);
+      expect(contrastRatio(color, background)).toBeGreaterThanOrEqual(3);
+    }
   });
 
   // ----------------------------------------------------------------

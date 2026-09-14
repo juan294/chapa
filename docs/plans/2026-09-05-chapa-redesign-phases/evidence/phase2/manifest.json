@@ -1,0 +1,23 @@
+{
+  "variant": "ice-terminal-v2",
+  "fixtures": [
+    {
+      "name": "plain",
+      "characters": 31474,
+      "bytes": 31781,
+      "sha256": "4143f1e597290e312320f534b5a7a43922499ceb93ae935c945ef50980e5c434"
+    },
+    {
+      "name": "demo",
+      "characters": 32018,
+      "bytes": 32327,
+      "sha256": "1659164367794bde6f9646a486e9d3064c67a5f5cc7b8e72d72e660c29071d5b"
+    },
+    {
+      "name": "static",
+      "characters": 23003,
+      "bytes": 23312,
+      "sha256": "195af3bda05a9233eeadb77c27f07a8e02d02d1f12396227674dd255e3d96c07"
+    }
+  ]
+}

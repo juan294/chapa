@@ -4,10 +4,6 @@ import { render, screen } from "@testing-library/react";
 import dynamic from "next/dynamic";
 import { resolveDynamicLoader } from "@/lib/test-helpers/dynamic-mock";
 
-vi.mock("./BadgeSkeleton", () => ({
-  BadgeSkeleton: () => <div data-testid="badge-skeleton" />,
-}));
-
 vi.mock("next/dynamic", () => ({
   default: vi.fn(
     (
@@ -45,7 +41,30 @@ describe("SharePageOwnerContentLazy render", () => {
     const wrapper = screen.getByTestId("owner-content-lazy");
     expect(wrapper.getAttribute("data-handle")).toBe("octocat");
     expect(wrapper.getAttribute("data-ssr")).toBe("undefined");
-    expect(screen.getByTestId("badge-skeleton")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Loading..." })).toBeTruthy();
+  });
+
+  // LE-5-1 — this chunk loads below a badge that is already on screen. Its
+  // fallback used to be BadgeSkeleton, a second badge-shaped plate captioned
+  // "Building the badge", so a slow chunk (Turbopack compiles it on first
+  // demand in dev) drew a badge under the badge. The wait belongs to the
+  // breakdown, so the placeholder is shaped like the breakdown.
+  it("does not draw a second badge plate while the chunk loads", async () => {
+    const { SharePageOwnerContentLazy } = await import(
+      "./SharePageOwnerContentLazy"
+    );
+
+    render(
+      <SharePageOwnerContentLazy
+        handle="octocat"
+        stats={null}
+        impact={null}
+      />,
+    );
+
+    expect(screen.queryByText("Building the badge")).toBeNull();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(document.querySelector(".aspect-\\[1200\\/630\\]")).toBeNull();
   });
 
   it("resolves the deferred loader to SharePageOwnerContent", async () => {

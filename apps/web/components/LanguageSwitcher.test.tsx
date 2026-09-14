@@ -313,3 +313,20 @@ describe("LanguageSwitcher", () => {
     });
   });
 });
+
+// LE-5-5 / LE-5-6 — the trigger keeps a 44px minimum in both axes and does
+// not shrink, but gives up horizontal padding on mobile so five controls fit
+// in 320px.
+describe("LanguageSwitcher — 320px fit and touch target (LE-5-5 / LE-5-6)", () => {
+  afterEach(cleanup);
+
+  it("trigger is at least 44x44, never shrinks, and tightens padding on mobile", () => {
+    render(<LanguageSwitcher />);
+    const trigger = screen.getByRole("button", { expanded: false });
+    expect(trigger.className).toContain("h-11");
+    expect(trigger.className).toContain("min-w-11");
+    expect(trigger.className).toContain("shrink-0");
+    expect(trigger.classList.contains("px-1.5")).toBe(true);
+    expect(trigger.classList.contains("sm:px-3")).toBe(true);
+  });
+});

@@ -27,11 +27,23 @@ export default function GlobalError({
           --color-text-secondary tokens (light default, dark override).
         */}
         <style>{`
-          .global-error-body { background-color: #FFFFFF; color: #0D2B1D; }
-          .global-error-subtext { color: #55665E; }
+          .global-error-body { background-color: #F4F0E7; color: #1B1B19; }
+          .global-error-subtext { color: #64625E; }
+          .global-error-title { color: #AA2D1A; }
+          .global-error-retry { background-color: #1B1B19; color: #F4F0E7; }
+          .global-error-retry:hover { background-color: #AA2D1A; }
+          .global-error-home { color: #1B1B19; }
+          .global-error-home:hover { background-color: #DCEAF0; }
+          .global-error-body :focus-visible { outline: 2px solid #AA2D1A; outline-offset: 4px; }
           @media (prefers-color-scheme: dark) {
-            .global-error-body { background-color: #08170F; color: #DFEAE4; }
-            .global-error-subtext { color: #8BA398; }
+            .global-error-body { background-color: #141719; color: #EEEAE1; }
+            .global-error-subtext { color: #B3B9B9; }
+            .global-error-title { color: #FF927D; }
+            .global-error-retry { background-color: #FF795F; color: #17191A; }
+            .global-error-retry:hover { background-color: #FF9D88; }
+            .global-error-home { color: #EEEAE1; }
+            .global-error-home:hover { background-color: #192B35; }
+            .global-error-body :focus-visible { outline-color: #FF927D; }
           }
         `}</style>
       </head>
@@ -55,10 +67,10 @@ export default function GlobalError({
           }}
         >
           <h1
+            className="global-error-title"
             style={{
               fontSize: "2.25rem",
               fontWeight: 700,
-              color: "#FD736D",
               fontFamily: '"JetBrains Mono", "Courier New", monospace',
               margin: 0,
             }}
@@ -81,20 +93,25 @@ export default function GlobalError({
             style={{
               marginTop: "2rem",
               display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
               alignItems: "center",
               gap: "1rem",
             }}
           >
             <button
               onClick={reset}
+              className="global-error-retry"
               style={{
-                borderRadius: "8px",
-                border: "1px solid rgba(27, 208, 147, 0.3)",
-                backgroundColor: "rgba(27, 208, 147, 0.08)",
+                borderRadius: "3px",
+                minHeight: "44px",
+                boxSizing: "border-box",
+                display: "inline-flex",
+                alignItems: "center",
+                border: "1px solid transparent",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#1BD093",
                 cursor: "pointer",
               }}
             >
@@ -103,13 +120,17 @@ export default function GlobalError({
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error replaces root layout; next/link may not be available */}
             <a
               href="/"
+              className="global-error-home"
               style={{
-                borderRadius: "8px",
-                border: "1px solid rgba(27, 208, 147, 0.10)",
+                borderRadius: "3px",
+                minHeight: "44px",
+                boxSizing: "border-box",
+                display: "inline-flex",
+                alignItems: "center",
+                border: "1px solid currentColor",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#8BA398",
                 textDecoration: "none",
                 cursor: "pointer",
               }}

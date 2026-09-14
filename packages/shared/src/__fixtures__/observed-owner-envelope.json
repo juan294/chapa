@@ -1,0 +1,360 @@
+{
+  "receipt": {
+    "action": "create",
+    "algorithm": {
+      "algorithmDigest": {
+        "algorithm": "SHA-256",
+        "value": "28d8fd32805421bf71bd818c09e101f4881c8934c614e857650ecc436d963087"
+      },
+      "algorithmId": "chapa-impact-v7",
+      "policyDigest": {
+        "algorithm": "SHA-256",
+        "value": "7681a2cbfdb1a9496dd94e1f4d3bbc7037d9b78ea8837b3bad4ce447c21edde7"
+      },
+      "revision": "v7.2"
+    },
+    "calculation": {
+      "core": {
+        "breadth": {
+          "categories": {
+            "cap": 4,
+            "clamped": 0,
+            "multiplier": 50,
+            "normalized": 0,
+            "observedCount": 0,
+            "originalBounds": {
+              "lower": 0,
+              "upper": 4
+            },
+            "weighted": 0
+          },
+          "projects": {
+            "cap": 4,
+            "clamped": 4,
+            "multiplier": 50,
+            "normalized": 1,
+            "observedCount": 4,
+            "originalBounds": {
+              "lower": 4,
+              "upper": 4
+            },
+            "weighted": 50
+          }
+        },
+        "composite": 46.40250879691149,
+        "consistency": {
+          "cap": 40,
+          "clamped": 5,
+          "multiplier": 100,
+          "normalized": 0.4824894837218527,
+          "observedCount": 5,
+          "originalBounds": {
+            "lower": 5,
+            "upper": 40
+          },
+          "weighted": 48.24894837218527
+        },
+        "delivery": {
+          "cap": 120,
+          "clamped": 65,
+          "multiplier": 100,
+          "normalized": 0.8736108681546069,
+          "observedCount": 65,
+          "originalBounds": {
+            "lower": 65,
+            "upper": 120
+          },
+          "weighted": 87.36108681546068
+        },
+        "dimensions": {
+          "breadth": 50,
+          "consistency": 48.24894837218527,
+          "delivery": 87.36108681546068,
+          "quality": 0
+        },
+        "displayed": {
+          "archetype": null,
+          "composite": {
+            "displayLabel": "46",
+            "displayValue": 46,
+            "exact": 46.40250879691149,
+            "kind": "point"
+          },
+          "dimensions": {
+            "breadth": {
+              "displayLabel": "50",
+              "displayValue": 50,
+              "exact": 50,
+              "kind": "point"
+            },
+            "consistency": {
+              "displayLabel": "48",
+              "displayValue": 48,
+              "exact": 48.24894837218527,
+              "kind": "point"
+            },
+            "delivery": {
+              "displayLabel": "87",
+              "displayValue": 87,
+              "exact": 87.36108681546068,
+              "kind": "point"
+            },
+            "quality": {
+              "displayLabel": "0",
+              "displayValue": 0,
+              "exact": 0,
+              "kind": "point"
+            }
+          },
+          "tier": "Solid"
+        },
+        "quality": {
+          "outcome_followup": {
+            "cap": 12,
+            "clamped": 0,
+            "multiplier": 25,
+            "normalized": 0,
+            "observedCount": 0,
+            "originalBounds": {
+              "lower": 0,
+              "upper": 12
+            },
+            "weighted": 0
+          },
+          "rationale": {
+            "cap": 12,
+            "clamped": 0,
+            "multiplier": 25,
+            "normalized": 0,
+            "observedCount": 0,
+            "originalBounds": {
+              "lower": 0,
+              "upper": 12
+            },
+            "weighted": 0
+          },
+          "review_or_correction": {
+            "cap": 12,
+            "clamped": 0,
+            "multiplier": 25,
+            "normalized": 0,
+            "observedCount": 0,
+            "originalBounds": {
+              "lower": 0,
+              "upper": 12
+            },
+            "weighted": 0
+          },
+          "verification": {
+            "cap": 12,
+            "clamped": 0,
+            "multiplier": 25,
+            "normalized": 0,
+            "observedCount": 0,
+            "originalBounds": {
+              "lower": 0,
+              "upper": 12
+            },
+            "weighted": 0
+          }
+        },
+        "weightedDimensions": {
+          "breadth": 12.5,
+          "consistency": 12.062237093046317,
+          "delivery": 21.84027170386517,
+          "quality": 0
+        }
+      },
+      "rules": {
+        "algorithmRevision": "v7.2",
+        "archetype": {
+          "eligibility": "original_normalized_dimension_endpoints_equal",
+          "reportCraftEffect": "none",
+          "rule": "v6_descriptive_tree_without_solo_exclusions",
+          "tieOrder": [
+            "breadth",
+            "quality",
+            "consistency",
+            "delivery"
+          ]
+        },
+        "breadthMinimumDates": 3,
+        "calendarDays": 365,
+        "caps": {
+          "breadthCategories": 4,
+          "breadthProjects": 4,
+          "consistency": 40,
+          "delivery": 120,
+          "qualityCriterion": 12
+        },
+        "coreWeights": {
+          "breadth": 0.25,
+          "consistency": 0.25,
+          "delivery": 0.25,
+          "quality": 0.25
+        },
+        "display": {
+          "core": "nearest_integer_unless_tier_crossing_then_floor_100_div_100",
+          "dimensionAndCraft": "nearest_integer_half_up",
+          "intermediate": "none",
+          "label": "canonical_finite_decimal_trim_trailing_zeroes",
+          "revision": "v7.2",
+          "tierBasis": "unrounded"
+        },
+        "displayVersion": "v7",
+        "normalization": "ln(1+min(count,cap))/ln(1+cap)",
+        "numericTolerance": 1e-10,
+        "observedSelection": "original_lower_qualifying_count",
+        "policyVersion": "v7.2",
+        "rawArtifactRetentionDays": 30,
+        "reportCraft": {
+          "aliases": {
+            "failed": "not_achieved",
+            "fully_achieved": "fully_achieved",
+            "mostly_achieved": "mostly_achieved",
+            "not_achieved": "not_achieved",
+            "partially_achieved": "partially_achieved"
+          },
+          "assessment": "model_estimate",
+          "classifierRevision": "cc-outcomes-v7.2",
+          "coreWeight": 0,
+          "denominator": "total_sessions",
+          "duplicateCategories": "reject_before_overwrite",
+          "exactDuplicate": "idempotent",
+          "expiry": "retain_unlocked_slot_without_numeric_vertex",
+          "normalization": "trim_ascii_whitespace_lowercase_ascii_collapse_ascii_space_hyphen_underscore",
+          "outcomeCredits": {
+            "fully_achieved": 1,
+            "mostly_achieved": 0.7,
+            "not_achieved": 0,
+            "partially_achieved": 0.3
+          },
+          "period": "wholly_within_annual_window_and_not_future",
+          "provenance": "report_derived",
+          "scoredEligibility": "positive_total_and_positive_recognized_count",
+          "selection": "latest_period_end_then_start_same_period_explicit_correction",
+          "unknownLabels": "private_aggregate_count_only_public"
+        },
+        "tierThresholds": {
+          "elite": 85,
+          "high": 70,
+          "solid": 30
+        },
+        "trendRetention": 0.85
+      }
+    },
+    "core": {
+      "archetype": null,
+      "composite": {
+        "displayLabel": "46",
+        "displayValue": 46,
+        "exact": 46.40250879691149,
+        "kind": "point"
+      },
+      "dimensions": {
+        "breadth": {
+          "displayLabel": "50",
+          "displayValue": 50,
+          "exact": 50,
+          "kind": "point"
+        },
+        "consistency": {
+          "displayLabel": "48",
+          "displayValue": 48,
+          "exact": 48.24894837218527,
+          "kind": "point"
+        },
+        "delivery": {
+          "displayLabel": "87",
+          "displayValue": 87,
+          "exact": 87.36108681546068,
+          "kind": "point"
+        },
+        "quality": {
+          "displayLabel": "0",
+          "displayValue": 0,
+          "exact": 0,
+          "kind": "point"
+        }
+      },
+      "tier": "Solid"
+    },
+    "coverage": [],
+    "craft": {
+      "report": null,
+      "status": "no_report",
+      "unlocked": false
+    },
+    "criteria": [],
+    "exclusions": [],
+    "inputs": {
+      "counts": {
+        "activeIsoWeeks": {
+          "lower": 5,
+          "upper": 40
+        },
+        "deliveryUnits": {
+          "lower": 65,
+          "upper": 120
+        },
+        "eligibleCategories": {
+          "lower": 0,
+          "upper": 4
+        },
+        "eligibleProjects": {
+          "lower": 4,
+          "upper": 4
+        },
+        "quality": {
+          "outcome_followup": {
+            "lower": 0,
+            "upper": 12
+          },
+          "rationale": {
+            "lower": 0,
+            "upper": 12
+          },
+          "review_or_correction": {
+            "lower": 0,
+            "upper": 12
+          },
+          "verification": {
+            "lower": 0,
+            "upper": 12
+          }
+        }
+      },
+      "policyVersion": "v7.2",
+      "window": {
+        "calendarDays": 365,
+        "endExclusive": "2026-09-08T00:00:00.000Z",
+        "referenceDate": "2026-09-07",
+        "referenceTime": "2026-09-07T17:20:02.164Z",
+        "startInclusive": "2025-09-08T00:00:00.000Z"
+      }
+    },
+    "limitations": [
+      "not_assessed"
+    ],
+    "policyVersion": "v7.2",
+    "receiptId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "recordedAt": "2026-09-07T17:20:02.164Z",
+    "revision": 1,
+    "revisionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "schemaVersion": "v7",
+    "serializationVersion": "canonical-json-v1",
+    "subjectRef": "subject-1",
+    "supersedesRevisionId": null,
+    "window": {
+      "calendarDays": 365,
+      "endExclusive": "2026-09-08T00:00:00.000Z",
+      "referenceDate": "2026-09-07",
+      "referenceTime": "2026-09-07T17:20:02.164Z",
+      "startInclusive": "2025-09-08T00:00:00.000Z"
+    }
+  },
+  "contentHash": {
+    "algorithm": "SHA-256",
+    "value": "c5f8b6e7185ea31343a96209575f97fc8f0fc2c9961333d7388c7cab72d53fb7"
+  }
+}

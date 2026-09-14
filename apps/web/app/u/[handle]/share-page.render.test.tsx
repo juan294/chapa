@@ -1,3 +1,11 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
 /**
  * Phase 4d — Share page i18n: interpolate helper, sharePage namespace,
  * generateMetadata locale, and LocaleSync mount.
@@ -48,6 +56,10 @@ const {
   mockIsWebmcpEnabled: vi.fn(),
   mockResolveBadgeConfigSnapshot: vi.fn(),
 }));
+
+// The badge's verification strip is wrapped in next/link, whose module object
+// is circular; these assertions serialize the JSX tree with JSON.stringify.
+vi.mock("next/link", () => ({ default: "a" }));
 
 vi.mock("@/lib/render/badge-config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/render/badge-config")>();

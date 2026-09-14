@@ -154,7 +154,9 @@ describe("GET /api/verify/[hash]", () => {
       const res = await GET(req, ctx);
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.status).toBe("verified");
+      expect(body.status).toBe("legacy_record");
+      expect(body.version).toBe("v6");
+      expect(body.arithmetic).toBe("replay_unavailable");
       expect(body.hash).toBe("abc12345");
       expect(body.data).toEqual(
         expect.objectContaining({
@@ -240,7 +242,7 @@ describe("GET /api/verify/[hash]", () => {
     it("returns CORS headers", async () => {
       const res = await OPTIONS();
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-      expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
+      expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
       expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
     });
   });

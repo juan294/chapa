@@ -6,6 +6,7 @@ import {
   contrastRatio,
   LIGHT_SURFACES,
   DARK_SURFACES,
+  compositeColor,
 } from "@/lib/test-helpers/css-tokens";
 
 /**
@@ -22,6 +23,13 @@ import {
 const THEME = themeBlock();
 
 const THEMED_TOKENS = [
+  "--color-action",
+  "--color-action-text",
+  "--color-action-hover",
+  "--color-identity-surface",
+  "--color-identity-text",
+  "--color-closing-surface",
+  "--color-closing-text",
   "--color-bg",
   "--color-card",
   "--color-text-primary",
@@ -168,11 +176,11 @@ describe("v2 token layer (#1211)", () => {
   });
 
   describe("palette decisions that must not be 'corrected'", () => {
-    it("keeps success green off the accent hue (145 vs 163)", () => {
+    it("keeps semantic success green distinct from the vermilion brand", () => {
       expect(themedTokenValue("--color-terminal-green", THEME).light).toContain(
         "145",
       );
-      expect(themedTokenValue("--color-amber", THEME).light).toContain("163");
+      expect(themedTokenValue("--color-amber", THEME)).toEqual({light: "#ed4930", dark: "#ff795f"});
     });
 
     it("keeps verification in the slate-blue family, never jade", () => {
@@ -181,4 +189,48 @@ describe("v2 token layer (#1211)", () => {
       expect(verify.dark).toMatch(/oklch\([\d.]+ [\d.]+ 22[0-9]/);
     });
   });
+});
+
+
+describe("redesign actual-surface contrast", () => {
+  it("keeps fixed terminal control boundaries visible", () => {
+    const line = themedTokenValue("--color-forest-line").light;
+    for (const surface of ["--color-forest", "--color-forest-card"]) {
+      expect(contrastRatio(line, themedTokenValue(surface).light)).toBeGreaterThanOrEqual(3);
+    }
+  });
+  it("composites alpha fills before measuring text", () => {
+    expect(compositeColor("#00000080", "#ffffff")).toBe("#7f7f7f");
+    expect(contrastRatio("#ffffff", "#00000080", "#ffffff")).toBeLessThan(4.5);
+    expect(() => contrastRatio("#ffffff", "#00000080")).toThrow(/backdrop/);
+    expect(compositeColor("oklch(.7 .11 225 / .16)", "#202528")).not.toBe("#202528");
+  });
+
+  for (const mode of ["light", "dark"] as const) {
+    const value = (name: string) => themedTokenValue(`--color-${name}`)[mode];
+    for (const surface of ["bg", "card", "hero-band"]) {
+      it(`${mode} ${surface}: body, status, accent, verification and focus remain legible`, () => {
+        for (const foreground of ["text-primary", "text-secondary", "terminal-dim", "amber-text", "complement-text", "complement-text-hover", "terminal-green", "terminal-yellow", "terminal-red"]) {
+          expect(contrastRatio(value(foreground), value(surface)), foreground).toBeGreaterThanOrEqual(4.5);
+        }
+        expect(contrastRatio(value("amber-text"), value(surface))).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(value("stroke-strong"), value(surface))).toBeGreaterThanOrEqual(3);
+        for (const foreground of ["terminal-green", "terminal-yellow", "terminal-red", "amber-text"]) {
+          const fill = compositeColor(value(foreground), value(surface), 0.1);
+          expect(contrastRatio(value(foreground), fill), `${foreground} selected/tinted`).toBeGreaterThanOrEqual(4.5);
+          const iconFill = compositeColor(value(foreground), fill, 0.15);
+          expect(contrastRatio(value(foreground), iconFill), `${foreground} nested icon`).toBeGreaterThanOrEqual(3);
+        }
+        expect(contrastRatio(value("complement-text"), value("complement-light"), value(surface))).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+    it(`${mode} paired action, identity and closing states clear AA`, () => {
+      for (const fill of ["action", "action-hover"]) {
+        expect(contrastRatio(value("action-text"), value(fill)), fill).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const role of ["identity", "closing"]) {
+        expect(contrastRatio(value(`${role}-text`), value(`${role}-surface`))).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
 });

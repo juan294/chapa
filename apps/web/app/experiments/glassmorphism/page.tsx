@@ -80,7 +80,7 @@ export default function GlassmorphismExperimentPage() {
             Four Levels of Frost
           </h2>
 
-          <div className="grid gap-6 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {(Object.keys(PRESETS) as GlassVariant[]).map((variant) => {
               const preset = PRESETS[variant];
               return (
@@ -210,7 +210,7 @@ export default function GlassmorphismExperimentPage() {
             and numbers remain readable through the frosted effect.
           </p>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatCard
               label="Delivery"
               value={34}
@@ -273,7 +273,7 @@ export default function GlassmorphismExperimentPage() {
             Customize the Glass
           </h2>
 
-          <div className="grid gap-8 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             {/* Controls panel */}
             <div className="flex flex-col gap-6 rounded-2xl border border-warm-stroke bg-warm-card/50 p-6">
               <h3 className="font-heading text-lg font-bold text-text-primary">
@@ -381,7 +381,7 @@ export default function GlassmorphismExperimentPage() {
             Key Observations
           </h2>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {[
               {
                 title: "Blobs Are Essential",

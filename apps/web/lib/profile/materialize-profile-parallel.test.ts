@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { materializeProfile } from "./materialize-profile";
+import { expectFound } from "@/lib/test-helpers/found";
 import { makeFullStats } from "../test-helpers/fixtures";
 
 const mockGetStats = vi.fn();
@@ -94,10 +95,9 @@ describe("materializeProfile parallelism (#800)", () => {
     mockGetCachedLatestSnapshot.mockRejectedValue(new Error("redis"));
     mockIsStatsDirty.mockRejectedValue(new Error("redis"));
 
-    const result = await materializeProfile("octocat");
-    expect(result).not.toBeNull();
-    expect(result!.craftResult).toBeNull();
-    expect(result!.latestSnapshot).toBeNull();
-    expect(result!.inputsChanged).toBe(false);
+    const result = expectFound(await materializeProfile("octocat"));
+    expect(result.craftResult).toBeNull();
+    expect(result.latestSnapshot).toBeNull();
+    expect(result.inputsChanged).toBe(false);
   });
 });

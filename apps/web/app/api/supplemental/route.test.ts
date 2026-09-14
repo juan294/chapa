@@ -5,13 +5,19 @@ import { NextRequest } from "next/server";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockResolveRequestAuth, mockCacheSet, mockCacheDel, mockRateLimit, mockDbUpsertSupplemental, mockGetClientIp } = vi.hoisted(() => ({
+const { mockResolveRequestAuth, mockCacheSet, mockCacheDel, mockRateLimit, mockDbUpsertSupplemental, mockGetClientIp, mockCaptureServerError } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockCacheSet: vi.fn(),
   mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
   mockDbUpsertSupplemental: vi.fn(),
   mockGetClientIp: vi.fn(),
+  mockCaptureServerError: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/analytics/server-errors", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/analytics/server-errors")>(),
+  captureServerError: mockCaptureServerError,
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -104,11 +110,60 @@ function makeRawRequest(body: string, token?: string): NextRequest {
 describe("POST /api/supplemental", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCacheSet.mockResolvedValue(undefined);
-    mockCacheDel.mockResolvedValue(undefined);
+    mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockDbUpsertSupplemental.mockResolvedValue(true);
     mockGetClientIp.mockReturnValue("127.0.0.1");
+  });
+
+  it("publishes nothing until the durable write commits", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    let commit!: (value: boolean) => void;
+    mockDbUpsertSupplemental.mockReturnValue(new Promise<boolean>((resolve) => { commit = resolve; }));
+    const response = POST(makeRequest({ targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats }, "valid-token"));
+    await vi.waitFor(() => expect(mockDbUpsertSupplemental).toHaveBeenCalled());
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    commit(true);
+    expect((await response).status).toBe(200);
+  });
+
+  it("keeps existing hot data untouched when the durable write fails", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    mockDbUpsertSupplemental.mockResolvedValue(false);
+    const response = await POST(makeRequest({ targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats }, "valid-token"));
+    expect(response.status).toBe(500);
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockCacheDel).not.toHaveBeenCalled();
+  });
+
+  it("awaits eviction when publication returns false", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    mockCacheSet.mockResolvedValueOnce(false);
+    let evict!: (value: boolean) => void;
+    mockCacheDel.mockImplementation((key: string) => key === "supplemental:juan294"
+      ? new Promise<boolean>((resolve) => { evict = resolve; }) : Promise.resolve(true));
+    let settled = false;
+    const response = POST(makeRequest({ targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats }, "valid-token"))
+      .then((value) => { settled = true; return value; });
+    await vi.waitFor(() => expect(mockCacheDel).toHaveBeenCalledWith("supplemental:juan294"));
+    expect(settled).toBe(false);
+    evict(true);
+    expect(await (await response).json()).toMatchObject({ success: true, cacheRefreshed: true });
+  });
+
+  it("reports committed data with deferred cache refresh when publication and eviction fail", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    mockCacheSet.mockResolvedValueOnce(false);
+    mockCacheDel.mockResolvedValue(false);
+    const response = await POST(makeRequest({ targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats }, "valid-token"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, cacheRefreshed: false });
+    expect(mockCaptureServerError).toHaveBeenCalledWith(expect.objectContaining({
+      route: "/api/supplemental",
+      statusCode: 200,
+      error: expect.objectContaining({ message: expect.stringContaining("cache refresh deferred") }),
+    }));
   });
 
   it("returns 401 when Authorization header is missing", async () => {
@@ -289,9 +344,9 @@ describe("POST /api/supplemental", () => {
     );
     await POST(req);
 
-    // The stats client (lib/github/client.ts) uses "stats:v2:merged:<handle>" as cache key.
+    // The stats client (lib/github/client.ts) uses "stats:v3:<handle>" as cache key.
     // The supplemental handler MUST delete the same key to force a re-merge.
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:juan294");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:juan294");
   });
 
   it("never clears the protected GitHub-derived baseline (#1060)", async () => {
@@ -414,7 +469,7 @@ describe("POST /api/supplemental", () => {
 
   it("returns 500 when dbUpsertSupplemental returns false (Supabase failure)", async () => {
     mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
-    mockCacheSet.mockResolvedValue(undefined);
+    mockCacheSet.mockResolvedValue(true);
     mockDbUpsertSupplemental.mockResolvedValue(false);
 
     const req = makeRequest(

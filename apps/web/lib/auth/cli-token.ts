@@ -9,6 +9,7 @@
 
 import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
+import { isValidHandle } from "@/lib/validation";
 
 interface CliTokenPayload {
   handle: string;
@@ -24,9 +25,12 @@ interface CliTokenPayload {
 // normal CLI usage friction-free (most users re-authorize far more often
 // than that in practice) while bounding the blast radius of any single
 // leaked/phished token to a much shorter window. Regression note: this
-// invalidates any CLI token issued before this change on its next use — the
+// invalidates ninety-day CLI tokens on their next use — the
 // holder must re-run `chapa login`. That is intended.
 const TOKEN_EXPIRY_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
+// Older ten-day issuers read Date.now() separately for iat and exp. Permit
+// one second of timestamp drift, without admitting their ninety-day grants.
+const TOKEN_TIMESTAMP_TOLERANCE_MS = 1000;
 
 /**
  * Generate an HMAC-signed CLI authentication token for a user.
@@ -40,11 +44,12 @@ const TOKEN_EXPIRY_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
  * @returns A dot-separated signed token string
  */
 export function generateCliToken(handle: string, secret: string): string {
+  const now = Date.now();
   const payload: CliTokenPayload = {
     handle,
     type: "cli",
-    iat: Date.now(),
-    exp: Date.now() + TOKEN_EXPIRY_MS,
+    iat: now,
+    exp: now + TOKEN_EXPIRY_MS,
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = createHmac("sha256", secret).update(encoded).digest("base64url");
@@ -55,7 +60,7 @@ export function generateCliToken(handle: string, secret: string): string {
  * Verify and decode a CLI authentication token.
  *
  * Validates the HMAC signature using timing-safe comparison, checks the
- * token type is `"cli"`, and verifies the token has not expired.
+ * claim shapes, token type, bounded signed lifetime, and expiry.
  * Returns the embedded handle on success, or `null` on any validation failure.
  *
  * @param token - The dot-separated signed token to verify
@@ -81,12 +86,18 @@ export function verifyCliToken(
   if (!timingSafeEqual(sigBuf, expectedBuf)) return null;
 
   try {
-    const payload: CliTokenPayload = JSON.parse(
+    const payload: unknown = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8"),
     );
-    if (payload.type !== "cli") return null;
-    if (payload.exp < Date.now()) return null;
-    return { handle: payload.handle };
+    if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return null;
+    const { handle, type, iat, exp } = payload as Record<string, unknown>;
+    if (type !== "cli" || typeof handle !== "string" || !isValidHandle(handle)) return null;
+    if (typeof iat !== "number" || !Number.isSafeInteger(iat) || iat <= 0) return null;
+    if (typeof exp !== "number" || !Number.isSafeInteger(exp)) return null;
+    const now = Date.now();
+    if (exp <= now || exp <= iat) return null;
+    if (exp - iat > TOKEN_EXPIRY_MS + TOKEN_TIMESTAMP_TOLERANCE_MS) return null;
+    return { handle };
   } catch {
     return null;
   }

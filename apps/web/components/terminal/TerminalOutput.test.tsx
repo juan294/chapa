@@ -1,17 +1,22 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { TerminalOutput } from "./TerminalOutput";
+import { TerminalOutput, scrollLogToEnd } from "./TerminalOutput";
 import type { OutputLine } from "./command-registry";
 import { LanguageProvider } from "@/lib/i18n";
 import { es } from "@/lib/i18n/dictionaries/es";
 
-// jsdom doesn't implement scrollIntoView
-beforeEach(() => {
-  Element.prototype.scrollIntoView = () => {};
-});
-
 afterEach(cleanup);
+
+/** jsdom lays nothing out, so a scroller's overflow is declared by hand. */
+function makeScroller(overflowY: string, scrollHeight: number, clientHeight: number) {
+  const el = document.createElement("div");
+  el.style.overflowY = overflowY;
+  Object.defineProperty(el, "scrollHeight", { value: scrollHeight });
+  Object.defineProperty(el, "clientHeight", { value: clientHeight });
+  el.scrollTo = vi.fn();
+  return el;
+}
 
 function makeLine(
   type: OutputLine["type"],
@@ -21,7 +26,80 @@ function makeLine(
   return { id: id ?? `test-${Math.random()}`, type, text };
 }
 
+describe("scrollLogToEnd", () => {
+  // The log used `scrollIntoView`, which scrolls every scrollable ancestor —
+  // the window included. In Studio each command appended output, so each
+  // control click dragged the page down to the log's tail and the badge out
+  // of view. Only the nearest bounded ancestor moves now, never the window.
+  it("scrolls the nearest overflowing ancestor to its end, not the window", () => {
+    const page = makeScroller("auto", 4000, 900);
+    const box = makeScroller("auto", 2000, 300);
+    const log = makeScroller("auto", 2000, 2000);
+    page.appendChild(box);
+    box.appendChild(log);
+    document.body.appendChild(page);
+    const windowScroll = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+
+    expect(scrollLogToEnd(log)).toBe(box);
+
+    expect(box.scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "smooth" });
+    expect(page.scrollTo).not.toHaveBeenCalled();
+    expect(windowScroll).not.toHaveBeenCalled();
+    windowScroll.mockRestore();
+    page.remove();
+  });
+
+  it("does nothing when no bounded ancestor exists below <body>", () => {
+    const log = makeScroller("visible", 2000, 2000);
+    document.body.style.overflowY = "auto";
+    Object.defineProperty(document.body, "scrollHeight", {
+      value: 4000,
+      configurable: true,
+    });
+    document.body.appendChild(log);
+    const bodyScroll = vi.fn();
+    document.body.scrollTo = bodyScroll;
+
+    expect(scrollLogToEnd(log)).toBeNull();
+    expect(bodyScroll).not.toHaveBeenCalled();
+
+    log.remove();
+    document.body.style.overflowY = "";
+  });
+
+  it("falls back to scrollTop where scrollTo is unavailable", () => {
+    const box = makeScroller("scroll", 1200, 200);
+    (box as { scrollTo?: unknown }).scrollTo = undefined;
+    const log = document.createElement("div");
+    box.appendChild(log);
+    document.body.appendChild(box);
+
+    expect(scrollLogToEnd(log, "auto")).toBe(box);
+    expect(box.scrollTop).toBe(1200);
+    box.remove();
+  });
+
+  it("tolerates a null start", () => {
+    expect(scrollLogToEnd(null)).toBeNull();
+  });
+});
+
 describe("TerminalOutput", () => {
+  it("scrolls its own scroll container when a line is appended", () => {
+    const box = makeScroller("auto", 2000, 300);
+    document.body.appendChild(box);
+    const first: OutputLine[] = [makeLine("info", "one", "l1")];
+    const { rerender } = render(<TerminalOutput lines={first} />, {
+      container: box,
+    });
+    vi.mocked(box.scrollTo).mockClear();
+
+    rerender(<TerminalOutput lines={[...first, makeLine("info", "two", "l2")]} />);
+
+    expect(box.scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "smooth" });
+    box.remove();
+  });
+
   it("renders with role=log for accessibility", () => {
     render(<TerminalOutput lines={[]} />);
     const log = screen.getByRole("log");
@@ -99,7 +177,7 @@ describe("TerminalOutput", () => {
 
 describe("TerminalOutput — line type color classes", () => {
   const typeStyleMap: Array<[OutputLine["type"], string]> = [
-    ["input", "text-amber"],
+    ["input", "text-amber-text"],
     ["success", "text-terminal-green"],
     ["error", "text-terminal-red"],
     ["warning", "text-terminal-yellow"],

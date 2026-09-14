@@ -140,7 +140,7 @@ describe("POST /api/auth/gitlab/disconnect", () => {
   it("invalidates stats cache on success", async () => {
     await POST(makeRequest());
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:gitlab:testuser");
   });
 
@@ -159,7 +159,7 @@ describe("POST /api/auth/gitlab/disconnect", () => {
 
     await POST(makeRequest());
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:gitlab:testuser");
   });
 });

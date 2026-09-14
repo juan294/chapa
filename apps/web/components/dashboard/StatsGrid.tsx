@@ -87,8 +87,13 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
           return (
             <div
               key={item.key}
-              className="rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up"
-              style={{ animationDelay: `${2200 + i * 60}ms` }}
+              className="rounded-[3px] border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up"
+              // Enters alongside the dimension cards (400–700ms), not after
+              // the whole dashboard: the grid sits far below the fold, so a
+              // 2.2s+ stagger showed nobody a choreography, but it did leave
+              // the captions at ~0.5 opacity when Lighthouse measured contrast
+              // (3.19:1 for a token that resolves to 7.78:1 — LE-8-3).
+              style={{ animationDelay: `${400 + i * 60}ms` }}
             >
               <div className="font-heading text-2xl font-bold text-text-primary">
                 {formatCompact(item.value)}

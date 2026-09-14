@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { StatsData, SupplementalStats } from "@chapa/shared";
 import { declareField, generatePayloads, runMatrix } from "@/test/contract/payload-matrix";
 import {
@@ -8,6 +8,11 @@ import {
   makeCliBearer,
   seedUser,
 } from "@/test/contract/invoke";
+
+import { redisFake } from "@/test/contract/redis-fake";
+import { getStats } from "@/lib/github/client";
+import { expectFound } from "@/lib/test-helpers/found";
+import { stubLegacyGitHub } from "@/test/contract/github-fixture";
 
 import { POST } from "./route";
 
@@ -40,6 +45,7 @@ function validStats(): StatsData {
 
 describe("POST /api/supplemental contract", () => {
   let bearer: string;
+  afterEach(() => vi.unstubAllGlobals());
 
   beforeAll(async () => {
     bearer = makeCliBearer(HANDLE);
@@ -48,6 +54,37 @@ describe("POST /api/supplemental contract", () => {
 
   afterAll(async () => {
     await cleanupUser(HANDLE);
+  });
+
+  it("recomposes committed supplemental data after Redis publication fails (#1287)", async () => {
+    redisFake.__reset();
+    const oldStats = validStats();
+    const newStats = { ...oldStats, commitsTotal: 100 };
+    const oldRecord = { targetHandle: HANDLE, sourceHandle: SOURCE_HANDLE,
+      stats: oldStats, uploadedAt: new Date().toISOString() };
+    const db = getServiceClient();
+    const seeded = await db.from("supplemental_stats").upsert({ target_handle: HANDLE,
+      source_handle: SOURCE_HANDLE, stats: oldStats, uploaded_at: oldRecord.uploadedAt });
+    expect(seeded.error).toBeNull();
+    await redisFake.cacheSet(`supplemental:${HANDLE}`, oldRecord);
+    const baseline = { ...oldStats, handle: HANDLE, commitsTotal: 10 };
+    await redisFake.cacheSet(`stats:stale:v2:${HANDLE}`, baseline);
+    redisFake.__failNext("cacheSet");
+
+    const response = await invokeJson(POST, { method: "POST", path: "/api/supplemental", bearer,
+      body: { targetHandle: HANDLE, sourceHandle: SOURCE_HANDLE, stats: newStats } });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, cacheRefreshed: true });
+    const stored = await db.from("supplemental_stats").select("stats").eq("target_handle", HANDLE).single();
+    expect(stored.error).toBeNull();
+    expect(stored.data?.stats.commitsTotal).toBe(100);
+    expect(await redisFake.cacheGet(`supplemental:${HANDLE}`)).toBeNull();
+    // Unbound legacy baselines are retired. A current primary observation
+    // must still compose the upload committed before cache publication failed.
+    stubLegacyGitHub(HANDLE, 0, 10);
+    const composed = await getStats(HANDLE);
+    expect(expectFound(composed).commitsTotal).toBe(110);
+    expect(await redisFake.cacheGet(`stats:stale:v2:${HANDLE}`)).toEqual(baseline);
   });
 
   it("runs the supplemental payload matrix with zero 5xx and persistence re-read", async () => {

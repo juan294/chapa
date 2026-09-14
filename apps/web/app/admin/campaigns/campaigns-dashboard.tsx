@@ -42,14 +42,14 @@ const EMPTY_FORM: FormData = {
 function StatusBadge({ status }: { status: Campaign["status"] }) {
   const classes: Record<string, string> = {
     draft: "bg-text-secondary/10 text-text-secondary",
-    sending: "bg-amber/10 text-amber animate-pulse",
+    sending: "bg-amber/10 text-amber-text animate-pulse",
     sent: "bg-terminal-green/10 text-terminal-green",
     failed: "bg-terminal-red/10 text-terminal-red",
   };
 
   return (
     <span
-      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium font-heading ${classes[status] ?? classes.draft}`}
+      className={`inline-flex items-center rounded-[3px] px-2 py-0.5 text-xs font-medium font-heading ${classes[status] ?? classes.draft}`}
     >
       {status}
     </span>
@@ -283,7 +283,7 @@ export function CampaignsDashboard() {
   // -------------------------------------------------------------------------
 
   const inputClass =
-    "w-full rounded-lg border border-stroke bg-bg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-amber focus:outline-none";
+    "min-h-11 min-w-0 w-full rounded-[3px] border border-text-primary bg-bg px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:border-amber-text";
 
   // -------------------------------------------------------------------------
   // Render
@@ -295,11 +295,11 @@ export function CampaignsDashboard() {
 
   // Error banner
   const errorBanner = error && (
-    <div className="rounded-lg border border-terminal-red/20 bg-terminal-red/5 px-4 py-2 text-sm text-terminal-red mb-4">
+    <div className="rounded-[3px] border border-terminal-red/20 bg-terminal-red/5 px-4 py-2 text-sm text-terminal-red mb-4">
       {error}
       <button
         onClick={() => setError(null)}
-        className="ml-2 text-terminal-red/60 hover:text-terminal-red"
+        className="ml-2 text-terminal-red hover:text-terminal-red"
       >
         Dismiss
       </button>
@@ -314,7 +314,7 @@ export function CampaignsDashboard() {
     return (
       <div className="space-y-6">
         <h2 className="font-heading text-2xl tracking-tight text-text-primary">
-          <span className="text-amber">$</span> campaigns
+          <span className="text-amber-text">$</span> campaigns
           <span className="text-text-secondary">/</span>new
         </h2>
 
@@ -322,11 +322,11 @@ export function CampaignsDashboard() {
 
         <form
           onSubmit={handleCreate}
-          className="space-y-4 rounded-xl border border-stroke bg-card p-6"
+          className="space-y-4 rounded-[3px] border border-stroke bg-card p-6"
         >
           <fieldset className="space-y-2">
             <legend className="text-xs font-medium text-text-secondary">Campaign Type</legend>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
                 <input type="radio" name="type" value="announcement"
                   checked={form.type === "announcement"}
@@ -342,7 +342,7 @@ export function CampaignsDashboard() {
                 Engagement
               </label>
             </div>
-            <p className="text-xs text-text-secondary/60">
+            <p className="text-xs text-text-secondary">
               {form.type === "announcement"
                 ? "Manual send to all users with email on file."
                 : "Automated — sent when a user's score increases significantly."}
@@ -380,7 +380,7 @@ export function CampaignsDashboard() {
           <div>
             <label htmlFor="create-preview" className="block text-xs font-medium text-text-secondary mb-1">
               Preview Text
-              <span className="text-text-secondary/50 ml-1">(optional)</span>
+              <span className="text-text-secondary ml-1">(optional)</span>
             </label>
             <input
               id="create-preview"
@@ -419,7 +419,7 @@ export function CampaignsDashboard() {
               required
             />
             {form.type === "engagement" && (
-              <p className="text-xs text-text-secondary/60 mt-1">
+              <p className="text-xs text-text-secondary mt-1">
                 Placeholders: {"{{handle}}"}, {"{{delta}}"}, {"{{tier_from}}"}, {"{{tier_to}}"}, {"{{archetype_from}}"}, {"{{archetype_to}}"}
               </p>
             )}
@@ -442,7 +442,7 @@ export function CampaignsDashboard() {
                   type="button"
                   onClick={() => removeFeature(i)}
                   aria-label="Remove feature"
-                  className="shrink-0 rounded-lg border border-stroke px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red/20"
+                  className="min-h-11 min-w-11 shrink-0 rounded-[3px] border border-text-primary px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red"
                 >
                   &times;
                 </button>
@@ -451,13 +451,13 @@ export function CampaignsDashboard() {
             <button
               type="button"
               onClick={addFeature}
-              className="text-xs text-amber hover:text-amber-light"
+              className="text-xs text-amber-text hover:text-text-primary"
             >
               + Add feature
             </button>
           </fieldset>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="create-cta-text" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA Button Text
@@ -484,17 +484,17 @@ export function CampaignsDashboard() {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
               onClick={() => setMode("list")}
-              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
+              className="min-h-11 rounded-[3px] border border-text-primary px-4 py-2 text-sm font-medium text-text-secondary hover:border-text-primary hover:text-text-primary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+              className="min-h-11 rounded-[3px] bg-action px-4 py-2 font-heading text-sm font-semibold text-action-text hover:bg-action-hover"
             >
               Create Draft
             </button>
@@ -512,7 +512,7 @@ export function CampaignsDashboard() {
     return (
       <div className="space-y-6">
         <h2 className="font-heading text-2xl tracking-tight text-text-primary">
-          <span className="text-amber">$</span> campaigns
+          <span className="text-amber-text">$</span> campaigns
           <span className="text-text-secondary">/</span>edit
         </h2>
 
@@ -520,7 +520,7 @@ export function CampaignsDashboard() {
 
         <form
           onSubmit={handleEdit}
-          className="space-y-4 rounded-xl border border-stroke bg-card p-6"
+          className="space-y-4 rounded-[3px] border border-stroke bg-card p-6"
         >
           <div>
             <label htmlFor="edit-name" className="block text-xs font-medium text-text-secondary mb-1">
@@ -551,7 +551,7 @@ export function CampaignsDashboard() {
           <div>
             <label htmlFor="edit-preview" className="block text-xs font-medium text-text-secondary mb-1">
               Preview Text
-              <span className="text-text-secondary/50 ml-1">(optional)</span>
+              <span className="text-text-secondary ml-1">(optional)</span>
             </label>
             <input
               id="edit-preview"
@@ -587,7 +587,7 @@ export function CampaignsDashboard() {
               required
             />
             {form.type === "engagement" && (
-              <p className="text-xs text-text-secondary/60 mt-1">
+              <p className="text-xs text-text-secondary mt-1">
                 Placeholders: {"{{handle}}"}, {"{{delta}}"}, {"{{tier_from}}"}, {"{{tier_to}}"}, {"{{archetype_from}}"}, {"{{archetype_to}}"}
               </p>
             )}
@@ -610,7 +610,7 @@ export function CampaignsDashboard() {
                   type="button"
                   onClick={() => removeFeature(i)}
                   aria-label="Remove feature"
-                  className="shrink-0 rounded-lg border border-stroke px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red/20"
+                  className="min-h-11 min-w-11 shrink-0 rounded-[3px] border border-text-primary px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red"
                 >
                   &times;
                 </button>
@@ -619,13 +619,13 @@ export function CampaignsDashboard() {
             <button
               type="button"
               onClick={addFeature}
-              className="text-xs text-amber hover:text-amber-light"
+              className="text-xs text-amber-text hover:text-text-primary"
             >
               + Add feature
             </button>
           </fieldset>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="edit-cta-text" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA Button Text
@@ -652,17 +652,17 @@ export function CampaignsDashboard() {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
               onClick={() => setMode("detail")}
-              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
+              className="min-h-11 rounded-[3px] border border-text-primary px-4 py-2 text-sm font-medium text-text-secondary hover:border-text-primary hover:text-text-primary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+              className="min-h-11 rounded-[3px] bg-action px-4 py-2 font-heading text-sm font-semibold text-action-text hover:bg-action-hover"
             >
               Save Changes
             </button>
@@ -700,7 +700,7 @@ export function CampaignsDashboard() {
           <StatusBadge status={c.status} />
         </div>
 
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-xl border border-stroke bg-card p-4 text-sm">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] break-words gap-x-6 gap-y-2 rounded-[3px] border border-stroke bg-card p-4 text-sm">
           <dt className="text-text-secondary">Subject</dt>
           <dd className="text-text-primary">{c.subject}</dd>
           <dt className="text-text-secondary">Headline</dt>
@@ -725,7 +725,7 @@ export function CampaignsDashboard() {
 
         {/* Progress for sending campaigns */}
         {c.status === "sending" && c.totalRecipients > 0 && (
-          <div className="rounded-xl border border-stroke bg-card p-4 space-y-2">
+          <div className="rounded-[3px] border border-stroke bg-card p-4 space-y-2">
             <div className="h-2 overflow-hidden rounded-full bg-stroke/30">
               <div
                 className="h-full rounded-full bg-amber transition-all"
@@ -742,7 +742,7 @@ export function CampaignsDashboard() {
                 </span>
               )}
             </p>
-            <p className="text-xs text-text-secondary/60">
+            <p className="text-xs text-text-secondary">
               Sends up to 95 emails/day (Free plan). Processing continues daily.
             </p>
           </div>
@@ -750,30 +750,30 @@ export function CampaignsDashboard() {
 
         {/* Send result */}
         {sendResult && (
-          <div className="rounded-lg border border-terminal-green/20 bg-terminal-green/5 px-4 py-2 text-sm text-terminal-green">
+          <div className="rounded-[3px] border border-terminal-green/20 bg-terminal-green/5 px-4 py-2 text-sm text-terminal-green">
             {sendResult}
           </div>
         )}
 
         {/* Engagement info banner */}
         {c.type === "engagement" && (
-          <div className="rounded-lg border border-complement/20 bg-complement/5 px-4 py-2 text-sm text-complement-text">
+          <div className="rounded-[3px] border border-complement/20 bg-complement/5 px-4 py-2 text-sm text-complement-text">
             This template is sent automatically when a user&apos;s score increases by 10+ points. Enable delivery in the Engagement tab.
           </div>
         )}
 
         {/* Actions */}
         {c.status === "draft" && (
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={() => handlePreview(c.id)}
-              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
+              className="min-h-11 rounded-[3px] border border-text-primary px-4 py-2 text-sm font-medium text-text-secondary hover:border-text-primary hover:text-text-primary"
             >
               Preview Email
             </button>
             <button
               onClick={() => openEdit(c)}
-              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
+              className="min-h-11 rounded-[3px] border border-text-primary px-4 py-2 text-sm font-medium text-text-secondary hover:border-text-primary hover:text-text-primary"
             >
               Edit Draft
             </button>
@@ -781,14 +781,14 @@ export function CampaignsDashboard() {
               <button
                 onClick={() => handleSend(c.id)}
                 disabled={sending}
-                className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light disabled:opacity-50"
+                className="min-h-11 rounded-[3px] bg-action px-4 py-2 font-heading text-sm font-semibold text-action-text hover:bg-action-hover disabled:opacity-50"
               >
                 {sending ? "Sending..." : "Send Campaign"}
               </button>
             )}
             <button
               onClick={() => handleDelete(c.id)}
-              className="rounded-lg border border-terminal-red/20 px-4 py-2 text-sm font-medium text-terminal-red hover:bg-terminal-red/5"
+              className="min-h-11 rounded-[3px] border border-terminal-red px-4 py-2 text-sm font-medium text-terminal-red hover:bg-terminal-red/5"
             >
               Delete
             </button>
@@ -796,7 +796,7 @@ export function CampaignsDashboard() {
         )}
 
         {/* Send Test Email */}
-        <div className="rounded-xl border border-stroke bg-card p-4 space-y-3">
+        <div className="rounded-[3px] border border-stroke bg-card p-4 space-y-3">
           <h3 className="font-heading text-sm text-text-secondary">
             Send Test Email
           </h3>
@@ -813,12 +813,12 @@ export function CampaignsDashboard() {
             <button
               onClick={() => handleSendTest(c.id)}
               disabled={sendingTest || !testEmail.trim()}
-              className="shrink-0 rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary disabled:opacity-50"
+              className="shrink-0 min-h-11 rounded-[3px] border border-text-primary px-4 py-2 text-sm font-medium text-text-secondary hover:border-text-primary hover:text-text-primary disabled:opacity-50"
             >
               {sendingTest ? "Sending..." : "Send Test"}
             </button>
           </div>
-          <p className="text-xs text-text-secondary/60">
+          <p className="text-xs text-text-secondary">
             Sends one email with [TEST] prefix. Does not affect campaign status.
           </p>
         </div>
@@ -832,7 +832,7 @@ export function CampaignsDashboard() {
             <iframe
               srcDoc={previewHtml}
               title="Campaign email preview"
-              className="w-full h-[600px] rounded-xl border border-stroke"
+              className="w-full h-[600px] rounded-[3px] border border-stroke"
               sandbox="allow-same-origin"
             />
           </div>
@@ -847,9 +847,9 @@ export function CampaignsDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <h2 className="font-heading text-2xl tracking-tight text-text-primary">
-          <span className="text-amber">$</span> admin
+          <span className="text-amber-text">$</span> admin
           <span className="text-text-secondary">/</span>campaigns
         </h2>
         <button
@@ -857,7 +857,7 @@ export function CampaignsDashboard() {
             setForm(EMPTY_FORM);
             setMode("create");
           }}
-          className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+          className="min-h-11 rounded-[3px] bg-action px-4 py-2 font-heading text-sm font-semibold text-action-text hover:bg-action-hover"
         >
           New Campaign
         </button>
@@ -865,11 +865,11 @@ export function CampaignsDashboard() {
 
       {errorBanner}
 
-      <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+      <div className="rounded-[3px] border border-stroke bg-card overflow-x-auto">
         {campaigns.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-sm text-text-secondary">No campaigns yet</p>
-            <p className="mt-1 text-xs text-text-secondary/60">
+            <p className="mt-1 text-xs text-text-secondary">
               Create your first campaign to get started.
             </p>
           </div>
@@ -913,7 +913,7 @@ export function CampaignsDashboard() {
                   <td className="px-4 py-3 text-text-primary">
                     {c.name}
                     {c.type === "engagement" && (
-                      <span className="ml-2 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-complement/10 text-complement-text font-heading">
+                      <span className="ml-2 inline-flex items-center rounded-[3px] px-2 py-0.5 text-xs font-medium bg-complement/10 text-complement-text font-heading">
                         engagement
                       </span>
                     )}

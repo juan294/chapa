@@ -29,7 +29,7 @@ export function AgentTogglesTable({
   );
 
   return (
-    <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+    <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-stroke">
@@ -47,7 +47,7 @@ export function AgentTogglesTable({
         <tbody>
           {/* Master toggle */}
           <tr className="border-b border-stroke bg-purple-tint">
-            <td className="px-4 py-3 font-heading text-sm font-medium text-amber">
+            <td className="px-4 py-3 font-heading text-sm font-medium text-amber-text">
               All Agents (master)
             </td>
             <td className="px-4 py-3 text-text-secondary text-xs hidden sm:table-cell">

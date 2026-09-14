@@ -2,13 +2,18 @@ import { fetchCodebergContributionData } from "./queries";
 import { buildStatsFromCodeberg } from "./stats-aggregation";
 import type { StatsData } from "@chapa/shared";
 
+/** @public Compatibility export for v7 evidence consumers. */
+export { fetchCodebergEvidence } from "./evidence";
+/** @public Compatibility types for v7 evidence consumers. */
+export type { CodebergEvidenceOptions, CodebergEvidenceProgress, CodebergEvidenceResult } from "./evidence";
+
 /** User profile info passed from the OAuth token store */
 interface UserProfile {
   displayName: string;
   avatarUrl: string;
 }
 
-/** Fetch and transform Codeberg data into StatsData */
+/** Legacy v6 scalar reader. v7 consumers must use fetchCodebergEvidence. */
 export async function fetchCodebergStats(
   username: string,
   accessToken: string,

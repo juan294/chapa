@@ -1,0 +1,640 @@
+{
+  "core": {
+    "tier": null,
+    "archetype": null,
+    "composite": {
+      "kind": "range",
+      "lower": 46.40250879691149,
+      "upper": 100,
+      "displayLower": 46,
+      "displayUpper": 100
+    },
+    "dimensions": {
+      "breadth": {
+        "kind": "range",
+        "lower": 50,
+        "upper": 100,
+        "displayLower": 50,
+        "displayUpper": 100
+      },
+      "quality": {
+        "kind": "range",
+        "lower": 0,
+        "upper": 100,
+        "displayLower": 0,
+        "displayUpper": 100
+      },
+      "delivery": {
+        "kind": "range",
+        "lower": 87.36108681546068,
+        "upper": 100,
+        "displayLower": 87,
+        "displayUpper": 100
+      },
+      "consistency": {
+        "kind": "range",
+        "lower": 48.24894837218527,
+        "upper": 100,
+        "displayLower": 48,
+        "displayUpper": 100
+      }
+    }
+  },
+  "craft": {
+    "inputs": {
+      "counts": {
+        "framing": {
+          "lower": 0,
+          "upper": 0
+        },
+        "tool_judgment": {
+          "lower": 0,
+          "upper": 0
+        },
+        "accepted_outcome": {
+          "lower": 0,
+          "upper": 0
+        },
+        "verification_debugging": {
+          "lower": 0,
+          "upper": 0
+        }
+      },
+      "window": {
+        "calendarDays": 365,
+        "endExclusive": "2026-09-08T00:00:00.000Z",
+        "referenceDate": "2026-09-07",
+        "referenceTime": "2026-09-07T17:20:02.164Z",
+        "startInclusive": "2025-09-08T00:00:00.000Z"
+      },
+      "policyVersion": "v7",
+      "eligibleEpisodes": 0,
+      "independentlyCorroboratedCompleteEpisodes": 0
+    },
+    "result": {
+      "status": "not_observed"
+    }
+  },
+  "action": "create",
+  "inputs": {
+    "counts": {
+      "quality": {
+        "rationale": {
+          "lower": 0,
+          "upper": 12
+        },
+        "verification": {
+          "lower": 0,
+          "upper": 12
+        },
+        "outcome_followup": {
+          "lower": 0,
+          "upper": 12
+        },
+        "review_or_correction": {
+          "lower": 0,
+          "upper": 12
+        }
+      },
+      "deliveryUnits": {
+        "lower": 65,
+        "upper": 120
+      },
+      "activeIsoWeeks": {
+        "lower": 5,
+        "upper": 40
+      },
+      "eligibleProjects": {
+        "lower": 4,
+        "upper": 4
+      },
+      "eligibleCategories": {
+        "lower": 0,
+        "upper": 4
+      }
+    },
+    "window": {
+      "calendarDays": 365,
+      "endExclusive": "2026-09-08T00:00:00.000Z",
+      "referenceDate": "2026-09-07",
+      "referenceTime": "2026-09-07T17:20:02.164Z",
+      "startInclusive": "2025-09-08T00:00:00.000Z"
+    },
+    "policyVersion": "v7"
+  },
+  "window": {
+    "calendarDays": 365,
+    "endExclusive": "2026-09-08T00:00:00.000Z",
+    "referenceDate": "2026-09-07",
+    "referenceTime": "2026-09-07T17:20:02.164Z",
+    "startInclusive": "2025-09-08T00:00:00.000Z"
+  },
+  "coverage": [
+    {
+      "status": "partial",
+      "provider": "github",
+      "discovery": "owned_and_contributed",
+      "sourceRef": "source-1",
+      "dataThrough": "2026-09-07T17:20:02.164Z",
+      "reasonCodes": [
+        "acceptance_time_unknown",
+        "discovery_incomplete",
+        "not_supported",
+        "pagination_incomplete",
+        "partial_files",
+        "source_error"
+      ],
+      "unknownPeriods": [
+        {
+          "endExclusive": "2026-09-08T00:00:00.000Z",
+          "startInclusive": "2025-09-08T00:00:00.000Z"
+        }
+      ],
+      "accessibleRepositoryCount": 34,
+      "repositoryDiscoveryComplete": false
+    },
+    {
+      "status": "partial",
+      "provider": "gitlab",
+      "discovery": "owned_and_contributed",
+      "sourceRef": "source-2",
+      "dataThrough": "2026-09-07T17:20:02.164Z",
+      "reasonCodes": [
+        "acceptance_time_unknown",
+        "attribution_unknown",
+        "discovery_incomplete",
+        "not_supported"
+      ],
+      "unknownPeriods": [
+        {
+          "endExclusive": "2026-09-08T00:00:00.000Z",
+          "startInclusive": "2025-09-08T00:00:00.000Z"
+        }
+      ],
+      "accessibleRepositoryCount": 0,
+      "repositoryDiscoveryComplete": false
+    },
+    {
+      "status": "partial",
+      "provider": "bitbucket",
+      "discovery": "owned_and_contributed",
+      "sourceRef": "source-3",
+      "dataThrough": "2026-09-07T17:20:02.164Z",
+      "reasonCodes": [
+        "acceptance_time_unknown",
+        "attribution_unknown",
+        "discovery_incomplete",
+        "not_supported",
+        "source_error"
+      ],
+      "unknownPeriods": [
+        {
+          "endExclusive": "2026-09-08T00:00:00.000Z",
+          "startInclusive": "2025-09-08T00:00:00.000Z"
+        }
+      ],
+      "accessibleRepositoryCount": 1,
+      "repositoryDiscoveryComplete": false
+    },
+    {
+      "status": "complete",
+      "provider": "portfolio",
+      "discovery": "registered_ledger",
+      "sourceRef": "source-4",
+      "dataThrough": "2026-09-07T17:20:02.164Z",
+      "reasonCodes": [],
+      "unknownPeriods": [],
+      "accessibleRepositoryCount": 0,
+      "repositoryDiscoveryComplete": true
+    }
+  ],
+  "criteria": [],
+  "revision": 1,
+  "algorithm": {
+    "revision": "v7.1",
+    "algorithmId": "chapa-impact-v7",
+    "policyDigest": {
+      "value": "48d367e72e6dead9e220c4b7164690c53ac967d195d54132bd38f1aa639f7ad1",
+      "algorithm": "SHA-256"
+    },
+    "algorithmDigest": {
+      "value": "e25b31e8c16e9153429dec5dc460296755c04753d249f4e306a6e80ef1c79864",
+      "algorithm": "SHA-256"
+    }
+  },
+  "receiptId": "11aa6ce5-f977-449e-aebd-4207685aa7f5",
+  "exclusions": [
+    {
+      "reason": "not_connected",
+      "provider": "codeberg"
+    }
+  ],
+  "recordedAt": "2026-09-07T17:20:02.164Z",
+  "revisionId": "c3f51ce6-195e-499c-b442-dc1b46bad288",
+  "subjectRef": "subject-1",
+  "calculation": {
+    "core": {
+      "breadth": {
+        "projects": {
+          "cap": 4,
+          "input": {
+            "lower": 4,
+            "upper": 4
+          },
+          "clamped": {
+            "lower": 4,
+            "upper": 4
+          },
+          "weighted": {
+            "lower": 50,
+            "upper": 50
+          },
+          "multiplier": 50,
+          "normalized": {
+            "lower": 1,
+            "upper": 1
+          }
+        },
+        "categories": {
+          "cap": 4,
+          "input": {
+            "lower": 0,
+            "upper": 4
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 4
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 50
+          },
+          "multiplier": 50,
+          "normalized": {
+            "lower": 0,
+            "upper": 1
+          }
+        }
+      },
+      "quality": {
+        "rationale": {
+          "cap": 12,
+          "input": {
+            "lower": 0,
+            "upper": 12
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 12
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 25
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 1
+          }
+        },
+        "verification": {
+          "cap": 12,
+          "input": {
+            "lower": 0,
+            "upper": 12
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 12
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 25
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 1
+          }
+        },
+        "outcome_followup": {
+          "cap": 12,
+          "input": {
+            "lower": 0,
+            "upper": 12
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 12
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 25
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 1
+          }
+        },
+        "review_or_correction": {
+          "cap": 12,
+          "input": {
+            "lower": 0,
+            "upper": 12
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 12
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 25
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 1
+          }
+        }
+      },
+      "delivery": {
+        "cap": 120,
+        "input": {
+          "lower": 65,
+          "upper": 120
+        },
+        "clamped": {
+          "lower": 65,
+          "upper": 120
+        },
+        "weighted": {
+          "lower": 87.36108681546068,
+          "upper": 100
+        },
+        "multiplier": 100,
+        "normalized": {
+          "lower": 0.8736108681546069,
+          "upper": 1
+        }
+      },
+      "composite": {
+        "lower": 46.40250879691149,
+        "upper": 100
+      },
+      "displayed": {
+        "tier": null,
+        "archetype": null,
+        "composite": {
+          "kind": "range",
+          "lower": 46.40250879691149,
+          "upper": 100,
+          "displayLower": 46,
+          "displayUpper": 100
+        },
+        "dimensions": {
+          "breadth": {
+            "kind": "range",
+            "lower": 50,
+            "upper": 100,
+            "displayLower": 50,
+            "displayUpper": 100
+          },
+          "quality": {
+            "kind": "range",
+            "lower": 0,
+            "upper": 100,
+            "displayLower": 0,
+            "displayUpper": 100
+          },
+          "delivery": {
+            "kind": "range",
+            "lower": 87.36108681546068,
+            "upper": 100,
+            "displayLower": 87,
+            "displayUpper": 100
+          },
+          "consistency": {
+            "kind": "range",
+            "lower": 48.24894837218527,
+            "upper": 100,
+            "displayLower": 48,
+            "displayUpper": 100
+          }
+        }
+      },
+      "dimensions": {
+        "breadth": {
+          "lower": 50,
+          "upper": 100
+        },
+        "quality": {
+          "lower": 0,
+          "upper": 100
+        },
+        "delivery": {
+          "lower": 87.36108681546068,
+          "upper": 100
+        },
+        "consistency": {
+          "lower": 48.24894837218527,
+          "upper": 100
+        }
+      },
+      "consistency": {
+        "cap": 40,
+        "input": {
+          "lower": 5,
+          "upper": 40
+        },
+        "clamped": {
+          "lower": 5,
+          "upper": 40
+        },
+        "weighted": {
+          "lower": 48.24894837218527,
+          "upper": 100
+        },
+        "multiplier": 100,
+        "normalized": {
+          "lower": 0.4824894837218527,
+          "upper": 1
+        }
+      },
+      "weightedDimensions": {
+        "breadth": {
+          "lower": 12.5,
+          "upper": 25
+        },
+        "quality": {
+          "lower": 0,
+          "upper": 25
+        },
+        "delivery": {
+          "lower": 21.84027170386517,
+          "upper": 25
+        },
+        "consistency": {
+          "lower": 12.062237093046317,
+          "upper": 25
+        }
+      }
+    },
+    "craft": {
+      "criteria": {
+        "framing": {
+          "cap": 8,
+          "input": {
+            "lower": 0,
+            "upper": 0
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 0
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 0
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 0
+          }
+        },
+        "tool_judgment": {
+          "cap": 8,
+          "input": {
+            "lower": 0,
+            "upper": 0
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 0
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 0
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 0
+          }
+        },
+        "accepted_outcome": {
+          "cap": 8,
+          "input": {
+            "lower": 0,
+            "upper": 0
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 0
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 0
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 0
+          }
+        },
+        "verification_debugging": {
+          "cap": 8,
+          "input": {
+            "lower": 0,
+            "upper": 0
+          },
+          "clamped": {
+            "lower": 0,
+            "upper": 0
+          },
+          "weighted": {
+            "lower": 0,
+            "upper": 0
+          },
+          "multiplier": 25,
+          "normalized": {
+            "lower": 0,
+            "upper": 0
+          }
+        }
+      },
+      "composite": {
+        "lower": 0,
+        "upper": 0
+      },
+      "displayed": {
+        "status": "not_observed"
+      }
+    },
+    "rules": {
+      "caps": {
+        "delivery": 120,
+        "consistency": 40,
+        "craftCriterion": 8,
+        "breadthProjects": 4,
+        "qualityCriterion": 12,
+        "breadthCategories": 4
+      },
+      "rounding": {
+        "point": "nearest_integer_half_up",
+        "tierBasis": "unrounded",
+        "rangeLower": "floor",
+        "rangeUpper": "ceil",
+        "intermediate": "none",
+        "pointEquality": "exact",
+        "tierBoundaryDisplay": "distinguishing_decimal_or_less_than"
+      },
+      "rangeTier": "entire_interval_in_one_tier",
+      "coreWeights": {
+        "breadth": 0.25,
+        "quality": 0.25,
+        "delivery": 0.25,
+        "consistency": 0.25
+      },
+      "archetypeRule": "v6_descriptive_tree_without_solo_exclusions",
+      "normalization": "ln(1+min(count,cap))/ln(1+cap)",
+      "rangeArchetype": "none_if_any_dimension_is_nonpoint",
+      "tierThresholds": {
+        "high": 70,
+        "elite": 85,
+        "solid": 30
+      },
+      "trendRetention": 0.85,
+      "trendAssumption": "new_value_backward_fill",
+      "numericTolerance": 1E-10,
+      "archetypeTieOrder": [
+        "breadth",
+        "quality",
+        "consistency",
+        "delivery"
+      ],
+      "deliveryMultiplier": 100,
+      "breadthMinimumDates": 3,
+      "craftCriterionWeight": 25,
+      "consistencyMultiplier": 100,
+      "breadthComponentWeight": 50,
+      "craftDescriptorMinimum": 60,
+      "qualityCriterionWeight": 25,
+      "craftDescriptorRequirement": "complete_point_and_independently_corroborated_episode_with_all_four_criteria"
+    }
+  },
+  "limitations": [
+    "acceptance_time_unknown",
+    "attribution_unknown",
+    "discovery_incomplete",
+    "not_assessed",
+    "not_supported",
+    "pagination_incomplete",
+    "partial_files",
+    "source_error"
+  ],
+  "policyVersion": "v7",
+  "schemaVersion": "v7",
+  "serializationVersion": "canonical-json-v1",
+  "supersedesRevisionId": null
+}

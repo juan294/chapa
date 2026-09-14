@@ -59,7 +59,7 @@ describe("CrossAgentInsights render", () => {
     it("uses card styling on the empty-state container", () => {
       const { container } = render(<CrossAgentInsights entries={[]} />);
       const root = container.firstElementChild;
-      expect(root?.className).toContain("rounded-xl");
+      expect(root?.className).toContain("rounded-[3px]");
       expect(root?.className).toContain("border-stroke");
       expect(root?.className).toContain("bg-card");
     });
@@ -81,7 +81,7 @@ describe("CrossAgentInsights render", () => {
         <CrossAgentInsights entries={[coverageEntry, securityEntry]} />,
       );
       const root = container.firstElementChild;
-      expect(root?.className).toContain("rounded-xl");
+      expect(root?.className).toContain("rounded-[3px]");
       expect(root?.className).toContain("border-stroke");
       expect(root?.className).toContain("bg-card");
 
@@ -95,7 +95,7 @@ describe("CrossAgentInsights render", () => {
 
       // First agent (coverage) should be selected — has amber bg
       const buttons = screen.getAllByRole("button");
-      expect(buttons[0]?.className).toContain("bg-amber");
+      expect(buttons[0]?.className).toContain("bg-action");
     });
 
     it("shows content of selected agent entry", () => {
@@ -164,17 +164,17 @@ describe("CrossAgentInsights render", () => {
   });
 
   describe("agent pill styling", () => {
-    it("selected pill has bg-amber text-white", () => {
+    it("selected pill has bg-action text-action-text", () => {
       render(<CrossAgentInsights entries={[coverageEntry, securityEntry]} />);
       const buttons = screen.getAllByRole("button");
-      expect(buttons[0]?.className).toContain("bg-amber");
-      expect(buttons[0]?.className).toContain("text-white");
+      expect(buttons[0]?.className).toContain("bg-action");
+      expect(buttons[0]?.className).toContain("text-action-text");
     });
 
-    it("unselected pill has stroke background", () => {
+    it("unselected pill has ice stage background", () => {
       render(<CrossAgentInsights entries={[coverageEntry, securityEntry]} />);
       const buttons = screen.getAllByRole("button");
-      expect(buttons[1]?.className).toContain("bg-stroke");
+      expect(buttons[1]?.className).toContain("bg-purple-tint");
     });
   });
 });

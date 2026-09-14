@@ -78,7 +78,7 @@ describe("SHORTCUTS array", () => {
     expect(studioIds).toContain("cycle-preset");
     expect(studioIds).toContain("toggle-quick-controls");
     expect(studioIds).toContain("refresh-preview");
-    expect(studioIds).toContain("focus-terminal");
+    expect(studioIds).not.toContain("focus-terminal");
   });
 });
 
@@ -179,11 +179,11 @@ describe("matchShortcut", () => {
       expect(result).toBe("refresh-preview");
     });
 
-    it("matches Cmd+K → focus-terminal (studio)", () => {
+    it("matches Cmd+K through the shared navigation scope in Studio", () => {
       const result = matchShortcut(fakeKey("k", { metaKey: true }), null, [
-        "studio",
+        "navigation", "studio",
       ]);
-      expect(result).toBe("focus-terminal");
+      expect(result).toBe("focus-command-bar");
     });
   });
 
@@ -345,5 +345,14 @@ describe("groupByScope", () => {
       0,
     );
     expect(total).toBe(SHORTCUTS.length);
+  });
+});
+
+
+describe("global terminal focus", () => {
+  it("uses the same owner for mod+K on global and Studio pages", () => {
+    for (const scopes of [["navigation"], ["navigation", "studio"]] as const) {
+      expect(matchShortcut(new KeyboardEvent("keydown", {key: "k", ctrlKey: true}), null, [...scopes])).toBe("focus-command-bar");
+    }
   });
 });

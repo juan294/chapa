@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QuickControls } from "./QuickControls";
-import type { BadgeConfig } from "@chapa/shared";
+import { DEFAULT_BADGE_CONFIG, type BadgeConfig } from "@chapa/shared";
 import { LanguageProvider } from "@/lib/i18n";
 import { es } from "@/lib/i18n/dictionaries/es";
 
@@ -21,7 +21,7 @@ vi.mock("@/lib/effects/defaults", () => ({
         scoreEffect: "standard",
         heatmapAnimation: "fade-in",
         tierTreatment: "standard",
-        colorPalette: "jade",
+        colorPalette: "ice",
       },
     },
     {
@@ -42,15 +42,7 @@ vi.mock("@/lib/effects/defaults", () => ({
 
 afterEach(cleanup);
 
-const baseConfig: BadgeConfig = {
-  background: "solid",
-  cardStyle: "flat",
-  border: "solid-amber",
-  scoreEffect: "standard",
-  heatmapAnimation: "fade-in",
-  tierTreatment: "standard",
-  colorPalette: "jade",
-};
+const baseConfig: BadgeConfig = { ...DEFAULT_BADGE_CONFIG };
 
 describe("QuickControls", () => {
   it("shows expand button when not visible", () => {
@@ -426,11 +418,8 @@ describe("QuickControls — v2 controls column (#1216)", () => {
     );
     fireEvent.click(screen.getByText("Background"));
 
-    // The raw fill token `text-amber` measures 2.75:1 against the light
-    // ground. The label uses `text-amber-text` instead (#1243) — the
-    // theme-aware, text-safe counterpart at 5.28:1 light and 11.94:1 dark —
-    // which is what makes the handoff's accent-coloured selected label
-    // (#1245) affordable at all.
+    // Selected labels use the theme-aware text-safe accent, alongside
+    // the semantic pressed state and visible border.
     const selected = screen.getByRole("button", { name: /Solid Dark/ });
     expect(selected.getAttribute("aria-pressed")).toBe("true");
     expect(selected.className).toContain("border-amber");
@@ -532,9 +521,7 @@ describe("QuickControls — v3 fidelity (#1243)", () => {
 
   it("renders the current value in an accent that clears AA on the column ground", () => {
     render_();
-    // `text-amber` measures 2.75:1 on the light ground. `--color-amber-text` is
-    // the theme-aware, text-safe counterpart (5.28:1 light, 11.94:1 dark), the
-    // same shape as --color-complement-text.
+    // The current value uses the theme-aware text-safe accent.
     const value = screen.getByTestId("qc-value-background");
     expect(value.className).toContain("text-amber-text");
     expect(value.className).not.toContain("text-terminal-dim");

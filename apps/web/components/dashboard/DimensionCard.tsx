@@ -65,6 +65,7 @@ export interface DimensionCardProps {
   className?: string;
   profileType?: ProfileType;
   craftResult?: CraftResult | null;
+  receiptPresentation?: { display: string | null; subtitle: string; detail: React.ReactNode };
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,7 @@ export function DimensionCard({
   className = "",
   profileType = "collaborative",
   craftResult = null,
+  receiptPresentation,
 }: DimensionCardProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -96,8 +98,8 @@ export function DimensionCard({
   );
 
   useEffect(() => {
-    if (inView) animate();
-  }, [inView, animate]);
+    if (inView && !receiptPresentation) animate();
+  }, [inView, animate, receiptPresentation]);
 
   // Toggle expand/collapse
   const toggle = useCallback(() => {
@@ -116,24 +118,24 @@ export function DimensionCard({
 
   const label = t(`dimensions.${dimension}.label`) as string;
   const isSoloQuality = dimension === "quality" && profileType === "solo";
-  const subtitle = isSoloQuality
+  const subtitle = receiptPresentation?.subtitle ?? (isSoloQuality
     ? t('dimensions.quality.soloSubtitle') as string
-    : t(`dimensions.${dimension}.subtitle`) as string;
+    : t(`dimensions.${dimension}.subtitle`) as string);
   const colors = DIMENSION_COLORS[dimension];
   const tooltipId = DIMENSION_TOOLTIP_IDS[dimension];
-  const tooltipTip = isSoloQuality
+  const tooltipTip = receiptPresentation ? t("observedScoring.intro") as string : isSoloQuality
     ? t('dimensions.quality.soloTip') as string
     : t(`dimensions.${dimension}.tip`) as string;
 
   const hasTrendRow =
-    (trend != null && trend.values.length > 0) || delta != null;
+    !receiptPresentation && ((trend != null && trend.values.length > 0) || delta != null);
 
   return (
     <div
       ref={containerRef}
       role="article"
-      aria-label={interpolate(t('aria.dimensionScore') as string, { label, score: String(score) })}
-      className={`rounded-xl bg-card shadow-card transition-shadow duration-200 hover:shadow-card-hover animate-fade-in-up ${className}`}
+      aria-label={interpolate(t('aria.dimensionScore') as string, { label, score: receiptPresentation ? receiptPresentation.display ?? (t("observedScoring.unavailable") as string) : String(score) })}
+      className={`rounded-[3px] border border-stroke bg-card transition-colors duration-200 animate-fade-in-up ${className}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       {/* Header */}
@@ -144,13 +146,13 @@ export function DimensionCard({
           </span>
           <InfoTooltip id={tooltipId} content={tooltipTip} />
         </div>
-        <span className="font-heading text-3xl font-extrabold text-text-primary tabular-nums">
-          {displayScore}
+        <span className={`font-heading ${receiptPresentation?.display === null ? "text-sm" : "text-3xl"} font-extrabold text-text-primary tabular-nums break-words`}>
+          {receiptPresentation ? receiptPresentation.display ?? (t("observedScoring.unavailable") as string) : displayScore}
         </span>
       </div>
 
       {/* Progress bar */}
-      <div className="px-4 pt-2">
+      {(!receiptPresentation || receiptPresentation.display !== null) && <div className="px-4 pt-2">
         <div
           role="progressbar"
           aria-valuenow={score}
@@ -168,6 +170,8 @@ export function DimensionCard({
           />
         </div>
       </div>
+
+      }
 
       {/* Trend row — only if trend or delta data exists */}
       {hasTrendRow && (
@@ -190,7 +194,9 @@ export function DimensionCard({
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
-        aria-label={interpolate(t('aria.toggleBreakdown') as string, { label })}
+        // WCAG 2.5.3: the visible subtitle must be part of the accessible
+        // name, so a voice-control user can say what they see (LE-8-3).
+        aria-label={`${interpolate(t('aria.toggleBreakdown') as string, { label })}: ${subtitle}`}
         onClick={toggle}
         onKeyDown={handleKeyDown}
         className="flex w-full cursor-pointer items-center justify-between p-4 pt-3 text-left"
@@ -217,14 +223,14 @@ export function DimensionCard({
 
       {/* Expanded panel */}
       <div id={panelId} className={isExpanded ? "border-t border-stroke" : ""}>
-        <SubMetricPanel
+        {receiptPresentation ? (isExpanded ? <div className="p-4">{receiptPresentation.detail}</div> : null) : <SubMetricPanel
           dimension={dimension}
           stats={stats}
           isOpen={isExpanded}
           onClose={toggle}
           profileType={profileType}
           craftResult={craftResult}
-        />
+        />}
       </div>
     </div>
   );

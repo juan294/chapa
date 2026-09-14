@@ -208,3 +208,12 @@ export async function dbCleanExpiredVerifications(): Promise<number> {
     return 0;
   }
 }
+
+/** V7 operations fail closed; never expose database errors or receipt inputs. */
+export async function dbVerificationRpcV7(name: string, args: Record<string, unknown>): Promise<unknown> {
+  const db = getSupabase();
+  if (!db) throw new Error("Receipt verification storage unavailable");
+  const { data, error } = await db.rpc(name, args);
+  if (error) throw new Error("Receipt verification storage unavailable");
+  return data;
+}

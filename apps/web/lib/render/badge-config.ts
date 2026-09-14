@@ -20,7 +20,7 @@ export type ResolvedBadgeConfigSnapshot = {
  * badge, and nothing would report an error.
  *
  * Failure is never fatal. A missing row, a disabled database, or a read error
- * all resolve to `DEFAULT_BADGE_CONFIG`, which renders the pre-#1191 badge
+ * all resolve to `DEFAULT_BADGE_CONFIG`, which renders the current default badge
  * byte-for-byte. A badge that renders in its default look is a far better
  * outcome than a badge that fails to render.
  *

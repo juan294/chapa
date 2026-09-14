@@ -94,12 +94,11 @@ export function ScoreExplanationPanel({
   });
 
   return (
-    <div className="rounded-xl bg-card shadow-card">
+    <div className="rounded-[3px] border border-stroke bg-card">
       <button
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
-        aria-label={t("aria.toggleScoreExplanation") as string}
         onClick={toggle}
         className="flex w-full cursor-pointer items-center justify-between gap-4 p-4 text-left sm:p-5"
       >
@@ -140,7 +139,7 @@ export function ScoreExplanationPanel({
               <h4 className="font-heading text-sm font-bold text-text-primary">
                 {t("scoreExplanation.composite.heading") as string}
               </h4>
-              <p className="mt-2 rounded-lg border border-stroke bg-track/40 p-3 font-heading text-xl font-bold text-text-primary tabular-nums">
+              <p className="mt-2 rounded-[3px] border border-stroke bg-track/40 p-3 font-heading text-xl font-bold text-text-primary tabular-nums">
                 {scoreLine}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-text-secondary">
@@ -185,7 +184,7 @@ export function ScoreExplanationPanel({
                   return (
                     <div
                       key={source.platform}
-                      className="rounded-lg border border-stroke bg-track/30 p-3"
+                      className="rounded-[3px] border border-stroke bg-track/30 p-3"
                     >
                       <p className="text-sm font-semibold text-text-primary">
                         {interpolate(t("scoreExplanation.dataSources.platformLine") as string, {
@@ -237,7 +236,7 @@ export function ScoreExplanationPanel({
                     {explanation.confidence.penalties.map((penalty) => (
                       <li
                         key={penalty.flag}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-stroke bg-track/30 p-3"
+                        className="flex items-start justify-between gap-3 rounded-[3px] border border-stroke bg-track/30 p-3"
                       >
                         <span className="text-sm leading-relaxed text-text-secondary">
                           {t(`scoreExplanation.confidence.reasons.${penalty.flag}`) as string}
@@ -286,7 +285,7 @@ function DimensionFormula({
   const color = DIMENSION_COLORS[dimension.key];
 
   return (
-    <article className="rounded-lg border border-stroke bg-track/30 p-3">
+    <article className="rounded-[3px] border border-stroke bg-track/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span
@@ -300,7 +299,7 @@ function DimensionFormula({
         </div>
         <div className="flex items-center gap-2">
           {!dimension.countsTowardComposite && (
-            <span className="rounded-full border border-stroke px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+            <span className="rounded-[3px] border border-stroke px-2 py-0.5 text-[11px] font-medium text-text-secondary">
               {notCountedLabel}
             </span>
           )}

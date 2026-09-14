@@ -53,6 +53,17 @@ describe("GET /og-image", () => {
     expect(svgArg).toContain("Developer Impact, Decoded");
   });
 
+  it("uses the static brand palette and fully opaque readable captions", async () => {
+    await GET();
+    const svg = mockSvgToPng.mock.calls[0]![0] as string;
+    expect(svg).toContain('fill="#0C141B"');
+    expect(svg).toContain('fill="#ED4930"');
+    expect(svg).toContain('fill="#BAD9E8"');
+    expect(svg).toContain('fill="#ABBAC3"');
+    expect(svg).not.toContain('opacity="0.6"');
+    expect(svg).not.toContain("#1BD093");
+  });
+
   it("includes full-year heatmap grid (52 cols x 7 rows)", async () => {
     await GET();
     const svgArg = mockSvgToPng.mock.calls[0]![0] as string;

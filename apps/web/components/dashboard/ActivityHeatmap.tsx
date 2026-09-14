@@ -23,6 +23,8 @@ export interface ActivityHeatmapProps {
   activeDays: number;
   /** Profile-level dimension scores (0–100). Used to derive per-day dominant dimension. */
   dimensions?: Record<Dimension, number>;
+  /** Current scoring does not infer per-day criterion attribution from totals. */
+  descriptiveOnly?: boolean;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -200,6 +202,7 @@ export function ActivityHeatmap({
   heatmapData,
   activeDays,
   dimensions,
+  descriptiveOnly = false,
 }: ActivityHeatmapProps) {
   const { t, locale } = useTranslation();
   // FE-M2 (#1173): this component is server-rendered by default (next/dynamic
@@ -243,6 +246,8 @@ export function ActivityHeatmap({
         {formatActivitySummary(insights.summary, locale, t)}
       </p>
 
+      {descriptiveOnly && <p className="mb-3 text-sm text-text-secondary">{t("observedScoring.activityOnly") as string}</p>}
+
       {/* Insight cards */}
       {hasInsights && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -264,9 +269,9 @@ export function ActivityHeatmap({
 
       {/* #1217 — a horizontal scroller, so a narrow screen scrolls the chart
           instead of crushing every column to a few pixels. */}
-      <div className="overflow-x-auto rounded-xl border border-stroke bg-card">
+      <div className="overflow-x-auto rounded-[3px] border border-stroke bg-card">
         <div className="min-w-[560px] p-4">
-          <DotTimeline data={enriched} peakDate={insights.peakDay.date} activeDays={activeDays} />
+          <DotTimeline data={enriched} peakDate={insights.peakDay.date} activeDays={activeDays} descriptiveOnly={descriptiveOnly} />
         </div>
       </div>
 
@@ -282,7 +287,7 @@ export function ActivityHeatmap({
           >
             {activeDaysLabel}
           </span>
-          {DIMENSIONS.map((dim) => (
+          {!descriptiveOnly && DIMENSIONS.map((dim) => (
             <div key={dim} className="flex items-center gap-1.5">
               <div
                 className="h-2 w-2 rounded-full"
@@ -322,7 +327,7 @@ export function ActivityHeatmap({
 
 // ── Insight cards ────────────────────────────────────────────────────
 
-const CARD_CLASS = "rounded-lg border border-stroke bg-card p-3";
+const CARD_CLASS = "rounded-[3px] border border-stroke bg-card p-3";
 
 function StreakCard({
   current,
@@ -344,7 +349,7 @@ function StreakCard({
           >
             {current}d
           </span>
-          <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider mt-0.5">
+          <span className="text-[11px] text-text-secondary font-body uppercase tracking-wider mt-0.5">
             {text(t, "dashboard.activity.currentStreak")}
           </span>
         </div>
@@ -365,7 +370,7 @@ function StreakCard({
           ))}
         </div>
       </div>
-      <p className="text-[10px] text-text-secondary font-body mt-1.5">
+      <p className="text-[11px] text-text-secondary font-body mt-1.5">
         {text(t, "dashboard.activity.best")} {" "}
         <span className="text-text-primary font-medium">{longest}d</span>
       </p>
@@ -412,7 +417,7 @@ function RhythmCard({
       <span className="text-lg font-heading font-semibold text-text-primary leading-none">
         {busiestDay}
       </span>
-      <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
+      <span className="text-[11px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
         {text(t, "dashboard.activity.mostActiveDay")}
       </span>
       <div className="flex items-end gap-px mt-2" style={{ height: 20 }}>
@@ -464,11 +469,11 @@ function ThisWeekCard({
       <span className="text-lg font-heading font-semibold text-text-primary leading-none">
         {total.toLocaleString(DATE_LOCALES[locale])}
       </span>
-      <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
+      <span className="text-[11px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
         {text(t, "dashboard.activity.thisWeek")}
       </span>
       {ratioLabel && (
-        <p className="text-[10px] font-body font-medium mt-1">
+        <p className="text-[11px] font-body font-medium mt-1">
           <span
             className={
               isAbove ? "text-terminal-green" : "text-terminal-red"
@@ -529,13 +534,13 @@ interface ChartTooltipData {
   cellBottom: number;
 }
 
-function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
+function ChartTooltip({ tip, descriptiveOnly }: { tip: ChartTooltipData; descriptiveOnly?: boolean }) {
   const { t, locale } = useTranslation();
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
       role="tooltip"
-      className="pointer-events-none fixed rounded-lg border border-stroke bg-card/95 px-3 py-2.5 text-xs font-body shadow-xl backdrop-blur-xl"
+      className="pointer-events-none fixed rounded-[3px] border border-stroke bg-card px-3 py-2.5 text-xs font-body shadow-card"
       style={{
         zIndex: 99999,
         left: tip.screenX,
@@ -558,7 +563,7 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
               { count: tip.count.toLocaleString(DATE_LOCALES[locale]) },
             )}
           </p>
-          <div className="mt-1.5 flex flex-col gap-0.5">
+          {!descriptiveOnly && <div className="mt-1.5 flex flex-col gap-0.5">
             {DIMENSIONS.map((dim) => {
               const pct = Math.round(tip.dimensionWeights[dim] * 100);
               return (
@@ -579,7 +584,7 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </>
       ) : (
         <p className="text-text-secondary">
@@ -597,7 +602,9 @@ function DotTimeline({
   data,
   peakDate,
   activeDays,
+  descriptiveOnly = false,
 }: {
+  descriptiveOnly?: boolean;
   data: EnrichedDay[];
   peakDate: string;
   activeDays: number;
@@ -648,7 +655,7 @@ function DotTimeline({
             {DOW_HEADER_KEYS.map((key, i) => (
               <span
                 key={i}
-                className="flex-1 text-center text-[10px] text-text-secondary font-body"
+                className="flex-1 text-center text-[11px] text-text-secondary font-body"
               >
                 {text(t, key)}
               </span>
@@ -660,7 +667,7 @@ function DotTimeline({
         <div className="space-y-2">
           {weeks.map((week, wi) => (
             <div key={wi} className="flex items-center gap-2">
-              <span className="text-[10px] text-text-secondary font-body w-14 shrink-0 text-right">
+              <span className="text-[11px] text-text-secondary font-body w-14 shrink-0 text-right">
                 {week.label}
               </span>
               <div className="flex items-center gap-1 flex-1">
@@ -678,7 +685,7 @@ function DotTimeline({
                           width: size,
                           height: size,
                           backgroundColor: day.count > 0
-                            ? DIMENSION_COLORS[day.dominant]
+                            ? descriptiveOnly ? "var(--color-amber)" : DIMENSION_COLORS[day.dominant]
                             : "var(--color-purple-tint)",
                           opacity: day.count > 0
                             ? 0.3 + (day.count / maxCount) * 0.7
@@ -710,34 +717,36 @@ function DotTimeline({
         contribution count available to screen readers — it must live
         outside the role="img" subtree, or it would be collapsed exactly
         like the dots it's meant to expose data for. Visually hidden via
-        `sr-only`; the same info a sighted mouse user gets from the hover
-        tooltip.
+        an `sr-only` block, since intrinsic table height can exceed 1px.
+        This provides the same information as the hover tooltip.
       */}
-      <table className="sr-only">
-        <caption>{timelineLabel}</caption>
-        <tbody>
-          {weeks.flatMap((week) =>
-            week.days.map((day) => (
-              <tr key={day.date}>
-                <th scope="row">{formatLocalizedDate(day.date, locale)}</th>
-                <td>
-                  {interpolate(
-                    text(
-                      t,
-                      day.count === 1
-                        ? "dashboard.activity.contributionOne"
-                        : "dashboard.activity.contributionMany",
-                    ),
-                    { count: String(day.count) },
-                  )}
-                </td>
-              </tr>
-            )),
-          )}
-        </tbody>
-      </table>
+      <div className="sr-only">
+        <table>
+          <caption>{timelineLabel}</caption>
+          <tbody>
+            {weeks.flatMap((week) =>
+              week.days.map((day) => (
+                <tr key={day.date}>
+                  <th scope="row">{formatLocalizedDate(day.date, locale)}</th>
+                  <td>
+                    {interpolate(
+                      text(
+                        t,
+                        day.count === 1
+                          ? "dashboard.activity.contributionOne"
+                          : "dashboard.activity.contributionMany",
+                      ),
+                      { count: String(day.count) },
+                    )}
+                  </td>
+                </tr>
+              )),
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {tooltip && <ChartTooltip tip={tooltip} />}
+      {tooltip && <ChartTooltip tip={tooltip} descriptiveOnly={descriptiveOnly} />}
     </>
   );
 }

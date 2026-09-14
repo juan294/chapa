@@ -14,6 +14,16 @@ import { parseRows } from "./parse-row";
 // ---------------------------------------------------------------------------
 
 interface AdminUserRow {
+  current_policy_version?: "v6" | "v7.2";
+  current_display_score?: number | null;
+  current_exact_score?: number | null;
+  current_tier?: string | null;
+  current_archetype?: string | null;
+  current_confidence?: number | null;
+  current_snapshot_date?: string | null;
+  current_fetched_at?: string | null;
+  current_revision_id?: string | null;
+  current_content_hash?: string | null;
   handle: string;
   registered_at: string;
   display_name: string | null;
@@ -72,6 +82,9 @@ export interface AdminUserQuery {
 }
 
 export interface AdminUserEntry {
+  policyVersion?: "v6" | "v7.2";
+  exactScore?: number | null;
+  identity?: { revisionId: string; contentHash: string } | null;
   handle: string;
   displayName: string | null;
   avatarUrl: string | null;
@@ -146,6 +159,18 @@ function rowToAdminUser(row: AdminUserRow): AdminUserEntry {
     adjustedComposite: row.adjusted_composite,
     rawScore: row.composite_score,
     confidence: row.confidence,
+    ...(row.current_policy_version && {
+      policyVersion: row.current_policy_version,
+      adjustedComposite: row.current_display_score ?? null,
+      rawScore: row.current_policy_version === "v7.2" ? row.current_display_score ?? null : row.composite_score,
+      exactScore: row.current_exact_score ?? null,
+      tier: row.current_tier ?? null,
+      archetype: row.current_archetype ?? null,
+      confidence: row.current_confidence ?? null,
+      lastSnapshotDate: row.current_snapshot_date ?? null,
+      fetchedAt: row.current_fetched_at ?? null,
+      identity: row.current_revision_id && row.current_content_hash ? { revisionId: row.current_revision_id, contentHash: row.current_content_hash } : null,
+    }),
   };
 }
 
@@ -192,6 +217,7 @@ const EMPTY_RESULT: AdminUserResult = {
  */
 export async function dbGetAdminUsers(
   query: AdminUserQuery,
+  options: { observed?: boolean } = {},
 ): Promise<AdminUserResult> {
   const db = getSupabase();
   if (!db) return EMPTY_RESULT;
@@ -203,7 +229,7 @@ export async function dbGetAdminUsers(
   const to = from + limit - 1;
 
   try {
-    let q = db.from("admin_users").select("*", { count: "exact" });
+    let q = db.from(options.observed ? "admin_users_observed" : "admin_users").select("*", { count: "exact" });
 
     // Search filter: ILIKE on handle OR display_name. The term is run through
     // escapeIlike() first, which strips PostgREST filter-string delimiters
@@ -215,20 +241,23 @@ export async function dbGetAdminUsers(
 
     // Tier filter
     if (query.tier) {
-      q = q.eq("tier", query.tier);
+      q = q.eq(options.observed ? "current_tier" : "tier", query.tier);
     }
 
     // Archetype filter
     if (query.archetype) {
-      q = q.eq("archetype", query.archetype);
+      q = q.eq(options.observed ? "current_archetype" : "archetype", query.archetype);
     }
 
     // Sorting — nulls last for snapshot columns
-    const sortCol = mapSortField(query.sort);
+    const observedSort: Partial<Record<AdminSortField, string>> = { adjustedComposite: "current_display_score", rawScore: "current_display_score", confidence: "current_confidence", tier: "current_tier", archetype: "current_archetype", lastSnapshotDate: "current_snapshot_date" };
+    const sortCol = options.observed ? observedSort[query.sort] ?? mapSortField(query.sort) : mapSortField(query.sort);
     q = q.order(sortCol, {
       ascending: query.dir === "asc",
       nullsFirst: false,
     });
+
+    if (options.observed && query.sort !== "handle") q = q.order("handle", { ascending: true });
 
     // Pagination
     q = q.range(from, to);

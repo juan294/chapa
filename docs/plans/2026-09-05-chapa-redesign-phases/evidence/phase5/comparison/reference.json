@@ -1,0 +1,54 @@
+[
+  {
+    "key": "reference-en-light-1440",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "light",
+    "lang": "en",
+    "heading": "GOOD WORK.LEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "reference-en-light-390",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "light",
+    "lang": "en",
+    "heading": "GOOD WORK.LEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "reference-en-dark-1440",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "dark",
+    "lang": "en",
+    "heading": "GOOD WORK.LEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  },
+  {
+    "key": "reference-en-dark-390",
+    "fonts": {
+      "Barlow Condensed": 1,
+      "Manrope": 1,
+      "JetBrains Mono": 1
+    },
+    "theme": "dark",
+    "lang": "en",
+    "heading": "GOOD WORK.LEAVES AMARK_",
+    "overflow": false,
+    "fontSource": "Existing compiled local WOFF2; archive Google Fonts request fulfilled locally, no source changes"
+  }
+]

@@ -53,7 +53,7 @@ export function ConfirmDialog({
       aria-labelledby={titleId}
       aria-describedby={descId}
       onClose={onCancel}
-      className="m-auto max-w-sm w-full rounded-2xl border border-stroke bg-card p-6 shadow-xl backdrop:bg-black/50"
+      className="m-auto max-w-sm w-full rounded-[3px] border border-stroke bg-card p-6 shadow-card backdrop:bg-black/50"
     >
       <h2
         id={titleId}
@@ -73,7 +73,7 @@ export function ConfirmDialog({
           type="button"
           disabled={loading}
           onClick={onCancel}
-          className="rounded-lg border border-stroke px-4 py-2 text-sm text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary disabled:opacity-50"
+          className="min-h-11 rounded-[3px] border border-stroke-strong px-4 py-2 text-sm text-text-secondary transition-colors hover:border-text-primary hover:text-text-primary disabled:opacity-50"
         >
           {cancelLabel}
         </button>
@@ -81,10 +81,10 @@ export function ConfirmDialog({
           type="button"
           disabled={loading}
           onClick={onConfirm}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
+          className={`min-h-11 rounded-[3px] border px-4 py-2 font-heading text-sm font-semibold transition-colors disabled:opacity-50 ${
             variant === "destructive"
-              ? "bg-terminal-red hover:bg-terminal-red/80"
-              : "bg-amber hover:bg-amber-light"
+              ? "border-terminal-red bg-card text-terminal-red hover:bg-terminal-red/10"
+              : "border-action bg-action text-action-text hover:bg-action-hover"
           }`}
         >
           {loading ? (

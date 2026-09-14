@@ -41,6 +41,7 @@ export const DEFAULT_KNOWN_WRITE_GETS = new Set<string>([
 ]);
 
 export const DEFAULT_EXEMPTIONS: Readonly<Record<string, string>> = {
+  "POST /api/verify/[hash]": "Read-only bounded submitted-receipt comparison; no durable writes",
   "POST /api/webhooks/resend":
     "Svix HMAC-verified provider payload, not user JSON",
   "GET /api/cron/warm-cache":

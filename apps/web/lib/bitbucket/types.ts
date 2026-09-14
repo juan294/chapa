@@ -1,3 +1,4 @@
+/** Legacy v6 source shapes below; v7 uses evidence.ts normalized contracts. */
 /** Paginated response wrapper — Bitbucket uses next/previous URLs */
 export interface BitbucketPaginated<T> {
   values: T[];

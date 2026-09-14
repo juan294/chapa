@@ -29,13 +29,13 @@ export default function Icon() {
         >
           <path
             d="M16 1 L29 6 L29 15 C29 23 23 29 16 31 C9 29 3 23 3 15 L3 6 Z"
-            fill="#0C0D14"
-            stroke="#1BD093"
+            fill="#0C141B"
+            stroke="#ED4930"
             strokeWidth="1.5"
           />
           <path
             d="M10 20 L16 12 L22 20"
-            stroke="#1BD093"
+            stroke="#ED4930"
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"

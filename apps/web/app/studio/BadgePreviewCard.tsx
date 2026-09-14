@@ -1,11 +1,13 @@
 "use client";
 
 import { memo, useMemo } from "react";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 import type { PublicVerificationCode } from "@/lib/profile/public-profile";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { useTranslation } from "@/lib/i18n";
+import { InlineBadgeSvg } from "@/components/badge/InlineBadgeSvg";
 
 export type PreviewVerification = PublicVerificationCode;
 
@@ -13,6 +15,10 @@ export interface BadgePreviewCardProps {
   config: BadgeConfig;
   stats: StatsData;
   impact: ImpactV6Result;
+  /** #1311 — the model the public badge draws. Without it the owner
+   *  customizes a v6 preview of a badge that publishes as v7, and saving then
+   *  invalidates the public badge so it re-renders as the other one. */
+  scoring?: ScoreViewModel;
   verification?: PreviewVerification | null;
   /**
    * Resolved server-side by `app/studio/page.tsx`, exactly as the badge route
@@ -52,6 +58,7 @@ function BadgePreviewCardInner({
   config,
   stats,
   impact,
+  scoring,
   verification = null,
   avatarDataUri,
   demoMode = false,
@@ -61,24 +68,25 @@ function BadgePreviewCardInner({
   const svg = useMemo(
     () =>
       renderBadgeSvg(stats, impact, {
+        scoring,
         config,
         avatarDataUri,
         verificationHash: verification?.hash,
         verificationDate: verification?.date,
         demoMode,
-        strings: buildBadgeI18nStrings(t, impact.tier),
+        strings: buildBadgeI18nStrings(t, scoring?.tier ?? impact.tier),
       }),
-    [config, stats, impact, verification, avatarDataUri, demoMode, t],
+    [config, stats, impact, scoring, verification, avatarDataUri, demoMode, t],
   );
 
   return (
-    <div
+    <InlineBadgeSvg
       data-testid="badge-preview"
       // The badge is a fixed 1200x630 document with a viewBox, so overriding
       // the root element's own width/height is what makes it scale to the
       // Studio column instead of overflowing it.
-      className="relative w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full [&>svg]:rounded-2xl"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      className="relative w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+      svg={svg}
     />
   );
 }

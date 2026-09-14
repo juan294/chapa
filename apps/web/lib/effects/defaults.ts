@@ -12,11 +12,9 @@ export interface StudioPreset {
  * overlay that never reached the badge. It now takes the name from the score
  * effect, which does.
  *
- * #1242 - every preset pins `colorPalette: "jade"`. A preset sets every category by
- * contract ("preset X applied - N categories set"), so leaving palette out
- * would make it the one field a preset silently preserved. Applying a preset
- * therefore returns the palette to jade, the same way it returns every other
- * category to the preset's own value.
+ * Every preset sets all seven categories. Minimal follows the current Ice
+ * default; the other presets retain their explicitly authored Jade palette.
+ * A preset never silently preserves a field from the previous config.
  */
 export const STUDIO_PRESETS: StudioPreset[] = [
   {

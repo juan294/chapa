@@ -42,6 +42,16 @@ function SubHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A published formula. Every dimension has one now, so it is a component
+ *  rather than a repeated inline block. */
+function Formula({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="my-4 overflow-x-auto rounded-[3px] border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
+      {children}
+    </div>
+  );
+}
+
 function Table({
   headers,
   rows,
@@ -92,14 +102,15 @@ function Table({
  */
 const SECTION_KEYS = [
   ["scoring-philosophy", "sectionPhilosophy"],
+  ["scoring-window", "sectionWindow"],
   ["scoring-normalization", "sectionNormalization"],
   ["scoring-caps", "sectionCaps"],
   ["scoring-dimensions", "sectionDimensions"],
   ["scoring-craft", "sectionCraft"],
+  ["scoring-ranges", "sectionRanges"],
   ["scoring-archetypes", "sectionArchetypes"],
   ["scoring-composite", "sectionComposite"],
-  ["scoring-confidence", "sectionConfidence"],
-  ["scoring-smoothing", "sectionSmoothing"],
+  ["scoring-receipts", "sectionReceipts"],
   ["scoring-excludes", "sectionExcludes"],
 ] as const;
 
@@ -110,6 +121,45 @@ function SECTION_INDEX(t: TFunction) {
   }));
 }
 
+/** Current observed policy reuses the document's sections and table treatment. */
+function ObservedSections({ t }: { t: TFunction }) {
+  const key = (name: string) => `about.scoringObserved.${name}`;
+  const text = (name: string) => t(key(name)) as string;
+  const paragraphs = (name: string) => tArray<string>(t, key(name)).map((body) => <p key={body}>{body}</p>);
+  const table = (name: string) => <Table headers={tArray<string>(t, key(`${name}TableHeaders`))} rows={tArray<string[]>(t, key(`${name}TableRows`))} />;
+  return <>
+    <SectionHeading id="scoring-philosophy">{text("sectionPhilosophy")}</SectionHeading>
+    {paragraphs("philosophyBody")}
+    <SectionHeading id="scoring-window">{text("sectionWindow")}</SectionHeading>
+    {paragraphs("windowBody")}
+    <SectionHeading id="scoring-normalization">{text("sectionNormalization")}</SectionHeading>
+    {paragraphs("normalizationBody")}
+    <Formula>{text("normalizationFormula")}</Formula>
+    <SectionHeading id="scoring-caps">{text("sectionCaps")}</SectionHeading>
+    {paragraphs("capsBody")}{table("caps")}
+    <SectionHeading id="scoring-dimensions">{text("sectionDimensions")}</SectionHeading>
+    {paragraphs("dimensionsBody")}{table("dimensions")}
+    <SectionHeading id="scoring-craft">{text("sectionCraft")}</SectionHeading>
+    {paragraphs("craftBody")}
+    <Formula>{text("craftFormula")}</Formula>
+    <p>{text("craftExample")}</p>
+    <Formula>{text("craftExampleFormula")}</Formula>
+    <p>{text("craftStates")}</p><p>{text("craftSelection")}</p>
+    <SectionHeading id="scoring-ranges">{text("sectionRanges")}</SectionHeading>
+    {paragraphs("rangesBody")}
+    <SectionHeading id="scoring-archetypes">{text("sectionArchetypes")}</SectionHeading>
+    {paragraphs("archetypesBody")}
+    <SectionHeading id="scoring-composite">{text("sectionComposite")}</SectionHeading>
+    {paragraphs("compositeBody")}
+    <Formula>{text("compositeFormula")}</Formula>
+    <p>{text("roundingBody")}</p>{table("tiers")}
+    <SectionHeading id="scoring-receipts">{text("sectionReceipts")}</SectionHeading>
+    {paragraphs("receiptsBody")}
+    <SectionHeading id="scoring-excludes">{text("sectionExcludes")}</SectionHeading>
+    {paragraphs("excludesBody")}
+  </>;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Page                                                                    */
 /* ---------------------------------------------------------------------- */
@@ -117,12 +167,13 @@ function SECTION_INDEX(t: TFunction) {
 /**
  * Server-rendered scoring methodology content (#1023 / FE-H1). `t` is
  * `getServerT(locale)`, resolved from the route's `[locale]` segment param —
- * both locale variants are statically pre-rendered, so there is no
+ * both locale variants resolve the selected policy on the server, with no
  * client-side re-render/flash. No genuinely-interactive leaf is needed here;
  * `LiteYouTubeEmbed` and `GlobalCommandBarLazy` are already independent
  * client components.
  */
-export function ScoringMethodologyContent({ t }: { t: TFunction }) {
+export function ScoringMethodologyContent({ t, observed = false }: { t: TFunction; observed?: boolean }) {
+  const namespace = observed ? "about.scoringObserved" : "about.scoring";
   return (
     <div className="min-h-screen bg-bg">
       <NavbarClient />
@@ -132,16 +183,17 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
         className="relative mx-auto max-w-5xl px-6 pt-32 pb-24"
       >
         <div className="@container relative">
+          {!observed && <p className="mb-4 text-sm text-text-secondary">{t("about.scoringObserved.archivedNotice") as string}</p>}
           <ContentPageHeader
             command="chapa explain --scoring"
-            title={t('about.scoring.h1') as string}
-            intro={t('about.scoring.intro') as string}
+            title={t(`${namespace}.h1`) as string}
+            intro={t(`${namespace}.intro`) as string}
           />
 
           {/* ---------------------------------------------------------- */}
           {/* Video explainer                                              */}
           {/* ---------------------------------------------------------- */}
-          <div className="mb-10 animate-fade-in-up [animation-delay:150ms]">
+          {!observed && <div className="mb-10 animate-fade-in-up [animation-delay:150ms]">
             <div className="flex items-center gap-2 mb-3">
               <svg
                 viewBox="0 0 24 24"
@@ -161,27 +213,29 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               </h2>
             </div>
             <LiteYouTubeEmbed
-              videoId="wcXXGn3JYyw"
+              // The v7 explainer. The earlier video described v6 scoring — confidence
+              // penalties, EMA smoothing, a Craft dimension inside the core — none
+              // of which this page documents any more.
+              videoId="jJiNANmCBw0"
               title={t('about.scoring.videoTitle') as string}
             />
             <p className="text-text-secondary text-sm mt-2">
               {t('about.scoring.videoReadingNote') as string}
             </p>
-          </div>
+          </div>}
 
           <div className="grid gap-10 lg:grid-cols-[13rem_minmax(0,1fr)]">
           <OnThisPageIndex
-            items={SECTION_INDEX(t)}
+            items={observed ? SECTION_KEYS.map(([id, key]) => ({ id, label: t(`${namespace}.${key}`) as string })) : SECTION_INDEX(t)}
             heading={t('content.onThisPage') as string}
           />
           <div className="min-w-0 space-y-2 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:200ms]">
+            {observed ? <ObservedSections t={t} /> : <>
             {/* ---------------------------------------------------------- */}
             {/* Philosophy                                                  */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading id="scoring-philosophy">{t('about.scoring.sectionPhilosophy') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.philosophyBody1') as string}
-            </p>
+            <p>{t('about.scoring.philosophyBody1') as string}</p>
             <p>
               {t('about.scoring.philosophyBody2Prefix') as string}
               <strong className="text-text-primary">
@@ -189,6 +243,13 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               </strong>
               {t('about.scoring.philosophyBody2Suffix') as string}
             </p>
+
+            {/* ---------------------------------------------------------- */}
+            {/* One window, one clock                                       */}
+            {/* ---------------------------------------------------------- */}
+            <SectionHeading id="scoring-window">{t('about.scoring.sectionWindow') as string}</SectionHeading>
+            <p>{t('about.scoring.windowBody') as string}</p>
+            <p>{t('about.scoring.windowNote') as string}</p>
 
             {/* ---------------------------------------------------------- */}
             {/* Normalization                                               */}
@@ -201,211 +262,128 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               </strong>
               {t('about.scoring.normalizationBodySuffix') as string}
             </p>
-            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
-              {t('about.scoring.normalizationFormula') as string}
-            </div>
-            <p>
-              {t('about.scoring.normalizationCurveNote') as string}
-            </p>
+            <Formula>{t('about.scoring.normalizationFormula') as string}</Formula>
+            <p>{t('about.scoring.normalizationCurveNote') as string}</p>
 
             {/* ---------------------------------------------------------- */}
             {/* Caps                                                        */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading id="scoring-caps">{t('about.scoring.sectionCaps') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.capsBody') as string}
-            </p>
+            <p>{t('about.scoring.capsBody') as string}</p>
             <Table
               headers={tArray<string>(t, 'about.scoring.capsTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.capsTableRows')}
             />
 
             {/* ---------------------------------------------------------- */}
-            {/* The dimensions                                               */}
+            {/* The four core dimensions                                    */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading id="scoring-dimensions">{t('about.scoring.sectionDimensions') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.dimensionsBody') as string}
-            </p>
+            <p>{t('about.scoring.dimensionsBody') as string}</p>
 
-            {/* Delivery */}
             <SubHeading>{t('about.scoring.deliveryHeading') as string}</SubHeading>
+            <Formula>{t('about.scoring.deliveryFormula') as string}</Formula>
             <Table
               headers={tArray<string>(t, 'about.scoring.deliveryTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.deliveryTableRows')}
             />
-            <p>
-              {t('about.scoring.deliveryPrWeightNote1') as string}
-            </p>
-            <p>
-              {t('about.scoring.deliveryPrWeightNote2') as string}
-              <strong className="text-text-primary">
-                {t('about.scoring.deliveryFlowHighlight') as string}
-              </strong>
-              {t('about.scoring.deliveryFlowSuffix') as string}
-            </p>
+            <p>{t('about.scoring.deliveryNote') as string}</p>
 
-            {/* Quality */}
-            <SubHeading>
-              {t('about.scoring.qualityHeading') as string}
-            </SubHeading>
-            <p>
-              {t('about.scoring.qualityIntro') as string}
-            </p>
-            <SubHeading>{t('about.scoring.collaborativeQualityHeading') as string}</SubHeading>
+            <SubHeading>{t('about.scoring.qualityHeading') as string}</SubHeading>
+            <Formula>{t('about.scoring.qualityFormula') as string}</Formula>
+            <p>{t('about.scoring.qualityIntro') as string}</p>
             <Table
-              headers={tArray<string>(t, 'about.scoring.collaborativeQualityTableHeaders')}
-              rows={tArray<string[]>(t, 'about.scoring.collaborativeQualityTableRows')}
+              headers={tArray<string>(t, 'about.scoring.qualityTableHeaders')}
+              rows={tArray<string[]>(t, 'about.scoring.qualityTableRows')}
             />
-            <SubHeading>{t('about.scoring.soloQualityHeading') as string}</SubHeading>
-            <Table
-              headers={tArray<string>(t, 'about.scoring.soloQualityTableHeaders')}
-              rows={tArray<string[]>(t, 'about.scoring.soloQualityTableRows')}
-            />
-            <p>
-              {t('about.scoring.soloQualityNote') as string}
-            </p>
+            <p>{t('about.scoring.qualityNote') as string}</p>
 
-            {/* Consistency */}
-            <SubHeading>
-              {t('about.scoring.consistencyHeading') as string}
-            </SubHeading>
-            <Table
-              headers={tArray<string>(t, 'about.scoring.consistencyTableHeaders')}
-              rows={tArray<string[]>(t, 'about.scoring.consistencyTableRows')}
-            />
-            <p>
-              {t('about.scoring.consistencyNote1Prefix') as string}
-              <strong className="text-text-primary">
-                {t('about.scoring.consistencyNote1Highlight') as string}
-              </strong>
-              {t('about.scoring.consistencyNote1Suffix') as string}
-            </p>
+            <SubHeading>{t('about.scoring.consistencyHeading') as string}</SubHeading>
+            <Formula>{t('about.scoring.consistencyFormula') as string}</Formula>
+            <p>{t('about.scoring.consistencyIntro') as string}</p>
+            <p>{t('about.scoring.consistencyNote') as string}</p>
 
-            {/* Breadth */}
             <SubHeading>{t('about.scoring.breadthHeading') as string}</SubHeading>
-            <Table
-              headers={tArray<string>(t, 'about.scoring.breadthTableHeaders')}
-              rows={tArray<string[]>(t, 'about.scoring.breadthTableRows')}
-            />
-            <p>
-              {t('about.scoring.breadthNote') as string}
-            </p>
+            <Formula>{t('about.scoring.breadthFormula') as string}</Formula>
+            <p>{t('about.scoring.breadthIntro') as string}</p>
+            <p>{t('about.scoring.breadthNote') as string}</p>
 
             {/* ---------------------------------------------------------- */}
-            {/* Craft dimension                                             */}
+            {/* Craft                                                       */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading id="scoring-craft">{t('about.scoring.sectionCraft') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.craftIntro') as string}
-            </p>
+            <p>{t('about.scoring.craftIntro') as string}</p>
+            <Formula>{t('about.scoring.craftFormula') as string}</Formula>
             <SubHeading>{t('about.scoring.craftHowToHeading') as string}</SubHeading>
             <p>
               {t('about.scoring.craftHowToBody') as string}<code className="bg-card px-1.5 py-0.5 rounded text-sm font-heading">{t('about.scoring.craftHowToCode') as string}</code>{t('about.scoring.craftHowToBodySuffix') as string}
             </p>
             <SubHeading>{t('about.scoring.craftWhatHeading') as string}</SubHeading>
-            <p>
-              {t('about.scoring.craftWhatIntro') as string}
-            </p>
+            <p>{t('about.scoring.craftWhatIntro') as string}</p>
             <Table
               headers={tArray<string>(t, 'about.scoring.craftTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.craftTableRows')}
             />
+            <p>{t('about.scoring.craftFrictionNote1') as string}</p>
+            <p>{t('about.scoring.craftArtificerNote') as string}</p>
+
+            {/* ---------------------------------------------------------- */}
+            {/* Evidence-completion ranges                                  */}
+            {/* ---------------------------------------------------------- */}
+            <SectionHeading id="scoring-ranges">{t('about.scoring.sectionRanges') as string}</SectionHeading>
             <p>
-              {t('about.scoring.craftFrictionNote1') as string}
+              {t('about.scoring.rangesIntro1Prefix') as string}
+              <strong className="text-text-primary">{t('about.scoring.rangesIntro1Highlight') as string}</strong>
+              {t('about.scoring.rangesIntro1Suffix') as string}
             </p>
+            <p>{t('about.scoring.rangesBody2') as string}</p>
+            <Table
+              headers={tArray<string>(t, 'about.scoring.rangesTableHeaders')}
+              rows={tArray<string[]>(t, 'about.scoring.rangesTableRows')}
+            />
+            <p>{t('about.scoring.rangesNote') as string}</p>
 
             {/* ---------------------------------------------------------- */}
             {/* Archetypes                                                  */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading id="scoring-archetypes">{t('about.scoring.sectionArchetypes') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.archetypesIntro') as string}
-            </p>
+            <p>{t('about.scoring.archetypesIntro') as string}</p>
             <Table
               headers={tArray<string>(t, 'about.scoring.archetypesTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.archetypesTableRows')}
             />
-            <p>
-              {t('about.scoring.archetypesTieBreaking') as string}
-            </p>
+            <p>{t('about.scoring.archetypesTieBreaking') as string}</p>
 
             {/* ---------------------------------------------------------- */}
             {/* Composite score and tiers                                   */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading id="scoring-composite">{t('about.scoring.sectionComposite') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.compositeIntro') as string}
-            </p>
-            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary space-y-1">
-              <p>{t('about.scoring.compositeFormula1') as string}</p>
-              <p>
-                {t('about.scoring.compositeFormula2') as string}
-              </p>
-            </div>
-            <p>
-              {t('about.scoring.compositeRecencyNote') as string}
-            </p>
-            <p>
-              {t('about.scoring.compositeConfidenceNote') as string}
-            </p>
+            <p>{t('about.scoring.compositeIntro') as string}</p>
+            <Formula>{t('about.scoring.compositeFormula1') as string}</Formula>
+            <p>{t('about.scoring.compositeRoundingNote') as string}</p>
             <Table
               headers={tArray<string>(t, 'about.scoring.tiersTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.tiersTableRows')}
             />
 
             {/* ---------------------------------------------------------- */}
-            {/* Confidence system                                           */}
+            {/* Receipts                                                    */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading id="scoring-confidence">{t('about.scoring.sectionConfidence') as string}</SectionHeading>
+            <SectionHeading id="scoring-receipts">{t('about.scoring.sectionReceipts') as string}</SectionHeading>
             <p>
-              {t('about.scoring.confidenceIntro1Prefix') as string}
-              <strong className="text-text-primary">{t('about.scoring.confidenceIntro1Highlight') as string}</strong>
-              {t('about.scoring.confidenceIntro1Suffix') as string}
+              {t('about.scoring.receiptsIntro1Prefix') as string}
+              <strong className="text-text-primary">{t('about.scoring.receiptsIntro1Highlight') as string}</strong>
+              {t('about.scoring.receiptsIntro1Suffix') as string}
             </p>
-            <p>
-              {t('about.scoring.confidenceIntro2') as string}
-            </p>
-            <Table
-              headers={tArray<string>(t, 'about.scoring.confidenceTableHeaders')}
-              rows={tArray<string[]>(t, 'about.scoring.confidenceTableRows')}
-            />
-            <p>
-              {t('about.scoring.confidenceFloor1Prefix') as string}
-              <strong className="text-text-primary">{t('about.scoring.confidenceFloor1Highlight') as string}</strong>
-              {t('about.scoring.confidenceFloor1Suffix') as string}
-            </p>
-            <p>
-              {t('about.scoring.confidenceMutuallyExclusivePrefix') as string}
-              <strong className="text-text-primary">{t('about.scoring.confidenceMutuallyExclusiveHighlight') as string}</strong>
-              {t('about.scoring.confidenceMutuallyExclusiveSuffix') as string}
-            </p>
+            <p>{t('about.scoring.receiptsBody2') as string}</p>
+            <p>{t('about.scoring.receiptsBody3') as string}</p>
+            <p>{t('about.scoring.receiptsConsentNote') as string}</p>
 
             {/* ---------------------------------------------------------- */}
-            {/* Score smoothing                                             */}
-            {/* ---------------------------------------------------------- */}
-            <SectionHeading id="scoring-smoothing">{t('about.scoring.sectionSmoothing') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.smoothingIntro1Prefix') as string}
-              <strong className="text-text-primary">
-                {t('about.scoring.smoothingIntro1Highlight') as string}
-              </strong>
-              {t('about.scoring.smoothingIntro1Suffix') as string}
-            </p>
-            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
-              {t('about.scoring.smoothingFormula') as string}
-            </div>
-            <p>
-              {t('about.scoring.smoothingNote') as string}
-            </p>
-
-            {/* ---------------------------------------------------------- */}
-            {/* What we don't use                                           */}
+            {/* What earns nothing                                          */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading id="scoring-excludes">{t('about.scoring.sectionExcludes') as string}</SectionHeading>
-            <p>
-              {t('about.scoring.excludesIntro') as string}
-            </p>
+            <p>{t('about.scoring.excludesIntro') as string}</p>
             <ul className="list-disc pl-6 space-y-1">
               <li>
                 <strong className="text-text-primary">{t('about.scoring.excludeFollowers') as string}</strong>
@@ -416,9 +394,15 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
                 {t('about.scoring.excludeLOCSuffix') as string}
               </li>
               <li>
-                <strong className="text-text-primary">
-                  {t('about.scoring.excludePrivate') as string}
-                </strong>
+                <strong className="text-text-primary">{t('about.scoring.excludeTooling') as string}</strong>
+                {t('about.scoring.excludeToolingSuffix') as string}
+              </li>
+              <li>
+                <strong className="text-text-primary">{t('about.scoring.excludeTenure') as string}</strong>
+                {t('about.scoring.excludeTenureSuffix') as string}
+              </li>
+              <li>
+                <strong className="text-text-primary">{t('about.scoring.excludePrivate') as string}</strong>
                 {t('about.scoring.excludePrivateSuffix') as string}
               </li>
             </ul>
@@ -426,7 +410,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* CTA                                                         */}
             {/* ---------------------------------------------------------- */}
-            <div className="mt-16 rounded-xl border border-stroke bg-card p-6 sm:p-8">
+            <div className="mt-16 rounded-[3px] border border-stroke bg-card p-6 sm:p-8">
               <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight mb-3">
                 {t('about.scoring.ctaHeading') as string}
               </h2>
@@ -438,18 +422,19 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
                   href="https://x.com/juang294"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[3px] bg-action px-6 py-3 font-heading text-sm font-semibold text-action-text hover:bg-action-hover transition-colors"
                 >
                   {t('about.scoring.ctaTwitter') as string}
                 </a>
                 <a
                   href="mailto:support@chapa.thecreativetoken.com"
-                  className="inline-flex items-center justify-center rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-all"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[3px] border border-text-primary px-6 py-3 text-sm font-medium text-text-secondary hover:border-text-primary hover:text-text-primary transition-all"
                 >
                   {t('about.scoring.ctaEmail') as string}
                 </a>
               </div>
             </div>
+            </>}
           </div>
           </div>
         </div>

@@ -207,6 +207,23 @@ describe("next.config.ts security headers", () => {
     });
   });
 
+  describe("CSP allows PostHog's assets host (LE-8-5)", () => {
+    // posthog-js loads its remote config and the `array` bundle from
+    // eu-assets.i.posthog.com, not from the ingestion host; without it the
+    // browser logs two CSP violations per page and remote config never loads.
+    it("includes eu-assets.i.posthog.com in script-src and connect-src", async () => {
+      const config = await loadConfig();
+      const headersArray = await config.headers!();
+      const matched = findMatchingHeaders(headersArray, "/");
+      expect(matched).toBeDefined();
+      const csp = getHeaderValue(matched!, "Content-Security-Policy")!;
+      const directive = (name: string) => csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `)) ?? "";
+      expect(directive("script-src")).toContain("https://eu-assets.i.posthog.com");
+      expect(directive("connect-src")).toContain("https://eu-assets.i.posthog.com");
+      expect(directive("connect-src")).toContain("https://eu.i.posthog.com");
+    });
+  });
+
   describe("CSP img-src includes YouTube thumbnails", () => {
     it("includes i.ytimg.com in img-src", async () => {
       const config = await loadConfig();

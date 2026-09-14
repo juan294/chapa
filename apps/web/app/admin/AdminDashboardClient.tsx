@@ -56,14 +56,14 @@ export function AdminDashboardClient() {
   // -------------------------------------------------------------------------
 
   const tabClasses = (tab: AdminTab) =>
-    `px-4 py-2 font-heading text-sm transition-colors ${
+    `min-h-11 px-4 py-2 font-heading text-sm transition-colors ${
       activeTab === tab
-        ? "border-b-2 border-amber text-amber"
+        ? "border-b-2 border-amber-text text-amber-text"
         : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
     }`;
 
   const tabBar = (
-    <div role="tablist" aria-label="Admin sections" className="flex gap-0 border-b border-stroke">
+    <div role="tablist" aria-label="Admin sections" className="flex flex-wrap gap-0 border-b border-stroke">
       <button
         id="tab-users"
         role="tab"
@@ -117,7 +117,7 @@ export function AdminDashboardClient() {
         {tabBar}
         <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
           <h2 className="font-heading text-2xl tracking-tight text-text-primary">
-            <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+            <span className="text-amber-text">$</span> admin<span className="text-text-secondary">/</span>users
           </h2>
           <span className="sr-only" aria-live="polite">Loading user data</span>
           <AdminTableSkeleton />
@@ -136,15 +136,15 @@ export function AdminDashboardClient() {
         {tabBar}
         <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="mx-auto max-w-lg py-32 text-center">
           <h2 className="font-heading text-2xl tracking-tight text-text-primary mb-6">
-            <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+            <span className="text-amber-text">$</span> admin<span className="text-text-secondary">/</span>users
           </h2>
-          <div className="rounded-xl border border-terminal-red/20 bg-terminal-red/5 p-6">
+          <div className="rounded-[3px] border border-terminal-red/20 bg-terminal-red/5 p-6">
             <p className="font-heading text-sm text-terminal-red">
-              <span className="text-terminal-red/50">ERR</span> {error}
+              <span className="text-terminal-red">ERR</span> {error}
             </p>
             <button
               onClick={() => { setError(null); setLoading(true); fetchUsers(); }}
-              className="mt-4 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+              className="mt-4 min-h-11 rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text hover:bg-action-hover"
             >
               Retry
             </button>
@@ -179,15 +179,15 @@ export function AdminDashboardClient() {
       ) : (
         <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
           {/* Header */}
-          <div className="animate-fade-in-up flex items-start justify-between gap-4">
+          <div className="animate-fade-in-up flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="font-heading text-2xl tracking-tight text-text-primary">
-                <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+                <span className="text-amber-text">$</span> admin<span className="text-text-secondary">/</span>users
               </h2>
               <p className="mt-1 text-sm text-text-secondary">
                 {total} developer{total !== 1 ? "s" : ""}
                 {lastRefreshed && (
-                  <span className="ml-2 text-text-secondary/60">
+                  <span className="ml-2 text-text-secondary">
                     &middot; updated {formatDate(lastRefreshed.toISOString())}
                   </span>
                 )}
@@ -196,7 +196,7 @@ export function AdminDashboardClient() {
             <button
               onClick={() => fetchUsers(true)}
               disabled={refreshing}
-              className="flex items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 min-h-11 rounded-[3px] border border-text-primary px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-text-primary hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Refresh data"
             >
               <svg
@@ -225,7 +225,7 @@ export function AdminDashboardClient() {
 
           {/* Search + Table */}
           <div
-            className="rounded-xl border border-stroke bg-card overflow-hidden animate-fade-in-up"
+            className="rounded-[3px] border border-stroke bg-card overflow-hidden animate-fade-in-up"
             style={{ animationDelay: "250ms" }}
           >
             <AdminSearchBar
@@ -242,7 +242,7 @@ export function AdminDashboardClient() {
             />
             {/* Pagination controls */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-stroke px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stroke px-4 py-3">
                 <span className="text-xs text-text-secondary tabular-nums">
                   Showing {((page - 1) * limit) + 1}&ndash;{Math.min(page * limit, total)} of {total}
                 </span>
@@ -250,7 +250,7 @@ export function AdminDashboardClient() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage(page - 1)}
-                    className="rounded-md border border-stroke px-3 py-1 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="min-h-11 rounded-[3px] border border-text-primary px-3 py-1 text-xs font-medium text-text-secondary hover:border-text-primary hover:text-text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Previous page"
                   >
                     Previous
@@ -261,7 +261,7 @@ export function AdminDashboardClient() {
                   <button
                     disabled={page >= totalPages}
                     onClick={() => setPage(page + 1)}
-                    className="rounded-md border border-stroke px-3 py-1 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="min-h-11 rounded-[3px] border border-text-primary px-3 py-1 text-xs font-medium text-text-secondary hover:border-text-primary hover:text-text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Next page"
                   >
                     Next

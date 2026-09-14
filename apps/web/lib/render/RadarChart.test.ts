@@ -239,7 +239,7 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
       expect(dotCount).toBe(5);
     });
 
-    it("renders the empty-state marker for an all-zero pentagon", () => {
+    it("retains the measured Craft zero in an all-zero pentagon", () => {
       const svg = renderRadarChart(
         makePentagonDimensions({
           delivery: 0,
@@ -251,11 +251,14 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
         200,
         200,
         100,
+        undefined,
+        undefined,
+        { observed: true },
       );
 
-      expect(svg).toContain('data-role="radar-empty-marker"');
-      expect(svg).toContain(">no data yet<");
-      expect(svg).not.toMatch(/fill-opacity="0\.15"/);
+      expect(svg).toContain('data-axis="craft" data-value="0"');
+      expect(svg).not.toContain(">no data yet<");
+      expect(svg).toMatch(/fill-opacity="0\.15"/);
     });
 
     it("uniform pentagon scores produce equidistant points", () => {

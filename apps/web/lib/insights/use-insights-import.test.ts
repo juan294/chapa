@@ -96,6 +96,7 @@ describe("useInsightsImport", () => {
     await act(() => result.current.importFile(file("ignored", 10 * 1024 * 1024 + 1)));
 
     expect(result.current.toast).toEqual({
+      id: 1,
       message: "File too large",
       detail: "Choose a file under 10 MB",
       type: "error",
@@ -119,11 +120,15 @@ describe("useInsightsImport", () => {
     expect(mocks.parseInsightsHtml).toHaveBeenCalledWith("report html");
     expect(fetch).toHaveBeenNthCalledWith(1, "/api/insights", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Chapa-Scoring-Policy": "v6",
+      },
       body: JSON.stringify({ messages: 12 }),
     });
     expect(fetch).toHaveBeenNthCalledWith(2, "/api/recalculate", { method: "POST" });
     expect(result.current.toast).toEqual({
+      id: 3,
       message: "Craft 91, Expert translated",
       detail: "Impact score 84",
       type: "success",
@@ -154,6 +159,7 @@ describe("useInsightsImport", () => {
     await act(() => result.current.importFile(file()));
 
     expect(result.current.toast).toEqual({
+      id: 3,
       message: "Insights imported",
       detail: "Scores will update later",
       type: "success",
@@ -171,6 +177,7 @@ describe("useInsightsImport", () => {
 
     await act(() => result.current.importFile(file()));
     expect(result.current.toast).toEqual({
+      id: 2,
       message: "Import failed",
       detail: "Try again",
       type: "error",

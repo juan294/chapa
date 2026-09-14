@@ -13,6 +13,7 @@ import {
   useLayoutEffect,
 } from "react";
 import { useRouter } from "next/navigation";
+import { navigateInApp } from "@/lib/navigation";
 import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
 import { type ShortcutScope, TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
@@ -148,7 +149,7 @@ export function KeyboardShortcutsListener() {
       // Navigation shortcuts (global)
       switch (id) {
         case "go-home":
-          router.push("/");
+          navigateInApp("/", (href) => router.push(href));
           return;
         case "go-profile": {
           // #1184 (FE-L6) — reuse useSession's shared, deduplicated
@@ -160,14 +161,14 @@ export function KeyboardShortcutsListener() {
           // to null.
           fetchSession().then((user) => {
             if (user?.login) {
-              router.push(`/u/${user.login}`);
+              navigateInApp(`/u/${user.login}`, (href) => router.push(href));
             }
           });
           return;
         }
         case "go-studio":
           if (studioEnabled) {
-            router.push("/studio");
+            navigateInApp("/studio", (href) => router.push(href));
           }
           return;
         case "open-cheatsheet":

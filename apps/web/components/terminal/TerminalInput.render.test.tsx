@@ -344,7 +344,7 @@ describe("TerminalInput — v2 field (#1214)", () => {
     const { container } = render(<TerminalInput onSubmit={() => {}} />);
     const field = container.firstElementChild as HTMLElement;
     expect(field.className).toContain("min-h-[46px]");
-    expect(field.className).toContain("rounded-lg");
+    expect(field.className).toContain("rounded-[3px]");
     expect(field.className).toContain("border");
   });
 

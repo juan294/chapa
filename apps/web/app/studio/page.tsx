@@ -19,6 +19,8 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { STUDIO_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +74,7 @@ async function renderStudio(clientProps: StudioClientProps) {
       ]}
     >
       <main id="main-content" className="min-h-screen bg-bg">
-        <div className="pt-[57px]">
+        <div className="pt-[69px]">
           <KeyboardShortcutsListener />
           <StudioClient
             key={clientProps.demo ? "demo" : "live"}
@@ -94,10 +96,12 @@ export default async function StudioPage(
 
   const params = searchParams ? await searchParams : {};
   if (params.demo === "1" && await isStudioDemoEnabled()) {
+    const scoringSelection = await readScoringRenderSelection();
     return renderStudio({
       initialConfig: DEFAULT_BADGE_CONFIG,
       stats: DEMO_STATS,
       impact: DEMO_IMPACT,
+      ...(scoringSelection.enabled ? { scoring: STUDIO_OBSERVED_DEMO } : {}),
       craftResult: null,
       handle: DEMO_STATS.handle,
       verification: null,
@@ -115,11 +119,27 @@ export default async function StudioPage(
     redirect("/api/auth/login");
   }
 
+  const scoringSelection = await readScoringRenderSelection();
+
   // Fetch the live owner display projection and saved config in parallel.
-  const [materialized, savedConfigResult] = await Promise.all([
-    materializeDisplayProfile(session.login, { token }),
+  const [sessionMaterialized, savedConfigResult] = await Promise.all([
+    materializeDisplayProfile(session.login, { token, scoringSelection }),
     loadStudioConfig(session.login),
   ]);
+
+  // Unknown persisted state is not a new account. The existing error boundary
+  // offers retry without mounting an editor that could overwrite saved choices.
+  if (savedConfigResult.status === "unavailable" || savedConfigResult.status === "invalid") {
+    throw new Error(`Unable to load Studio configuration for ${session.login}`);
+  }
+
+  // #1282/#1283 — same fallback as /api/generate: a first-time owner has no
+  // baseline, so a session-token fetch that times out or is rejected by the
+  // integrity guard used to surface here as a 500 ("Unable to load Studio
+  // profile"). Retry once as the server GITHUB_TOKEN, which is private-
+  // inclusive and classified `authenticated`, before giving up.
+  const materialized =
+    sessionMaterialized ?? (await materializeDisplayProfile(session.login, { scoringSelection }));
 
   if (!materialized) {
     throw new Error(`Unable to load Studio profile for ${session.login}`);
@@ -145,6 +165,7 @@ export default async function StudioPage(
     initialConfig,
     stats: materialized.stats,
     impact: materialized.displayImpact,
+    scoring: materialized.scoring,
     craftResult: materialized.craftResult,
     handle: session.login,
     verification,

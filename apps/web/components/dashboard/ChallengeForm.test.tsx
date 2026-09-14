@@ -38,6 +38,16 @@ afterEach(() => {
 });
 
 describe("ChallengeForm", () => {
+  it("uses paired action colors and retains visible keyboard focus in the form", () => {
+    render(<ChallengeForm handle="octocat" />);
+    openForm();
+    const submit = screen.getByRole("button", { name: "scoreExplanation.challenge.submit" });
+    expect(submit.className).toContain("bg-action");
+    expect(submit.className).toContain("text-action-text");
+    expect(submit.className).toContain("min-h-[44px]");
+    expect(screen.getByRole("textbox").className).not.toContain("focus-visible:outline-none");
+  });
+
   it("shows the CTA button initially, not the form", () => {
     render(<ChallengeForm handle="octocat" />);
 
