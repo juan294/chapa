@@ -201,13 +201,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## Infrastructure
 
-## GitHub Advanced Security (code scanning + secret scanning) unavailable on repo tier
+## GitHub code scanning pending activation after repository visibility change
 
-- **Risk:** Native GitHub code scanning (CodeQL) and secret scanning are disabled on this repository (`403`/`404` from the respective alert APIs) — GitHub Advanced Security is not licensed for private repositories on this plan tier, so these alert surfaces cannot be enabled without a paid upgrade.
-- **Accepted because:** Equivalent coverage already runs in CI on every PR: the `Secret Scanning` workflow runs Gitleaks, and the `Security Scan` workflow runs the OSV-backed `pnpm run check:vulnerabilities` gate plus `pnpm run check:licenses`. Weekly security-agent cycles independently re-verify secrets, dependency vulnerabilities, and license compliance against live source. Dependabot security alerts are a separate, unaffected surface and remain enabled.
-- **Mitigation:** None required today. Re-evaluate if the repo tier changes or if GHAS becomes available for private repos on the current plan.
+- **Original risk:** Native GitHub code scanning (CodeQL) and secret scanning were unavailable while this repository was private on a plan without GitHub Advanced Security. The alert APIs returned `403`/`404`, so Chapa relied on Gitleaks, the OSV-backed vulnerability gate, the license gate, and weekly security-agent cycles.
+- **Current state:** The repository is now public, so the private-tier licensing constraint no longer applies. `.github/workflows/codeql.yml` prepares JavaScript/TypeScript CodeQL analysis for pushes and pull requests against `develop` and `main`, plus a weekly scheduled scan. Existing Gitleaks, dependency, and license gates remain in place.
+- **Activation:** The workflow is local during the project code freeze. CodeQL results and a successful code-scanning alert API response can only be verified after the workflow reaches GitHub and completes its first run. Keep this risk open until that verification succeeds.
 - **Severity:** Low
-- **Accepted:** 2026-07-15
+- **Accepted:** 2026-07-15 | **Status updated:** 2026-09-14
 
 ## `packages/shared` build step exists but does not drive runtime resolution (#450, #1099)
 

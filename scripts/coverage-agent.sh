@@ -41,9 +41,8 @@ log_info "Running Claude headless mode..."
 # failures never replace the last valid report with an error stub.
 cd "${CHAPA_DIR}"
 acquire_agent_lock "vitest-heavy-agent" "coverage-agent"
-trap 'release_agent_lock "vitest-heavy-agent"' EXIT
-
-TMP_OUTPUT=$(mktemp)
+TMP_OUTPUT=$(create_report_temp "${OUTPUT_FILE}")
+trap 'rm -f "${TMP_OUTPUT}"; release_agent_lock "vitest-heavy-agent"' EXIT
 claude_ok=false
 for attempt in $(seq 1 "${CLAUDE_MAX_ATTEMPTS}"); do
   if claude -p "${PROMPT}" \
@@ -67,7 +66,7 @@ if [ "${claude_ok}" != "true" ]; then
   exit 1
 fi
 
-mv "${TMP_OUTPUT}" "${OUTPUT_FILE}"
+publish_report_file "${TMP_OUTPUT}" "${OUTPUT_FILE}" "coverage-agent"
 release_agent_lock "vitest-heavy-agent"
 trap - EXIT
 

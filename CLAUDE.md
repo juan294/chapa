@@ -85,6 +85,10 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/llms.txt` LLM-friendly site summary
 - GET `/llms-full.txt` Full LLM-friendly site content
 - GET `/.well-known/security.txt` Security contact info
+- GET `/.well-known/glama.json` Glama connector ownership claim (no-store)
+- GET `/.well-known/mcp.json` Static WebMCP and remote MCP discovery document
+- GET `/.well-known/openai-apps-challenge` OpenAI Apps domain-verification token (404 until configured; no-store)
+- POST `/api/mcp` Stateless Streamable HTTP MCP endpoint with 9 public read-only tools (feature-gated and rate-limited; GET and DELETE return 405)
 
 ### Authenticated API
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)

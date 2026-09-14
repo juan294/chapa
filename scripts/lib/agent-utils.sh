@@ -119,6 +119,28 @@ validate_report_file() {
   return 0
 }
 
+# create_report_temp <report_file>
+# Creates the temporary file beside its destination so publication can use an
+# atomic rename on the same filesystem.
+create_report_temp() {
+  local report_file="$1"
+  mktemp "${report_file}.tmp.XXXXXX"
+}
+
+# publish_report_file <temp_file> <report_file> <agent_label> [valid_pattern]
+# Validates new output before atomically replacing the last good report.
+publish_report_file() {
+  local temp_file="$1"
+  local report_file="$2"
+  local agent_label="$3"
+  local valid_pattern="${4:-^(# |\`\`\`markdown)}"
+
+  if ! validate_report_file "${temp_file}" "${agent_label}" "${valid_pattern}"; then
+    return 1
+  fi
+  mv "${temp_file}" "${report_file}"
+}
+
 # ---------------------------------------------------------------------------
 # Feature flag check
 # ---------------------------------------------------------------------------

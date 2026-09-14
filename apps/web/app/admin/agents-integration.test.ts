@@ -307,12 +307,13 @@ describe("agents integration: shell scripts and launchd plists", () => {
     for (const scriptPath of scripts) {
       const fullPath = path.join(projectRoot, scriptPath);
       const content = fs.readFileSync(fullPath, "utf-8");
-      expect(content).toContain('validate_report_file "${OUTPUT_FILE}"');
+      expect(content).toContain("create_report_temp");
+      expect(content).toContain("publish_report_file");
     }
 
     const ccRpiPath = path.join(projectRoot, "scripts/cc-rpi-update.sh");
     const ccRpiContent = fs.readFileSync(ccRpiPath, "utf-8");
-    expect(ccRpiContent).toContain("validate_report_file");
+    expect(ccRpiContent).toContain("publish_report_file");
     expect(ccRpiContent).toContain('"${REPORT_FILE}"');
   });
 
