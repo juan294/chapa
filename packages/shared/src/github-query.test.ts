@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CONTRIBUTION_QUERY } from "./github-query";
+import { CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY } from "./github-query";
 
 describe("CONTRIBUTION_QUERY", () => {
   it("is a non-empty string", () => {
@@ -11,18 +11,13 @@ describe("CONTRIBUTION_QUERY", () => {
     expect(CONTRIBUTION_QUERY).toContain("user(login: $login)");
   });
 
-  it("uses both DateTime and GitTimestamp variables", () => {
+  it("uses DateTime variables for contribution activity", () => {
     expect(CONTRIBUTION_QUERY).toContain("$since: DateTime!");
-    expect(CONTRIBUTION_QUERY).toContain("$historySince: GitTimestamp!");
+    expect(CONTRIBUTION_QUERY).not.toContain("$historySince: GitTimestamp!");
   });
 
   it("queries contributionsCollection", () => {
     expect(CONTRIBUTION_QUERY).toContain("contributionsCollection");
-  });
-
-  it("queries repositories with commit history", () => {
-    expect(CONTRIBUTION_QUERY).toContain("repositories(");
-    expect(CONTRIBUTION_QUERY).toContain("history(since: $historySince");
   });
 
   it("queries pull request contributions with additions/deletions/changedFiles", () => {
@@ -30,13 +25,6 @@ describe("CONTRIBUTION_QUERY", () => {
     expect(CONTRIBUTION_QUERY).toContain("additions");
     expect(CONTRIBUTION_QUERY).toContain("deletions");
     expect(CONTRIBUTION_QUERY).toContain("changedFiles");
-  });
-
-  it("queries owned repos for watchers, forkCount, and stargazerCount", () => {
-    expect(CONTRIBUTION_QUERY).toContain("stargazerCount");
-    expect(CONTRIBUTION_QUERY).toContain("forkCount");
-    expect(CONTRIBUTION_QUERY).toContain("watchers");
-    expect(CONTRIBUTION_QUERY).toContain("totalCount");
   });
 
   // ---------------------------------------------------------------------------
@@ -54,5 +42,22 @@ describe("CONTRIBUTION_QUERY", () => {
     const userBlockStart = CONTRIBUTION_QUERY.indexOf("user(login: $login)");
     expect(userBlockStart).toBeGreaterThanOrEqual(0);
     expect(userBlockEnd).toBeGreaterThan(userBlockStart);
+  });
+});
+
+describe("REPOSITORY_STATS_QUERY", () => {
+  it("isolates repository history from contribution activity", () => {
+    expect(REPOSITORY_STATS_QUERY).toContain("user(login: $login)");
+    expect(REPOSITORY_STATS_QUERY).toContain("$historySince: GitTimestamp!");
+    expect(REPOSITORY_STATS_QUERY).toContain("repositories(");
+    expect(REPOSITORY_STATS_QUERY).toContain("history(since: $historySince");
+    expect(REPOSITORY_STATS_QUERY).not.toContain("contributionsCollection");
+  });
+
+  it("queries owned repos for watchers, forkCount, and stargazerCount", () => {
+    expect(REPOSITORY_STATS_QUERY).toContain("stargazerCount");
+    expect(REPOSITORY_STATS_QUERY).toContain("forkCount");
+    expect(REPOSITORY_STATS_QUERY).toContain("watchers");
+    expect(REPOSITORY_STATS_QUERY).toContain("totalCount");
   });
 });

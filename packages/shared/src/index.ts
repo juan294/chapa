@@ -34,7 +34,7 @@ export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG, RETIRED_BADGE_CONFIG_KEYS }
 
 export type { Platform, LinkedPlatform } from "./platforms";
 
-export { CONTRIBUTION_QUERY } from "./github-query";
+export { CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY } from "./github-query";
 export { buildStatsFromRaw, normalizeStats } from "./stats-aggregation";
 export { computePlatformStats } from "./platform-stats";
 export type { PlatformStatsInput, NormalizedRepo, NormalizedMergedPr } from "./platform-stats";

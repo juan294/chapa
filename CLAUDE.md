@@ -509,7 +509,7 @@ SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBL
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
-CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1/P2 operational alerts (optional, custom endpoint only — no Discord/Slack integration exists or is planned; triggers on health_degraded, badge_5xx, oauth_callback_failure, cron_failure, warm_cache_high_failure_rate, warm_cache_ceiling_approached, badge_latency_slo_breach). When unset (the current production default), the same signals deliver via email instead (Resend, to SUPPORT_FORWARD_EMAIL) — see docs/runbooks/incident-response.md.
+CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for operational alerts (optional, custom endpoint only — no Discord/Slack integration exists or is planned; triggers on health_degraded, badge_5xx, oauth_callback_failure, cron_failure, warm_cache_handle_failure, warm_cache_high_failure_rate, warm_cache_ceiling_approached, badge_latency_slo_breach). When unset (the current production default), the same signals deliver via email instead (Resend, to SUPPORT_FORWARD_EMAIL) — see docs/runbooks/incident-response.md.
 
 RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
 RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)

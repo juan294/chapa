@@ -3,6 +3,7 @@ export interface RedesignUpstreamFixtures {
   journeyRunId?: 'redesign';
   avatarPng?: string;
   contributionQuery?: string;
+  repositoryQuery?: string;
   cache: Record<string, unknown>;
   github: Record<string, unknown>;
 }

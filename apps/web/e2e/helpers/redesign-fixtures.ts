@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import type { BrowserContext } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY } from '@chapa/shared';
+import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY } from '@chapa/shared';
 import { buildRedesignGitHubFixture } from './redesign-github';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
 import { DEMO_STATS } from '../../lib/render/demoData';
@@ -92,7 +92,7 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
     for (const handle of SCORING_POINT_HANDLES) github[handle] = buildRedesignGitHubFixture(handle, new Date().toISOString()).response;
     const today = new Date().toISOString();
     await check(db.from('verification_records').insert({ hash: REDESIGN_VALID_HASH, handle: 'chapa-redesign-owner', display_name: 'Local redesign fixture', adjusted_composite: 70, confidence: 86, tier: 'High', archetype: 'Builder', profile_type: 'collaborative', building: 74, guarding: 69, consistency: 71, breadth: 67, commits_total: 124, prs_merged_count: 18, reviews_submitted: 33, generated_at: today.slice(0, 10), expires_at: new Date(Date.now() + 86400_000).toISOString() }));
-    await writeFile(upstreamFile, JSON.stringify({ cache, github, journeyRunId: 'redesign', contributionQuery: CONTRIBUTION_QUERY, avatarPng: (await readFile(resolve(__dirname, '../../public/logo-512.png'))).toString('base64') }));
+    await writeFile(upstreamFile, JSON.stringify({ cache, github, journeyRunId: 'redesign', contributionQuery: CONTRIBUTION_QUERY, repositoryQuery: REPOSITORY_STATS_QUERY, avatarPng: (await readFile(resolve(__dirname, '../../public/logo-512.png'))).toString('base64') }));
     return { db, cleanup };
   } catch (error) {
     try { await cleanup(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Redesign bootstrap and cleanup failed'); }

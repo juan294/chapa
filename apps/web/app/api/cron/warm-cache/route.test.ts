@@ -315,12 +315,34 @@ it("reports raw-retention failures without claiming deletion success", async () 
 
     expect(body.warmed).toBe(1);
     expect(body.failed).toBe(1);
-    expect(mockCaptureServerError).toHaveBeenCalledWith(
+    expect(mockCacheSetNxStatus).toHaveBeenCalledWith(
+      expect.stringMatching(/^warm-cache:handle-failure-alerted:alice:\d{4}-\d{2}-\d{2}$/),
+      86400,
+    );
+    expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
       expect.objectContaining({
+        signal: "warm_cache_handle_failure",
+        severity: "P3",
         route: "/api/cron/warm-cache",
-        statusCode: 502,
+        summary: "warm-cache could not refresh stats for alice",
+        properties: expect.objectContaining({ handle: "alice" }),
       }),
     );
+    expect(mockCaptureServerError).not.toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 502 }),
+    );
+  });
+
+  it("deduplicates a handle failure alert for the UTC day", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValueOnce(null);
+    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
+
+    await GET(makeRequest());
+
+    const handleAlerts = (mockCaptureOperationalAlert.mock.calls as Array<[{ signal: string }]>).filter(
+      ([options]) => options.signal === "warm_cache_handle_failure",
+    );
+    expect(handleAlerts).toHaveLength(0);
   });
 
   it("compares snapshots and notifies when an inserted canonical snapshot is significant", async () => {

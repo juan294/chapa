@@ -146,7 +146,7 @@ describe("fetchContributionData", () => {
 
     expect(result).toBeNull();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] GraphQL HTTP 401"),
+      expect.stringContaining("[github] GraphQL HTTP activity=401 repositories=401"),
     );
     consoleSpy.mockRestore();
   });
@@ -175,47 +175,49 @@ describe("fetchContributionData", () => {
     consoleSpy.mockRestore();
   });
 
-  it("sends separate DateTime and GitTimestamp variables in the query body", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          data: {
-            user: {
-              login: "testuser",
-              name: "Test",
-              avatarUrl: "https://example.com/avatar.png",
-              contributionsCollection: {
-                contributionCalendar: { totalContributions: 0, weeks: [] },
-                pullRequestContributions: { totalCount: 0, nodes: [] },
-                pullRequestReviewContributions: { totalCount: 0 },
-                issueContributions: { totalCount: 0 },
-              },
-              repositories: { totalCount: 0, nodes: [] },
+  it("splits activity and repository history into concurrent requests", async () => {
+    const mockFetch = vi.fn().mockImplementation((_: string, options: RequestInit) => {
+      const body = JSON.parse(String(options.body));
+      const user = body.query.includes("contributionsCollection")
+        ? {
+            login: "testuser",
+            name: "Test",
+            avatarUrl: "https://example.com/avatar.png",
+            contributionsCollection: {
+              contributionCalendar: { totalContributions: 12, weeks: [] },
+              pullRequestContributions: { totalCount: 3, nodes: [] },
+              pullRequestReviewContributions: { totalCount: 2 },
+              issueContributions: { totalCount: 1 },
             },
-          },
-        }),
+          }
+        : {
+            repositories: { totalCount: 308, nodes: [] },
+            ownedRepos: { nodes: [] },
+          };
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: { user } }),
+      });
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await fetchContributionData("testuser", "token");
+    const result = expectFound(await fetchContributionData("testuser", "token"));
 
-    const [, opts] = mockFetch.mock.calls[0]!;
-    const body = JSON.parse(opts.body);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const bodies = mockFetch.mock.calls.map(([, opts]) => JSON.parse(opts.body));
+    const activity = bodies.find((body) => body.query.includes("contributionsCollection"));
+    const repositories = bodies.find((body) => body.query.includes("history(since:"));
 
-    // Query must declare GitTimestamp variables for Commit.history
-    expect(body.query).toContain("$historySince: GitTimestamp!");
-    expect(body.query).toContain("$historyUntil: GitTimestamp!");
-    // And pass them to the history field
-    expect(body.query).toContain("history(since: $historySince, until: $historyUntil)");
-    // Variables must include both sets
-    expect(body.variables).toHaveProperty("since");
-    expect(body.variables).toHaveProperty("until");
-    expect(body.variables).toHaveProperty("historySince");
-    expect(body.variables).toHaveProperty("historyUntil");
-    // Both pairs should have the same ISO string values
-    expect(body.variables.historySince).toBe(body.variables.since);
-    expect(body.variables.historyUntil).toBe(body.variables.until);
+    expect(activity.query).not.toContain("history(since:");
+    expect(activity.variables).toHaveProperty("since");
+    expect(activity.variables).toHaveProperty("until");
+    expect(repositories.query).not.toContain("contributionsCollection");
+    expect(repositories.variables).toHaveProperty("historySince");
+    expect(repositories.variables).toHaveProperty("historyUntil");
+    expect(repositories.variables.historySince).toBe(activity.variables.since);
+    expect(repositories.variables.historyUntil).toBe(activity.variables.until);
+    expect(result.contributionCalendar.totalContributions).toBe(12);
+    expect(result.repositories.totalCount).toBe(308);
   });
 
   // ---------------------------------------------------------------------------
@@ -515,7 +517,7 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("testuser", "token");
     expect(result).toBeNull();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] GraphQL HTTP 500"),
+      expect.stringContaining("[github] GraphQL HTTP activity=500 repositories=500"),
     );
     consoleSpy.mockRestore();
   });

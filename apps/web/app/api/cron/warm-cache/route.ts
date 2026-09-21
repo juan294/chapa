@@ -56,16 +56,16 @@ export const maxDuration = 300;
  * Maximum handles to warm per cron invocation (stay within GitHub rate
  * limits and the maxDuration budget above).
  *
- * #1010 — rate-limit math: each handle warm makes at most one GitHub
- * GraphQL call (contribution data + the authoritative merged-PR search are
- * both fields on a single `fetchContributionData` request — see
+ * #1010 — rate-limit math: each handle warm makes at most two concurrent
+ * GitHub GraphQL calls (activity and repository history are split so large
+ * accounts do not exceed GitHub's per-operation latency limit — see
  * `lib/github/queries.ts`), and only on a stats-cache miss (6h TTL, see
  * `lib/github/client.ts`'s CACHE_TTL) — a warm re-run inside that window is
  * a cache hit and makes zero GitHub calls. Since the Vercel cron schedule
  * (`vercel.json`) was bumped from once daily to hourly, worst case this cron
- * now makes up to MAX_HANDLES GraphQL calls *per hour* instead of per day —
- * at 50/hour that's ~1,200/day, still only ~1% of GitHub's 5,000/hr
- * authenticated budget (`GITHUB_TOKEN`; 50 ÷ 5,000, not the daily total
+ * now makes up to 2 × MAX_HANDLES GraphQL calls *per hour* instead of per day —
+ * at 100/hour that's ~2,400/day, still only ~2% of GitHub's 5,000/hr
+ * authenticated budget (`GITHUB_TOKEN`; 100 ÷ 5,000, not the daily total
  * compared against the hourly budget), leaving ample headroom for real user traffic
  * hitting `getStats()` on the same token pool. MAX_HANDLES was deliberately
  * left unchanged rather than raised alongside the frequency bump — the
@@ -471,12 +471,24 @@ async function warmHandle(
 
     const materialized = await materializeOrchestratedProfile(handle, { scoringSelection });
     if (!materialized) {
-      void captureServerError({
-        route: "/api/cron/warm-cache",
-        statusCode: 502,
-        error: new Error(`Stats fetch returned null for handle: ${handle}`),
+      const today = new Date().toISOString().slice(0, 10);
+      const guardStatus = await cacheSetNxStatus(
+        `warm-cache:handle-failure-alerted:${handle.toLowerCase()}:${today}`,
+        86400,
+      );
+      void captureServerEvent("warm_cache_handle_failure", {
+        handle,
         requestId,
       });
+      if (guardStatus !== "exists") {
+        void captureOperationalAlert({
+          signal: "warm_cache_handle_failure",
+          severity: "P3",
+          summary: `warm-cache could not refresh stats for ${handle}`,
+          route: "/api/cron/warm-cache",
+          properties: { handle, requestId },
+        });
+      }
       return { warmed: false, snapshotRecorded: false, notified: false };
     }
 

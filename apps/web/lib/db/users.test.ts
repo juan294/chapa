@@ -15,6 +15,7 @@ const mockEq = vi.fn();
 const mockUpdate = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockNot = vi.fn();
+const mockNeq = vi.fn();
 
 let listResolve: { data: unknown; error: unknown; count?: number | null };
 let singleResolve: { data: unknown; error: unknown };
@@ -52,6 +53,14 @@ const buildOrderable = (handleOnly = false): any => {
     gt: (...gtArgs: unknown[]) => {
       mockGt(...gtArgs);
       afterHandle = gtArgs[1] as string;
+      return query;
+    },
+    not: (...notArgs: unknown[]) => {
+      mockNot(...notArgs);
+      return query;
+    },
+    neq: (...neqArgs: unknown[]) => {
+      mockNeq(...neqArgs);
       return query;
     },
     limit: (...limitArgs: unknown[]) => {
@@ -512,6 +521,13 @@ describe("dbGetUserHandlePage", () => {
 });
 
 describe("dbGetAllUserHandles", () => {
+  it("queries only rows with OAuth email evidence", async () => {
+    await dbGetAllUserHandles();
+
+    expect(mockNot).toHaveBeenCalledWith("email", "is", null);
+    expect(mockNeq).toHaveBeenCalledWith("email", "");
+  });
+
   it("excludes EMU source handles from the warm-cache registry", async () => {
     handlePageResolver = () => ({
       data: [

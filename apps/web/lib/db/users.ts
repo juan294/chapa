@@ -317,7 +317,13 @@ export async function dbGetAllUserHandles(): Promise<string[]> {
     let after: string | undefined;
 
     while (true) {
-      let query = db.from("users").select("handle");
+      let query = db
+        .from("users")
+        .select("handle")
+        // Only the OAuth callback writes email. Rows without it were created by
+        // the retired public render-path upsert and are not Chapa signups.
+        .not("email", "is", null)
+        .neq("email", "");
       if (after) query = query.gt("handle", after);
 
       const { data, error } = await query

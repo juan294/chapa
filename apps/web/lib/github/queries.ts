@@ -1,5 +1,9 @@
 import type { RawContributionData } from "@chapa/shared";
-import { CONTRIBUTION_QUERY, SCORING_WINDOW_DAYS } from "@chapa/shared";
+import {
+  CONTRIBUTION_QUERY,
+  REPOSITORY_STATS_QUERY,
+  SCORING_WINDOW_DAYS,
+} from "@chapa/shared";
 import { getGithubToken } from "@/lib/env";
 import { fetchWithRetry } from "@/lib/utils/fetch-retry";
 import { githubUserNotFound, type GitHubUserNotFound } from "./not-found";
@@ -79,38 +83,62 @@ export async function fetchContributionData(
   }
 
   try {
-    const res = await fetchWithRetry("https://api.github.com/graphql", {
+    const common = {
       method: "POST",
       headers,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      body: JSON.stringify({
-        query: CONTRIBUTION_QUERY,
-        variables: {
-          login,
-          since: since.toISOString(),
-          until: now.toISOString(),
-          historySince: since.toISOString(),
-          historyUntil: now.toISOString(),
-          mergedPrSearch,
-        },
+    } as const;
+    const [activityResponse, repositoryResponse] = await Promise.all([
+      fetchWithRetry("https://api.github.com/graphql", {
+        ...common,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        body: JSON.stringify({
+          query: CONTRIBUTION_QUERY,
+          variables: {
+            login,
+            since: since.toISOString(),
+            until: now.toISOString(),
+            mergedPrSearch,
+          },
+        }),
       }),
-    });
+      fetchWithRetry("https://api.github.com/graphql", {
+        ...common,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        body: JSON.stringify({
+          query: REPOSITORY_STATS_QUERY,
+          variables: {
+            login,
+            historySince: since.toISOString(),
+            historyUntil: now.toISOString(),
+          },
+        }),
+      }),
+    ]);
 
-    if (!res.ok) {
-      console.error(`[github] GraphQL HTTP ${res.status} for ${login}`);
+    if (!activityResponse.ok || !repositoryResponse.ok) {
+      console.error(
+        `[github] GraphQL HTTP activity=${activityResponse.status} repositories=${repositoryResponse.status} for ${login}`,
+      );
       return null;
     }
 
-    const json = await res.json();
+    const [activityJson, repositoryJson] = await Promise.all([
+      activityResponse.json(),
+      repositoryResponse.json(),
+    ]);
+    const errors = [
+      ...(activityJson.errors ?? []),
+      ...(repositoryJson.errors ?? []),
+    ] as GraphqlError[];
 
-    if (json.errors) {
+    if (errors.length > 0) {
       console.error(`[github] GraphQL errors for ${login}`);
 
       // Treat RATE_LIMITED or FORBIDDEN errors as a complete fetch failure.
       // GitHub returns partial data alongside these errors, but that partial data
       // has zero stars/forks/watchers which would get cached for 6h and cause
       // score drops. Returning null lets the caller serve stale cache instead.
-      const isBlocking = (json.errors as GraphqlError[]).some(
+      const isBlocking = errors.some(
         (e) =>
           e.extensions?.type === "RATE_LIMITED" ||
           e.extensions?.type === "FORBIDDEN" ||
@@ -120,11 +148,15 @@ export async function fetchContributionData(
       if (isBlocking) return null;
     }
 
-    if (!json.data?.user) return isUserNotFound(json) ? githubUserNotFound(login) : null;
+    if (!activityJson.data?.user) {
+      return isUserNotFound(activityJson) ? githubUserNotFound(login) : null;
+    }
+    if (!repositoryJson.data?.user) return null;
 
-    const user = json.data.user;
+    const user = activityJson.data.user;
+    const repositoryUser = repositoryJson.data.user;
     const cc = user.contributionsCollection;
-    const mergedPrTotalCount: number = json.data?.search?.issueCount ?? 0;
+    const mergedPrTotalCount: number = activityJson.data?.search?.issueCount ?? 0;
 
     return {
       login: user.login,
@@ -174,11 +206,11 @@ export async function fetchContributionData(
       reviews: { totalCount: cc?.pullRequestReviewContributions?.totalCount ?? 0 },
       issues: { totalCount: cc?.issueContributions?.totalCount ?? 0 },
       repositories: {
-        totalCount: user.repositories.totalCount,
-        nodes: user.repositories.nodes,
+        totalCount: repositoryUser.repositories.totalCount,
+        nodes: repositoryUser.repositories.nodes,
       },
       ownedRepoStars: {
-        nodes: ((user.ownedRepos?.nodes ?? []) as { stargazerCount: number; forkCount: number; watchers: { totalCount: number } }[])
+        nodes: ((repositoryUser.ownedRepos?.nodes ?? []) as { stargazerCount: number; forkCount: number; watchers: { totalCount: number } }[])
           .filter((n): n is { stargazerCount: number; forkCount: number; watchers: { totalCount: number } } => n != null)
           .map((n) => ({ stargazerCount: n.stargazerCount, forkCount: n.forkCount, watchers: { totalCount: n.watchers.totalCount } })),
       },

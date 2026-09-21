@@ -84,9 +84,13 @@ export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onU
       if (fixtures.qualificationHealth === true && method === 'POST' && request.variables?.login === 'this-user-definitely-does-not-exist-xyz123' && request.query === fixtures.contributionQuery && fixtures.contributionQuery) {
         return Response.json({ data: { user: null } });
       }
+      const isLegacyStatsQuery = Boolean(
+        (fixtures.contributionQuery && request.query === fixtures.contributionQuery) ||
+        (fixtures.repositoryQuery && request.query === fixtures.repositoryQuery),
+      );
       const response = fixtures.github[request.variables?.login];
-      if (response && request.query === fixtures.contributionQuery && fixtures.contributionQuery) return Response.json(response);
-      if (method === 'POST' && journeyShape(request.variables?.login) && request.query === fixtures.contributionQuery && fixtures.contributionQuery) {
+      if (response && isLegacyStatsQuery) return Response.json(response);
+      if (method === 'POST' && journeyShape(request.variables?.login) && isLegacyStatsQuery) {
         // Synthetic journey accounts intentionally do not exist on GitHub;
         // durable snapshot/config assertions remain in the real journey test.
         return Response.json({ data: { user: null } });
@@ -112,7 +116,11 @@ export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onU
       const query = typeof request?.query === 'string' ? request.query : '';
       const known = ['V7Profile', 'V7Repositories', 'V7ContributedRepositories', 'V7MergedChanges', 'V7Files', 'V7ReviewDiscovery', 'V7Reviews', 'V7Commits'];
       const named = query.match(/\bquery\s+([A-Za-z0-9_]+)/)?.[1];
-      const operation = query === fixtures.contributionQuery ? 'legacy_contribution' : known.includes(named) ? named : 'other';
+      const operation = fixtures.contributionQuery && query === fixtures.contributionQuery
+        ? 'legacy_contribution'
+        : fixtures.repositoryQuery && query === fixtures.repositoryQuery
+          ? 'legacy_repositories'
+          : known.includes(named) ? named : 'other';
       const candidate = request?.variables?.login;
       const isSynthetic = typeof candidate === 'string' && ((Object.hasOwn(fixtures.github, candidate) && /^chapa-[a-z0-9-]+$/.test(candidate)) || journeyShape(candidate));
       const login = isSynthetic ? candidate : 'not_allowlisted';
