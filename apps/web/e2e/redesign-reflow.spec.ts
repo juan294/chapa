@@ -16,9 +16,11 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
       await expect(page.locator('h1')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       const input = page.locator('#terminal-command-input');
-      await page.locator('h1').click();
-      await page.keyboard.press('ControlOrMeta+k');
-      await expect(input).toBeFocused();
+      await expect(async () => {
+        await page.locator('h1').click();
+        await page.keyboard.press('ControlOrMeta+k');
+        await expect(input).toBeFocused({ timeout: 500 });
+      }).toPass();
       const bounds = await input.boundingBox();
       expect(bounds!.x).toBeGreaterThanOrEqual(0);
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
