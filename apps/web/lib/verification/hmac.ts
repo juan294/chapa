@@ -5,49 +5,13 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
 import { parseVerificationTokenV7 } from "./constants";
 import { toDateString } from "@/lib/utils/date";
 import { getChapaVerificationSecret, getVercelEnv } from "@/lib/env";
-import { CURRENT_VERIFICATION_HASH_HEX_LENGTH } from "./constants";
+import { buildPayload, computeHash } from "./hmac-payload";
 
-const PAYLOAD_VERSION = "v2";
-
-/**
- * Build a deterministic pipe-delimited payload string from badge data.
- * Same inputs on the same date always produce the same string.
- */
-export function buildPayload(
-  stats: StatsData,
-  impact: ImpactV6Result,
-  date: string,
-): string {
-  return [
-    PAYLOAD_VERSION,
-    stats.handle.toLowerCase(),
-    impact.adjustedComposite,
-    impact.confidence,
-    impact.tier,
-    impact.archetype,
-    Math.round(impact.dimensions.delivery),
-    Math.round(impact.dimensions.quality),
-    Math.round(impact.dimensions.consistency),
-    Math.round(impact.dimensions.breadth),
-    Math.round(impact.dimensions.craft ?? 0),
-    stats.commitsTotal,
-    stats.prsMergedCount,
-    stats.reviewsSubmittedCount,
-    stats.activeDays,
-    stats.reposContributed,
-    date,
-  ].join("|");
-}
-
-/**
- * Compute a truncated HMAC-SHA256 hash (32 hex chars / 128 bits) from a payload string.
- */
-export function computeHash(payload: string, secret: string): string {
-  return createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex")
-    .slice(0, CURRENT_VERIFICATION_HASH_HEX_LENGTH);
-}
+// `buildPayload`/`computeHash` are pure and live in `./hmac-payload` (no
+// `import "server-only"`) so a disposable fixture can import them directly;
+// re-exported here unchanged so every existing caller of this module keeps
+// working.
+export { buildPayload, computeHash } from "./hmac-payload";
 
 /**
  * Generate a verification code for the given stats and impact.

@@ -1,10 +1,16 @@
 import "server-only";
 import { createHmac } from "node:crypto";
-import { canonicalJson } from "@chapa/shared";
 import type { StatsData } from "@chapa/shared";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getNextauthSecret } from "@/lib/env";
 import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found";
+import {
+  buildStatsCacheEnvelope,
+  statsCacheBindingBytes,
+  type CachedStatsEnvelopeV2,
+  type StatsCacheBindingInput,
+} from "@/lib/cache/stats-cache-envelope";
+export type { StatsCacheBindingInput } from "@/lib/cache/stats-cache-envelope";
 
 /**
  * The read-through cache for composed legacy stats.
@@ -76,22 +82,6 @@ export function buildStatsCacheKey(handle: string): string {
   return `stats:v3:${handle.toLowerCase()}`;
 }
 
-interface CachedStatsEnvelopeV2 {
-  readonly schemaVersion: 2;
-  readonly authorizationBinding: string;
-  readonly referenceDate: string;
-  readonly capturedAt: string;
-  readonly freshUntil: string;
-  readonly stats: StatsData;
-}
-
-export interface StatsCacheBindingInput {
-  /** The private access context ID. Hashed again here; never stored as-is. */
-  readonly accessContextId: string;
-  /** The linked-platform grant versions, as `getStats`/`readStats` already compute them. */
-  readonly links: string;
-}
-
 /**
  * Returns the cache binding for a source context, or `null` when the signing
  * secret is unavailable — in which case the caller skips caching rather than
@@ -106,16 +96,7 @@ export function statsCacheBinding(input: StatsCacheBindingInput): string | null 
   const secret = getNextauthSecret();
   if (!secret) return null;
 
-  return createHmac("sha256", secret)
-    .update(
-      canonicalJson({
-        version: "stats-cache-binding-v2",
-        accessContextId: input.accessContextId,
-        links: input.links,
-      }),
-      "utf8",
-    )
-    .digest("hex");
+  return createHmac("sha256", secret).update(statsCacheBindingBytes(input), "utf8").digest("hex");
 }
 
 export type CachedStatsRead =
@@ -176,16 +157,7 @@ export async function writeCachedStats(
   stats: StatsData,
   now: Date = new Date(),
 ): Promise<void> {
-  const capturedAt = now.toISOString();
-  const freshUntil = new Date(now.getTime() + FRESH_SECONDS * 1000).toISOString();
-  const entry: CachedStatsEnvelopeV2 = {
-    schemaVersion: 2,
-    authorizationBinding: binding,
-    referenceDate,
-    capturedAt,
-    freshUntil,
-    stats: structuredClone(stats),
-  };
+  const entry: CachedStatsEnvelopeV2 = buildStatsCacheEnvelope(binding, referenceDate, stats, now, FRESH_SECONDS);
   // The Redis TTL is the outer retention bound, not the fresh window — a
   // record must survive past `freshUntil` so a later failure can still serve
   // it as stale.
