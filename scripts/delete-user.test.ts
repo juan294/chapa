@@ -91,7 +91,7 @@ function makeFakeFetch(opts: FakeFetchOptions) {
       } as Response;
     }
 
-    if (url.startsWith(SUPA_URL)) {
+    if (new URL(url).origin === SUPA_URL) {
       const table = tableFromUrl(url);
       if (method === "HEAD") {
         const count = scoringDeleted && SUPABASE_TABLES.some(row => row.table === table && row.deletion === "scoring_v7_rpc") ? 0 : opts.supaCounts?.[table] ?? 0;

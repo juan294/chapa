@@ -13,6 +13,18 @@ import { expectFound } from "@/lib/test-helpers/found";
 // Real legacy collection/materialization/persistence; only GitHub HTTP is
 // synthetic. Local Supabase requests use the original fetch implementation.
 const handles = ["contract-empty-sample", "contract-old-baseline", "contract-durable-overlay", "contract-valid-pr-0", "contract-valid-pr-1", "contract-unbound-cache"];
+function isGitHubApiRequest(input: unknown): boolean {
+  const value = input instanceof Request
+    ? input.url
+    : input instanceof URL
+      ? input.href
+      : String(input);
+  try {
+    return new URL(value).origin === "https://api.github.com";
+  } catch {
+    return false;
+  }
+}
 async function cleanup() {
   const db = getServiceClient();
   for (const handle of handles) {
@@ -36,10 +48,10 @@ describe("source integrity through actual legacy collection and local persistenc
       binding: expect.any(String), referenceDate: expect.any(String), stats: { prsMergedCount: 904 },
     });
     // Same grant, same scoring day: the second read is served from that entry.
-    const before = http.mock.calls.filter(([input]) => String(input).includes("api.github.com")).length;
+    const before = http.mock.calls.filter(([input]) => isGitHubApiRequest(input)).length;
     _resetInflight();
     expect(await getStats(handle)).toMatchObject({ prsMergedCount: 904 });
-    expect(http.mock.calls.filter(([input]) => String(input).includes("api.github.com"))).toHaveLength(before);
+    expect(http.mock.calls.filter(([input]) => isGitHubApiRequest(input))).toHaveLength(before);
   });
   it("does not substitute a larger unbound legacy baseline for the current small observation", async () => {
     const handle = handles[1]!;
@@ -73,7 +85,7 @@ describe("source integrity through actual legacy collection and local persistenc
     await redisFake.cacheSet(`stats:v2:merged:${handle}`, makeFullStats({ handle, fetchedAt: "invalid" }), 21600);
     const http = stubLegacyGitHub(handle);
     expect(await materializeProfile(handle, { readOnly: true })).toBeNull();
-    expect(http.mock.calls.filter(([input]) => String(input).includes("api.github.com"))).toHaveLength(0);
+    expect(http.mock.calls.filter(([input]) => isGitHubApiRequest(input))).toHaveLength(0);
     expect(await dbGetLatestSnapshot(handle)).toBeNull();
   });
 });

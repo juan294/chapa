@@ -34,19 +34,21 @@ describe("scheduled agent report publication", () => {
     execFileSync(
       "bash",
       [
-        "-c",
-        `source "$1"
+        "-s",
+        "--",
+        agentUtils,
+        report,
+      ],
+      {
+        input: `source "$1"
 temp_file=$(create_report_temp "$2")
 printf "%s\\n" "You've hit your limit" > "$temp_file"
 if publish_report_file "$temp_file" "$2" "test-agent"; then
   exit 2
 fi
 rm -f "$temp_file"`,
-        "report-safety-test",
-        agentUtils,
-        report,
-      ],
-      { stdio: "pipe" },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
     );
 
     expect(readFileSync(report, "utf8")).toBe("# Last good report\n");
@@ -57,23 +59,24 @@ rm -f "$temp_file"`,
     const report = path.join(directory, "report.md");
     writeFileSync(report, "# Old report\n");
 
-    const output = execFileSync(
+    execFileSync(
       "bash",
       [
-        "-c",
-        `source "$1"
-temp_file=$(create_report_temp "$2")
-printf "%s\\n" "# New report" > "$temp_file"
-publish_report_file "$temp_file" "$2" "test-agent"
-cat "$2"`,
-        "report-safety-test",
+        "-s",
+        "--",
         agentUtils,
         report,
       ],
-      { encoding: "utf8" },
+      {
+        input: `source "$1"
+temp_file=$(create_report_temp "$2")
+printf "%s\\n" "# New report" > "$temp_file"
+publish_report_file "$temp_file" "$2" "test-agent"`,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
     );
 
-    expect(output).toBe("# New report\n");
+    expect(readFileSync(report, "utf8")).toBe("# New report\n");
   });
 
   it.each([

@@ -480,9 +480,11 @@ describe("BadgeToolbar render", () => {
         <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
-      const xLink = links.find((l) => l.href.includes("x.com"));
+      const xLink = links.find(
+        (link) => new URL(link.href).origin === "https://x.com",
+      );
       expect(xLink).toBeDefined();
-      expect(xLink?.href).toContain("x.com/intent/tweet");
+      expect(new URL(xLink!.href).pathname).toBe("/intent/tweet");
     });
 
     it("LinkedIn link includes correct share URL", () => {
@@ -491,9 +493,13 @@ describe("BadgeToolbar render", () => {
         <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
-      const linkedinLink = links.find((l) => l.href.includes("linkedin.com"));
+      const linkedinLink = links.find(
+        (link) => new URL(link.href).origin === "https://www.linkedin.com",
+      );
       expect(linkedinLink).toBeDefined();
-      expect(linkedinLink?.href).toContain("linkedin.com/sharing/share-offsite");
+      expect(new URL(linkedinLink!.href).pathname).toBe(
+        "/sharing/share-offsite/",
+      );
     });
 
     it("Bluesky link includes compose intent", () => {
@@ -502,9 +508,11 @@ describe("BadgeToolbar render", () => {
         <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
-      const bskyLink = links.find((l) => l.href.includes("bsky.app"));
+      const bskyLink = links.find(
+        (link) => new URL(link.href).origin === "https://bsky.app",
+      );
       expect(bskyLink).toBeDefined();
-      expect(bskyLink?.href).toContain("bsky.app/intent/compose");
+      expect(new URL(bskyLink!.href).pathname).toBe("/intent/compose");
     });
 
     it("X link click tracks share event and closes dropdown", async () => {
@@ -515,7 +523,9 @@ describe("BadgeToolbar render", () => {
         <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
-      const xLink = links.find((l) => l.href.includes("x.com"));
+      const xLink = links.find(
+        (link) => new URL(link.href).origin === "https://x.com",
+      );
 
       fireEvent.click(xLink!);
 
@@ -531,7 +541,9 @@ describe("BadgeToolbar render", () => {
         <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
-      const linkedinLink = links.find((l) => l.href.includes("linkedin.com"));
+      const linkedinLink = links.find(
+        (link) => new URL(link.href).origin === "https://www.linkedin.com",
+      );
 
       fireEvent.click(linkedinLink!);
 
@@ -547,7 +559,9 @@ describe("BadgeToolbar render", () => {
         <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
-      const bskyLink = links.find((l) => l.href.includes("bsky.app"));
+      const bskyLink = links.find(
+        (link) => new URL(link.href).origin === "https://bsky.app",
+      );
 
       fireEvent.click(bskyLink!);
 
