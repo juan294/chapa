@@ -11,6 +11,7 @@ test.skip(process.env.REDESIGN_DISPOSABLE_PROJECT !== 'chapa-redesign', 'require
 const evidence = resolve(process.env.REDESIGN_EVIDENCE_DIR ?? resolve(__dirname, "../../../logs/v7-point/browser/redesign"), "surfaces");
 async function command(page: Page, text: string) {
   const input = page.locator('#terminal-command-input');
+  await expect(input).toHaveCount(1);
   await input.fill(text); await input.press('Enter');
 }
 async function capture(page: Page, name: string) {
