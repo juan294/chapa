@@ -155,7 +155,8 @@ This step requires read-only Supabase Management API credentials
 Actions secrets. **Both secrets were added on 2026-08-10** (confirmed via
 `gh secret list`), and the gate has run against production on at least one
 release PR since (#1063 — see the "Pending-migrations gate tolerates one
-migra artifact on `admin_users` (#1064)" entry in `docs/accepted-risks.md`).
+migra artifact on the `admin_users` view chain (#1064)" entry in
+`docs/accepted-risks.md`).
 It is active today. If those secrets were ever removed or rotated out from
 under CI, the job now **fails closed** (`::error::` and a nonzero exit)
 rather than logging a skip and reporting a passing check (#1206) — a missing
