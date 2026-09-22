@@ -32,6 +32,7 @@ const {
   mockIsValidHandle,
   mockRateLimit,
   mockCaptureServerError,
+  mockCaptureServerEvent,
   mockCacheGet,
   mockCacheSet,
   mockCacheSetNx,
@@ -49,6 +50,7 @@ const {
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockCaptureServerEvent: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
   mockCacheSetNx: vi.fn(),
@@ -70,6 +72,19 @@ vi.mock("@/lib/profile/public-profile", () => ({
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
+}));
+
+// badge-source-outage-resilience (2026-09-22) — the durable stored-badge
+// fallback consulted at the `!materialized` branch. `storedBadgeRenderInputs`
+// is kept real (pure, no I/O) so its actual `StatsData`/`ImpactV6Result`
+// projection is exercised; only the async `readStoredBadgeProfile` read is
+// mocked.
+const { mockReadStoredBadgeProfile } = vi.hoisted(() => ({
+  mockReadStoredBadgeProfile: vi.fn(),
+}));
+vi.mock("@/lib/profile/stored-badge-profile", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/profile/stored-badge-profile")>(),
+  readStoredBadgeProfile: (...args: unknown[]) => mockReadStoredBadgeProfile(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
@@ -100,6 +115,7 @@ vi.mock("@/lib/http/client-ip", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
+  captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
 }));
 
 vi.mock("@/lib/render/escape", () => ({
@@ -163,6 +179,31 @@ const FAKE_MATERIALIZED = {
     profileType: "collaborative",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 65, tier: "Solid" },
+  // badge-source-outage-resilience (2026-09-22) — real `MaterializedProfile.
+  // scoring` always carries an explicit `freshness`; this fixture's default
+  // is the normal "current" live read so pre-existing cache-write tests keep
+  // their prior behavior. Tests for the phase-1 stale-aggregate path override
+  // this explicitly.
+  scoring: {
+    policyVersion: "v6" as const,
+    handle: "testuser",
+    identity: null,
+    window: null,
+    dimensions: {
+      delivery: { kind: "point" as const, value: 70, display: 70 },
+      quality: { kind: "point" as const, value: 60, display: 60 },
+      consistency: { kind: "point" as const, value: 65, display: 65 },
+      breadth: { kind: "point" as const, value: 55, display: 55 },
+    },
+    composite: { kind: "point" as const, value: 65, display: 65 },
+    tier: "Solid" as const,
+    archetype: "Builder" as const,
+    craft: null,
+    freshness: "current" as const,
+    coverage: [],
+    exclusions: [],
+    limitations: ["legacy_aggregate" as const],
+  },
 };
 
 function makeRequest(
@@ -191,11 +232,13 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockCaptureServerError.mockResolvedValue(undefined);
+    mockCaptureServerEvent.mockResolvedValue(undefined);
     // SVG cache: miss by default
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
     mockCacheSetNx.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
+    mockReadStoredBadgeProfile.mockResolvedValue(null);
   });
 
   it("switches prewarmed SVG namespaces off and back on for both locales without re-materializing", async () => {
@@ -554,6 +597,243 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
   });
 
+  // ---------------------------------------------------------------------------
+  // Stored badge fallback (badge-source-outage-resilience, 2026-09-22) — a
+  // known profile with no safe live aggregate still gets a truthful badge
+  // from its committed receipt/snapshot when `!materialized`. See
+  // `apps/web/lib/profile/stored-badge-profile.ts`.
+  // ---------------------------------------------------------------------------
+
+  describe("stored badge fallback when live sources are unavailable", () => {
+    const STORED_V6 = {
+      kind: "stored" as const,
+      handle: "juan294",
+      policyVersion: "v6" as const,
+      observedAt: "2026-09-18T00:00:00.000Z",
+      scoring: {
+        policyVersion: "v6" as const,
+        handle: "juan294",
+        identity: null,
+        window: null,
+        dimensions: {
+          delivery: { kind: "point" as const, value: 70, display: 70 },
+          quality: { kind: "point" as const, value: 60, display: 60 },
+          consistency: { kind: "point" as const, value: 65, display: 65 },
+          breadth: { kind: "point" as const, value: 55, display: 55 },
+        },
+        composite: { kind: "point" as const, value: 63, display: 63 },
+        tier: "Solid" as const,
+        archetype: "Builder" as const,
+        craft: null,
+        freshness: "stale" as const,
+        coverage: [],
+        exclusions: [],
+        limitations: ["legacy_aggregate" as const],
+      },
+      legacyImpact: {
+        handle: "juan294",
+        profileType: "collaborative" as const,
+        dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+        archetype: "Builder" as const,
+        compositeScore: 63,
+        confidence: 85,
+        confidencePenalties: [],
+        adjustedComposite: 63,
+        tier: "Solid" as const,
+        computedAt: "2026-09-18T00:00:00.000Z",
+      },
+      context: {
+        commitsTotal: 400,
+        prsMergedCount: 30,
+        prsMergedWeight: 45,
+        reviewsSubmittedCount: 20,
+        issuesClosedCount: 10,
+        reposContributed: 8,
+        activeDays: 200,
+        linesAdded: 5000,
+        linesDeleted: 2000,
+        totalStars: 100,
+        totalForks: 25,
+        totalWatchers: 50,
+        topRepoShare: 0.4,
+        maxCommitsIn10Min: 3,
+      },
+    };
+
+    const STORED_V72 = {
+      ...STORED_V6,
+      policyVersion: "v7.2" as const,
+      scoring: {
+        ...STORED_V6.scoring,
+        policyVersion: "v7.2" as const,
+        identity: {
+          receiptId: "11111111-1111-1111-1111-111111111111",
+          revisionId: "22222222-2222-2222-2222-222222222222",
+          revision: 1,
+          recordedAt: "2026-09-18T00:00:00.000Z",
+          action: "create" as const,
+          supersedesRevisionId: null,
+          contentHash: "a".repeat(64),
+        },
+        composite: { kind: "point" as const, value: 71, display: 71 },
+        tier: "High" as const,
+      },
+    };
+
+    it("renders a real, explicitly stale badge instead of the load-error SVG — production-visible failure text is absent, the handle and stored score content are present", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+      mockRenderBadgeSvg.mockReturnValue(
+        '<svg data-chapa-state="rendered" data-chapa-freshness="stale">@juan294 63 Solid</svg>',
+      );
+
+      const [req, ctx] = makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+      const body = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(body).not.toContain("Could not load data.");
+      expect(body).toContain("@juan294");
+      expect(body).toContain("63");
+    });
+
+    it("reads the stored profile with the handle and the captured scoring selection", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(mockReadStoredBadgeProfile).toHaveBeenCalledWith(
+        "juan294",
+        expect.objectContaining({ machinePolicy: "v6" }),
+      );
+    });
+
+    it("passes the stored scoring model, the degraded disclosure and an empty heatmap to renderBadgeSvg", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        expect.objectContaining({ handle: "juan294", heatmapData: [] }),
+        STORED_V6.legacyImpact,
+        expect.objectContaining({
+          scoring: STORED_V6.scoring,
+          disableAnimation: true,
+          degraded: {
+            reason: "live_sources_unavailable",
+            observedAt: STORED_V6.observedAt,
+            activityAvailable: false,
+          },
+        }),
+      );
+    });
+
+    it("uses the current v7.2 receipt as the sole scoring authority when one is available, never a v6 headline", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V72);
+
+      const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(res.status).toBe(200);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ scoring: STORED_V72.scoring }),
+      );
+    });
+
+    it("never writes the normal daily SVG cache, never runs after() side effects, and never resolves verification", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+      await flushAfterCallbacks();
+
+      expect(mockCacheSet).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
+    });
+
+    it("keeps the existing 60-second client/edge cache policy and per-handle purge tags", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("public, s-maxage=60");
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-juan294,scoring-images");
+    });
+
+    it("reports the stored-fallback materialize timing on Server-Timing", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(res.headers.get("Server-Timing")).toContain('materialize;desc="stored-fallback"');
+    });
+
+    it.each([
+      ["", "Last successful snapshot: 2026-09-18"],
+      ["?lang=es", "Última instantánea correcta: 2026-09-18"],
+    ])("passes the localized stored-snapshot disclosure to the renderer (%s)", async (search, expected) => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }, search));
+
+      const options = mockRenderBadgeSvg.mock.calls.at(-1)?.[2] as { strings?: { activityUnavailable?: string } };
+      expect(options.strings?.activityUnavailable).toContain(expected);
+    });
+
+    it("emits bounded fallback telemetry (kind and date only), never an error capture", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith("badge_stored_fallback", {
+        policyVersion: STORED_V6.policyVersion,
+        observedDate: STORED_V6.observedAt.slice(0, 10),
+      });
+      expect(mockCaptureServerError).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the existing localized load-error SVG when no durable authority exists either", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(null);
+
+      const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+      const body = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(body).toContain("Could not load data.");
+    });
+
+    it("never resurrects a GitHub-confirmed-nonexistent handle through the stored fallback — 404 stays 404", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      const res = await GET(...makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(res.status).toBe(404);
+      expect(mockReadStoredBadgeProfile).not.toHaveBeenCalled();
+    });
+
+    it("keeps the existing render-error contract when materialization throws, even if a durable authority exists", async () => {
+      mockMaterializePublicProfile.mockRejectedValue(new Error("boom"));
+      mockReadStoredBadgeProfile.mockResolvedValue(STORED_V6);
+
+      const res = await GET(...makeRequest("juan294", { "x-forwarded-for": "1.2.3.4" }));
+
+      expect(res.status).toBe(500);
+      expect(mockReadStoredBadgeProfile).not.toHaveBeenCalled();
+    });
+  });
 
   // LE-8-2 — GitHub answered that nobody owns the handle. Unlike the share
   // page, this route has not streamed anything yet, so it can say so with the

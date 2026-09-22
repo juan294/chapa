@@ -6,6 +6,7 @@ import {
   makeStats as _makeStats,
   makeImpact,
 } from "../test-helpers/fixtures";
+import { legacyViewModel } from "@/lib/profile/score-view-model";
 
 // ---------------------------------------------------------------------------
 // Local wrapper — badge tests need a populated heatmap to test animations
@@ -969,6 +970,143 @@ describe("renderBadgeSvg", () => {
       });
       expect(svg).not.toContain('"onload=');
       expect(svg).toContain("&quot;onload=");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Machine-readable state (badge-source-outage-resilience, 2026-09-22) —
+  // the release probe and monitoring must be able to tell a real rendered
+  // badge from the route's generic fallback SVG, and a current render from a
+  // degraded/stale one, without parsing localized copy.
+  // ---------------------------------------------------------------------------
+
+  describe("machine-readable state (data-chapa-*)", () => {
+    it("always marks a normal render as rendered/current", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain('data-chapa-state="rendered"');
+      expect(svg).toContain('data-chapa-freshness="current"');
+    });
+
+    it("marks a phase-1 stale-aggregate live render as stale (heatmap unaffected)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        scoring: legacyViewModel(makeImpact(), { freshness: "stale" }),
+      });
+      expect(svg).toContain('data-chapa-state="rendered"');
+      expect(svg).toContain('data-chapa-freshness="stale"');
+      // A stale aggregate has real heatmap data — cells still draw.
+      expect(svg).toContain('rx="4"');
+    });
+
+    it("marks a degraded stored-badge render as stale", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        degraded: {
+          reason: "live_sources_unavailable",
+          observedAt: "2026-09-18T00:00:00.000Z",
+          activityAvailable: false,
+        },
+      });
+      expect(svg).toContain('data-chapa-state="rendered"');
+      expect(svg).toContain('data-chapa-freshness="stale"');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Degraded (stored-badge) rendering — missing live activity is disclosed,
+  // never represented as zero.
+  // ---------------------------------------------------------------------------
+
+  describe("degraded rendering (live sources unavailable)", () => {
+    function activityBlock(svg: string): string {
+      const match = svg.match(/<g data-element="activity"[^>]*>([\s\S]*?)<\/g>/);
+      expect(match).not.toBeNull();
+      return match![1]!;
+    }
+
+    it("omits heatmap cells and shows the last-successful-snapshot disclosure instead", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        disableAnimation: true,
+        degraded: {
+          reason: "live_sources_unavailable",
+          observedAt: "2026-09-18T00:00:00.000Z",
+          activityAvailable: false,
+        },
+      });
+      const block = activityBlock(svg);
+      expect(block).not.toContain("<rect");
+      expect(block).not.toContain("<animate");
+      expect(block).toContain("Last successful snapshot: 2026-09-18");
+      expect(block).toContain("temporarily unavailable");
+    });
+
+    it("never claims zero activity — no 0% / empty-grid wording, and the real heatmap markup is entirely absent", () => {
+      const svg = renderBadgeSvg(
+        makeStats({
+          heatmapData: Array.from({ length: 91 }, (_, i) => ({
+            date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+            count: 0,
+          })),
+        }),
+        makeImpact(),
+        {
+          disableAnimation: true,
+          degraded: {
+            reason: "live_sources_unavailable",
+            observedAt: "2026-09-18T00:00:00.000Z",
+            activityAvailable: false,
+          },
+        },
+      );
+      const block = activityBlock(svg);
+      expect(block).not.toContain("<rect");
+    });
+
+    it("includes the disclosure in the accessible <desc> (route-served variant)", () => {
+      const svg = renderBadgeSvg(makeStats({ handle: "octocat" }), makeImpact(), {
+        disableAnimation: true,
+        degraded: {
+          reason: "live_sources_unavailable",
+          observedAt: "2026-09-18T00:00:00.000Z",
+          activityAvailable: false,
+        },
+      });
+      const descMatch = svg.match(/<desc>([\s\S]*?)<\/desc>/);
+      expect(descMatch).not.toBeNull();
+      expect(descMatch![1]).toContain("Last successful snapshot: 2026-09-18");
+    });
+
+    it("uses a translated activityUnavailable string when provided", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        disableAnimation: true,
+        degraded: {
+          reason: "live_sources_unavailable",
+          observedAt: "2026-09-18T00:00:00.000Z",
+          activityAvailable: false,
+        },
+        strings: { activityUnavailable: "Última instantánea correcta: 2026-09-18. Las fuentes en vivo no están disponibles temporalmente." },
+      });
+      const block = activityBlock(svg);
+      expect(block).toContain("instantánea correcta");
+      expect(block).not.toContain("Last successful snapshot");
+    });
+
+    it("a non-degraded render still shows real heatmap cells", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), { disableAnimation: true });
+      const block = activityBlock(svg);
+      expect(block).toContain("<rect");
+    });
+
+    it("escapes a custom activityUnavailable string (XSS boundary)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        disableAnimation: true,
+        degraded: {
+          reason: "live_sources_unavailable",
+          observedAt: "2026-09-18T00:00:00.000Z",
+          activityAvailable: false,
+        },
+        strings: { activityUnavailable: '<script>alert(1)</script>' },
+      });
+      expect(svg).not.toContain("<script>alert(1)</script>");
+      expect(svg).toContain("&lt;script&gt;");
     });
   });
 

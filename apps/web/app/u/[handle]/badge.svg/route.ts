@@ -30,7 +30,7 @@ import {
 } from "@/lib/render/badge-svg-cache";
 import { badgeEdgeCacheTag, SCORING_IMAGES_EDGE_TAG } from "@/lib/cache/edge-cache";
 import { getClientIp } from "@/lib/http/client-ip";
-import { captureServerError } from "@/lib/analytics/server-errors";
+import { captureServerError, captureServerEvent } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import {
@@ -40,11 +40,13 @@ import {
 } from "@/lib/profile/public-profile";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import type { MaterializedProfile } from "@/lib/profile/materialize-profile";
+import { readStoredBadgeProfile, storedBadgeRenderInputs } from "@/lib/profile/stored-badge-profile";
 import { isGitHubUserNotFound, type GitHubUserNotFound } from "@/lib/github/not-found";
 import {
   formatServerTiming,
   type ServerTimingEntry,
 } from "@/lib/monitoring/latency-slo";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 export const maxDuration = 35;
 
@@ -139,9 +141,17 @@ function resolveLocaleFromRequest(request: NextRequest): Locale {
   return isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
 }
 
-function fallbackSvg(handle: string, message: string, tagline: string): string {
+/**
+ * Stable, locale-independent reason a machine reader (the release probe,
+ * monitoring) can key on without parsing localized copy. Passed separately
+ * from the localized message key so a translation change can never change
+ * what the probe checks.
+ */
+type BadgeFallbackReason = "invalid-handle" | "not-found" | "load-error" | "render-error";
+
+function fallbackSvg(handle: string, message: string, tagline: string, reason: BadgeFallbackReason): string {
   const safe = escapeXml(handle);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" data-chapa-state="fallback" data-chapa-reason="${reason}">
   <rect width="1200" height="630" rx="16" fill="#0C0D14" stroke="${WARM_AMBER.tint(0.12)}" stroke-width="2"/>
   <text x="60" y="80" font-family="'JetBrains Mono', monospace" font-size="42" font-weight="700" fill="${WARM_AMBER.accent}">CHAPA</text>
   <text x="60" y="120" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" fill="#9AA4B2">${escapeXml(tagline)}</text>
@@ -151,9 +161,20 @@ function fallbackSvg(handle: string, message: string, tagline: string): string {
 }
 
 /** Localized fallback SVG — resolves both the message and tagline for `locale`. */
-function localizedFallbackSvg(handle: string, locale: Locale, messageKey: string): string {
+function localizedFallbackSvg(handle: string, locale: Locale, messageKey: string, reason: BadgeFallbackReason): string {
   const t = getServerT(locale);
-  return fallbackSvg(handle, t(messageKey) as string, t("badge.tagline") as string);
+  return fallbackSvg(handle, t(messageKey) as string, t("badge.tagline") as string, reason);
+}
+
+/** The stored-badge fallback's heatmap disclosure, date-interpolated for
+ * `locale`. Built once here rather than in `buildBadgeI18nStrings` (shared
+ * with Studio's client-side preview, which never renders a degraded badge
+ * and has no per-request date to interpolate). */
+function storedBadgeActivityUnavailable(locale: Locale, observedAt: string): string {
+  const t = getServerT(locale);
+  return interpolate(t("badge.activityUnavailable") as string, {
+    date: observedAt.slice(0, 10),
+  });
 }
 
 function sleep(ms: number): Promise<void> {
@@ -349,13 +370,22 @@ async function finalizeMaterializedBadge(
   // 24-hour cache value; a later complete fetch must be able to heal it.
   // #1166 — when deferred, the caller performs this write itself inside
   // after() instead (foreground winner path only).
+  // badge-source-outage-resilience (2026-09-22) — a phase-1 exact-bound
+  // stale aggregate renders (real heatmap/stats data) but must never be
+  // published as the normal 24h-cacheable badge: `materialized.scoring`'s
+  // freshness threads through the underlying `statsFreshness` for a v6
+  // model, or the receipt's own window/read-failure state for v7.2, so
+  // requiring exactly `"current"` (not merely `!== "unavailable"`) is what
+  // keeps a `"stale"` last-known-good render out of the normal SVG cache.
+  const freshnessCacheable = materialized.scoring?.freshness === "current";
+
   if (!options.deferCacheWrite) {
     await persistFinalizedBadgeCache(handle, svg, {
       readOnly: options.readOnly,
       svgCacheKey: options.svgCacheKey,
       verification,
       avatarCachePolicy,
-      configCacheable: configSnapshot.cacheable && materialized.scoring?.freshness !== "unavailable",
+      configCacheable: configSnapshot.cacheable && freshnessCacheable,
       configRevision: configSnapshot.revision,
       receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null,
       scoringSelection: options.scoringSelection,
@@ -367,7 +397,7 @@ async function finalizeMaterializedBadge(
     verification,
     renderMs,
     avatarCachePolicy,
-    configCacheable: configSnapshot.cacheable && materialized.scoring?.freshness !== "unavailable",
+    configCacheable: configSnapshot.cacheable && freshnessCacheable,
     configRevision: configSnapshot.revision,
   };
 }
@@ -448,7 +478,7 @@ export async function GET(
 
   // Validate handle before any cache/rate-limit work
   if (!isValidHandle(handle)) {
-    const svg = localizedFallbackSvg(handle, locale, "badge.invalidHandle");
+    const svg = localizedFallbackSvg(handle, locale, "badge.invalidHandle", "invalid-handle");
     return badgeSvgResponse(
       svg,
       { "Content-Type": "image/svg+xml", "Cache-Control": "private, no-store, max-age=0", "Vercel-CDN-Cache-Control": "no-store" },
@@ -668,7 +698,7 @@ export async function GET(
       // origin, and a handle claimed later is not pinned to a 404. The
       // `null` branch below is untouched — an outage keeps the 200 fallback.
       const notFoundResult = {
-        svg: localizedFallbackSvg(handle, locale, "badge.userNotFound"),
+        svg: localizedFallbackSvg(handle, locale, "badge.userNotFound", "not-found"),
         status: 404,
         headers: badgeCacheHeaders(
           handle,
@@ -687,8 +717,62 @@ export async function GET(
       );
     }
     if (!materialized) {
+      // badge-source-outage-resilience (2026-09-22) — live materialization
+      // failed (a linked-source refresh outage, a GitHub rejection, etc.),
+      // but a durable last committed receipt/snapshot may still exist. A
+      // stored fallback is a distinct, non-`MaterializedProfile` projection
+      // (`lib/profile/stored-badge-profile.ts`): it is never cached as the
+      // normal daily SVG, never verified, and never runs the normal profile
+      // side effects (snapshot persist, verification mint) — those all
+      // require a real live `MaterializedProfile`.
+      const stored = await readStoredBadgeProfile(handle, scoringSelection);
+      if (stored) {
+        const { stats, impact } = storedBadgeRenderInputs(stored);
+        const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+        const renderStart = Date.now();
+        const svg = renderBadgeSvg(stats, impact, {
+          scoring: stored.scoring,
+          config: configSnapshot.config,
+          disableAnimation: true,
+          degraded: {
+            reason: "live_sources_unavailable",
+            observedAt: stored.observedAt,
+            activityAvailable: false,
+          },
+          strings: {
+            ...resolveBadgeLocale(locale).stringsFor(stored.scoring.tier ?? null),
+            activityUnavailable: storedBadgeActivityUnavailable(locale, stored.observedAt),
+          },
+        });
+        const renderMs = Date.now() - renderStart;
+
+        // Bounded telemetry: fallback kind + date only. No credential,
+        // provider body, token or refresh-claim ID reaches this event.
+        fireAndForget(() =>
+          captureServerEvent("badge_stored_fallback", {
+            policyVersion: stored.policyVersion,
+            observedDate: stored.observedAt.slice(0, 10),
+          }),
+        );
+
+        const storedResult = {
+          svg,
+          // Short-lived and never the normal daily SVG cache: a real live
+          // render (this request's retry, or the next one) must replace it
+          // quickly rather than being shadowed for a normal 24h TTL.
+          headers: badgeCacheHeaders(handle, scoringSelection, 60),
+          selection: scoringSelection,
+        } satisfies BadgeRenderResult;
+        deferred.resolve(storedResult);
+        return badgeSvgResponse(storedResult.svg, storedResult.headers, startedAt, [
+          ...cacheTimeoutMetric,
+          { name: "materialize", desc: "stored-fallback", durMs: materializeMs },
+          { name: "render", durMs: renderMs },
+        ]);
+      }
+
       const fallbackResult = {
-        svg: localizedFallbackSvg(handle, locale, "badge.loadError"),
+        svg: localizedFallbackSvg(handle, locale, "badge.loadError", "load-error"),
         headers: badgeCacheHeaders(
           handle,
           scoringSelection,
@@ -764,7 +848,7 @@ export async function GET(
     ]);
   } catch (err) {
     const fallbackResult = {
-      svg: localizedFallbackSvg(handle, locale, "badge.renderError"),
+      svg: localizedFallbackSvg(handle, locale, "badge.renderError", "render-error"),
       status: 500,
       headers: badgeCacheHeaders(handle, { ...scoringSelection, cacheable: false }, 0),
       selection: scoringSelection,

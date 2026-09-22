@@ -187,6 +187,7 @@ score has far more surfaces than a badge does.
 | `apps/web/lib/profile/materialize-profile.ts` | `apps/web/lib/profile/materialize-profile.test.ts` |
 | `apps/web/lib/profile/orchestrated-profile.ts` | `apps/web/lib/profile/orchestrated-profile.test.ts` |
 | `apps/web/lib/profile/public-profile.ts` | `apps/web/lib/profile/public-profile.test.ts` |
+| `apps/web/lib/profile/stored-badge-profile.ts` | `apps/web/lib/profile/stored-badge-profile.test.ts` |
 
 ### public API
 

@@ -646,6 +646,7 @@ export const en: Translations = {
     userNotFound: 'No GitHub user with this handle.',
     renderError: 'Something went wrong. Try again later.',
     tagline: 'Developer Impact Badge',
+    activityUnavailable: 'Last successful snapshot: {date}. Live sources are temporarily unavailable.',
   },
   archetypes: {
     dominantDimensionLabel: 'Dominant dimension:',
