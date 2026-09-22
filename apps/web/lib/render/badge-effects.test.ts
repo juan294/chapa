@@ -66,9 +66,13 @@ describe("historical jade-v1 artifact and current default equivalence", () => {
 // Reviewed Ice outputs are a deliberate version event; retain historical locks above.
 describe("ice-terminal-v2 reviewed artifacts", () => {
   it.each([
-    ["plain", {}, "4143f1e597290e31", 31474],
-    ["demo", { includeBranding: true, demoMode: true }, "1659164367794bde", 32018],
-    ["static", { disableAnimation: true }, "195af3bda05a9233", 23003],
+    // badge-source-outage-resilience (2026-09-22) — lengths/hashes re-baselined
+    // for the new `data-chapa-state`/`data-chapa-freshness` root attributes
+    // (+59 bytes: ` data-chapa-state="rendered" data-chapa-freshness="current"`).
+    // No other byte changed — verified by diffing before/after output.
+    ["plain", {}, "6aba0efddec77c11", 31533],
+    ["demo", { includeBranding: true, demoMode: true }, "665041ce30d60195", 32077],
+    ["static", { disableAnimation: true }, "337244e8303ad0a9", 23062],
   ] as const)("%s", (_label, options, expectedHash, expectedLength) => {
     const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, options);
     expect(svg.length).toBe(expectedLength);

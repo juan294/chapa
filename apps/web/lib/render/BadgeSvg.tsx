@@ -45,6 +45,15 @@ export interface BadgeI18nStrings {
   scoringEvidence?: ScoringEvidenceLabels;
   verifiedLabel?: string;
   sampleDisclosure?: string;
+  /**
+   * Fully composed disclosure shown in place of the heatmap when
+   * `degraded.activityAvailable === false` (badge-source-outage-resilience,
+   * 2026-09-22). Interpolated by the caller (the date varies per render), so
+   * unlike the other `strings` fields this one is a finished sentence, not a
+   * label. Falls back to an English sentence built from `degraded.observedAt`
+   * when omitted.
+   */
+  activityUnavailable?: string;
 }
 
 interface BadgeOptions {
@@ -86,6 +95,59 @@ interface BadgeOptions {
    * and rasterizable to PNG.
    */
   config?: BadgeConfig;
+  /**
+   * Set when this render is a durable stored-badge fallback
+   * (badge-source-outage-resilience, 2026-09-22) rather than a live
+   * materialization: live sources were unavailable, so the drawn score comes
+   * from the last committed receipt/snapshot instead of a fresh fetch.
+   *
+   * The heatmap is never zero-filled to represent this — an empty grid reads
+   * as "no activity", a claim the evidence does not support. Instead the
+   * heatmap area is replaced with an explicit disclosure naming the last
+   * successful snapshot date, and the root SVG carries
+   * `data-chapa-freshness="stale"` so a machine reader (the release probe,
+   * monitoring) can tell a degraded render from a current one without
+   * parsing localized copy.
+   */
+  degraded?: {
+    reason: "live_sources_unavailable";
+    /** ISO timestamp of the last successful snapshot/receipt capture. */
+    observedAt: string;
+    activityAvailable: false;
+  };
+}
+
+/** Wrap `text` onto multiple lines of at most `maxChars` characters each,
+ * breaking only on spaces. SVG has no native text-wrapping. */
+function wrapBadgeText(text: string, maxChars: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/** Replaces the heatmap grid when live activity is unavailable (#degraded).
+ * Deliberately text, never an empty/zero-filled grid — the absence of cells
+ * must read as "unknown", not as "no activity". */
+function renderActivityUnavailableNotice(text: string, color: string): string {
+  const lines = wrapBadgeText(text, 42);
+  const lineHeight = 24;
+  return lines
+    .map(
+      (line, index) =>
+        `<text x="4" y="${30 + index * lineHeight}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${color}">${escapeXml(line)}</text>`,
+    )
+    .join("\n    ");
 }
 
 /**
@@ -108,7 +170,7 @@ export function renderBadgeSvg(
   impact: ImpactV6Result,
   options: BadgeOptions = {},
 ): string {
-  const { scoring, includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {}, config = DEFAULT_BADGE_CONFIG } = options;
+  const { scoring, includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {}, config = DEFAULT_BADGE_CONFIG, degraded } = options;
   const hasVerification = Boolean(verificationHash && verificationDate);
   // #1242 — the palette is resolved from the config, not a module singleton,
   // so a Studio palette reaches the artifact people embed rather than only the
@@ -202,7 +264,17 @@ export function renderBadgeSvg(
     config.heatmapAnimation,
     t,
   );
-  const heatmapSvg = renderHeatmapSvg(heatmapCells, { disableAnimation });
+  // #degraded — omit the heatmap cells entirely rather than draw an empty
+  // (falsely zero) grid. `strings.activityUnavailable` is a caller-resolved,
+  // date-interpolated sentence; the English default below is built from
+  // `degraded.observedAt` so this stays correct without one.
+  const activityUnavailableText = degraded
+    ? strings.activityUnavailable ??
+      `Last successful snapshot: ${degraded.observedAt.slice(0, 10)}. Live sources are temporarily unavailable.`
+    : null;
+  const heatmapSvg = degraded && activityUnavailableText
+    ? renderActivityUnavailableNotice(activityUnavailableText, t.textSecondary)
+    : renderHeatmapSvg(heatmapCells, { disableAnimation });
 
   // Right column: radar chart + score ring (no pill — it moved above)
   const profileColX = 720;
@@ -324,13 +396,23 @@ export function renderBadgeSvg(
   // non-default locale, which this cutover has no business doing. `null` is the
   // v7 range that earned no tier.
   const accessibleTier = score.tier ?? "unassigned";
-  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(accessibleTier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring, strings.scoringEvidence))}`;
+  const accessibleDesc = `Chapa developer impact badge for ${headerName}. Composite score ${scoreStr} out of 100, ${escapeXml(accessibleTier)} tier, ${escapeXml(archetypeText)} archetype. ${escapeXml(metricsLabel)}.${escapeXml(describeScoringEvidence(scoring, strings.scoringEvidence))}${degraded && activityUnavailableText ? ` ${escapeXml(activityUnavailableText)}` : ""}`;
   const a11yAttrs = disableAnimation ? ' role="img"' : "";
   const a11yMarkup = disableAnimation
     ? `\n  <title>${accessibleTitle}</title>\n  <desc>${accessibleDesc}</desc>`
     : "";
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" data-badge-design="${BADGE_RENDER_VARIANT}"${a11yAttrs}>${a11yMarkup}
+  // Machine-readable state for consumers that must not parse localized copy
+  // (the release probe, monitoring): `renderBadgeSvg` always produced a real
+  // rendered artifact, so `data-chapa-state` is unconditionally "rendered"
+  // here — only the route's generic fallback SVG (a different code path,
+  // never this function) carries `data-chapa-state="fallback"`.
+  // `data-chapa-freshness` is "stale" for a `degraded` stored-badge render OR
+  // a phase-1 stale-aggregate live render (`scoring.freshness === "stale"`);
+  // otherwise "current".
+  const chapaFreshness = degraded || model.freshness === "stale" ? "stale" : "current";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" data-badge-design="${BADGE_RENDER_VARIANT}" data-chapa-state="rendered" data-chapa-freshness="${chapaFreshness}"${a11yAttrs}>${a11yMarkup}
   <defs>
     <style>
       @keyframes pulse-glow {
