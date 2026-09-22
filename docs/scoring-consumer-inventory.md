@@ -100,6 +100,7 @@ score has far more surfaces than a badge does.
 | --- | --- |
 | `apps/web/app/verify/[hash]/page.tsx` | `apps/web/lib/verification/store.test.ts` |
 | `apps/web/lib/db/verification.ts` | `apps/web/lib/db/verification.test.ts` |
+| `apps/web/lib/verification/hmac-payload.ts` | `apps/web/lib/verification/hmac.test.ts` |
 | `apps/web/lib/verification/hmac.ts` | `apps/web/lib/verification/hmac.test.ts` |
 | `apps/web/lib/verification/types.ts` | `apps/web/lib/verification/store.test.ts` |
 
