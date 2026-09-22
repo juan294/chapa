@@ -33,7 +33,9 @@ async function settlePublicBadge(page: Page) {
   await page.evaluate(async () => { await document.fonts.ready; });
 }
 async function servedImage(page: Page) {
-  const metadata = await page.locator('meta[property="og:image"]').getAttribute("content");
+  const imageMetadata = page.locator('meta[property="og:image"]');
+  await expect(imageMetadata).toHaveCount(1);
+  const metadata = await imageMetadata.getAttribute("content");
   expect(metadata).toBeTruthy();
   const url = new URL(metadata!);
   expect(url.searchParams.get("v")).toBeTruthy();
