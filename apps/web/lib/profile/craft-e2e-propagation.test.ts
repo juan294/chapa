@@ -13,7 +13,7 @@
  *   - applyImpactScorePolicy / buildSnapshot (smoothing + snapshot)
  *
  * What is mocked at the boundary:
- *   - getStats (GitHub data fetch)
+ *   - readStats (GitHub data fetch)
  *   - getCachedCraftScore (craft cache read)
  *   - getCachedLatestSnapshot (snapshot cache read)
  *   - isStatsDirty (dirty marker)
@@ -38,7 +38,7 @@ import { makeFullStats } from "@/lib/test-helpers/fixtures";
 
 // Hoisted boundary mocks. Real scoring code lives below; only I/O is faked.
 const {
-  mockGetStats,
+  mockReadStats,
   mockGetCachedCraftScore,
   mockGetCachedLatestSnapshot,
   mockIsStatsDirty,
@@ -46,7 +46,7 @@ const {
   mockDbReplaceSnapshot,
   mockUpdateSnapshotCache,
 } = vi.hoisted(() => ({
-  mockGetStats: vi.fn(),
+  mockReadStats: vi.fn(),
   mockGetCachedCraftScore: vi.fn(),
   mockGetCachedLatestSnapshot: vi.fn(),
   mockIsStatsDirty: vi.fn(),
@@ -56,7 +56,7 @@ const {
 }));
 
 vi.mock("@/lib/github/client", () => ({
-  getStats: (...args: unknown[]) => mockGetStats(...args),
+  readStats: (...args: unknown[]) => mockReadStats(...args),
 }));
 
 vi.mock("@/lib/cache/craft-cache", () => ({
@@ -172,9 +172,11 @@ describe("end-to-end craft propagation through every impact-computing endpoint (
     vi.clearAllMocks();
 
     // Default I/O behavior — happy path with insights cached and no stale snapshot.
-    mockGetStats.mockImplementation(async (handle: string) =>
-      makeStatsForHandle(handle),
-    );
+    mockReadStats.mockImplementation(async (handle: string) => ({
+      status: "current" as const,
+      stats: makeStatsForHandle(handle),
+      capturedAt: new Date().toISOString(),
+    }));
     mockGetCachedCraftScore.mockResolvedValue(craftFromInsights());
     mockGetCachedLatestSnapshot.mockResolvedValue(null);
     mockIsStatsDirty.mockResolvedValue(false);

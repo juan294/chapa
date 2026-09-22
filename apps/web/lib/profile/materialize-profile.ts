@@ -13,9 +13,19 @@ import {
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { readRenderableReceipt, scoreModelFrom } from "./score-model";
 import type { ScoreViewModel } from "./score-view-model";
-import { getStats } from "@/lib/github/client";
+import { readStats } from "@/lib/github/client";
 import { isGitHubUserNotFound, type GitHubUserNotFound } from "@/lib/github/not-found";
 import { isValidLegacyStats } from "@/lib/github/stats-integrity";
+
+/** Whether the stats an aggregate was drawn from were collected under the
+ * exact current source authorization (`current`) or are a last-known-good
+ * serve from a bounded retention window after a live refresh/collection
+ * failure (`stale`). See `apps/web/lib/github/client.ts`'s `readStats` and
+ * `apps/web/lib/cache/stats-cache.ts`. `stale` is structurally renderable but
+ * never publication-eligible: `statsComplete` below is unconditionally false
+ * for it, which is what keeps stale data out of snapshot persistence and v6
+ * verification issuance (`persist-guard.ts`, `public-profile.ts`). */
+export type StatsFreshness = "current" | "stale";
 
 export interface MaterializeImpactStateOptions {
   craftResult?: CraftResult | null;
@@ -29,6 +39,13 @@ export interface MaterializeImpactStateOptions {
    * insert on UNIQUE(handle, date) conflict.
    */
   inputsChanged?: boolean;
+  /** Defaults to `"current"`. Set explicitly by `loadDisplayInputs` from
+   * `readStats`'s result; a direct caller (tests, admin recompute paths that
+   * already hold a freshly-fetched `StatsData`) gets the historical
+   * always-eligible behavior when this is omitted. */
+  statsFreshness?: StatsFreshness;
+  /** Defaults to `new Date().toISOString()` when omitted. */
+  statsCapturedAt?: string;
 }
 
 export interface MaterializedDisplayState {
@@ -37,8 +54,15 @@ export interface MaterializedDisplayState {
   displayImpact: ImpactV6Result;
   /** Legacy compatibility name: structural validity for v6 persistence and
    * lookup-record issuance. It does not certify source coverage or v7 evidence.
+   * Unconditionally `false` when `statsFreshness !== "current"` — a stale
+   * last-known-good aggregate renders but is never publication-eligible.
    */
   statsComplete: boolean;
+  /** See {@link StatsFreshness}. */
+  statsFreshness: StatsFreshness;
+  /** When the underlying stats were captured — the fresh-collection instant
+   * for `current`, or the original capture instant for a `stale` serve. */
+  statsCapturedAt: string;
 }
 
 export interface MaterializedImpactState extends MaterializedDisplayState {
@@ -88,38 +112,52 @@ export interface MaterializedDisplayProfile extends MaterializedDisplayState {
 interface DisplayInputs {
   stats: StatsData;
   craftResult: CraftResult | null;
+  statsFreshness: StatsFreshness;
+  statsCapturedAt: string;
 }
 
 function materializeDisplayState(
   stats: StatsData,
   craftResult: CraftResult | null,
+  statsFreshness: StatsFreshness = "current",
+  statsCapturedAt: string = new Date().toISOString(),
 ): MaterializedDisplayState {
   const rawImpact = computeImpactV6(stats, craftResult?.craftScore);
   return {
     craftResult,
     rawImpact,
     displayImpact: rawImpact,
-    statsComplete: statsLookComplete(stats),
+    statsComplete: statsFreshness === "current" && statsLookComplete(stats),
+    statsFreshness,
+    statsCapturedAt,
   };
 }
 
+/**
+ * `readStats` — never the collapsed `getStats` — so a last-known-good
+ * `stale` serve is distinguishable from a fresh one (badge-source-outage-
+ * resilience, 2026-09-22). A `not_found`/`unavailable` result collapses to
+ * the same sentinel/`null` contract every existing caller already handles.
+ */
 async function loadDisplayInputs(
   handle: string,
   token: string | undefined,
   readOnly: boolean | undefined,
 ): Promise<DisplayInputs | GitHubUserNotFound | null> {
   const [statsSettled, craftSettled] = await Promise.allSettled([
-    getStats(handle, token, { readOnly }),
+    readStats(handle, token, { readOnly }),
     getCachedCraftScore(handle),
   ]);
 
-  const stats = statsSettled.status === "fulfilled" ? statsSettled.value : null;
+  const statsResult = statsSettled.status === "fulfilled" ? statsSettled.value : { status: "unavailable" as const };
   // LE-8-2 — carried, not folded into the `null` an outage produces.
-  if (isGitHubUserNotFound(stats)) return stats;
-  if (!stats) return null;
+  if (statsResult.status === "not_found") return statsResult.value;
+  if (statsResult.status === "unavailable") return null;
 
   return {
-    stats,
+    stats: statsResult.stats,
+    statsFreshness: statsResult.status,
+    statsCapturedAt: statsResult.capturedAt,
     craftResult:
       craftSettled.status === "fulfilled" ? craftSettled.value : null,
   };
@@ -132,7 +170,7 @@ export function materializeImpactState(
   const craftResult = options.craftResult ?? null;
   const latestSnapshot = options.latestSnapshot ?? null;
   const inputsChanged = options.inputsChanged ?? false;
-  const displayState = materializeDisplayState(stats, craftResult);
+  const displayState = materializeDisplayState(stats, craftResult, options.statsFreshness, options.statsCapturedAt);
 
   // #1001 — The live headline shown to users (badge, dashboard, verification
   // record, emails) is the FRESH score, always internally consistent with the
@@ -188,11 +226,11 @@ export async function materializeDisplayProfile(
   ]);
   if (!inputs || isGitHubUserNotFound(inputs)) return null;
 
-  const displayState = materializeDisplayState(inputs.stats, inputs.craftResult);
+  const displayState = materializeDisplayState(inputs.stats, inputs.craftResult, inputs.statsFreshness, inputs.statsCapturedAt);
   return {
     stats: inputs.stats,
     ...displayState,
-    scoring: scoreModelFrom(handle, displayState.displayImpact, receipt, selection),
+    scoring: scoreModelFrom(handle, displayState.displayImpact, receipt, selection, displayState.statsFreshness),
   };
 }
 
@@ -234,7 +272,7 @@ export async function materializeProfile(
   if (!displayInputs) {
     return null;
   }
-  const { stats, craftResult } = displayInputs;
+  const { stats, craftResult, statsFreshness, statsCapturedAt } = displayInputs;
   const latestSnapshot = options.ignoreSnapshot
     ? null
     : snapshotSettled.status === "fulfilled" ? snapshotSettled.value : null;
@@ -251,6 +289,8 @@ export async function materializeProfile(
     policy: options.policy,
     today: options.today,
     inputsChanged,
+    statsFreshness,
+    statsCapturedAt,
   });
   return {
     stats,
@@ -260,6 +300,7 @@ export async function materializeProfile(
       impactState.displayImpact,
       receiptSettled.status === "fulfilled" ? receiptSettled.value : { unavailable: true },
       selection,
+      impactState.statsFreshness,
     ),
   };
 }

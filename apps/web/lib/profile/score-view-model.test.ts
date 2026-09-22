@@ -97,6 +97,20 @@ describe("shared score view model", () => {
     expect(Object.keys(model.dimensions)).toEqual([...CORE_DIMENSION_KEYS]);
   });
 
+  // badge-source-outage-resilience (2026-09-22) — the legacy v6 projection
+  // accepts an explicit freshness so materialize-profile.ts can carry
+  // `readStats`'s current/stale distinction onto the model every consumer
+  // renders, without ever touching a committed v7/v7.2 receipt's own
+  // freshness authority (`observedReceiptViewModel` derives that separately).
+  it("carries an explicit current/stale freshness onto the legacy model, and omits it by default", () => {
+    expect(legacyViewModel(legacy).freshness).toBeUndefined();
+    expect(legacyViewModel(legacy, { freshness: "current" }).freshness).toBe("current");
+    expect(legacyViewModel(legacy, { freshness: "stale" }).freshness).toBe("stale");
+    // Every other field is unaffected by the freshness label.
+    const { freshness: _freshness, ...withoutFreshness } = legacyViewModel(legacy, { freshness: "stale" });
+    expect(withoutFreshness).toEqual(legacyViewModel(legacy));
+  });
+
   it("keeps the visitor-redacted v6 shape renderable without confidence data", () => {
     const { confidence: _confidence, confidencePenalties: _penalties, ...visitor } = legacy;
     expect(legacyViewModel(visitor)).toEqual(legacyViewModel(legacy));

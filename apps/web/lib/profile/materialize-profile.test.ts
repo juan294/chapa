@@ -10,14 +10,28 @@ import {
 import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found";
 import { expectFound } from "@/lib/test-helpers/found";
 
-const mockGetStats = vi.fn();
+const mockReadStats = vi.fn();
 const mockGetCachedCraftScore = vi.fn();
 const mockGetCachedLatestSnapshot = vi.fn();
 const mockIsStatsDirty = vi.fn();
 
 vi.mock("@/lib/github/client", () => ({
-  getStats: (...args: unknown[]) => mockGetStats(...args),
+  readStats: (...args: unknown[]) => mockReadStats(...args),
 }));
+
+/** `loadDisplayInputs` reads `readStats`'s detailed result, not the collapsed
+ * `getStats` shape. These helpers build that result so the bulk of this file
+ * (written against the old `getStats`-returns-`StatsData` shape) only needs
+ * one wrapper at each mock call, not a rewrite of every assertion. */
+function current(stats: import("@chapa/shared").StatsData, capturedAt = "2026-04-17T12:00:00.000Z") {
+  return { status: "current" as const, stats, capturedAt };
+}
+function unavailable() {
+  return { status: "unavailable" as const };
+}
+function notFound(value: ReturnType<typeof githubUserNotFound>) {
+  return { status: "not_found" as const, value };
+}
 
 vi.mock("@/lib/cache/craft-cache", () => ({
   getCachedCraftScore: (...args: unknown[]) => mockGetCachedCraftScore(...args),
@@ -276,14 +290,14 @@ describe("materializeDisplayProfile", () => {
   it("loads a live owner profile without trend-state reads", async () => {
     const stats = makeFullStats({ handle: "testuser" });
     const craftResult = makeCraftResult({ craftScore: 88 });
-    mockGetStats.mockResolvedValue(stats);
+    mockReadStats.mockResolvedValue(current(stats));
     mockGetCachedCraftScore.mockResolvedValue(craftResult);
 
     const result = await materializeDisplayProfile("testuser", {
       token: "oauth-token",
     });
 
-    expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token", {
+    expect(mockReadStats).toHaveBeenCalledWith("testuser", "oauth-token", {
       readOnly: false,
     });
     expect(mockGetCachedCraftScore).toHaveBeenCalledWith("testuser");
@@ -297,13 +311,15 @@ describe("materializeDisplayProfile", () => {
   });
 
   it("accepts structurally valid zero-PR stats", async () => {
-    mockGetStats.mockResolvedValue(
-      makeFullStats({
-        handle: "testuser",
-        prsMergedCount: 0,
-        commitsTotal: 15585,
-        issuesClosedCount: 0,
-      }),
+    mockReadStats.mockResolvedValue(
+      current(
+        makeFullStats({
+          handle: "testuser",
+          prsMergedCount: 0,
+          commitsTotal: 15585,
+          issuesClosedCount: 0,
+        }),
+      ),
     );
     mockGetCachedCraftScore.mockResolvedValue(null);
 
@@ -313,7 +329,7 @@ describe("materializeDisplayProfile", () => {
   });
 
   it("returns null instead of fabricating stats when the live load fails", async () => {
-    mockGetStats.mockResolvedValue(null);
+    mockReadStats.mockResolvedValue(unavailable());
     mockGetCachedCraftScore.mockResolvedValue(null);
 
     const result = await materializeDisplayProfile("testuser");
@@ -334,14 +350,14 @@ describe("materializeDisplayProfile", () => {
   // fetch on a cold key from a read-only caller).
   it("passes readOnly through to getStats for a public read-only caller (#1180 PE-L2)", async () => {
     const stats = makeFullStats({ handle: "testuser" });
-    mockGetStats.mockResolvedValue(stats);
+    mockReadStats.mockResolvedValue(current(stats));
     mockGetCachedCraftScore.mockResolvedValue(null);
 
     const result = await materializeDisplayProfile("testuser", {
       readOnly: true,
     });
 
-    expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined, {
+    expect(mockReadStats).toHaveBeenCalledWith("testuser", undefined, {
       readOnly: true,
     });
     expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
@@ -362,7 +378,7 @@ describe("materializeProfile", () => {
   });
 
   it("returns null when stats could not be loaded", async () => {
-    mockGetStats.mockResolvedValue(null);
+    mockReadStats.mockResolvedValue(unavailable());
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(null);
 
@@ -377,7 +393,7 @@ describe("materializeProfile", () => {
       adjustedComposite: 90,
     });
 
-    mockGetStats.mockResolvedValue(stats);
+    mockReadStats.mockResolvedValue(current(stats));
     mockGetCachedCraftScore.mockResolvedValue(craftResult);
     mockGetCachedLatestSnapshot.mockResolvedValue(latestSnapshot);
 
@@ -386,7 +402,7 @@ describe("materializeProfile", () => {
       today: "2026-04-17",
     }));
 
-    expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token", {
+    expect(mockReadStats).toHaveBeenCalledWith("testuser", "oauth-token", {
       readOnly: undefined,
     });
     expect(mockGetCachedCraftScore).toHaveBeenCalledWith("testuser");
@@ -397,14 +413,14 @@ describe("materializeProfile", () => {
 
   it("passes read-only mode to the stats loader", async () => {
     const stats = makeFullStats({ handle: "testuser" });
-    mockGetStats.mockResolvedValue(stats);
+    mockReadStats.mockResolvedValue(current(stats));
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(null);
     mockIsStatsDirty.mockResolvedValue(false);
 
     await materializeProfile("testuser", { readOnly: true });
 
-    expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined, {
+    expect(mockReadStats).toHaveBeenCalledWith("testuser", undefined, {
       readOnly: true,
     });
   });
@@ -412,7 +428,7 @@ describe("materializeProfile", () => {
   it("tolerates craft and snapshot loader failures for public consumers", async () => {
     const stats = makeFullStats({ handle: "testuser" });
 
-    mockGetStats.mockResolvedValue(stats);
+    mockReadStats.mockResolvedValue(current(stats));
     mockGetCachedCraftScore.mockRejectedValue(new Error("craft cache down"));
     mockGetCachedLatestSnapshot.mockRejectedValue(new Error("snapshot cache down"));
 
@@ -431,7 +447,7 @@ describe("materializeProfile", () => {
     // Simulate the GitLab-timeout scenario: same-day snapshot has adjustedComposite: 0
     const badSameDaySnapshot = makeSnapshot({ date: "2026-04-17", adjustedComposite: 0 });
 
-    mockGetStats.mockResolvedValue(stats);
+    mockReadStats.mockResolvedValue(current(stats));
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(badSameDaySnapshot);
     mockIsStatsDirty.mockResolvedValue(false);
@@ -459,7 +475,7 @@ describe("materializeProfile", () => {
       adjustedComposite: 42,
     });
 
-    mockGetStats.mockResolvedValue(stats);
+    mockReadStats.mockResolvedValue(current(stats));
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(staleSameDaySnapshot);
     mockIsStatsDirty.mockResolvedValue(true);
@@ -493,7 +509,7 @@ describe("materializeProfile", () => {
 describe("a handle GitHub does not know (LE-8-2)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetStats.mockResolvedValue(githubUserNotFound("ghost"));
+    mockReadStats.mockResolvedValue(notFound(githubUserNotFound("ghost")));
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(null);
     mockIsStatsDirty.mockResolvedValue(false);
@@ -504,12 +520,95 @@ describe("a handle GitHub does not know (LE-8-2)", () => {
   });
 
   it("materializeProfile still returns null when stats are merely unavailable", async () => {
-    mockGetStats.mockResolvedValue(null);
+    mockReadStats.mockResolvedValue(unavailable());
 
     expect(await materializeProfile("ghost")).toBeNull();
   });
 
   it("materializeDisplayProfile keeps its null contract for the owner and read-only callers", async () => {
     expect(await materializeDisplayProfile("ghost", { readOnly: true })).toBeNull();
+  });
+});
+
+// badge-source-outage-resilience (2026-09-22) — a `readStats` "stale" result
+// (an exact-bound last-known-good aggregate served after a live
+// refresh/collection failure, e.g. an ambiguous Bitbucket token-refresh claim)
+// is structurally renderable but must never look publication-eligible. See
+// `apps/web/lib/github/client.ts`'s `readStats` and
+// `apps/web/lib/cache/stats-cache.ts`.
+describe("stale last-known-good materialization (badge-source-outage-resilience)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-17T12:00:00.000Z"));
+    mockGetCachedCraftScore.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
+    mockIsStatsDirty.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function stale(stats: ReturnType<typeof makeFullStats>, capturedAt = "2026-04-17T06:00:00.000Z") {
+    return { status: "stale" as const, stats, capturedAt };
+  }
+
+  it("materializeProfile renders a stale aggregate but marks it structurally incomplete", async () => {
+    const stats = makeFullStats({ handle: "testuser", prsMergedCount: 12, commitsTotal: 80 });
+    mockReadStats.mockResolvedValue(stale(stats));
+
+    const result = expectFound(await materializeProfile("testuser"));
+
+    // Renderable: the same score a fresh aggregate would produce.
+    expect(result.displayImpact.dimensions).toEqual(
+      materializeImpactState(stats).rawImpact.dimensions,
+    );
+    // Never publication-eligible, however healthy the underlying counts look.
+    expect(result.statsFreshness).toBe("stale");
+    expect(result.statsCapturedAt).toBe("2026-04-17T06:00:00.000Z");
+    expect(result.statsComplete).toBe(false);
+  });
+
+  it("carries stale freshness onto the v6 score view model", async () => {
+    const stats = makeFullStats({ handle: "testuser" });
+    mockReadStats.mockResolvedValue(stale(stats));
+
+    const result = expectFound(await materializeProfile("testuser"));
+
+    expect(result.scoring.policyVersion).toBe("v6");
+    expect(result.scoring.freshness).toBe("stale");
+  });
+
+  it("materializeDisplayProfile carries the same stale/incomplete contract", async () => {
+    const stats = makeFullStats({ handle: "testuser", prsMergedCount: 3 });
+    mockReadStats.mockResolvedValue(stale(stats));
+
+    const result = await materializeDisplayProfile("testuser");
+
+    expect(result).not.toBeNull();
+    expect(result?.statsFreshness).toBe("stale");
+    expect(result?.statsComplete).toBe(false);
+    expect(result?.scoring.freshness).toBe("stale");
+  });
+
+  it("a fresh (current) aggregate remains publication-eligible, unlike a stale one for the same handle", async () => {
+    const stats = makeFullStats({ handle: "testuser", prsMergedCount: 3 });
+    mockReadStats.mockResolvedValue(current(stats));
+
+    const result = expectFound(await materializeProfile("testuser"));
+
+    expect(result.statsFreshness).toBe("current");
+    expect(result.statsComplete).toBe(true);
+    // The v6 model carries explicit "current" freshness too — the badge route
+    // (phase 2) reads this field, not just `statsComplete`, to label its
+    // machine-readable `data-chapa-freshness` attribute.
+    expect(result.scoring.freshness).toBe("current");
+  });
+
+  it("no trusted aggregate at all remains unavailable/null, never a fabricated stale render", async () => {
+    mockReadStats.mockResolvedValue(unavailable());
+
+    expect(await materializeProfile("testuser")).toBeNull();
   });
 });

@@ -175,7 +175,10 @@ export function observedReceiptViewModel(handle: string, snapshot: ObservedRecei
  * legacy aggregates, it has no receipt identity, no evidence coverage and no
  * Craft channel, and `legacy_aggregate` is its standing limitation.
  */
-export function legacyViewModel(impact: ClientImpactV6Result): ScoreViewModel {
+export function legacyViewModel(
+  impact: ClientImpactV6Result,
+  options: { readonly freshness?: "current" | "stale" } = {},
+): ScoreViewModel {
   return {
     policyVersion: "v6",
     handle: impact.handle.toLowerCase(),
@@ -194,6 +197,7 @@ export function legacyViewModel(impact: ClientImpactV6Result): ScoreViewModel {
     coverage: [],
     exclusions: [],
     limitations: ["legacy_aggregate"],
+    ...(options.freshness ? { freshness: options.freshness } : {}),
   };
 }
 

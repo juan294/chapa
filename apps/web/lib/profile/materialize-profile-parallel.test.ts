@@ -1,7 +1,7 @@
 /**
- * #800 — materializeProfile must run getStats concurrently with the
+ * #800 — materializeProfile must run readStats concurrently with the
  * craft / snapshot / dirty cache lookups. The cache lookups only need
- * the handle, so blocking them behind getStats adds an extra RTT to
+ * the handle, so blocking them behind readStats adds an extra RTT to
  * every share-page / badge.svg cache miss.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -9,13 +9,13 @@ import { materializeProfile } from "./materialize-profile";
 import { expectFound } from "@/lib/test-helpers/found";
 import { makeFullStats } from "../test-helpers/fixtures";
 
-const mockGetStats = vi.fn();
+const mockReadStats = vi.fn();
 const mockGetCachedCraftScore = vi.fn();
 const mockGetCachedLatestSnapshot = vi.fn();
 const mockIsStatsDirty = vi.fn();
 
 vi.mock("@/lib/github/client", () => ({
-  getStats: (...args: unknown[]) => mockGetStats(...args),
+  readStats: (...args: unknown[]) => mockReadStats(...args),
 }));
 vi.mock("@/lib/cache/craft-cache", () => ({
   getCachedCraftScore: (...args: unknown[]) => mockGetCachedCraftScore(...args),
@@ -33,15 +33,15 @@ beforeEach(() => {
 });
 
 describe("materializeProfile parallelism (#800)", () => {
-  it("starts the cache lookups before getStats resolves", async () => {
+  it("starts the cache lookups before readStats resolves", async () => {
     const callOrder: string[] = [];
 
     let resolveStats: (v: unknown) => void = () => {};
-    mockGetStats.mockImplementation(() => {
-      callOrder.push("getStats:start");
+    mockReadStats.mockImplementation(() => {
+      callOrder.push("readStats:start");
       return new Promise((resolve) => {
         resolveStats = (v) => {
-          callOrder.push("getStats:end");
+          callOrder.push("readStats:end");
           resolve(v);
         };
       });
@@ -69,18 +69,18 @@ describe("materializeProfile parallelism (#800)", () => {
     // Yield once so all synchronously-started promises can record their start.
     await new Promise((r) => setTimeout(r, 0));
 
-    // The cache lookups must have started before getStats resolved.
+    // The cache lookups must have started before readStats resolved.
     expect(callOrder).toContain("craft:start");
     expect(callOrder).toContain("snapshot:start");
     expect(callOrder).toContain("dirty:start");
-    expect(callOrder).not.toContain("getStats:end");
+    expect(callOrder).not.toContain("readStats:end");
 
-    resolveStats(makeFullStats());
+    resolveStats({ status: "current", stats: makeFullStats(), capturedAt: new Date().toISOString() });
     await promise;
   });
 
-  it("returns null when getStats fails, even if cache lookups succeed", async () => {
-    mockGetStats.mockResolvedValue(null);
+  it("returns null when readStats fails, even if cache lookups succeed", async () => {
+    mockReadStats.mockResolvedValue({ status: "unavailable" });
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(null);
     mockIsStatsDirty.mockResolvedValue(false);
@@ -90,7 +90,7 @@ describe("materializeProfile parallelism (#800)", () => {
   });
 
   it("survives cache lookup rejections (fail open to defaults)", async () => {
-    mockGetStats.mockResolvedValue(makeFullStats());
+    mockReadStats.mockResolvedValue({ status: "current", stats: makeFullStats(), capturedAt: new Date().toISOString() });
     mockGetCachedCraftScore.mockRejectedValue(new Error("redis"));
     mockGetCachedLatestSnapshot.mockRejectedValue(new Error("redis"));
     mockIsStatsDirty.mockRejectedValue(new Error("redis"));
