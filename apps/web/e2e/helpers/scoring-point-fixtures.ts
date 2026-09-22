@@ -3,13 +3,20 @@ import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { canonicalJson, canonicalSha256, createScoringWindow, DEFAULT_BADGE_CONFIG, type CoreCountInputs, type PublicObservedCraft } from "@chapa/shared";
+import { canonicalJson, canonicalSha256, createScoringWindow, DEFAULT_BADGE_CONFIG, type CoreCountInputs, type PublicObservedCraft, type StatsData } from "@chapa/shared";
 import { observedReceiptFixture } from "../../lib/history/__fixtures__/receipts-observed";
 import { calculateReportCraftInputs } from "../../lib/insights/report-craft";
 import { observedSemanticIdentity } from "../../lib/profile/receipt-semantic-identity";
 import { DEMO_IMPACT } from "../../lib/render/demoData";
+import { buildStatsCacheEnvelope, statsCacheBindingBytes } from "../../lib/cache/stats-cache-envelope";
 import { buildRedesignGitHubFixture } from "./redesign-github";
 import { localCandidateTarget } from "./local-candidate";
+
+/** Mirrors `FRESH_SECONDS` in `lib/cache/stats-cache.ts` (that module cannot
+ * be imported here — see `stats-cache-envelope.ts`'s header). Kept as a
+ * literal rather than re-derived so a change to the real constant is a
+ * visible diff here too. */
+const STATS_CACHE_FRESH_SECONDS = 6 * 60 * 60;
 
 export const SCORING_POINT_HANDLES = ["chapa-score-chromium", "chapa-score-mobile", "chapa-score-expired", "chapa-score-boundary"] as const;
 const DAY = 86_400_000;
@@ -43,10 +50,22 @@ export async function buildScoringPointSeeds(referenceTime: string) {
   }));
 }
 /** The existing fixture session uses the same local-only token as the server.
- * Bind stats to that actual credential/day; never weaken the production cache. */
-export function fixtureStatsBinding(handle: string, referenceDate: string, secret: string, token: string) {
+ * Bind stats to that actual credential; never weaken the production cache.
+ * Mirrors `createSourceContext`'s `accessContextId` bytes exactly (that
+ * module also carries `import "server-only"` and cannot be imported here),
+ * then signs `statsCacheBindingBytes` — the pure, shared bytes builder in
+ * `stats-cache-envelope.ts` — so the binding itself can never drift from
+ * `statsCacheBinding`'s domain string or field shape. */
+export function fixtureStatsBinding(handle: string, secret: string, token: string) {
   const accessContextId = createHmac("sha256", secret).update(canonicalJson({ version: "source-context-v1", owner: handle, requestedSource: { provider: "github", host: "github.com", login: handle }, scope: { discovery: "legacy_upload", repositoryIds: [], eventKinds: [] }, link: null, credential: token })).digest("hex");
-  return createHmac("sha256", secret).update(canonicalJson({ version: "stats-cache-binding-v1", accessContextId, links: "unlinked|unlinked|unlinked", referenceDate })).digest("hex");
+  return createHmac("sha256", secret).update(statsCacheBindingBytes({ accessContextId, links: "unlinked|unlinked|unlinked" })).digest("hex");
+}
+
+/** Seeds the exact `{ schemaVersion: 2, ... }` envelope `readCachedStats`
+ * accepts as `fresh`, via the same pure builder `writeCachedStats` uses. */
+export function fixtureStatsCacheEntry(handle: string, referenceDate: string, secret: string, token: string, stats: StatsData, now = new Date()): string {
+  const binding = fixtureStatsBinding(handle, secret, token);
+  return JSON.stringify(buildStatsCacheEnvelope(binding, referenceDate, stats, now, STATS_CACHE_FRESH_SECONDS));
 }
 export async function bootstrapScoringPointFixtures(db: SupabaseClient, options: { referenceTime: string }) {
   assertScoringFixtureEnvironment(process.env);
@@ -87,7 +106,7 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
       await check(db.rpc("scoring_observed_publish_receipt", { p_owner: handle, p_actor: handle, p_receipt: receipt, p_canonical: canonicalJson(receipt), p_semantic_digest: await observedSemanticIdentity(coreDigest, receipt.craft), p_core_semantic_digest: coreDigest }));
       const signature = createHmac("sha256", signing).update(canonicalJson(receipt)).digest("hex");
       await check(db.rpc("scoring_v7_issue_verification", { p_owner: handle, p_actor: handle, p_revision: receipt.revisionId, p_key_version: "v7-1", p_signature: signature, p_canonical: canonicalJson(receipt) }));
-      cache[`stats:v3:${handle}`] = JSON.stringify({ binding: fixtureStatsBinding(handle, receipt.window.referenceDate, secret, token), referenceDate: receipt.window.referenceDate, stats });
+      cache[`stats:v3:${handle}`] = fixtureStatsCacheEntry(handle, receipt.window.referenceDate, secret, token, stats, new Date(options.referenceTime));
       cache[`stats:stale:v2:${handle}`] = JSON.stringify(stats);
       owners[handle] = { revisionId: receipt.revisionId, receiptId: receipt.receiptId, contentHash: envelope.contentHash.value, verificationToken: `v7.${receipt.revisionId}.${signature}` };
     }

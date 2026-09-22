@@ -8,7 +8,7 @@ import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY } from
 import { buildRedesignGitHubFixture } from './redesign-github';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
 import { DEMO_STATS } from '../../lib/render/demoData';
-import { SCORING_POINT_HANDLES, fixtureStatsBinding } from "./scoring-point-fixtures";
+import { SCORING_POINT_HANDLES, fixtureStatsCacheEntry } from "./scoring-point-fixtures";
 
 export const REDESIGN_OWNERS = ['en', 'es'].flatMap(locale => ['light', 'dark'].flatMap(theme => ['desktop', 'mobile'].map(device => `chapa-redesign-${locale}-${theme}-${device}`)));
 export const REDESIGN_HANDLES = ['octocat', 'juan294', 'chapa-redesign-owner', 'chapa-redesign-visitor', ...REDESIGN_OWNERS];
@@ -85,7 +85,7 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
       const secret = process.env.NEXTAUTH_SECRET, token = process.env.GITHUB_TOKEN;
       if (!secret || token !== 'redesign-local-fixture') throw new Error('Explicit local fixture secrets/token required for bound stats');
       const referenceDate = stats.fetchedAt.slice(0, 10);
-      cache[`stats:v3:${handle}`] = JSON.stringify({ binding: fixtureStatsBinding(handle, referenceDate, secret, token), referenceDate, stats });
+      cache[`stats:v3:${handle}`] = fixtureStatsCacheEntry(handle, referenceDate, secret, token, stats, new Date(stats.fetchedAt));
       cache[`stats:stale:v2:${handle}`] = JSON.stringify(stats);
       github[handle] = { data: { user: { login: handle, name: handle, avatarUrl: '', contributionsCollection: { contributionCalendar: { totalContributions: 0, weeks: [] }, pullRequestContributions: { totalCount: 0, nodes: [] }, pullRequestReviewContributions: { totalCount: 0 }, issueContributions: { totalCount: 0 } }, repositories: { totalCount: 0, nodes: [] } }, search: { issueCount: 0 } } };
     }
