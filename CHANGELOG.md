@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   publication.** Preview creation is prohibited, pending migrations fail
   closed, candidate and production trees must match, and release proof records
   actual deployment identity and readback.
+- **Vercel Git deployments are disabled for `develop`.** The production branch
+  remains `main`, so the release push cannot create a Preview deployment while
+  the authorized merge can still create the production deployment.
 
 ### Fixed
 
