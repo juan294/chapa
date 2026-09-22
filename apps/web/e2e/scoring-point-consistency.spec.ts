@@ -106,10 +106,17 @@ async function recordPublicReceipt(page: Page, owner: string, profile: { identit
   const link = await page.locator(`a[href*="/verify/v7.${profile.identity.revisionId}."]`).first().getAttribute("href");
   await testInfo.attach(`${label}-public-identity.json`, { body: Buffer.from(JSON.stringify({ owner, receiptId: envelope.receipt.receiptId, revisionId: profile.identity.revisionId, contentHash: profile.identity.contentHash, verificationPath: link ? new URL(link, page.url()).pathname : null }, null, 2)), contentType: "application/json" });
 }
+async function chooseInsightsReport(page: Page, file: { name: string; mimeType: string; buffer: Buffer }) {
+  const importButton = page.getByRole("button", { name: "Import Claude Code Insights", exact: true });
+  await expect(importButton).toBeEnabled();
+  const chooser = page.waitForEvent("filechooser");
+  await importButton.click();
+  await (await chooser).setFiles(file);
+}
 async function upload(page: Page, point: 57 | 0, referenceTime: string) {
   await page.goto("/settings?lang=en");
   const response = page.waitForResponse(r => r.url().endsWith("/api/insights") && r.request().method() === "POST");
-  await page.locator('[data-testid="settings-insights"] input[type="file"]').setInputFiles({ name: `report-${point}.html`, mimeType: "text/html", buffer: Buffer.from(scoringReportHtml(point, referenceTime)) });
+  await chooseInsightsReport(page, { name: `report-${point}.html`, mimeType: "text/html", buffer: Buffer.from(scoringReportHtml(point, referenceTime)) });
   let result = await response;
   if (point === 0) expect(result.status()).toBe(409);
   if (result.status() === 409) {
@@ -140,7 +147,7 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     await page.goto("/settings?lang=en");
     const html = scoringReportHtml(0, referenceTime).replace("Failed", "Unknown");
     const uploaded = page.waitForResponse(r => r.url().endsWith("/api/insights") && r.request().method() === "POST");
-    await page.locator('[data-testid="settings-insights"] input[type="file"]').setInputFiles({ name: "report-insufficient.html", mimeType: "text/html", buffer: Buffer.from(html) });
+    await chooseInsightsReport(page, { name: "report-insufficient.html", mimeType: "text/html", buffer: Buffer.from(html) });
     const response = await uploaded;
     expect(response.status()).toBe(200);
     expect((await response.json()).craft.status).toBe("insufficient_report_data");
