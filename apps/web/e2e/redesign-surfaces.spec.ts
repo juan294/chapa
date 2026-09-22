@@ -10,7 +10,7 @@ import { REDESIGN_VALID_HASH, setRedesignSession, redesignFixtureClient } from '
 test.skip(process.env.REDESIGN_DISPOSABLE_PROJECT !== 'chapa-redesign', 'requires disposable local redesign fixtures');
 const evidence = resolve(process.env.REDESIGN_EVIDENCE_DIR ?? resolve(__dirname, "../../../logs/v7-point/browser/redesign"), "surfaces");
 async function command(page: Page, text: string) {
-  const input = page.locator('#terminal-command-input');
+  const input = page.locator('#terminal-command-input:visible');
   await expect(input).toHaveCount(1);
   await input.fill(text); await input.press('Enter');
 }
@@ -138,7 +138,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await capture(page, `share-${locale}-${theme}-${width}`);
     await page.goto(`/verify/${REDESIGN_VALID_HASH}?lang=${locale}`);
     await expect(page.locator('h1')).toHaveText(locale === 'en' ? 'Legacy verification record' : 'Registro de verificación antiguo');
-    await expect(page.getByText('@chapa-redesign-owner')).toBeVisible();
+    await expect(page.getByRole('link', { name: '@chapa-redesign-owner', exact: true })).toBeVisible();
     await capture(page, `verify-${locale}-${theme}-${width}`);
     await page.goto(`/studio?demo=1&lang=${locale}`);
     await expect(page.getByTestId('studio-demo-marker')).toBeVisible();

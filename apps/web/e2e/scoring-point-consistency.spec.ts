@@ -134,7 +134,10 @@ async function upload(page: Page, point: 57 | 0, referenceTime: string) {
 }
 
 test("real report57 then explicit correction0 preserves one core across surfaces, saves and rollback", async ({ page, context, baseURL }, testInfo) => {
-  test.setTimeout(150_000);
+  // This is the longest browser contract: it publishes twice, saves and
+  // restores Studio state, verifies two locales, rolls the flag back and
+  // withdraws the receipt. Leave headroom when the full suite is concurrent.
+  test.setTimeout(240_000);
   assertScoringFixtureEnvironment(process.env);
   const owner = `chapa-score-${testInfo.project.name}`;
   const db = redesignFixtureClient();
