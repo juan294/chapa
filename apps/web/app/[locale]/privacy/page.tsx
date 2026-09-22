@@ -52,14 +52,14 @@ export default async function PrivacyPage({
             title={
               <>
                 {t('legal.privacy.h1Before') as string}
-                <span className="text-amber">
+                <span className="text-amber-text">
                   {t('legal.privacy.h1Highlight') as string}
                 </span>
               </>
             }
           />
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
-            <p className="text-xs text-text-secondary/60">
+            <p className="text-xs text-text-secondary">
               {t('legal.privacy.lastUpdated') as string}
             </p>
             {sections.map((section, i) => (
@@ -72,7 +72,7 @@ export default async function PrivacyPage({
                   {i === sections.length - 1 && (
                     <a
                       href={`mailto:${t('legal.privacy.contactEmail') as string}`}
-                      className="text-amber hover:text-amber-light transition-colors"
+                      className="text-amber-text hover:text-text-primary transition-colors"
                     >
                       {t('legal.privacy.contactEmail') as string}
                     </a>

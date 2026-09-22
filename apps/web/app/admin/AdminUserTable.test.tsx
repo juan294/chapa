@@ -99,11 +99,20 @@ describe("AdminUserTable", () => {
       render(
         <AdminUserTable {...defaultTableProps} users={[makeUser({ confidence: 63 })]} />,
       );
-      const progressbar = screen.getByRole("progressbar", { name: "Confidence score" });
+      const progressbar = screen.getByRole("progressbar", { name: "Legacy confidence score" });
       expect(progressbar.getAttribute("aria-valuenow")).toBe("63");
       expect(progressbar.getAttribute("aria-valuemin")).toBe("0");
       expect(progressbar.getAttribute("aria-valuemax")).toBe("100");
     });
+  });
+
+  it("shows canonical current precision, exact value and nullable archetype without legacy confidence", () => {
+    render(<AdminUserTable {...defaultTableProps} users={[makeUser({ policyVersion: "v7.2", adjustedComposite: 69.99, rawScore: 69.99, exactScore: 69.998, archetype: null, confidence: null })]} />);
+    expect(screen.getByText("69.99")).toBeDefined();
+    expect(screen.getByText("69.998")).toBeDefined();
+    expect(screen.getByText("v7.2")).toBeDefined();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.queryByText("Builder")).toBeNull();
   });
 
   // ---------------------------------------------------------------------------

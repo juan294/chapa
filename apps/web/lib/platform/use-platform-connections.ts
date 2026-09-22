@@ -54,9 +54,8 @@ function emptyPlatformStatusCache(): PlatformStatusCache {
   };
 }
 
-// Backed by the shared module-store primitive (#774). Read and written
-// imperatively (in useState initializers, effects, and after unlink); there
-// are no reactive subscribers, so `getSnapshot()`/`set()` are used directly.
+// Backed by the shared module-store primitive (#774). Every mounted consumer
+// subscribes so concurrent mounts share requests and receive the same result.
 const platformStatusStore = createModuleStore<PlatformStatusCache>(
   emptyPlatformStatusCache(),
 );
@@ -89,13 +88,7 @@ export function usePlatformConnections(): PlatformConnections {
     gitlab: gitlabEnabled,
   };
 
-  const [statuses, setStatuses] = useState<Record<PlatformId, PlatformStatus | null>>(
-    () => ({
-      bitbucket: platformStatusStore.getSnapshot().bitbucket.status,
-      codeberg: platformStatusStore.getSnapshot().codeberg.status,
-      gitlab: platformStatusStore.getSnapshot().gitlab.status,
-    }),
-  );
+  const statusCache = platformStatusStore.useStore();
   const [unlinking, setUnlinking] = useState<Record<PlatformId, boolean>>({
     bitbucket: false,
     codeberg: false,
@@ -128,9 +121,6 @@ export function usePlatformConnections(): PlatformConnections {
                 ...platformStatusStore.getSnapshot(),
                 [platform]: { fetched: true, pending: false, status },
               });
-              if (data.enabled) {
-                setStatuses((prev) => ({ ...prev, [platform]: status }));
-              }
             }),
         () => {
           platformStatusStore.set({
@@ -157,11 +147,15 @@ export function usePlatformConnections(): PlatformConnections {
       });
       const body = await res.json().catch(() => null);
       if (res.ok && body?.success === true) {
-        clearPlatformStatusCache();
-        setStatuses((prev) => ({
-          ...prev,
-          [platform]: { linked: false, remoteLogin: null },
-        }));
+        const cache = platformStatusStore.getSnapshot();
+        platformStatusStore.set({
+          ...cache,
+          [platform]: {
+            fetched: true,
+            pending: false,
+            status: { linked: false, remoteLogin: null },
+          },
+        });
         return true;
       }
       return false;
@@ -176,7 +170,7 @@ export function usePlatformConnections(): PlatformConnections {
     connections: PLATFORM_IDS.map((platform) => ({
       platform,
       enabled: enabledByPlatform[platform],
-      status: statuses[platform],
+      status: statusCache[platform].status,
       unlinking: unlinking[platform],
     })),
     unlink,

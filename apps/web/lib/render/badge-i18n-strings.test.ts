@@ -13,6 +13,9 @@ describe("buildBadgeI18nStrings", () => {
 
   it("resolves every literal the badge renders", () => {
     expect(buildBadgeI18nStrings(echo, "Solid")).toEqual({
+      activityHeading: "badge.activityHeading",
+      heatmapCaption: "badge.heatmapCaption",
+      impactHeading: "badge.impactHeading",
       metricsSimulated: "badge.metricsSimulated",
       metricsVerified: "badge.metricsVerified",
       metricsPublic: "badge.metricsPublic",
@@ -22,8 +25,20 @@ describe("buildBadgeI18nStrings", () => {
         consistency: "dimensions.consistency.label",
         breadth: "dimensions.breadth.label",
         craft: "dimensions.craft.label",
+        craftUnavailable: "badge.craftUpdate",
       },
       radarNoData: "badge.radarNoData",
+      scoringEvidence: {
+        illustrativeExample: "badge.illustrativeExample",
+        observedScoreDescription: "badge.observedScoreDescription",
+        reportCraftDescription: "badge.reportCraftDescription",
+        reportCraftAbsent: "badge.reportCraftAbsent",
+        reportCraftUnavailable: "badge.reportCraftUnavailable",
+        incompleteSources: "badge.incompleteSources",
+        excludedSources: "badge.excludedSources",
+      },
+      tierUnknownLabel: "badge.tierUnknown",
+      archetypeUnknownLabel: "badge.archetypeUnknown",
       verifiedLabel: "badge.verifiedLabel",
       sampleDisclosure: "badge.sampleDisclosure",
       tierLabel: "tiers.solid",
@@ -51,6 +66,7 @@ describe("buildBadgeI18nStrings", () => {
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
     expect(first.radarLabels).not.toBe(second.radarLabels);
+    expect(first.scoringEvidence).not.toBe(second.scoringEvidence);
   });
 
   // The point of this module is that it runs in the browser. An import of

@@ -26,16 +26,16 @@ export default function ErrorPage({
         description={t('cliAuthorize.errorBoundaryBody') as string}
         className="w-full max-w-xl text-left"
       />
-      <div className="mt-8 flex items-center gap-4">
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
         <button
           onClick={reset}
-          className="rounded-lg border border-terminal-red/30 bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/20"
+          className="min-h-11 rounded-[3px] border border-terminal-red bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/10 hover:underline"
         >
           {t('common.tryAgain') as string}
         </button>
         <Link
           href="/"
-          className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-terminal-red/30 hover:text-text-primary"
+          className="inline-flex min-h-11 items-center rounded-[3px] border border-text-primary px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-text-primary hover:text-text-primary"
         >
           {t('common.goHome') as string}
         </Link>

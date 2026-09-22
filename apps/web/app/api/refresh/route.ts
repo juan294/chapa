@@ -1,13 +1,17 @@
+import { postWriteScore } from "@/lib/profile/post-write-score";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimitStrict } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
+import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
 import { getRequestId } from "@/lib/log";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -73,10 +77,24 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
+  const scoringSelection = await readScoringRenderSelection();
   const materialized = await materializeOrchestratedProfile(handle, {
+    scoringSelection,
     token,
   });
   if (!materialized) {
+    // A connected platform whose token can no longer be refreshed makes the
+    // whole fetch null — a connected source must not silently disappear from
+    // an aggregate. Retrying cannot fix that, so name the connection instead
+    // of returning a bare 502 the user can only stare at (same treatment as
+    // /api/generate).
+    const unusable = await findUnusableSourceLinks(handle);
+    if (unusable.length > 0) {
+      return NextResponse.json(
+        { error: `Reconnect ${unusable.join(", ")} to include it in your profile.`, staleSources: unusable },
+        { status: 409 },
+      );
+    }
     void captureServerError({
       route: "/api/refresh",
       statusCode: 502,
@@ -140,6 +158,14 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     history: true,
   });
 
+  // #1311 — a refresh is an owner-initiated recompute, so it is where a
+  // consented subject's v7 receipt is re-issued. Awaited rather than deferred:
+  // the invalidation above has already cleared the badge, and issuing after
+  // that clear is what makes the next render draw the new revision.
+  const issuance = await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
+
+  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
+
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
   if (craftResult) {
@@ -148,6 +174,12 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
 
   // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
   revalidatePath(`/u/${handle}`);
+
+  if (publishedScore.status !== "legacy") return NextResponse.json({
+    success: true,
+    ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : { policyVersion: "v7.2", displayScore: null, exactScore: null, compositeScore: null, adjustedComposite: null, scoring: null, publication: "pending" }),
+    legacy: { impact: materialized.displayImpact },
+  }, { headers: { "Cache-Control": "no-store" } });
 
   return NextResponse.json({
     stats: materialized.stats,

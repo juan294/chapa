@@ -1,0 +1,86 @@
+{
+  "reviewedImplementationCommit": "87fd325867db87462407d94418555a5c6bf5df3e",
+  "commands": [
+    {
+      "command": "pnpm run typecheck",
+      "exit": 0,
+      "seconds": 8.0
+    },
+    {
+      "command": "pnpm run lint",
+      "exit": 0,
+      "seconds": 10.3
+    },
+    {
+      "command": "pnpm run test:coverage",
+      "exit": 0,
+      "seconds": 21.5
+    },
+    {
+      "command": "pnpm run check:circular",
+      "exit": 0,
+      "seconds": 2.3
+    },
+    {
+      "command": "pnpm run validate:migrations",
+      "exit": 0,
+      "seconds": 0.3
+    },
+    {
+      "command": "pnpm run check:write-registration",
+      "exit": 0,
+      "seconds": 0.3
+    },
+    {
+      "command": "pnpm run check:vercel-config",
+      "exit": 0,
+      "seconds": 0.3
+    },
+    {
+      "command": "pnpm run check:licenses",
+      "exit": 0,
+      "seconds": 0.5
+    },
+    {
+      "command": "pnpm run build",
+      "exit": 0,
+      "seconds": 8.5
+    },
+    {
+      "command": "pnpm run test:contract:local",
+      "exit": 0,
+      "seconds": 2.4
+    }
+  ],
+  "additionalChecks": [
+    {
+      "command": "bash scripts/check-craft-propagation.sh",
+      "exit": 0
+    },
+    {
+      "command": "bash scripts/check-bundle-size.sh 350",
+      "exit": 0
+    }
+  ],
+  "coverage": {
+    "files": 531,
+    "tests": 8811,
+    "statements": 95.27,
+    "branches": 90.93,
+    "functions": 95.22,
+    "lines": 97.32
+  },
+  "scriptsCoverage": {
+    "files": 22,
+    "tests": 264,
+    "statements": 59.39,
+    "branches": 62.87,
+    "functions": 71.08,
+    "lines": 59.64
+  },
+  "contracts": {
+    "files": 35,
+    "tests": 79
+  },
+  "dependenciesChanged": false
+}

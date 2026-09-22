@@ -116,6 +116,7 @@ describe("proxy matcher scope (#1023 / FE-H1 — must stay narrow)", () => {
     "/about",
     "/about/scoring",
     "/about/verification",
+    "/about/leaderboard",
     "/privacy",
     "/terms",
     "/archetypes/builder",
@@ -127,7 +128,7 @@ describe("proxy matcher scope (#1023 / FE-H1 — must stay narrow)", () => {
     "/archetypes/emerging",
   ];
 
-  it("matches exactly the 9 migrated content pages (13 literal paths incl. 7 archetype slugs)", () => {
+  it("matches exactly the 10 migrated content pages (14 literal paths incl. 7 archetype slugs)", () => {
     expect(config.matcher.sort()).toEqual([...CONTENT_PAGES].sort());
   });
 

@@ -7,7 +7,7 @@ export function AdminTableSkeleton({ rowCount = 8 }: { rowCount?: number }) {
         {Array.from({ length: 5 }, (_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-xl border border-stroke bg-card p-4"
+            className="animate-pulse rounded-[3px] border border-stroke bg-card p-4"
           >
             <div className="mb-2 h-3 w-16 rounded bg-amber/10" />
             <div className="h-6 w-12 rounded bg-amber/10" />
@@ -16,7 +16,7 @@ export function AdminTableSkeleton({ rowCount = 8 }: { rowCount?: number }) {
       </div>
 
       {/* Search bar shimmer */}
-      <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+      <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
         <div className="flex items-center gap-3 border-b border-stroke px-4 py-3">
           <div className="h-4 w-4 animate-pulse rounded bg-amber/10" />
           <div className="h-4 flex-1 animate-pulse rounded bg-amber/[0.06]" />

@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "develop": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/warm-cache",

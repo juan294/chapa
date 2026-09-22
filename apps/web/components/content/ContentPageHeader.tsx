@@ -21,11 +21,11 @@ export function ContentPageHeader({
   return (
     <header className="mb-10">
       <div className="font-heading text-sm whitespace-nowrap text-text-secondary">
-        <span className="select-none text-amber">%</span> {command}
+        <span className="select-none text-amber-text">%</span> {command}
       </div>
       <h1 className="mt-4 font-heading text-[clamp(1.875rem,6cqi,2.75rem)] leading-tight font-bold tracking-tight text-balance">
         {title}
-        <span className="animate-cursor-blink text-amber">_</span>
+        <span className="animate-cursor-blink text-amber-text">_</span>
       </h1>
       {intro && (
         <p className="mt-4 text-lg text-pretty text-text-secondary">{intro}</p>

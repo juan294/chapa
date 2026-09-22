@@ -22,12 +22,41 @@ vi.mock("@/lib/auth/github-session-token", () => ({
   getSessionGitHubToken: vi.fn(),
 }));
 
+vi.mock("@/lib/platform/source-diagnostics", () => ({
+  findUnusableSourceLinks: vi.fn(),
+}));
+
+vi.mock("@/lib/analytics/server-errors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/analytics/server-errors")>();
+  return {
+    ...actual,
+    captureServerError: vi.fn().mockResolvedValue(undefined),
+    captureServerEvent: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+// Capture next/server's after() callbacks instead of running them, so a test
+// can assert the warm happens only when the callback runs, never before the
+// response (see .claude/rules/post-response-work.md).
+const afterCallbacks: Array<() => void | Promise<void>> = [];
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => {
+      afterCallbacks.push(cb);
+    },
+  };
+});
+
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { rateLimit } from "@/lib/cache/redis";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
+import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
+import { captureServerError } from "@/lib/analytics/server-errors";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 
 const mockRequireSession = vi.mocked(requireSession);
@@ -35,6 +64,8 @@ const mockGetStats = vi.mocked(getStats);
 const mockComputeImpact = vi.mocked(computeImpactV6);
 const mockRateLimit = vi.mocked(rateLimit);
 const mockGetSessionGitHubToken = vi.mocked(getSessionGitHubToken);
+const mockFindUnusableSourceLinks = vi.mocked(findUnusableSourceLinks);
+const mockCaptureServerError = vi.mocked(captureServerError);
 
 function makeRequest(cookie?: string): NextRequest {
   const req = new NextRequest("http://localhost:3001/api/generate", {
@@ -53,8 +84,10 @@ const SESSION = {
 describe("POST /api/generate", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    afterCallbacks.length = 0;
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockGetSessionGitHubToken.mockResolvedValue("ghp_test");
+    mockFindUnusableSourceLinks.mockResolvedValue([]);
   });
 
   it("returns 401 when no session cookie is present", async () => {
@@ -126,14 +159,67 @@ describe("POST /api/generate", () => {
     expect(mockGetStats).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when GitHub API fails", async () => {
+  it("returns 502 when both the session-token and server-token fetches fail", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue(null);
+    mockFindUnusableSourceLinks.mockResolvedValue([]);
 
     const res = await POST(makeRequest("chapa_session=abc"));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toContain("Failed to fetch");
+    expect(mockGetStats).toHaveBeenCalledTimes(2);
+    expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
+    expect(mockGetStats).toHaveBeenNthCalledWith(2, "juan294");
+  });
+
+  // A connected platform whose token cannot be refreshed makes getStats null.
+  // Retrying is useless, so the response has to name the connection.
+  it("returns 409 naming the connections that blocked the fetch", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockGetStats.mockResolvedValue(null);
+    mockFindUnusableSourceLinks.mockResolvedValue(["bitbucket", "gitlab"]);
+
+    const res = await POST(makeRequest("chapa_session=abc"));
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.staleSources).toEqual(["bitbucket", "gitlab"]);
+    expect(body.error).toContain("bitbucket");
+    expect(mockFindUnusableSourceLinks).toHaveBeenCalledWith("juan294");
+  });
+
+  // #1282/#1283 — a first-time handle has no baseline, so a session-token
+  // fetch that times out or is rejected by the integrity guard (private-only
+  // PR history under a token with no `repo` scope) returns null. Retrying
+  // with the SAME token cannot succeed; the tokenless call authenticates as
+  // the repo-scoped server GITHUB_TOKEN and can.
+  it("falls back to a tokenless (server-token) fetch when the session-token fetch returns null", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    const fakeStats = { handle: "juan294", commitsTotal: 7 } as unknown as StatsData;
+    mockGetStats.mockResolvedValueOnce(null).mockResolvedValueOnce(fakeStats);
+    mockComputeImpact.mockReturnValue({ archetype: "Emerging" } as unknown as ImpactV6Result);
+
+    const res = await POST(makeRequest("chapa_session=abc"));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true, handle: "juan294", policyVersion: "v6" });
+    expect(mockGetStats).toHaveBeenCalledTimes(2);
+    expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
+    // Exactly one argument: an explicit `undefined` token would be a
+    // different call shape and is not what getStats' scope classifier expects.
+    expect(mockGetStats.mock.calls[1]).toEqual(["juan294"]);
+    expect(mockComputeImpact).toHaveBeenCalledWith(fakeStats);
+  });
+
+  it("does not fall back when the session-token fetch succeeds", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
+    mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
+
+    await POST(makeRequest("chapa_session=abc"));
+
+    expect(mockGetStats).toHaveBeenCalledTimes(1);
   });
 
   it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {
@@ -142,4 +228,87 @@ describe("POST /api/generate", () => {
 
     await expect(POST(makeRequest("chapa_session=abc"))).rejects.toThrow("unexpected boom");
   });
+
+  // LE-5-1 — the share page materializes tokenless (as the server
+  // GITHUB_TOKEN), and the stats cache row is bound to the credential that
+  // fetched it (lib/platform/source-context.ts hashes the token into
+  // accessContextId). A generate that only warmed the session-token row left
+  // the owner's very first share-page load on a cold live fetch, which can
+  // time out and render the badge beside an empty Impact Breakdown.
+  describe("warming the server-token stats row after the response (LE-5-1)", () => {
+    it("schedules a tokenless getStats in after() and awaits it only when the callback runs", async () => {
+      mockRequireSession.mockReturnValue({ session: SESSION });
+      const fakeStats = { handle: "juan294", commitsTotal: 100 } as unknown as StatsData;
+      mockGetStats.mockResolvedValue(fakeStats);
+      mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
+
+      const res = await POST(makeRequest("chapa_session=abc"));
+
+      expect(res.status).toBe(200);
+      // Before the callback runs: only the session-token fetch happened.
+      expect(mockGetStats).toHaveBeenCalledTimes(1);
+      expect(mockGetStats).toHaveBeenCalledWith("juan294", "ghp_test");
+      expect(afterCallbacks).toHaveLength(1);
+
+      let settled = false;
+      mockGetStats.mockImplementationOnce(async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        settled = true;
+        return fakeStats;
+      });
+      await afterCallbacks[0]!();
+
+      expect(settled).toBe(true);
+      expect(mockGetStats).toHaveBeenCalledTimes(2);
+      // Exactly one argument: the same call shape the share page's
+      // materializer makes, so it binds the same cache row.
+      expect(mockGetStats.mock.calls[1]).toEqual(["juan294"]);
+      expect(mockCaptureServerError).not.toHaveBeenCalled();
+    });
+
+    it("captures a warm failure instead of letting the after() callback reject", async () => {
+      mockRequireSession.mockReturnValue({ session: SESSION });
+      mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
+      mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
+
+      const res = await POST(makeRequest("chapa_session=abc"));
+      expect(res.status).toBe(200);
+
+      mockGetStats.mockRejectedValueOnce(new Error("graphql timeout"));
+      await expect(afterCallbacks[0]!()).resolves.toBeUndefined();
+
+      expect(mockCaptureServerError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          route: "/api/generate",
+          error: expect.objectContaining({ message: "graphql timeout" }),
+        }),
+      );
+    });
+
+    it("schedules no warm when generation fails", async () => {
+      mockRequireSession.mockReturnValue({ session: SESSION });
+      mockGetStats.mockResolvedValue(null);
+
+      const res = await POST(makeRequest("chapa_session=abc"));
+
+      expect(res.status).toBe(502);
+      expect(afterCallbacks).toHaveLength(0);
+    });
+
+    it("schedules no warm when the tokenless fallback already fetched the server-token row", async () => {
+      mockRequireSession.mockReturnValue({ session: SESSION });
+      const fakeStats = { handle: "juan294", commitsTotal: 7 } as unknown as StatsData;
+      mockGetStats.mockResolvedValueOnce(null).mockResolvedValueOnce(fakeStats);
+      mockComputeImpact.mockReturnValue({ archetype: "Emerging" } as unknown as ImpactV6Result);
+
+      const res = await POST(makeRequest("chapa_session=abc"));
+
+      expect(res.status).toBe(200);
+      expect(afterCallbacks).toHaveLength(0);
+      expect(mockGetStats).toHaveBeenCalledTimes(2);
+    });
+  });
 });
+
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));
+vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceiptIfConsented: vi.fn(async () => "skipped") }));

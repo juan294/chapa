@@ -6,7 +6,8 @@ export default defineConfig({
     testTimeout: 30000,
     include: ["apps/web/**/*.contract.test.ts"],
     exclude: ["**/node_modules/**", "**/node_modules.nosync/**"],
-    setupFiles: ["./vitest.contract-setup.ts"],
+    setupFiles: ["./apps/web/test/contract/next-runtime-setup.ts", "./vitest.contract-setup.ts"],
+    sequence: { setupFiles: "list" },
     coverage: { enabled: false },
   },
   resolve: {

@@ -5,17 +5,17 @@ import React, { forwardRef, useImperativeHandle } from "react";
 import { GlobalCommandBar } from "./GlobalCommandBar";
 
 const mockPush = vi.fn();
+const mockSetTheme = vi.fn();
+vi.mock("next-themes", () => ({useTheme: () => ({theme: "dark", setTheme: mockSetTheme})}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
-}));
-
-vi.mock("@/components/AuthorTypewriter", () => ({
-  AuthorTypewriter: () => <div data-testid="author-typewriter" />,
+  usePathname: () => "/",
 }));
 
 // Track the ref-clear calls
 const mockClear = vi.fn();
+const mockFill = vi.fn();
 
 vi.mock("@/components/terminal/TerminalInput", () => ({
   TerminalInput: forwardRef(function MockTerminalInput(
@@ -23,19 +23,22 @@ vi.mock("@/components/terminal/TerminalInput", () => ({
       onSubmit,
       onPartialChange,
       prompt,
+      history,
     }: {
       onSubmit: (cmd: string) => void;
       onPartialChange?: (val: string) => void;
       prompt?: string;
+      history?: string[];
     },
     ref: React.Ref<{ clear: () => void; focus: () => void }>,
   ) {
     useImperativeHandle(ref, () => ({
       clear: mockClear,
+      fill: mockFill,
       focus: vi.fn(),
     }));
     return (
-      <div data-testid="terminal-input">
+      <div data-testid="terminal-input" data-history={JSON.stringify(history)}>
         <input
           id="terminal-command-input"
           data-testid="cmd-input"
@@ -104,9 +107,19 @@ describe("GlobalCommandBar", () => {
     expect(screen.getByTestId("terminal-input")).toBeDefined();
   });
 
-  it("renders AuthorTypewriter", () => {
-    render(<GlobalCommandBar />);
-    expect(screen.getByTestId("author-typewriter")).toBeDefined();
+  it("allows an editor to intercept command navigation", () => {
+    const intercept = vi.fn((event: Event) => event.preventDefault());
+    window.addEventListener("chapa:app-navigation", intercept);
+    try {
+      render(<GlobalCommandBar />);
+      const input = screen.getByTestId("cmd-input");
+      fireEvent.change(input, { target: { value: "/about" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(intercept).toHaveBeenCalledOnce();
+      expect(mockPush).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("chapa:app-navigation", intercept);
+    }
   });
 
   it("navigates on submit with navigation command", () => {
@@ -151,36 +164,11 @@ describe("GlobalCommandBar", () => {
   });
 
   describe("handleAutocompleteFill (lines 103-117)", () => {
-    it("fills the input element with the command via native setter and focuses it", () => {
+    it("fills through the controlled input handle", () => {
       render(<GlobalCommandBar />);
-      const input = screen.getByTestId("cmd-input");
-
-      // Type "/" to open autocomplete
-      fireEvent.change(input, { target: { value: "/" } });
-      expect(screen.getByTestId("autocomplete")).toBeDefined();
-
-      // The mock input has aria-label="Terminal command input" which handleAutocompleteFill queries
-      const nativeSetterSpy = vi.fn();
-      const origDescriptor = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      );
-      Object.defineProperty(window.HTMLInputElement.prototype, "value", {
-        ...origDescriptor,
-        set: nativeSetterSpy,
-      });
-
-      const focusSpy = vi.spyOn(input, "focus");
-
-      // Click the fill button
+      fireEvent.change(screen.getByTestId("cmd-input"), {target: {value: "/"}});
       fireEvent.click(screen.getByTestId("autocomplete-fill"));
-
-      // handleAutocompleteFill should have used nativeInputValueSetter to set value
-      expect(nativeSetterSpy).toHaveBeenCalledWith("/badge ");
-      expect(focusSpy).toHaveBeenCalled();
-
-      // Restore
-      Object.defineProperty(window.HTMLInputElement.prototype, "value", origDescriptor!);
+      expect(mockFill).toHaveBeenCalledWith("/badge ");
     });
   });
 
@@ -250,7 +238,7 @@ describe("GlobalCommandBar", () => {
   });
 
   describe("output auto-clear timeout", () => {
-    it("auto-clears output lines after OUTPUT_TIMEOUT_MS", () => {
+    it("keeps output readable until the next input", () => {
       render(<GlobalCommandBar />);
       const input = screen.getByTestId("cmd-input");
 
@@ -266,8 +254,8 @@ describe("GlobalCommandBar", () => {
         vi.advanceTimersByTime(5001);
       });
 
-      // Output should be cleared
-      expect(screen.queryByTestId("terminal-output")).toBeNull();
+      // Help remains readable without a deadline.
+      expect(screen.getByTestId("terminal-output")).toBeDefined();
     });
 
     it("clears output on next keystroke", () => {
@@ -287,33 +275,87 @@ describe("GlobalCommandBar", () => {
     });
   });
 
-  // #1214 — the bar is inline and always visible, so the commands have to be
-  // discoverable without typing `/` first. That is what the rejected palette
-  // overlay was for.
+  // The chip row was removed: the landing page already carries the same
+  // navigation above the fold, and the dock is for typing commands, not
+  // clicking buttons. Typing `/` opens the autocomplete instead.
   describe("suggestion chips", () => {
-    it("renders a scrolling row of command chips", () => {
+    it("renders no chip row under the input", () => {
       render(<GlobalCommandBar />);
-      const row = screen.getByLabelText("Command suggestions");
-      expect(row.className).toContain("overflow-x-auto");
-      const chips = row.querySelectorAll("button");
-      expect(chips.length).toBeGreaterThan(0);
-      for (const chip of Array.from(chips)) {
-        expect(chip.textContent).toMatch(/^\//);
-        expect(chip.className).toContain("whitespace-nowrap");
-      }
+      expect(screen.queryByLabelText("Command suggestions")).toBeNull();
     });
+  });
+});
 
-    it("fills the input with the chip's command instead of running it", () => {
-      render(<GlobalCommandBar />);
-      const chip = screen
-        .getByLabelText("Command suggestions")
-        .querySelector("button") as HTMLButtonElement;
-      const command = chip.textContent!;
-      fireEvent.click(chip);
-      expect(mockPush).not.toHaveBeenCalled();
-      expect(
-        (screen.getByTestId("cmd-input") as HTMLInputElement).value,
-      ).toBe(`${command} `);
+
+// LE-4-3 — a hard-coded spacer (`h-28`, 112px) left the footer 0.375px under
+// the dock on the Pixel 5 viewport: the dock's height follows font metrics
+// plus its 1px border, and the integer scroll height discards up to one
+// sub-pixel of the document's bottom edge, which the spacer absorbs. The
+// spacer follows the measured border box, rounded up, plus that one pixel.
+describe("dock spacer", () => {
+  const spacerOf = (container: HTMLElement) => container.querySelector(".fixed")!.previousElementSibling as HTMLElement;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("reserves the dock's rendered height plus the scroll-height rounding pixel, and follows resizes", () => {
+    let notify: ResizeObserverCallback | undefined;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { notify = callback; }
+      observe = observe;
+      disconnect = disconnect;
     });
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({height: 112.375} as DOMRect);
+
+    const {container, unmount} = render(<GlobalCommandBar />);
+    const spacer = spacerOf(container);
+    expect(spacer.style.height).toBe("114px");
+    expect(observe).toHaveBeenCalledWith(container.querySelector(".fixed"));
+
+    rect.mockReturnValue({height: 96} as DOMRect);
+    act(() => notify!([], {} as ResizeObserver));
+    expect(spacer.style.height).toBe("97px");
+
+    unmount();
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the static floor when the dock cannot be measured", () => {
+    vi.stubGlobal("ResizeObserver", undefined);
+    const {container} = render(<GlobalCommandBar />);
+    const spacer = spacerOf(container);
+    expect(spacer.className).toContain("h-28");
+    expect(spacer.style.height).toBe("");
+  });
+});
+
+describe("theme and session history", () => {
+  it("reads provider preference and only sets valid choices", () => {
+    mockSetTheme.mockClear();
+    render(<GlobalCommandBar />);
+    const input = screen.getByTestId("cmd-input");
+    const submit = (value: string) => {fireEvent.change(input, {target: {value}}); fireEvent.keyDown(input, {key: "Enter"});};
+    submit("/theme");
+    expect(screen.getByTestId("terminal-output").textContent).toContain("dark");
+    expect(mockSetTheme).not.toHaveBeenCalled();
+    submit("/theme purple");
+    expect(mockSetTheme).not.toHaveBeenCalled();
+    submit("/theme system");
+    expect(mockSetTheme).toHaveBeenCalledWith("system");
+  });
+  it("bounds history at 50 and preserves it when clearing", () => {
+    render(<GlobalCommandBar />);
+    const input = screen.getByTestId("cmd-input");
+    for (let i = 0; i < 55; i++) {fireEvent.change(input, {target: {value: `/unknown${i}`}}); fireEvent.keyDown(input, {key: "Enter"});}
+    fireEvent.change(input, {target: {value: "/clear"}}); fireEvent.keyDown(input, {key: "Enter"});
+    const history = JSON.parse(screen.getByTestId("terminal-input").getAttribute("data-history")!);
+    expect(history).toHaveLength(50);
+    expect(history[0]).toBe("/unknown6");
+    expect(history.at(-1)).toBe("/clear");
+    expect(screen.queryByTestId("terminal-output")).toBeNull();
   });
 });

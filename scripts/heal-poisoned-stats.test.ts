@@ -1,545 +1,116 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  parseArgs,
-  normalizeHandle,
-  mergedStatsKey,
-  staleStatsKey,
-  snapshotKey,
-  SNAPSHOT_COMMITS_THRESHOLD,
-  healHandle,
-  selectPoisonedSnapshotDates,
-  type Config,
-} from "./heal-poisoned-stats";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { inspectRecord, healHandle, normalizeHandle, parseArgs, run, type Config } from "./heal-poisoned-stats";
+import { loadConfig } from "./lib/env";
 
-describe("parseArgs", () => {
-  it("returns handles with dry-run default (no --apply)", () => {
-    expect(parseArgs(["juan294"])).toEqual({
-      handles: ["juan294"],
-      apply: false,
-    });
+vi.mock("./lib/env", () => ({ loadConfig: vi.fn() }));
+const cfg: Config = { redisUrl: "https://redis.example", redisToken: "test", supaUrl: "https://db.example", supaKey: "test" };
+const quiet = { handle: "alice", prsMergedCount: 0, commitsTotal: 15000, issuesClosedCount: 5000, linesAdded: 0, linesDeleted: 0 };
+const location = { kind: "merged_cache" as const, owner: "alice", recordId: "stats:v2:merged:alice" };
+const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+beforeEach(() => { vi.clearAllMocks(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+describe("read-only historical inspection", () => {
+  it.each([["--apply", "alice"], ["alice", "--apply"], ["--apply"]])("rejects mutation before configuration or I/O: %j", async (...args) => {
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    await expect(run(args)).rejects.toThrow(/retired|read.only/i);
+    expect(loadConfig).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled();
   });
-
-  it("accepts multiple handles", () => {
-    expect(parseArgs(["juan294", "mdburgos"])).toEqual({
-      handles: ["juan294", "mdburgos"],
-      apply: false,
-    });
-  });
-
-  it("sets apply when --apply is passed (order-independent)", () => {
-    expect(parseArgs(["--apply", "juan294"])).toEqual({
-      handles: ["juan294"],
-      apply: true,
-    });
-    expect(parseArgs(["juan294", "--apply"])).toEqual({
-      handles: ["juan294"],
-      apply: true,
-    });
-  });
-
-  it("throws when no handle is provided", () => {
+  it("normalizes every handle before configuration, rejects unknown options and unsafe handles", async () => {
+    expect(parseArgs([" Alice ", "BOB", "alice"])).toEqual({ handles: ["alice", "bob"] });
     expect(() => parseArgs([])).toThrow(/handle/i);
-    expect(() => parseArgs(["--apply"])).toThrow(/handle/i);
+    expect(() => parseArgs(["alice", "--force"])).toThrow(/option/i);
+    await expect(run(["alice", "bad*"])).rejects.toThrow(/handle/i);
+    expect(loadConfig).not.toHaveBeenCalled();
+    expect(normalizeHandle(" ALICE ")).toBe("alice");
   });
-});
-
-describe("normalizeHandle", () => {
-  it("lowercases and trims", () => {
-    expect(normalizeHandle("  Juan294  ")).toBe("juan294");
+  it("rejects programmatic legacy apply before any request", async () => {
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    await expect(healHandle(cfg, "alice", true)).rejects.toThrow(/retired|read.only/i);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
-
-  it("rejects glob/wildcard and injection characters", () => {
-    expect(() => normalizeHandle("*")).toThrow(/invalid/i);
-    expect(() => normalizeHandle("foo;drop")).toThrow(/invalid/i);
+  it.each([
+    quiet, { ...quiet, prsMergedCount: 140, prsMergedWeight: 3.38, linesAdded: 59, linesDeleted: 10 },
+    { ...quiet, commitsTotal: 0, issuesClosedCount: 0 },
+    { ...quiet, fetchedAt: "2026-01-01", uploadedAt: "2026-09-05", hasSupplementalData: false },
+    { ...quiet, corruptionReason: "scope_blinded", contentDigest: "a".repeat(64) },
+  ])("does not infer corruption from activity, upload age, reason strings or supplied digests", value => {
+    expect(inspectRecord(location, JSON.stringify(value))).toMatchObject({ status: "unproven", reasons: [] });
   });
-
-  it("rejects empty handles", () => {
-    expect(() => normalizeHandle("")).toThrow();
+  it("binds a subject mismatch to the exact requested storage identity and observed bytes", () => {
+    const raw = JSON.stringify({ ...quiet, handle: "bob" });
+    const finding = inspectRecord(location, raw);
+    expect(finding).toMatchObject({ ...location, status: "recorded_contradiction", reasons: ["subject_mismatch"] });
+    expect(finding.contentSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(inspectRecord(location, raw + " ").contentSha256).not.toBe(finding.contentSha256);
+    expect(inspectRecord({ ...location, owner: "bob", recordId: "stats:v2:merged:bob" }, raw).status).toBe("unproven");
+    expect(JSON.stringify(finding)).not.toContain('"prsMergedCount"');
   });
-});
-
-describe("key builders", () => {
-  it("build the exact keys the app itself reads/writes", () => {
-    expect(mergedStatsKey("juan294")).toBe("stats:v2:merged:juan294");
-    expect(staleStatsKey("juan294")).toBe("stats:stale:v2:juan294");
-    expect(snapshotKey("juan294")).toBe("snapshot:v2:latest:juan294");
+  it("treats missing ownership evidence as unproven, malformed records as uninterpretable and absent records as missing", () => {
+    expect(inspectRecord(location, JSON.stringify({ prsMergedCount: 0 })).status).toBe("unproven");
+    expect(inspectRecord(location, "{private invalid JSON").status).toBe("uninterpretable");
+    expect(inspectRecord(location, "[]").status).toBe("uninterpretable");
+    expect(inspectRecord(location, null).status).toBe("missing");
+    expect(inspectRecord(location, JSON.stringify({ handle: "ALICE" })).status).toBe("unproven");
   });
-});
-
-describe("SNAPSHOT_COMMITS_THRESHOLD", () => {
-  it("is the documented threshold (100)", () => {
-    expect(SNAPSHOT_COMMITS_THRESHOLD).toBe(100);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// healHandle — network-mocked tests
-// ---------------------------------------------------------------------------
-
-const cfg: Config = {
-  redisUrl: "https://redis.example",
-  redisToken: "redis-token",
-  supaUrl: "https://supa.example",
-  supaKey: "supa-key",
-};
-
-const poisonedStats = {
-  prsMergedCount: 0,
-  commitsTotal: 15533,
-  issuesClosedCount: 5096,
-};
-
-// The exact juan294 2026-07-14 production shape (#1049): a POSITIVE count from
-// the token-scoped search, with sample-derived fields collapsed. Invisible to
-// isPoisonedStats, which keys on count === 0.
-const blindedStats = {
-  prsMergedCount: 140,
-  prsMergedWeight: 3.37828,
-  linesAdded: 59,
-  linesDeleted: 10,
-  commitsTotal: 16292,
-  issuesClosedCount: 5208,
-};
-
-const healthyStats = {
-  prsMergedCount: 41,
-  prsMergedWeight: 120,
-  linesAdded: 78545,
-  linesDeleted: 26537,
-  commitsTotal: 14000,
-  issuesClosedCount: 608,
-};
-
-/** Snapshot row as PostgREST returns it (snake_case). */
-interface SnapshotRowLike {
-  date: string;
-  prs_merged_count: number;
-  prs_merged_weight: number | null;
-  lines_added: number | null;
-  lines_deleted: number | null;
-  commits_total: number;
-  issues_closed: number;
-}
-
-const blindedRow: SnapshotRowLike = {
-  date: "2026-07-14",
-  prs_merged_count: 140,
-  prs_merged_weight: 3.37828,
-  lines_added: 59,
-  lines_deleted: 10,
-  commits_total: 16292,
-  issues_closed: 5208,
-};
-
-const zeroShapeRow: SnapshotRowLike = {
-  date: "2026-03-02",
-  prs_merged_count: 0,
-  prs_merged_weight: 0,
-  lines_added: 0,
-  lines_deleted: 0,
-  commits_total: 15533,
-  issues_closed: 5096,
-};
-
-const healthyRow: SnapshotRowLike = {
-  date: "2026-07-13",
-  prs_merged_count: 953,
-  prs_merged_weight: 120,
-  lines_added: 101313,
-  lines_deleted: 54996,
-  commits_total: 16187,
-  issues_closed: 608,
-};
-
-interface FetchScenario {
-  mergedValue: unknown;
-  staleValue: unknown;
-  snapshotRows: SnapshotRowLike[];
-  /** The `supplemental:<handle>` record, when the handle has an EMU merge. */
-  supplementalValue?: unknown;
-}
-
-function mockFetch(scenario: FetchScenario) {
-  const calls: { url: string; method: string }[] = [];
-
-  const fn = vi.fn(async (url: string, init?: RequestInit) => {
-    const method = init?.method ?? "GET";
-    calls.push({ url, method });
-
-    // Redis GET
-    if (url.includes("/GET/stats%3Av2%3Amerged%3A")) {
-      return jsonResponse({ result: toRedisResult(scenario.mergedValue) });
+  it("reads full identified rows and only GETs; bounded row reads disclose incomplete enumeration", async () => {
+    const row = { id: 7, handle: "alice", date: "2026-09-05", commits_total: 15000, prs_merged_count: 0, privateField: "private-value" };
+    const fetchMock = vi.fn(async (input: string) => input.includes("metrics_snapshots")
+      ? new Response(JSON.stringify([row]), { headers: { "content-range": "0-0/2" } })
+      : response({ result: JSON.stringify(quiet) }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await healHandle(cfg, "alice");
+    expect(result.mode).toBe("dry_run"); expect(result.snapshotEnumeration).toBe("partial");
+    expect(result.records).toHaveLength(3);
+    expect(result.records[2]).toMatchObject({ kind: "metrics_snapshot", owner: "alice", recordId: "7", status: "unproven" });
+    expect(JSON.stringify(result)).not.toContain("private-value");
+    for (const [input, init] of fetchMock.mock.calls as unknown as [string, RequestInit][]) {
+      expect(init.method ?? "GET").toBe("GET"); expect(input).not.toContain("/DEL/");
     }
-    if (url.includes("/GET/stats%3Astale%3A")) {
-      return jsonResponse({ result: toRedisResult(scenario.staleValue) });
-    }
-    if (url.includes("/GET/supplemental%3A")) {
-      return jsonResponse({ result: toRedisResult(scenario.supplementalValue ?? null) });
-    }
-
-    // Redis DEL
-    if (url.includes("/DEL/")) {
-      return jsonResponse({ result: 1 });
-    }
-
-    // Supabase GET candidate rows
-    if (method === "GET" && url.includes("/rest/v1/metrics_snapshots")) {
-      return jsonResponse(scenario.snapshotRows);
-    }
-
-    // Supabase DELETE (date-filtered)
-    if (method === "DELETE") {
-      const m = url.match(/date=in\.%28([^&]*)%29|date=in\.\(([^&)]*)\)/);
-      const rawDates = decodeURIComponent(m?.[1] ?? m?.[2] ?? "");
-      const dates = rawDates.split(",").filter(Boolean);
-      return jsonResponse(scenario.snapshotRows.filter((r) => dates.includes(r.date)));
-    }
-
-    throw new Error(`Unexpected fetch call: ${method} ${url}`);
+    const url = fetchMock.mock.calls.find(([input]) => input.includes("metrics_snapshots"))![0];
+    expect(url).toContain("select=*"); expect(url).toContain("handle=eq.alice");
+  });
+  it("never emits upstream bodies or request errors", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({ message: "https://private.example/secret" }, 500)));
+    await expect(healHandle(cfg, "alice")).rejects.toThrow("Historical inspection read failed");
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("private-token"); }));
+    await expect(healHandle(cfg, "alice")).rejects.toThrow("Historical inspection read failed");
+  });
+  it("prints counts and limitations without record contents, digests or false clean/repair claims", async () => {
+    vi.mocked(loadConfig).mockReturnValue(cfg);
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => input.includes("metrics_snapshots")
+      ? new Response("[]", { headers: { "content-range": "*/0" } }) : response({ result: JSON.stringify({ ...quiet, privateURL: "https://private.example" }) })));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await run(["alice"]);
+    const output = log.mock.calls.flat().join(" ");
+    expect(output).toMatch(/unproven/i); expect(output).toMatch(/no.*(deleted|changed)/i);
+    expect(output).not.toMatch(/https:\/\/private|[a-f0-9]{64}|nothing to heal|re-run with --apply|sees everything/i);
+  });
+  it.each([
+    ["0-0/1", "complete"], ["0-0/2", "partial"], ["garbage", "partial"],
+    ["0-4/5", "partial"], [null, "partial"],
+  ])("reports snapshot enumeration honestly for range %s", async (range, expected) => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => input.includes("metrics_snapshots")
+      ? new Response(JSON.stringify([{ id: 1, handle: "alice" }]), { headers: range ? { "content-range": range } : {} })
+      : response({ result: null })));
+    expect((await healHandle(cfg, "alice")).snapshotEnumeration).toBe(expected);
+  });
+  it.each([[{ id: 0 }], [{ id: Number.MAX_SAFE_INTEGER + 1 }], [{ id: "1" }], Array.from({ length: 1001 }, (_, id) => ({ id: id + 1 }))])("rejects snapshots without safe exact identity or exceeding the bound", async (...rows) => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => input.includes("metrics_snapshots") ? response(rows) : response({ result: null })));
+    await expect(healHandle(cfg, "alice")).rejects.toThrow("Historical inspection read failed");
+  });
+  it.each([{ error: "private failure", result: null }, {}, { result: {} }])("rejects malformed Redis envelopes without leaking them", async body => {
+    vi.stubGlobal("fetch", vi.fn(async () => response(body)));
+    await expect(healHandle(cfg, "alice")).rejects.toThrow("Historical inspection read failed");
+  });
+  it("binds a mismatching snapshot subject to its exact row ID and contents", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => input.includes("metrics_snapshots")
+      ? response([{ id: 42, handle: "bob", date: "2026-09-05", privateURL: "private-sentinel" }])
+      : response({ result: null })));
+    const record = (await healHandle(cfg, "alice")).records[2]!;
+    expect(record).toMatchObject({ recordId: "42", owner: "alice", status: "recorded_contradiction", reasons: ["subject_mismatch"] });
+    expect(record.contentSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(record)).not.toContain("private-sentinel");
   });
 
-  return { fn, calls };
-}
-
-function toRedisResult(value: unknown): string | null {
-  if (value === null) return null;
-  return JSON.stringify(value);
-}
-
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-beforeEach(() => {
-  vi.restoreAllMocks();
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-describe("healHandle — dry run (apply: false)", () => {
-  it("identifies the poisoned shape without mutating anything", async () => {
-    const { fn, calls } = mockFetch({
-      mergedValue: poisonedStats,
-      staleValue: poisonedStats,
-      snapshotRows: [zeroShapeRow, blindedRow, healthyRow],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "juan294", false);
-
-    expect(result).toEqual({
-      handle: "juan294",
-      mergedPoisoned: true,
-      stalePoisoned: true,
-      supplementalStale: false,
-      poisonedSnapshotRows: 2,
-      poisonedSnapshotDates: ["2026-03-02", "2026-07-14"],
-      deletedRedisKeys: [],
-      deletedSnapshotRows: 0,
-    });
-
-    // Never mutates in dry-run mode.
-    expect(calls.some((c) => c.url.includes("/DEL/"))).toBe(false);
-    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-  });
-
-  it("reports a healthy handle as not poisoned", async () => {
-    const { fn } = mockFetch({
-      mergedValue: healthyStats,
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "healthy-user", false);
-
-    expect(result).toEqual({
-      handle: "healthy-user",
-      mergedPoisoned: false,
-      stalePoisoned: false,
-      supplementalStale: false,
-      poisonedSnapshotRows: 0,
-      poisonedSnapshotDates: [],
-      deletedRedisKeys: [],
-      deletedSnapshotRows: 0,
-    });
-  });
-
-  it("treats a missing Redis key as not poisoned (no data to purge)", async () => {
-    const { fn } = mockFetch({
-      mergedValue: null,
-      staleValue: null,
-      snapshotRows: [],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "no-cache-user", false);
-
-    expect(result.mergedPoisoned).toBe(false);
-    expect(result.stalePoisoned).toBe(false);
-  });
-});
-
-describe("healHandle — apply mode (apply: true)", () => {
-  it("DELETEs the poisoned Redis keys, the snapshot cache key, and the corrupt snapshot rows", async () => {
-    const { fn, calls } = mockFetch({
-      mergedValue: poisonedStats,
-      staleValue: poisonedStats,
-      snapshotRows: [zeroShapeRow, blindedRow],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "juan294", true);
-
-    expect(result.deletedRedisKeys.sort()).toEqual(
-      [
-        "stats:v2:merged:juan294",
-        "stats:stale:v2:juan294",
-        "snapshot:v2:latest:juan294",
-      ].sort(),
-    );
-    expect(result.deletedSnapshotRows).toBe(2);
-
-    expect(calls.some((c) => c.url.includes("/DEL/stats%3Av2%3Amerged%3Ajuan294"))).toBe(true);
-    expect(calls.some((c) => c.url.includes("/DEL/stats%3Astale%3Av2%3Ajuan294"))).toBe(true);
-    expect(calls.some((c) => c.url.includes("/DEL/snapshot%3Av2%3Alatest%3Ajuan294"))).toBe(true);
-    expect(calls.some((c) => c.method === "DELETE")).toBe(true);
-  });
-
-  it("does NOT issue any mutating call for a healthy handle", async () => {
-    const { fn, calls } = mockFetch({
-      mergedValue: healthyStats,
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "healthy-user", true);
-
-    expect(result.deletedRedisKeys).toEqual([]);
-    expect(result.deletedSnapshotRows).toBe(0);
-    expect(calls.some((c) => c.url.includes("/DEL/"))).toBe(false);
-    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// #1049 — the scope-blinded shape (positive count, collapsed sample fields)
-// ---------------------------------------------------------------------------
-
-describe("selectPoisonedSnapshotDates (#1049)", () => {
-  it("selects zero-shape and blinded rows, never healthy ones", () => {
-    expect(selectPoisonedSnapshotDates([zeroShapeRow, blindedRow, healthyRow])).toEqual([
-      "2026-03-02",
-      "2026-07-14",
-    ]);
-  });
-
-  it("keeps the commits threshold for the zero shape (low-activity zero rows are left alone)", () => {
-    const quietZeroRow = { ...zeroShapeRow, commits_total: SNAPSHOT_COMMITS_THRESHOLD };
-    expect(selectPoisonedSnapshotDates([quietZeroRow])).toEqual([]);
-  });
-
-  it("tolerates legacy rows with null sample fields — zero-check only, no crash", () => {
-    const legacyRow = {
-      ...blindedRow,
-      prs_merged_weight: null,
-      lines_added: null,
-      lines_deleted: null,
-    };
-    // Without the sample-derived fields the blindness proof is impossible, so
-    // the row must be left alone rather than guessed at.
-    expect(selectPoisonedSnapshotDates([legacyRow])).toEqual([]);
-  });
-});
-
-describe("healHandle — blinded Redis keys (#1049)", () => {
-  it("flags a blinded (positive-count) cached stats value as poisoned", async () => {
-    const { fn } = mockFetch({
-      mergedValue: blindedStats,
-      staleValue: healthyStats,
-      snapshotRows: [],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "juan294", false);
-
-    expect(result.mergedPoisoned).toBe(true);
-    expect(result.stalePoisoned).toBe(false);
-  });
-
-  it("treats a legacy cached value without sample fields as zero-check only", async () => {
-    const legacy = { prsMergedCount: 140, commitsTotal: 16292, issuesClosedCount: 5208 };
-    const { fn } = mockFetch({
-      mergedValue: legacy,
-      staleValue: null,
-      snapshotRows: [],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "juan294", false);
-
-    expect(result.mergedPoisoned).toBe(false);
-  });
-
-  it("apply mode DELETEs snapshot rows by exact date list, not a broad filter", async () => {
-    const { fn, calls } = mockFetch({
-      mergedValue: blindedStats,
-      staleValue: healthyStats,
-      snapshotRows: [blindedRow, healthyRow],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "juan294", true);
-
-    expect(result.poisonedSnapshotDates).toEqual(["2026-07-14"]);
-    expect(result.deletedSnapshotRows).toBe(1);
-
-    const del = calls.find((c) => c.method === "DELETE");
-    expect(del).toBeDefined();
-    // The delete must be scoped to the reviewed dates — a dry-run shows the
-    // operator exactly these dates, and apply must delete exactly them.
-    expect(decodeURIComponent(del!.url)).toContain("date=in.(2026-07-14)");
-    expect(decodeURIComponent(del!.url)).toContain("handle=eq.juan294");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// #1060 — the pre-merge shape.
-//
-// A composed entry written before (or without) the current supplemental record
-// is not "poisoned" by either existing predicate: it is structurally valid
-// GitHub-derived data that simply never saw the EMU merge. The frivas incident
-// (2026-08-11) had exactly this shape and the script could not detect it.
-// ---------------------------------------------------------------------------
-describe("healHandle — stale supplemental (#1060)", () => {
-  const uploadedAt = "2026-08-11T11:14:49.248Z";
-
-  /** A composed entry that correctly absorbed the supplemental. */
-  const composedAfterUpload = {
-    ...healthyStats,
-    fetchedAt: "2026-08-11T11:29:33.141Z",
-    hasSupplementalData: true,
-  };
-
-  /** The real frivas entry: written 3h13m before the upload, never recomposed. */
-  const preMergeEntry = {
-    prsMergedCount: 0,
-    prsMergedWeight: 0,
-    linesAdded: 0,
-    linesDeleted: 0,
-    commitsTotal: 54,
-    issuesClosedCount: 0,
-    fetchedAt: "2026-08-11T08:01:47.493Z",
-  };
-
-  function supplementalRecord() {
-    return {
-      targetHandle: "frivas",
-      sourceHandle: "frivas-at-navteca",
-      uploadedAt,
-      stats: { prsMergedCount: 32, commitsTotal: 453 },
-    };
-  }
-
-  it("does not flag a composed entry that absorbed the supplemental", async () => {
-    const { fn } = mockFetch({
-      mergedValue: composedAfterUpload,
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-      supplementalValue: supplementalRecord(),
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "frivas", false);
-
-    expect(result.supplementalStale).toBe(false);
-  });
-
-  it("flags a composed entry missing the supplemental marker", async () => {
-    const { fn } = mockFetch({
-      mergedValue: { ...healthyStats, fetchedAt: "2026-08-11T12:00:00.000Z" },
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-      supplementalValue: supplementalRecord(),
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "frivas", false);
-
-    expect(result.supplementalStale).toBe(true);
-  });
-
-  it("flags a composed entry written before the supplemental was uploaded", async () => {
-    const { fn } = mockFetch({
-      mergedValue: {
-        ...healthyStats,
-        fetchedAt: "2026-08-11T08:01:47.493Z",
-        hasSupplementalData: true,
-      },
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-      supplementalValue: supplementalRecord(),
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "frivas", false);
-
-    expect(result.supplementalStale).toBe(true);
-  });
-
-  it("never flags a handle with no supplemental record", async () => {
-    const { fn } = mockFetch({
-      mergedValue: { ...healthyStats, fetchedAt: "2026-08-11T08:01:47.493Z" },
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "frivas", false);
-
-    expect(result.supplementalStale).toBe(false);
-  });
-
-  it("the frivas incident shape is detected", async () => {
-    const { fn, calls } = mockFetch({
-      mergedValue: preMergeEntry,
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-      supplementalValue: supplementalRecord(),
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "frivas", false);
-
-    expect(result.supplementalStale).toBe(true);
-    // Dry run mutates nothing.
-    expect(calls.some((c) => c.url.includes("/DEL/"))).toBe(false);
-    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-  });
-
-  it("apply mode purges the composed and snapshot keys but preserves the baseline", async () => {
-    const { fn } = mockFetch({
-      mergedValue: preMergeEntry,
-      staleValue: healthyStats,
-      snapshotRows: [healthyRow],
-      supplementalValue: supplementalRecord(),
-    });
-    vi.stubGlobal("fetch", fn);
-
-    const result = await healHandle(cfg, "frivas", true);
-
-    expect(result.deletedRedisKeys).toContain(mergedStatsKey("frivas"));
-    expect(result.deletedRedisKeys).toContain(snapshotKey("frivas"));
-    // The baseline is the protected GitHub-derived record and is not the
-    // defective value — deleting it would discard the scope protection.
-    expect(result.deletedRedisKeys).not.toContain(staleStatsKey("frivas"));
-    // The supplemental record itself is the user's data and is never touched.
-    expect(result.deletedRedisKeys.every((k) => !k.startsWith("supplemental:"))).toBe(true);
-  });
 });

@@ -22,12 +22,20 @@ export type BadgeTranslate = (key: string) => unknown;
  * Pure and synchronous, matching `renderBadgeSvg` itself. Returns a fresh
  * object (including a fresh `radarLabels`) on every call, so no caller can
  * mutate another's bundle.
+ *
+ * `tier` is the tier of the model actually being drawn, and `null` is a real
+ * v7 result: an evidence-completion range whose interval straddles a boundary
+ * earns no tier. Passing the v6 aggregate's tier while the badge draws a v7
+ * receipt would print one policy's label over the other policy's number.
  */
 export function buildBadgeI18nStrings(
   t: BadgeTranslate,
-  tier: string,
+  tier: string | null,
 ): BadgeI18nStrings {
   return {
+    activityHeading: t("badge.activityHeading") as string,
+    heatmapCaption: t("badge.heatmapCaption") as string,
+    impactHeading: t("badge.impactHeading") as string,
     metricsSimulated: t("badge.metricsSimulated") as string,
     metricsVerified: t("badge.metricsVerified") as string,
     metricsPublic: t("badge.metricsPublic") as string,
@@ -37,10 +45,24 @@ export function buildBadgeI18nStrings(
       consistency: t("dimensions.consistency.label") as string,
       breadth: t("dimensions.breadth.label") as string,
       craft: t("dimensions.craft.label") as string,
+      craftUnavailable: t("badge.craftUpdate") as string,
     },
     radarNoData: t("badge.radarNoData") as string,
+    scoringEvidence: {
+      illustrativeExample: t("badge.illustrativeExample") as string,
+      observedScoreDescription: t("badge.observedScoreDescription") as string,
+      reportCraftDescription: t("badge.reportCraftDescription") as string,
+      reportCraftAbsent: t("badge.reportCraftAbsent") as string,
+      reportCraftUnavailable: t("badge.reportCraftUnavailable") as string,
+      incompleteSources: t("badge.incompleteSources") as string,
+      excludedSources: t("badge.excludedSources") as string,
+    },
     verifiedLabel: t("badge.verifiedLabel") as string,
     sampleDisclosure: t("badge.sampleDisclosure") as string,
-    tierLabel: t(`tiers.${tier.toLowerCase()}`) as string,
+    // Omitted entirely for a tier-less v7 range, so the renderer falls through
+    // to `tierUnknownLabel` rather than receiving an empty translated string.
+    ...(tier === null ? {} : { tierLabel: t(`tiers.${tier.toLowerCase()}`) as string }),
+    tierUnknownLabel: t("badge.tierUnknown") as string,
+    archetypeUnknownLabel: t("badge.archetypeUnknown") as string,
   };
 }

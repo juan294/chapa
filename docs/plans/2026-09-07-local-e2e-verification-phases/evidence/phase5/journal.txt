@@ -1,0 +1,13 @@
+session before login: juan294
+logged in as juan294
+studio config reference captured: revision ? keys border,cardStyle,background,scoreEffect,colorPalette,tierTreatment,heatmapAnimation
+POST /api/generate -> 200
+after generation url: http://localhost:3001/u/juan294
+owner view mentions confidence: false
+share page overflow px: 0
+locale es: lang=es h1=Juan González
+POST /api/refresh -> 429
+cold share page: placeholder seen=false, badge visible after 958 ms without reload
+
+console/page errors:
+

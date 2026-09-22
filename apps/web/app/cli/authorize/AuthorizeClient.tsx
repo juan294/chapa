@@ -44,7 +44,7 @@ export function AuthorizeClient({ sessionId, handle, deviceContext = null }: Pro
 
   return (
     <main id="main-content" className="flex min-h-screen items-center justify-center bg-bg px-6">
-      <div className="w-full max-w-md rounded-xl border border-stroke bg-card p-8">
+      <div className="w-full max-w-md rounded-[3px] border border-stroke bg-card p-8">
         <h1 className="font-heading text-xl font-bold text-text-primary mb-2">
           {t('cliAuthorize.h1') as string}
         </h1>
@@ -61,14 +61,14 @@ export function AuthorizeClient({ sessionId, handle, deviceContext = null }: Pro
               {t('cliAuthorize.description') as string}
             </p>
 
-            <div className="rounded-lg border border-stroke bg-bg p-4">
+            <div className="rounded-[3px] border border-stroke bg-bg p-4">
               <p className="text-text-secondary text-xs mb-1">{t('cliAuthorize.loggedInAs') as string}</p>
-              <p className="font-heading text-amber font-bold">{handle}</p>
+              <p className="font-heading text-amber-text font-bold">{handle}</p>
             </div>
 
             <div
               data-testid="cli-device-context"
-              className="rounded-lg border border-stroke bg-bg p-4 space-y-2"
+              className="rounded-[3px] border border-stroke bg-bg p-4 space-y-2"
             >
               <p className="text-text-secondary text-xs">
                 {t('cliAuthorize.deviceContextHeading') as string}
@@ -106,7 +106,7 @@ export function AuthorizeClient({ sessionId, handle, deviceContext = null }: Pro
               <button
                 onClick={handleApprove}
                 disabled={state === "approving"}
-                className="flex-1 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 disabled:opacity-50 transition-all"
+                className="min-h-11 flex-1 rounded-[3px] bg-action px-6 py-3 text-sm font-semibold text-action-text hover:bg-action-hover disabled:opacity-50 transition-colors"
               >
                 {state === "approving"
                   ? (t('cliAuthorize.authorizing') as string)

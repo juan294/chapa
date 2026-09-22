@@ -21,14 +21,20 @@ export function median(values: number[]): number | undefined {
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 0) {
-    return (sorted[middle - 1]! + sorted[middle]!) / 2;
+    const lower = sorted[middle - 1]!;
+    const upper = sorted[middle]!;
+    // Avoid overflowing the sum for two large finite observations. The
+    // opposite-sign fallback also avoids overflowing their difference.
+    const distance = upper - lower;
+    return Number.isFinite(distance) ? lower + distance / 2 : lower / 2 + upper / 2;
   }
 
   return sorted[middle]!;
 }
 
 /**
- * Transform raw GitHub GraphQL contribution data into a StatsData object.
+ * Legacy v6 only: transform raw GitHub GraphQL data into stored StatsData.
+ * Scalar estimates are not accepted by the v7 evidence aggregation API.
  *
  * This is a pure function — deterministic output for a given input
  * (except for `fetchedAt` which uses the current time).

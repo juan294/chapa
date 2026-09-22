@@ -35,28 +35,28 @@ fi
 
 log_info "Running Claude headless mode..."
 
-# Run Claude in headless mode
+# Run Claude in headless mode. Publish only validated output so a failed run
+# cannot replace the last good report.
 cd "${CHAPA_DIR}"
 acquire_agent_lock "vitest-heavy-agent" "qa-agent"
-trap 'release_agent_lock "vitest-heavy-agent"' EXIT
+TMP_OUTPUT=$(create_report_temp "${OUTPUT_FILE}")
+trap 'rm -f "${TMP_OUTPUT}"; release_agent_lock "vitest-heavy-agent"' EXIT
 
 claude -p "${PROMPT}" \
   --model "${MODEL}" \
   --allowedTools "Read,Glob,Grep,Bash" \
   --output-format text \
-  > "${OUTPUT_FILE}" 2>>"${LOG_FILE}" || {
+  > "${TMP_OUTPUT}" 2>>"${LOG_FILE}" || {
     log_error "Claude execution failed. Check ${LOG_FILE}"
     exit 1
   }
 
+publish_report_file "${TMP_OUTPUT}" "${OUTPUT_FILE}" "qa-agent"
 release_agent_lock "vitest-heavy-agent"
 trap - EXIT
-
-log_info "Report written to ${OUTPUT_FILE}"
-
-validate_report_file "${OUTPUT_FILE}" "qa-agent"
 
 # Extract shared context and update shared file
 extract_and_write_shared_context "${AGENT_KEY}" "${OUTPUT_FILE}"
 
+log_info "Report written to ${OUTPUT_FILE}"
 log_info "=== QA Agent complete ==="

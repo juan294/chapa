@@ -200,20 +200,21 @@ function ArrowUpIcon({ size = 18 }: { size?: number }) {
 // ---------------------------------------------------------------------------
 
 const ARCHETYPE_COLOR_MAP: Record<string, string> = {
-  Builder: "var(--color-archetype-builder)",
-  "Quality Champion": "var(--color-archetype-guardian)",
-  Marathoner: "var(--color-archetype-marathoner)",
-  Polymath: "var(--color-archetype-polymath)",
-  Balanced: "var(--color-archetype-balanced)",
-  Emerging: "var(--color-archetype-emerging)",
-  Artificer: "var(--color-archetype-artificer)",
+  Builder: "builder",
+  "Quality Champion": "guardian",
+  Marathoner: "marathoner",
+  Polymath: "polymath",
+  Balanced: "balanced",
+  Emerging: "emerging",
+  Artificer: "artificer",
 };
 
-function resolveArchetypeColor(archetypeName?: string): string {
-  if (archetypeName) {
-    return ARCHETYPE_COLOR_MAP[archetypeName] ?? "var(--color-amber)";
-  }
-  return "var(--color-amber)";
+function resolveArchetypeColors(archetypeName?: string) {
+  const archetype = archetypeName ? ARCHETYPE_COLOR_MAP[archetypeName] : undefined;
+  return {
+    tint: archetype ? `var(--color-archetype-${archetype})` : "var(--color-amber)",
+    foreground: archetype ? `var(--color-archetype-${archetype}-text)` : "var(--color-amber-text)",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -227,19 +228,16 @@ const TIER_LIST_EN = ["Emerging", "Solid", "High", "Elite"];
 // Type-specific renderers
 // ---------------------------------------------------------------------------
 
-/** Achievement — celebratory banner with green glow + shimmer */
+/** Achievement — semantic success emphasis within the shared rule system. */
 function AchievementCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="relative rounded-xl border border-terminal-green/20 bg-terminal-green/[0.04] p-5 animate-fade-in-up overflow-hidden"
+      className="relative rounded-[3px] border border-terminal-green/20 bg-terminal-green/[0.04] p-5 animate-fade-in-up overflow-hidden"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      {/* Animated shimmer sweep */}
-      <div className="absolute inset-0 animate-shimmer-sweep bg-gradient-to-r from-transparent via-terminal-green/10 to-transparent pointer-events-none" />
-
       <div className="relative flex items-center gap-4">
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-terminal-green/10 flex items-center justify-center text-terminal-green">
+        <div className="flex-shrink-0 w-10 h-10 rounded-[3px] bg-terminal-green/10 flex items-center justify-center text-terminal-green">
           <TrophyIcon size={22} />
         </div>
         <div className="min-w-0">
@@ -268,19 +266,19 @@ function TrendCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
+      className="rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
         <div
-          className="relative flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
+          className="relative flex-shrink-0 w-8 h-8 rounded-[3px] flex items-center justify-center overflow-hidden"
           data-testid="trend-icon"
         >
           <div
-            className="absolute inset-0 opacity-15 rounded-lg"
+            className="absolute inset-0 opacity-15 rounded-[3px]"
             style={{ backgroundColor: accentColor }}
           />
-          <div style={{ color: accentColor }}>
+          <div style={{ color: dimColor ? "var(--color-text-primary)" : accentColor }}>
             {isUp ? <TrendingUpIcon /> : <TrendingDownIcon />}
           </div>
         </div>
@@ -306,11 +304,11 @@ function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
+      className="rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5 text-amber">
+        <div className="flex-shrink-0 mt-0.5 text-amber-text">
           <ArrowUpIcon />
         </div>
         <div className="min-w-0 flex-1">
@@ -342,12 +340,12 @@ function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
                     }`}
                   />
                   <span
-                    className={`text-[10px] font-heading leading-none ${
+                    className={`text-[11px] font-heading leading-none ${
                       i === tierInfo.currentIndex
-                        ? "text-amber font-semibold"
+                        ? "text-amber-text font-semibold"
                         : i === tierInfo.nextIndex
                           ? "text-text-secondary"
-                          : "text-text-secondary/40"
+                          : "text-terminal-dim"
                     }`}
                   >
                     {tierLabel}
@@ -371,7 +369,7 @@ function CoachingTipCard({ insight, animationDelay = 0 }: InsightCardProps) {
   return (
     <div
       role="article"
-      className="rounded-lg border border-stroke/50 bg-card/50 px-4 py-3 animate-fade-in-up"
+      className="rounded-[3px] border border-stroke/50 bg-card/50 px-4 py-3 animate-fade-in-up"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
@@ -393,31 +391,31 @@ function CoachingTipCard({ insight, animationDelay = 0 }: InsightCardProps) {
 
 /** Archetype — identity card with colored icon and headline */
 function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
-  const archetypeColor = resolveArchetypeColor(insight.archetypeName);
+  const archetypeColors = resolveArchetypeColors(insight.archetypeName);
 
   return (
     <div
       role="article"
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up overflow-hidden"
+      className="rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up overflow-hidden"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
         <div
-          className="relative flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
+          className="relative flex-shrink-0 w-8 h-8 rounded-[3px] flex items-center justify-center overflow-hidden"
           data-testid="archetype-icon"
         >
           <div
-            className="absolute inset-0 opacity-15 rounded-lg"
-            style={{ backgroundColor: archetypeColor }}
+            className="absolute inset-0 opacity-15 rounded-[3px]"
+            style={{ backgroundColor: archetypeColors.tint }}
           />
-          <div style={{ color: archetypeColor }}>
+          <div style={{ color: archetypeColors.foreground }}>
             <TargetIcon size={18} />
           </div>
         </div>
         <div className="min-w-0">
           <p
             className="font-heading text-sm font-bold"
-            style={{ color: archetypeColor }}
+            style={{ color: archetypeColors.foreground }}
           >
             {insight.headline}
           </p>

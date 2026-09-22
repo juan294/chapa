@@ -1,3 +1,5 @@
+import { postWriteScore } from "@/lib/profile/post-write-score";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
@@ -6,6 +8,7 @@ import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -53,7 +56,9 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     );
   }
 
+  const scoringSelection = await readScoringRenderSelection();
   const materialized = await materializeOrchestratedProfile(handle, {
+    scoringSelection,
     token: auth.token,
   });
 
@@ -94,6 +99,13 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     history: true,
   });
 
+  // #1311 — recalculate exists to make a subject's published numbers current
+  // after a scoring change, so a consented subject's receipt is re-issued here
+  // for the same reason the snapshot was rewritten above.
+  const issuance = await issueScoreReceiptIfConsented(handle, { token: auth.token, scoringSelection });
+
+  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
+
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
   if (craftResult) {
@@ -101,6 +113,12 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
   }
 
   revalidatePath(`/u/${handle}`);
+
+  if (publishedScore.status !== "legacy") return NextResponse.json({
+    success: true,
+    ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : { policyVersion: "v7.2", displayScore: null, exactScore: null, compositeScore: null, adjustedComposite: null, scoring: null, publication: "pending" }),
+    legacy: { impact: materialized.displayImpact },
+  }, { headers: { "Cache-Control": "no-store" } });
 
   return NextResponse.json({
     success: true,

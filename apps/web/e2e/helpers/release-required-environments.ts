@@ -1,5 +1,5 @@
 export type DeploymentEnvironment = "preview" | "production";
-export type ReleaseVerificationMode = "default" | "deep";
+export type ReleaseVerificationMode = "default" | "deep" | "local-candidate";
 
 const deploymentEnvironments: readonly DeploymentEnvironment[] = [
   "preview",
@@ -8,6 +8,7 @@ const deploymentEnvironments: readonly DeploymentEnvironment[] = [
 const releaseVerificationModes: readonly ReleaseVerificationMode[] = [
   "default",
   "deep",
+  "local-candidate",
 ];
 
 function isDeploymentEnvironment(
@@ -28,7 +29,7 @@ export function parseReleaseVerificationMode(
   if (raw === undefined) return "default";
   if (isReleaseVerificationMode(raw)) return raw;
   throw new Error(
-    `unknown release verification mode: ${raw}. Expected "default" or "deep".`,
+    `unknown release verification mode: ${raw}. Expected "default", "deep" or "local-candidate".`,
   );
 }
 
@@ -55,6 +56,10 @@ export function releaseRequiredScenarioIds(
   environment: string | undefined,
   mode: string | undefined = "default",
 ): ReadonlySet<string> {
+  if (environment === "local" || mode === "local-candidate") {
+    if (environment !== "local" || mode !== "local-candidate") throw new Error("Local qualification requires environment=local and mode=local-candidate together");
+    return new Set(["deployment.local-candidate-identity", ...corePublicReadScenarioIds, ...deepSharedScenarioIds, "auth.protected-write-denied"]);
+  }
   if (!isDeploymentEnvironment(environment)) {
     throw new Error(
       `unknown deployment environment: ${environment}. Expected "preview" or "production".`,

@@ -105,7 +105,7 @@ export function LanguageSwitcher() {
         }}
         aria-expanded={isExpanded}
         aria-haspopup="listbox"
-        className="flex h-11 items-center gap-1.5 px-3 rounded-lg font-heading text-sm text-terminal-dim transition-colors hover:text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
+        className="flex h-11 min-w-11 shrink-0 items-center gap-1 rounded-[3px] px-1.5 font-heading text-sm text-terminal-dim transition-colors hover:text-amber-text sm:gap-1.5 sm:px-3"
       >
         <span suppressHydrationWarning>{current.label}</span>
         {/* Inline chevron — no icon library dependency */}
@@ -133,7 +133,7 @@ export function LanguageSwitcher() {
         aria-label={t("aria.languageSwitcher") as string}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleListboxKeyDown}
-        className={`absolute z-50 top-full right-0 mt-2 p-1.5 min-w-[8rem] rounded-lg bg-card border border-stroke shadow-card transition-all duration-200 ease-out ${
+        className={`absolute z-50 top-full right-0 mt-2 p-1.5 min-w-[8rem] rounded-[3px] bg-card border border-stroke shadow-card transition-all duration-200 ease-out ${
           isExpanded
             ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
             : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
@@ -152,14 +152,14 @@ export function LanguageSwitcher() {
                 e.stopPropagation();
                 handleSelect(lang.code);
               }}
-              className={`w-full text-left px-3 py-1.5 rounded-md font-heading text-sm transition-colors ${
+              className={`w-full text-left px-3 py-2.5 rounded-[3px] font-heading text-sm transition-colors ${
                 locale === lang.code
-                  ? "bg-amber/10 text-amber"
+                  ? "bg-purple-tint text-amber-text"
                   : "text-terminal-dim hover:text-text-primary hover:bg-stroke/30"
               }`}
             >
               {lang.label}{" "}
-              <span className="text-terminal-dim/70">— {lang.fullName}</span>
+              <span className="text-terminal-dim">— {lang.fullName}</span>
             </button>
           ))}
         </div>

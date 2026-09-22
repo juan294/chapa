@@ -1,156 +1,91 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStats, _resetInflight } from "./client";
 import { materializeProfile } from "@/lib/profile/materialize-profile";
 import { persistProfileSnapshot, getPublicProfileVerification } from "@/lib/profile/public-profile";
 import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
+import { dbUpsertSupplemental } from "@/lib/db/supplemental";
+import { getServiceClient } from "@/test/contract/invoke";
 import { redisFake } from "@/test/contract/redis-fake";
+import { stubLegacyGitHub } from "@/test/contract/github-fixture";
 import { makeFullStats } from "@/lib/test-helpers/fixtures";
-import type { StatsData } from "@chapa/shared";
+import { expectFound } from "@/lib/test-helpers/found";
 
-// ---------------------------------------------------------------------------
-// Real-pipeline regression contract (2026-07-07 scoring-integrity-contract,
-// Phase 5b). Only the network edge (global fetch, for the GitHub GraphQL
-// POST) is mocked — getStats/_fetchAndCache (client.ts), fetchStats
-// (stats.ts), fetchContributionData (queries.ts), materializeProfile, and
-// persistProfileSnapshot/getPublicProfileVerification all run for real
-// against the redisFake cache (globally mocked by vitest.contract-setup.ts)
-// and the real local Supabase instance.
-// ---------------------------------------------------------------------------
-
-/** The juan294 corruption signature: search sees merged PRs, sample is empty. */
-function degradedGraphqlResponse() {
-  return {
-    ok: true,
-    json: () =>
-      Promise.resolve({
-        data: {
-          user: {
-            login: "contract-degraded-user",
-            name: "Contract Degraded User",
-            avatarUrl: "https://avatars.githubusercontent.com/u/1",
-            contributionsCollection: {
-              contributionCalendar: { totalContributions: 15533, weeks: [] },
-              pullRequestContributions: { totalCount: 143, nodes: [] },
-              pullRequestReviewContributions: { totalCount: 16 },
-              issueContributions: { totalCount: 5096 },
-            },
-            repositories: { totalCount: 0, nodes: [] },
-          },
-          search: { issueCount: 904 },
-        },
-      }),
-  };
+// Real legacy collection/materialization/persistence; only GitHub HTTP is
+// synthetic. Local Supabase requests use the original fetch implementation.
+const handles = ["contract-empty-sample", "contract-old-baseline", "contract-durable-overlay", "contract-valid-pr-0", "contract-valid-pr-1", "contract-unbound-cache"];
+function isGitHubApiRequest(input: unknown): boolean {
+  const value = input instanceof Request
+    ? input.url
+    : input instanceof URL
+      ? input.href
+      : String(input);
+  try {
+    return new URL(value).origin === "https://api.github.com";
+  } catch {
+    return false;
+  }
 }
-
-function healthyStaleStats(handle: string): StatsData {
-  return makeFullStats({
-    handle,
-    prsMergedCount: 904,
-    prsMergedWeight: 120,
-    commitsTotal: 15533,
-    reviewsSubmittedCount: 16,
-    issuesClosedCount: 5096,
-    fetchScope: "authenticated",
-  });
+async function cleanup() {
+  const db = getServiceClient();
+  for (const handle of handles) {
+    for (const [table, column] of [["metrics_snapshots", "handle"], ["supplemental_stats", "target_handle"]] as const) {
+      expect((await db.from(table).delete().eq(column, handle)).error).toBeNull();
+    }
+  }
 }
+beforeEach(async () => { redisFake.__reset(); _resetInflight(); await cleanup(); });
+afterEach(async () => { vi.unstubAllGlobals(); await cleanup(); });
 
-describe("scoring-integrity real-pipeline contract", () => {
-  beforeEach(() => {
-    redisFake.__reset();
-    _resetInflight();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("degraded fetch with no stale baseline: getStats returns null, writes nothing to merged/stale", async () => {
-    const handle = "contract-degraded-cold";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(degradedGraphqlResponse()));
-
-    const result = await getStats(handle);
-
-    expect(result).toBeNull();
+describe("source integrity through actual legacy collection and local persistence", () => {
+  it("accepts a valid empty PR sample and caches it only under a bound entry", async () => {
+    const handle = handles[0]!; const http = stubLegacyGitHub(handle);
+    expect(await getStats(handle)).toMatchObject({ prsMergedCount: 904, prsMergedWeight: 0 });
+    // The pre-S08 handle-only keys stay empty; the replacement carries the
+    // binding that decides whether a later reader may have the row at all.
     expect(await redisFake.cacheGet(`stats:v2:merged:${handle}`)).toBeNull();
     expect(await redisFake.cacheGet(`stats:stale:v2:${handle}`)).toBeNull();
-  });
-
-  it("degraded fetch with a healthy stale baseline: getStats serves the stale value and does not downgrade it", async () => {
-    const handle = "contract-degraded-warm";
-    const healthy = healthyStaleStats(handle);
-    await redisFake.cacheSet(`stats:stale:v2:${handle}`, healthy, 604800);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(degradedGraphqlResponse()));
-
-    const result = await getStats(handle);
-
-    expect(result).not.toBeNull();
-    expect(result!.prsMergedCount).toBe(904);
-
-    const staleAfter = await redisFake.cacheGet<StatsData>(`stats:stale:v2:${handle}`);
-    expect(staleAfter).not.toBeNull();
-    expect(staleAfter!.prsMergedCount).toBe(904);
-  });
-
-  it("#1060: a rejected fetch re-composes the current supplemental instead of discarding it", async () => {
-    // The frivas shape, through the real pipeline: an EMU record is uploaded,
-    // then a degraded/scope-blind fetch arrives. The fetch is correctly
-    // rejected in favour of the baseline — and the supplemental must survive
-    // that rejection rather than being dropped for the 6h cache TTL.
-    const handle = "contract-supplemental-rejected";
-    const healthy = healthyStaleStats(handle);
-    await redisFake.cacheSet(`stats:stale:v2:${handle}`, healthy, 604800);
-    await redisFake.cacheSet(
-      `supplemental:${handle}`,
-      {
-        targetHandle: handle,
-        sourceHandle: `${handle}-emu`,
-        uploadedAt: new Date().toISOString(),
-        stats: makeFullStats({
-          handle: `${handle}-emu`,
-          prsMergedCount: 32,
-          commitsTotal: 453,
-        }),
-      },
-      86400,
-    );
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(degradedGraphqlResponse()));
-
-    const result = await getStats(handle);
-
-    expect(result).not.toBeNull();
-    // 904 (protected GitHub-derived baseline) + 32 (current supplemental).
-    expect(result!.prsMergedCount).toBe(936);
-    expect(result!.hasSupplementalData).toBe(true);
-
-    // The baseline itself stays GitHub-derived and untouched by the rejection.
-    const baselineAfter = await redisFake.cacheGet<StatsData>(`stats:stale:v2:${handle}`);
-    expect(baselineAfter!.prsMergedCount).toBe(904);
-    expect(baselineAfter!.hasSupplementalData).not.toBe(true);
-  });
-
-  it("persist boundary: a poisoned hot-cache entry never becomes a snapshot row or a verification record", async () => {
-    const handle = "contract-poisoned-hot";
-    const poisoned = makeFullStats({
-      handle,
-      prsMergedCount: 0,
-      prsMergedWeight: 0,
-      commitsTotal: 15585,
-      fetchScope: "authenticated",
+    expect(await redisFake.cacheGet(`stats:v3:${handle}`)).toMatchObject({
+      binding: expect.any(String), referenceDate: expect.any(String), stats: { prsMergedCount: 904 },
     });
-    // Seed the hot key directly — getStats hits it and returns immediately,
-    // never calling _fetchAndCache (no network mock needed for this case).
-    await redisFake.cacheSet(`stats:v2:merged:${handle}`, poisoned, 21600);
-
-    const materialized = await materializeProfile(handle);
-    expect(materialized).not.toBeNull();
-    expect(materialized!.statsComplete).toBe(false);
-
-    const persisted = await persistProfileSnapshot(handle, materialized!);
-    expect(persisted).toBe(false);
-
-    const snapshotRow = await dbGetLatestSnapshot(handle);
-    expect(snapshotRow).toBeNull();
-
-    expect(getPublicProfileVerification(materialized!)).toBeNull();
+    // Same grant, same scoring day: the second read is served from that entry.
+    const before = http.mock.calls.filter(([input]) => isGitHubApiRequest(input)).length;
+    _resetInflight();
+    expect(await getStats(handle)).toMatchObject({ prsMergedCount: 904 });
+    expect(http.mock.calls.filter(([input]) => isGitHubApiRequest(input))).toHaveLength(before);
+  });
+  it("does not substitute a larger unbound legacy baseline for the current small observation", async () => {
+    const handle = handles[1]!;
+    const old = makeFullStats({ handle, prsMergedCount: 999, prsMergedWeight: 120, fetchScope: "authenticated" });
+    await redisFake.cacheSet(`stats:stale:v2:${handle}`, old, 604800); stubLegacyGitHub(handle, 1);
+    expect(await getStats(handle)).toMatchObject({ prsMergedCount: 1, prsMergedWeight: 0 });
+    expect(await redisFake.cacheGet(`stats:stale:v2:${handle}`)).toEqual(old);
+  });
+  it("composes the actual durable supplemental without using its retired Redis mirror", async () => {
+    const handle = handles[2]!;
+    const supplemental = { targetHandle: handle, sourceHandle: `${handle}-emu`, uploadedAt: new Date().toISOString(),
+      stats: makeFullStats({ handle: `${handle}-emu`, prsMergedCount: 32, commitsTotal: 453 }) };
+    expect(await dbUpsertSupplemental(handle, supplemental)).toBe(true);
+    await redisFake.cacheSet(`supplemental:${handle}`, { ...supplemental, stats: makeFullStats({ prsMergedCount: 999 }) }, 86400);
+    stubLegacyGitHub(handle);
+    expect(await getStats(handle)).toMatchObject({ prsMergedCount: 936, hasSupplementalData: true });
+    expect(await redisFake.cacheGet(`stats:v2:merged:${handle}`)).toBeNull();
+  });
+  it.each([0, 1])("persists an actually fetched valid legacy PR count of %i", async prsMergedCount => {
+    const handle = `contract-valid-pr-${prsMergedCount}`; stubLegacyGitHub(handle, prsMergedCount);
+    const materialized = expectFound(await materializeProfile(handle));
+    expect(materialized.statsComplete).toBe(true);
+    expect(await persistProfileSnapshot(handle, materialized)).toBe(true);
+    expect(await dbGetLatestSnapshot(handle)).toMatchObject({ prsMergedCount, prsMergedWeight: 0 });
+    // This remains explicitly legacy verification; it cannot mint a v7 receipt.
+    const verification = getPublicProfileVerification(materialized);
+    expect(verification).not.toBeNull(); expect(verification!.hash.startsWith("v7.")).toBe(false);
+  });
+  it("never turns a malformed unbound hot-cache row into a snapshot on a read-only call", async () => {
+    const handle = handles[5]!;
+    await redisFake.cacheSet(`stats:v2:merged:${handle}`, makeFullStats({ handle, fetchedAt: "invalid" }), 21600);
+    const http = stubLegacyGitHub(handle);
+    expect(await materializeProfile(handle, { readOnly: true })).toBeNull();
+    expect(http.mock.calls.filter(([input]) => isGitHubApiRequest(input))).toHaveLength(0);
+    expect(await dbGetLatestSnapshot(handle)).toBeNull();
   });
 });

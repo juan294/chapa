@@ -1,3 +1,11 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -188,6 +196,8 @@ vi.mock("@/components/BadgeSkeleton", () => ({
 }));
 
 import SharePage, { SharePageContent, generateMetadata } from "./page";
+import { BadgeSkeleton } from "@/components/BadgeSkeleton";
+import { githubUserNotFound } from "@/lib/github/not-found";
 import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
@@ -305,7 +315,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(metadata.openGraph?.images).toEqual([
       {
-        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=2026-04-17-r7",
+        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=ice-terminal-v2-v6-2026-04-17-r7&lang=es",
         width: 1200,
         height: 630,
         alt: "Chapa de testuser",
@@ -540,6 +550,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: false,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     // #1181 — the call now always also carries a locale-resolved `strings`
     // bundle; see the "badge content and cache key never diverge by locale"
@@ -563,58 +574,57 @@ describe("SharePage /u/[handle]", () => {
     const callback = mockAfter.mock.calls[0][0];
     await callback();
 
-    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
-      "testuser",
-      FAKE_MATERIALIZED,
-      { readOnly: false },
-    );
-    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
       { verification: { hash: "abc12345", date: "2026-04-17" } },
     );
+    // The page no longer sequences the two halves itself.
+    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
-  // #1091 (PE-M6) — persistProfileSnapshot is a durable Supabase write with
-  // nothing in the rendered HTML depending on its result. It must not hold
-  // TTFB open, mirroring the badge route's #1013 fix.
+  // #1091 (PE-M6) — the durable side effects (snapshot persist, verification
+  // record) have nothing in the rendered HTML depending on their result. They
+  // must not hold TTFB open, mirroring the badge route's #1013 fix.
   describe("durable snapshot write deferred to after() (#1091)", () => {
-    it("does not await the durable snapshot write on the render path — only after() invokes it", async () => {
+    it("does not await the durable side effects on the render path — only after() invokes them", async () => {
       await renderPage();
 
       // The render call itself must return without having invoked the
       // durable write directly.
-      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
       expect(mockAfter).toHaveBeenCalledTimes(1);
 
       const callback = mockAfter.mock.calls[0][0];
       await callback();
 
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
-        "testuser",
-        FAKE_MATERIALIZED,
-        { readOnly: false },
-      );
-      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
         "testuser",
         FAKE_MATERIALIZED,
         { verification: { hash: "abc12345", date: "2026-04-17" } },
       );
     });
 
-    it("skips deferProfileCacheWork when persistProfileSnapshot resolves false", async () => {
-      mockPersistProfileSnapshot.mockResolvedValue(false);
-
+    // LE-6-1 — the strip on the inline SVG and the record the deferred
+    // sequence stores come from the same minted code.
+    it("hands the exact verification the inline SVG printed to the deferred sequence", async () => {
       await renderPage();
       const callback = mockAfter.mock.calls[0][0];
       await callback();
 
-      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        FAKE_MATERIALIZED.stats,
+        FAKE_MATERIALIZED.displayImpact,
+        expect.objectContaining({ verificationHash: "abc12345", verificationDate: "2026-04-17" }),
+      );
+      const [, , options] = mockRunPublicProfileSideEffects.mock.calls[0];
+      expect(options.verification).toEqual(mockGetPublicProfileVerification.mock.results[0].value);
     });
 
     it("escalates a deferred snapshot-write failure via captureServerError instead of swallowing it", async () => {
       const writeError = new Error("supabase write failed");
-      mockPersistProfileSnapshot.mockRejectedValue(writeError);
+      mockRunPublicProfileSideEffects.mockRejectedValue(writeError);
 
       await renderPage();
       const callback = mockAfter.mock.calls[0][0];
@@ -743,11 +753,49 @@ describe("SharePage /u/[handle]", () => {
     });
   });
 
+
+  // LE-8-2 — GitHub answered that nobody owns the handle. The route's loading
+  // boundary has already committed the response to 200 by the time the
+  // streamed content learns this, so the honest outcome here is Next's own
+  // mid-stream not-found: the not-found UI plus an injected
+  // `<meta name="robots" content="noindex">`. An outage stays `null` and
+  // keeps the try-later state; a real user must never 404 for that.
+  describe("a handle GitHub does not know (LE-8-2)", () => {
+    it("calls notFound() from the streamed content instead of rendering the empty state", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      await expect(renderPage("ghost")).rejects.toThrow("NOT_FOUND");
+
+      expect(mockNotFound).toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+    });
+
+    it("treats the owner exactly like a visitor: a session for the handle still gets notFound()", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "ghost", token: "gho_x" });
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      await expect(renderPage("ghost")).rejects.toThrow("NOT_FOUND");
+
+      expect(mockNotFound).toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("keeps the try-later state, never notFound(), when materialization is merely unavailable", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+
+      await renderPage();
+
+      expect(mockNotFound).not.toHaveBeenCalled();
+    });
+  });
+
   it("does not register side effects in read-only smoke mode", async () => {
     await SharePageContent({ handle: "testuser", readOnly: true });
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: true,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     expect(mockRenderBadgeSvg).toHaveBeenCalled();
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
@@ -831,7 +879,7 @@ describe("SharePage /u/[handle]", () => {
         expect.any(String),
         FAKE_SVG,
         "testuser",
-        undefined,
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }), configRevision: 7 }),
       );
     });
   });
@@ -1154,6 +1202,51 @@ describe("SharePage /u/[handle]", () => {
       expect(esShortcuts!.props.embedMarkdown).toContain("![Chapa de testuser](");
       // English dict: shareOwner.badgeAltOf = 'Chapa Badge of'
       expect(enShortcuts!.props.embedMarkdown).toContain("![Chapa Badge of testuser](");
+    });
+  });
+
+  // LE-5-1 — when the inline render is unavailable the page falls back to a
+  // loading plate plus a `<img>` of the badge route. Both used to sit in
+  // normal flow inside the frame, so the plate rendered ABOVE the image (two
+  // badge-shaped boxes stacked) instead of underneath it. The plate has to be
+  // taken out of flow and layered behind, so the image covers it once loaded.
+  describe("img fallback layers the loading plate behind the image (LE-5-1)", () => {
+    it("positions the plate absolutely inside the frame and the image relatively on top", async () => {
+      mockCacheGet.mockResolvedValue(null);
+      mockRenderBadgeSvg.mockReturnValue(null);
+
+      const tree = await renderPage();
+
+      const img = findElement(
+        tree,
+        (el) => el.type === "img" && String(el.props.src).includes("/u/testuser/badge.svg"),
+      );
+      expect(img).not.toBeNull();
+
+      const frame = findElement(tree, (el) => {
+        const children = el.props.children;
+        return Array.isArray(children) && children.some((c) => c === img);
+      });
+      expect(frame).not.toBeNull();
+      expect(String(frame!.props.className).split(/\s+/)).toContain("relative");
+
+      const plateWrapper = findElement(
+        frame,
+        (el) => el.type === "div" && findElement(el.props.children, (c) => c.type === BadgeSkeleton) !== null && el !== frame,
+      );
+      expect(plateWrapper).not.toBeNull();
+      const plateClasses = String(plateWrapper!.props.className).split(/\s+/);
+      expect(plateClasses).toContain("absolute");
+      expect(plateClasses).toContain("inset-0");
+
+      const imgClasses = String(img!.props.className).split(/\s+/);
+      expect(imgClasses).toContain("relative");
+      expect(imgClasses).not.toContain("absolute");
+
+      // The plate precedes the image in DOM order, so with both positioned and
+      // no explicit z-index the image paints on top.
+      const siblings = frame!.props.children as unknown[];
+      expect(siblings.indexOf(plateWrapper)).toBeLessThan(siblings.indexOf(img));
     });
   });
 });

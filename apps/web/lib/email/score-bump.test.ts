@@ -428,3 +428,21 @@ describe("DB-backed engagement template", () => {
     expect(call.html).toContain("Impact changed by +7!");
   });
 });
+
+describe("observed revision notifications", () => {
+  it("uses current canonical observations and refuses cross-policy claims", async () => {
+    const { notifyObservedScoreChange } = await import("./score-bump");
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const { scoringObservation, compareScoringObservations } = await import("@/lib/history/scoring-observations");
+    const { model } = await scoringConsistencyFixture({ boundary: true });
+    const current = scoringObservation(model)!;
+    const previous = { ...current, composite: { exact: 46, display: 46 } };
+    await notifyObservedScoreChange("alice", compareScoringObservations(previous, { ...current, policyVersion: "v6" }));
+    expect(mockSend).not.toHaveBeenCalled();
+    await notifyObservedScoreChange("alice", compareScoringObservations(previous, current));
+    expect(mockSend.mock.calls[0]![0].text).toContain("69.99");
+    expect(mockSend.mock.calls[0]![0].text).toContain("v7.2");
+    expect(mockSend.mock.calls[0]![0].text).toContain(model.identity!.revisionId);
+    expect(mockSend.mock.calls[0]![0].text).not.toContain("Builder");
+  });
+});

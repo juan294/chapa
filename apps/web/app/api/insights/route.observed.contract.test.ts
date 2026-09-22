@@ -1,0 +1,55 @@
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+import { getServiceClient } from "@/test/contract/invoke";
+import { assertLocalSqlTarget } from "@/test/contract/local-sql";
+const owner = "contract-observed-upload";
+const capturedAt = "2026-09-08T12:00:00.000Z";
+const controlled = vi.hoisted(() => ({ source: vi.fn(async (input: unknown) => { void input; return { status: "unlinked" }; }), invalidate: vi.fn(async () => ({ redis: true, edge: "skipped" })) }));
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: async () => ({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T12:00:00.000Z") }) }));
+vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: controlled.source }));
+vi.mock("@/lib/auth/resolve-request-auth", () => ({ resolveRequestAuth: async () => ({ handle: "contract-observed-upload" }) }));
+vi.mock("@/lib/render/badge-svg-cache", () => ({ invalidateBadgeSvgCacheForHandle: controlled.invalidate, isBadgeCacheRefreshed: (r: { redis: boolean; edge: string }) => r.redis && r.edge !== "failed" }));
+import { POST } from "./route";
+import { materializeCurrentObservedReceipt } from "@/lib/profile/issue-receipt";
+import { dbReadObservedReceipt } from "@/lib/db/score-receipts-observed";
+import * as env from "@/lib/env";
+const db = () => getServiceClient();
+const cleanup = async () => { assertLocalSqlTarget(); expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); };
+beforeEach(async () => {
+  await cleanup(); vi.clearAllMocks();
+  expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: capturedAt })).error).toBeNull();
+});
+afterEach(async () => { vi.restoreAllMocks(); await cleanup(); });
+const report = (zero = false) => ({ schemaVersion: "v7.2", tool: "claude-code", reportPeriod: { start: "2026-09-01", end: "2026-09-07" }, totalSessions: 10,
+  outcomes: zero ? [{ label: "Failed", count: 10 }] : [{ label: "Fully Achieved", count: 4 }, { label: "Mostly Achieved", count: 2 }, { label: "Partially Achieved", count: 1 }, { label: "Failed", count: 1 }, { label: "private category", count: 1 }] });
+const upload = async (zero = false, supersedesReportId?: string) => {
+  const response = await POST(new NextRequest("http://localhost/api/insights", { method: "POST", body: JSON.stringify({ schemaVersion: "v7.2", report: report(zero), supersedesReportId }) }));
+  return { response, body: await response.json() };
+};
+it("C10/C15 publishes57 then0 with a frozen core and repairs durable verification/purge on identical retry", async () => {
+  const baseline = await materializeCurrentObservedReceipt(owner, { referenceTime: capturedAt });
+  if (baseline.status === "unavailable") throw new Error("Expected baseline");
+  const core = baseline.snapshot.receipt.receipt.core;
+  controlled.source.mockClear();
+  vi.spyOn(env, "getChapaVerificationSecret").mockReturnValueOnce(undefined);
+  expect((await upload()).body).toMatchObject({ persisted: true, publication: "pending", refreshed: false });
+  const first = await dbReadObservedReceipt(owner);
+  if (first.status !== "found") throw new Error("Expected published report receipt");
+  expect(first.envelope.receipt.core).toEqual(core);
+  expect(first.envelope.receipt.craft).toMatchObject({ status: "scored", report: { result: { point: { exact: 57 } } } });
+  controlled.invalidate.mockResolvedValueOnce({ redis: false, edge: "failed" });
+  expect((await upload()).body).toMatchObject({ persisted: true, publication: "unchanged", refreshed: false });
+  expect((await upload()).body).toMatchObject({ persisted: true, publication: "unchanged", refreshed: true });
+  expect((await db().from("scoring_v7_receipts").select("id").eq("owner_handle", owner)).data).toHaveLength(2);
+  expect((await db().from("scoring_v7_verification").select("receipt_id").eq("receipt_id", first.envelope.receipt.revisionId)).data).toHaveLength(1);
+  const conflict = await upload(true);
+  expect(conflict.response.status).toBe(409);
+  const corrected = await upload(true, conflict.body.supersedesReportId);
+  expect(corrected.body).toMatchObject({ persisted: true, publication: "published", craft: { status: "scored", report: { result: { point: { exact: 0 } } } } });
+  const current = await dbReadObservedReceipt(owner);
+  if (current.status !== "found") throw new Error("Expected corrected report");
+  expect(current.envelope.receipt.core).toEqual(core);
+  expect(current.envelope.receipt.window.referenceTime).toBe(capturedAt);
+  expect(controlled.source.mock.calls.every(args => (args[0] as { readOnly: boolean }).readOnly)).toBe(true);
+  expect(JSON.stringify(current.envelope)).not.toContain("private category");
+});

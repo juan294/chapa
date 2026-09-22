@@ -90,7 +90,7 @@ describe("VerifyForm", () => {
     expect(screen.getByRole("alert")).toBeDefined();
     // English: verifyForm.invalidHash
     expect(screen.getByRole("alert").textContent).toContain(
-      "Enter a valid 8, 16, or 32-character hex hash",
+      "Enter a complete v7 receipt token",
     );
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -156,4 +156,15 @@ describe("VerifyForm", () => {
     fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8?lang=en");
   });
+});
+
+
+it("accepts the complete v7 token without truncating its input", () => {
+  const token = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
+  render(<VerifyForm />);
+  const input = screen.getByLabelText("Verification hash") as HTMLInputElement;
+  expect(input.maxLength).toBe(104);
+  fireEvent.change(input, { target: { value: token } });
+  fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
+  expect(mockPush).toHaveBeenCalledWith(`/verify/${token}?lang=en`);
 });

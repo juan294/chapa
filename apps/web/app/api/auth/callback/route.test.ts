@@ -17,6 +17,7 @@ const {
   mockAddContact,
   mockCaptureServerError,
   mockStoreGitHubToken,
+  mockAfter,
 } = vi.hoisted(() => ({
   mockExchangeCodeForToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
@@ -30,6 +31,12 @@ const {
   mockAddContact: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockStoreGitHubToken: vi.fn(),
+  mockAfter: vi.fn((cb: () => Promise<void>) => { void cb(); }),
+}));
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("next/server")>(),
+  after: mockAfter,
 }));
 
 vi.mock("@/lib/auth/github", () => ({
@@ -109,7 +116,7 @@ function allowRateLimit() {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   mockConsumeOauthState.mockResolvedValue(true);
   mockFetchGitHubUserEmail.mockResolvedValue(null);
-  mockDbUpsertUser.mockResolvedValue(undefined);
+  mockDbUpsertUser.mockResolvedValue(true);
   mockAddContact.mockResolvedValue(undefined);
   mockCaptureServerError.mockResolvedValue(undefined);
   mockStoreGitHubToken.mockResolvedValue(true);
@@ -847,6 +854,43 @@ describe("GET /api/auth/callback — audience sync", () => {
     mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
     mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
   }
+
+  it("defers registration and keeps after alive until registration completes", async () => {
+    setupHappyPath();
+    let callback!: () => Promise<void>;
+    mockAfter.mockImplementationOnce((cb) => { callback = cb; });
+    let commit!: (value: boolean) => void;
+    mockDbUpsertUser.mockReturnValue(new Promise<boolean>((resolve) => { commit = resolve; }));
+    const response = await GET(makeRequest({ code: "test-code", state: "valid-state" }));
+    expect(response.status).toBe(307);
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+    expect(callback).toBeTypeOf("function");
+    let completed = false;
+    const work = callback().then(() => { completed = true; });
+    await Promise.resolve();
+    expect(completed).toBe(false);
+    commit(true);
+    await work;
+  });
+
+  it.each(["false", "rejection"])("awaits error capture for registration %s without denying login", async (failure) => {
+    setupHappyPath();
+    let callback!: () => Promise<void>;
+    mockAfter.mockImplementationOnce((cb) => { callback = cb; });
+    if (failure === "false") mockDbUpsertUser.mockResolvedValue(false);
+    else mockDbUpsertUser.mockRejectedValue(new Error("registration unavailable"));
+    let captured!: () => void;
+    mockCaptureServerError.mockReturnValue(new Promise<void>((resolve) => { captured = resolve; }));
+    const response = await GET(makeRequest({ code: "test-code", state: "valid-state" }));
+    expect(response.status).toBe(307);
+    expect(callback).toBeTypeOf("function");
+    let completed = false;
+    const work = callback().then(() => { completed = true; });
+    await vi.waitFor(() => expect(mockCaptureServerError).toHaveBeenCalled());
+    expect(completed).toBe(false);
+    captured();
+    await work;
+  });
 
   it("calls addContact when email is available", async () => {
     setupHappyPath({ email: "octocat@github.com" });

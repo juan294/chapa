@@ -164,7 +164,10 @@ clobbering the private-inclusive server-token entry (`authenticated`), and `stat
 holds complete data. At the persist boundary, snapshot history and the HMAC verification record
 are gated on stats completeness. `stats_fetch_rejected` and
 `snapshot_skipped_incomplete_stats` telemetry surface degradation in production; the
-`heal-poisoned-stats` maintenance script repairs already-poisoned cache keys and snapshot rows.
+`heal-poisoned-stats` command previously purged records under those v6 heuristics.
+For the v7 relaunch, its mutation mode is retired: it performs read-only historical
+inspection, reports recorded subject contradictions, and leaves records without
+source proof unproven. Low activity and upload age cannot justify deletion.
 
 Confidence is surfaced only to the profile owner in the share page's "How is my score calculated" panel. Visitors see formulas and platform caveats, but not confidence percentage or penalty flags, and public JSON-LD excludes confidence.
 

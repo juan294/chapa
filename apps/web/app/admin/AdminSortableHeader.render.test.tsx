@@ -108,7 +108,7 @@ describe("AdminSortableHeader — render tests", () => {
         sortDir: "desc",
       });
       const svg = container.querySelector("svg");
-      expect(svg?.classList.contains("text-amber")).toBe(true);
+      expect(svg?.classList.contains("text-amber-text")).toBe(true);
     });
 
     it("inactive sort icon uses muted color class", () => {

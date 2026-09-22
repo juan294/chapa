@@ -1,0 +1,61 @@
+review threshold [
+  {
+    reviews: 2,
+    craft: undefined,
+    type: 'solo',
+    dimensions: { delivery: 93, quality: 0, consistency: 96, breadth: 78 },
+    composite: 89
+  },
+  {
+    reviews: 3,
+    craft: undefined,
+    type: 'collaborative',
+    dimensions: { delivery: 93, quality: 20, consistency: 96, breadth: 78 },
+    composite: 72
+  }
+]
+optional Craft [
+  {
+    reviews: 2,
+    craft: undefined,
+    type: 'solo',
+    dimensions: { delivery: 93, quality: 0, consistency: 96, breadth: 78 },
+    composite: 89
+  },
+  {
+    reviews: 2,
+    craft: 40,
+    type: 'solo',
+    dimensions: {
+      delivery: 93,
+      quality: 0,
+      consistency: 96,
+      breadth: 78,
+      craft: 40
+    },
+    composite: 77
+  }
+]
+normalization examples {
+  commits150of300: 0.8791278955665481,
+  pr25of60: 0.7925557060789747,
+  issues10of40: 0.6457112531348923
+}
+Breadth theoretical input maximum 95
+EMA constant raw=70 previous=60, 30 observations [
+  62, 63, 64, 65, 66, 67, 67, 67, 67,
+  67, 67, 67, 67, 67, 67, 67, 67, 67,
+  67, 67, 67, 67, 67, 67, 67, 67, 67,
+  67, 67, 67
+]
+same events sparse vs zero-padded [
+  { evenness: 1, coverage: 1 },
+  { evenness: 0.5047174010164595, coverage: 0.5094339622641509 }
+]
+same changed lines one PR vs ten PRs { one: 2.8266625130283978, ten: 18.27066924350301 }
+median of [1,1,1] plus [2,100,100] { reported: 50.5, actual: 1.5 }
+quality merge depends on placement of unmeasured platform { first: 0.9166666666666666, last: 0.5 }
+normalized tool entropy { twoEqual: 1, plusRareThird: 0.6752431409230879 }
+missing vs measured 300-second response time [ 1, 0.2890648263178878 ]
+JSON overflow accepted and scored { validation: { valid: true }, result: NaN }
+finite counts overflow accepted and scored { validation: { valid: true }, result: NaN }

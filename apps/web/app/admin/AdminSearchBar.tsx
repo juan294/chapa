@@ -11,7 +11,7 @@ interface AdminSearchBarProps {
 export function AdminSearchBar({ search, onSearchChange, resultCount }: AdminSearchBarProps) {
   return (
     <div className="border-b border-stroke px-4 py-3 flex items-center gap-3">
-      <span className="font-heading text-sm text-amber" aria-hidden="true">
+      <span className="font-heading text-sm text-amber-text" aria-hidden="true">
         &gt;
       </span>
       <input
@@ -19,7 +19,7 @@ export function AdminSearchBar({ search, onSearchChange, resultCount }: AdminSea
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder="filter by handle or name..."
-        className="terminal-input-bare flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/50 font-heading"
+        className="terminal-input-bare min-h-11 min-w-0 flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary font-heading"
         aria-label="Filter users"
       />
       {search && (

@@ -291,7 +291,7 @@ describe("GET /api/auth/gitlab/callback", () => {
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_gl_oauth_state=xyz" }),
     );
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:gitlab:testuser");
   });
 

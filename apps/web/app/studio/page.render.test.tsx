@@ -3,9 +3,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 
 const mocks = vi.hoisted(() => ({
+  readScoringRenderSelection: vi.fn(),
   headers: vi.fn(),
   redirect: vi.fn(),
   isStudioEnabled: vi.fn(),
@@ -25,6 +28,8 @@ vi.mock("@/lib/render/avatar-outcome", () => ({
   resolveBadgeAvatar: mocks.resolveBadgeAvatar,
   getBadgeAvatarDataUri: mocks.getBadgeAvatarDataUri,
 }));
+
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: mocks.readScoringRenderSelection }));
 
 vi.mock("next/headers", () => ({
   headers: mocks.headers,
@@ -82,6 +87,7 @@ vi.mock("./StudioClient", () => ({
     stats,
     impact,
     craftResult,
+    scoring,
     initialConfig,
     verification,
     avatarDataUri,
@@ -91,6 +97,7 @@ vi.mock("./StudioClient", () => ({
     stats: StatsData;
     impact: ImpactV6Result;
     craftResult: CraftResult | null;
+    scoring?: ScoreViewModel;
     initialConfig: { theme?: string; background?: string };
     verification: { hash: string; date: string } | null;
     avatarDataUri?: string;
@@ -102,6 +109,7 @@ vi.mock("./StudioClient", () => ({
         data-testid="studio-client"
         data-handle={handle}
         data-commits={String(stats.commitsTotal)}
+        data-scoring={JSON.stringify(scoring)}
         data-impact-score={String(impact.adjustedComposite)}
         data-craft-score={String(craftResult?.craftScore ?? "none")}
         data-config-theme={initialConfig.theme ?? "none"}
@@ -155,6 +163,7 @@ const craftResult = {
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.readScoringRenderSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: 1788868800000 });
   mocks.headers.mockResolvedValue(new Headers());
   mocks.redirect.mockImplementation((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -227,6 +236,17 @@ describe("StudioPage render", () => {
     expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
   });
 
+  it("uses an explicitly illustrative current demo model only while observed rendering is selected", async () => {
+    mocks.isStudioDemoEnabled.mockResolvedValue(true);
+    const { default: StudioPage } = await import("./page");
+    const view = render(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
+    const model = JSON.parse(screen.getByTestId("studio-client").getAttribute("data-scoring")!);
+    expect(model).toMatchObject({ policyVersion: "v7.2", illustrative: true, identity: null, composite: { kind: "point", display: 82 }, archetype: "Balanced" });
+    mocks.readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 });
+    view.rerender(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
+    expect(screen.getByTestId("studio-client").getAttribute("data-scoring")).toBeNull();
+  });
+
   it("remounts Studio state when navigation crosses the demo boundary", async () => {
     mocks.isStudioDemoEnabled.mockResolvedValue(true);
     const { default: StudioPage } = await import("./page");
@@ -285,6 +305,18 @@ describe("StudioPage render", () => {
     await expect(StudioPage()).rejects.toThrow("redirect:/api/auth/login");
   });
 
+  it("forwards the exact observed model despite contradictory legacy scores", async () => {
+    const fixture = await scoringConsistencyFixture({ craft: 57 });
+    mocks.materializeDisplayProfile.mockResolvedValue({ stats: fixture.stats, displayImpact: fixture.impact, scoring: fixture.model, craftResult, statsComplete: true });
+    const { default: StudioPage } = await import("./page");
+    render(await StudioPage());
+    const model = JSON.parse(screen.getByTestId("studio-client").getAttribute("data-scoring")!);
+    expect(model).toEqual(fixture.model);
+    expect(model.composite.display).toBe(46);
+    expect(model.archetype).toBeNull();
+    expect(model.reportCraft.report.result.point.exact).toBe(57);
+  });
+
   it("renders the studio shell with fetched stats and saved config", async () => {
     const { default: StudioPage } = await import("./page");
 
@@ -304,6 +336,7 @@ describe("StudioPage render", () => {
     );
     expect(mocks.materializeDisplayProfile).toHaveBeenCalledWith("octocat", {
       token: "gho_token",
+      scoringSelection: expect.objectContaining({ machinePolicy: "v7.2" }),
     });
     expect(mocks.getPublicProfileVerification).toHaveBeenCalledWith(
       expect.objectContaining({ stats }),
@@ -360,18 +393,51 @@ describe("StudioPage render", () => {
     await expect(StudioPage()).rejects.toThrow(
       "Unable to load Studio profile for octocat",
     );
+    // #1282/#1283 — the session-token attempt, then the tokenless server-
+    // token attempt; only when both fail does the page throw.
+    expect(mocks.materializeDisplayProfile).toHaveBeenCalledTimes(2);
+    expect(mocks.materializeDisplayProfile).toHaveBeenNthCalledWith(1, "octocat", {
+      token: "gho_token",
+      scoringSelection: expect.objectContaining({ machinePolicy: "v7.2" }),
+    });
+    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat", { scoringSelection: mocks.materializeDisplayProfile.mock.calls[0]?.[1].scoringSelection }]);
+    expect(mocks.readScoringRenderSelection).toHaveBeenCalledOnce();
     expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
   });
 
-  it("fails open to the default config when persisted storage is unavailable", async () => {
-    mocks.loadStudioConfig.mockResolvedValue({ status: "unavailable" });
+  // #1282/#1283 — a first-time owner has no baseline, so a session-token
+  // fetch that is rejected by the integrity guard or times out returns null.
+  // The page retries once as the server GITHUB_TOKEN instead of throwing.
+  it("falls back to a tokenless server-token profile load when the session-token load returns null", async () => {
+    const fallbackStats = { ...stats, commitsTotal: 7 };
+    mocks.materializeDisplayProfile
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        stats: fallbackStats,
+        craftResult,
+        displayImpact: { compositeScore: 80 },
+        statsComplete: true,
+      });
     const { default: StudioPage } = await import("./page");
 
     render(await StudioPage());
 
-    expect(
-      screen.getByTestId("studio-client").getAttribute("data-config-background"),
-    ).toBe("solid");
+    const client = screen.getByTestId("studio-client");
+    expect(client.getAttribute("data-handle")).toBe("octocat");
+    expect(client.getAttribute("data-commits")).toBe("7");
+    expect(mocks.materializeDisplayProfile).toHaveBeenCalledTimes(2);
+    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat", { scoringSelection: mocks.materializeDisplayProfile.mock.calls[0]?.[1].scoringSelection }]);
+    expect(mocks.readScoringRenderSelection).toHaveBeenCalledOnce();
+  });
+
+  it.each(["unavailable", "invalid"] as const)("blocks editing when persisted config is %s", async (status) => {
+    mocks.loadStudioConfig.mockResolvedValue({ status });
+    const { default: StudioPage } = await import("./page");
+    await expect(StudioPage()).rejects.toThrow("Unable to load Studio configuration");
+    expect(screen.queryByTestId("studio-client")).toBeNull();
+    mocks.loadStudioConfig.mockResolvedValue({ status: "not_found" });
+    render(await StudioPage());
+    expect(screen.getByTestId("studio-client").getAttribute("data-config-background")).toBe("solid");
   });
 
   it("is configured as a force-dynamic route", async () => {

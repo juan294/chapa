@@ -18,12 +18,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
-## Pending-migrations gate tolerates one migra artifact on `admin_users` (#1064)
+## Pending-migrations gate tolerates one migra artifact on the `admin_users` view chain (#1064)
 
-- **Risk:** `pnpm run check:pending-migrations` treats a schema diff consisting *solely* of a `drop view` + `create or replace view` pair for `public.admin_users`, matching one exact pinned body, as clean. An `admin_users` change that normalized to precisely that text would pass unnoticed.
-- **Why accepted:** The tolerated text is what the view already is, so reaching it requires changing the view to itself. migra emits this block on every run against the production project even when nothing differs — verified read-only on 2026-08-11: production's `pg_get_viewdef('public.admin_users')` is textually identical to what `014_views_security_invoker.sql` produces, `pg_class.reloptions` is `{security_invoker=true}` as that migration sets, and the emitted block is byte-for-byte identical (674 characters) whether or not a migration recreates the view. No migration content can silence it, which is why `032_reconcile_remote_schema.sql` deliberately omits the view. Without this tolerance the gate blocks *every* release PR, including ones that change no migrations — which is how it behaved when it first started running, and a gate that always fails is a gate nobody reads.
-- **Mitigation:** The tolerance is pinned to the exact statement pair, whitespace-normalized, in `TOLERATED_MIGRA_ARTIFACT` (`scripts/check-pending-migrations.ts`). Three regression tests in `check-pending-migrations.test.ts` assert that the gate still blocks when the artifact is accompanied by any other statement, when the `admin_users` body genuinely changes, and when the same body shape appears for a different view. Real drift in any other object is unaffected. The proper fix is replacing migra with schema introspection, tracked in #1064.
-- **Severity:** Low (one admin-only view, pinned body, blocking behavior preserved everywhere else)
+- **Risk:** `pnpm run check:pending-migrations` treats a schema diff consisting *solely* of exact drop/recreate pairs for `public.admin_users` and its `public.admin_users_observed` dependent, matching two pinned bodies, as clean. A change that normalized to precisely those definitions would pass unnoticed.
+- **Why accepted:** The tolerated text is what both views already are, so reaching it requires changing them to themselves. migra emits the `admin_users` block on every run against the production project even when nothing differs — verified read-only on 2026-08-11: production's `pg_get_viewdef('public.admin_users')` is textually identical to what `014_views_security_invoker.sql` produces, `pg_class.reloptions` is `{security_invoker=true}` as that migration sets, and the emitted block is byte-for-byte identical whether or not a migration recreates the view. After migration 052 added `admin_users_observed`, the same false-positive recreation must also drop and restore that exact dependent view. The linked-production diff after applying migrations 049-052 contains only this expanded view chain. No migration content can silence the underlying artifact, which is why `032_reconcile_remote_schema.sql` deliberately omits the view. Without this tolerance the gate blocks every release PR.
+- **Mitigation:** The tolerance is pinned to the exact view-chain statements, whitespace-normalized, in `TOLERATED_MIGRA_ARTIFACT` (`scripts/check-pending-migrations.ts`). Regression tests assert that the gate still blocks when the artifact is accompanied by any other statement, when either body genuinely changes, and when the same body shape appears under a different view name. Real drift in any other object is unaffected. The proper fix is replacing migra with schema introspection, tracked in #1064.
+- **Severity:** Low (two admin-only views, pinned bodies, blocking behavior preserved everywhere else)
 - **Accepted:** 2026-08-11
 
 ---
@@ -201,13 +201,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ## Infrastructure
 
-## GitHub Advanced Security (code scanning + secret scanning) unavailable on repo tier
+## GitHub code scanning pending activation after repository visibility change
 
-- **Risk:** Native GitHub code scanning (CodeQL) and secret scanning are disabled on this repository (`403`/`404` from the respective alert APIs) — GitHub Advanced Security is not licensed for private repositories on this plan tier, so these alert surfaces cannot be enabled without a paid upgrade.
-- **Accepted because:** Equivalent coverage already runs in CI on every PR: the `Secret Scanning` workflow runs Gitleaks, and the `Security Scan` workflow runs the OSV-backed `pnpm run check:vulnerabilities` gate plus `pnpm run check:licenses`. Weekly security-agent cycles independently re-verify secrets, dependency vulnerabilities, and license compliance against live source. Dependabot security alerts are a separate, unaffected surface and remain enabled.
-- **Mitigation:** None required today. Re-evaluate if the repo tier changes or if GHAS becomes available for private repos on the current plan.
+- **Original risk:** Native GitHub code scanning (CodeQL) and secret scanning were unavailable while this repository was private on a plan without GitHub Advanced Security. The alert APIs returned `403`/`404`, so Chapa relied on Gitleaks, the OSV-backed vulnerability gate, the license gate, and weekly security-agent cycles.
+- **Current state:** The repository is now public, so the private-tier licensing constraint no longer applies. `.github/workflows/codeql.yml` prepares JavaScript/TypeScript CodeQL analysis for pushes and pull requests against `develop` and `main`, plus a weekly scheduled scan. Existing Gitleaks, dependency, and license gates remain in place.
+- **Activation:** The workflow is local during the project code freeze. CodeQL results and a successful code-scanning alert API response can only be verified after the workflow reaches GitHub and completes its first run. Keep this risk open until that verification succeeds.
 - **Severity:** Low
-- **Accepted:** 2026-07-15
+- **Accepted:** 2026-07-15 | **Status updated:** 2026-09-14
 
 ## `packages/shared` build step exists but does not drive runtime resolution (#450, #1099)
 
@@ -244,7 +244,29 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Historical production-only build guard and current Preview prohibition
+
+The 2026-09-06 configuration used an Ignored Build Step to skip non-production
+builds. That guard still allowed a Preview deployment object to be created,
+so it does not satisfy the standing prohibition on Preview creation.
+
+The earlier instruction to clear the guard for a release is superseded by
+[the current release playbook](release/release-playbook.md). Qualification is
+local schema2 proof. Before any later authorized push, inspect actual remote
+triggers read-only and prove documented non-destructive Preview prevention.
+If that prevention is not available, stop before push; do not alter the guard
+or create a deployment to discover what happens. This note records a prior
+configuration and does not assert current remote state or authorize a change.
+
+
 ## Profile type threshold boundary (0.15 review-to-PR ratio)
+
+> **Superseded for v7 (#1312).** v7 has no solo/collaborative switch: Quality
+> practices is one of four fixed dimensions at 0.25 each, counted from
+> demonstrated rationale, verification, review-or-correction and outcome
+> follow-up, and it is never excluded from the composite. This entry remains as
+> the accurate record of v6 behaviour, which v6 records still carry. See
+> `docs/impact-v7.md`.
 
 - **Risk:** A developer with exactly 15% review rate sits on the solo/collaborative boundary. Crossing the threshold changes which Quality formula is used and whether Quality is included in the composite.
 - **Mitigation:** The threshold is intentionally conservative (solo-favoring) because the collaborative path has a much stronger impact on scores. Edge cases near the boundary will see modest score changes when crossing. The threshold (0.15) is a shared constant (`SOLO_REVIEW_RATIO_THRESHOLD`) that can be tuned.
@@ -254,6 +276,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 ---
 
 ## Per-platform quality-signal availability
+
+> **Superseded for v7 (#1312).** v7 does not silently absorb a source gap into
+> a lower score. A connected source that could not be fully read stays in scope
+> with its own incomplete coverage, and the affected dimensions publish an
+> evidence-completion range whose bounds contain every admissible completion.
+> The gap is disclosed in the receipt rather than mitigated by a panel note.
+> This entry remains as the accurate record of v6 behaviour.
 
 - **Risk:** PR-description, feature-branch, issue-linkage, batch-size, and lead-time signals are computed only from GitHub. GitLab, Bitbucket, and Codeberg do not expose them, so a profile whose merged work is mostly on those platforms has a Quality dimension based on limited data. For solo profiles, Quality is display-only and excluded from the composite.
 - **Mitigation:** The share-page "How is my score calculated" panel states this per platform. Quality is never counted in the solo composite, so the gap does not depress the headline score for solo developers.
@@ -325,6 +354,40 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Accepted:** 2026-07-16
 
 ---
+
+## AI insights parser chunk exceeds the per-file bundle budget (2026-09-07)
+
+**Risk:** One client JS chunk is 368 KB against a documented 350 KB per-file
+budget, and `scripts/check-bundle-size.sh` exempts it explicitly.
+
+**Why it is accepted:** The chunk is the AI insights report parser, reached
+only through a dynamic import:
+
+`use-insights-import.ts:133` -> `lib/insights/parser` -> `lib/insights/report-v7`
+-> `zod`
+
+It is therefore fetched when someone imports an insights report, and never as
+part of loading a page. The budget exists to stop pages getting heavy; this
+chunk does not make any page heavier. Every other client chunk is well under
+the ceiling (next largest 227 KB, then 125 KB).
+
+Raising the budget to 400 KB for everything would have hidden a future genuine
+380 KB page chunk, which is the failure the budget exists to catch. Splitting
+or replacing the zod schema is real work on a validation path and buys nothing
+a reader would notice.
+
+**Bounded how:** The exemption is not a filename allowlist — Turbopack chunk
+names are content hashes and would drift on every change. The chunk is
+identified by a stable literal from the insights schema, only one chunk may be
+exempted, and it must still stay under a separate 400 KB ceiling. Both bounds
+are covered: a different over-budget chunk fails, and the exempt chunk fails
+once it passes its own ceiling.
+
+**Revisit if:** the parser grows toward 400 KB, the insights import stops being
+dynamically loaded, or a second chunk needs the same treatment — a second
+exception means the rule, not the chunk, is wrong.
+
+**Refs:** [#1319](https://github.com/juan294/chapa/issues/1319)
 
 ## Review schedule
 

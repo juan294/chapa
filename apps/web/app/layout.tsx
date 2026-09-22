@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { JetBrains_Mono, Plus_Jakarta_Sans, Manrope, Barlow_Condensed } from "next/font/google";
 import "@/styles/globals.css";
 import { ClientInstrumentation } from "@/components/ClientInstrumentation";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -39,6 +39,20 @@ const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-plus-jakarta",
+  display: "swap",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-manrope",
+  display: "swap",
+});
+
+const barlowCondensed = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-barlow-condensed",
   display: "swap",
 });
 
@@ -124,7 +138,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${jetbrainsMono.variable} ${plusJakarta.variable}`}
+      className={`${jetbrainsMono.variable} ${plusJakarta.variable} ${manrope.variable} ${barlowCondensed.variable}`}
       suppressHydrationWarning
       data-scroll-behavior="smooth"
     >
@@ -157,7 +171,7 @@ export default async function RootLayout({
         */}
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:rounded-lg focus:bg-amber focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg focus:shadow-amber/25"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:rounded-[3px] focus:bg-action focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-action-text focus:shadow-card"
         >
           <span lang="es" data-document-locale="es">
             {resolveTranslation("common.skipToMainContent", es) as string}

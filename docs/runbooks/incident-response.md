@@ -15,7 +15,7 @@ candidate tree, deployed commit, and rollback identity throughout this runbook.
 
 ## Detection
 
-The app sends active operational alerts for these launch-critical signals via
+The app sends active operational alerts for these signals via
 `captureOperationalAlert()` (`apps/web/lib/analytics/server-errors.ts`):
 
 | Signal | Threshold | Severity |
@@ -24,6 +24,7 @@ The app sends active operational alerts for these launch-critical signals via
 | `badge_5xx` | Every captured 5xx from `/u/:handle/badge.svg` | P1 |
 | `oauth_callback_failure` | Every captured 5xx from `/api/auth/callback` | P1 |
 | `cron_failure` | Every captured 5xx from `/api/cron/*` | P2 |
+| `warm_cache_handle_failure` | One handle cannot refresh; deduplicated per handle and UTC day | P3 |
 | `warm_cache_high_failure_rate` / `warm_cache_ceiling_approached` | Warm-cache cron thresholds | P2 |
 | `badge_latency_slo_breach` | Daily `latency-check` cron p95 budget breach or probe failure | P2 |
 

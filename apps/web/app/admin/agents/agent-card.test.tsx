@@ -54,7 +54,7 @@ describe("AgentCard", () => {
       <AgentCard agent={agent} isRunning={false} onRun={vi.fn()} onStop={vi.fn()} />,
     );
     const root = container.firstElementChild;
-    expect(root?.className).toContain("rounded-xl");
+    expect(root?.className).toContain("rounded-[3px]");
     expect(root?.className).toContain("border-stroke");
     expect(root?.className).toContain("bg-card");
   });

@@ -1,20 +1,12 @@
-import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import { renderBadgeBranding } from "./BadgeBranding";
 import { WARM_AMBER } from "./theme";
 
 describe("renderBadgeBranding", () => {
-  it("preserves the exact SVG bytes after metadata extraction", () => {
-    const svg = renderBadgeBranding(60, 585, 1140, [
-      "gitlab",
-      "github",
-      "github",
-      "bitbucket",
-    ]);
-
-    expect(createHash("sha256").update(svg).digest("hex")).toBe(
-      "ff20e4bd16c90409c890ba442f2d8d670db799a70b188d6ffdf10d55cafbc561",
-    );
+  it("produces the same themed footer after sorting and deduplicating platforms", () => {
+    const svg = renderBadgeBranding(60, 585, 1140, ["gitlab", "github", "github", "bitbucket"]);
+    expect(svg).toBe(renderBadgeBranding(60, 585, 1140, ["github", "bitbucket", "gitlab"]));
+    expect(svg).toContain(`fill="${WARM_AMBER.textSecondary}"`);
   });
 
   it("returns SVG markup with branding text (opacity contrast tspans)", () => {
@@ -23,8 +15,8 @@ describe("renderBadgeBranding", () => {
     expect(svg).toContain("purpose");
     expect(svg).toContain("Driven by ");
     expect(svg).toContain("curiosity");
-    // Opacity contrast: connecting words at 0.5, key words at 0.9
-    expect(svg).toContain('opacity="0.5">Forged from ');
+    // Opacity contrast: connecting words at 0.85, key words at 0.9
+    expect(svg).toContain('opacity="0.85">Forged from ');
     expect(svg).toContain('opacity="0.9">purpose');
     expect(svg).toContain('opacity="0.9">curiosity');
   });

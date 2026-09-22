@@ -1,3 +1,8 @@
+import { readRenderableReceipt } from "@/lib/profile/score-model";
+import { observedReceiptViewModel } from "@/lib/profile/score-view-model";
+import { scoringObservation, compareScoringObservations } from "@/lib/history/scoring-observations";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { sweepRevokedReceiptCachesV7, sweepRetiredSupplementalCachesV7 } from "@/lib/verification/cleanup";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
 import { getWarmCachePriorityHandles } from "@/lib/env";
@@ -8,8 +13,9 @@ import {
 } from "@/lib/db/snapshots";
 import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
-import { notifyScoreBump } from "@/lib/email/score-bump";
+import { notifyScoreBump, notifyObservedScoreChange } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
+import { dbPurgeExpiredCraftRawV7 } from "@/lib/db/craft-v7";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet, cacheSetNxStatus } from "@/lib/cache/redis";
 import { processInBatches } from "@/lib/async/process-in-batches";
@@ -26,7 +32,7 @@ import {
   resolveBadgeAvatar,
 } from "@/lib/render/avatar-outcome";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { resolveBadgeConfig } from "@/lib/render/badge-config";
+import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import {
@@ -35,11 +41,13 @@ import {
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
+import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
-import { getPublicProfileVerification } from "@/lib/profile/public-profile";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
+import { deferProfileCacheWork } from "@/lib/profile/public-profile";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -48,16 +56,16 @@ export const maxDuration = 300;
  * Maximum handles to warm per cron invocation (stay within GitHub rate
  * limits and the maxDuration budget above).
  *
- * #1010 — rate-limit math: each handle warm makes at most one GitHub
- * GraphQL call (contribution data + the authoritative merged-PR search are
- * both fields on a single `fetchContributionData` request — see
+ * #1010 — rate-limit math: each handle warm makes at most two concurrent
+ * GitHub GraphQL calls (activity and repository history are split so large
+ * accounts do not exceed GitHub's per-operation latency limit — see
  * `lib/github/queries.ts`), and only on a stats-cache miss (6h TTL, see
  * `lib/github/client.ts`'s CACHE_TTL) — a warm re-run inside that window is
  * a cache hit and makes zero GitHub calls. Since the Vercel cron schedule
  * (`vercel.json`) was bumped from once daily to hourly, worst case this cron
- * now makes up to MAX_HANDLES GraphQL calls *per hour* instead of per day —
- * at 50/hour that's ~1,200/day, still only ~1% of GitHub's 5,000/hr
- * authenticated budget (`GITHUB_TOKEN`; 50 ÷ 5,000, not the daily total
+ * now makes up to 2 × MAX_HANDLES GraphQL calls *per hour* instead of per day —
+ * at 100/hour that's ~2,400/day, still only ~2% of GitHub's 5,000/hr
+ * authenticated budget (`GITHUB_TOKEN`; 100 ÷ 5,000, not the daily total
  * compared against the hourly budget), leaving ample headroom for real user traffic
  * hitting `getStats()` on the same token pool. MAX_HANDLES was deliberately
  * left unchanged rather than raised alongside the frequency bump — the
@@ -358,6 +366,29 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     // Non-critical — don't fail the cron response
   }
 
+  let revokedReceiptCaches: Awaited<ReturnType<typeof sweepRevokedReceiptCachesV7>> | null = null;
+  try {
+    revokedReceiptCaches = await sweepRevokedReceiptCachesV7();
+  } catch {
+    console.error("[RETENTION_FAILURE] Receipt cache sweep failed");
+    void captureServerError({ error: new Error("Receipt cache sweep failed"), route: "/api/cron/warm-cache", statusCode: 503 });
+  }
+
+  let retiredSupplementalCaches: Awaited<ReturnType<typeof sweepRetiredSupplementalCachesV7>> | null = null;
+  try {
+    retiredSupplementalCaches = await sweepRetiredSupplementalCachesV7();
+  } catch {
+    console.error("[RETENTION_FAILURE] Retired supplemental cache sweep failed");
+    void captureServerError({ error: new Error("Retired supplemental cache sweep failed"), route: "/api/cron/warm-cache", statusCode: 503 });
+  }
+  let expiredCraftRawDeleted: number | null = null;
+  try {
+    expiredCraftRawDeleted = await dbPurgeExpiredCraftRawV7();
+  } catch {
+    console.error("[RETENTION_FAILURE] Craft raw artifact purge failed");
+    void captureServerError({ error: new Error("Craft raw artifact purge failed"), route: "/api/cron/warm-cache", statusCode: 503 });
+  }
+
   // Clean metrics_snapshots older than retention period (fire-and-forget safe)
   let expiredSnapshotsDeleted = 0;
   try {
@@ -387,6 +418,9 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       expiredVerificationsDeleted,
       expiredMergeOpsDeleted,
       expiredSnapshotsDeleted,
+      expiredCraftRawDeleted,
+      revokedReceiptCaches,
+      retiredSupplementalCaches,
       processedCount,
       processedSample: toWarm.slice(0, Math.min(completedCount, 10)),
       timedOut,
@@ -423,14 +457,38 @@ async function warmHandle(
   requestId?: string,
 ): Promise<HandleResult> {
   try {
-    const materialized = await materializeOrchestratedProfile(handle);
+    // #1311 — issue before materializing, not after. Materialization is what
+    // reads the receipt the badge is rendered from, so issuing afterwards left
+    // the warmed SVG a revision behind for a full hour. Non-consented handles
+    // skip silently — every handle until its owner opts in — and failures are
+    // captured inside the helper rather than failing the warm.
+    const scoringSelection = await readScoringRenderSelection();
+    const baseline = scoringSelection.cacheable && scoringSelection.machinePolicy === "v7.2"
+      ? await readRenderableReceipt(handle, scoringSelection).catch(() => null) : null;
+    const previousObserved = baseline && !("unavailable" in baseline)
+      ? scoringObservation(observedReceiptViewModel(handle, baseline, scoringSelection.capturedAt)) : null;
+    await issueScoreReceiptIfConsented(handle, { scoringSelection });
+
+    const materialized = await materializeOrchestratedProfile(handle, { scoringSelection });
     if (!materialized) {
-      void captureServerError({
-        route: "/api/cron/warm-cache",
-        statusCode: 502,
-        error: new Error(`Stats fetch returned null for handle: ${handle}`),
+      const today = new Date().toISOString().slice(0, 10);
+      const guardStatus = await cacheSetNxStatus(
+        `warm-cache:handle-failure-alerted:${handle.toLowerCase()}:${today}`,
+        86400,
+      );
+      void captureServerEvent("warm_cache_handle_failure", {
+        handle,
         requestId,
       });
+      if (guardStatus !== "exists") {
+        void captureOperationalAlert({
+          signal: "warm_cache_handle_failure",
+          severity: "P3",
+          summary: `warm-cache could not refresh stats for ${handle}`,
+          route: "/api/cron/warm-cache",
+          properties: { handle, requestId },
+        });
+      }
       return { warmed: false, snapshotRecorded: false, notified: false };
     }
 
@@ -462,7 +520,7 @@ async function warmHandle(
     // lib/auth/platform-oauth.ts for platform connect/disconnect) already
     // deletes this exact key — verified before landing this skip.
     try {
-      const today = toDateString(new Date());
+      const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
       // #1181 (UX-H3 follow-up) — this cron has no request/cookie context to
       // resolve a per-visitor locale from, so it only ever warms the
       // DEFAULT_LOCALE ('es') badge — the locale most real traffic reads
@@ -475,9 +533,9 @@ async function warmHandle(
       // default while writing it under `buildBadgeSvgCacheKey`'s separately
       // defaulted key, so the hourly pre-warm published an English badge
       // into the Spanish-keyed slot for every handle.
-      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE);
+      const badgeLocale = resolveBadgeLocale(DEFAULT_LOCALE, scoringSelection.machinePolicy);
       const svgCacheKey = badgeLocale.cacheKey(handle, today);
-      const existingSvg = await readBadgeSvgCache(svgCacheKey);
+      const existingSvg = scoringSelection.cacheable ? await readBadgeSvgCache(svgCacheKey) : null;
 
       if (existingSvg === null) {
         const avatarOutcome = await resolveBadgeAvatar(
@@ -487,28 +545,46 @@ async function warmHandle(
         );
         const avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
         const avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
-        const verification = getPublicProfileVerification(materialized);
+        const verification = await resolveBadgeVerification(materialized);
 
         if (avatarCachePolicy !== "skip" && verification) {
-          const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
-            avatarDataUri,
-            // #1191 — the cron writes to the same cache slot as the request
-            // path, so it must render the same config. Warming with the
-            // default would silently replace a user's configured badge.
-            config: await resolveBadgeConfig(handle),
-            verificationHash: verification.hash,
-            verificationDate: verification.date,
-            // Mirrors the request path — this SVG is served to <img> embeds,
-            // where SMIL <animate> never runs.
-            disableAnimation: true,
-            strings: badgeLocale.stringsFor(materialized.displayImpact.tier),
-          });
-          if (avatarCachePolicy === "short") {
-            await writeBadgeSvgCache(svgCacheKey, svg, handle, {
-              ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+          const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+          // Keep profile warming successful when styling storage is unavailable;
+          // a fallback design must not overwrite the public SVG cache.
+          if (configSnapshot.cacheable && scoringSelection.cacheable && materialized.scoring?.freshness !== "unavailable") {
+            const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
+              scoring: materialized.scoring,
+              avatarDataUri,
+              // #1191 — the cron writes to the same cache slot as the request
+              // path, so it must render the same config. Warming with the
+              // default would silently replace a user's configured badge.
+              config: configSnapshot.config,
+              verificationHash: verification.hash,
+              verificationDate: verification.date,
+              // Mirrors the request path — this SVG is served to <img> embeds,
+              // where SMIL <animate> never runs.
+              disableAnimation: true,
+              strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
             });
-          } else {
-            await writeBadgeSvgCache(svgCacheKey, svg, handle);
+            if (avatarCachePolicy === "short") {
+              await writeBadgeSvgCache(svgCacheKey, svg, handle, {
+                ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS,
+                scoringSelection, configRevision: configSnapshot.revision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null,
+              });
+            } else {
+              await writeBadgeSvgCache(svgCacheKey, svg, handle, { scoringSelection, configRevision: configSnapshot.revision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null });
+            }
+            // LE-6-1 — this SVG is the public badge for the rest of the day,
+            // and the hash it prints was minted here, by a materialization
+            // nothing else sees. The record has to be stored by the same
+            // pass: the snapshot writer below never touches
+            // `verification_records`, and the request path only stores what
+            // IT rendered. A v7 profile stores nothing here (its receipt is
+            // the attestation); `deferProfileCacheWork` enforces that.
+            await deferProfileCacheWork(handle, materialized, {
+              verification,
+              verificationOnly: true,
+            });
           }
         }
       }
@@ -527,7 +603,7 @@ async function warmHandle(
         snapshotRecorded = true;
 
         // Score bump notification: compare new vs previous snapshot
-        if (previousSnapshot) {
+        if (previousSnapshot && scoringSelection.cacheable && scoringSelection.machinePolicy === "v6" && materialized.scoring?.policyVersion !== "v7.2" && materialized.scoring?.freshness !== "unavailable") {
           try {
             const diff = compareSnapshots(
               previousSnapshot as Parameters<typeof compareSnapshots>[0],
@@ -547,6 +623,12 @@ async function warmHandle(
       // Snapshot recording is non-critical — don't fail the warm
     }
 
+    if (previousObserved && materialized.scoring && scoringSelection.cacheable) {
+      const current = scoringObservation(materialized.scoring);
+      if (current && current.identity?.revisionId !== previousObserved.identity?.revisionId) {
+        notified = await notifyObservedScoreChange(handle, compareScoringObservations(previousObserved, current)).catch(() => false);
+      }
+    }
     return { warmed: true, snapshotRecorded, notified };
   } catch (err) {
     void captureServerError({

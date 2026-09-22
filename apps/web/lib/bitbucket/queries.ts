@@ -25,7 +25,7 @@ interface UserProfile {
   avatarUrl: string;
 }
 
-/** Fetch all Bitbucket contribution data for a user */
+/** Legacy v6 aggregate reader. Never substitute these totals for v7 events. */
 export async function fetchBitbucketContributionData(
   username: string,
   accessToken: string,

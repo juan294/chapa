@@ -5,6 +5,7 @@ import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { useTranslation } from "@/lib/i18n";
+import { InlineBadgeSvg } from "./InlineBadgeSvg";
 
 export interface BadgeContentProps {
   stats: StatsData;
@@ -49,11 +50,11 @@ export function BadgeContent({
   );
 
   return (
-    <div
+    <InlineBadgeSvg
       data-testid="badge-content"
       className={`[&>svg]:block [&>svg]:h-auto [&>svg]:w-full ${className}`}
       style={style}
-      dangerouslySetInnerHTML={{ __html: svg }}
+      svg={svg}
     />
   );
 }

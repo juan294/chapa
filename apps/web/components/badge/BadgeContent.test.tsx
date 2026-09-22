@@ -25,6 +25,10 @@ const stats = {
 } as unknown as StatsData;
 
 const impact = {
+  // The renderer projects this through the shared score view model, which
+  // identifies the subject — a fixture that casts the field away is lying
+  // about a value `ImpactV6Result` requires.
+  handle: "testuser",
   dimensions: { delivery: 72, quality: 64, consistency: 81, breadth: 58 },
   archetype: "builder",
   compositeScore: 65,

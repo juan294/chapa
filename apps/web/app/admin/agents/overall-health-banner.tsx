@@ -53,11 +53,11 @@ export function OverallHealthBanner({ agents }: OverallHealthBannerProps) {
 
   return (
     <div
-      className={`rounded-xl border ${config.border} ${config.bg} p-4`}
+      className={`rounded-[3px] border ${config.border} ${config.bg} p-4`}
       role="status"
       aria-label={`Agent health: ${config.label}`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="font-heading text-sm text-terminal-dim">
           $ agents/health
         </span>
@@ -66,7 +66,7 @@ export function OverallHealthBanner({ agents }: OverallHealthBannerProps) {
           {config.label}
         </span>
       </div>
-      <div className="mt-2 flex gap-4 pl-6 font-heading text-xs text-text-secondary">
+      <div className="mt-2 flex flex-wrap gap-4 pl-6 font-heading text-xs text-text-secondary">
         {counts.green > 0 && (
           <span className="text-terminal-green">{counts.green} green</span>
         )}

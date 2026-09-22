@@ -8,11 +8,13 @@ import {
   type BadgeConfig,
   type CraftResult,
   type ImpactV6Result,
+  type StatsData,
 } from "@chapa/shared";
 import type { CommandResult } from "@/components/terminal/command-registry";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 import { WEBMCP_INVALID_INPUT_PREFIX } from "@/lib/webmcp/use-model-context-tools";
 import type { StudioCommandAction } from "./useStudioCommands";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { useStudioWebMcpTools } from "./useStudioWebMcpTools";
 
 vi.mock("@/lib/env", () => ({
@@ -65,6 +67,12 @@ function makeRunCommand() {
           action: { type: "set", category: "background", value: "aurora" },
         };
       }
+      if (input === "/set palette ice") {
+        return {
+          lines: [line("colorPalette → ice")],
+          action: { type: "set", category: "colorPalette", value: "ice" },
+        };
+      }
       if (input === "/preset premium") {
         return {
           lines: [line("Applied preset: Premium")],
@@ -83,6 +91,8 @@ function makeRunCommand() {
 }
 
 function setup(overrides?: {
+  scoring?: import("@/lib/profile/score-view-model").ScoreViewModel;
+  stats?: StatsData;
   config?: BadgeConfig;
   impact?: ImpactV6Result;
   craftResult?: CraftResult | null;
@@ -96,8 +106,9 @@ function setup(overrides?: {
   const { result } = renderHook(() =>
     useStudioWebMcpTools({
       config,
-      stats: DEMO_STATS,
+      stats: overrides?.stats ?? { ...DEMO_STATS, heatmapData: [] },
       impact,
+      scoring: overrides?.scoring,
       craftResult: overrides?.craftResult ?? null,
       handle: "dev user",
       enabled: overrides?.enabled ?? true,
@@ -163,6 +174,17 @@ describe("useStudioWebMcpTools", () => {
 
     rerender();
     expect(result.current).toBe(first);
+  });
+
+  it("applies Ice through the palette alias without saving or mutating the saved config", async () => {
+    const { getTool, runCommand, proposeSave, config } = setup({
+      config: { ...DEFAULT_BADGE_CONFIG, colorPalette: "jade" },
+    });
+    const response = await execute(getTool("apply_badge_style"), { category: "palette", value: "ice" });
+    expect(runCommand).toHaveBeenCalledWith("/set palette ice");
+    expect(readCommandConfig(response).colorPalette).toBe("ice");
+    expect(config.colorPalette).toBe("jade");
+    expect(proposeSave).not.toHaveBeenCalled();
   });
 
   it("does not build the catalog while the WebMCP kill-switch is off", () => {
@@ -258,6 +280,9 @@ describe("useStudioWebMcpTools", () => {
     };
 
     expect(payload.categories).toHaveLength(7);
+    expect(payload.categories.find((category) => category.key === "colorPalette")?.options).toEqual(
+      expect.arrayContaining([expect.objectContaining({ value: "ice", label: "Ice Terminal" })]),
+    );
     expect(payload.categories[0]).toMatchObject({
       key: "background",
       alias: "bg",
@@ -386,6 +411,7 @@ describe("useStudioWebMcpTools", () => {
     );
 
     expect(payload).toEqual({
+      hypothetical: true, policyVersion: "v6",
       composite: 58,
       adjusted: 57,
       tier: "Solid",
@@ -535,4 +561,39 @@ describe("useStudioWebMcpTools", () => {
       ),
     ).toEqual([0, 0, 0]);
   });
+});
+
+
+describe("production recency simulation", () => {
+  afterEach(() => { cleanup(); vi.useRealTimers(); });
+  it.each(["2026-09-05", "2026-01-01"])("unchanged dimensions preserve the real score for activity on %s", async (date) => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
+    const stats = { ...DEMO_STATS, heatmapData: [{ date, count: 10 }] };
+    const impact = computeImpactV6(stats);
+    const { getTool } = setup({ stats, impact });
+    const payload = JSON.parse(await execute(getTool("simulate_score"), { dimensions: impact.dimensions }));
+    expect(payload.adjusted).toBe(impact.adjustedComposite);
+    expect(payload.tier).toBe(impact.tier);
+    expect(payload.deltaVsCurrent).toBe(0);
+  });
+  it("applies recent activity before confidence across the Elite boundary", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
+    const stats = { ...DEMO_STATS, heatmapData: [{ date: "2026-09-05", count: 10 }] };
+    const { getTool } = setup({ stats, impact: { ...DEMO_IMPACT, confidence: 100 } });
+    const payload = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { delivery: 81, quality: 81, consistency: 81, breadth: 81, craft: 81 } }));
+    expect(payload).toMatchObject({ composite: 81, adjusted: 86, tier: "Elite" });
+  });
+});
+
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
+it("Studio tools simulate and explain the selected receipt without legacy proficiency", async () => {
+  const f = await scoringConsistencyFixture({ craft: 57 });
+  const { getTool } = setup({ impact: f.impact, stats: f.stats, scoring: f.model });
+  const simulation = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { craft: 0 } }));
+  expect(simulation).toMatchObject({ hypothetical: true, policyVersion: "v7.2", displayScore: 46, baselineRevision: f.model.identity!.revisionId });
+  expect(JSON.parse(await execute(getTool("simulate_score"), { counts: {} }))).toMatchObject({ scope: "evidence_counts", displayScore: 46 });
+  const explanation = JSON.parse(await execute(getTool("explain_dimension"), { dimension: "craft" }));
+  expect(explanation).toMatchObject({ policyVersion: "v7.2", score: 57, craft: { status: "scored" } });
+  expect(JSON.stringify(explanation)).not.toMatch(/proficiency|sophistication|Expert/);
+  expect(await execute(getTool("suggest_improvements"))).not.toMatch(/points to|Master|Expert/);
 });

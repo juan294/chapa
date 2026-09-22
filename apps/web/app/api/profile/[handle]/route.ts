@@ -1,3 +1,5 @@
+import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { readPublicObservedScore } from "@/lib/profile/post-write-score";
 import { type NextRequest, NextResponse } from "next/server";
 import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
@@ -7,49 +9,20 @@ import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { legacyViewModel, type ScoreViewModel } from "@/lib/profile/score-view-model";
 
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
 
-/**
- * #1062 — the fresh, badge-consistent headline.
- *
- * `adjustedComposite`/`tier` on this endpoint come from the persisted snapshot
- * and are EMA-smoothed for the trend sparkline (#1001), while the badge, share
- * page and verification record all show the FRESH score. After a step change in
- * inputs the two diverge sharply — an EMU merge took frivas to a badge headline
- * of 69/Solid while this endpoint still reported 25/Emerging.
- *
- * Rather than silently change the meaning of two published fields, the fresh
- * pair is exposed additively. Read-only materialization: this is a public,
- * CORS-enabled GET and must never trigger a cache write.
- *
- * Failure here is non-fatal by design — the endpoint predates these fields and
- * must keep serving the snapshot half if the fresh score cannot be computed.
- *
- * #1180 (PE-L2) — uses `materializeDisplayProfile`, not
- * `materializePublicProfile`. The caller above already read
- * `getCachedLatestSnapshot(handle)` once for the snapshot half of this
- * response; `materializePublicProfile` (via `materializeProfile`) would
- * perform a SECOND, identical `getCachedLatestSnapshot` read whose result
- * only ever feeds the EMA-smoothed *persisted* snapshot (#1001) — never
- * `displayImpact`, which is always the fresh score and therefore genuinely
- * snapshot-independent. `materializeDisplayProfile` skips that lookup (and
- * the dirty-marker lookup) entirely rather than deduplicating it.
- */
-async function getDisplayHeadline(
-  handle: string,
-): Promise<{ displayScore: number | null; displayTier: string | null }> {
+/** Legacy fallback keeps its historical EMA aliases; the fresh headline is
+ * explicitly v6 and uses the already captured policy clock. */
+async function getDisplayHeadline(handle: string, selection: ScoringRenderSelection): Promise<{ displayScore: number | null; displayTier: string | null; scoring: ScoreViewModel | null }> {
   try {
-    const materialized = await materializeDisplayProfile(handle, {
-      readOnly: true,
-    });
-    if (!materialized) return { displayScore: null, displayTier: null };
-    return {
-      displayScore: materialized.displayImpact.adjustedComposite,
-      displayTier: materialized.displayImpact.tier,
-    };
+    const materialized = await materializeDisplayProfile(handle, { readOnly: true, scoringSelection: { ...selection, enabled: false, machinePolicy: "v6" } });
+    if (!materialized) return { displayScore: null, displayTier: null, scoring: null };
+    const scoring = legacyViewModel(materialized.displayImpact);
+    return { displayScore: scoring.composite.kind === "point" ? scoring.composite.display : null, displayTier: scoring.tier, scoring };
   } catch {
-    return { displayScore: null, displayTier: null };
+    return { displayScore: null, displayTier: null, scoring: null };
   }
 }
 
@@ -59,8 +32,8 @@ async function getDisplayHeadline(
  * Returns the latest impact dimensions, archetype, tier, and optional craft
  * score for a user. Designed for external consumers (portfolio sites).
  *
- * `adjustedComposite`/`tier` are the smoothed trend values; `displayScore`/
- * `displayTier` are the fresh values shown on the badge (#1062).
+ * Current v7.2 aliases share one canonical display point. Only the explicitly
+ * labelled v6 fallback retains historical smoothed aliases and fresh headline.
  */
 export const GET = withErrorCapture("/api/profile/[handle]", async (
   request: NextRequest,
@@ -85,6 +58,11 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
     );
   }
 
+  const selection = await readScoringRenderSelection();
+  const current = await readPublicObservedScore(handle, selection);
+  if (current.status === "unavailable") return NextResponse.json({ error: "Current scoring is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
+  if (current.status === "current") return NextResponse.json({ handle, ...current.projection }, { headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
+
   const snapshot = await getCachedLatestSnapshot(handle);
 
   if (!snapshot) {
@@ -103,7 +81,7 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
   const craftScore = snapshot.craft ?? (craftResult ? craftResult.craftScore : undefined);
 
   // Only after the 404 above — the missing-snapshot path stays a cheap cache read.
-  const { displayScore, displayTier } = await getDisplayHeadline(handle);
+  const { displayScore, displayTier, scoring } = await getDisplayHeadline(handle, selection);
 
   const dimensions: DimensionScores = {
     delivery: snapshot.delivery,
@@ -116,6 +94,7 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
   return NextResponse.json(
     {
       handle,
+      policyVersion: "v6",
       dimensions,
       compositeScore: snapshot.compositeScore,
       adjustedComposite: snapshot.adjustedComposite,
@@ -133,12 +112,13 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
       // #1062 — fresh, matches the badge. Null when it cannot be computed.
       displayScore,
       displayTier,
+      scoring,
     },
     {
       headers: {
         ...CORS_HEADERS,
         "Cache-Control":
-          "public, s-maxage=300, stale-while-revalidate=3600",
+          "no-store",
       },
     },
   );

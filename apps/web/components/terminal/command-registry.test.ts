@@ -165,7 +165,7 @@ describe("createNavigationCommands (studio disabled)", () => {
   it("returns 14 commands when studio is disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
-    expect(commands).toHaveLength(14);
+    expect(commands).toHaveLength(17);
   });
 
   it("/help does not mention /studio when disabled", () => {
@@ -187,7 +187,7 @@ describe("createNavigationCommands (studio disabled)", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
     const matches = getMatchingCommands("/", commands);
-    expect(matches).toHaveLength(14);
+    expect(matches).toHaveLength(17);
   });
 
   it("/s does not match /studio when disabled", () => {
@@ -221,7 +221,7 @@ describe("createNavigationCommands (studio enabled)", () => {
   it("returns 15 commands when studio is enabled", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
-    expect(commands).toHaveLength(15);
+    expect(commands).toHaveLength(18);
   });
 
   it("/studio navigates to /studio when enabled", () => {
@@ -331,7 +331,7 @@ describe("createNavigationCommands (studio enabled)", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
     const matches = getMatchingCommands("/", commands);
-    expect(matches).toHaveLength(15);
+    expect(matches).toHaveLength(18);
   });
 
   it("getMatchingCommands filters correctly", () => {
@@ -550,31 +550,27 @@ describe("createNavigationCommands (isAdmin)", () => {
   it("returns 20 commands when isAdmin + studio disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(20);
+    expect(commands).toHaveLength(23);
   });
 
   it("returns 21 commands when isAdmin + studio enabled", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(21);
+    expect(commands).toHaveLength(24);
   });
 
-  it("/help includes Admin section when isAdmin", () => {
+  it("/help includes every available admin command", () => {
     const commands = createNavigationCommands({ isAdmin: true });
     const result = executeCommand("/help", commands);
     const allText = result.lines.map((l) => l.text).join("\n");
-    expect(allText).toContain("Admin:");
-    expect(allText).toContain("/admin");
-    expect(allText).toContain("/refresh");
-    expect(allText).toContain("/sort");
+    for (const command of createAdminCommands()) expect(allText).toContain(command.usage ?? command.name);
   });
 
-  it("/help does NOT include Admin section when not admin", () => {
+  it("/help excludes every admin command for a non-admin", () => {
     const commands = createNavigationCommands();
     const result = executeCommand("/help", commands);
     const allText = result.lines.map((l) => l.text).join("\n");
-    expect(allText).not.toContain("Admin:");
-    expect(allText).not.toContain("/refresh");
+    for (const command of createAdminCommands()) expect(allText).not.toContain(command.name);
   });
 
   it("/admin matches in autocomplete when isAdmin", () => {
@@ -718,5 +714,18 @@ describe("createAdminCommands (localized descriptions)", () => {
     const cmds = createAdminCommands({ descriptions: {} });
     const sort = cmds.find((c) => c.name === "/sort")!;
     expect(sort.description).toBe("Sort table by field");
+  });
+});
+
+
+describe("composed navigation registry", () => {
+  it("generates help from available commands, including scoped entries and new routes", () => {
+    const commands = createNavigationCommands({ studioEnabled: false, additionalCommands: [{ name: "/whoami", description: "Sample exploration", execute: () => ({lines: []}) }] });
+    const help = executeCommand("/help", commands).lines.map(line => line.text).join("\n");
+    for (const command of commands) expect(help).toContain(command.name);
+    expect(help).not.toContain("/studio");
+    expect(executeCommand("/verify", commands).action).toEqual({type: "navigate", path: "/verify"});
+    expect(executeCommand("/artificer", commands).action).toEqual({type: "navigate", path: "/archetypes/artificer"});
+    expect(executeCommand("/clear", commands).action).toEqual({type: "clear"});
   });
 });

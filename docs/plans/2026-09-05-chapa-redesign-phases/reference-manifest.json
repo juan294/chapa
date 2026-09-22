@@ -1,0 +1,80 @@
+{
+  "date": "2026-09-05",
+  "kind": "approved local reference hashes; not implementation evidence",
+  "sourceRoot": "/Users/juan/code/chapa-redesign",
+  "repositoryBaseline": "c1ce31cbf5969ee400c4cf232d67cf7dc1b1de0d",
+  "userOverrides": [
+    "Plain hero explanation and commit-count line",
+    "Landing-only Elite sample, plan selects92",
+    "Open the Creator Studio at /studio",
+    "Preserve EN/ES picker and signature pill",
+    "Retain existing design-sync schema"
+  ],
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 15680,
+      "sha256": "1ef9d8b8ae2cfdfde23df8cf7f9eaafd5399b01185f9fd8eabbebab5f590f12f"
+    },
+    {
+      "path": "style.css",
+      "bytes": 35826,
+      "sha256": "ce593303493732327a8d82cdc46fb0356e89b302feba0ccde4b7b29f5abcb35c"
+    },
+    {
+      "path": "theme.css",
+      "bytes": 7521,
+      "sha256": "46ca4bb9acbfd000b588a29d6bca7945c7da62eee2e44230d9847c5241e52237"
+    },
+    {
+      "path": "script.js",
+      "bytes": 4839,
+      "sha256": "1b150b98b9664f4cc72735aba1bef530b17014ea1da667cc9194c7ff204706eb"
+    },
+    {
+      "path": "shell.js",
+      "bytes": 13376,
+      "sha256": "cb9594d3edd6da3db1dc66494a8323cca6ca6cb6962516331469e94d27eaf302"
+    },
+    {
+      "path": "theme.js",
+      "bytes": 1502,
+      "sha256": "9fc0171e18a5403566f6332b21c6d1c3a146ca823ca50ab5e973be9a6f28cae9"
+    },
+    {
+      "path": "CONCEPT.md",
+      "bytes": 4937,
+      "sha256": "bde3f75ef610e36c7be9a94158005f8cb9dbc31ea8c94dd68bfc871065e821c1"
+    },
+    {
+      "path": "badge-lab/ProposalSvg.ts",
+      "bytes": 23598,
+      "sha256": "7ef86aa8ef47e01df0b6423eb5cc784bb0d6db64333f7448eef16fc8a95cc212"
+    },
+    {
+      "path": "badge-lab/proposal-theme.ts",
+      "bytes": 793,
+      "sha256": "e61669521bfc76bdda9153d5cb2e8ef22fd3e78e1772b45ceb6fa0a3c6f24b6f"
+    },
+    {
+      "path": "badge-lab/PROPOSAL.md",
+      "bytes": 5893,
+      "sha256": "8d298d2baabd19ab7667ffe930e03bd97e764a76b8d973f2a1043d1b23fcb301"
+    },
+    {
+      "path": "badge-lab/version.json",
+      "bytes": 550,
+      "sha256": "6bdb93759c9d3ce9563a6b89fe4f9ee2f6446220cf68e2900d42239ab6853e5f"
+    },
+    {
+      "path": "badge-lab/ice-terminal-v2-proposal.svg",
+      "bytes": 23394,
+      "sha256": "763c530535862f7fb913b77648253184a03ad2785ea82eb681e7de2bfb06844f"
+    },
+    {
+      "path": "badge-lab/jade-v1.svg",
+      "bytes": 22688,
+      "sha256": "e1496b200cff5035cdd7e8e824c31e765236b6cb2536d6e1599cb3ec9b2eacb9"
+    }
+  ]
+}

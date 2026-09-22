@@ -1,3 +1,12 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { CACHE_VERSION } from "@/lib/cache/version";
@@ -7,6 +16,9 @@ import {
   buildBadgeSvgRenderLockKey,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
+
+const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
+vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
 
 const {
   mockMaterializePublicProfile,
@@ -113,6 +125,7 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 import { GET } from "./route";
+import { githubUserNotFound } from "@/lib/github/not-found";
 
 /** Invoke and await every `after()` callback registered so far by the route. */
 async function flushAfterCallbacks(): Promise<void> {
@@ -166,6 +179,7 @@ function makeRequest(
 describe("GET /u/[handle]/badge.svg", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockGetOptionalRequestSession.mockReturnValue(null);
@@ -182,6 +196,129 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockCacheSet.mockResolvedValue(true);
     mockCacheSetNx.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
+  });
+
+  it("switches prewarmed SVG namespaces off and back on for both locales without re-materializing", async () => {
+    mockCacheGet.mockImplementation(async (key: string) => key.includes(":v7.2:") ? "<svg>current</svg>" : "<svg>legacy</svg>");
+    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
+      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy: enabled ? "v7.2" : "v6", cacheable: true, capturedAt: Date.now() });
+      const request = new NextRequest(`https://chapa.thecreativetoken.com/u/testuser/badge.svg?lang=${locale}`);
+      const response = await GET(request, { params: Promise.resolve({ handle: "testuser" }) });
+      expect(await response.text()).toBe(enabled ? "<svg>current</svg>" : "<svg>legacy</svg>");
+      expect(mockCacheGet).toHaveBeenLastCalledWith(expect.stringMatching(new RegExp(`:${enabled ? "v7\\.2" : "v6"}:.*:${locale}$`)));
+    }
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+  });
+
+  it("uses yesterday only for legacy policy; current policy re-evaluates expired Craft", async () => {
+    const yesterday = toDateString(new Date(Date.now() - 86_400_000));
+    // The current lock-holder can finish today's eligibility-aware render.
+    // Yesterday's raw SVG still claims Craft57 and cannot be reused as current.
+    mockCacheSetNx.mockResolvedValue(false);
+    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
+      const machinePolicy = enabled ? "v7.2" : "v6";
+      let todayReads = 0;
+      mockCacheGet.mockClear();
+      mockCacheGet.mockImplementation(async (key: string) => {
+        if (key.includes(`:${yesterday}:`)) return enabled ? "<svg>expired Craft57</svg>" : "<svg>legacy</svg>";
+        return ++todayReads > 1 ? "<svg>Craft expired, update insights</svg>" : null;
+      });
+      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy, cacheable: true, capturedAt: Date.now() });
+      const response = await GET(new NextRequest(`https://chapa.thecreativetoken.com/u/testuser/badge.svg?lang=${locale}`), { params: Promise.resolve({ handle: "testuser" }) });
+      expect(await response.text()).toBe(enabled ? "<svg>Craft expired, update insights</svg>" : "<svg>legacy</svg>");
+      if (enabled) expect(mockCacheGet.mock.calls.some(([key]) => String(key).includes(`:${yesterday}:`))).toBe(false);
+      else expect(mockCacheGet).toHaveBeenLastCalledWith(expect.stringContaining(`:v6:${yesterday}:${locale}`));
+      expect(mockCacheSetNx.mock.calls.at(-1)?.[0]).toContain(`:${machinePolicy}:`);
+    }
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+  });
+
+  it("ignores a warm namespace when the selection lookup fails", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: false, capturedAt: Date.now() });
+    mockCacheGet.mockResolvedValue("<svg>must not use</svg>");
+    const response = await GET(...makeRequest("testuser"));
+    expect(await response.text()).toBe(FAKE_SVG);
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(response.headers.get("X-Scoring-Selection")).toBe("unavailable");
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("does not publish deferred SVG bytes after the scoring flag changes", async () => {
+    const captured = { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() };
+    mockReadScoringSelection.mockResolvedValue(captured);
+    await GET(...makeRequest("testuser"));
+    mockReadScoringSelection.mockResolvedValue({ ...captured, enabled: true, machinePolicy: "v7.2" });
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", expect.objectContaining({ scoringSelection: captured }));
+  });
+
+  it("reads the selected policy namespace before a warm SVG hit", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+    mockCacheGet.mockResolvedValue(FAKE_SVG);
+    const response = await GET(...makeRequest("testuser"));
+    expect(mockCacheGet).toHaveBeenCalledWith(expect.stringContaining(":v7.2:"));
+    expect(response.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
+    expect(response.headers.get("Vercel-CDN-Cache-Control")).not.toMatch(/stale-/);
+  });
+
+  it.each(["unavailable", "invalid"])("#1289 renders %s config fallback without publishing it", async (status) => {
+    mockDbGetStudioConfig.mockResolvedValue({ status });
+    const response = await GET(...makeRequest("testuser"));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(FAKE_SVG);
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({config: DEFAULT_BADGE_CONFIG}));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+  });
+
+  it("#1289 recovers custom config after an unavailable read and caches confirmed absence", async () => {
+    mockDbGetStudioConfig.mockResolvedValueOnce({ status: "unavailable" });
+    await GET(...makeRequest("testuser"));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    mockAfter.mockClear();
+    const custom = {...DEFAULT_BADGE_CONFIG, border: "none"};
+    mockDbGetStudioConfig.mockResolvedValue({status: "found", config: custom, revision: 7});
+    const response = await GET(...makeRequest("testuser"));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).toHaveBeenCalledTimes(1);
+    const maxAge = Number(response.headers.get("Cache-Control")?.match(/^public, max-age=(\d+)$/)?.[1]);
+    expect(Number.isInteger(maxAge)).toBe(true);
+    expect(maxAge).toBeGreaterThanOrEqual(0);
+    expect(maxAge).toBeLessThanOrEqual(300);
+    expect(mockRenderBadgeSvg).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({config: custom}));
+    mockAfter.mockClear();
+    await GET(...makeRequest("testuser"));
+    await flushAfterCallbacks();
+    expect(mockCacheSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("#1289 warm hits do not read config", async () => {
+    mockCacheGet.mockResolvedValue(FAKE_SVG);
+    await GET(...makeRequest("testuser"));
+    expect(mockDbGetStudioConfig).not.toHaveBeenCalled();
+  });
+
+  it("#1289 background completion does not cache an unknown config fallback", async () => {
+    vi.useFakeTimers();
+    try {
+      mockDbGetStudioConfig.mockResolvedValue({status: "unavailable"});
+      mockCacheGet.mockResolvedValueOnce(null).mockResolvedValueOnce("<svg>STALE</svg>");
+      let finish!: (value: typeof FAKE_MATERIALIZED) => void;
+      mockMaterializePublicProfile.mockReturnValue(new Promise(resolve => {finish = resolve;}));
+      const pending = GET(...makeRequest("testuser"));
+      await vi.advanceTimersByTimeAsync(2300);
+      expect(await (await pending).text()).toBe("<svg>STALE</svg>");
+      finish(FAKE_MATERIALIZED);
+      await flushAfterCallbacks();
+      expect(mockRenderBadgeSvg).toHaveBeenCalled();
+      expect(mockCacheSet).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
   });
 
   it("returns 429 when the badge route is rate limited", async () => {
@@ -216,6 +353,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
       readOnly: false,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
   });
 
@@ -260,19 +398,24 @@ describe("GET /u/[handle]/badge.svg", () => {
     // must be explicitly flushed before asserting on them.
     await flushAfterCallbacks();
 
-    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
-      "testuser",
-      FAKE_MATERIALIZED,
-      { readOnly: false },
+    // LE-6-1 — the code the SVG was rendered with is the code handed to the
+    // shared sequence, which stores its record on every render.
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({ verificationHash: "abc12345", verificationDate: "2026-04-17" }),
     );
-    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
       {
-        verification: { hash: "abc12345", date: "2026-04-17" },
         readOnly: false,
+        verification: { hash: "abc12345", date: "2026-04-17" },
       },
     );
+    // The route no longer sequences the two halves itself.
+    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
   it("does not cache an unverified badge so a later complete fetch can heal", async () => {
@@ -294,7 +437,6 @@ describe("GET /u/[handle]/badge.svg", () => {
   });
 
   it("passes read-only mode and skips SVG cache writes for smoke requests", async () => {
-    mockPersistProfileSnapshot.mockResolvedValue(false);
     const [req, ctx] = makeRequest(
       "testuser",
       { "x-forwarded-for": "1.2.3.4" },
@@ -306,14 +448,16 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: undefined,
       readOnly: true,
+      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
-    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+    // Read-only is threaded through; the shared sequence writes nothing for it.
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
-      { readOnly: true },
+      expect.objectContaining({ readOnly: true }),
     );
+    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
     expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
-    expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
     expect(mockCacheSet).not.toHaveBeenCalled();
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
   });
@@ -331,17 +475,17 @@ describe("GET /u/[handle]/badge.svg", () => {
     );
   });
 
-  // #1013 — persistProfileSnapshot is a durable Supabase write with nothing in
-  // the response depending on its result. It must run in after() so it can
-  // never block (or, hypothetically, fail and destroy) an otherwise-successful
-  // render.
+  // #1013 — the durable side effects (snapshot persist, verification record,
+  // telemetry) have nothing in the response depending on their result. They
+  // must run in after() so they can never block (or, hypothetically, fail and
+  // destroy) an otherwise-successful render.
   describe("deferred durable persistence (#1013)", () => {
-    it("returns the response without waiting for persistProfileSnapshot to resolve", async () => {
+    it("returns the response without waiting for the durable side effects to resolve", async () => {
       // Never resolves — if the route still awaited this inline on the
       // critical path (the pre-fix behavior), `await GET(...)` below would
       // hang forever and this test would time out.
-      mockPersistProfileSnapshot.mockImplementation(
-        () => new Promise<boolean>(() => undefined),
+      mockRunPublicProfileSideEffects.mockImplementation(
+        () => new Promise<void>(() => undefined),
       );
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
@@ -350,29 +494,29 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(res.status).toBe(200);
       expect(await res.text()).toBe(FAKE_SVG);
       // Not called on the synchronous path — only after() has scheduled it.
-      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
     });
 
-    it("schedules persistProfileSnapshot inside after(), not on the synchronous path", async () => {
+    it("schedules the durable side effects inside after(), not on the synchronous path", async () => {
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
 
       // Not called yet — only after() has been registered with the work.
-      expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
       expect(mockAfter).toHaveBeenCalledWith(expect.any(Function));
 
       await flushAfterCallbacks();
 
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
         "testuser",
         FAKE_MATERIALIZED,
-        { readOnly: false },
+        expect.objectContaining({ readOnly: false }),
       );
     });
 
     it("still captures/alerts via the existing error-handling path when the deferred work rejects", async () => {
       const persistError = new Error("supabase write failed");
-      mockPersistProfileSnapshot.mockRejectedValue(persistError);
+      mockRunPublicProfileSideEffects.mockRejectedValue(persistError);
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
@@ -405,9 +549,86 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=600",
+      "public, s-maxage=60",
     );
-    expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
+  });
+
+
+  // LE-8-2 — GitHub answered that nobody owns the handle. Unlike the share
+  // page, this route has not streamed anything yet, so it can say so with the
+  // status code. An outage still gets the 200 try-later fallback above: the
+  // README embed of a real user must never turn into a 404 because GitHub
+  // was unavailable.
+  describe("a handle GitHub does not know (LE-8-2)", () => {
+    it("answers 404 with a localized fallback SVG and runs no side effects", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(404);
+      expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+      expect(await res.text()).toContain("No GitHub user with this handle.");
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+      expect(mockCacheSet).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
+    });
+
+    it("caches the 404 briefly at the edge under the handle's purge tag, and only briefly on the client", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
+        "public, s-maxage=60",
+      );
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-ghost,scoring-images");
+    });
+
+    it("localizes the not-found SVG from ?lang=", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" }, "?lang=es");
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(404);
+      expect(await res.text()).toContain("No existe ningún usuario de GitHub con este nombre.");
+    });
+
+    it("shares the 404 with a request coalesced onto the same render", async () => {
+      let resolveMaterialized!: () => void;
+      const gate = new Promise<void>((resolve) => { resolveMaterialized = resolve; });
+      mockMaterializePublicProfile.mockImplementation(async () => {
+        await gate;
+        return githubUserNotFound("ghost");
+      });
+
+      const [req1, ctx1] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const [req2, ctx2] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const first = GET(req1, ctx1);
+      const second = GET(req2, ctx2);
+      await Promise.resolve();
+      resolveMaterialized();
+      const [res1, res2] = await Promise.all([first, second]);
+
+      expect(res1.status).toBe(404);
+      expect(res2.status).toBe(404);
+      expect(mockMaterializePublicProfile).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the 200 try-later fallback when materialization is merely unavailable", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("ghost", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("Could not load data.");
+    });
   });
 
   it("captures and returns a 500 fallback when rendering throws", async () => {
@@ -648,11 +869,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
 
-      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
-      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-        "public, s-maxage=21600, stale-while-revalidate=86400",
-      );
-      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+      // Response age is reduced by elapsed render time; it must never extend
+      // the five-minute policy bound just because the test crossed a second.
+      const ttl = Number(res.headers.get("Cache-Control")?.match(/^public, max-age=(\d+)$/)?.[1]);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(300);
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(`public, s-maxage=${ttl}`);
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
     });
 
     it("PE-M1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
@@ -697,11 +920,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
 
-      expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
-      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-        "public, s-maxage=21600, stale-while-revalidate=86400",
-      );
-      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+      // Response age is reduced by elapsed render time; it must never extend
+      // the five-minute policy bound just because the test crossed a second.
+      const ttl = Number(res.headers.get("Cache-Control")?.match(/^public, max-age=(\d+)$/)?.[1]);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(300);
+      expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(`public, s-maxage=${ttl}`);
+      expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
     });
 
     it("acquires and releases a versioned render lock on cold-cache renders", async () => {
@@ -916,8 +1141,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       await flushAfterCallbacks();
 
       expect(mockCacheSet).toHaveBeenCalledTimes(1);
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledTimes(1);
-      expect(mockDeferProfileCacheWork).toHaveBeenCalledTimes(1);
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledTimes(1);
     });
 
     // `writeBadgeSvgCache` itself fails open (`withCacheFallback` catches and
@@ -938,10 +1162,10 @@ describe("GET /u/[handle]/badge.svg", () => {
       await flushAfterCallbacks();
 
       expect(mockCaptureServerError).not.toHaveBeenCalled();
-      expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+      expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
         "testuser",
         FAKE_MATERIALIZED,
-        { readOnly: false },
+        expect.objectContaining({ readOnly: false }),
       );
     });
   });
@@ -1013,9 +1237,9 @@ describe("GET /u/[handle]/badge.svg", () => {
         const edgeControl = res.headers.get("Vercel-CDN-Cache-Control");
         expect(edgeControl).toMatch(/s-maxage=\d+/);
         expect(edgeControl).not.toBe(
-          "public, s-maxage=21600, stale-while-revalidate=86400",
+          "public, s-maxage=300",
         );
-        expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser");
+        expect(res.headers.get("Vercel-Cache-Tag")).toBe("badge-testuser,scoring-images");
         // The full render pipeline has not run yet — we returned before
         // materialize settled.
         expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
@@ -1035,12 +1259,13 @@ describe("GET /u/[handle]/badge.svg", () => {
           FAKE_SVG,
           expect.any(Number),
         );
-        expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+        // LE-6-1 — the background continuation stores the record for the
+        // hash it just published, exactly like the foreground path.
+        expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
           "testuser",
           FAKE_MATERIALIZED,
-          { readOnly: false },
+          { readOnly: false, verification: { hash: "abc12345", date: "2026-04-17" } },
         );
-        expect(mockDeferProfileCacheWork).toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
       }
@@ -1061,9 +1286,8 @@ describe("GET /u/[handle]/badge.svg", () => {
           order.push("cacheSet-end");
           return true;
         });
-        mockPersistProfileSnapshot.mockImplementation(async () => {
+        mockRunPublicProfileSideEffects.mockImplementation(async () => {
           order.push("persist");
-          return true;
         });
 
         mockCacheGet

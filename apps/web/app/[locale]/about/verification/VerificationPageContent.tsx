@@ -137,7 +137,7 @@ export function VerificationPageContent({ t }: { t: TFunction }) {
               {t('about.verification.whyBody2Prefix') as string}
               <Link
                 href="/verify"
-                className="text-amber hover:text-amber-light transition-colors"
+                className="text-amber-text hover:text-text-primary transition-colors"
               >
                 {t('about.verification.verifyPageLink') as string}
               </Link>
@@ -257,7 +257,7 @@ export function VerificationPageContent({ t }: { t: TFunction }) {
                 {t('about.verification.howToStep2Prefix') as string}
                 <Link
                   href="/verify"
-                  className="text-amber hover:text-amber-light transition-colors"
+                  className="text-amber-text hover:text-text-primary transition-colors"
                 >
                   {t('about.verification.howToStep2Link') as string}
                 </Link>
@@ -288,7 +288,7 @@ export function VerificationPageContent({ t }: { t: TFunction }) {
             {/* ---------------------------------------------------------- */}
             {/* CTA                                                         */}
             {/* ---------------------------------------------------------- */}
-            <div className="mt-16 rounded-xl border border-stroke bg-card p-6 sm:p-8">
+            <div className="mt-16 rounded-[3px] border border-stroke bg-card p-6 sm:p-8">
               <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight mb-3">
                 {t('about.verification.ctaHeading') as string}
               </h2>
@@ -297,7 +297,7 @@ export function VerificationPageContent({ t }: { t: TFunction }) {
               </p>
               <Link
                 href="/verify"
-                className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
+                className="group inline-flex min-h-11 items-center gap-2.5 rounded-[3px] border border-complement-text bg-card px-6 py-3 font-heading text-sm font-semibold text-complement-text transition-colors hover:bg-purple-tint focus-visible:outline-complement-text!"
               >
                 <ShieldCheckIcon className="w-4 h-4" />
                 {t('about.verification.ctaButton') as string}

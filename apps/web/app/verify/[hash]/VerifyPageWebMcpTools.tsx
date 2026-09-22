@@ -8,6 +8,7 @@ import {
 } from "@/lib/verification/types";
 import {
   VERIFICATION_EXPLANATION,
+  RECEIPT_VERIFICATION_EXPLANATION,
   verificationCodeFormat,
 } from "@/lib/webmcp/catalog";
 import {
@@ -20,19 +21,20 @@ import {
   type WebMcpTool,
 } from "@/lib/webmcp/use-model-context-tools";
 
-interface VerifyPageWebMcpToolsProps {
-  hash: string;
-  record: PublicVerificationRecord;
-}
+type VerifyPageWebMcpToolsProps = { hash: string } & (
+  | { version: "v7"; record?: never }
+  | { version?: "v6"; record: PublicVerificationRecord }
+);
 
 export function VerifyPageWebMcpTools({
   hash,
   record,
+  version = "v6",
 }: VerifyPageWebMcpToolsProps) {
   const { webmcpEnabled } = useClientFeatureFlags();
   const tools = useMemo<WebMcpTool[]>(() => {
     if (!webmcpEnabled) return [];
-    const publicRecord = toPublicVerificationRecord(record);
+    const publicRecord = record ? toPublicVerificationRecord(record) : null;
 
     const codeFormat = verificationCodeFormat(hash);
 
@@ -43,7 +45,14 @@ export function VerifyPageWebMcpTools({
           "Return the verification hash and record displayed on this page.",
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
-        execute: () => JSON.stringify({ hash, record: publicRecord }),
+        execute: async (_input, context) => {
+          if (version !== "v7") return JSON.stringify({ version: "v6", hash, record: publicRecord });
+          try {
+            const response = await fetch(`/api/verify/${hash}`, { cache: "no-store", signal: context.signal });
+            if (response.ok || response.status === 410) return JSON.stringify(await response.json());
+            return JSON.stringify({ error: "Verification is unavailable. Reload the page or retry later; no current verification success is claimed." });
+          } catch { return JSON.stringify({ error: "Verification could not be checked. Retry later; no cached receipt is returned." }); }
+        },
       },
       {
         name: "explain_verification",
@@ -52,12 +61,12 @@ export function VerifyPageWebMcpTools({
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
         execute: () => JSON.stringify({
-          ...VERIFICATION_EXPLANATION,
+          ...(version === "v7" ? RECEIPT_VERIFICATION_EXPLANATION : VERIFICATION_EXPLANATION),
           codeFormat,
         }),
       },
     ];
-  }, [hash, record, webmcpEnabled]);
+  }, [hash, record, version, webmcpEnabled]);
 
   useModelContextTools(tools, webmcpEnabled);
   return null;

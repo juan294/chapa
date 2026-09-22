@@ -8,44 +8,113 @@ This is the extended documentation for AI models and LLM crawlers. For a concise
 
 ## Overview
 
-Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Badges marked "Verified metrics" include a cryptographic verification hash (HMAC-SHA256) proving the data has not been tampered with. Badges marked "Public metrics" do not claim cryptographic attestation.
+Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes the last 365 calendar days across four core dimensions of equal weight, and reports a separate optional report-derived Craft score beside them. Badges marked "Verified metrics" carry an HMAC-SHA256 hash showing the badge was issued by Chapa and has not been modified since; it does not establish that the underlying platform data is accurate. Badges marked "Public metrics" do not claim cryptographic attestation.
 
-## Scoring Model: Impact v6
+## Scoring Model: Impact v7.2
 
-### Core Dimensions (each scored 0-100)
+Chapa reports an **observed engineering activity and practices index** over a
+declared evidence scope. It does not certify ability, causal business impact,
+architecture, reliability or security. "Complete" means complete for the
+connected, consented sources and the reference window named in the receipt —
+never all work a person has done.
 
-1. **Delivery** — Measures shipping capability. Inputs: pull requests merged, issues closed, commit frequency. A ±5% flow efficiency modifier rewards fast PR turnaround (median creation-to-merge time). A high Delivery score indicates a developer who consistently ships meaningful changes.
+Read policyVersion on every response: v6 remains the rollout-off policy. The archived v7.1 algorithm (machine policy v7) retains its original evidence-completion range arithmetic and immutable receipts. Current v7.2 receipts use the point policy below. A missing current receipt is explicitly labelled legacy; an unavailable authoritative read is not replaced by a fabricated current score.
 
-2. **Quality** — Measures engineering discipline. For collaborative developers (review-to-PR ratio ≥ 15%), inputs are code reviews submitted and review-to-PR ratio. For solo developers (ratio < 15%), inputs are PR description rate, feature branch usage, issue linkage, and batch size score (fraction of PRs in the 20-500 line reviewable sweet spot). A high Quality score indicates someone who actively maintains engineering standards.
+### The window
 
-3. **Consistency** — Measures sustained contribution over time. Inputs: active days (sqrt curve), heatmap evenness (weekly distribution with outlier clipping), and week coverage (fraction of weeks with any activity). A high Consistency score means reliable, regular contributions across weeks.
+One reference time is captured per scoring run. The window is the reference UTC
+date plus the preceding 364 UTC dates: 365 calendar dates including a partial
+current day, not a trailing 8760-hour interval. Every API response, receipt,
+snapshot and trend key carries that same context.
 
-4. **Breadth** — Measures cross-project influence. Inputs: number of distinct repositories contributed to, diversity of organizations, contributions outside owned repos. A high Breadth score indicates influence across multiple projects and teams.
+### Core dimensions (four, each weighted 0.25)
 
-### Optional Fifth Dimension
+Let N(x, c) = ln(1 + min(x, c)) / ln(1 + c).
 
-5. **Craft** — Measures AI tool collaboration patterns. Computed from Claude Code usage insights when a developer imports their usage report. A high Craft score indicates deliberate, effective human-AI partnership.
+1. **Delivery** — D = 100 x N(delivery units, 120). A delivery unit is a
+   distinct (project, UTC date) pair containing at least one attributable
+   accepted change. Changed lines, files, PR count within the same project and
+   day, tool usage and merge latency have zero effect.
 
-### Composite Score
+2. **Quality practices** — Q = 25 x (N(rationale, 12) + N(verification, 12) +
+   N(review or correction, 12) + N(outcome follow-up, 12)). These count
+   demonstrated practices, not software correctness rates. A work item can
+   qualify once per criterion; duplicate comments, approval clicks and reruns
+   add nothing.
 
-The composite score (0-100) is the average of all dimensions (4 or 5). It is further adjusted by confidence to produce an adjusted score. The adjusted score determines the tier.
+3. **Consistency** — C = 100 x N(active ISO weeks, 40). No weekend, burst or
+   response-speed penalty, and no tenure normalization: identical evidence with
+   only the account creation date changed scores identically.
+
+4. **Breadth** — B = 50 x N(eligible projects, 4) + 50 x N(eligible categories,
+   4). Stars, forks, watchers, repository concentration and changed-line
+   magnitude carry zero weight.
+
+For all coverage states, core = (D + Q + C + B) / 4. No optional Craft, solo
+switch, confidence deduction or recency multiplier enters that formula. The
+caps and thresholds above are published product choices, not measured
+percentiles.
+
+### Observed points and coverage
+
+Current dimensions use the known qualifying counts with the formulas above.
+Core and dimensions each publish an exact arithmetic value and a canonical
+0-100 display value. Coverage bounds and missing-source descriptions remain
+receipt metadata; they do not become a displayed current range or a confidence
+deduction. Identical inputs under the same policy and window produce identical
+scores. Caps and credits are explicit product choices, not empirical proof of
+fairness across professions or evidence sources.
+
+### Separate optional Craft
+
+Craft = 100 x (fully + 0.7 x mostly + 0.3 x partially) / total.
+
+The first valid Claude Code insights report unlocks the existing fifth Craft
+dimension, including a score of 0. A valid scored report needs a positive total
+and at least one recognized outcome count. Failed outcomes earn zero; unknown
+labels and unclassified outcomes remain in the denominator with zero credit,
+without being described as proven failures. Coverage is stated separately.
+For example, total 10, fully 4, mostly 2, partially 1, failed 1, unknown 1 and
+unclassified 1 yield 5.7 credited outcomes and Craft 57; 8 of 10 are classified.
+
+Craft is reported beside the core and never enters it. The newest eligible
+report period supplies Craft; scores are not pooled and the highest score is
+not selected. Replacing the same period requires an explicit correction.
+Older or insufficient uploads do not replace a still-valid scored report.
+Expiry retains the unlocked Craft label with update guidance and no fabricated
+zero or current point. Raw reports and unknown labels remain private; public
+receipts contain the numeric aggregates needed to replay the calculation.
+Report Craft does not assess personal engineering ability or assign Artificer.
+
+### Receipts
+
+Each scored revision issues an immutable public receipt containing every
+aggregate, coverage bound and report outcome credit needed to replay the arithmetic
+offline. It excludes private paths, repository names, report contents, tokens
+and evaluator identities. Public replay validates arithmetic over the issued
+aggregates; it does not establish private-source truth.
 
 ### Tiers
 
-- **Emerging** (0-29): Early-stage or occasional contributor.
-- **Solid** (30-69): Regular, meaningful contributor.
-- **High** (70-84): Significant impact across multiple dimensions.
-- **Elite** (85-100): Exceptional impact — top-tier contributor.
+- **Emerging**: unrounded core below 30.
+- **Solid**: unrounded core from 30 to below 70.
+- **High**: unrounded core from 70 to below 85.
+- **Elite**: unrounded core from 85 through 100.
+
+Display normally rounds to the nearest integer, but never crosses the exact
+score's tier boundary. For example, an exact 69.99723619005769 displays 69.99
+with Solid. Consumers use this canonical display and retain exact arithmetic
+separately rather than rounding it again.
 
 ### Developer Archetypes
 
-Based on the shape of the dimension radar chart, each developer is assigned one of seven archetypes:
+Existing archetype names and core classification rules are retained. A definitive core archetype is assigned only when normalized coverage endpoints agree; otherwise archetype is null. The existing guide names are:
 
 - **Builder**: Dominant in Delivery. Ships features, closes issues, high PR merge rate. The quintessential feature developer.
 - **Quality Champion**: Dominant in Quality. Reviews code rigorously, provides thorough feedback. The team's quality gatekeeper.
 - **Marathoner**: Dominant in Consistency. Shows up reliably week after week. Steady, dependable contributor.
 - **Polymath**: Dominant in Breadth. Works across many repos, orgs, and project boundaries. A cross-team collaborator.
-- **Artificer**: Dominant in Craft. Master of AI tool collaboration, amplifies output while maintaining quality through deliberate human-AI partnership.
+- **Artificer**: An existing guide and historical label. Current report-derived Craft does not assign this label.
 - **Balanced**: No single dominant dimension — all are closely matched and collectively strong. A versatile, well-rounded contributor.
 - **Emerging**: Low overall activity or new to contribution. The starting point for developers building their profile.
 
@@ -55,8 +124,8 @@ Each archetype has a dedicated guide page at /archetypes/{type} explaining the t
 
 - **Live SVG**: Rendered server-side, embeddable anywhere that supports images (GitHub README, portfolio sites, LinkedIn, resumes).
 - **Activity Timeline**: Dot-based daily contribution visualization showing activity distribution.
-- **Radar Chart**: Dynamic radar visualization — five-point pentagon when Craft data exists, four-point diamond otherwise.
-- **Score and Tier**: Prominent adjusted score with tier badge.
+- **Radar Chart**: Dynamic radar visualization — five dimensions after Craft unlocks, including a valid zero; four core dimensions before unlock. An expired Craft point is omitted while its unlocked label remains.
+- **Score and Tier**: Prominent canonical core point with its unrounded tier. Coverage limitations are explained separately.
 - **Archetype Label**: Primary archetype classification.
 - **Creator Studio**: Visual customization tool at /studio with 7 categories (background, card style, border, score effect, heatmap animation, tier treatment, color palette), every one of which renders in the embeddable badge.
 
@@ -79,9 +148,9 @@ Demo mode at \`/studio?demo=1\` needs no login and uses fixed local data. Tools 
 - \`preview_badge\` (read-only): Returns the current configuration, public badge SVG URL, and save status.
 - \`reset_badge_config\` (changes page state): Runs the visible \`/reset\` command and returns the reset configuration.
 - \`save_badge_config\` (human-gated): Opens an on-page save proposal but never calls the save API itself.
-- \`simulate_score\` (read-only): Calculates a score from supplied dimensions without saving data.
+- \`simulate_score\` (read-only): Replays supplied count scenarios under the current receipt policy and window without saving data. Direct dimension overrides are explicitly hypothetical, use the four core weights, and cannot add Craft to the core.
 - \`suggest_improvements\` (read-only): Returns grounded improvement suggestions from the current impact profile.
-- \`explain_dimension\` (read-only): Returns the selected score, formula, tip, and normalized submetrics.
+- \`explain_dimension\` (read-only): Returns the selected receipt point and its recorded calculation; legacy submetrics are not presented as current arithmetic.
 
 ### Public profile: \`/u/{handle}\`
 
@@ -89,7 +158,7 @@ Demo mode at \`/studio?demo=1\` needs no login and uses fixed local data. Tools 
 - \`get_impact_history\` (read-only): Fetches public snapshots and trend data with friendly missing-data and rate-limit messages.
 - \`verify_badge\` (read-only): Returns the public verification record and verification URL when the profile has a hash.
 - \`explain_dimension\` (read-only): Explains a dimension using the current public page data.
-- \`compare_profiles\` (read-only): Compares the on-page profile with another existing public Chapa profile and returns score and dimension differences.
+- \`compare_profiles\` (read-only): Compares compatible public profiles under the same policy and window; mixed policies or incompatible windows return not_comparable without numeric deltas.
 - \`get_embed_snippet\` (read-only): Returns canonical Markdown and HTML snippets for the live badge.
 
 ### Verification page: \`/verify/{hash}\`
@@ -104,10 +173,10 @@ Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless St
 ## API Endpoints
 
 ### Public (no auth required)
-- \`GET /u/{handle}/badge.svg\` — Embeddable badge image. Returns SVG with Cache-Control headers (6h s-maxage, 7d stale-while-revalidate).
+- \`GET /u/{handle}/badge.svg\` — Embeddable badge image. Returns SVG with policy-aware Cache-Control headers, bounded to at most five minutes and the current UTC date; unavailable or changing authority responses are not cached.
 - \`GET /u/{handle}\` — Share page with badge, breakdown, and embed snippets.
-- \`GET /api/profile/{handle}\` — JSON: impact dimensions, archetype, tier, and optional craft score. Two headline pairs, deliberately distinct: \`displayScore\`/\`displayTier\` are the FRESH values shown on the badge and share page, while \`compositeScore\`/\`adjustedComposite\`/\`tier\` come from the persisted daily snapshot and are EMA-smoothed for the trend sparkline. Use \`displayScore\` to match the badge; use \`adjustedComposite\` to plot history. \`displayScore\`/\`displayTier\` are null when the fresh score cannot be computed.
-- \`GET /api/history/{handle}\` — JSON: score history, trend (improving/stable/declining), and snapshot diffs.
+- \`GET /api/profile/{handle}\` — JSON: policyVersion, receipt identity and window, canonical displayScore, exactScore, dimensions, tier, nullable archetype and separate Craft. Current compositeScore and adjustedComposite aliases agree with displayScore; they do not expose a competing EMA headline. Historical v6 fields, when supplied, are explicitly nested under legacy. Report-derived Craft is read from the published receipt, not a pending upload.
+- \`GET /api/history/{handle}\` — JSON: policy-qualified immutable observations and durable trend anchors. EMA is a separate trend value, never the badge score. Policy changes or incompatible windows do not produce a comparable score delta.
 - \`GET /about/scoring\` — Scoring methodology page.
 - \`GET /archetypes/{type}\` — Archetype guide (builder, guardian, marathoner, polymath, artificer, balanced, emerging).
 

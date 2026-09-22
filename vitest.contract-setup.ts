@@ -23,24 +23,6 @@ process.env.NEXT_PUBLIC_BITBUCKET_ENABLED ??= "true";
 process.env.NEXT_PUBLIC_CODEBERG_ENABLED ??= "true";
 process.env.NEXT_PUBLIC_GITLAB_ENABLED ??= "true";
 
-vi.mock("next/server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next/server")>();
-  return {
-    ...actual,
-    after: (cb: () => void | Promise<void>) => {
-      void cb();
-    },
-  };
-});
-
-vi.mock("next/cache", () => ({
-  unstable_cache: <Args extends unknown[], Result>(
-    fn: (...args: Args) => Result,
-  ) => fn,
-  revalidatePath: vi.fn(),
-  revalidateTag: vi.fn(),
-}));
-
 vi.mock("@/lib/cache/redis", () => redisFake);
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -52,6 +34,11 @@ vi.mock("@/lib/feature-flags", () => ({
   isExperimentsEnabled: vi.fn(async () => true),
   isMcpServerEnabled: vi.fn(async () => true),
   isAgentEnabled: vi.fn(async () => false),
+  // #1311 — off, matching the production default. The contract suite therefore
+  // exercises the path that actually ships today: no receipt read, no
+  // issuance. Covering the flag-on path against real persistence is its own
+  // piece of work, listed in the cutover handoff.
+  isScoringV7RenderingEnabled: vi.fn(async () => false),
   isStudioEnabledSync: vi.fn(() => true),
   isBitbucketEnabledSync: vi.fn(() => true),
   isCodebergEnabledSync: vi.fn(() => true),

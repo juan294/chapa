@@ -1,3 +1,4 @@
+/** Legacy v6 scalar merge; v7 must pool dated sufficient evidence before statistics. */
 import type { StatsData, HeatmapDay } from "@chapa/shared";
 import { PR_WEIGHT_AGG_CAP } from "@chapa/shared";
 
@@ -180,3 +181,6 @@ function mergeOptionalWeightedAvg(
   if (totalCount === 0) return undefined;
   return (aVal * aCount + bVal * bCount) / totalCount;
 }
+
+/** @public Compatibility export for v7 evidence consumers. */
+export { mergeEngineeringEvidence } from "@chapa/shared";

@@ -1,0 +1,62 @@
+[
+  {
+    "url": "http://localhost:3002/",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost--2026_09_07_16_26_04.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost--2026_09_07_16_26_04.report.json",
+    "summary": {
+      "performance": 0.89,
+      "accessibility": 1,
+      "best-practices": 0.96,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3002/about",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-about-2026_09_07_16_26_19.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-about-2026_09_07_16_26_19.report.json",
+    "summary": {
+      "performance": 0.91,
+      "accessibility": 1,
+      "best-practices": 0.96,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3002/about/scoring",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-about_scoring-2026_09_07_16_26_30.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-about_scoring-2026_09_07_16_26_30.report.json",
+    "summary": {
+      "performance": 0.86,
+      "accessibility": 1,
+      "best-practices": 0.96,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3002/u/juan294",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-u_juan294-2026_09_07_16_26_42.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-u_juan294-2026_09_07_16_26_42.report.json",
+    "summary": {
+      "performance": 0.83,
+      "accessibility": 1,
+      "best-practices": 0.96,
+      "seo": 0.91
+    }
+  },
+  {
+    "url": "http://localhost:3002/studio?demo=1",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-studio-2026_09_07_16_26_59.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse-fix/localhost-studio-2026_09_07_16_26_59.report.json",
+    "summary": {
+      "performance": 0.91,
+      "accessibility": 1,
+      "best-practices": 0.93,
+      "seo": 0.66
+    }
+  }
+]

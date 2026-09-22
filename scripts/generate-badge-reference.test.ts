@@ -1,67 +1,67 @@
 /**
- * Badge reference PNG generator + validator.
+ * Badge reference PNG pipeline validator.
  *
- * This test file serves dual purpose:
- * 1. Generates docs/assets/badge-reference.png using the production rendering
- *    pipeline (renderBadgeSvg + svgToPng) with demo data
- * 2. Validates the generated PNG is well-formed and non-trivial
+ * #1277 — this test used to write `docs/assets/badge-reference.png` in
+ * `beforeAll` on every run, so the tracked file changed bytes after almost
+ * every `pnpm run test` (the output depends on the host's resvg binary and
+ * font resolution). It now renders into a temporary directory and validates
+ * that output, and separately checks that the committed asset is a
+ * well-formed PNG so it cannot silently vanish or be replaced by a stub.
  *
- * Run with: pnpm run test -- --run scripts/generate-badge-reference.test.ts
+ * Regenerate the committed asset on purpose: `pnpm run generate:badge-reference`.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
-import { renderBadgeSvg } from "../apps/web/lib/render/BadgeSvg";
-import { svgToPng } from "../apps/web/lib/render/svg-to-png";
-import { DEMO_STATS, DEMO_IMPACT } from "../apps/web/lib/render/demoData";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  REFERENCE_PNG_PATH,
+  REFERENCE_PNG_WIDTH,
+  writeBadgeReferencePng,
+} from "./badge-reference";
 
-const REFERENCE_PNG_PATH = join(
-  __dirname,
-  "..",
-  "docs",
-  "assets",
-  "badge-reference.png",
-);
+/** Every valid PNG file starts with these 8 bytes. */
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-/**
- * PNG magic bytes: 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A
- * Every valid PNG file starts with these 8 bytes.
- */
-const PNG_MAGIC = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-]);
+function pngWidth(buffer: Buffer): number {
+  // IHDR is the first chunk: 8-byte signature, 4-byte length, 4-byte type, then width.
+  return buffer.readUInt32BE(16);
+}
 
-describe("badge reference PNG", () => {
+function expectWellFormedBadgePng(buffer: Buffer): void {
+  expect(Array.from(buffer.subarray(0, 8))).toEqual(PNG_MAGIC);
+  expect(pngWidth(buffer)).toBe(REFERENCE_PNG_WIDTH);
+  expect(buffer.length).toBeGreaterThan(10_000);
+  expect(buffer.length).toBeLessThan(500_000);
+}
+
+describe("badge reference PNG pipeline (rendered into a temp dir)", () => {
+  let dir: string;
+  let output: string;
+
   beforeAll(async () => {
-    // Generate the reference PNG using the production rendering pipeline
-    mkdirSync(dirname(REFERENCE_PNG_PATH), { recursive: true });
-
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
-      includeBranding: true,
-      demoMode: true,
-    });
-
-    const png = await svgToPng(svg, 1200);
-    writeFileSync(REFERENCE_PNG_PATH, png);
+    dir = mkdtempSync(join(tmpdir(), "chapa-badge-reference-"));
+    output = join(dir, "badge-reference.png");
+    await writeBadgeReferencePng(output);
   });
 
-  it("exists at docs/assets/badge-reference.png", () => {
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("renders a well-formed 1200px-wide PNG with real badge content", () => {
+    expectWellFormedBadgePng(readFileSync(output));
+  });
+
+  it("never writes the tracked documentation asset (#1277)", () => {
+    expect(output).not.toBe(REFERENCE_PNG_PATH);
+    expect(output.startsWith(tmpdir())).toBe(true);
+  });
+});
+
+describe("committed docs/assets/badge-reference.png", () => {
+  it("exists and is a well-formed 1200px-wide PNG", () => {
     expect(existsSync(REFERENCE_PNG_PATH)).toBe(true);
-  });
-
-  it("has valid PNG magic bytes", () => {
-    const buffer = readFileSync(REFERENCE_PNG_PATH);
-    const header = new Uint8Array(buffer.buffer, buffer.byteOffset, 8);
-    expect(Array.from(header)).toEqual(Array.from(PNG_MAGIC));
-  });
-
-  it("is larger than 10KB (contains real badge content)", () => {
-    const buffer = readFileSync(REFERENCE_PNG_PATH);
-    expect(buffer.length).toBeGreaterThan(10_000);
-  });
-
-  it("is a reasonable file size (under 500KB)", () => {
-    const buffer = readFileSync(REFERENCE_PNG_PATH);
-    expect(buffer.length).toBeLessThan(500_000);
+    expectWellFormedBadgePng(readFileSync(REFERENCE_PNG_PATH));
   });
 });

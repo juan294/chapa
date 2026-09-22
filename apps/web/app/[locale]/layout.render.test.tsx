@@ -18,6 +18,9 @@ describe("dynamicParams", () => {
 });
 
 describe("LocaleSegmentLayout", () => {
+  it("rejects unknown locale segments instead of falling back to English", async () => {
+    await expect(LocaleSegmentLayout({ params: Promise.resolve({ locale: "nonexistent-page-xyz" }), children: null })).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK;404");
+  });
   it("renders its children unchanged", async () => {
     const jsx = await LocaleSegmentLayout({
       params: Promise.resolve({ locale: "en" }),

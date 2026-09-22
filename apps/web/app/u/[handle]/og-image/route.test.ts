@@ -1,3 +1,11 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -74,6 +82,7 @@ vi.mock("@/lib/render/badge-config", () => ({
 }));
 
 import { GET } from "./route";
+import { githubUserNotFound } from "@/lib/github/not-found";
 
 const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
 const FAKE_PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -110,7 +119,7 @@ const FAKE_MATERIALIZED = {
 function makeRequest(
   handle: string,
   lang?: string,
-  version: string | null = "2026-02-14-r7",
+  version: string | null = "ice-terminal-v2-v6-2026-02-14-r7",
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
   const query = new URLSearchParams();
   if (lang) query.set("lang", lang);
@@ -152,9 +161,58 @@ describe("GET /u/[handle]/og-image", () => {
     vi.useRealTimers();
   });
 
+  it("keeps a late previous-day context out of today's PNG namespace", async () => {
+    vi.setSystemTime(new Date("2026-02-14T00:00:00.100Z"));
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-02-13T23:59:59.900Z") });
+    const version = "ice-terminal-v2-v7.2-2026-02-13-r7";
+    mockCacheGet.mockResolvedValue({ version, pngBase64: FAKE_PNG_BASE64 });
+    const response = await GET(...makeRequest("testuser", "en", version));
+    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v5:testuser:ice-terminal-v2:v7.2:2026-02-13:en");
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("switches prewarmed versioned PNGs off and back on in both locales", async () => {
+    mockCacheGet.mockImplementation(async (key: string) => ({ version: `ice-terminal-v2-${key.includes(":v7.2:") ? "v7.2" : "v6"}-2026-02-14-r7`, pngBase64: FAKE_PNG_BASE64 }));
+    for (const locale of ["en", "es"]) for (const enabled of [true, false, true]) {
+      const machinePolicy = enabled ? "v7.2" : "v6";
+      mockReadScoringSelection.mockResolvedValue({ enabled, machinePolicy, cacheable: true, capturedAt: Date.now() });
+      const response = await GET(...makeRequest("testuser", locale, `ice-terminal-v2-${machinePolicy}-2026-02-14-r7`));
+      expect(response.headers.get("X-Scoring-Selection")).toBe(machinePolicy);
+      expect(mockCacheGet).toHaveBeenLastCalledWith(`og-image:v5:testuser:ice-terminal-v2:${machinePolicy}:2026-02-14:${locale}`);
+    }
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+  });
+
+  it("does not cache a render whose flag changes during PNG generation", async () => {
+    const captured = { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() };
+    mockReadScoringSelection.mockResolvedValueOnce(captured).mockResolvedValue({ ...captured, enabled: true, machinePolicy: "v7.2" });
+    const res = await GET(...makeRequest("testuser"));
+    expect(res.headers.get("Cache-Control")).toContain("no-store");
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", { scoringSelection: captured });
+  });
+
+  it("removes a PNG when the flag changes during its cache write", async () => {
+    const captured = { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() };
+    mockReadScoringSelection.mockResolvedValueOnce(captured).mockResolvedValueOnce(captured).mockResolvedValue({ ...captured, enabled: true, machinePolicy: "v7.2" });
+    const res = await GET(...makeRequest("testuser"));
+    expect(mockCacheSet).toHaveBeenCalledOnce();
+    expect(mockCacheDel).toHaveBeenCalledWith(expect.stringContaining(":v6:"));
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+  });
+
+  it("caps a cache hit by the age of the captured flag without stale extensions", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() - 120_000 });
+    mockCacheGet.mockResolvedValue({ version: "ice-terminal-v2-v6-2026-02-14-r7", pngBase64: FAKE_PNG_BASE64 });
+    const res = await GET(...makeRequest("testuser"));
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=180");
+    expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("public, s-maxage=180");
+  });
+
   it("returns the cached png when Redis already has the image", async () => {
     mockCacheGet.mockResolvedValue({
-      version: "2026-02-14-r7",
+      version: "ice-terminal-v2-v6-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 
@@ -163,18 +221,18 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(200);
     expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
-    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v4:testuser:2026-02-14:en");
-    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
+    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v5:testuser:ice-terminal-v2:v6:2026-02-14:en");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser,scoring-images");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-      "public, s-maxage=21600, stale-while-revalidate=86400",
+      "public, s-maxage=300",
     );
   });
 
   it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
     // Cache hit — rate limiter must NOT be called (deferred to miss branch only)
     mockCacheGet.mockResolvedValue({
-      version: "2026-02-14-r7",
+      version: "ice-terminal-v2-v6-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 
@@ -216,17 +274,17 @@ describe("GET /u/[handle]/og-image", () => {
       },
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "og-image:v4:testuser:2026-02-14:en",
+      "og-image:v5:testuser:ice-terminal-v2:v6:2026-02-14:en",
       {
-        version: "2026-02-14-r7",
+        version: "ice-terminal-v2-v6-2026-02-14-r7",
         pngBase64: FAKE_PNG_BASE64,
       },
       172800,
     );
-    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-testuser,scoring-images");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe(
-      "public, s-maxage=21600, stale-while-revalidate=86400",
+      "public, s-maxage=300",
     );
   });
 
@@ -235,9 +293,9 @@ describe("GET /u/[handle]/og-image", () => {
     const res = await GET(req, ctx);
 
     expect(mockCacheGet).toHaveBeenCalledWith(
-      "og-image:v4:mixedcase:2026-02-14:en",
+      "og-image:v5:mixedcase:ice-terminal-v2:v6:2026-02-14:en",
     );
-    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-mixedcase");
+    expect(res.headers.get("Vercel-Cache-Tag")).toBe("og-mixedcase,scoring-images");
   });
 
   // #760 — the SVG is rasterized to PNG, where SMIL <animate> does not run.
@@ -260,6 +318,16 @@ describe("GET /u/[handle]/og-image", () => {
     const res = await GET(req, ctx);
 
     expect(res.status).toBe(400);
+  });
+
+  it("LE-8-2: returns 404 without rendering when GitHub does not know the handle", async () => {
+    mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+    const [req, ctx] = makeRequest("ghost");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(404);
+    expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
   });
 
   it("returns 404 when public materialization returns null", async () => {
@@ -371,6 +439,7 @@ describe("GET /u/[handle]/og-image", () => {
         revision: 7,
         cacheable: true,
       })
+      .mockResolvedValueOnce({ config: { border: "solid" }, revision: 7, cacheable: true })
       .mockResolvedValueOnce({
         config: { border: "none" },
         revision: 8,
@@ -383,7 +452,7 @@ describe("GET /u/[handle]/og-image", () => {
     expect(res.status).toBe(200);
     expect(mockCacheSet).toHaveBeenCalledOnce();
     expect(mockCacheDel).toHaveBeenCalledWith(
-      "og-image:v4:testuser:2026-02-14:en",
+      "og-image:v5:testuser:ice-terminal-v2:v6:2026-02-14:en",
     );
     expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(res.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
@@ -392,7 +461,7 @@ describe("GET /u/[handle]/og-image", () => {
 
   it("does not use or publish cache entries without the revisioned metadata URL", async () => {
     mockCacheGet.mockResolvedValue({
-      version: "2026-02-14-r7",
+      version: "ice-terminal-v2-v6-2026-02-14-r7",
       pngBase64: FAKE_PNG_BASE64,
     });
 

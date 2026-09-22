@@ -1,0 +1,62 @@
+[
+  {
+    "url": "http://localhost:3002/",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost--2026_09_07_12_37_47.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost--2026_09_07_12_37_47.report.json",
+    "summary": {
+      "performance": 0.87,
+      "accessibility": 0.97,
+      "best-practices": 0.96,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3002/about",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-about-2026_09_07_12_38_00.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-about-2026_09_07_12_38_00.report.json",
+    "summary": {
+      "performance": 0.91,
+      "accessibility": 0.97,
+      "best-practices": 0.96,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3002/about/scoring",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-about_scoring-2026_09_07_12_38_11.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-about_scoring-2026_09_07_12_38_11.report.json",
+    "summary": {
+      "performance": 0.84,
+      "accessibility": 0.97,
+      "best-practices": 0.96,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3002/u/juan294",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-u_juan294-2026_09_07_12_38_23.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-u_juan294-2026_09_07_12_38_23.report.json",
+    "summary": {
+      "performance": 0.81,
+      "accessibility": 0.92,
+      "best-practices": 0.96,
+      "seo": 0.91
+    }
+  },
+  {
+    "url": "http://localhost:3002/studio?demo=1",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-studio-2026_09_07_12_38_36.report.html",
+    "jsonPath": "/Users/juan/code/chapa/docs/plans/2026-09-07-local-e2e-verification-phases/evidence/phase8/lighthouse/localhost-studio-2026_09_07_12_38_36.report.json",
+    "summary": {
+      "performance": 0.9,
+      "accessibility": 1,
+      "best-practices": 0.93,
+      "seo": 0.66
+    }
+  }
+]

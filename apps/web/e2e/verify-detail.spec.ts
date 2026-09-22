@@ -13,7 +13,8 @@ test.describe("Verification detail — /verify/:hash", () => {
     // #1217 made the h1 the profile identity, which is the same in both
     // locales. The badge's accessible label is what proves the English deep
     // link rendered in English.
-    await expect(page.locator("h1")).toHaveText("octocat");
+    // The header names the profile (#1217): the display name when GitHub has one, the handle otherwise.
+    await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(
       page.getByRole("img", { name: "Chapa badge for octocat" }),
     ).toBeAttached();

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -8,126 +8,13 @@ function workflow(path: string): string {
   return readFileSync(resolve(repositoryRoot, path), "utf8");
 }
 
-describe("release verification workflow contract", () => {
-  const release = workflow(".github/workflows/release-verification.yml");
-
-  it("accepts exactly the five retained immutable candidate inputs", () => {
-    expect(release).toContain("workflow_dispatch:");
-    expect(release).toContain("workflow_call:");
-    for (const input of [
-      "baselineTag",
-      "developCommit",
-      "candidateTreeDigest",
-      "previewUrl",
-      "runId",
-    ]) {
-      expect(release).toMatch(new RegExp(`\\n\\s{6}${input}:`));
+describe("local release qualification has no hosted Preview workflow", () => {
+  it("retires the active Preview dispatch and reusable qualifier", () => {
+    expect(existsSync(resolve(repositoryRoot, ".github/workflows/release-verification.yml"))).toBe(false);
+    for (const file of readdirSync(resolve(repositoryRoot, ".github/workflows")).filter(file => /\.ya?ml$/.test(file))) {
+      const source = workflow(`.github/workflows/${file}`);
+      expect(source).not.toMatch(/release-verification\.yml|release:verify-identity|--stage preview|RELEASE_VERIFICATION_MODE:\s*default/);
     }
-    for (const removedInput of ["releasePrRunId", "releasePrRunAttempt", "preMergeEvidence"]) {
-      expect(release).not.toContain(removedInput);
-    }
-  });
-
-  it("checks out the exact developCommit with minimal history", () => {
-    expect(release).toContain("ref: ${{ inputs.developCommit }}");
-    expect(release).toContain("fetch-depth: 1");
-    expect(release).not.toContain("fetch-depth: 0");
-  });
-
-  it("verifies HEAD equals developCommit and HEAD tree equals candidateTreeDigest", () => {
-    expect(release).toContain('ACTUAL_COMMIT="$(git rev-parse HEAD)"');
-    expect(release).toContain("HEAD^{tree}");
-    expect(release).toContain('test "$ACTUAL_COMMIT" = "$DEVELOP_COMMIT"');
-    expect(release).toContain('test "$ACTUAL_TREE" = "$CANDIDATE_TREE_DIGEST"');
-  });
-
-  it("verifies the baseline tag is annotated and resolves to the current production rollback commit", () => {
-    // Fetches the tag by name (`git fetch <remote> tag <name>`), not just its
-    // commit via --no-tags, which never creates a local refs/tags/<name> ref
-    // and leaves "$BASELINE_TAG" unresolvable by name in every later step.
-    expect(release).toContain('git fetch --depth=1 origin tag "$BASELINE_TAG"');
-    expect(release).not.toContain("--no-tags");
-    expect(release).toContain('git cat-file -t "$BASELINE_TAG"');
-    expect(release).toMatch(/TAG_TYPE.*=.*"tag"/);
-    expect(release).toContain("https://chapa.thecreativetoken.com/api/version");
-    expect(release).toContain("PRODUCTION_COMMIT");
-    expect(release).toContain('test "$PRODUCTION_COMMIT" = "$TAG_COMMIT"');
-  });
-
-  it("verifies the immutable Preview identity via release:verify-identity", () => {
-    expect(release).toContain("release:verify-identity");
-    expect(release).toContain("VERCEL_AUTOMATION_BYPASS_SECRET");
-    expect(release).toMatch(
-      /workflow_call:[\s\S]*?secrets:\s+VERCEL_AUTOMATION_BYPASS_SECRET:\s+required: true/,
-    );
-  });
-
-  it("runs the default Preview scenario mode", () => {
-    expect(release).toContain("RELEASE_VERIFICATION_MODE: default");
-    expect(release).toContain("e2e/release-required.spec.ts");
-    expect(release).toContain("--grep @release-required");
-  });
-
-  it("writes and uploads exactly one release-result.json unconditionally", () => {
-    expect(release).toContain("release:write-result");
-    expect(release).toContain("--stage preview");
-    const uploadStep = release.slice(
-      release.indexOf("Upload release result"),
-      release.indexOf("Upload release result") + 400,
-    );
-    expect(uploadStep).toContain("if: always()");
-    expect(uploadStep).toContain("release-result.json");
-    expect(release.match(/uses: actions\/upload-artifact@v7/g)?.length).toBe(1);
-  });
-
-  it("propagates the direct check status after uploading the result", () => {
-    const uploadIndex = release.indexOf("Upload release result");
-    const writeResultIndex = release.indexOf("release:write-result");
-    expect(writeResultIndex).toBeLessThan(uploadIndex);
-    expect(release).toContain("outputs:");
-    expect(release).toMatch(/status:\s*\$\{\{\s*steps\.[\w-]+\.outcome/);
-  });
-
-  it("contains no evidence-graph import, aggregation, analyzer, renderer, or charter machinery", () => {
-    for (const removed of [
-      "import-ci",
-      "import-release-pr",
-      "aggregate:",
-      "merge-release-evidence",
-      "analyze-release-run",
-      "render-release-report",
-      "release:analyze",
-      "release:render-report",
-      "release:collect-evidence",
-      "release:prepare-run",
-      "release:merge-evidence",
-      "quality:validate",
-      "preMergeEvidence",
-      "exploratoryCharters",
-      "evidence-manifest",
-      "release-artifact-contract",
-    ]) {
-      expect(release).not.toContain(removed);
-    }
-  });
-
-  it("does not contain release, deploy, database, Git, or publication mutations", () => {
-    expect(release).not.toMatch(/\b(vercel\s+deploy|vercel\s+promote|gh\s+release\s+create)\b/);
-    expect(release).not.toMatch(/\bgit\s+(push|merge|tag)\b/);
-    expect(release).not.toMatch(/\bsupabase\s+(db\s+push|migration\s+up)\b/);
-  });
-
-  it("has read-only permissions and a candidate-scoped concurrency group", () => {
-    expect(release).toMatch(/permissions:\s*\n\s*contents:\s*read/);
-    expect(release).not.toContain("actions: read");
-    expect(release).toContain(
-      "group: release-verification-${{ inputs.developCommit }}-${{ inputs.runId }}",
-    );
-    expect(release).toContain("cancel-in-progress: false");
-  });
-
-  it("contains exactly one job", () => {
-    expect(release.match(/^  [a-z][\w-]*:\n\s+name:/gm)?.length).toBe(1);
   });
 });
 

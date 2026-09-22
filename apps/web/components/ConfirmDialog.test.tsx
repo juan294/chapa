@@ -105,7 +105,7 @@ describe("ConfirmDialog", () => {
     expect(dialog!.getAttribute("aria-describedby")).toBeTruthy();
   });
 
-  it("default variant styles confirm button with amber (non-destructive)", () => {
+  it("default variant styles confirm button with paired action colors (non-destructive)", () => {
     render(
       <ConfirmDialog
         {...baseProps}
@@ -114,7 +114,8 @@ describe("ConfirmDialog", () => {
       />,
     );
     const confirmBtn = screen.getByRole("button", { name: "OK" });
-    expect(confirmBtn.className).toContain("bg-amber");
+    expect(confirmBtn.className).toContain("bg-action");
+    expect(confirmBtn.className).toContain("text-action-text");
     expect(confirmBtn.className).not.toContain("terminal-red");
   });
 
@@ -320,7 +321,7 @@ describe("ConfirmDialog", () => {
   });
 
   describe("variant styling", () => {
-    it("destructive variant has bg-terminal-red class", () => {
+    it("destructive variant keeps red text on a semantic surface", () => {
       render(
         <ConfirmDialog
           {...baseProps}
@@ -329,13 +330,13 @@ describe("ConfirmDialog", () => {
         />,
       );
       const confirmBtn = screen.getByRole("button", { name: "Delete" });
-      expect(confirmBtn.className).toContain("bg-terminal-red");
+      expect(confirmBtn.className).toContain("text-terminal-red");
       expect(confirmBtn.className).toContain(
-        "hover:bg-terminal-red/80",
+        "hover:bg-terminal-red/10",
       );
     });
 
-    it("default variant has bg-amber class without terminal-red", () => {
+    it("default variant uses paired action colors without terminal-red", () => {
       render(
         <ConfirmDialog
           {...baseProps}
@@ -344,8 +345,9 @@ describe("ConfirmDialog", () => {
         />,
       );
       const confirmBtn = screen.getByRole("button", { name: "Save" });
-      expect(confirmBtn.className).toContain("bg-amber");
-      expect(confirmBtn.className).toContain("hover:bg-amber-light");
+      expect(confirmBtn.className).toContain("bg-action");
+      expect(confirmBtn.className).toContain("text-action-text");
+      expect(confirmBtn.className).toContain("hover:bg-action-hover");
       expect(confirmBtn.className).not.toContain("terminal-red");
     });
 
@@ -360,7 +362,7 @@ describe("ConfirmDialog", () => {
         />,
       );
       const confirmBtn = screen.getByRole("button", { name: "Confirm" });
-      expect(confirmBtn.className).toContain("bg-terminal-red");
+      expect(confirmBtn.className).toContain("text-terminal-red");
     });
   });
 

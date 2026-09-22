@@ -33,7 +33,7 @@ vi.mock("@/lib/i18n/server", () => ({
         "Terms of Service for Chapa. Understand the rules and guidelines for using the developer impact badge platform.",
       "legal.terms.metadataOgTitle": "Terms of Service — Chapa",
       "landing.footer.tagline": "Built for developers, by developers.",
-      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.poweredBy": "Import your work from",
       "landing.footer.about": "About",
       "landing.footer.scoring": "Scoring",
       "landing.footer.terms": "Terms",

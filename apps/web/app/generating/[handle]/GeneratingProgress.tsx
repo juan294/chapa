@@ -2,17 +2,27 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { markCacheWarmed } from "@/hooks/useOwnerCacheWarm";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 type StepStatus = "pending" | "active" | "done" | "error";
-type ErrorKind = "rateLimited" | "session" | "generic";
+type ErrorKind = "rateLimited" | "session" | "staleSource" | "generic";
+
+/** Display names for the platforms a user can connect; the API answers with
+ * the lowercase provider ids the rest of the codebase uses. */
+const PLATFORM_NAMES: Record<string, string> = { bitbucket: "Bitbucket", codeberg: "Codeberg", gitlab: "GitLab" };
 
 const STEP_DELAY_MS = 300;
 const REDIRECT_DELAY_MS = 800;
 // Generous ceiling: a false timeout (user sees "failed" on a slow-but-working
 // request) is worse than a longer worst-case wait. Cold-cache generations
 // with large contribution histories are routinely multi-second. (#1108)
-const GENERATE_TIMEOUT_MS = 45_000;
+// #1283 — /api/generate now makes up to two sequential GitHub attempts
+// (session token, then server token), each bounded by getStats' 30s inflight
+// cap, so the ceiling sits above the realistic two-attempt worst case (a 15s
+// GraphQL timeout followed by a full second fetch) rather than inside it.
+const GENERATE_TIMEOUT_MS = 60_000;
 // After this long with no response, reassure the user the wait is normal
 // progress rather than a freeze. (#1108)
 const SLOW_NOTICE_DELAY_MS = 5_000;
@@ -40,6 +50,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
   // transition instead of a burst covering every step (#1114).
   const [announcedStepIndex, setAnnouncedStepIndex] = useState(0);
   const [errorKind, setErrorKind] = useState<ErrorKind | null>(null);
+  const [staleSources, setStaleSources] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [showSlowNotice, setShowSlowNotice] = useState(false);
 
@@ -58,6 +69,13 @@ export function GeneratingProgress({ handle }: { handle: string }) {
       message: t('generation.errorSession') as string,
       href: signInAgainHref,
       linkText: t('generation.signInAgain') as string,
+    },
+    staleSource: {
+      message: interpolate(t('generation.errorStaleSource') as string, {
+        platforms: staleSources.map((source) => PLATFORM_NAMES[source] ?? source).join(", "),
+      }),
+      href: "/settings",
+      linkText: t('generation.reconnect') as string,
     },
     generic: {
       message: t('generation.error') as string,
@@ -133,8 +151,24 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         if (cancelled) return;
 
         if (!res.ok) {
+          // 409 carries the connections that blocked the fetch; a malformed or
+          // missing body degrades to the generic message rather than throwing.
+          const sources = res.status === 409
+            ? await res.json().then(
+                (body: unknown) => {
+                  const value = (body as { staleSources?: unknown } | null)?.staleSources;
+                  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+                },
+                () => [],
+              )
+            : [];
+          if (cancelled) return;
+          setStaleSources(sources);
           const kind: ErrorKind =
-            res.status === 429 ? "rateLimited" : res.status === 401 ? "session" : "generic";
+            res.status === 429 ? "rateLimited"
+              : res.status === 401 ? "session"
+                : sources.length > 0 ? "staleSource"
+                  : "generic";
           setErrorKind(kind);
           setStepStatuses((prev) =>
             prev.map((s) => (s === 'active' ? 'error' : s)),
@@ -142,6 +176,10 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           return;
         }
 
+        // LE-5-2 — the share page this redirects to warms the owner's cache
+        // with the same session-token fetch that just succeeded here. Record
+        // it as done so that visit does not spend a refresh on a repeat.
+        markCacheWarmed(handle);
         setStepStatuses(['done', 'active', 'pending', 'pending']);
         setAnnouncedStepIndex(1);
         completeRemainingSteps(registerStepTimer);
@@ -163,7 +201,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
       controller.abort();
       stepTimerIds.forEach(clearTimeout);
     };
-  }, [completeRemainingSteps]);
+  }, [completeRemainingSteps, handle]);
 
   // Reassure the user the wait is normal progress, not a freeze, once the
   // request has been in flight for a while (#1108).
@@ -192,7 +230,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           </p>
           <h1 className="mt-2 font-heading text-lg font-bold tracking-tight text-text-primary">
             {t('generation.heading') as string}{" "}
-            <span className="text-amber">@{handle}</span>
+            <span className="text-amber-text">@{handle}</span>
           </h1>
         </div>
 
@@ -216,7 +254,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
                 key={label}
                 data-step={i}
                 data-status={status}
-                className={`flex items-center gap-3 rounded-lg border px-4 py-3 font-heading text-sm transition-all duration-300 ${
+                className={`flex items-center gap-3 rounded-[3px] border px-4 py-3 font-heading text-sm transition-all duration-300 ${
                   status === "done"
                     ? "border-terminal-green/20 bg-terminal-green/[0.06]"
                     : status === "active"
@@ -274,7 +312,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
                     status === "done"
                       ? "text-terminal-green"
                       : status === "active"
-                        ? "text-amber"
+                        ? "text-amber-text"
                         : status === "error"
                           ? "text-terminal-red"
                           : "text-terminal-dim"
@@ -298,7 +336,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
         {/* Error message */}
         {errorKind && (
-          <div role="alert" className="mt-6 animate-terminal-fade-in motion-reduce:animate-none rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
+          <div role="alert" className="mt-6 animate-terminal-fade-in motion-reduce:animate-none rounded-[3px] border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
             <p className="font-heading text-sm text-terminal-red">
               {errorConfig[errorKind].message}
             </p>

@@ -59,6 +59,8 @@ If there are no changes needed, just output: 'cc-rpi sync: already up to date as
 
 MAX_RETRIES=2
 RETRY_COUNT=0
+TMP_OUTPUT=$(create_report_temp "${REPORT_FILE}")
+trap 'rm -f "${TMP_OUTPUT}"' EXIT
 
 cd "${PROJECT_ROOT}"
 log_info "=== cc-rpi Blueprint Sync starting ==="
@@ -70,25 +72,21 @@ while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
     --model "${MODEL}" \
     --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git add*),Bash(git commit*),Bash(git diff*),Bash(git log*),Bash(git status*)" \
     --output-format text \
-    > "${REPORT_FILE}" 2>&1; then
-    # Primary validation: first non-empty line matches a known report opener.
-    # Secondary validation: the explicit success string appears anywhere in the
-    # file — handles LLM preamble variants ("The local cc-rpi…", "The cc-rpi
-    # blueprint HEAD…", etc.) that precede the required status line.
-    if ! validate_report_file \
+    > "${TMP_OUTPUT}" 2>&1; then
+    if publish_report_file \
+      "${TMP_OUTPUT}" \
       "${REPORT_FILE}" \
       "cc-rpi-update" \
       "^(# |\`\`\`markdown|cc-rpi sync: already up to date as of )"; then
-      if ! grep -q "cc-rpi sync: already up to date as of" "${REPORT_FILE}"; then
-        RETRY_COUNT=$((RETRY_COUNT + 1))
-        log_error "Attempt ${RETRY_COUNT} produced invalid report output. Retrying in 10s..."
-        sleep 10
-        continue
-      fi
+      trap - EXIT
+      log_info "Report written to ${REPORT_FILE}"
+      log_info "=== cc-rpi Blueprint Sync complete ==="
+      exit 0
     fi
-    log_info "Report written to ${REPORT_FILE}"
-    log_info "=== cc-rpi Blueprint Sync complete ==="
-    exit 0
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    log_error "Attempt ${RETRY_COUNT} produced invalid report output. Retrying in 10s..."
+    sleep 10
+    continue
   fi
   RETRY_COUNT=$((RETRY_COUNT + 1))
   log_error "Attempt ${RETRY_COUNT} failed. Retrying in 10s..."
@@ -96,5 +94,4 @@ while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
 done
 
 log_error "cc-rpi Blueprint Sync FAILED after ${MAX_RETRIES} attempts"
-echo "cc-rpi sync: FAILED after ${MAX_RETRIES} attempts — $(date)" >> "${REPORT_FILE}"
 exit 1

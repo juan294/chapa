@@ -11,7 +11,7 @@ import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { clearPlatformStatusCache } from "@/lib/platform/use-platform-connections";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
-import { GitHubIcon } from "@/components/icons";
+import { ChapaBadgeIcon } from "@/components/icons";
 
 /**
  * #1223 — the platform-connection cache, status fetching and unlink flow moved
@@ -67,10 +67,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={t('aria.userMenu') as string}
-        className="flex items-center gap-2 rounded-full border border-stroke bg-card/60 px-1.5 py-1 transition-colors hover:border-amber/20 hover:bg-card"
+        className="flex min-h-11 items-center gap-2 rounded-[3px] bg-transparent px-1.5 py-1 transition-colors hover:bg-purple-tint"
       >
         {imgError ? (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber/10 text-sm font-semibold text-amber">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber/10 text-sm font-semibold text-amber-text">
             {fallbackLetter}
           </div>
         ) : (
@@ -79,7 +79,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             alt={avatarAlt}
             width={32}
             height={32}
-            className="h-8 w-8 rounded-full img-outline"
+            className="h-8 w-8 rounded-full"
             onError={() => setImgError(true)}
           />
         )}
@@ -105,13 +105,13 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         <div
           role="menu"
           aria-label={t('aria.userMenuOptions') as string}
-          className={`absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-card shadow-card ${dropdownExiting ? "animate-fade-out-up" : "animate-scale-in"}`}
+          className={`absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-[3px] border border-stroke bg-card shadow-card ${dropdownExiting ? "animate-fade-out-up" : "animate-scale-in"}`}
         >
           {/* Header */}
           <div className="border-b border-stroke px-4 py-3">
             <div className="flex items-center gap-3">
               {imgError ? (
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber/10 text-base font-semibold text-amber">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber/10 text-base font-semibold text-amber-text">
                   {fallbackLetter}
                 </div>
               ) : (
@@ -120,7 +120,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   alt={avatarAlt}
                   width={40}
                   height={40}
-                  className="h-10 w-10 rounded-full img-outline"
+                  className="h-10 w-10 rounded-full"
                   onError={() => setImgError(true)}
                 />
               )}
@@ -142,9 +142,9 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               href={`/u/${login}`}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+              className="flex min-h-11 items-center gap-3 rounded-[3px] px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-purple-tint"
             >
-              <GitHubIcon className="h-4 w-4 text-text-secondary" />
+              <ChapaBadgeIcon className="h-4 w-4 text-text-secondary" />
               {t('userMenu.myBadge') as string}
             </Link>
             {studioEnabled && (
@@ -152,7 +152,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 href="/studio"
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+                className="flex min-h-11 items-center gap-3 rounded-[3px] px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-purple-tint"
               >
                 <svg
                   className="h-4 w-4 text-text-secondary"
@@ -176,7 +176,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               href="/settings"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+              className="flex min-h-11 items-center gap-3 rounded-[3px] px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-purple-tint"
             >
               <svg
                 className="h-4 w-4 text-text-secondary"
@@ -198,7 +198,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 href="/admin"
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+                className="flex min-h-11 items-center gap-3 rounded-[3px] px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-purple-tint"
               >
                 <svg
                   className="h-4 w-4 text-text-secondary"
@@ -225,7 +225,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               <button
                 type="submit"
                 role="menuitem"
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
+                className="flex min-h-11 w-full items-center gap-3 rounded-[3px] px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-purple-tint hover:text-text-primary"
               >
                 <svg
                   className="h-4 w-4"

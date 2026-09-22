@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fetchContributionData } from "./queries";
+import { githubUserNotFound, isGitHubUserNotFound } from "./not-found";
+import { expectFound } from "@/lib/test-helpers/found";
 import { _setRetryDelayFn } from "@/lib/utils/fetch-retry";
 
 describe("fetchContributionData", () => {
@@ -144,7 +146,7 @@ describe("fetchContributionData", () => {
 
     expect(result).toBeNull();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] GraphQL HTTP 401"),
+      expect.stringContaining("[github] GraphQL HTTP activity=401 repositories=401"),
     );
     consoleSpy.mockRestore();
   });
@@ -166,56 +168,56 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("nonexistent");
 
     expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] GraphQL errors for nonexistent:"),
-      expect.arrayContaining([
-        expect.objectContaining({ message: "Could not resolve to a User" }),
-      ]),
+    // The provider's error body is never echoed into logs (S08).
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      "[github] GraphQL errors for nonexistent",
     );
     consoleSpy.mockRestore();
   });
 
-  it("sends separate DateTime and GitTimestamp variables in the query body", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          data: {
-            user: {
-              login: "testuser",
-              name: "Test",
-              avatarUrl: "https://example.com/avatar.png",
-              contributionsCollection: {
-                contributionCalendar: { totalContributions: 0, weeks: [] },
-                pullRequestContributions: { totalCount: 0, nodes: [] },
-                pullRequestReviewContributions: { totalCount: 0 },
-                issueContributions: { totalCount: 0 },
-              },
-              repositories: { totalCount: 0, nodes: [] },
+  it("splits activity and repository history into concurrent requests", async () => {
+    const mockFetch = vi.fn().mockImplementation((_: string, options: RequestInit) => {
+      const body = JSON.parse(String(options.body));
+      const user = body.query.includes("contributionsCollection")
+        ? {
+            login: "testuser",
+            name: "Test",
+            avatarUrl: "https://example.com/avatar.png",
+            contributionsCollection: {
+              contributionCalendar: { totalContributions: 12, weeks: [] },
+              pullRequestContributions: { totalCount: 3, nodes: [] },
+              pullRequestReviewContributions: { totalCount: 2 },
+              issueContributions: { totalCount: 1 },
             },
-          },
-        }),
+          }
+        : {
+            repositories: { totalCount: 308, nodes: [] },
+            ownedRepos: { nodes: [] },
+          };
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: { user } }),
+      });
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await fetchContributionData("testuser", "token");
+    const result = expectFound(await fetchContributionData("testuser", "token"));
 
-    const [, opts] = mockFetch.mock.calls[0]!;
-    const body = JSON.parse(opts.body);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const bodies = mockFetch.mock.calls.map(([, opts]) => JSON.parse(opts.body));
+    const activity = bodies.find((body) => body.query.includes("contributionsCollection"));
+    const repositories = bodies.find((body) => body.query.includes("history(since:"));
 
-    // Query must declare GitTimestamp variables for Commit.history
-    expect(body.query).toContain("$historySince: GitTimestamp!");
-    expect(body.query).toContain("$historyUntil: GitTimestamp!");
-    // And pass them to the history field
-    expect(body.query).toContain("history(since: $historySince, until: $historyUntil)");
-    // Variables must include both sets
-    expect(body.variables).toHaveProperty("since");
-    expect(body.variables).toHaveProperty("until");
-    expect(body.variables).toHaveProperty("historySince");
-    expect(body.variables).toHaveProperty("historyUntil");
-    // Both pairs should have the same ISO string values
-    expect(body.variables.historySince).toBe(body.variables.since);
-    expect(body.variables.historyUntil).toBe(body.variables.until);
+    expect(activity.query).not.toContain("history(since:");
+    expect(activity.variables).toHaveProperty("since");
+    expect(activity.variables).toHaveProperty("until");
+    expect(repositories.query).not.toContain("contributionsCollection");
+    expect(repositories.variables).toHaveProperty("historySince");
+    expect(repositories.variables).toHaveProperty("historyUntil");
+    expect(repositories.variables.historySince).toBe(activity.variables.since);
+    expect(repositories.variables.historyUntil).toBe(activity.variables.until);
+    expect(result.contributionCalendar.totalContributions).toBe(12);
+    expect(result.repositories.totalCount).toBe(308);
   });
 
   // ---------------------------------------------------------------------------
@@ -281,9 +283,8 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.mergedPrTotalCount).toBe(904);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.mergedPrTotalCount).toBe(904);
   });
 
   it("defaults mergedPrTotalCount to 0 when search is missing from the response", async () => {
@@ -311,9 +312,8 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.mergedPrTotalCount).toBe(0);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.mergedPrTotalCount).toBe(0);
   });
 
   it("does not throw when pullRequestContributions is null (optional-chained, defaults to empty sample)", async () => {
@@ -342,12 +342,11 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.pullRequests).toEqual({ totalCount: 0, nodes: [] });
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.pullRequests).toEqual({ totalCount: 0, nodes: [] });
     // The authoritative count still comes through — this is exactly the shape
     // assessRawFetchIntegrity (stats-integrity.ts) rejects downstream.
-    expect(result!.mergedPrTotalCount).toBe(904);
+    expect(result.mergedPrTotalCount).toBe(904);
   });
 
   it("skips PR contribution nodes where pullRequest is null", async () => {
@@ -383,13 +382,11 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-
-    expect(result).not.toBeNull();
+    const result = expectFound(await fetchContributionData("testuser", "token"));
     // Should have 2 nodes (the null one filtered out)
-    expect(result!.pullRequests.nodes).toHaveLength(2);
-    expect(result!.pullRequests.nodes[0]!.additions).toBe(10);
-    expect(result!.pullRequests.nodes[1]!.additions).toBe(5);
+    expect(result.pullRequests.nodes).toHaveLength(2);
+    expect(result.pullRequests.nodes[0]!.additions).toBe(10);
+    expect(result.pullRequests.nodes[1]!.additions).toBe(5);
   });
 
   it("passes an AbortSignal with timeout to fetch", async () => {
@@ -433,9 +430,8 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("testuser", "token");
 
     expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] fetch error for testuser:"),
-      expect.any(DOMException),
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^\[github\] fetch error for testuser — \w+: /),
     );
     consoleSpy.mockRestore();
   });
@@ -472,11 +468,10 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.ownedRepoStars.nodes).toHaveLength(2);
-    expect(result!.ownedRepoStars.nodes[0]!.stargazerCount).toBe(50);
-    expect(result!.ownedRepoStars.nodes[1]!.stargazerCount).toBe(30);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.ownedRepoStars.nodes).toHaveLength(2);
+    expect(result.ownedRepoStars.nodes[0]!.stargazerCount).toBe(50);
+    expect(result.ownedRepoStars.nodes[1]!.stargazerCount).toBe(30);
   });
 
   it("handles missing ownedRepos gracefully", async () => {
@@ -504,9 +499,8 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
-    expect(result!.ownedRepoStars.nodes).toEqual([]);
+    const result = expectFound(await fetchContributionData("testuser", "token"));
+    expect(result.ownedRepoStars.nodes).toEqual([]);
   });
 
   it("handles unreadable error body on HTTP failure", async () => {
@@ -523,7 +517,7 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("testuser", "token");
     expect(result).toBeNull();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] GraphQL HTTP 500"),
+      expect.stringContaining("[github] GraphQL HTTP activity=500 repositories=500"),
     );
     consoleSpy.mockRestore();
   });
@@ -621,8 +615,7 @@ describe("fetchContributionData", () => {
       }),
     );
 
-    const result = await fetchContributionData("testuser", "token");
-    expect(result).not.toBeNull();
+    expectFound(await fetchContributionData("testuser", "token"));
     expect(callCount).toBeGreaterThanOrEqual(2);
   });
 
@@ -652,9 +645,8 @@ describe("fetchContributionData", () => {
     const result = await fetchContributionData("testuser", "token");
 
     expect(result).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[github] fetch error for testuser:"),
-      expect.any(Error),
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/^\[github\] fetch error for testuser — \w+: /),
     );
     consoleSpy.mockRestore();
   });
@@ -700,11 +692,8 @@ describe("fetchContributionData", () => {
       const result = await fetchContributionData("testuser", "token");
 
       expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[github] GraphQL errors for testuser:"),
-        expect.arrayContaining([
-          expect.objectContaining({ extensions: { type: "RATE_LIMITED" } }),
-        ]),
+      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+        "[github] GraphQL errors for testuser",
       );
       consoleSpy.mockRestore();
     });
@@ -842,12 +831,100 @@ describe("fetchContributionData", () => {
         }),
       );
 
-      const result = await fetchContributionData("testuser", "token");
-
       // Non-blocking error — should still return data
-      expect(result).not.toBeNull();
-      expect(result!.login).toBe("testuser");
+      const result = expectFound(await fetchContributionData("testuser", "token"));
+      expect(result.login).toBe("testuser");
       consoleSpy.mockRestore();
+    });
+  });
+
+  // LE-8-2 — the one answer that must not collapse into the same `null` as an
+  // outage: GitHub responded, and the handle is nobody's.
+  describe("a handle GitHub does not know (LE-8-2)", () => {
+    function stubGraphql(body: unknown) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) }),
+      );
+    }
+    const nullUser = { user: null, search: { issueCount: 0 } };
+
+    it("returns the not-found sentinel when data.user is null beside GitHub's NOT_FOUND error", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({
+        data: nullUser,
+        errors: [
+          {
+            type: "NOT_FOUND",
+            path: ["user"],
+            locations: [{ line: 2, column: 3 }],
+            message: "Could not resolve to a User with the login of 'ghost'.",
+          },
+        ],
+      });
+
+      const result = await fetchContributionData("ghost", "token");
+
+      expect(result).toEqual(githubUserNotFound("ghost"));
+      consoleSpy.mockRestore();
+    });
+
+    it("returns the sentinel when data.user is null and there are no errors at all", async () => {
+      stubGraphql({ data: nullUser });
+
+      expect(isGitHubUserNotFound(await fetchContributionData("ghost", "token"))).toBe(true);
+    });
+
+    it("recognizes NOT_FOUND carried in extensions.type as well", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ data: nullUser, errors: [{ message: "no such user", extensions: { type: "NOT_FOUND" } }] });
+
+      expect(isGitHubUserNotFound(await fetchContributionData("ghost", "token"))).toBe(true);
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null when data.user is null beside an error that is not NOT_FOUND", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ data: nullUser, errors: [{ message: "Something went wrong while executing your query." }] });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null for RATE_LIMITED even when data.user is null", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ data: nullUser, errors: [{ message: "rate limited", extensions: { type: "RATE_LIMITED" } }] });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null when the payload carries no data object at all", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      stubGraphql({ errors: [{ type: "NOT_FOUND", message: "no such user" }] });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null, never the sentinel, when the token is rejected with HTTP 401", async () => {
+      // A bad or expired session token is GitHub refusing to answer, not
+      // GitHub saying the handle is nobody's. The badge route falls back to
+      // its 200 try-later SVG on null; a 404 here would 404 a real user.
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: false, status: 401, text: () => Promise.resolve("Bad credentials") }),
+      );
+
+      expect(await fetchContributionData("ghost", "ghp_e2e_fixture")).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns null when the user key is absent rather than null", async () => {
+      stubGraphql({ data: {} });
+
+      expect(await fetchContributionData("ghost", "token")).toBeNull();
     });
   });
 });

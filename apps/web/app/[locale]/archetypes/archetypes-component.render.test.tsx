@@ -174,7 +174,7 @@ vi.mock("@/lib/i18n/server", () => ({
       "archetypes.emerging.backLink": "Back to features",
       "archetypes.emerging.methodologyLink": "Full scoring methodology",
       "landing.footer.tagline": "Built for developers, by developers.",
-      "landing.footer.poweredBy": "Compatible with",
+      "landing.footer.poweredBy": "Import your work from",
       "landing.footer.about": "About",
       "landing.footer.scoring": "Scoring",
       "landing.footer.terms": "Terms",

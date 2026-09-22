@@ -46,7 +46,7 @@ describe("BadgeOverlay — static structure", () => {
   it("hotspots use aria-describedby referencing an existing sr-only span", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
     for (const hotspot of hotspots) {
       const describedById = hotspot.getAttribute("aria-describedby");
@@ -59,15 +59,15 @@ describe("BadgeOverlay — static structure", () => {
     const { container } = render(<BadgeOverlay />);
     const archetypeHotspot = screen
       .getAllByRole("group")
-      .find((el) => el.getAttribute("aria-label") === "archetype info")!;
+      .find((el) => el.getAttribute("aria-label") === "ARCHETYPE — More information")!;
 
     fireEvent.mouseEnter(archetypeHotspot);
 
     // badge-archetype's leaderLine.path starts "M 144 159 ..."
     const circle = container.querySelector("circle");
     expect(circle).not.toBeNull();
-    expect(circle!.getAttribute("cx")).toBe("144");
-    expect(circle!.getAttribute("cy")).toBe("159");
+    expect(circle!.getAttribute("cx")).toBe("127");
+    expect(circle!.getAttribute("cy")).toBe("156");
   });
 });
 
@@ -93,7 +93,7 @@ describe("BadgeOverlay — rendering", () => {
   it("activates leader line panel on mouseEnter", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
     expect(hotspots.length).toBeGreaterThan(0);
 
@@ -109,7 +109,7 @@ describe("BadgeOverlay — rendering", () => {
   it("deactivates leader line panel on mouseLeave", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
 
     fireEvent.mouseEnter(hotspots[0]!);
@@ -129,7 +129,7 @@ describe("BadgeOverlay — rendering", () => {
   it("does not activate the leader line panel on focus — hotspot is no longer focusable (#1116)", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
 
     fireEvent.focus(hotspots[0]!);
@@ -139,7 +139,7 @@ describe("BadgeOverlay — rendering", () => {
   it("hotspots are excluded from the keyboard tab order (#1116)", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
     expect(hotspots.length).toBe(11);
     for (const hotspot of hotspots) {
@@ -172,27 +172,27 @@ describe("BadgeOverlay — rendering", () => {
   it("switching between hotspots shows the correct tooltip content", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
 
     // Activate first hotspot
     fireEvent.mouseEnter(hotspots[0]!);
     const firstAriaLabel = hotspots[0]!.getAttribute("aria-label");
-    expect(firstAriaLabel).toContain("info");
+    expect(firstAriaLabel).toContain("More information");
 
     fireEvent.mouseLeave(hotspots[0]!);
 
     // Activate second hotspot
     fireEvent.mouseEnter(hotspots[1]!);
     const secondAriaLabel = hotspots[1]!.getAttribute("aria-label");
-    expect(secondAriaLabel).toContain("info");
+    expect(secondAriaLabel).toContain("More information");
     expect(secondAriaLabel).not.toBe(firstAriaLabel);
   });
 
   it("renders leader line SVG path when hotspot is active", () => {
     const { container } = render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
 
     // No SVG path rendered initially
@@ -207,7 +207,7 @@ describe("BadgeOverlay — rendering", () => {
   it("renders circle dot at leader line origin when hotspot is active", () => {
     const { container } = render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
 
     fireEvent.mouseEnter(hotspots[0]!);
@@ -232,6 +232,9 @@ describe("BadgeOverlay — rendering", () => {
       y: 400,
       toJSON: () => {},
     });
+    for (const hotspot of screen.getAllByRole("group").filter(el => el.hasAttribute("data-hotspot"))) {
+      vi.spyOn(hotspot, "getBoundingClientRect").mockReturnValue({x:100,y:400,left:100,top:400,right:200,bottom:450,width:100,height:50,toJSON() {}});
+    }
     return overlay;
   }
 
@@ -241,7 +244,7 @@ describe("BadgeOverlay — rendering", () => {
     // badge-archetype has panelAnchor: "above"
     const archetypeHotspot = screen
       .getAllByRole("group")
-      .find((el) => el.getAttribute("aria-label") === "archetype info");
+      .find((el) => el.getAttribute("aria-label") === "ARCHETYPE — More information");
     expect(archetypeHotspot).toBeDefined();
 
     fireEvent.mouseEnter(archetypeHotspot!);
@@ -257,7 +260,7 @@ describe("BadgeOverlay — rendering", () => {
     // badge-heatmap has panelAnchor: "below"
     const heatmapHotspot = screen
       .getAllByRole("group")
-      .find((el) => el.getAttribute("aria-label") === "heatmap info");
+      .find((el) => el.getAttribute("aria-label") === "HEATMAP — More information");
     expect(heatmapHotspot).toBeDefined();
 
     fireEvent.mouseEnter(heatmapHotspot!);
@@ -275,7 +278,7 @@ describe("BadgeOverlay — rendering", () => {
     mockOverlayRect();
     const archetypeHotspot = screen
       .getAllByRole("group")
-      .find((el) => el.getAttribute("aria-label") === "archetype info");
+      .find((el) => el.getAttribute("aria-label") === "ARCHETYPE — More information");
     expect(archetypeHotspot).toBeDefined();
 
     fireEvent.mouseEnter(archetypeHotspot!);
@@ -295,7 +298,7 @@ describe("BadgeOverlay — rendering", () => {
     mockOverlayRect();
     const archetypeHotspot = screen
       .getAllByRole("group")
-      .find((el) => el.getAttribute("aria-label") === "archetype info");
+      .find((el) => el.getAttribute("aria-label") === "ARCHETYPE — More information");
 
     fireEvent.mouseEnter(archetypeHotspot!);
 
@@ -324,7 +327,7 @@ describe("BadgeOverlay — rendering", () => {
     });
     const archetypeHotspot = screen
       .getAllByRole("group")
-      .find((el) => el.getAttribute("aria-label") === "archetype info")!;
+      .find((el) => el.getAttribute("aria-label") === "ARCHETYPE — More information")!;
     vi.spyOn(archetypeHotspot, "getBoundingClientRect").mockReturnValue({
       top: 34,
       left: 60,
@@ -341,7 +344,7 @@ describe("BadgeOverlay — rendering", () => {
 
     const panel = screen.getByRole("tooltip") as HTMLElement;
     expect(panel.style.transform).toBe("translate(-50%, 0%)");
-    expect(panel.style.top).toBe("54px");
+    expect(panel.style.top).toBe("66px");
   });
 });
 
@@ -413,7 +416,7 @@ describe("BadgeOverlay — desktop panel heading translation (#1109)", () => {
     mockOverlayRect();
     const heatmapHotspot = screen
       .getAllByRole("group")
-      .find((el) => el.getAttribute("aria-label") === "heatmap info")!;
+      .find((el) => el.getAttribute("aria-label") === "HEATMAP — More information")!;
 
     fireEvent.mouseEnter(heatmapHotspot);
 
@@ -425,12 +428,12 @@ describe("BadgeOverlay — desktop panel heading translation (#1109)", () => {
     render(<BadgeOverlay />);
     mockOverlayRect();
     const hotspots = screen.getAllByRole("group").filter(
-      (el) => el.getAttribute("aria-label")?.endsWith(" info"),
+      (el) => el.hasAttribute("data-hotspot"),
     );
     expect(hotspots.length).toBe(11);
 
     for (const hotspot of hotspots) {
-      // e.g. aria-label "archetype info" -> raw slug "archetype", the
+      // e.g. aria-label "ARCHETYPE — More information" -> raw slug "archetype", the
       // buggy pre-#1109 heading (activeBase.id.replace("badge-", "")).
       const rawSlug = hotspot.getAttribute("aria-label")!.replace(" info", "");
 
@@ -442,5 +445,30 @@ describe("BadgeOverlay — desktop panel heading translation (#1109)", () => {
       expect(heading).not.toContain("badge-");
       fireEvent.mouseLeave(hotspot);
     }
+  });
+});
+
+describe("BadgeOverlay — transformed badge anchoring", () => {
+  it("anchors to the actual hotspot viewport rectangle and follows scrolling", () => {
+    render(<BadgeOverlay />);
+    const hotspot = screen.getByLabelText("SCORE — More information");
+    const rect = (x: number, y: number) => ({x,y,left:x,top:y,right:x+80,bottom:y+80,width:80,height:80,toJSON() {}});
+    const measure = vi.spyOn(hotspot,"getBoundingClientRect").mockReturnValue(rect(400,330));
+    fireEvent.mouseEnter(hotspot);
+    const panel = screen.getByRole("tooltip");
+    expect(panel.style.left).toBe("440px");
+    expect(panel.style.top).toBe("422px");
+    measure.mockReturnValue(rect(450,280));
+    fireEvent.scroll(window);
+    expect(panel.style.left).toBe("490px");
+    expect(panel.style.top).toBe("372px");
+  });
+
+  it("keeps the panel within the horizontal viewport beside an edge hotspot", () => {
+    render(<BadgeOverlay />);
+    const hotspot = screen.getByLabelText("ARCHETYPE — More information");
+    vi.spyOn(hotspot,"getBoundingClientRect").mockReturnValue({x:0,y:400,left:0,top:400,right:40,bottom:434,width:40,height:34,toJSON() {}});
+    fireEvent.mouseEnter(hotspot);
+    expect(screen.getByRole("tooltip").style.left).toBe("126px");
   });
 });

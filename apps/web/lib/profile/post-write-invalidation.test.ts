@@ -75,7 +75,7 @@ describe("invalidateProfileReadModels", () => {
     // invalidateBadgeSvgCacheForHandle helper (both Redis locales + edge tag)
     // instead of enumerating per-locale cacheDel calls itself.
     expect(steps).toEqual([
-      "stats:v2:merged:mixedcase",
+      "stats:v3:mixedcase",
       "craft:mixedcase",
       "badge:mixedcase",
       "snapshot:mixedcase",
@@ -97,7 +97,7 @@ describe("invalidateProfileReadModels", () => {
     await invalidateProfileReadModels("Solo", { stats: true });
 
     expect(mockCacheDel).toHaveBeenCalledTimes(1);
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:solo");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:solo");
     expect(mockBuildCraftKey).not.toHaveBeenCalled();
     expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
     expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe("invalidateProfileReadModels", () => {
       }),
     ).resolves.toBeUndefined();
 
-    expect(mockCacheDel).toHaveBeenNthCalledWith(1, "stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenNthCalledWith(1, "stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenNthCalledWith(2, "craft:testuser");
     expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("testuser");
   });

@@ -3,16 +3,20 @@
 import { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "@/lib/i18n";
+import { useInkTerminal } from "./TerminalPresentation";
 import { TERMINAL_COMMAND_INPUT_ID } from "@/lib/keyboard/shortcuts";
 
 export interface TerminalInputHandle {
   clear: () => void;
+  fill: (value: string) => void;
   focus: () => void;
 }
 
 interface TerminalInputProps {
   onSubmit: (command: string) => void;
   onPartialChange?: (partial: string) => void;
+  /** History recall can update the draft without reopening autocomplete. */
+  onHistoryChange?: (partial: string) => void;
   history?: string[];
   prompt?: string;
   autoFocus?: boolean;
@@ -29,6 +33,7 @@ interface TerminalInputProps {
 export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>(function TerminalInput({
   onSubmit,
   onPartialChange,
+  onHistoryChange,
   history = [],
   prompt = "chapa",
   autoFocus = false,
@@ -38,6 +43,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
   trailing,
 }, ref) {
   const { t } = useTranslation();
+  const ink = useInkTerminal();
   // `t` is a stable reference per locale (memoized in LanguageProvider), but
   // `value`/`historyIndex` state changes on every keystroke re-render this
   // component — memoize so the dictionary lookup only reruns on locale
@@ -52,6 +58,12 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
     clear() {
       setValue("");
       setHistoryIndex(-1);
+    },
+    fill(nextValue) {
+      setValue(nextValue);
+      setHistoryIndex(-1);
+      onPartialChange?.(nextValue);
+      inputRef.current?.focus();
     },
     focus() {
       inputRef.current?.focus();
@@ -83,7 +95,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         const historyValue = history[history.length - 1 - nextIndex];
         if (historyValue) {
           setValue(historyValue);
-          onPartialChange?.(historyValue);
+          (onHistoryChange ?? onPartialChange)?.(historyValue);
         }
         return;
       }
@@ -93,7 +105,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         if (historyIndex <= 0) {
           setHistoryIndex(-1);
           setValue("");
-          onPartialChange?.("");
+          (onHistoryChange ?? onPartialChange)?.("");
           return;
         }
         const nextIndex = historyIndex - 1;
@@ -101,7 +113,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         const historyValue = history[history.length - 1 - nextIndex];
         if (historyValue) {
           setValue(historyValue);
-          onPartialChange?.(historyValue);
+          (onHistoryChange ?? onPartialChange)?.(historyValue);
         }
         return;
       }
@@ -113,7 +125,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
         return;
       }
     },
-    [value, history, historyIndex, onSubmit, onPartialChange],
+    [value, history, historyIndex, onSubmit, onPartialChange, onHistoryChange],
   );
 
   const handleChange = useCallback(
@@ -131,11 +143,12 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
     // divider. The bar chrome around it (sticky positioning, backdrop,
     // suggestion chips) belongs to the caller, so Studio and the global
     // command bar can frame the same field differently.
-    <div className="flex min-h-[46px] items-center gap-2 rounded-lg border border-stroke bg-card px-3 font-terminal text-base leading-6 transition-colors focus-within:border-amber sm:text-sm">
-      <span className="text-amber select-none shrink-0">
-        {prompt} &gt;
+    <div className={`flex min-h-[46px] items-center gap-2 rounded-[3px] border px-3 font-terminal text-base leading-6 transition-colors sm:text-sm ${ink ? "border-forest-line bg-forest-card focus-within:border-forest-text" : "border-stroke-strong bg-card focus-within:border-amber-text"}`}>
+      <span className="select-none shrink-0">
+        <span className={ink ? "text-forest-accent" : "text-amber-text"}>{prompt}</span>
+        <span className={`ml-2 ${ink ? "text-forest-dim" : "text-terminal-dim"}`}>&gt;</span>
       </span>
-      <div className="relative flex-1">
+      <div className="relative min-w-0 flex-1">
         <input
           ref={inputRef}
           type="text"
@@ -143,7 +156,7 @@ export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           id={TERMINAL_COMMAND_INPUT_ID}
-          className="terminal-input-bare w-full bg-transparent text-text-primary caret-amber placeholder:text-terminal-dim outline-none focus:ring-0 focus:outline-none border-none"
+          className={`terminal-input-bare w-full bg-transparent outline-none focus:ring-0 focus:outline-none border-none ${ink ? "text-forest-text caret-forest-text placeholder:text-forest-dim" : "text-text-primary caret-amber placeholder:text-terminal-dim"}`}
           style={{ outline: "none" }}
           placeholder={placeholder}
           aria-label={ariaLabel}

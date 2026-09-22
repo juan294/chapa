@@ -50,6 +50,12 @@ function findCommand(name: string, commands = getCommands()) {
 }
 
 describe("useStudioCommands (render)", () => {
+  it("accepts the palette alias with Ice without changing other categories", () => {
+    expect(findCommand("/set")!.execute(["palette", "ice"]).action).toEqual({
+      type: "set", category: "colorPalette", value: "ice",
+    });
+  });
+
   it("narrows set action categories to BadgeConfig keys", () => {
     type SetCategory = Extract<
       StudioCommandAction,

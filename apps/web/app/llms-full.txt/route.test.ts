@@ -41,7 +41,11 @@ describe("GET /llms-full.txt", () => {
     expect(text).toContain("Quality");
     expect(text).toContain("Consistency");
     expect(text).toContain("Breadth");
-    expect(text).toContain("0-100");
+    // v7 publishes the actual formulas and the window, not a bare 0-100 label.
+    expect(text).toContain("N(x, c) = ln(1 + min(x, c)) / ln(1 + c)");
+    expect(text).toContain("365 calendar dates");
+    expect(text).toContain("evidence-completion range");
+    expect(text).toContain("never enters it");
   });
 
   it("contains archetype descriptions", async () => {
@@ -112,6 +116,18 @@ describe("GET /llms-full.txt", () => {
     expect(text).toContain("No personal data is sold.");
     expect(text).toContain("https://chapa.thecreativetoken.com/privacy");
     expect(text).not.toContain("sold or shared with third parties");
+  });
+
+  it("distinguishes current point scoring from archived ranges and explains unlocked report Craft", async () => {
+    const text = await getLlmsFullTxt(request()).text();
+    expect(text).toContain("v7.2");
+    expect(text).toContain("archived v7.1");
+    expect(text).toContain("100 x (fully + 0.7 x mostly + 0.3 x partially) / total");
+    expect(text).toContain("including a score of 0");
+    expect(text).toContain("69.99");
+    expect(text).not.toContain("optional Craft practice portfolio");
+    expect(text).not.toContain("A range spanning a boundary receives no tier.");
+    expect(text).not.toContain("Two headline pairs, deliberately distinct");
   });
 
   it("delegates agent-surface scheduling", () => {

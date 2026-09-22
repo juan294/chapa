@@ -10,6 +10,7 @@ const mockUpsert = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
 const mockIn = vi.fn();
+const mockNot = vi.fn();
 const mockGte = vi.fn();
 const mockLte = vi.fn();
 const mockLt = vi.fn();
@@ -30,6 +31,10 @@ function chainBuilder() {
   };
   chain.in = (...args: unknown[]) => {
     mockIn(...args);
+    return chain;
+  };
+  chain.not = (...args: unknown[]) => {
+    mockNot(...args);
     return chain;
   };
   chain.gte = (...args: unknown[]) => {
@@ -110,6 +115,7 @@ import {
   dbGetLatestSnapshot,
   dbGetLatestSnapshotBatch,
   dbCleanOldSnapshots,
+  dbGetTopScoredProfiles,
   SNAPSHOT_RETENTION_DAYS,
   SNAPSHOT_CLEANUP_BATCH_SIZE,
 } from "./snapshots";
@@ -821,5 +827,122 @@ describe("dbGetLatestSnapshot error paths", () => {
       "connection refused",
     );
     consoleSpy.mockRestore();
+  });
+});
+
+// Landing strip standings. Reads snapshots, never the `users` signup table.
+describe("dbGetTopScoredProfiles", () => {
+  const today = new Date("2026-09-06T12:00:00.000Z");
+  const ELIGIBLE = ["juan294", "torvalds", "gvanrossum", "dev1", "dev2", "dev3", "dev4", "dev"];
+
+  it("ranks handles by their current score, best first", async () => {
+    terminalResolve = {
+      data: [
+        { handle: "juan294", date: "2026-09-06", headline_score: 88, tier: "High" },
+        { handle: "Torvalds", date: "2026-09-06", headline_score: 94, tier: "Elite" },
+        { handle: "gvanrossum", date: "2026-09-05", headline_score: 91, tier: "Elite" },
+      ],
+      error: null,
+    };
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 3, today)).resolves.toEqual([
+      { handle: "torvalds", score: 94, tier: "Elite", rank: 0 },
+      { handle: "gvanrossum", score: 91, tier: "Elite", rank: 0 },
+      { handle: "juan294", score: 88, tier: "High", rank: 0 },
+    ]);
+    expect(mockFrom).toHaveBeenCalledWith("metrics_snapshots");
+  });
+
+  // A standing is what the handle holds now, not its best ever: rows arrive
+  // newest first, so only the first row per handle counts.
+  // The board must print what the badge prints: headline_score is the fresh
+  // number, adjusted_composite the smoothed one kept for the trend line.
+  it("prefers the recorded headline score over the smoothed composite", async () => {
+    terminalResolve = {
+      data: [{ handle: "juan294", date: "2026-09-06", headline_score: 80, tier: "High" }],
+      error: null,
+    };
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 1, today)).resolves.toEqual([
+      { handle: "juan294", score: 80, tier: "High", rank: 0 },
+    ]);
+  });
+
+  // Publishing the smoothed composite would contradict the badge the row
+  // links to, so a row that never recorded a headline is simply not ranked.
+  it("drops a row written before the headline column existed", async () => {
+    terminalResolve = {
+      data: [
+        { handle: "juan294", date: "2026-09-06", headline_score: null, tier: "High" },
+        { handle: "w-winter", date: "2026-09-06", headline_score: 80, tier: "High" },
+      ],
+      error: null,
+    };
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 2, today)).resolves.toEqual([
+      { handle: "w-winter", score: 80, tier: "High", rank: 0 },
+    ]);
+  });
+
+  it("uses each handle's latest snapshot, not its highest past score", async () => {
+    terminalResolve = {
+      data: [
+        { handle: "juan294", date: "2026-09-06", headline_score: 60, tier: "Solid" },
+        { handle: "juan294", date: "2026-08-20", headline_score: 99, tier: "Elite" },
+        { handle: "torvalds", date: "2026-09-06", headline_score: 70, tier: "High" },
+      ],
+      error: null,
+    };
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 2, today)).resolves.toEqual([
+      { handle: "torvalds", score: 70, tier: "High", rank: 0 },
+      { handle: "juan294", score: 60, tier: "Solid", rank: 0 },
+    ]);
+  });
+
+  it("honours the requested size", async () => {
+    terminalResolve = {
+      data: [1, 2, 3, 4].map((n) => ({ handle: `dev${n}`, date: "2026-09-06", headline_score: 100 - n, tier: "High" })),
+      error: null,
+    };
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 2, today)).resolves.toHaveLength(2);
+  });
+
+  it("skips rows with no usable handle or score", async () => {
+    terminalResolve = {
+      data: [
+        { handle: "  ", date: "2026-09-06", headline_score: 99, tier: "Elite" },
+        { handle: "dev", date: "2026-09-06", headline_score: "high", tier: "Elite" },
+        { handle: "juan294", date: "2026-09-06", headline_score: 88, tier: "High" },
+      ],
+      error: null,
+    };
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 3, today)).resolves.toEqual([
+      { handle: "juan294", score: 88, tier: "High", rank: 0 },
+    ]);
+  });
+
+  // A snapshot exists for any rendered badge, including people who never
+  // signed up. The eligible set is the caller's consent check, so an empty one
+  // means an empty board rather than "rank everybody".
+  it("returns an empty list when no handle is eligible", async () => {
+    terminalResolve = { data: [{ handle: "torvalds", date: "2026-09-06", headline_score: 99, tier: "Elite" }], error: null };
+
+    await expect(dbGetTopScoredProfiles([], 3, today)).resolves.toEqual([]);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty list on a query error rather than throwing", async () => {
+    terminalResolve = { data: null, error: new Error("boom") };
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 3, today)).resolves.toEqual([]);
+  });
+
+  it("returns an empty list when the database is unconfigured", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    await expect(dbGetTopScoredProfiles(ELIGIBLE, 3, today)).resolves.toEqual([]);
   });
 });

@@ -1,6 +1,8 @@
 import "server-only";
 import { createHmac } from "node:crypto";
-import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import { canonicalJson, verifyRegisteredScoreReceipt, type StatsData, type ImpactV6Result } from "@chapa/shared";
+import { safeEqual } from "@/lib/crypto/safe-equal";
+import { parseVerificationTokenV7 } from "./constants";
 import { toDateString } from "@/lib/utils/date";
 import { getChapaVerificationSecret, getVercelEnv } from "@/lib/env";
 import { CURRENT_VERIFICATION_HASH_HEX_LENGTH } from "./constants";
@@ -71,4 +73,17 @@ export function generateVerificationCode(
   const hash = computeHash(payload, secret);
 
   return { hash, date };
+}
+
+/** No clock or selected-field projection: authenticate the complete immutable receipt. */
+export async function signReceiptV7(envelope: unknown, secret: string): Promise<string> {
+  if (!secret) throw new Error("Receipt signing key unavailable");
+  const receipt = await verifyRegisteredScoreReceipt(envelope);
+  const signature = createHmac("sha256", secret).update(canonicalJson(receipt), "utf8").digest("hex");
+  return `v7.${receipt.revisionId}.${signature}`;
+}
+
+export async function authenticateReceiptV7(token: string, envelope: unknown, secret: string | null): Promise<boolean> {
+  if (!secret || !parseVerificationTokenV7(token)) return false;
+  try { return safeEqual(token, await signReceiptV7(envelope, secret)); } catch { return false; }
 }

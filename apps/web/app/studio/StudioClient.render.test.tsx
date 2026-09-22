@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { useState } from "react";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 import { LanguageContext, type LanguageContextValue } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { resolveTranslation } from "@/lib/i18n/resolve";
+import type { CommandAction } from "@/components/terminal/command-registry";
 import {
   formatConfigCommands,
   formatConfigSummary,
@@ -99,7 +102,9 @@ vi.mock("./BadgePreviewCard", () => ({
     config,
     verification,
     avatarDataUri,
+    scoring,
   }: {
+    scoring?: ScoreViewModel;
     config: Record<string, unknown>;
     verification?: { hash: string; date: string } | null;
     avatarDataUri?: string;
@@ -109,6 +114,7 @@ vi.mock("./BadgePreviewCard", () => ({
       <div
         data-testid="badge-preview"
         data-instance-id={instanceId}
+        data-scoring={JSON.stringify(scoring)}
         data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
         data-avatar={avatarDataUri ?? "none"}
       >
@@ -259,6 +265,7 @@ vi.mock("@/components/KeyboardShortcutsListener", () => ({
 }));
 
 import { parseRetryAfterSeconds, StudioClient } from "./StudioClient";
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import type {
   BadgeConfig,
   CraftResult,
@@ -268,15 +275,7 @@ import type {
 
 // ---------- Test fixtures ----------
 
-const defaultConfig: BadgeConfig = {
-  background: "solid",
-  cardStyle: "flat",
-  border: "solid-amber",
-  scoreEffect: "standard",
-  heatmapAnimation: "fade-in",
-  tierTreatment: "standard",
-  colorPalette: "jade",
-};
+const defaultConfig: BadgeConfig = { ...DEFAULT_BADGE_CONFIG };
 
 const stats: StatsData = {
   handle: "testuser",
@@ -394,6 +393,27 @@ describe("StudioClient render", () => {
       ).not.toBe("");
     });
 
+    it.each(["en", "es"] as const)("explains Save publication and keeps demo wording local in %s", (locale) => {
+      const live = locale === "en"
+        ? "Changes preview locally until you save. Save updates your public badge, share page, and social preview."
+        : "Los cambios se previsualizan aquí hasta que guardas. Guardar actualiza tu Chapa pública, página compartida y vista previa social.";
+      const demoText = locale === "en" ? "Illustrative demo. Changes stay in this preview; Save does not publish them." : "Demo ilustrativa. Los cambios se quedan en esta vista previa; Guardar no los publica.";
+      const { rerender } = render(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} /></LanguageContext.Provider>);
+      expect(screen.getByTestId("studio-visible-subtitle").textContent).toBe(live);
+      rerender(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} demo /></LanguageContext.Provider>);
+      expect(screen.getByTestId("studio-visible-subtitle").textContent).toBe(demoText);
+      expect(screen.getByText(locale === "en" ? "Demo preview only" : "Solo vista previa de demo")).toBeDefined();
+    });
+
+    it("forwards observed core46 and report0 unchanged to the real preview boundary", async () => {
+      const fixture = await scoringConsistencyFixture({ craft: 0 });
+      render(<StudioClient initialConfig={defaultConfig} stats={fixture.stats} impact={fixture.impact} scoring={fixture.model} />);
+      const model = JSON.parse(screen.getByTestId("badge-preview").getAttribute("data-scoring")!);
+      expect(model).toEqual(fixture.model);
+      expect(model.composite.display).toBe(46);
+      expect(model.reportCraft.report.result.point.exact).toBe(0);
+    });
+
     it("forwards materialized Craft data to the Studio WebMCP tools", () => {
       render(
         <StudioClient
@@ -427,6 +447,61 @@ describe("StudioClient render", () => {
       // The tools band is what splits, and it splits on its own width rather
       // than a viewport breakpoint, so one layout serves desktop and 390px.
       expect(tools.className).toContain("minmax(min(100%,460px),1fr)");
+    });
+
+    it("keeps the badge on screen: the studio fills the viewport on a wide screen and the columns scroll on their own", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      // Applying an effect used to grow the session log, grow the page, and
+      // push the badge above the fold, so every change needed a scroll up to
+      // see it. The root is exactly the viewport below the nav on `lg`, the
+      // stage never shrinks, and the band under it is what gives.
+      const root = screen.getByTestId("studio-root");
+      expect(root.className).toContain("lg:h-[calc(100dvh-69px)]");
+      expect(screen.getByTestId("studio-stage").className).toContain(
+        "shrink-0",
+      );
+      const tools = screen.getByTestId("studio-tools");
+      expect(tools.className).toContain("flex-1");
+      // A floor, not `min-h-0`: a stage taller than the viewport (100% zoom)
+      // must overflow the page rather than crush the tools to nothing.
+      expect(tools.className).toContain("lg:min-h-[18rem]");
+      // Fit is bounded by height too on a wide viewport: the badge gives way
+      // before the controls and the save row fall below the fold.
+      expect(screen.getByTestId("studio-badge-frame").className).toContain(
+        "lg:w-[clamp(360px,calc((100dvh-560px)*1.9),min(720px,100%))]",
+      );
+      // Each column scrolls inside the band. `min-h-0` is what lets a flex or
+      // grid child shrink below its content in the first place.
+      const controls = screen.getByTestId("studio-controls-column");
+      expect(controls.className).toContain("lg:min-h-0");
+      expect(controls.className).toContain("lg:overflow-y-auto");
+      expect(screen.getByTestId("studio-session").className).toContain(
+        "lg:min-h-0",
+      );
+      expect(screen.getByTestId("studio-session").className).not.toContain(
+        "overflow-y-auto",
+      );
+    });
+
+    it("caps the session log on a narrow screen so it cannot grow the page", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      const log = screen.getByTestId("studio-session-log");
+      expect(log.className).toContain("overflow-y-auto");
+      expect(log.className).toContain("max-h-[50dvh]");
+      expect(log.className).toContain("lg:max-h-none");
+      expect(log.contains(screen.getByTestId("terminal-output"))).toBe(true);
     });
   });
 
@@ -917,7 +992,7 @@ describe("StudioClient render", () => {
       render(
         <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
       );
-      expect(screen.getByText("Preview saved")).toBeDefined();
+      expect(screen.getByText("Configuration saved")).toBeDefined();
 
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/set bg aurora" } });
@@ -942,7 +1017,7 @@ describe("StudioClient render", () => {
       fireEvent.change(input, { target: { value: "/set bg solid" } });
       fireEvent.keyDown(input, { key: "Enter" });
 
-      expect(screen.getByText("Preview saved")).toBeDefined();
+      expect(screen.getByText("Configuration saved")).toBeDefined();
       expect(screen.queryByText("Unsaved preview changes")).toBeNull();
     });
 
@@ -1190,7 +1265,7 @@ describe("StudioClient render", () => {
       expect(save.hasAttribute("disabled")).toBe(true);
       resolveSave(new Response("{}", { status: 200 }));
       await screen.findByText(
-        "Configuration saved. Your public badge and share page now show it.",
+        "Configuration saved. Your public badge, share page, and social preview now use it.",
       );
     });
 
@@ -1207,7 +1282,7 @@ describe("StudioClient render", () => {
       fireEvent.click(screen.getByTestId("studio-save"));
 
       const line = await screen.findByText(
-        "Configuration saved. Your public badge may take a few hours to update.",
+        "Configuration saved. Public previews could not be refreshed yet.",
       );
       expect(line.getAttribute("data-line-type")).toBe("warning");
       expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -1239,7 +1314,7 @@ describe("StudioClient render", () => {
       expect(screen.getByText("A save is already in progress.")).toBeDefined();
       resolveSave(new Response("{}", { status: 200 }));
       await screen.findByText(
-        "Configuration saved. Your public badge and share page now show it.",
+        "Configuration saved. Your public badge, share page, and social preview now use it.",
       );
     });
 
@@ -1616,7 +1691,7 @@ describe("StudioClient render", () => {
       expect(capturedShortcutHandler).not.toBeNull();
     });
 
-    it("focus-terminal shortcut focuses the terminal input", () => {
+    it("leaves terminal focus ownership to the global listener", () => {
       render(
         <StudioClient
           initialConfig={defaultConfig}
@@ -1629,10 +1704,10 @@ describe("StudioClient render", () => {
       const focusSpy = vi.spyOn(input, "focus");
 
       act(() => {
-        capturedShortcutHandler?.("focus-terminal");
+        capturedShortcutHandler?.("focus-command-bar");
       });
 
-      expect(focusSpy).toHaveBeenCalled();
+      expect(focusSpy).not.toHaveBeenCalled();
     });
 
     it("toggle-quick-controls shortcut toggles quick controls visibility", () => {
@@ -1765,6 +1840,16 @@ describe("StudioClient render", () => {
   // spurious "leave site?" prompt on every judge-demo exit would itself be a
   // regression.
   describe("beforeunload guard", () => {
+    // #1316 — these dispatch on the shared `window`, and the guard registers
+    // and unregisters on the save-state transition rather than on mount. The
+    // file-level `afterEach(cleanup)` should already remove every listener, so
+    // this is belt-and-braces against a component from an earlier test still
+    // being mounted when the next one dispatches: a stale dirty-state listener
+    // would call preventDefault and fail the "saved state" assertion below.
+    // The flake it guards against has not been reproduced on demand, so this
+    // is defensive rather than a confirmed fix.
+    beforeEach(cleanup);
+
     function dispatchBeforeUnload(): Event {
       const event = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(event);
@@ -1824,7 +1909,7 @@ describe("StudioClient render", () => {
 
       fireEvent.change(input, { target: { value: "/save" } });
       fireEvent.keyDown(input, { key: "Enter" });
-      await screen.findByText("Preview saved");
+      await screen.findByText("Configuration saved");
 
       const event = dispatchBeforeUnload();
       expect(event.defaultPrevented).toBe(false);
@@ -1873,12 +1958,12 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
       />,
     );
 
-  it("renders the save state as a status pill in the stage header", () => {
+  it("renders the save state as a restrained status label in the stage header", () => {
     renderStudio();
     const pill = document.querySelector("[data-save-state]") as HTMLElement;
     expect(pill).not.toBeNull();
     expect(pill.tagName).toBe("SPAN");
-    expect(pill.className).toContain("rounded-full");
+    expect(pill.className).toContain("rounded-[3px]");
     expect(pill.getAttribute("role")).toBe("status");
     expect(screen.getByTestId("studio-stage").contains(pill)).toBe(true);
   });
@@ -1998,10 +2083,9 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
     expect(screen.getByTestId("studio-prompt-row").className).toContain(
       "mt-auto",
     );
-    // The log is the flexible region now — it grows with the column instead of
-    // being a bounded strip above a sticky cluster.
-    const log = screen.getByTestId("terminal-output")
-      .parentElement as HTMLElement;
+    // The log is the flexible region: it takes the column's spare height and
+    // scrolls inside it, so it never grows the column or the page.
+    const log = screen.getByTestId("studio-session-log");
     expect(log.className).toContain("flex-1");
     expect(log.className).toContain("overflow-y-auto");
   });
@@ -2064,5 +2148,64 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
         "0 lines",
       ),
     );
+  });
+});
+
+
+describe("persisted configuration and pending response bodies", () => {
+  async function command(action: CommandAction) {
+    const { executeCommand } = await import("@/components/terminal/command-registry");
+    vi.mocked(executeCommand).mockReturnValue({ lines: [], action });
+    fireEvent.click(screen.getByTestId("studio-save"));
+  }
+  function unload() {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+  it.each([500, "transport"])("protects edits after a %s save failure", async (failure) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      if (failure === "transport") throw new Error("offline");
+      return new Response("{}", { status: failure as number });
+    });
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    await command({ type: "save" });
+    await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+    expect(unload()).toBe(true);
+  });
+  it("clears unsaved protection when edits return to the persisted config", async () => {
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    expect(unload()).toBe(true);
+    await command({ type: "set", category: "background", value: defaultConfig.background });
+    expect(unload()).toBe(false);
+  });
+  it("reset to the persisted defaults clears both dirty status and protection", async () => {
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    await command({ type: "reset" });
+    expect(screen.getByText("Configuration saved")).toBeDefined();
+    expect(unload()).toBe(false);
+  });
+  it("keeps saving through body delivery and leaves body-time edits unsaved", async () => {
+    let finishBody!: (value: unknown) => void;
+    const json = vi.fn(() => new Promise((resolve) => { finishBody = resolve; }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json } as unknown as Response);
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    await command({ type: "set", category: "background", value: "aurora" });
+    await command({ type: "save" });
+    await waitFor(() => expect(json).toHaveBeenCalled());
+    expect(screen.getByTestId("studio-save").hasAttribute("disabled")).toBe(true);
+    const { executeCommand } = await import("@/components/terminal/command-registry");
+    vi.mocked(executeCommand).mockReturnValue({ lines: [], action: { type: "set", category: "background", value: "gradient" } });
+    const input = screen.getByLabelText("Terminal command input");
+    fireEvent.change(input, { target: { value: "/set bg gradient" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await act(async () => { finishBody({ badgeRefreshed: false }); });
+    expect(screen.getByText("Unsaved preview changes")).toBeDefined();
+    expect(unload()).toBe(true);
+    await command({ type: "set", category: "background", value: "aurora" });
+    expect(unload()).toBe(false);
   });
 });

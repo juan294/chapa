@@ -13,6 +13,14 @@
     ".design-sync/emit-tokens.mjs",
     "apps/web/.ds-entry.tsx"
   ],
+  "ignoreFiles": [
+    "docs/design/chapa-redesign-reference/badge-lab/proposal-theme.ts",
+    "docs/design/chapa-redesign-reference/badge-lab/ProposalSvg.ts",
+    "docs/design/chapa-redesign-reference/script.js",
+    "docs/design/chapa-redesign-reference/shell.js",
+    "docs/design/chapa-redesign-reference/theme.js",
+    "docs/research/2026-09-05-scoring-audit-probes.ts"
+  ],
   "workspaces": {
     ".": {
       "entry": [

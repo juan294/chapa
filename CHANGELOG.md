@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-22
+
+### Added
+
+- **Impact v7.2 is implemented behind the existing disabled-by-default
+  `scoring_v7_rendering` flag.** Four equally weighted observed core points,
+  optional zero-weight Craft, exact arithmetic, immutable registered receipts,
+  offline replay, trend history, and verification now share one policy and
+  identity across badges, profiles, Studio, APIs, tools, email, and the
+  leaderboard.
+- **Evidence is durable and attributable.** New ledgers cover dated provider
+  observations, supplemental uploads, report-derived Craft, consent and
+  publication state, source context, receipt revisions, and public projections.
+  Fourteen additive Supabase migrations (`039` through `052`) install the
+  schema and seed the rendering flag off.
+- **The product has a new paper-and-ink interface and Ice Terminal badge.** The
+  landing page, profile, Studio, settings, administration, content pages,
+  loading and error states, mobile navigation, and generated images use the
+  refreshed design system, responsive behavior, and accessible interaction
+  targets.
+- **Profiles expose a consent-aware evidence workflow.** Owners can manage
+  publication consent and scored report state, while public output excludes
+  private report labels, paths, body digests, credentials, and withdrawn data.
+- **Release qualification is now exact and local-first.** Schema 2 evidence
+  binds the candidate commit and full tree to an allowlisted production build,
+  full browser selection, local dependency contracts, replay output, and every
+  required quality gate without creating a Vercel Preview deployment.
+
+### Changed
+
+- **All scored surfaces use a captured scoring selection.** Badge, share page,
+  OG image, Studio, history, APIs, MCP tools, email, and leaderboard agree on
+  the selected policy, exact score, canonical display, tier, and receipt.
+  Legacy v6 remains available when selected or when a current receipt does not
+  exist; archived v7/v7.1 receipts remain replayable.
+- **Statistics caching is bound to the credential and scoring context that
+  produced it.** Read-only consumers can reuse safe records without receiving
+  data collected under another grant, while invalidation remains per handle.
+- **Public navigation and localized rendering are stricter.** Unsupported
+  locales are rejected before streaming, static and dynamic locale boundaries
+  remain explicit, mobile layouts fit at 320 px, and internal-link coverage now
+  runs across both supported locales and viewports.
+- **The release path is `develop` to `main` by merge commit with tag-last
+  publication.** Preview creation is prohibited, pending migrations fail
+  closed, candidate and production trees must match, and release proof records
+  actual deployment identity and readback.
+- **Vercel Git deployments are disabled for `develop`.** The production branch
+  remains `main`, so the release push cannot create a Preview deployment while
+  the authorized merge can still create the production deployment.
+
+### Fixed
+
+- **First-time signups no longer get stuck on a 502 they cannot retry out
+  of.** Generation and Studio retry a failed session-token GitHub fetch once
+  with the server token, and the client allows enough time for both bounded
+  attempts. (#1282, #1283)
+- **Warm-cache failures no longer create a misleading P2 cron storm.** The
+  large GitHub GraphQL request is split into bounded concurrent operations,
+  ineligible handles are excluded, and per-handle failures emit deduplicated
+  P3 alerts while the HTTP cron outcome remains truthful.
+- Fixed receipt issuance, verification persistence, score-display agreement,
+  stale image fencing, owner/visitor not-found behavior, first-load cache
+  warming, leaderboard placement, reduced-motion startup, and verification
+  strip overflow found during the local relaunch qualification.
+
+### Security
+
+- Added CodeQL, grant-bound provider caches, strict receipt manifests,
+  authenticated evidence writes, consent-aware public projections, provider
+  token refresh auditing, and broader CORS/write-registration contract checks.
+
+### Dependencies
+
+- Updated Next.js and its analyzer/lint packages to 16.3.4, refreshed the
+  production dependency group, and kept TypeScript 6 and ESLint 9 within their
+  documented compatibility bounds.
+
 ## [2.29.5] - 2026-09-03
 
 ### Fixed
@@ -1594,7 +1671,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.24.1...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/juan294/chapa/compare/v2.29.5...v3.0.0
 [2.24.1]: https://github.com/juan294/chapa/compare/v2.24.0...v2.24.1
 [2.24.0]: https://github.com/juan294/chapa/compare/v2.23.0...v2.24.0
 [2.23.0]: https://github.com/juan294/chapa/compare/v2.22.1...v2.23.0

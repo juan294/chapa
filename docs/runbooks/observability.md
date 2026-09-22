@@ -92,8 +92,8 @@ dashboard** (last N runs of each cron path + status), and a **health dashboard**
 Log drains are for **retention and forensics**; they are **not** the real-time
 alert path. The app already does active alerting independently via
 `captureOperationalAlert()` (`apps/web/lib/analytics/server-errors.ts`), which
-sends **P1/P2 alerts** for `health_degraded`, `badge_5xx`,
-`oauth_callback_failure`, `cron_failure`, `warm_cache_high_failure_rate`,
+sends operational alerts for `health_degraded`, `badge_5xx`,
+`oauth_callback_failure`, `cron_failure`, `warm_cache_handle_failure`, `warm_cache_high_failure_rate`,
 `warm_cache_ceiling_approached`, and `badge_latency_slo_breach` (#974, raised
 by the daily `latency-check` cron when the badge route's p95 latency budget is
 exceeded or the probe fails). Alert payloads are JSON with secrets scrubbed.

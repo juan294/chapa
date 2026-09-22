@@ -617,6 +617,7 @@ export default function NumberCountersPage() {
             Animated Number{" "}
             <span className="text-amber">Counters</span>
           </h1>
+          <p className="mt-3 text-sm text-text-secondary">Illustrative fixtures for visual testing; these are not published profile scores.</p>
           <p className="mt-4 text-lg leading-relaxed text-text-secondary">
             Count-up animations with configurable easing, duration, and
             scroll-triggered reveals.

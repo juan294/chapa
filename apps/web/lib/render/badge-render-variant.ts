@@ -5,4 +5,4 @@
  * scripts can share the app's exact cache key without importing the Next.js
  * cache implementation.
  */
-export const BADGE_RENDER_VARIANT = "jade-v1";
+export const BADGE_RENDER_VARIANT = "ice-terminal-v2";

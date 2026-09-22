@@ -1,0 +1,14 @@
+{
+  "reviewedServerCommit": "72c376b3",
+  "command": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 pnpm --filter @chapa/web exec playwright test --project=chromium --project=mobile --workers=1 --reporter=line",
+  "passed": 176,
+  "failed": 0,
+  "skipped": 0,
+  "duration": "2.2m",
+  "fixtures": "chapa-redesign disposable project, loopback55331 API/55332 DB; 12 owned redesign handles and isolated journey shapes",
+  "upstreamUnexpectedCount": 0,
+  "journeyReceipts": [
+    "journey-full-impact-journe-97e21-h-across-persistence-shapes-mobile.json",
+    "journey-full-impact-journe-97e21-h-across-persistence-shapes-chromium.json"
+  ]
+}

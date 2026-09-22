@@ -40,6 +40,7 @@ export default function TierVisualsExperimentPage() {
               Tier-Specific{" "}
               <span className="text-amber">Visual Treatment</span>
             </h1>
+          <p className="mt-3 text-sm text-text-secondary">Illustrative fixtures for visual testing; these are not published profile scores.</p>
             <p className="text-text-secondary text-base sm:text-lg leading-relaxed">
               Progressive visual escalation across four tiers. Higher tiers earn
               more premium effects. Emerging is clean and professional. Elite is

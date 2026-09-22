@@ -1,0 +1,63 @@
+{
+  "results": {
+    "/?lang=en": [
+      "find_profile",
+      "get_site_capabilities"
+    ],
+    "/u/juan294?lang=en": [
+      "compare_profiles",
+      "explain_dimension",
+      "get_embed_snippet",
+      "get_impact_history",
+      "get_impact_profile",
+      "verify_badge"
+    ],
+    "/studio?lang=en": [
+      "apply_badge_style",
+      "apply_preset",
+      "explain_dimension",
+      "list_style_options",
+      "preview_badge",
+      "reset_badge_config",
+      "save_badge_config",
+      "simulate_score",
+      "suggest_improvements"
+    ],
+    "/studio?demo=1&lang=en": [
+      "apply_badge_style",
+      "apply_preset",
+      "explain_dimension",
+      "list_style_options",
+      "preview_badge",
+      "reset_badge_config",
+      "save_badge_config",
+      "simulate_score",
+      "suggest_improvements"
+    ],
+    "/verify/cc3c850fc319cc10921fed46c38912c3?lang=en": [
+      "explain_verification",
+      "get_verification_record"
+    ],
+    "/about?lang=en": []
+  },
+  "exec": {
+    "get_impact_profile": "ERR not registered",
+    "get_impact_history": "ERR not registered",
+    "compare_profiles": "ERR not registered",
+    "explain_dimension": "ERR not registered",
+    "explain_dimension_craft": "ERR not registered",
+    "get_embed_snippet": "ERR not registered",
+    "verify_badge": "ERR not registered",
+    "schemas": {}
+  },
+  "studio": {
+    "list_style_options": "ERR UnknownError: Failed to parse input arguments",
+    "apply_badge_style": "ERR UnknownError: Failed to parse input arguments",
+    "preview_badge": "ERR UnknownError: Failed to parse input arguments",
+    "simulate_score": "ERR UnknownError: Failed to parse input arguments",
+    "suggest_improvements": "ERR UnknownError: Failed to parse input arguments",
+    "apply_preset": "ERR UnknownError: Failed to parse input arguments",
+    "save_badge_config": "ERR UnknownError: Failed to parse input arguments",
+    "reset_badge_config": "ERR UnknownError: Failed to parse input arguments"
+  }
+}

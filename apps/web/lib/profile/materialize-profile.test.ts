@@ -7,6 +7,8 @@ import {
   materializeImpactState,
   materializeProfile,
 } from "./materialize-profile";
+import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found";
+import { expectFound } from "@/lib/test-helpers/found";
 
 const mockGetStats = vi.fn();
 const mockGetCachedCraftScore = vi.fn();
@@ -177,6 +179,19 @@ describe("materializeImpactState", () => {
 });
 
 describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
+  it.each(["2026-02-30", "2026-04-31"])("blocks persistence of an impossible heatmap date: %s", date => {
+    expect(materializeImpactState(makeFullStats({ heatmapData: [{ date, count: 0 }] })).statsComplete).toBe(false);
+  });
+
+  it("blocks persistence of an impossible fetched timestamp", () => {
+    expect(materializeImpactState(makeFullStats({ fetchedAt: "2026-02-30T12:00:00Z" })).statsComplete).toBe(false);
+  });
+
+  it("retains the persistence gate for structurally malformed legacy stats", () => {
+    const result = materializeImpactState(makeFullStats({ fetchedAt: "invalid" }));
+    expect(result.statsComplete).toBe(false);
+  });
+
   it("is true when prsMergedCount is greater than zero", () => {
     const stats = makeFullStats({ prsMergedCount: 5, commitsTotal: 50 });
 
@@ -197,7 +212,7 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
     expect(result.statsComplete).toBe(true);
   });
 
-  it("is false for the corrupt shape: 0 PRs but real commit activity", () => {
+  it("accepts measured zero with 0 PRs but real commit activity", () => {
     const stats = makeFullStats({
       prsMergedCount: 0,
       commitsTotal: 15585,
@@ -206,10 +221,10 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
 
     const result = materializeImpactState(stats);
 
-    expect(result.statsComplete).toBe(false);
+    expect(result.statsComplete).toBe(true);
   });
 
-  it("is false for the corrupt shape: 0 PRs but real issue activity", () => {
+  it("accepts measured zero with 0 PRs but real issue activity", () => {
     const stats = makeFullStats({
       prsMergedCount: 0,
       commitsTotal: 0,
@@ -218,13 +233,10 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
 
     const result = materializeImpactState(stats);
 
-    expect(result.statsComplete).toBe(false);
+    expect(result.statsComplete).toBe(true);
   });
 
-  it("is false for the #1049 scope-blinded shape: positive count, collapsed sample", () => {
-    // The exact juan294 2026-07-14 payload that DID persist and poison three
-    // snapshot rows: prsMergedCount 140 sails past the zero-check, while the
-    // fields Delivery actually scores on (weight is 70% of it) collapsed.
+  it("accepts positive counts with small samples without inferring corruption", () => {
     const stats = makeFullStats({
       prsMergedCount: 140,
       prsMergedWeight: 3.37828,
@@ -236,7 +248,7 @@ describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
 
     const result = materializeImpactState(stats);
 
-    expect(result.statsComplete).toBe(false);
+    expect(result.statsComplete).toBe(true);
   });
 
   it("stays true for a prolific user whose weight sits at the aggregation cap", () => {
@@ -284,7 +296,7 @@ describe("materializeDisplayProfile", () => {
     expect(result).not.toHaveProperty("latestSnapshot");
   });
 
-  it("preserves the completeness gate for poisoned stats", async () => {
+  it("accepts structurally valid zero-PR stats", async () => {
     mockGetStats.mockResolvedValue(
       makeFullStats({
         handle: "testuser",
@@ -297,7 +309,7 @@ describe("materializeDisplayProfile", () => {
 
     const result = await materializeDisplayProfile("testuser");
 
-    expect(result?.statsComplete).toBe(false);
+    expect(result?.statsComplete).toBe(true);
   });
 
   it("returns null instead of fabricating stats when the live load fails", async () => {
@@ -354,9 +366,7 @@ describe("materializeProfile", () => {
     mockGetCachedCraftScore.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(null);
 
-    const result = await materializeProfile("testuser");
-
-    expect(result).toBeNull();
+    expect(await materializeProfile("testuser")).toBeNull();
   });
 
   it("always reads craft from the cache (no live recomputation on read paths)", async () => {
@@ -371,10 +381,10 @@ describe("materializeProfile", () => {
     mockGetCachedCraftScore.mockResolvedValue(craftResult);
     mockGetCachedLatestSnapshot.mockResolvedValue(latestSnapshot);
 
-    const result = await materializeProfile("testuser", {
+    const result = expectFound(await materializeProfile("testuser", {
       token: "oauth-token",
       today: "2026-04-17",
-    });
+    }));
 
     expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token", {
       readOnly: undefined,
@@ -406,7 +416,7 @@ describe("materializeProfile", () => {
     mockGetCachedCraftScore.mockRejectedValue(new Error("craft cache down"));
     mockGetCachedLatestSnapshot.mockRejectedValue(new Error("snapshot cache down"));
 
-    const result = await materializeProfile("testuser");
+    const result = expectFound(await materializeProfile("testuser"));
 
     expect(result).not.toBeNull();
     expect(result?.craftResult).toBeNull();
@@ -426,10 +436,10 @@ describe("materializeProfile", () => {
     mockGetCachedLatestSnapshot.mockResolvedValue(badSameDaySnapshot);
     mockIsStatsDirty.mockResolvedValue(false);
 
-    const result = await materializeProfile("testuser", {
+    const result = expectFound(await materializeProfile("testuser", {
       today: "2026-04-17",
       ignoreSnapshot: true,
-    });
+    }));
 
     expect(result).not.toBeNull();
     // Raw score passes through — same-day lock never consulted.
@@ -460,9 +470,9 @@ describe("materializeProfile", () => {
       inputsChanged: true,
     });
 
-    const result = await materializeProfile("testuser", {
+    const result = expectFound(await materializeProfile("testuser", {
       today: "2026-04-17",
-    });
+    }));
 
     expect(mockIsStatsDirty).toHaveBeenCalledWith("testuser");
     expect(result?.inputsChanged).toBe(true);
@@ -474,5 +484,32 @@ describe("materializeProfile", () => {
     expect(result?.snapshot.adjustedComposite).toBe(
       expected.snapshot.adjustedComposite,
     );
+  });
+});
+
+// LE-8-2 — the stats loader distinguishes "GitHub says nobody owns this
+// handle" from "could not load". The public materializer must carry that
+// through rather than fold it into the same null an outage produces.
+describe("a handle GitHub does not know (LE-8-2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetStats.mockResolvedValue(githubUserNotFound("ghost"));
+    mockGetCachedCraftScore.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
+    mockIsStatsDirty.mockResolvedValue(false);
+  });
+
+  it("materializeProfile returns the sentinel, not null", async () => {
+    expect(isGitHubUserNotFound(await materializeProfile("ghost"))).toBe(true);
+  });
+
+  it("materializeProfile still returns null when stats are merely unavailable", async () => {
+    mockGetStats.mockResolvedValue(null);
+
+    expect(await materializeProfile("ghost")).toBeNull();
+  });
+
+  it("materializeDisplayProfile keeps its null contract for the owner and read-only callers", async () => {
+    expect(await materializeDisplayProfile("ghost", { readOnly: true })).toBeNull();
   });
 });

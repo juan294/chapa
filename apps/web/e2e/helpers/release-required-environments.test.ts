@@ -90,3 +90,15 @@ describe("parseReleaseVerificationMode", () => {
     );
   });
 });
+
+
+describe("explicit local qualification scenarios", () => {
+  it("selects all seven local required probes without production or rollback reads", () => {
+    expect([...releaseRequiredScenarioIds("local", "local-candidate")]).toEqual([
+      "deployment.local-candidate-identity", "health.core-dependencies", "profile.public-badge-read", "profile.public-share-read", "profile.share-verification", "locales.en-es", "auth.protected-write-denied",
+    ]);
+  });
+  it.each([["local", "default"], ["preview", "local-candidate"], ["production", "local-candidate"]])("rejects an ambiguous %s/%s pairing", (environment, mode) => {
+    expect(() => releaseRequiredScenarioIds(environment, mode)).toThrow(/local/i);
+  });
+});

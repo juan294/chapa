@@ -1,21 +1,20 @@
 /**
- * GitHub GraphQL query for fetching a user's contribution data over 365 days.
+ * Legacy v6 GraphQL activity contract. Repository history is intentionally a
+ * separate request: large accounts can make GitHub time out when both expensive
+ * fields share one operation. New scoring consumes fetchGitHubEvidence
+ * (apps/web/lib/github/evidence.ts), never these historical scalar proxies.
  *
  * Variables:
  * - $login: String! — GitHub username
  * - $since: DateTime! — Start of window (contributionsCollection)
  * - $until: DateTime! — End of window (contributionsCollection)
- * - $historySince: GitTimestamp! — Start of window (commit history)
- * - $historyUntil: GitTimestamp! — End of window (commit history)
  * - $mergedPrSearch: String! — `author:<login> is:pr is:merged created:<since>..<until>`,
- *   used by the top-level `search` field for an authoritative merged-PR count
- *   that isn't capped/scoped the way `pullRequestContributions` is.
+ *   used by the top-level `search` field for a legacy token-visible count.
+ *   This is not an independent authoritative completeness cross-check.
  *
- * Note: DateTime and GitTimestamp are different GraphQL types but accept
- * the same ISO 8601 strings. They must be declared as separate variables.
  */
 export const CONTRIBUTION_QUERY = `
-query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitTimestamp!, $historyUntil: GitTimestamp!, $mergedPrSearch: String!) {
+query($login: String!, $since: DateTime!, $until: DateTime!, $mergedPrSearch: String!) {
   user(login: $login) {
     login
     name
@@ -54,6 +53,17 @@ query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitT
         totalCount
       }
     }
+  }
+  search(query: $mergedPrSearch, type: ISSUE) {
+    issueCount
+  }
+}
+`;
+
+/** Legacy repository and commit-history fields, isolated from activity data. */
+export const REPOSITORY_STATS_QUERY = `
+query($login: String!, $historySince: GitTimestamp!, $historyUntil: GitTimestamp!) {
+  user(login: $login) {
     repositories(first: 100, ownerAffiliations: [OWNER, COLLABORATOR], orderBy: {field: PUSHED_AT, direction: DESC}) {
       totalCount
       nodes {
@@ -72,9 +82,6 @@ query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitT
     ownedRepos: repositories(ownerAffiliations: OWNER, first: 100, orderBy: {field: STARGAZERS, direction: DESC}) {
       nodes { stargazerCount forkCount watchers { totalCount } }
     }
-  }
-  search(query: $mergedPrSearch, type: ISSUE) {
-    issueCount
   }
 }
 `;

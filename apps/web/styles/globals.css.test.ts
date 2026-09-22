@@ -22,15 +22,9 @@ describe("globals.css", () => {
     });
 
     it("pins the --color-amber token value (accidental drift shifts the whole brand hue)", () => {
-      // Originally (#1167) this asserted #8B5CF6, to stop a contrast fix from
-      // rebranding the app as a side effect. #1206 replaced the violet accent
-      // with Jade deliberately, so the guard now pins the new value and keeps
-      // doing its real job: catching an UNINTENDED hue change. The accent is
-      // theme-aware since Jade, hence a value per block.
-      // #1211 folded the two per-theme declarations into one light-dark()
-      // value; the guard still pins both halves.
+      // Pin the approved vermilion/coral pair against accidental brand drift.
       expect(SOURCE).toContain(
-        "--color-amber: light-dark(oklch(.66 .15 163), oklch(.76 .16 163));",
+        "--color-amber: light-dark(#ed4930, #ff795f);",
       );
     });
   });
@@ -53,5 +47,37 @@ describe("globals.css", () => {
       expect(match).not.toBeNull();
       expect(match![1]).not.toContain("--color-amber)");
     });
+  });
+});
+
+describe("browser font delivery", () => {
+  it("retains explicit browser badge font loaders alongside the raster assets", () => {
+    // Next 16.3.3 emits these literal family names in the compiled CSS.
+    // Browser verification checks document.fonts; avoid duplicate TTF faces.
+    const layout = fs.readFileSync(path.resolve(__dirname, "../app/layout.tsx"), "utf-8");
+    for (const [loader, variable, weights] of [
+      ["Plus_Jakarta_Sans", "--font-plus-jakarta", ["400", "500", "600", "700"]],
+      ["JetBrains_Mono", "--font-jetbrains-mono", ["400", "500", "700", "800"]],
+    ] as const) {
+      const definition = layout.match(new RegExp(`${loader}\\(\\{([\\s\\S]*?)\\}\\)`))?.[1];
+      expect(definition).toContain(`variable: "${variable}"`);
+      for (const weight of weights) expect(definition).toContain(`"${weight}"`);
+    }
+    for (const file of [
+      "PlusJakartaSans-Regular.ttf",
+      "PlusJakartaSans-SemiBold.ttf",
+      "JetBrainsMono-Regular.ttf",
+      "JetBrainsMono-Bold.ttf",
+    ]) {
+      expect(fs.statSync(path.resolve(__dirname, `../lib/render/fonts/${file}`)).size).toBeGreaterThan(0);
+    }
+    expect(SOURCE).not.toContain('src: url("/fonts/');
+  });
+
+  it("keeps body, expressive and technical fonts separate", () => {
+    expect(SOURCE).toContain('--font-body: var(--font-manrope), system-ui, sans-serif;');
+    expect(SOURCE).toContain('--font-display: var(--font-barlow-condensed), sans-serif;');
+    expect(SOURCE).toContain('--font-heading: var(--font-jetbrains-mono)');
+    expect(SOURCE).toContain('--font-terminal: var(--font-jetbrains-mono)');
   });
 });

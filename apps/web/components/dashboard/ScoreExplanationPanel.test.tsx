@@ -72,7 +72,7 @@ function renderPanel(isOwner: boolean) {
 
 function expandPanel() {
   const toggle = screen.getByRole("button", {
-    name: "Toggle how your score is calculated",
+    name: /^How is my score calculated\?/i,
   });
   fireEvent.click(toggle);
   return toggle;
@@ -83,7 +83,7 @@ describe("ScoreExplanationPanel", () => {
     renderPanel(false);
 
     const toggle = screen.getByRole("button", {
-      name: "Toggle how your score is calculated",
+      name: /^How is my score calculated\?/i,
     });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
 

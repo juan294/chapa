@@ -1,7 +1,24 @@
+const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
+vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
+  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
+}));
+beforeEach(() => {
+  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+});
+const { mockSweepReceipts } = vi.hoisted(() => ({ mockSweepReceipts: vi.fn(async () => ({ attempted: 0, deleted: 0, failed: 0, cursorSaved: true })) }));
+vi.mock("@/lib/verification/cleanup", () => ({ sweepRevokedReceiptCachesV7: mockSweepReceipts, sweepRetiredSupplementalCachesV7: mockSweepReceipts }));
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { GET } from "./route";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+
+const { mockPurgeCraft } = vi.hoisted(() => ({ mockPurgeCraft: vi.fn(async () => 0) }));
+vi.mock("@/lib/db/craft-v7", () => ({ dbPurgeExpiredCraftRawV7: mockPurgeCraft }));
+
+const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
+vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
 
 const {
   mockVerifyCronSecret,
@@ -25,6 +42,7 @@ const {
   mockCaptureOperationalAlert,
   mockRenderBadgeSvg,
   mockGetPublicProfileVerification,
+  mockDeferProfileCacheWork,
   mockBuildBadgeSvgCacheKey,
   mockWriteBadgeSvgCache,
   mockReadBadgeSvgCache,
@@ -50,6 +68,7 @@ const {
   mockCaptureOperationalAlert: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
+  mockDeferProfileCacheWork: vi.fn(),
   mockBuildBadgeSvgCacheKey: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
   mockReadBadgeSvgCache: vi.fn(),
@@ -92,7 +111,10 @@ vi.mock("@/lib/history/significant-change", () => ({
   isSignificantChange: (...args: unknown[]) => mockIsSignificantChange(...args),
 }));
 
+vi.mock("@/lib/profile/score-model", () => ({ readRenderableReceipt: vi.fn(async () => null) }));
+
 vi.mock("@/lib/email/score-bump", () => ({
+  notifyObservedScoreChange: vi.fn(async () => false),
   notifyScoreBump: (...args: unknown[]) => mockNotifyScoreBump(...args),
 }));
 
@@ -114,6 +136,8 @@ vi.mock("@/lib/render/BadgeSvg", () => ({
 vi.mock("@/lib/profile/public-profile", () => ({
   getPublicProfileVerification: (...args: unknown[]) =>
     mockGetPublicProfileVerification(...args),
+  deferProfileCacheWork: (...args: unknown[]) =>
+    mockDeferProfileCacheWork(...args),
 }));
 
 vi.mock("@/lib/render/badge-svg-cache", () => ({
@@ -175,6 +199,7 @@ function user(handle: string) {
 describe("GET /api/cron/warm-cache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
     mockVerifyCronSecret.mockReturnValue(null);
     mockDbGetUsers.mockResolvedValue([user("alice"), user("bob")]);
     mockDbGetAllUserHandles.mockImplementation(async () =>
@@ -208,14 +233,37 @@ describe("GET /api/cron/warm-cache", () => {
       (handle: string, date: string) => `badge:v1:${handle}:warm-amber-v3:${date}`,
     );
     mockWriteBadgeSvgCache.mockResolvedValue(true);
+    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     // Default: no pre-existing badge SVG cache entry for today's key, so the
     // existing render/write assertions below keep passing unchanged.
     mockReadBadgeSvgCache.mockResolvedValue(null);
   });
 
+
+it("reports raw-retention failures without claiming deletion success", async () => {
+  mockVerifyCronSecret.mockReturnValue(null);
+  mockCacheSetNxStatus.mockResolvedValue("acquired");
+  mockPurgeCraft.mockRejectedValueOnce(new Error("private database detail"));
+  const response = await GET(new NextRequest("https://chapa.test/api/cron/warm-cache"));
+  const body = await response.json();
+  expect(body.expiredCraftRawDeleted).toBeNull();
+  expect(mockCaptureServerError).toHaveBeenCalledWith(expect.objectContaining({ error: expect.objectContaining({ message: "Craft raw artifact purge failed" }), route: "/api/cron/warm-cache" }));
+});
+
   afterEach(() => {
     vi.stubEnv("GITHUB_TOKEN", undefined);
     vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", undefined);
+  });
+
+  it("#1289 skips unknown config cache publication while continuing profile warming", async () => {
+    mockDbGetStudioConfig.mockResolvedValue({status: "unavailable"});
+    const response = await GET(makeRequest());
+    expect(response.status).toBe(200);
+    expect((await response.json()).warmed).toBe(2);
+    expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    mockDbGetStudioConfig.mockResolvedValue({status: "found", config: DEFAULT_BADGE_CONFIG, revision: 2});
+    await GET(makeRequest());
+    expect(mockWriteBadgeSvgCache).toHaveBeenCalled();
   });
 
   it("returns the denied response when cron auth fails", async () => {
@@ -240,7 +288,7 @@ describe("GET /api/cron/warm-cache", () => {
     expect(body.processedCount).toBe(2);
     expect(body.processedSample).toEqual(["alice", "bob"]);
     expect(body.handles).toBeUndefined();
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice");
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", { scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "alice",
       FAKE_MATERIALIZED,
@@ -267,12 +315,34 @@ describe("GET /api/cron/warm-cache", () => {
 
     expect(body.warmed).toBe(1);
     expect(body.failed).toBe(1);
-    expect(mockCaptureServerError).toHaveBeenCalledWith(
+    expect(mockCacheSetNxStatus).toHaveBeenCalledWith(
+      expect.stringMatching(/^warm-cache:handle-failure-alerted:alice:\d{4}-\d{2}-\d{2}$/),
+      86400,
+    );
+    expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
       expect.objectContaining({
+        signal: "warm_cache_handle_failure",
+        severity: "P3",
         route: "/api/cron/warm-cache",
-        statusCode: 502,
+        summary: "warm-cache could not refresh stats for alice",
+        properties: expect.objectContaining({ handle: "alice" }),
       }),
     );
+    expect(mockCaptureServerError).not.toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 502 }),
+    );
+  });
+
+  it("deduplicates a handle failure alert for the UTC day", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValueOnce(null);
+    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
+
+    await GET(makeRequest());
+
+    const handleAlerts = (mockCaptureOperationalAlert.mock.calls as Array<[{ signal: string }]>).filter(
+      ([options]) => options.signal === "warm_cache_handle_failure",
+    );
+    expect(handleAlerts).toHaveLength(0);
   });
 
   it("compares snapshots and notifies when an inserted canonical snapshot is significant", async () => {
@@ -300,6 +370,30 @@ describe("GET /api/cron/warm-cache", () => {
       expect.any(Object),
       expect.objectContaining({ significant: true, reason: "score_bump" }),
     );
+  });
+
+  it("never sends a legacy score bump while the observed policy is selected", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
+    mockDbGetLatestSnapshotBatch.mockResolvedValue(new Map([["alice", { date: "2026-04-16", adjustedComposite: 55 }]]));
+    mockIsSignificantChange.mockReturnValue({ significant: true, reason: "score_bump", allReasons: ["score_bump"] });
+    await GET(makeRequest());
+    expect(mockCompareSnapshots).not.toHaveBeenCalled();
+    expect(mockNotifyScoreBump).not.toHaveBeenCalled();
+  });
+
+  it("compares published observed revisions captured around issuance, never legacy snapshots", async () => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const { readRenderableReceipt } = await import("@/lib/profile/score-model");
+    const { notifyObservedScoreChange } = await import("@/lib/email/score-bump");
+    const before = await scoringConsistencyFixture();
+    const after = await scoringConsistencyFixture({ boundary: true });
+    const model = { ...after.model, identity: { ...after.model.identity!, revisionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } };
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
+    vi.mocked(readRenderableReceipt).mockResolvedValueOnce({ receipt: before.envelope, trend: null });
+    mockMaterializeOrchestratedProfile.mockResolvedValue({ ...FAKE_MATERIALIZED, scoring: model });
+    await GET(makeRequest());
+    expect(notifyObservedScoreChange).toHaveBeenCalledWith("alice", expect.objectContaining({ status: "comparable", current: expect.objectContaining({ identity: model.identity, composite: expect.objectContaining({ display: 69.99 }) }) }));
+    expect(mockCompareSnapshots).not.toHaveBeenCalled();
   });
 
   it("skips notifications when the snapshot was not persisted", async () => {
@@ -658,11 +752,13 @@ describe("GET /api/cron/warm-cache", () => {
         expect.stringContaining("alice"),
         "<svg>rendered</svg>",
         "alice",
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
       );
       expect(mockWriteBadgeSvgCache).toHaveBeenCalledWith(
         expect.stringContaining("bob"),
         "<svg>rendered</svg>",
         "bob",
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
       );
     });
 
@@ -677,6 +773,41 @@ describe("GET /api/cron/warm-cache", () => {
       expect(body.warmed).toBe(2);
       expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
+    });
+
+    // LE-6-1 — the SVG the cron publishes at the date rollover is the public
+    // badge for the rest of the day, and nothing else ever stored the record
+    // for the hash it printed: the snapshot writer below never writes
+    // `verification_records`, and the request path only stores what IT
+    // rendered. Once a visitor's stats moved, `/verify/<hash>` was a 404 for
+    // the number on the badge.
+    it("stores the verification record for the hash it rendered into the warmed SVG", async () => {
+      await GET(makeRequest());
+
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+        "alice",
+        FAKE_MATERIALIZED,
+        { verification: { hash: "verified-hash", date: "2026-04-17" }, verificationOnly: true },
+      );
+      expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
+        "bob",
+        FAKE_MATERIALIZED,
+        { verification: { hash: "verified-hash", date: "2026-04-17" }, verificationOnly: true },
+      );
+      // The record is stored after the SVG that prints it is published.
+      const writeOrder = mockWriteBadgeSvgCache.mock.invocationCallOrder[0]!;
+      const storeOrder = mockDeferProfileCacheWork.mock.invocationCallOrder[0]!;
+      expect(storeOrder).toBeGreaterThan(writeOrder);
+    });
+
+    it("stores no record when today's SVG was already warm (nothing new was printed)", async () => {
+      mockReadBadgeSvgCache.mockResolvedValue("<svg>already cached</svg>");
+
+      await GET(makeRequest());
+
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
     });
 
     it("withholds the SVG cache write when the avatar fails to resolve", async () => {
@@ -705,6 +836,7 @@ describe("GET /api/cron/warm-cache", () => {
         expect.any(String),
         "<svg>rendered</svg>",
         expect.any(String),
+        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) }),
       );
     });
 
@@ -774,6 +906,7 @@ describe("GET /api/cron/warm-cache", () => {
         "alice",
         expect.any(String),
         DEFAULT_LOCALE,
+        "v6",
       );
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         expect.anything(),
@@ -843,6 +976,7 @@ describe("GET /api/cron/warm-cache", () => {
         "alice",
         expect.any(String),
         DEFAULT_LOCALE,
+        "v6",
       );
     });
 

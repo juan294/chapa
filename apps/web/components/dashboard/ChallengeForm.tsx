@@ -96,7 +96,7 @@ export function ChallengeForm({ handle }: ChallengeFormProps) {
         <button
           type="button"
           onClick={() => setView("form")}
-          className="text-xs text-text-secondary underline decoration-dashed underline-offset-2 transition-colors hover:text-text-primary motion-reduce:transition-none"
+          className="min-h-[44px] text-xs text-text-secondary underline decoration-dashed underline-offset-2 transition-colors hover:text-text-primary motion-reduce:transition-none"
         >
           {t("scoreExplanation.challenge.ctaButton") as string}
         </button>
@@ -132,7 +132,7 @@ export function ChallengeForm({ handle }: ChallengeFormProps) {
           rows={4}
           aria-invalid={Boolean(validationError)}
           aria-describedby={validationError ? errorId : undefined}
-          className="w-full resize-none rounded-lg border border-stroke bg-track/40 px-3 py-2 text-sm text-text-primary transition-colors placeholder:text-text-secondary/50 focus:border-amber/40 focus:ring-1 focus:ring-amber/30 focus-visible:outline-none motion-reduce:transition-none"
+          className="w-full resize-none rounded-[3px] border border-stroke-strong bg-bg px-3 py-2 text-sm text-text-primary transition-colors placeholder:text-text-secondary focus:border-amber-text motion-reduce:transition-none"
         />
         {validationError && (
           <p id={errorId} role="alert" className="mt-1 text-xs text-terminal-red">
@@ -152,7 +152,7 @@ export function ChallengeForm({ handle }: ChallengeFormProps) {
           type="submit"
           disabled={submitting}
           aria-busy={submitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-amber px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-light disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] bg-action px-4 py-2 text-xs font-semibold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
         >
           {submitting
             ? (t("scoreExplanation.challenge.submitting") as string)
@@ -162,7 +162,7 @@ export function ChallengeForm({ handle }: ChallengeFormProps) {
           <button
             type="button"
             onClick={handleCancel}
-            className="text-xs text-text-secondary transition-colors hover:text-text-primary motion-reduce:transition-none"
+            className="min-h-[44px] text-xs text-text-secondary transition-colors hover:text-text-primary motion-reduce:transition-none"
           >
             {t("scoreExplanation.challenge.cancel") as string}
           </button>

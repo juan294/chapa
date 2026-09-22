@@ -314,3 +314,28 @@ describe("POST /api/insights contract", () => {
     expect(data).toMatchObject({ handle: HANDLE, tool: "claude-code" });
   });
 });
+
+describe("POST /api/insights v7 durable report contract", () => {
+  const owner = "contract-insights-v7";
+  afterAll(async () => {
+    await getServiceClient().rpc("scoring_v7_withdraw", { p_owner: owner });
+    await cleanupUser(owner);
+  });
+  it("persists the authenticated owner's descriptive import without rubric or core records", async () => {
+    await seedUser(owner);
+    const body = { schemaVersion: "v7", tool: "claude-code", reportPeriod: { start: "2026-02-20", end: "2026-03-07" }, totalSessions: 1,
+      outcomes: { fully_achieved: 1 }, satisfaction: null, toolUsage: null, sessionTypes: null, friction: null, toolErrors: null, totalToolCalls: null,
+      responseTime: { medianSeconds: null, averageSeconds: null }, volume: null, multiClauding: null };
+    const response = await invokeJson(POST, { method: "POST", path: "/api/insights", bearer: makeCliBearer(owner), body });
+    expect(response.status).toBe(200);
+    const output = bodyAsRecord(response);
+    expect(output).toMatchObject({ schemaVersion: "v7", success: true, persisted: true });
+    expect(output).not.toHaveProperty("craftScore");
+    const stored = await getServiceClient().from("scoring_v7_evidence").select("owner_handle,channel,category").eq("id", output.uploadId);
+    expect(stored.data).toEqual([{ owner_handle: owner, channel: "craft", category: "craft" }]);
+    expect((await getServiceClient().from("scoring_v7_raw_artifacts").select("id").eq("owner_handle", owner)).data).toHaveLength(1);
+    const forged = await invokeJson(POST, { method: "POST", path: "/api/insights", bearer: makeCliBearer(owner), body: { ...body, ownerId: "stranger", episodes: [{ assessments: [{ status: "accepted" }] }] } });
+    expect(forged.status).toBe(400);
+    expect((await getServiceClient().from("scoring_v7_assessments").select("id").eq("owner_handle", owner)).data).toEqual([]);
+  });
+});

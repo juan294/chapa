@@ -14,12 +14,21 @@ afterEach(cleanup);
 
 describe("Root loading.tsx", () => {
   describe("render", () => {
-    it("renders a status landmark with an accessible loading label", () => {
+    it("renders a status region with an accessible loading label", () => {
       render(RootLoading());
       const status = screen.getByRole("status");
-      expect(status.tagName).toBe("MAIN");
-      expect(status.id).toBe("main-content");
       expect(status.getAttribute("aria-label")).toBeTruthy();
+    });
+
+    // LE-5-3 — the fallback streams beside the page's own <main> until React
+    // swaps them, so a fallback that is itself `main#main-content` duplicates
+    // the landmark element and the skip-link id for that whole window. It
+    // never was a main landmark anyway: role="status" overrides <main>'s
+    // implicit role, so nothing is lost by making the element a <div>.
+    it("does not claim the page's main landmark or skip-link target", () => {
+      const { container } = render(RootLoading());
+      expect(container.querySelector("main")).toBeNull();
+      expect(container.querySelector("#main-content")).toBeNull();
     });
 
     it("has sr-only text for screen readers", () => {

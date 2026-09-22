@@ -225,3 +225,23 @@ describe("graceful degradation", () => {
     expect(mockCacheSet).not.toHaveBeenCalled();
   });
 });
+
+describe("current receipt notification content", () => {
+  it("uses the current canonical headline, dimensions and Craft instead of legacy traps", async () => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const fixture = await scoringConsistencyFixture({ craft: 0, boundary: true });
+    await notifyFirstBadge("alice", fixture.impact, fixture.model);
+    const payload = mockSend.mock.calls[0]![0];
+    expect(payload.text).toContain("Policy: v7.2");
+    expect(payload.text).toContain("Score: 69.99");
+    expect(payload.text).toContain("Craft: 0");
+    expect(payload.text).toContain(fixture.model.identity!.revisionId);
+    expect(payload.text).not.toMatch(/Confidence:|Adjusted:|Builder|Craft: 83/);
+  });
+  it("suppresses a notification with unavailable current authority", async () => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const fixture = await scoringConsistencyFixture();
+    await notifyFirstBadge("alice", fixture.impact, { ...fixture.model, freshness: "unavailable" });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+});

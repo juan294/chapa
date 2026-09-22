@@ -1,3 +1,4 @@
+// Explicit legacy v6 behavior. V7 uses the separate Craft evidence/diagnostics entry points.
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
 import type { CraftResult, CraftTier, InsightsUpload, InsightsTool } from "@chapa/shared";

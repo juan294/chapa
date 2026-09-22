@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { getServiceClient } from "@/test/contract/invoke";
 import {
   dbGetAllUserHandles,
+  dbUpsertUser,
   dbGetUserHandlePage,
   dbGetUsers,
   dbGetUsersWithEmail,
@@ -25,6 +26,7 @@ import {
 const RUN_ID = randomUUID();
 const HANDLE_PREFIX = `chapa-e2e-${RUN_ID.slice(0, 8)}-user-`;
 const EMU_SOURCE_HANDLE = `chapa-emu-${RUN_ID.slice(0, 8)}_source`;
+const LEGACY_RENDER_HANDLE = `chapa-legacy-${RUN_ID.slice(0, 8)}`;
 const TOTAL_USERS = 1001;
 
 describe("user accessors past the 1000-row max_rows cap (contract)", () => {
@@ -32,6 +34,18 @@ describe("user accessors past the 1000-row max_rows cap (contract)", () => {
     const db = getServiceClient();
     await db.from("users").delete().like("handle", `${HANDLE_PREFIX}%`);
     await db.from("users").delete().eq("handle", EMU_SOURCE_HANDLE);
+    await db.from("users").delete().eq("handle", LEGACY_RENDER_HANDLE);
+  });
+
+  it("reports committed registration and preserves profile updates (#1288)", async () => {
+    const handle = `${HANDLE_PREFIX}registry`;
+    expect(await dbUpsertUser(handle.toUpperCase(), { email: "registry@example.com", displayName: "First" })).toBe(true);
+    expect(await dbUpsertUser(handle, { displayName: "Updated" })).toBe(true);
+    const { data, error } = await getServiceClient().from("users")
+      .select("handle,email,display_name").eq("handle", handle).single();
+    expect(error).toBeNull();
+    expect(data).toEqual({ handle, email: "registry@example.com", display_name: "Updated" });
+    await getServiceClient().from("users").delete().eq("handle", handle);
   });
 
   it("excludes an EMU source row from the primary warm-cache registry", async () => {
@@ -43,6 +57,17 @@ describe("user accessors past the 1000-row max_rows cap (contract)", () => {
 
     const allHandles = await dbGetAllUserHandles();
     expect(allHandles).not.toContain(EMU_SOURCE_HANDLE);
+  });
+
+  it("excludes a valid legacy render-path handle without OAuth email evidence", async () => {
+    const db = getServiceClient();
+    const { error } = await db.from("users").insert({
+      handle: LEGACY_RENDER_HANDLE,
+    });
+    expect(error).toBeNull();
+
+    const allHandles = await dbGetAllUserHandles();
+    expect(allHandles).not.toContain(LEGACY_RENDER_HANDLE);
   });
 
   it("seeds past the max_rows cap and returns every row from both accessors", async () => {

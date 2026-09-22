@@ -1,3 +1,5 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { readObservedScoringHistory } from "@/lib/history/observed-history";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
@@ -78,13 +80,28 @@ export const GET = withErrorCapture("/api/history/[handle]", async (request: Nex
     window = parsed;
   }
 
+  const selection = await readScoringRenderSelection();
+  if (!selection.cacheable) return NextResponse.json({ error: "Scoring policy is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  if (selection.enabled) {
+    const stored = await readObservedScoringHistory(handle, { from, to });
+    if (stored.status === "unavailable") return NextResponse.json({ error: "Current scoring history is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    if (stored.status === "found") {
+      const history = stored.history;
+      return NextResponse.json({ handle, policyVersion: "v7.2",
+        ...(includes.has("snapshots") && { snapshots: history.observations }),
+        ...(includes.has("trend") && { trend: history.trend }),
+        ...(includes.has("diff") && { diff: history.comparisons.at(-1) ?? null }),
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
+  }
+
   // Fetch snapshots
   const snapshots = await getSnapshots(handle, from, to);
 
   const publicSnapshots = snapshots.map(redactSnapshotForVisitor);
 
   // Build response
-  const response: Record<string, unknown> = { handle };
+  const response: Record<string, unknown> = { handle, policyVersion: "v6" };
 
   if (includes.has("snapshots")) {
     response.snapshots = publicSnapshots;
@@ -108,7 +125,7 @@ export const GET = withErrorCapture("/api/history/[handle]", async (request: Nex
 
   return NextResponse.json(response, {
     headers: {
-      "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      "Cache-Control": "no-store",
     },
   });
 });

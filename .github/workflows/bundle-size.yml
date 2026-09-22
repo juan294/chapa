@@ -4,8 +4,9 @@
 # 1. `analyze` — Standard build, measures aggregate directory sizes, comments
 #    on PRs with a size table.
 # 2. `bundle-analyzer` — Runs @next/bundle-analyzer (ANALYZE=true), uploads
-#    interactive HTML treemap reports as CI artifacts, and enforces a 350 KB
-#    per-file budget on JS bundles.
+#    interactive HTML treemap reports as CI artifacts. It does NOT enforce the
+#    size budget: it builds with ANALYZE=true, which is not the build that
+#    ships (#1319). The budget is enforced in `analyze`, against the real build.
 #
 # NOTE: Turbopack limitation (see GitHub issue #303)
 #
@@ -97,6 +98,14 @@ jobs:
           NEXTAUTH_SECRET: dummy-secret-for-ci-32-characters
           UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
           UPSTASH_REDIS_REST_TOKEN: dummy
+
+      # #1319 — the budget is enforced here, against `pnpm run build`, because
+      # this is the build that deploys. It used to live only in the
+      # `bundle-analyzer` job, which builds with ANALYZE=true and therefore
+      # measured output production never emits: a 368 KB chunk sat over budget
+      # while this workflow reported success.
+      - name: Enforce JS bundle size budget
+        run: bash scripts/check-bundle-size.sh
 
       - name: Analyze bundle
         id: bundle
@@ -243,62 +252,3 @@ jobs:
             apps/web/.next/analyze/
           retention-days: 14
           if-no-files-found: warn
-
-      - name: Check JS bundle sizes (350 KB budget)
-        working-directory: apps/web
-        run: |
-          BUDGET_KB=350
-          BUDGET_BYTES=$((BUDGET_KB * 1024))
-          FAILED=0
-
-          echo "## Bundle Analyzer — Size Budget Check" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Budget: **${BUDGET_KB} KB** per JS file in \`.next/static/\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
-          # Check .next/static JS files (client bundles delivered to browsers)
-          if [ -d ".next/static" ]; then
-            OVER_BUDGET=""
-            while IFS=$'\t' read -r SIZE_BYTES FILE; do
-              SIZE_KB=$((SIZE_BYTES / 1024))
-              if [ "$SIZE_BYTES" -gt "$BUDGET_BYTES" ]; then
-                OVER_BUDGET="${OVER_BUDGET}\n| \`${FILE}\` | ${SIZE_KB} KB | :red_circle: OVER |"
-                FAILED=1
-              fi
-            done < <(find .next/static -name "*.js" -type f -print0 | xargs -0 -I{} sh -c 'printf "%s\t%s\n" "$(wc -c < "$1")" "$1"' _ {})
-
-            if [ -n "$OVER_BUDGET" ]; then
-              echo "| File | Size | Status |" >> "$GITHUB_STEP_SUMMARY"
-              echo "|------|------|--------|" >> "$GITHUB_STEP_SUMMARY"
-              echo -e "$OVER_BUDGET" >> "$GITHUB_STEP_SUMMARY"
-              echo "" >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo ":white_check_mark: All client JS files are under ${BUDGET_KB} KB." >> "$GITHUB_STEP_SUMMARY"
-              echo "" >> "$GITHUB_STEP_SUMMARY"
-            fi
-
-            echo "### Top 15 client JS files by size" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            find .next/static -name "*.js" -type f -exec du -h {} + | sort -rh | head -15 >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo ":warning: \`.next/static\` not found — Turbopack may structure output differently." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          # Report on analyzer HTML output
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ -d ".next/analyze" ]; then
-            FILE_COUNT=$(find .next/analyze -name "*.html" -type f | wc -l | tr -d ' ')
-            echo ":bar_chart: Bundle analyzer generated **${FILE_COUNT}** HTML report(s)." >> "$GITHUB_STEP_SUMMARY"
-            echo "Download the **bundle-analyzer-report** artifact to view interactive treemaps." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo ":warning: No \`.next/analyze/\` directory found." >> "$GITHUB_STEP_SUMMARY"
-            echo "Turbopack may not support \`@next/bundle-analyzer\` treemap generation." >> "$GITHUB_STEP_SUMMARY"
-            echo "See [Next.js #49887](https://github.com/vercel/next.js/issues/49887) for tracking." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          if [ "$FAILED" -eq 1 ]; then
-            echo ""
-            echo "::error::One or more JS files in .next/static/ exceed the ${BUDGET_KB} KB budget."
-            exit 1
-          fi

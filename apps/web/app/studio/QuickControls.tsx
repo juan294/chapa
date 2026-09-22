@@ -23,7 +23,7 @@ interface QuickControlsProps {
 }
 
 /**
- * The pointer affordance for the six badge categories: presets, then one
+ * The pointer affordance for the seven badge categories: presets, then one
  * accordion row per category.
  *
  * `/save` and `/reset` used to live at the bottom of this panel. They moved to
@@ -64,7 +64,7 @@ export function QuickControls({
         data-testid="qc-presets"
         className="border-b border-stroke px-4 py-3.5"
       >
-        <div className="mb-2.5 font-heading text-[10.5px] tracking-[0.16em] text-terminal-dim">
+        <div className="mb-2.5 font-heading text-[11px] tracking-[0.16em] text-terminal-dim">
           {t("studio.presetsHeading") as string}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -77,10 +77,10 @@ export function QuickControls({
                 data-testid={`qc-preset-${preset.id}`}
                 aria-pressed={applied}
                 onClick={() => onCommand(`/preset ${preset.id}`)}
-                className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg border px-3.5 font-heading text-[12.5px] transition-colors ${
+                className={`inline-flex min-h-[44px] items-center gap-2 rounded-[3px] border px-3.5 font-heading text-[12.5px] transition-colors ${
                   applied
-                    ? "border-amber bg-amber/10 font-bold text-text-primary"
-                    : "border-stroke bg-bg text-text-secondary hover:border-amber/30 hover:text-text-primary"
+                    ? "border-amber-text bg-amber/10 font-bold text-text-primary"
+                    : "border-stroke-strong bg-bg text-text-secondary hover:border-amber-text hover:text-text-primary"
                 }`}
               >
                 {applied && (
@@ -102,7 +102,7 @@ export function QuickControls({
         onClick={onToggle}
         aria-expanded={visible}
         aria-controls={panelId}
-        className="flex items-center justify-between gap-2 px-3 py-2 text-xs font-heading text-text-secondary transition-colors hover:text-text-primary w-full"
+        className="flex min-h-[44px] items-center justify-between gap-2 px-3 py-2 text-xs font-heading text-text-secondary transition-colors hover:text-text-primary w-full"
       >
         <span>{t("studio.quickControls") as string}</span>
         <span className="relative w-3.5 h-3.5">
@@ -139,12 +139,12 @@ export function QuickControls({
         </span>
       </button>
       {/* #1216 — how far the preview has drifted from the default, at a
-          glance. Without it the only way to tell was opening all nine
+          glance. Without it the only way to tell was opening all seven
           categories one by one. Kept OUTSIDE the toggle so it does not end up
           in that button's accessible name. */}
       <span
         data-testid="studio-changed-count"
-        className="shrink-0 rounded-full border border-stroke px-2 py-0.5 font-heading text-[11px] whitespace-nowrap text-terminal-dim"
+        className="shrink-0 rounded-[3px] border border-stroke px-2 py-0.5 font-heading text-[11px] whitespace-nowrap text-terminal-dim"
       >
         {changedCount === 0
           ? (t("studio.defaultConfig") as string)
@@ -159,8 +159,9 @@ export function QuickControls({
         {/* Categories */}
         {/* #1243 — no height cap. The 256px window suited #1216's narrow
             sticky column beside a 50%-width preview; in the v3 tools column it
-            was a small scroller above a large void. The list flows and the
-            column scrolls with the page. */}
+            was a small scroller above a large void. The list flows; the column
+            around it scrolls (on its own on a wide viewport, with the page on a
+            narrow one) so the badge stage above stays put. */}
         <div data-testid="qc-categories">
           {STUDIO_CATEGORIES.map((category) => {
               const alias = CATEGORY_KEY_TO_ALIAS[category.key] ?? category.key;
@@ -188,8 +189,7 @@ export function QuickControls({
                       </span>
                       {getCategoryLabel(category, t)}
                     </span>
-                    {/* `text-amber` is a fill value at 2.75:1 on the light
-                        ground; `text-amber-text` is its text-safe counterpart. */}
+                    {/* Use the text-safe accent for a label on the page ground. */}
                     <span
                       data-testid={`qc-value-${category.key}`}
                       className="truncate font-heading text-xs text-amber-text"
@@ -218,18 +218,14 @@ export function QuickControls({
                             // glyph inside the text would be read out as one.
                             aria-pressed={opt.value === currentValue}
                             onClick={() => onCommand(`/set ${alias} ${opt.value}`)}
-                            className={`inline-flex min-h-[44px] flex-col items-start justify-center gap-0.5 rounded-[9px] border px-3 py-1.5 text-left transition-colors ${
+                            className={`inline-flex min-h-[44px] flex-col items-start justify-center gap-0.5 rounded-[3px] border px-3 py-1.5 text-left transition-colors ${
                               opt.value === currentValue
-                                ? "border-amber bg-amber/10"
-                                : "border-stroke hover:border-amber/20"
+                                ? "border-amber-text bg-amber/10"
+                                : "border-stroke-strong hover:border-amber-text"
                             }`}
                           >
-                            {/* Selection is carried by the accent border and
-                                tint. `text-amber` is a fill value at 2.75:1 on
-                                the light ground, which no 11px label can afford
-                                (#1241); `text-amber-text` (#1243) is the
-                                text-safe accent, used for the row value where
-                                the type is larger. */}
+                            {/* Selection is carried by the text-safe accent border,
+                                tint, check mark and pressed state. */}
                             <span
                               className={`font-heading text-xs ${
                                 opt.value === currentValue

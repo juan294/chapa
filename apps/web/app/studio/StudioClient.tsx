@@ -14,6 +14,8 @@ import type {
   StatsData,
   ImpactV6Result,
 } from "@chapa/shared";
+import { useUnsavedNavigation } from "@/hooks/useUnsavedNavigation";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { BadgePreviewCard } from "./BadgePreviewCard";
@@ -52,6 +54,8 @@ export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: StatsData;
   impact: ImpactV6Result;
+  /** The model the public badge draws; forwarded to the preview (#1311). */
+  scoring?: ScoreViewModel;
   craftResult?: CraftResult | null;
   handle?: string;
   verification?: PreviewVerification | null;
@@ -76,9 +80,22 @@ type Translate = LanguageContextValue["t"];
  * The 50%/100% frames are flex children of a horizontally scrolling viewport,
  * so they need `shrink-0`: without it flexbox quietly shrinks them back to the
  * container width and the zoom appears to do nothing.
+ *
+ * Fit is bounded by height as well as width on a wide viewport, so the badge,
+ * the controls and the save row share the screen without the page scrolling.
+ * The badge is 1200x630, so its width is 1.9x the height it can have, and
+ * that height is the viewport minus what surrounds it: the nav (69px), the
+ * stage's own chrome (header, padding, config line: ~205px) and the tools
+ * band's floor (`lg:min-h-[18rem]`, 288px). The 360px floor keeps it legible
+ * on a very short window at the cost of a little page scroll.
  */
 const ZOOM_OPTIONS = [
-  { id: "fit", labelKey: "studio.zoom.fit", frameClass: "w-[min(720px,100%)]" },
+  {
+    id: "fit",
+    labelKey: "studio.zoom.fit",
+    frameClass:
+      "w-[min(720px,100%)] lg:w-[clamp(360px,calc((100dvh-560px)*1.9),min(720px,100%))]",
+  },
   {
     id: "half",
     labelKey: "studio.zoom.half",
@@ -101,6 +118,11 @@ const TERMINAL_HINT_LINE_ID = "studio-terminal-hint";
 // UX-M1 (#1173): Quick Controls now defaults to expanded (see showQuickControls
 // below) but a user's explicit collapse choice is still respected across visits.
 const QUICK_CONTROLS_STORAGE_KEY = "chapa:studio:quickControlsVisible";
+
+function sameConfig(left: BadgeConfig, right: BadgeConfig): boolean {
+  return (Object.keys(left) as (keyof BadgeConfig)[])
+    .every((key) => left[key] === right[key]);
+}
 
 function translation(t: Translate, key: string): string {
   return t(key) as string;
@@ -177,6 +199,7 @@ export function StudioClient({
   initialConfig,
   stats,
   impact,
+  scoring,
   craftResult = null,
   handle = "",
   verification = null,
@@ -187,6 +210,10 @@ export function StudioClient({
   const { webmcpEnabled } = useClientFeatureFlags();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
   const configRef = useRef(config);
+  const [persistedConfig, setPersistedConfig] = useState(initialConfig);
+  const persistedConfigRef = useRef(initialConfig);
+  const hasUnsavedChanges = !sameConfig(config, persistedConfig);
+  useUnsavedNavigation(!demo && hasUnsavedChanges);
   const [saveState, setSaveState] = useState<SaveState>({ status: "saved" });
   const [pendingAgentSave, setPendingAgentSave] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
@@ -234,7 +261,6 @@ export function StudioClient({
   }, []);
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
-  const configRevisionRef = useRef(0);
   const saveInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -299,22 +325,6 @@ export function StudioClient({
     }
   }, [trackStudioEvent]);
 
-  // FE-M3 (#1173): warn before an unsaved-changes loss. Registered/removed on
-  // the saveState.status transition (not just on mount) so the listener only
-  // exists while there's actually something to lose. Demo mode never
-  // persists by design (see handleSave above) — the guard must not fire
-  // there, or the judge-demo flow gets a spurious "leave site?" prompt on
-  // every exit even though there was never anything to save.
-  useEffect(() => {
-    if (demo || saveState.status !== "dirty") return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [demo, saveState.status]);
-
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
       const currentConfig = configRef.current;
@@ -330,9 +340,9 @@ export function StudioClient({
         }
       }
       if (changed) {
-        configRevisionRef.current += 1;
         if (!saveInFlightRef.current) {
-          setSaveState({ status: "dirty" });
+          const unsaved = !sameConfig(newConfig, persistedConfigRef.current);
+          setSaveState({ status: unsaved ? "dirty" : "saved" });
         }
       }
       configRef.current = newConfig;
@@ -351,7 +361,6 @@ export function StudioClient({
     }
 
     saveInFlightRef.current = true;
-    const revision = configRevisionRef.current;
     const configToSave = configRef.current;
     setSaveState({ status: "saving" });
     try {
@@ -375,8 +384,6 @@ export function StudioClient({
       });
       if (res.ok) {
         trackStudioEvent("config_saved", { config: configToSave });
-        const hasNewerChanges = configRevisionRef.current !== revision;
-        setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
         // hotfix v2.29.2 — an older server during a rolling deploy omits
         // `badgeRefreshed` from the body; treat that as refreshed rather than
         // showing a deferred warning for a save that actually succeeded. One
@@ -385,6 +392,12 @@ export function StudioClient({
         const payload: { badgeRefreshed?: boolean } = await res
           .json()
           .catch(() => ({}));
+        // The body may arrive after more edits. Record only what this request
+        // actually persisted, and derive status after the final await.
+        persistedConfigRef.current = configToSave;
+        setPersistedConfig(configToSave);
+        const hasNewerChanges = !sameConfig(configRef.current, configToSave);
+        setSaveState({ status: hasNewerChanges ? "dirty" : "saved" });
         const badgeRefreshed = payload.badgeRefreshed !== false;
         const status = hasNewerChanges
           ? "changedDuringSave"
@@ -450,16 +463,12 @@ export function StudioClient({
     const currentConfig = configRef.current;
     const resetConfig = getStudioCommandConfig(currentConfig, { type: "reset" });
     if (!resetConfig) return;
-    const changed = Object.keys(resetConfig).some((key) => {
-      const configKey = key as keyof BadgeConfig;
-      return currentConfig[configKey] !== resetConfig[configKey];
-    });
+    const changed = !sameConfig(currentConfig, resetConfig);
     configRef.current = resetConfig;
     setConfig(resetConfig);
     if (changed) {
-      configRevisionRef.current += 1;
       if (!saveInFlightRef.current) {
-        setSaveState({ status: "dirty" });
+        setSaveState({ status: sameConfig(resetConfig, persistedConfigRef.current) ? "saved" : "dirty" });
       }
     }
     trackStudioEvent("effect_changed", {
@@ -551,6 +560,7 @@ export function StudioClient({
     enabled: webmcpEnabled,
     stats,
     impact,
+    scoring,
     craftResult,
     handle,
     saveStatus: saveState.status,
@@ -567,9 +577,9 @@ export function StudioClient({
     [handleSubmit],
   );
 
-  const handlePartialChange = useCallback((val: string) => {
+  const handlePartialChange = useCallback((val: string, suggest = true) => {
     setPartial(val);
-    setShowAutocomplete(val.startsWith("/") && val.length > 0);
+    setShowAutocomplete(suggest && val.startsWith("/") && val.length > 0);
   }, []);
 
   const handleAutocompleteDismiss = useCallback(() => {
@@ -609,13 +619,6 @@ export function StudioClient({
   useEffect(() => {
     return registerPageShortcuts("studio", (id: string) => {
       switch (id) {
-        case "focus-terminal": {
-          const input = document.querySelector<HTMLInputElement>(
-            `#${TERMINAL_COMMAND_INPUT_ID}`,
-          );
-          input?.focus();
-          break;
-        }
         case "cycle-preset": {
           const currentIdx = STUDIO_PRESETS.findIndex(
             (p) => p.config.background === config.background,
@@ -648,7 +651,17 @@ export function StudioClient({
     ZOOM_OPTIONS[0]!.frameClass;
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+    // The badge must stay on screen while the user works. On a wide viewport
+    // the studio is exactly the viewport below the nav (`pt-[69px]` in
+    // page.tsx): the stage keeps its natural height at the top and the tools
+    // band takes the rest, with each column scrolling on its own. The page
+    // itself only scrolls when the stage alone is taller than the viewport
+    // (100% zoom, a short window), because the band keeps a floor height
+    // rather than collapsing. Narrow viewports keep the flowing layout.
+    <div
+      data-testid="studio-root"
+      className="flex min-h-[calc(100dvh-69px)] flex-col lg:h-[calc(100dvh-69px)]"
+    >
       <h1 className="sr-only">{t("studio.title") as string}</h1>
 
       {/* #1241 — the stage owns the full width. The badge is a fixed 1200x630
@@ -658,14 +671,14 @@ export function StudioClient({
       <section
         data-testid="studio-stage"
         aria-busy={saving}
-        className="@container border-b border-stroke px-3 py-4 sm:px-6 sm:py-6"
+        className="@container shrink-0 border-b border-stroke px-3 py-4 sm:px-6 sm:py-6"
       >
         <h2 className="sr-only">{t("studio.stage.title") as string}</h2>
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="font-heading text-sm whitespace-nowrap text-text-primary">
-              <span className="select-none text-amber">%</span>{" "}
+              <span className="select-none text-amber-text">%</span>{" "}
               {t("studio.stage.command") as string}
             </span>
             {/* The section-header rule keeps meta on one line, but this meta
@@ -677,7 +690,7 @@ export function StudioClient({
             </span>
             {demo && (
               <span
-                className="font-heading text-xs font-bold tracking-[0.2em] text-amber"
+                className="font-heading text-xs font-bold tracking-[0.2em] text-amber-text"
                 data-testid="studio-demo-marker"
               >
                 {t("studio.demoMarker") as string}
@@ -690,7 +703,7 @@ export function StudioClient({
             <div
               role="group"
               aria-label={t("studio.zoom.groupLabel") as string}
-              className="inline-flex gap-0.5 rounded-lg border border-stroke-strong bg-bg p-0.5"
+              className="inline-flex gap-0.5 rounded-[3px] border border-stroke-strong bg-bg p-0.5"
             >
               {ZOOM_OPTIONS.map((option) => {
                 const selected = option.id === zoom;
@@ -701,7 +714,7 @@ export function StudioClient({
                     data-testid={`studio-zoom-${option.id}`}
                     aria-pressed={selected}
                     onClick={() => setZoom(option.id)}
-                    className={`min-h-[36px] rounded-md px-3 font-heading text-[11.5px] transition-colors ${
+                    className={`min-h-[44px] rounded-[3px] px-3 font-heading text-[11.5px] transition-colors ${
                       selected
                         ? "bg-amber/10 font-bold text-amber-text"
                         : "text-text-secondary hover:text-text-primary"
@@ -714,11 +727,11 @@ export function StudioClient({
             </div>
 
             <span
-              className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 font-heading text-xs ${
+              className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-[3px] border px-3 font-heading text-xs ${
                 saveState.status === "error"
                   ? "border-terminal-red/40 bg-terminal-red/10 text-terminal-red"
                   : saveState.status === "saving"
-                    ? "animate-terminal-fade-in border-amber/40 bg-amber/10 text-amber"
+                    ? "animate-terminal-fade-in border-amber/40 bg-amber/10 text-amber-text"
                     : saveState.status === "dirty"
                       ? "border-terminal-yellow/40 bg-terminal-yellow/10 text-terminal-yellow"
                       : "border-terminal-green/40 bg-terminal-green/10 text-terminal-green"
@@ -728,14 +741,14 @@ export function StudioClient({
             >
               {saveState.status === "error"
                 ? saveState.message
-                : (t(`studio.save.${saveState.status}`) as string)}
+                : (t(demo && saveState.status === "saved" ? "studio.save.demoPreview" : `studio.save.${saveState.status}`) as string)}
             </span>
           </div>
         </div>
 
         {/* The badge is server-rendered and always dark, so its stage is one of
             the fixed-ground surfaces: forest tokens, not theme-aware ones. */}
-        <div className="bg-grid-forest flex flex-col items-center gap-4 rounded-2xl border border-forest-line bg-forest p-4 sm:p-6">
+        <div className="bg-grid-forest flex flex-col items-center gap-4 rounded-[3px] border border-forest-line bg-forest p-4 sm:p-6">
           <div
             data-testid="studio-stage-viewport"
             className="flex max-w-full overflow-x-auto [justify-content:safe_center]"
@@ -749,6 +762,7 @@ export function StudioClient({
                 config={config}
                 stats={stats}
                 impact={impact}
+                scoring={scoring}
                 verification={verification}
                 avatarDataUri={avatarDataUri}
                 demoMode={demo}
@@ -773,7 +787,7 @@ export function StudioClient({
               type="button"
               data-testid="studio-copy-config"
               onClick={() => void handleCopyConfig()}
-              className="min-h-[36px] rounded-lg border border-forest-line px-3 font-heading text-[11px] whitespace-nowrap text-forest-dim transition-colors hover:border-forest-text/40 hover:text-forest-text"
+              className="min-h-[44px] rounded-[3px] border border-forest-dim px-3 font-heading text-[11px] whitespace-nowrap text-forest-dim transition-colors hover:border-forest-text hover:text-forest-text focus-visible:outline-forest-text!"
             >
               {copied
                 ? `✓ ${t("studio.copyConfig.copied") as string}`
@@ -794,9 +808,12 @@ export function StudioClient({
           instead of being stranded at the bottom of the page. */}
       <div
         data-testid="studio-tools"
-        className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] items-stretch"
+        className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] items-stretch lg:min-h-[18rem]"
       >
-        <div className="@container flex min-w-0 flex-col border-r border-b border-stroke">
+        <div
+          data-testid="studio-controls-column"
+          className="@container flex min-w-0 flex-col border-r border-b border-stroke lg:min-h-0 lg:overflow-y-auto"
+        >
           {/* The page's only accessible name is the sr-only <h1> above; this
               repeats it visually and is hidden from assistive tech to avoid a
               double announcement. The subhead is new descriptive copy. */}
@@ -812,7 +829,7 @@ export function StudioClient({
               data-testid="studio-visible-subtitle"
               className="text-sm leading-relaxed text-pretty text-text-secondary"
             >
-              {t("studio.subtitle") as string}
+              {t(demo ? "studio.demoSubtitle" : "studio.subtitle") as string}
             </p>
           </div>
 
@@ -826,23 +843,31 @@ export function StudioClient({
 
         <div
           data-testid="studio-session"
-          className="@container flex min-w-0 flex-col border-b border-stroke bg-card"
+          className="@container flex min-w-0 flex-col border-b border-stroke bg-card lg:min-h-0"
         >
           <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1">
-            <span className="font-heading text-[10px] tracking-[0.14em] text-terminal-dim">
+            <span className="font-heading text-[11px] tracking-[0.14em] text-terminal-dim">
               {t("studio.session") as string}
             </span>
             <button
               type="button"
               data-testid="studio-clear-session"
               onClick={() => handleQuickCommand("/clear")}
-              className="min-h-[36px] rounded-lg border border-stroke px-2.5 font-heading text-[11px] text-text-secondary transition-colors hover:border-amber/30 hover:text-text-primary"
+              className="min-h-[44px] rounded-[3px] border border-stroke-strong px-2.5 font-heading text-[11px] text-text-secondary transition-colors hover:border-amber-text hover:text-text-primary"
             >
               {t("studio.clearSession") as string}
             </button>
           </div>
 
-          <div className="min-h-36 flex-1 overflow-y-auto">
+          {/* The log scrolls inside this box and never grows the page: on a
+              wide viewport it takes whatever height the column leaves after
+              the prompt and the save row, on a narrow one it is capped at half
+              the viewport. `TerminalOutput` scrolls this box to the latest
+              line, not the window. */}
+          <div
+            data-testid="studio-session-log"
+            className="min-h-24 max-h-[50dvh] flex-1 overflow-y-auto lg:max-h-none"
+          >
             <TerminalOutput lines={localizedLines} />
           </div>
 
@@ -863,6 +888,7 @@ export function StudioClient({
             <TerminalInput
               onSubmit={handleSubmit}
               onPartialChange={handlePartialChange}
+              onHistoryChange={value => handlePartialChange(value, false)}
               history={history}
               prompt="studio"
               suggestionsVisible={autocompleteExpanded}
@@ -880,7 +906,7 @@ export function StudioClient({
               data-testid="studio-save"
               onClick={() => handleQuickCommand("/save")}
               disabled={saving}
-              className="min-h-[46px] flex-1 rounded-lg bg-amber-dark font-heading text-sm font-bold text-white transition-colors hover:bg-amber disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[46px] flex-1 rounded-[3px] bg-action font-heading text-sm font-bold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               /save
             </button>
@@ -888,7 +914,7 @@ export function StudioClient({
               type="button"
               data-testid="studio-reset"
               onClick={() => handleQuickCommand("/reset")}
-              className="min-h-[46px] rounded-lg border border-stroke px-4 font-heading text-sm text-text-secondary transition-colors hover:border-amber/30 hover:text-text-primary"
+              className="min-h-[46px] rounded-[3px] border border-stroke-strong px-4 font-heading text-sm text-text-secondary transition-colors hover:border-amber-text hover:text-text-primary"
             >
               /reset
             </button>
@@ -909,7 +935,7 @@ export function StudioClient({
                   data-testid="agent-save-confirm"
                   onClick={handleAgentSaveConfirm}
                   disabled={saving}
-                  className="min-h-[44px] flex-1 rounded-lg bg-amber-dark px-3 font-heading text-xs font-bold text-white transition-colors hover:bg-amber disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-[44px] flex-1 rounded-[3px] bg-action px-3 font-heading text-xs font-bold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("studio.agentSave.confirm") as string}
                 </button>
@@ -917,7 +943,7 @@ export function StudioClient({
                   type="button"
                   data-testid="agent-save-dismiss"
                   onClick={handleAgentSaveDismiss}
-                  className="min-h-[44px] rounded-lg border border-stroke px-3 font-heading text-xs text-text-secondary transition-colors hover:border-amber/30 hover:text-text-primary"
+                  className="min-h-[44px] rounded-[3px] border border-stroke-strong px-3 font-heading text-xs text-text-secondary transition-colors hover:border-amber-text hover:text-text-primary"
                 >
                   {t("studio.agentSave.dismiss") as string}
                 </button>

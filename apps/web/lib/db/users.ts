@@ -20,6 +20,7 @@ interface UserRow {
   registered_at: string;
   display_name: string | null;
   avatar_url: string | null;
+  email?: string | null;
 }
 
 const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
@@ -85,7 +86,7 @@ interface UpsertUserOpts {
 }
 
 /**
- * Register a user (upsert — idempotent).
+ * Register a user (upsert — idempotent). Returns whether the write succeeded.
  * Handles are stored lowercase for consistent lookups.
  *
  * When any profile field is provided, updates the existing row
@@ -95,15 +96,15 @@ interface UpsertUserOpts {
 export async function dbUpsertUser(
   handle: string,
   opts?: UpsertUserOpts,
-): Promise<void> {
+): Promise<boolean> {
   // The permanent users registry contains primary GitHub identities only.
   // EMU source handles can contain underscores and are stored separately as
   // supplemental data; registering one here makes warm-cache retry an account
   // the server token cannot resolve on every hourly run.
-  if (!isValidHandle(handle)) return;
+  if (!isValidHandle(handle)) return false;
 
   const db = getSupabase();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     const row: Record<string, string | null> = { handle: handle.toLowerCase() };
@@ -116,7 +117,7 @@ export async function dbUpsertUser(
       opts?.displayName !== undefined ||
       opts?.avatarUrl !== undefined;
 
-    await db
+    const { error } = await db
       .from("users")
       .upsert(row, {
         onConflict: "handle",
@@ -124,8 +125,11 @@ export async function dbUpsertUser(
         // Without extra fields, skip duplicates to preserve existing data.
         ignoreDuplicates: !hasUpdateFields,
       });
+    if (error) throw error;
+    return true;
   } catch (error) {
     console.error("[db] dbUpsertUser failed:", (error as Error).message);
+    return false;
   }
 }
 
@@ -192,7 +196,19 @@ export async function dbUpdateUserProfile(
  */
 export async function dbGetUsers(
   opts?: { limit?: number; offset?: number },
-): Promise<{ handle: string; registeredAt: string; displayName: string | null; avatarUrl: string | null }[]> {
+): Promise<{
+  handle: string;
+  registeredAt: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  /**
+   * Whether the row was written by the OAuth callback, the only writer of
+   * `email` (#1239). A row without one was registered by a render path before
+   * that rule existed — a stranger whose badge someone viewed, not a signup.
+   * The address itself stays here; callers only learn that one exists.
+   */
+  hasEmail: boolean;
+}[]> {
   const db = getSupabase();
   if (!db) return [];
 
@@ -200,7 +216,7 @@ export async function dbGetUsers(
     const baseQuery = () =>
       db
         .from("users")
-        .select("id, handle, registered_at, display_name, avatar_url")
+        .select("id, handle, registered_at, display_name, avatar_url, email")
         .order("registered_at", { ascending: false })
         .order("id", { ascending: false });
 
@@ -224,6 +240,7 @@ export async function dbGetUsers(
       registeredAt: row.registered_at,
       displayName: row.display_name ?? null,
       avatarUrl: row.avatar_url ?? null,
+      hasEmail: typeof row.email === "string" && row.email.length > 0,
     }));
   } catch (error) {
     console.error("[db] dbGetUsers failed:", (error as Error).message);
@@ -300,7 +317,13 @@ export async function dbGetAllUserHandles(): Promise<string[]> {
     let after: string | undefined;
 
     while (true) {
-      let query = db.from("users").select("handle");
+      let query = db
+        .from("users")
+        .select("handle")
+        // Only the OAuth callback writes email. Rows without it were created by
+        // the retired public render-path upsert and are not Chapa signups.
+        .not("email", "is", null)
+        .neq("email", "");
       if (after) query = query.gt("handle", after);
 
       const { data, error } = await query

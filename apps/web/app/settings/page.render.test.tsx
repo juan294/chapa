@@ -24,6 +24,13 @@ vi.mock("@/components/Navbar", () => ({
     <div data-testid="navbar" data-links={navLinks.map((l) => l.href).join(",")} />
   ),
 }));
+// An async server component cannot render in this environment; the owner-facing
+// evidence states have their own suite in lib/evidence/workflow-state.test.ts.
+vi.mock("./EvidenceWorkflow", () => ({
+  EvidenceWorkflow: ({ handle }: { handle: string }) => (
+    <div data-testid="evidence-workflow" data-handle={handle} />
+  ),
+}));
 vi.mock("./SettingsClient", () => ({
   SettingsClient: ({
     login,
@@ -77,6 +84,24 @@ describe("SettingsPage", () => {
     expect(client.getAttribute("data-avatar")).toBe(
       "https://example.com/octo.png",
     );
+  });
+
+  // LE-5-3 — a streamed document holds the root loading fallback beside the
+  // page until React swaps them (in dev that swap waits for hydration, so it
+  // can land after `load`). Only the page may own the main landmark and the
+  // skip-link target; the fallback stays a status region the whole time.
+  it("owns the only main#main-content, even beside the root loading fallback", async () => {
+    const { default: SettingsPage } = await import("./page");
+    const { default: RootLoading } = await import("../loading");
+    const { container } = render(
+      <>
+        <RootLoading />
+        {await SettingsPage()}
+      </>,
+    );
+    expect(container.querySelectorAll("main")).toHaveLength(1);
+    expect(container.querySelectorAll("#main-content")).toHaveLength(1);
+    expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("links back to the owner's badge", async () => {

@@ -2,113 +2,128 @@
 
 This is the single source of truth for visual design decisions. All agents working on UI must follow these guidelines.
 
-## Theme: Terminal Dark + Jade Accent (with Light Mode)
+## Theme: Paper, ink, vermilion and ice
 
-Bold, developer-tool aesthetic inspired by terminal UIs. The dark theme is the signature brand look: a deep forest ground with a vivid jade accent (`oklch(.66 .15 163)` light, `oklch(.76 .16 163)` dark) used sparingly for CTAs, highlights, and active states (#1206, replacing the previous violet). Terminal-specific colors (green, red, yellow) for output types. A light theme is supported as an alternative, toggled via the `ThemeToggle` component in the nav bar. Badge SVG always renders in dark theme as an independent embeddable asset.
+Chapa combines editorial composition with a working developer shell. Light mode
+uses paper and warm-white panels; dark mode uses charcoal with warm-white text.
+Vermilion/coral provides emphasis, and ice fields frame the independent dark SVG
+badge. Technical headings, navigation and terminal labels remain JetBrains Mono;
+Manrope is body/UI and Barlow Condensed is reserved for expressive display.
 
 ### Theme switching
 
 - Powered by `next-themes` with `attribute="data-theme"` and `defaultTheme="system"`.
 - `ThemeProvider` wraps the app in `layout.tsx`; `ThemeToggle` lives in the nav bar and cycles three modes: system, light, dark (#1211).
-- **Every color token is ONE declaration** (#1211): `--color-bg: light-dark(#f7fbf8, #08170f);` inside the `@theme` block of `globals.css`. `color-scheme` on the root element decides which half resolves - `:root` carries `color-scheme: light dark` (follow the OS), and `[data-theme="light"]` / `[data-theme="dark"]` force one. Tailwind utilities (`bg-bg`, `text-text-primary`, etc.) resolve at runtime via `var()`, unchanged.
+- **Every themed color token is ONE declaration** (#1211): `--color-bg: light-dark(#F4F0E7, #141719);` inside the `@theme` block of `globals.css`. `color-scheme` on the root element decides which half resolves - `:root` carries `color-scheme: light dark` (follow the OS), and `[data-theme="light"]` / `[data-theme="dark"]` force one. Tailwind utilities (`bg-bg`, `text-text-primary`, etc.) resolve at runtime via `var()`, unchanged.
 - The paired `:root` / `[data-theme="dark"]` custom property blocks are gone. `data-theme` now carries `color-scheme` only. Native form controls, scrollbars and focus rings follow the theme for free.
-- When adding a new color token, write one `light-dark(<light>, <dark>)` value. Do not reintroduce a second per-theme block.
+- When adding a theme-aware color token, write one `light-dark(<light>, <dark>)` value. Fixed ink terminal and raw archetype colors intentionally use one literal value in both themes. Do not reintroduce a second per-theme block.
 - No `@supports` fallback is needed or wanted. LightningCSS (Next.js 16's CSS pipeline) compiles `light-dark()` to a custom-property toggle keyed off the same `color-scheme` selectors, so all three modes work below the native floor (Chrome/Edge 123+, Safari 17.5+, Firefox 120+). See `docs/decisions/2026-08-29-light-dark-token-layer.md`.
 
 ## Colors
 
-Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-dark(<light>, <dark>)` declaration per token. Both halves are listed below.
+Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`: 77 tokens total, comprising 71 colors, four font roles and two shadows. Theme-aware colors use one `light-dark(<light>, <dark>)` declaration; fixed colors resolve identically in both themes. Both values are listed below. Token export must match the current declarations exactly, rather than assuming this count can never change.
 
-| Token | Dark value | Light value | Tailwind class | Usage |
-|-------|-----------|-------------|----------------|-------|
-| `--color-bg` | `#08170f` | `#f7fbf8` | `bg-bg` | Page background |
-| `--color-card` | `#0f2419` | `#edf6f0` | `bg-card` | Card/panel surfaces |
-| `--color-text-primary` | `#dfeae4` | `#0b2018` | `text-text-primary` | Headings, body text |
-| `--color-text-secondary` | `#a9c0b5` | `#33453c` | `text-text-secondary` | Muted text, labels (#1212 raised both halves to clear AA) |
-| `--color-amber` | `oklch(.76 .16 163)` | `oklch(.66 .15 163)` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
-| `--color-amber-light` | `oklch(.84 .14 163)` | `oklch(.76 .14 163)` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
-| `--color-amber-dark` | `oklch(.58 .14 165)` | `oklch(.5 .12 165)` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
-| `--color-amber-text` | `oklch(.84 .14 163)` | `oklch(.5 .12 165)` | `text-amber-text` | Accent-coloured TEXT and icon strokes on `bg-bg`/`bg-card` (#1243). `--color-amber` is a fill/tint value and measures 2.75:1 on the light ground - below AA at any size. This is its text-safe counterpart: the light half darkens, the dark half brightens, so both gain contrast against their own ground (5.28:1 light, 11.94:1 dark). Exactly the same shape and reason as `--color-complement-text`. |
-| `--color-stroke` | `#7dffbc1f` | `#0d3b2417` | `border-stroke` | Borders, dividers (accent-tinted) |
-| `--color-stroke-strong` | `#7dffbc2e` | `#0d3b2426` | `border-stroke-strong` | The heavier rule: section-header underlines, table separators (#1211) |
-| `--color-warm-bg` | `#08170f` | `#f7fbf8` | `bg-warm-bg` | Alias for page background |
-| `--color-warm-card` | `#0f2419` | `#edf6f0` | `bg-warm-card` | Alias for card background |
-| `--color-warm-stroke` | `#7dffbc1f` | `#0d3b2417` | `border-warm-stroke` | Alias for borders |
-| `--color-dark-section` | `#050f0a` | `#0d2b1d` | `bg-dark-section` | Deeper emphasis band backgrounds |
-| `--color-dark-card` | `#0c1f15` | `#123526` | `bg-dark-card` | Cards inside dark sections |
-| `--color-hero-band` | `#0b2018` | `#e9f3ec` | `bg-hero-band` | Landing hero band. Theme aware on purpose (#1215) |
-| `--color-purple-tint` | `#123526` | `#dff0e6` | `bg-purple-tint` | Subtle accent section tint |
-| `--color-terminal-green` | `oklch(.8 .16 148)` | `oklch(.55 .13 145)` | `text-terminal-green` | Success messages, checkmarks |
-| `--color-terminal-red` | `oklch(.72 .17 25)` | `oklch(.55 .19 25)` | `text-terminal-red` | Error messages |
-| `--color-terminal-yellow` | `oklch(.82 .13 85)` | `oklch(.62 .13 78)` | `text-terminal-yellow` | Warning messages |
-| `--color-terminal-dim` | `#8ba398` | `oklch(.48 .025 160)` | `text-terminal-dim` | Dim text, prefixes, decorative. #1212 raised both halves: the old pair measured 2.41:1 light and 2.19:1 on the dark band, while carrying informational text (step numbers, section counts, eyebrows, meta lines) |
-| `--color-complement` | `oklch(.7 .11 225)` | `oklch(.55 .1 225)` | `bg-complement`, `border-complement` | Slate-blue accent (sparingly) — verification, secondary CTAs. **Non-textual only** — see `--color-complement-text` below for complement-as-text/icon-stroke |
-| `--color-complement-light` | `oklch(.7 .11 225 / .16)` | `oklch(.94 .035 225)` | `bg-complement-light` | Complement tint |
-| `--color-complement-dark` | `oklch(.42 .09 228)` | `oklch(.42 .09 228)` | `bg-complement-dark` | White-text-on-solid-fill verification CTAs only (`bg-complement` measures 2.54:1 for white text, below AA; this measures ~5.49:1) |
-| `--color-complement-text` | `oklch(.76 .11 222)` | `oklch(.48 .1 228)` | `text-complement-text` | Complement-colored TEXT and icon strokes on `bg-bg`/`bg-card` (#1189). The raw `--color-complement` is a fill/tint value and does not clear AA as text; this theme-aware token is the text-safe counterpart, re-tuned to slate blue in #1206. |
-| `--color-complement-text-hover` | `oklch(.84 .1 220)` | `oklch(.38 .09 228)` | `hover:text-complement-text-hover` | Hover state for `text-complement-text` (#1189 follow-up). Light theme darkens, dark theme brightens; both directions increase contrast against their own ground. Re-tuned to slate blue in #1206. |
-| `--color-track` | `#7dffbc14` | `#0d3b2414` | `bg-track` | Progress bar/gauge track background |
-| | | | | |
-| **Always-dark band** | | | | **One value in both themes (#1211). The hero band, badge panel and CLI blocks frame a server-rendered artifact, so they do not follow the theme.** |
-| `--color-forest` | `#0b2018` | same | `bg-forest` | Band ground |
-| `--color-forest-card` | `#0f2419` | same | `bg-forest-card` | Cards inside the band |
-| `--color-forest-line` | `#7dffbc2e` | same | `border-forest-line` | Hairlines inside the band |
-| `--color-forest-text` | `#dfeae4` | same | `text-forest-text` | Text on the band |
-| `--color-forest-dim` | `#8ba398` | same | `text-forest-dim` | Muted text on the band. Was `#42574c`, which measured 2.19:1 (#1212) |
-| `--color-forest-grid` | `#7dffbc0a` | same | (`.bg-grid-forest`) | The band's 72px hairline grid |
-| `--color-forest-ok` | `oklch(.8 .16 148)` | same | `text-forest-ok` | Success text inside a forest block |
-| `--color-forest-warn` | `oklch(.82 .13 85)` | same | `text-forest-warn` | Warning text inside a forest block |
-| `--color-forest-err` | `oklch(.72 .17 25)` | same | `text-forest-err` | Error text inside a forest block |
-| | | | | |
-| **Dimension colors** | | | | **Data visualization accents for the 4 impact dimensions** |
-| `--color-dimension-delivery` | `oklch(.72 .14 145)` | `oklch(.62 .14 145)` | `text-dimension-delivery`, `bg-dimension-delivery` | Delivery dimension (green, hue 145) |
-| `--color-dimension-quality` | `oklch(.72 .14 50)` | `oklch(.62 .14 50)` | `text-dimension-quality`, `bg-dimension-quality` | Quality dimension (orange, hue 50) |
-| `--color-dimension-consistency` | `oklch(.72 .14 215)` | `oklch(.62 .14 215)` | `text-dimension-consistency`, `bg-dimension-consistency` | Consistency dimension (cyan, hue 215) |
-| `--color-dimension-breadth` | `oklch(.72 .14 330)` | `oklch(.62 .14 330)` | `text-dimension-breadth`, `bg-dimension-breadth` | Breadth dimension (pink, hue 330) |
-| `--color-dimension-delivery-light` | `oklch(.8 .13 145)` | `oklch(.75 .13 145)` | `text-dimension-delivery-light` | Lighter delivery accent |
-| `--color-dimension-quality-light` | `oklch(.8 .13 50)` | `oklch(.75 .13 50)` | `text-dimension-quality-light` | Lighter quality accent |
-| `--color-dimension-consistency-light` | `oklch(.8 .13 215)` | `oklch(.75 .13 215)` | `text-dimension-consistency-light` | Lighter consistency accent |
-| `--color-dimension-breadth-light` | `oklch(.8 .13 330)` | `oklch(.75 .13 330)` | `text-dimension-breadth-light` | Lighter breadth accent |
-| `--color-dimension-craft` | `oklch(.72 .14 95)` | `oklch(.62 .14 95)` | `text-dimension-craft`, `bg-dimension-craft` | Craft dimension (amber, hue 95) |
-| `--color-dimension-craft-light` | `oklch(.8 .13 95)` | `oklch(.75 .13 95)` | `text-dimension-craft-light` | Lighter craft accent |
-| | | | | |
-| **Archetype colors** | | | | **Accent color per developer archetype** |
-| `--color-archetype-builder` | `oklch(.62 .14 163)` | `oklch(.62 .14 163)` | `text-archetype-builder`, `bg-archetype-builder` | Builder archetype (jade) |
-| `--color-archetype-guardian` | `oklch(.62 .14 330)` | `oklch(.62 .14 330)` | `text-archetype-guardian`, `bg-archetype-guardian` | Quality Champion archetype (magenta) |
-| `--color-archetype-marathoner` | `oklch(.62 .14 145)` | `oklch(.62 .14 145)` | `text-archetype-marathoner`, `bg-archetype-marathoner` | Marathoner archetype (leaf) |
-| `--color-archetype-polymath` | `oklch(.62 .14 110)` | `oklch(.62 .14 110)` | `text-archetype-polymath`, `bg-archetype-polymath` | Polymath archetype (olive) |
-| `--color-archetype-balanced` | `oklch(.62 .14 240)` | `oklch(.62 .14 240)` | `text-archetype-balanced`, `bg-archetype-balanced` | Balanced archetype (blue) |
-| `--color-archetype-emerging` | `oklch(.62 .14 50)` | `oklch(.62 .14 50)` | `text-archetype-emerging`, `bg-archetype-emerging` | Emerging archetype (orange) |
-| `--color-archetype-artificer` | `oklch(.62 .14 75)` | `oklch(.62 .14 75)` | `text-archetype-artificer`, `bg-archetype-artificer` | Artificer archetype (amber) |
+| Token | Light value | Dark value |
+| --- | --- | --- |
+| `--color-bg` | `#f4f0e7` | `#141719` |
+| `--color-card` | `#fffdf7` | `#202528` |
+| `--color-purple-tint` | `#dceaf0` | `#192b35` |
+| `--color-dark-section` | `#1b1b19` | `#0d1215` |
+| `--color-dark-card` | `#252521` | `#202528` |
+| `--color-hero-band` | `#dceaf0` | `#192b35` |
+| `--color-warm-bg` | `#f4f0e7` | `#141719` |
+| `--color-warm-card` | `#fffdf7` | `#202528` |
+| `--color-warm-stroke` | `#24232130` | `#eeeae12b` |
+| `--color-text-primary` | `#1b1b19` | `#eeeae1` |
+| `--color-text-secondary` | `#64625e` | `#b3b9b9` |
+| `--color-terminal-dim` | `#64625e` | `#b3b9b9` |
+| `--color-stroke` | `#24232130` | `#eeeae12b` |
+| `--color-stroke-strong` | `#1b1b19` | `#eeeae166` |
+| `--color-track` | `#1b1b191f` | `#eeeae121` |
+| `--color-amber` | `#ed4930` | `#ff795f` |
+| `--color-amber-light` | `#f77a62` | `#ff9d88` |
+| `--color-amber-dark` | `#aa2d1a` | `#c24e39` |
+| `--color-amber-text` | `#aa2d1a` | `#ff927d` |
+| `--color-terminal-green` | `oklch(.46 .13 145)` | `oklch(.8 .16 148)` |
+| `--color-terminal-yellow` | `oklch(.46 .1 78)` | `oklch(.82 .13 85)` |
+| `--color-terminal-red` | `oklch(.49 .18 25)` | `oklch(.76 .16 25)` |
+| `--color-complement` | `oklch(.55 .1 225)` | `oklch(.7 .11 225)` |
+| `--color-complement-light` | `oklch(.94 .035 225)` | `oklch(.7 .11 225 / .16)` |
+| `--color-complement-dark` | `oklch(.42 .09 228)` | `oklch(.42 .09 228)` |
+| `--color-complement-text` | `oklch(.46 .1 228)` | `oklch(.79 .1 222)` |
+| `--color-complement-text-hover` | `oklch(.38 .09 228)` | `oklch(.84 .1 220)` |
+| `--color-forest` | `#1b1b19` | `#1b1b19` |
+| `--color-forest-card` | `#252521` | `#252521` |
+| `--color-forest-line` | `#f4f0e766` | `#f4f0e766` |
+| `--color-forest-text` | `#f4f0e7` | `#f4f0e7` |
+| `--color-forest-dim` | `#c2c0b8` | `#c2c0b8` |
+| `--color-forest-accent` | `#ff795f` | `#ff795f` |
+| `--color-medal-gold` | `#d4a017` | `#d4a017` |
+| `--color-medal-silver` | `#a8b0b8` | `#a8b0b8` |
+| `--color-medal-bronze` | `#b8763e` | `#b8763e` |
+| `--color-forest-grid` | `#f4f0e70a` | `#f4f0e70a` |
+| `--color-forest-ok` | `oklch(.8 .16 148)` | `oklch(.8 .16 148)` |
+| `--color-forest-warn` | `oklch(.82 .13 85)` | `oklch(.82 .13 85)` |
+| `--color-forest-err` | `oklch(.72 .17 25)` | `oklch(.72 .17 25)` |
+| `--color-identity-surface` | `#ed4930` | `#3a2222` |
+| `--color-identity-text` | `#1b1b19` | `#eeeae1` |
+| `--color-closing-surface` | `#ed4930` | `#a92f21` |
+| `--color-closing-text` | `#1b1b19` | `#f4f0e7` |
+| `--color-action` | `#1b1b19` | `#ff795f` |
+| `--color-action-text` | `#f4f0e7` | `#17191a` |
+| `--color-action-hover` | `#aa2d1a` | `#ff9d88` |
+| `--color-dimension-delivery` | `oklch(.62 .14 145)` | `oklch(.72 .14 145)` |
+| `--color-dimension-quality` | `oklch(.62 .14 50)` | `oklch(.72 .14 50)` |
+| `--color-dimension-consistency` | `oklch(.62 .14 215)` | `oklch(.72 .14 215)` |
+| `--color-dimension-breadth` | `oklch(.62 .14 330)` | `oklch(.72 .14 330)` |
+| `--color-dimension-craft` | `oklch(.62 .14 95)` | `oklch(.72 .14 95)` |
+| `--color-dimension-delivery-light` | `oklch(.75 .13 145)` | `oklch(.8 .13 145)` |
+| `--color-dimension-quality-light` | `oklch(.75 .13 50)` | `oklch(.8 .13 50)` |
+| `--color-dimension-consistency-light` | `oklch(.75 .13 215)` | `oklch(.8 .13 215)` |
+| `--color-dimension-breadth-light` | `oklch(.75 .13 330)` | `oklch(.8 .13 330)` |
+| `--color-dimension-craft-light` | `oklch(.75 .13 95)` | `oklch(.8 .13 95)` |
+| `--color-archetype-builder` | `oklch(.62 .14 163)` | `oklch(.62 .14 163)` |
+| `--color-archetype-guardian` | `oklch(.62 .14 330)` | `oklch(.62 .14 330)` |
+| `--color-archetype-marathoner` | `oklch(.62 .14 145)` | `oklch(.62 .14 145)` |
+| `--color-archetype-polymath` | `oklch(.62 .14 110)` | `oklch(.62 .14 110)` |
+| `--color-archetype-balanced` | `oklch(.62 .14 240)` | `oklch(.62 .14 240)` |
+| `--color-archetype-emerging` | `oklch(.62 .14 50)` | `oklch(.62 .14 50)` |
+| `--color-archetype-artificer` | `oklch(.62 .14 75)` | `oklch(.62 .14 75)` |
+| `--color-archetype-builder-text` | `oklch(.48 .12 163)` | `oklch(.78 .12 163)` |
+| `--color-archetype-guardian-text` | `oklch(.48 .12 330)` | `oklch(.78 .12 330)` |
+| `--color-archetype-marathoner-text` | `oklch(.48 .12 145)` | `oklch(.78 .12 145)` |
+| `--color-archetype-polymath-text` | `oklch(.48 .12 110)` | `oklch(.78 .12 110)` |
+| `--color-archetype-balanced-text` | `oklch(.48 .12 240)` | `oklch(.78 .12 240)` |
+| `--color-archetype-emerging-text` | `oklch(.48 .12 50)` | `oklch(.78 .12 50)` |
+| `--color-archetype-artificer-text` | `oklch(.48 .12 75)` | `oklch(.78 .12 75)` |
 
 ### Color rules
 
-- Jade is the signature accent. Use sparingly — CTAs, active states, key data points.
-- Use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, etc.) — they resolve correctly in both themes.
-- Never hardcode hex colors in components; always use the CSS variable tokens so theme switching works.
-- The hero band is theme aware: mint in light, forest in dark. Do not make it always dark - that turned light mode into a strip around a dark slab. Only the badge panel and the CLI blocks stay dark in both themes, via the `--color-forest-*` family.
-- Accent-tinted borders (`border-stroke`) are the default for all dividers.
-- Terminal colors used in terminal output only: green for success, red for errors, yellow for warnings. These also have light-appropriate values.
-- **Status colors resolve per SURFACE, not per theme.** `terminal-green` / `-yellow` / `-red` are correct on a surface that follows the theme. On a surface with a fixed ground they are wrong half the time: inside an always-dark forest block on a light page, the light-theme values land on the dark ground and measure 3.72:1 (green) and 3.19:1 (red), below AA. Use `text-forest-ok` / `text-forest-warn` / `text-forest-err` there, which pin the dark values (#1215). Any future fixed-ground surface needs its own status family for the same reason - do not reach for the theme-aware tokens and hope.
-- **Error banners and alerts** must use terminal-red tokens (`border-terminal-red/30`, `bg-terminal-red/10`, `text-terminal-red`) — never the brand accent for error states.
-- **Verification-related UI on the site itself** (verify page headings, verify CTAs, in-app verification indicators) must use the complement (slate blue since #1206) tokens: `bg-complement`, `border-complement`, `bg-complement-light` for fills/tints/borders, and — for text and icon strokes specifically — `text-complement-text` (#1189), never `text-complement`. The raw fill value does not clear the AA floor as text.54:1 as text against the site's light-theme backgrounds, below the WCAG AA floor even for large/bold text (3:1), let alone normal text (4.5:1); `--color-complement-text` is the theme-aware, text-safe counterpart (see the color table above). This semantically distinguishes cryptographic trust from primary brand actions while keeping teal legible as text in both themes. **Hovering a `text-complement-text` element** must go to `hover:text-complement-text-hover`, never `hover:text-complement-light` — `--color-complement-light` is a translucent BACKGROUND tint (pale mint on white in light theme, 15%-alpha green in dark theme) that renders as near-invisible text; a hover state that's harder to read than rest is backwards. `--color-complement-text-hover` is the theme-aware, text-safe hover counterpart (darker in light theme, lighter/brighter in dark theme — see the color table above).
-- **The embeddable badge SVG's own "verified" signal** (shield icon + vertical verification strip) is the one deliberate exception: it uses its own coral constant, `VERIFICATION_CORAL` (`#E05A47`, `apps/web/lib/badge-visual-metadata.ts`) — never the teal tokens above. The badge is a static, theme-independent asset rendered server-side before app CSS exists, so it can't reference CSS custom properties at all; coral was already load-bearing in the verification strip pre-dating this rule, and previously coexisted with the brand-purple shield icon (two colors signaling one "verified" concept). #1168 (UX-M10) resolved that duality by recoloring the shield to the same coral, so the badge now has exactly one verified color, distinct from the on-site complement and from the brand accent. ("Brand-purple shield" above is badge history: the badge carried the pre-#1206 violet until #1225 converged its accent and archetype colours onto Jade. Coral is unaffected by that convergence and must stay distinct from the accent — the whole point of #1168 was one verified colour, separate from the brand.) Contrast: coral is ~5.3:1 against the badge's own fixed dark background (#0C0D14) — comfortably AA. It is only ~3.7:1 against a light background (#FFFFFF/#F9FAFB) — AA for large/bold text only, not small body text — so if a coral accent is ever carried onto the (light/dark-capable) verify page, it needs its own contrast pass and cannot assume the badge's dark-background numbers apply. Coral vs. `--color-terminal-red` (error state) hue is close (~7° apart in HSL) but separated by lightness/saturation on the badge's dark canvas (~13pp lightness gap vs. dark-theme `--color-terminal-red` #F87171); the gap narrows on a hypothetical light-theme use (~7pp vs. light-theme `--color-terminal-red` #DC2626, nearly identical saturation) — verify the two stay visually distinguishable, including for colorblind users, before extending coral beyond the badge.
-- **Wave 2 decision (#1183): coral stays badge-only — the verify page keeps the complement family.**
-  > **Superseded in part by #1206.** The conclusion still holds (coral stays
-  > badge-only), but the reasoning below is written against the old emerald
-  > *teal* complement. The complement is now a cool slate blue (hue 225-228),
-  > which sits further from coral than teal did, so the separation argument is
-  > stronger, not weaker. Read the hue-distance numbers below as historical.
- The question above ("if a coral accent is ever carried onto the verify page") was evaluated and resolved: `/verify/:hash` and `StatusCallout`'s `verification` variant keep the teal family (`bg-complement`/`border-complement`, and — since #1189 — `text-complement-text` for text/icon-stroke) rather than adopting coral, and `VERIFICATION_CORAL` is not imported by either (enforced by `apps/web/lib/badge-visual-metadata.test.ts` and `apps/web/components/StatusCallout.render.test.tsx`). Two measured reasons, not just inertia:
-  1. **Contrast.** Coral measures ~5.38:1 against the badge's own fixed dark canvas (comfortably AA for any text size there) but only ~3.67:1 against the site's light-theme backgrounds (`#FFFFFF`/`#F9FAFB`) — that clears the 3:1 large/bold-text AA floor but falls well short of the 4.5:1 normal-text floor. The verify page's body copy (verification hash, handle, dimension values) is normal-weight, non-large text; carrying coral there would mean either an inaccessible page or an inconsistent "coral heading, teal everything else" treatment — undermining the "one verified color" continuity this ticket was meant to serve, not delivering it.
-  2. **Colorblind-safe separation from error red.** Coral and `--color-terminal-red` sit ~7.5° apart in hue in both themes; the *lightness* gap that currently keeps them apart on the badge's fixed dark canvas (~12.9pp) shrinks to ~7.3pp on light theme — the site's **default** theme (`defaultTheme="light"` in `next-themes`). A page whose entire purpose is asserting "verified" (not "error") cannot afford that shrinking margin, especially for protanopia/deuteranopia viewers where the red-orange range compresses further.
-
-  The badge and the site are different rendering contexts by construction — the badge is a single fixed-dark canvas rendered server-side with no CSS custom properties, while the verify page is light/dark-capable and text-heavy — so this is a deliberate, documented split, not an oversight. Teal was already the intentional, colorblind-distinguishable verification signal for on-site UI (see the bullet above); Wave 2 confirmed it stays that way rather than partially diluting it with coral.
-- Use Tailwind opacity modifiers: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
-- Cards use `bg-card` with `border-stroke`.
-- Button text on a solid accent background: always `text-white`, and use `bg-amber-dark` (see the AA note below).
-- **Accent-coloured text is `text-amber-text`, never `text-amber`.** The raw accent is a fill value (pills, heatmap, focus rings, tints) and fails AA as text in the light theme. This is the same split the complement family already has (`--color-complement` fill vs `--color-complement-text`), and it exists for the same measured reason.
-- **White text on a solid `bg-amber`/`bg-complement` fill fails AA contrast** (`bg-amber` measures 4.06:1, `bg-complement` measures 2.54:1 — both below the 4.5:1 floor). Never change the `--color-amber`/`--color-complement` tokens themselves to fix this (they're used non-textually elsewhere — pills, heatmap, focus rings — and a token change shifts the whole brand/verification hue). Instead, at the specific white-text-on-solid-fill call site, use the darker step of the ramp: `bg-amber-dark` (~5.4:1) or `bg-complement-dark` (~5.49:1). When re-anchoring a hover state that previously went to the *lighter* step (e.g. `hover:bg-amber-light`, 2.72:1), shift the whole ramp one step darker instead (base `bg-amber-dark`, hover `bg-amber`) rather than just swapping the base color.
+- Use the existing semantic tokens; retain historical `amber`, `warm-*`,
+  `forest-*` and `purple-tint` names so all consumers and sync exports agree.
+- Brand fill is vermilion/coral. Small accent text/icons use `amber-text`.
+  Primary actions use `bg-action text-action-text hover:bg-action-hover`.
+  Both states use the same paired foreground; do not assume white-on-coral.
+- The hero/stage is theme-aware ice. Fixed terminals use ink `forest` surfaces
+  with `forest-text`, `forest-dim`, the fixed coral `forest-accent` (the terminal
+  prompt and status dot) and fixed `forest-ok/warn/err` status roles.
+  A scoped terminal presentation context chooses these classes without changing
+  theme tokens globally or affecting Studio's theme-aware session controls.
+  Fixed ink controls use full-opacity `forest-text` focus outlines; page accent
+  focus colors must not leak into that independent surface.
+- Use neutral stroke/strong-stroke rules and solid offset shadows. Keep semantic
+  green status and dimension/archetype colors; do not recolor data as branding.
+  Raw `archetype-*` colors identify charts; guide headings and small signal
+  labels use the corresponding `archetype-*-text` role, which preserves the hue
+  with readable light/dark values.
+- Site verification uses slate-blue complement fills and `complement-text` /
+  `complement-text-hover` text. The independent SVG keeps its existing coral
+  verification signal. Do not import badge coral into site verification UI.
+- Measure text against actual page, panel, stage and selected/hover backgrounds.
+  Composite translucent fills before contrast evaluation: normal text requires
+  4.5:1, large text and meaningful control boundaries 3:1.
+- Error text/alerts use semantic terminal-red. Destructive controls must retain
+  a label/icon and measured contrast in both themes; color alone is insufficient.
 
 ## Touch targets
 
@@ -125,31 +140,36 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`, one `light-da
 
 ### Shadow rules
 
-- Use `shadow-card` on data cards, dropdown menus, tooltips, and toasts. These replace `border border-stroke` on non-terminal components.
-- Use `shadow-card-hover` as hover state via `hover:shadow-card-hover` with `transition-shadow`.
-- Terminal-aesthetic components (TerminalInput, TerminalOutput, GlobalCommandBar, Navbar) keep `border border-stroke` — sharp lines are part of the terminal look.
-- The first shadow layer (0px spread, 1px ring) replaces the border — don't combine `border` with `shadow-card`.
-- Dark mode shadows use an accent-tinted ring + deeper black spread. The ring is `color-mix(in oklab, var(--color-amber) …%, transparent)`, so it follows the theme rather than pinning a hue.
+Use neutral solid offsets: `shadow-card` is 3px and `shadow-card-hover` is 5px.
+Keep a visible neutral rule around panels where needed. Dense UI uses smaller or
+no offsets. Terminal chrome relies on thin borders; do not add ambient glow.
 
 ## Typography
 
-Two fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`:
+Four families are loaded in the root layout; semantic roles are additive.
 
-| Role | Font | Tailwind class | CSS variable | Weights |
-|------|------|----------------|-------------|---------|
-| Headings | **JetBrains Mono** | `font-heading` | `--font-jetbrains-mono` | 400, 500, 700, 800 |
-| Body/UI | **Plus Jakarta Sans** | `font-body` | `--font-plus-jakarta` | 400, 500, 600, 700 |
-| Terminal UI | **JetBrains Mono** | `font-terminal` | `--font-terminal` | (inherits heading weights) |
+| Role | Font | Utility | Next variable |
+| --- | --- | --- | --- |
+| Technical headings | JetBrains Mono | `font-heading` | `--font-jetbrains-mono` |
+| Terminal | JetBrains Mono | `font-terminal` | `--font-jetbrains-mono` |
+| Body/UI | Manrope | `font-body` | `--font-manrope` |
+| Expressive display | Barlow Condensed | `font-display` | `--font-barlow-condensed` |
+| Badge metrics/footer/tier | Plus Jakarta Sans | SVG literal family | `--font-plus-jakarta` |
 
-`--font-terminal` is an alias for JetBrains Mono with `ui-monospace` fallback, defined in `globals.css` `@theme`. Use `font-terminal` on terminal-specific components (`TerminalInput`, `TerminalOutput`, `AutocompleteDropdown`) for semantic clarity — it resolves to the same typeface as `font-heading` but signals "this is terminal chrome" to other developers.
+Browser SVG text needs the literal `Plus Jakarta Sans` and `JetBrains Mono`
+family names. The installed Next 16.3.3 font output exposes those exact names
+with local WOFF2 files, confirmed in the compiled CSS and browser font checks.
+Keep both loaders: CSS variables alone are not evidence of literal names.
+The resvg pipeline continues loading its original TTF files separately.
+Standalone `.design-sync/fonts.css` binds the same roles without Next runtime.
 
 ### Typography rules
 
-- All `<h1>`-`<h3>` elements use `font-heading` (JetBrains Mono).
-- Body text, labels, buttons, and UI chrome use `font-body` (Plus Jakarta Sans) — default on `<body>`.
+- Technical and content headings use `font-heading`; selected editorial headings use `font-display`.
+- Body text, labels, buttons, and UI chrome use `font-body` (Manrope) — default on `<body>`.
 - JetBrains Mono is monospace — do NOT use `italic` with it.
 - Terminal output uses `font-heading` throughout for monospace consistency.
-- Accent text in headings uses `text-amber`.
+- Small accent text uses `text-amber-text`.
 - Use `tracking-tight` on headings. Use `leading-relaxed` on body paragraphs.
 - Use `text-balance` on all `<h1>`-`<h3>` elements to prevent orphaned words.
 - Use `text-pretty` on body paragraphs longer than one sentence.
@@ -193,56 +213,72 @@ contrast compound.
 
 ## Spacing & Layout
 
-- Max content width: `max-w-7xl` (nav), `max-w-4xl` (terminal session, landing page).
-- Section spacing: `space-y-24` between terminal sections on landing page.
-- Horizontal padding: `px-6` on all containers.
+- Use `max-w-7xl` for editorial composition/nav; constrain long-form prose separately.
+- Use generous section fields, asymmetric desktop composition and neutral dividers.
+- Horizontal padding is responsive: editorial containers commonly use `px-6`; the navbar uses `px-2 sm:px-6` so that at 320px its five controls (logo, menu toggle, language, theme, login or user menu) keep their 44px hit areas without horizontal overflow (LE-5-6).
 - Section dividers: `border-l border-stroke` — vertical left border for terminal output blocks.
 
-## Terminal Section Pattern
+## Landing composition and shell
 
-The landing page is structured as a "terminal session" — each section is a command + output pair:
+The locale landing body is server-rendered editorial content: an asymmetric hero,
+ice badge stage, vermilion identity field, archetype and dimension exploration,
+README example, enterprise/tool/trust sections and a closing field. Technical
+command markers support this hierarchy; the whole page is not a simulated log.
+`MARK_` / `HUELLA_` stays JetBrains Mono beside selective Barlow display headings.
 
-```
-$ command-name
-  [output content with left border]
-```
+The hero uses the real animated SVG and its overlay in one tilted wrapper. The
+README uses a static SVG data URL from the same immutable `LANDING_IMPACT` fixture:
+92 / Elite / Balanced. These are curated illustrative values, not a computed
+result of `DEMO_STATS`. Shared Studio `DEMO_IMPACT` remains 82 / High / Balanced.
+Derive visible sample scores, summaries and accessible labels from the supplied
+fixture; do not hardcode a second sample or duplicate inline SVG IDs.
 
-- Command line: `font-heading text-sm`, `$` prefix in `text-terminal-dim`, command in `text-text-secondary`
-- Output block: `pl-4 border-l border-stroke`
-- Sections animate in with `animate-fade-in-up` and staggered `animation-delay`
+`ArchetypeExplorer` exposes seven keyboard tabs (arrows, Home and End).
+`DimensionExplorer` uses five native details elements, with optional Craft
+identified explicitly. Small client leaves own these interactions; they do not
+turn the translated server body into a client boundary.
+
+The persistent bottom dock is fixed ink in both page themes and reserves document
+space beneath the footer. It retains the last 50 submitted commands in React
+state while mounted; it does not persist history across reloads. Global navigation,
+`/theme [light|dark|system]`, autocomplete and history share the existing command
+registry. `KeyboardShortcutsListener` alone owns `/` and Mod+K focus routing.
+Landing adds scoped `/archetypes`, `/dimensions`, `/section`, `/embed`, `/mcp`,
+`/copy` and `/whoami` commands. Command prompts fill the same input. Copy uses the
+visible button's clipboard action and reports its actual success or failure.
 
 ## Components
 
 ### Cards
 
 ```
-rounded-xl border border-stroke bg-card overflow-hidden
+rounded-[3px] border border-stroke bg-card overflow-hidden
 ```
 
 ### Buttons (Primary)
 
 ```
-rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white
-hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25
+rounded-[3px] bg-action px-6 py-3 text-sm font-semibold text-action-text
+hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-amber-text
 ```
-
-White text on the accent. `rounded-lg` (not `rounded-full`).
 
 ### Buttons (Ghost/Outline)
 
 ```
-rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary
-hover:border-amber/20 hover:text-text-primary
+min-h-11 rounded-[3px] border border-text-primary px-6 py-3 text-sm text-text-primary
+hover:bg-purple-tint focus-visible:outline-2 focus-visible:outline-amber-text
 ```
 
 ### Navigation
 
-- Fixed top, dark glass: `fixed top-0 z-50 border-b border-stroke bg-bg/80 backdrop-blur-xl`
+- The navbar is 69px tall (44px controls plus 24px vertical padding and a 1px rule). Studio page, viewport calculations and loading skeleton use this same offset.
+- Fixed top, theme-aware surface: `fixed top-0 z-50 border-b border-stroke bg-bg`
 - Logo: `Chapa_` with blinking cursor (`animate-cursor-blink`)
-- Nav links: `/` prefix in `text-amber/50`, label in `text-text-secondary` (was `text-terminal-dim` — 2.29:1 dark / 2.54:1 light, below the 4.5:1 AA floor; `text-text-secondary` measures 6.15:1 / 4.83:1). `terminal-dim` stays reserved for genuinely decorative glyphs (`$`, `>`, `|`).
-- Active nav link (`aria-current="page"`): styled globally via `nav [aria-current="page"], [role="navigation"] [aria-current="page"]` in `globals.css` (covers both the desktop `<nav>` and `MobileNav`'s `role="navigation"` panel) — `color: var(--color-text-primary)` + `font-weight: 600`, deliberately not amber so it stays distinguishable from the `text-amber/50` `/` prefix already inside every link.
-- CTA: `/ login` text link (no button), hover to `text-amber`
-- **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), shows `ES | EN` pill menu on click. This is a **listbox**, not a menu — a language picker is a single-select choice among options, not a set of commands. The trigger uses `aria-expanded` + `aria-haspopup="listbox"`; the container is `role="group"`; the panel is `role="listbox"` with `role="option"` items (not `role="menu"`/`role="menuitem"`). Active locale highlighted with `text-amber font-semibold`. Own hand-rolled behavior (not `useDropdownMenu` — see "Listbox vs. menu pattern" below): closes on outside click and on Escape, arrow-key (`ArrowUp`/`ArrowDown`/`Home`/`End`) traversal between options, and Escape **returns focus to the trigger button**. Sits between ThemeToggle and login CTA in the nav bar.
+- Nav links keep monospace command prefixes and readable `text-text-secondary`.
+  Active links use the global primary-text/weight treatment. Informational meta
+  may use `terminal-dim`, measured on actual page/card/stage surfaces.
+- Login remains a text navigation action; its hover uses `text-text-primary`.
+- **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), opens the `ES` / `EN` option list on click. This is a **listbox**, not a menu — a language picker is a single-select choice among options, not a set of commands. The trigger uses `aria-expanded` + `aria-haspopup="listbox"`; the container is `role="group"`; the panel is `role="listbox"` with `role="option"` items (not `role="menu"`/`role="menuitem"`). Active locale highlighted with `text-amber-text font-semibold`. Own hand-rolled behavior (not `useDropdownMenu` — see "Listbox vs. menu pattern" below): closes on outside click and on Escape, arrow-key (`ArrowUp`/`ArrowDown`/`Home`/`End`) traversal between options, and Escape **returns focus to the trigger button**. Precedes ThemeToggle and the login/user control in the nav bar.
 
 #### Listbox vs. menu pattern
 
@@ -262,7 +298,7 @@ A component whose items are alternatives the user picks one of (language, theme,
 
 `apps/web/components/SectionHeader.tsx` (#1214). A flex row with the
 `% chapa <command>` marker on the left and a right-aligned meta readout
-(`exit 0 · 5 results`, `3 steps · ~1 min`, `composite 82 · high`), and a
+(`exit 0 · 5 results`, `3 steps · ~1 min`), and a
 `border-stroke-strong` rule underneath. Both spans are `whitespace-nowrap`:
 the pair is one line of terminal output, and the row wraps as a whole instead
 of breaking either half. Pass `title` to put the real section name in the
@@ -292,9 +328,20 @@ Every tooltip/popover must be portal-rendered to `document.body` with `position:
 ### Terminal components
 
 - **TerminalOutput**: `role="log" aria-live="polite"`, monospace, color-coded by line type
-- **TerminalInput**: `chapa >` or `studio >` prompt in amber, blinking cursor, input with placeholder
+- **TerminalInput**: `chapa >` or `studio >` prompt, native editable input and history navigation; presentation context supplies page-theme or fixed ink colors.
 - **AutocompleteDropdown**: `role="listbox"`, shows on `/` keystroke, accent color on active item
-- **QuickControls**: Collapsible panel with clickable chips that insert terminal commands
+- **QuickControls**: Seven configuration groups drive the same Studio state and commands.
+
+### Studio
+
+The ice stage contains the canonical rendered SVG. Fit, 50% and 100% change only
+preview presentation and never enter saved config. At desktop sizes the controls
+and session form the workspace below the stage; narrow layouts stack and retain
+scroll access. The saved schema remains seven fields and six palettes: Ice, Jade,
+Indigo, Amber, Crimson and Mono. New/no-row/reset configs use Ice; saved rows
+missing a palette resolve to Jade, and explicit saved palette colors stay intact.
+The current renderer is `ice-terminal-v2` for every palette, with no selectable
+historical layout. See `docs/svg-design.md` for geometry and cache versioning.
 
 ### Images
 
@@ -306,37 +353,37 @@ All avatar and user-uploaded images use the `.img-outline` utility class:
 ### Code blocks
 
 ```
-rounded-xl border border-stroke bg-card overflow-hidden
+rounded-[3px] border border-stroke bg-card overflow-hidden
 ```
 
 Terminal dots: `bg-terminal-red/60`, `bg-terminal-yellow/60`, `bg-terminal-green/60`.
 
 ## Background Effects
 
-- **Grid pattern**: `.bg-grid-warm` — faint 72px grid lines at 4% opacity. Uses subtle black lines in light mode and accent-tinted lines in dark mode (both defined in `globals.css`).
+- **Grid pattern**: `.bg-grid-warm` — faint 72px grid lines at 4% opacity. Uses subtle black lines in light mode and neutral light lines in dark mode (both defined in `globals.css`).
 - No ambient glow on dark backgrounds.
 
 ## Animations
 
-Defined in `globals.css`:
+Defined in `globals.css`; availability does not imply use in every redesigned section. Reduced-motion rules disable decorative motion, show inline badge activity immediately and retain the complete score ring. Badge SVG/static export behavior is specified in `docs/svg-design.md`.
 
 | Class | Effect | Duration |
 |-------|--------|----------|
 | `animate-fade-in-up` | Fade in + slide up 30px | 0.8s ease-out |
 | `animate-cursor-blink` | Step cursor blink | 1s infinite |
 | `animate-terminal-fade-in` | Fade in + slide up 8px | 0.3s ease-out |
-| `animate-pulse-glow-amber` | Soft pulsing accent shadow | 3s infinite |
+| `animate-pulse-glow-amber` | Historical name: neutral solid offset changes from 2px to 3px | 3s infinite |
 | `animate-float-slow` | Gentle vertical float + slight rotation | 6s infinite |
 | `animate-float-medium` | Medium vertical float + counter-rotation | 7.5s infinite |
 | `animate-float-fast` | Faster vertical float + stronger rotation | 5s infinite |
 | `animate-drift` | Multi-axis drift with 4 waypoints | 8s infinite |
 | `animate-shimmer` | Horizontal shimmer gradient (left to right) | 3s linear infinite |
-| `animate-shimmer-sweep` | Horizontal shimmer gradient (right to left) | 3s linear infinite |
+| `shimmer-sweep` (keyframe only) | Horizontal shimmer gradient (right to left) | (set per-element) |
 | `animate-scale-in` | Scale from 0.92 + fade in | 0.6s ease-out |
 | `animate-toast-out` | Scale to 0.95 + fade out + slide up 8px | 0.3s ease-in forwards |
 | `animate-gauge-fill` | SVG circular gauge stroke fill | 1.5s ease-out |
 | `animate-bar-fill` | Horizontal bar scale from 0 to target | 0.8s ease-out |
-| `animate-terminal-type` | Typewriter width expansion (0 to 100%) | (set per-element) |
+| `terminal-type` (keyframe only) | Typewriter width expansion (0 to 100%) | (set per-element) |
 | `.sparkline-animated polyline` | SVG polyline stroke trace via `--sparkline-length` | 0.6s ease-out |
 | `radar-expand` (keyframe only) | Scale from 0 + fade in (for radar chart polygons) | (set per-element) |
 | `animate-hex-cell-in` | Scale from 0.3 + fade in (hex grid cells) | 0.45s ease-out |
@@ -355,68 +402,15 @@ Defined in `globals.css`:
 - Use icon libraries (lucide, heroicons, etc.) — keep inline SVGs.
 - Use `Inter`, `Roboto`, `Arial`, or other generic fonts.
 - Add ambient glow blurs on dark backgrounds (invisible, wastes DOM).
-- Use `text-warm-bg` for button text — use `text-white` instead.
+- Assume white text works on brand fills — use the paired action foreground.
 - Touch badge SVG theme — it stays dark as an independent embeddable asset.
-- Use `rounded-full` for text/CTA buttons — use `rounded-lg` instead. Exception: icon-only buttons (dismiss, info trigger, avatar) may use `rounded-full`.
+- Use pill corners for ordinary text/CTA buttons. Keep the explicit author signature pill and round avatars/icon buttons.
 
 
-## Jade palette (#1206)
+## Historical badge palettes
 
-The violet-on-cool-gray scheme was replaced by **Jade**: a mint-cast light
-surface family, one vivid jade accent, and a deep forest dark theme. Status and
-chart colors were re-tuned off stock Tailwind and harmonized in oklch. Two
-decisions in that palette are deliberate and must not be "corrected":
-
-1. **Success green is not the accent green.** The accent sits at hue 163;
-   `--color-terminal-green` sits at hue 145, leafier and darker. With a green
-   brand accent, an unshifted success color makes every success state read as a
-   brand highlight.
-2. **Verification is no longer teal.** The `complement` family moved to a cool
-   slate blue (hue 225-228). Its job is to signal cryptographic trust as
-   distinct from the brand, and teal sat too close to jade to do that.
-
-The archetype tokens share one lightness and chroma (`.62 .14`), varying only in
-hue. Keep that prefix if an eighth archetype is ever added.
-
-**The token name `--color-amber` is now doubly inaccurate** — it was violet, and
-it is now green. Renaming it to `--color-accent` is the right cleanup but
-touches every consuming utility class (`bg-amber` etc.), so it was deliberately
-left out of the palette change to keep that diff a pure value swap.
-
-**The badge SVG has now moved too (#1225).** It is rendered server-side before
-app CSS exists, so it cannot read a custom property and carries literals in
-`lib/render/theme.ts`. Those literals are now the Jade tokens, converted:
-
-| Badge constant | From the app token | Hex |
-|---|---|---|
-| `accent` | `--color-amber`, dark half `oklch(.76 .16 163)` | `#1BD093` |
-| `accentLight` | `--color-amber-light`, dark half `oklch(.84 .14 163)` | `#65E7B0` |
-| archetypes | `--color-archetype-*`, `oklch(.62 .14 <hue>)` | seven hexes |
-
-Three things about that conversion are deliberate:
-
-- **Hex, not `oklch()`.** The OG-image route rasterizes the badge through
-  resvg, which parses a narrower colour syntax than a browser.
-- **The dark half.** The badge is always dark, so it takes the dark value of
-  any light-dark() token.
-- **The archetypes keep lightness `.62`.** Matching the app exactly is the
-  point, and all seven clear AA on the badge's ground anyway (measured 4.96:1
-  for Quality Champion up to 5.70:1 for Builder). The accent measures 9.68:1,
-  up from the violet's 4.58:1.
-
-The accent is defined **once**, as `BADGE_ACCENT_RGB`, with `accentTint(alpha)`
-deriving every translucent use. The violet it replaced had been spelled out as
-28 separate literals across six files, which is exactly how it survived the
-#1206 rebrand; `lib/render/badge-palette.test.ts` now fails if a literal
-reappears anywhere on the render path.
-
-**The badge ground did not move.** `bg` (`#0C0D14`) and `card` (`#13141E`) are
-a cooler canvas tuned for the badge, and changing them is a design decision
-separate from the brand colour. `lib/render/theme.test.ts` still records that
-divergence as intentional.
-
-Shipping this changed every cached badge and every embedded README image, which
-is why `BADGE_RENDER_VARIANT` moved from `warm-amber-v3` to `jade-v1` in the
-same commit and the byte-for-byte baseline in `badge-effects.test.ts` was
-re-captured. `VERIFICATION_CORAL` is untouched: it is the badge's one "verified"
-colour and deliberately not the brand accent (#1168/#1183).
+The five historical palette identifiers — Jade, Indigo, Amber, Crimson and Mono — retain their colors.
+The redesign's additive Ice palette and global layout version are documented in
+`docs/svg-design.md`. Badge output uses literal raster-compatible colors and one
+renderer; it never inherits page theme or CSS custom properties. The historical
+Jade references remain archived for comparison and rollback planning.

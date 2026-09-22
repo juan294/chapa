@@ -15,7 +15,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
+      className="rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up"
       style={{ animationDelay: `${delay}ms` }}
     >
       <p className="font-heading text-xs text-text-secondary tracking-wider uppercase">

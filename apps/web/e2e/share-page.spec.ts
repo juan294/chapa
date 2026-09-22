@@ -21,7 +21,7 @@ test.describe("Share page — /u/:handle", () => {
 
     // sr-only h1: "@octocat — Developer Impact, Decoded"
     const h1 = page.locator("h1");
-    await expect(h1).toContainText("octocat");
+    await expect(h1).toContainText(/octocat/i);
   });
 
   test("badge preview section is visible", async ({ page }) => {
@@ -40,7 +40,8 @@ test.describe("Share page — /u/:handle", () => {
 
     // #1217 removed SharePageH2 ("Tu Impacto, Decodificado") in favour of a
     // header that names the profile and carries the localized subtitle.
-    await expect(page.locator("h1")).toHaveText("octocat");
+    // The header names the profile (#1217): the display name when GitHub has one, the handle otherwise.
+    await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(
       page.getByText("Insignia de impacto de desarrollador", { exact: false }),
     ).toBeVisible();
@@ -55,7 +56,8 @@ test.describe("Share page — /u/:handle", () => {
 
     // The h1 is the profile identity and is the same in both locales; the
     // badge's accessible label is what carries the locale (#1217).
-    await expect(page.locator("h1")).toHaveText("octocat");
+    // The header names the profile (#1217): the display name when GitHub has one, the handle otherwise.
+    await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(page.getByRole("img", { name: "Chapa de octocat" })).toBeAttached();
 
     await page.getByRole("button", { name: "ES", exact: true }).click();
@@ -65,7 +67,8 @@ test.describe("Share page — /u/:handle", () => {
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
-    await expect(page.locator("h1")).toHaveText("octocat");
+    // The header names the profile (#1217): the display name when GitHub has one, the handle otherwise.
+    await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(
       page.getByRole("img", { name: "Chapa badge for octocat" }),
     ).toBeAttached();
@@ -99,7 +102,8 @@ test.describe("Share page — /u/:handle", () => {
     expect(response!.status()).toBeLessThan(500);
 
     await expect(page).toHaveURL(path);
-    await expect(page.locator("h1")).toHaveText("octocat");
+    // The header names the profile (#1217): the display name when GitHub has one, the handle otherwise.
+    await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
@@ -113,7 +117,8 @@ test.describe("Share page — /u/:handle", () => {
 
     await page.reload(GOTO_OPTS);
     await expect(page).toHaveURL(path);
-    await expect(page.locator("h1")).toHaveText("octocat");
+    // The header names the profile (#1217): the display name when GitHub has one, the handle otherwise.
+    await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(page).toHaveTitle(
       "@octocat — Developer Impact, Decoded — Chapa",
     );
@@ -130,7 +135,8 @@ test.describe("Share page — /u/:handle", () => {
     const spanishPath = `${smokeProfilePath}&lang=es`;
 
     await page.goto(englishPath, GOTO_OPTS);
-    await expect(page.locator("h1")).toHaveText("octocat");
+    // The header names the profile (#1217): the display name when GitHub has one, the handle otherwise.
+    await expect(page.locator("h1")).toHaveText(/octocat/i);
     await expect(
       page.getByRole("img", { name: "Chapa badge for octocat" }),
     ).toBeAttached();

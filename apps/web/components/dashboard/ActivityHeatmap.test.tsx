@@ -687,7 +687,7 @@ describe("ActivityHeatmap", () => {
         />,
       );
 
-      const table = container.querySelector("table.sr-only");
+      const table = container.querySelector(".sr-only table");
       expect(table).not.toBeNull();
 
       const rows = table!.querySelectorAll("tbody tr");
@@ -915,4 +915,13 @@ describe("ActivityHeatmap — v2 chart framing (#1217)", () => {
       (scroller.firstElementChild as HTMLElement).className,
     ).toContain("min-w-[560px]");
   });
+});
+
+it("describes current-policy activity without invented per-day dimension percentages", () => {
+  const { container } = render(<ActivityHeatmap heatmapData={mockHeatmapData} activeDays={2} dimensions={mockDimensions} descriptiveOnly />);
+  expect(screen.queryByText("Delivery")).toBeNull();
+  const dot = container.querySelector(".cursor-pointer");
+  if (!dot) throw new Error("Expected activity dot");
+  fireEvent.mouseEnter(dot);
+  expect(screen.getByRole("tooltip").textContent).not.toContain("%");
 });

@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { ReceiptExplanationPanel } from "@/components/dashboard/ReceiptExplanationPanel";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
 import { useState } from "react";
 import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
@@ -12,6 +15,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 /**
  * Client-side component that renders public share-page sections plus owner-only
@@ -27,9 +31,15 @@ import { useTranslation } from "@/lib/i18n";
  * - Visitor: i18n-aware acquisition CTA
  */
 
+/** Display names for connectable platforms; the API answers with lowercase ids. */
+const PLATFORM_NAMES: Record<string, string> = { bitbucket: "Bitbucket", codeberg: "Codeberg", gitlab: "GitLab" };
+
 function EmptyImpactState({ handle }: { handle: string }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  // A 409 names the platform connection that blocked the fetch. Regenerating
+  // cannot fix a dead token, so say which one and stop offering the loop.
+  const [staleSources, setStaleSources] = useState<string[]>([]);
 
   async function handleRegenerate() {
     setStatus("loading");
@@ -40,9 +50,19 @@ function EmptyImpactState({ handle }: { handle: string }) {
       if (res.ok) {
         setStatus("success");
         setTimeout(() => window.location.reload(), 800);
-      } else {
-        setStatus("error");
+        return;
       }
+      if (res.status === 409) {
+        const sources = await res.json().then(
+          (body: unknown) => {
+            const value = (body as { staleSources?: unknown } | null)?.staleSources;
+            return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+          },
+          () => [],
+        );
+        setStaleSources(sources);
+      }
+      setStatus("error");
     } catch {
       setStatus("error");
     }
@@ -50,9 +70,13 @@ function EmptyImpactState({ handle }: { handle: string }) {
 
   return (
     <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
-      <div className="rounded-2xl border border-stroke bg-card p-8 space-y-4">
+      <div className="rounded-[3px] border border-stroke bg-card p-8 space-y-4">
         <p className="text-text-secondary text-sm">
-          {t('shareOwner.emptyState') as string}
+          {staleSources.length > 0
+            ? interpolate(t("generation.errorStaleSource") as string, {
+                platforms: staleSources.map((source) => PLATFORM_NAMES[source] ?? source).join(", "),
+              })
+            : (t('shareOwner.emptyState') as string)}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -61,7 +85,7 @@ function EmptyImpactState({ handle }: { handle: string }) {
             disabled={status === "loading" || status === "success"}
             aria-busy={status === "loading"}
             aria-label={status === "loading" ? (t('shareOwner.ariaBusy') as string) : undefined}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white transition-all motion-reduce:transition-none hover:bg-amber-light disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-all motion-reduce:transition-none hover:bg-action-hover disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === "loading"
               ? t('shareOwner.regenerating') as string
@@ -110,6 +134,11 @@ interface SharePageOwnerContentProps {
   // equivalent using the same formula.
   embedMarkdown?: string;
   embedHtml?: string;
+  /** #1311 — the issued v7 receipt's own arithmetic, resolved server-side.
+   *  Present only for a subject with a receipt; its presence is what switches
+   *  this surface off the v6 explanation. */
+  receiptExplanation?: ReceiptExplanation | null;
+  scoring?: ScoreViewModel | null;
 }
 
 export function SharePageOwnerContent({
@@ -122,6 +151,8 @@ export function SharePageOwnerContent({
   isOwner: isOwnerProp,
   embedMarkdown: embedMarkdownProp,
   embedHtml: embedHtmlProp,
+  receiptExplanation = null,
+  scoring,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -160,7 +191,10 @@ export function SharePageOwnerContent({
       {impact && stats ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
           <ImpactDashboard
+            isOwner={isOwner}
             impact={impact}
+            scoring={scoring}
+            receiptExplanation={receiptExplanation}
             stats={stats}
             craftResult={craftResult}
             trend={trend}
@@ -171,7 +205,17 @@ export function SharePageOwnerContent({
         <EmptyImpactState handle={handle} />
       )}
 
-      {impact && stats && (
+      {/* #1311 — a v7 subject is explained by its receipt. The v6 panel
+          explains confidence penalties, an adjusted score and a recency
+          multiplier, none of which produced the number on the badge above,
+          so showing it here would explain arithmetic that never ran. */}
+      {receiptExplanation ? (
+        <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
+          <ReceiptExplanationPanel explanation={receiptExplanation} />
+        </section>
+      ) : scoring?.policyVersion === "v7.2" ? (
+        <p className="mb-12 text-sm text-text-secondary">{t("observedScoring.explanationUnavailable") as string}</p>
+      ) : impact && stats ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
           <ScoreExplanationPanel
             impact={impact}
@@ -180,7 +224,7 @@ export function SharePageOwnerContent({
             isOwner={isOwner}
           />
         </section>
-      )}
+      ) : null}
 
       {/* Embed Snippets */}
       <section className="space-y-6 animate-fade-in-up motion-reduce:animate-none [animation-delay:500ms]">
@@ -189,7 +233,7 @@ export function SharePageOwnerContent({
         </h2>
 
         {/* Markdown snippet */}
-        <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+        <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
@@ -203,17 +247,17 @@ export function SharePageOwnerContent({
           </div>
           <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <p className="text-text-primary/80 whitespace-nowrap">
-              <span className="text-amber">{`![${embedAltText}](`}</span>
+              <span className="text-amber-text">{`![${embedAltText}](`}</span>
               <span className="text-text-secondary">
                 {badgeUrl}
               </span>
-              <span className="text-amber">{")"}</span>
+              <span className="text-amber-text">{")"}</span>
             </p>
           </div>
         </div>
 
         {/* HTML snippet */}
-        <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+        <div className="rounded-[3px] border border-stroke bg-card overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
             <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
@@ -227,16 +271,16 @@ export function SharePageOwnerContent({
           </div>
           <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <p className="text-text-primary/80 whitespace-nowrap">
-              <span className="text-amber">{"<img "}</span>
+              <span className="text-amber-text">{"<img "}</span>
               <span className="text-text-secondary">{"src="}</span>
-              <span className="text-amber/70">{`"${badgeUrl}"`}</span>
+              <span className="text-amber-text">{`"${badgeUrl}"`}</span>
               <span className="text-text-secondary">{" alt="}</span>
-              <span className="text-amber/70">{`"${embedAltText}"`}</span>
+              <span className="text-amber-text">{`"${embedAltText}"`}</span>
               <span className="text-text-secondary">{" width="}</span>
-              <span className="text-amber/70">{'"600"'}</span>
+              <span className="text-amber-text">{'"600"'}</span>
               <span className="text-text-secondary">{" height="}</span>
-              <span className="text-amber/70">{'"315"'}</span>
-              <span className="text-amber">{" />"}</span>
+              <span className="text-amber-text">{'"315"'}</span>
+              <span className="text-amber-text">{" />"}</span>
             </p>
           </div>
         </div>
@@ -244,7 +288,7 @@ export function SharePageOwnerContent({
 
       {isVisitor && (
         <section className="mt-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:560ms]">
-          <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
+          <div className="rounded-[3px] border border-stroke bg-card p-6 sm:p-8 text-center">
             <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2 text-balance">
               {t('shareVisitor.title') as string}
             </h2>
@@ -253,7 +297,7 @@ export function SharePageOwnerContent({
             </p>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all motion-reduce:transition-none"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] bg-action pl-6 pr-5 py-3 text-sm font-semibold text-action-text hover:bg-action-hover transition-all motion-reduce:transition-none"
             >
               {t('shareVisitor.cta') as string}
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

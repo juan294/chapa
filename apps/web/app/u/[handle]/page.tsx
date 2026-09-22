@@ -1,7 +1,10 @@
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { Suspense } from "react";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
+import { InlineBadgeSvg } from "@/components/badge/InlineBadgeSvg";
 import { isValidHandle } from "@/lib/validation";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -11,10 +14,7 @@ import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import {
-  resolveBadgeConfig,
-  resolveBadgeConfigSnapshot,
-} from "@/lib/render/badge-config";
+import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
 import { resolveBadgeLocale } from "@/lib/render/badge-locale";
 import {
   AVATAR_ABSENT_CACHE_TTL_SECONDS,
@@ -28,15 +28,15 @@ import {
   resolveBadgeAvatar,
 } from "@/lib/render/avatar-outcome";
 import { CommandBarHint } from "@/components/CommandBarHint";
+import Link from "next/link";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
-  getPublicProfileVerification,
-  deferProfileCacheWork,
   materializePublicProfile,
-  persistProfileSnapshot,
   redactImpactForVisitor,
+  runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
+import { isGitHubUserNotFound } from "@/lib/github/not-found";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
@@ -52,6 +52,10 @@ import { interpolate } from "@/lib/i18n/interpolate";
 import { tArray } from "@/lib/i18n/typed-accessors";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SharePageHeader } from "./SharePageHeader";
+import { describeScoreForMetadata } from "@/lib/profile/score-description";
+import { readScoreReceiptV7 } from "@/lib/profile/score-receipt-v7";
+import { readObservedScoreReceipt } from "@/lib/profile/score-receipt-observed";
+import { explainReceipt, explainObservedReceipt } from "@/lib/dashboard/receipt-explanation";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
@@ -88,12 +92,13 @@ export async function generateMetadata({
   // The date and durable Studio revision make each rendered configuration a
   // distinct CDN URL. This prevents an in-flight pre-save response from
   // refilling the URL advertised after that save.
-  const today = toDateString(new Date());
+  const scoringSelection = await readScoringRenderSelection();
+  const today = toDateString(new Date(scoringSelection.capturedAt));
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
-  const ogVersion = configSnapshot.cacheable
-    ? buildOgImageCacheVersion(today, configSnapshot.revision)
-    : `${today}-uncached`;
-  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${ogVersion}`;
+  const ogVersion = configSnapshot.cacheable && scoringSelection.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision, scoringSelection.machinePolicy)
+    : `${buildOgImageCacheVersion(today, null, scoringSelection.machinePolicy)}-uncached`;
+  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${ogVersion}&lang=${locale}`;
   return {
     title: `@${interpolate(t("sharePage.metadataTitle") as string, { handle })}`,
     description: interpolate(t("sharePage.metadataDescription") as string, { handle }),
@@ -138,6 +143,15 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const t = getServerT(locale);
   const errorMessage = getOAuthErrorMessage(errorCode, (key) => t(key) as string);
 
+  // Every notFound() on this route is a soft 404 (LE-8-2): the root
+  // `app/loading.tsx` and this route's own `loading.tsx` each wrap the page
+  // in a Suspense boundary, so Next has committed the response to 200 before
+  // this function runs. Next renders
+  // the not-found UI into the stream and injects
+  // `<meta name="robots" content="noindex">`, which is the documented
+  // behaviour for a streamed not-found. A real 404 status would need the
+  // check to run before the shell — in `proxy.ts`, which the i18n carve-out
+  // ADR deliberately keeps away from `/u/*`, or without that root boundary.
   if (!isValidHandle(handle)) {
     notFound();
   }
@@ -207,7 +221,8 @@ export async function SharePageContent({
   // below — computing the date once and reusing it (rather than recomputing
   // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
   // race where a request could read one day's key and write another.
-  const today = toDateString(new Date());
+  const scoringSelection = await readScoringRenderSelection();
+  const today = toDateString(new Date(scoringSelection.capturedAt));
   // #1181 (UX-H3 follow-up) — the cache key and the rendered content below
   // MUST come from the same resolved locale, never independent defaults.
   // `resolveBadgeLocale` (not `buildBadgeSvgCacheKey` directly) is the only
@@ -217,15 +232,22 @@ export async function SharePageContent({
   // this fixed — content defaulted to English while the key defaulted to
   // DEFAULT_LOCALE/Spanish, so the majority Spanish-locale traffic was
   // served an English badge).
-  const badgeLocale = resolveBadgeLocale(locale);
+  const badgeLocale = resolveBadgeLocale(locale, scoringSelection.machinePolicy);
   const svgCacheKey = badgeLocale.cacheKey(handle, today);
-  const [session, materialized, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
+  const [session, materialization, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
-    materializePublicProfile(handle, { readOnly }),
+    materializePublicProfile(handle, { readOnly, scoringSelection }),
     getTrendData(handle).catch(() => ({ trend: null, diff: null })),
     isWebmcpEnabled(),
-    readBadgeSvgCache(svgCacheKey),
+    scoringSelection.cacheable ? readBadgeSvgCache(svgCacheKey) : Promise.resolve(null),
   ]);
+  // LE-8-2 — GitHub answered that nobody owns this handle. Not the empty
+  // "try later" state, which is reserved for `null` (an outage or a rate
+  // limit must never 404 a real user): Next's mid-stream not-found, with the
+  // not-found UI and an injected noindex — see the shell note on SharePage
+  // for why the status itself is already 200 here.
+  if (isGitHubUserNotFound(materialization)) notFound();
+  const materialized = materialization;
   const isOwner = session?.login === handle;
   const stats = materialized?.stats ?? null;
   // `impact` stays the FULL, unredacted result — it feeds renderBadgeSvg and
@@ -236,7 +258,7 @@ export async function SharePageContent({
   const impact = materialized?.displayImpact ?? null;
   const craftResult = materialized?.craftResult ?? null;
   const verification = materialized
-    ? getPublicProfileVerification(materialized)
+    ? await resolveBadgeVerification(materialized)
     : null;
 
   // #720 — try the shared SVG cache first (read kicked off above, alongside
@@ -245,6 +267,8 @@ export async function SharePageContent({
   // avatar fetch + render entirely.
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
+  let configCacheable = false;
+  let configRevision: number | null = null;
   let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
 
   if (!cachedSvg && stats && impact) {
@@ -262,16 +286,22 @@ export async function SharePageContent({
       avatarDataUri = getBadgeAvatarDataUri(avatarOutcome);
       avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
     }
+    const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+    configCacheable = configSnapshot.cacheable && materialized?.scoring?.freshness !== "unavailable";
+    configRevision = configSnapshot.revision;
     inlineSvg = renderBadgeSvg(stats, impact, {
+      // `impact` is non-null here only because `materialized` was; the optional
+      // read keeps the compiler honest and falls back to the same legacy model.
+      scoring: materialized?.scoring,
       avatarDataUri,
       // #1191 — this render writes to the same cache slot the badge route
       // reads, so it must use the same config.
-      config: await resolveBadgeConfig(handle),
+      config: configSnapshot.config,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
       // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
       // so content and key are always for the same locale.
-      strings: badgeLocale.stringsFor(impact.tier),
+      strings: badgeLocale.stringsFor(materialized?.scoring?.tier ?? impact.tier),
     });
     renderedFresh = true;
   }
@@ -288,16 +318,21 @@ export async function SharePageContent({
   // It still gets a write, just a short-TTL one, so it doesn't shadow a
   // later good render for the full 24h+jitter a normal write would use.
   //
-  // #1091 — persistProfileSnapshot is a durable Supabase write with nothing
+  // #1091 — the snapshot persist is a durable Supabase write with nothing
   // in the rendered HTML depending on its result, so (mirroring the badge
-  // route's #1013 fix) it now runs inside after() alongside the deferred
-  // cache work it gates, instead of blocking TTFB. A genuine failure from
-  // the deferred chain is escalated via captureServerError rather than
-  // swallowed — persistProfileSnapshot already does this internally for its
-  // own "failed" write outcome; this outer catch covers any other error.
+  // route's #1013 fix) it runs inside after() alongside the deferred cache
+  // work, instead of blocking TTFB. A genuine failure from the deferred chain
+  // is escalated via captureServerError rather than swallowed —
+  // persistProfileSnapshot already does this internally for its own "failed"
+  // write outcome; this outer catch covers any other error.
+  //
+  // LE-6-1 — `verification` is the code rendered into the inline SVG above
+  // (or minted for this visit when the cached SVG was served), and
+  // `runPublicProfileSideEffects` records it on every visit rather than only
+  // on the first of the day, so the strip's link always resolves.
   if (materialized && inlineSvg && !readOnly) {
     const cacheEligible =
-      renderedFresh && !!verification && avatarCachePolicy !== "skip";
+      renderedFresh && configCacheable && !!verification && avatarCachePolicy !== "skip";
     const svgToCache = cacheEligible ? inlineSvg : null;
     // Short-TTL only when stats have no avatar URL; a resolved avatar keeps
     // the standard 24h+jitter TTL (writeBadgeSvgCache's own default).
@@ -305,20 +340,16 @@ export async function SharePageContent({
       cacheEligible && avatarCachePolicy === "short"
         ? AVATAR_ABSENT_CACHE_TTL_SECONDS
         : undefined;
-    after(() => {
+    after(async () => {
       if (svgToCache) {
-        void writeBadgeSvgCache(
+        await writeBadgeSvgCache(
           svgCacheKey,
           svgToCache,
           handle,
-          svgCacheTtlSeconds !== undefined ? { ttlSeconds: svgCacheTtlSeconds } : undefined,
+          { ttlSeconds: svgCacheTtlSeconds, scoringSelection, configRevision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null },
         );
       }
-      return persistProfileSnapshot(handle, materialized, { readOnly })
-        .then((shouldRunDeferred) => {
-          if (!shouldRunDeferred) return;
-          return deferProfileCacheWork(handle, materialized, { verification });
-        })
+      return runPublicProfileSideEffects(handle, materialized, { verification })
         .catch((err) => {
           fireAndForget(() =>
             captureServerError({
@@ -357,17 +388,33 @@ export async function SharePageContent({
 
   const displayLabel = stats?.displayName ?? handle;
 
+  const scoreDescription = describeScoreForMetadata(materialized?.scoring ?? null);
+
+  // #1311 — a v7 subject's breakdown is the receipt's own arithmetic. Resolved
+  // here rather than in the client tree: `explainReceipt` reads the sealed
+  // receipt, and the projection it returns is what crosses the boundary.
+  const identity = materialized?.scoring?.identity;
+  const receiptExplanation = identity && materialized?.scoring.policyVersion === "v7.2"
+    ? await readObservedScoreReceipt(handle, identity.revisionId).then(stored =>
+        stored.status === "found" && stored.envelope.receipt.revisionId === identity.revisionId && stored.envelope.contentHash.value === identity.contentHash
+          ? explainObservedReceipt({ receipt: stored.envelope, trend: stored.trend }, scoringSelection.capturedAt) : null)
+    : identity && materialized?.scoring.policyVersion === "v7"
+      ? await readScoreReceiptV7(handle, identity.revisionId).then(snapshot =>
+          snapshot && snapshot.receipt.receipt.revisionId === identity.revisionId && snapshot.receipt.contentHash.value === identity.contentHash ? explainReceipt(snapshot) : null)
+      : null;
+
   const personJsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
     name: displayLabel,
     url: `https://github.com/${handle}`,
     sameAs: [`https://github.com/${handle}`],
-    ...(impact
-      ? {
-          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier).`,
-        }
-      : {}),
+    // #1311 — described from the model the badge draws, not the v6 aggregate.
+    // A v7 evidence range has no single number and may have no tier, and this
+    // description is what a search result and an LLM quote back: publishing a
+    // point here while the badge shows an interval would put a number Chapa
+    // does not claim into someone else's index.
+    ...(scoreDescription ? { description: scoreDescription } : {}),
     ...(verification?.hash
       ? {
           potentialAction: {
@@ -399,10 +446,11 @@ export async function SharePageContent({
         handle={handle}
         isOwner={isOwner}
       />
-      {webmcpEnabled && stats && impactForClient && (
+      {webmcpEnabled && stats && impactForClient && materialized && (
         <SharePageWebMcpTools
           handle={handle}
           impact={impactForClient}
+          scoring={materialized.scoring}
           stats={stats}
           verification={verification}
           trend={trendData.trend}
@@ -424,28 +472,38 @@ export async function SharePageContent({
         <SharePageLocaleContent handle={handle} badgeLabelId={badgeLabelId} />
 
         {/* ── Header: identity paired with the headline score (#1217) ── */}
-        <SharePageHeader
-          handle={handle}
-          displayLabel={displayLabel}
-          score={impact?.adjustedComposite ?? null}
-          tier={impact?.tier ?? null}
-          verificationHash={verification?.hash ?? null}
-        />
+        <SharePageHeader handle={handle} displayLabel={displayLabel} />
 
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
-          <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
+          <div className="relative rounded-[3px] border border-stroke bg-card p-4">
+            {/* The badge draws its own verification strip down the right edge.
+                That strip is the profile's only route to the verification
+                record now that the header pill is gone, so it is covered by a
+                transparent link rather than repeating the claim in text. */}
+            {verification?.hash && (
+              <Link
+                href={`/verify/${verification.hash}`}
+                aria-label={t("badge.metricsVerified") as string}
+                className="absolute top-4 right-4 bottom-4 z-10 w-[5%] rounded-[3px] focus-visible:outline-2 focus-visible:outline-amber-text"
+              />
+            )}
             <div
               role="img"
               aria-labelledby={badgeLabelId}
-              className="w-full rounded-xl overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:block"
+              className="w-full overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:block"
             >
               {inlineSvg ? (
-                <div dangerouslySetInnerHTML={{ __html: inlineSvg }} />
+                <InlineBadgeSvg svg={inlineSvg} />
               ) : (
-                /* Fallback: if SVG render failed, load via <img> with skeleton */
+                /* Fallback: if SVG render failed, load via <img> with the
+                   loading plate layered BEHIND it (LE-5-1). The plate is out
+                   of flow so the frame is one badge-shaped box, not two
+                   stacked; the positioned image paints over it once loaded. */
                 <div className="relative">
-                  <BadgeSkeleton />
+                  <div aria-hidden="true" className="absolute inset-0">
+                    <BadgeSkeleton />
+                  </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={badgeImageSrc}
@@ -454,7 +512,7 @@ export async function SharePageContent({
                     width={1200}
                     height={630}
                     fetchPriority="high"
-                    className="w-full rounded-xl relative"
+                    className="relative w-full"
                   />
                 </div>
               )}
@@ -483,6 +541,8 @@ export async function SharePageContent({
           isOwner={isOwner}
           embedMarkdown={embedMarkdown}
           embedHtml={embedHtml}
+          receiptExplanation={receiptExplanation}
+          scoring={materialized?.scoring ?? null}
         />
       </div>
 

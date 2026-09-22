@@ -279,6 +279,19 @@ describe("KeyboardShortcutsListener", () => {
   /* ── Navigation shortcuts ─────────────────────────────────────── */
 
   describe("navigation shortcuts", () => {
+    it("allows an editor to hand keyboard departures to native confirmation", () => {
+      const intercept = vi.fn((event: Event) => event.preventDefault());
+      window.addEventListener("chapa:app-navigation", intercept);
+      try {
+        render(<KeyboardShortcutsListener />);
+        act(() => { capturedOnShortcut!("go-home"); });
+        expect(intercept).toHaveBeenCalledOnce();
+        expect(mockPush).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener("chapa:app-navigation", intercept);
+      }
+    });
+
     it("go-home navigates to /", () => {
       render(<KeyboardShortcutsListener />);
 

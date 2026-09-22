@@ -15,6 +15,7 @@ const mockEq = vi.fn();
 const mockUpdate = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockNot = vi.fn();
+const mockNeq = vi.fn();
 
 let listResolve: { data: unknown; error: unknown; count?: number | null };
 let singleResolve: { data: unknown; error: unknown };
@@ -52,6 +53,14 @@ const buildOrderable = (handleOnly = false): any => {
     gt: (...gtArgs: unknown[]) => {
       mockGt(...gtArgs);
       afterHandle = gtArgs[1] as string;
+      return query;
+    },
+    not: (...notArgs: unknown[]) => {
+      mockNot(...notArgs);
+      return query;
+    },
+    neq: (...neqArgs: unknown[]) => {
+      mockNeq(...neqArgs);
       return query;
     },
     limit: (...limitArgs: unknown[]) => {
@@ -154,6 +163,19 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("dbUpsertUser", () => {
+  it("reports and logs a resolved PostgREST error", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockUpsert.mockResolvedValue({ error: { message: "write denied", code: "42501" } });
+    await expect(dbUpsertUser("testuser")).resolves.toBe(false);
+    expect(log).toHaveBeenCalledWith("[db] dbUpsertUser failed:", "write denied");
+    log.mockRestore();
+  });
+
+  it("returns true for a committed registration", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+    await expect(dbUpsertUser("TestUser")).resolves.toBe(true);
+  });
+
   it("does not register an EMU source handle as a primary user", async () => {
     await dbUpsertUser("Juan-GonzalezPonce_avoltagh");
 
@@ -247,13 +269,13 @@ describe("dbUpsertUser", () => {
   it("does not throw when upsert fails", async () => {
     mockUpsert.mockRejectedValue(new Error("DB down"));
 
-    await expect(dbUpsertUser("testuser")).resolves.toBeUndefined();
+    await expect(dbUpsertUser("testuser")).resolves.toBe(false);
   });
 
-  it("returns void when DB is unavailable", async () => {
+  it("returns false when DB is unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
 
-    await expect(dbUpsertUser("testuser")).resolves.toBeUndefined();
+    await expect(dbUpsertUser("testuser")).resolves.toBe(false);
     expect(mockFrom).not.toHaveBeenCalled();
   });
 });
@@ -336,19 +358,21 @@ describe("dbUpdateUserProfile", () => {
 describe("dbGetUsers", () => {
   it("returns mapped user rows ordered by registered_at desc", async () => {
     const rows = [
-      { id: 2, handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
-      { id: 1, handle: "bob", registered_at: "2025-06-14T10:00:00Z", display_name: null, avatar_url: null },
+      { id: 2, handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: "Alice", avatar_url: "https://example.com/alice.png", email: "alice@example.com" },
+      { id: 1, handle: "bob", registered_at: "2025-06-14T10:00:00Z", display_name: null, avatar_url: null, email: null },
     ];
 
     listResolve = { data: rows, error: null };
 
     const result = await dbGetUsers();
 
+    // LE-8-4 — `hasEmail` says whether the OAuth callback wrote the row
+    // (#1239); the address itself never leaves this module through here.
     expect(result).toEqual([
-      { handle: "alice", registeredAt: "2025-06-15T10:00:00Z", displayName: "Alice", avatarUrl: "https://example.com/alice.png" },
-      { handle: "bob", registeredAt: "2025-06-14T10:00:00Z", displayName: null, avatarUrl: null },
+      { handle: "alice", registeredAt: "2025-06-15T10:00:00Z", displayName: "Alice", avatarUrl: "https://example.com/alice.png", hasEmail: true },
+      { handle: "bob", registeredAt: "2025-06-14T10:00:00Z", displayName: null, avatarUrl: null, hasEmail: false },
     ]);
-    expect(mockSelect).toHaveBeenCalledWith("id, handle, registered_at, display_name, avatar_url");
+    expect(mockSelect).toHaveBeenCalledWith("id, handle, registered_at, display_name, avatar_url, email");
     expect(mockOrder).toHaveBeenCalledWith("registered_at", {
       ascending: false,
     });
@@ -497,6 +521,13 @@ describe("dbGetUserHandlePage", () => {
 });
 
 describe("dbGetAllUserHandles", () => {
+  it("queries only rows with OAuth email evidence", async () => {
+    await dbGetAllUserHandles();
+
+    expect(mockNot).toHaveBeenCalledWith("email", "is", null);
+    expect(mockNeq).toHaveBeenCalledWith("email", "");
+  });
+
   it("excludes EMU source handles from the warm-cache registry", async () => {
     handlePageResolver = () => ({
       data: [

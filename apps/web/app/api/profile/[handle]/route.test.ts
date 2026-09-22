@@ -12,6 +12,10 @@ const {
   mockGetClientIp,
   mockIsValidHandle,
   mockMaterializeDisplayProfile,
+  mockReadScoreReceiptV7,
+  mockCacheGet,
+  mockCacheSet,
+  mockFetchStats,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetCachedLatestSnapshot: vi.fn(),
@@ -19,6 +23,16 @@ const {
   mockGetClientIp: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockMaterializeDisplayProfile: vi.fn(),
+  mockReadScoreReceiptV7: vi.fn(),
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
+  mockFetchStats: vi.fn(),
+}));
+
+vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
+
+vi.mock("@/lib/profile/score-receipt-v7", () => ({
+  readScoreReceiptV7: mockReadScoreReceiptV7,
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -27,6 +41,33 @@ vi.mock("@/lib/validation", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  cacheGet: mockCacheGet,
+  cacheSet: mockCacheSet,
+}));
+
+// The warm-cache test below runs the REAL materializer and the REAL
+// `getStats` so that the read-only stats path is exercised end to end from
+// this route; only the I/O boundaries beneath them are stubbed.
+vi.mock("@/lib/env", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/env")>(),
+  getGithubToken: () => "server-token",
+  getNextauthSecret: () => "profile-route-fixture-secret",
+}));
+vi.mock("@/lib/github/stats", () => ({ fetchStats: mockFetchStats }));
+vi.mock("@/lib/platform/source-authorization", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/platform/source-authorization")>(),
+  readSourceAuthorization: async () => ({ status: "unlinked" }),
+}));
+vi.mock("@/lib/platform/source-refresh", () => ({ refreshSourceLink: async (value: unknown) => value }));
+vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: vi.fn() }));
+vi.mock("@/lib/db/supplemental", () => ({ dbGetSupplemental: async () => null }));
+vi.mock("@/lib/bitbucket/client", () => ({ fetchBitbucketIfLinked: async () => null }));
+vi.mock("@/lib/codeberg/client", () => ({ fetchCodebergIfLinked: async () => null }));
+vi.mock("@/lib/gitlab/client", () => ({ fetchGitlabIfLinked: async () => null }));
+vi.mock("@/lib/cache/craft-cache", () => ({ getCachedCraftScore: async () => null }));
+vi.mock("@/lib/profile/score-model", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/profile/score-model")>(),
+  readRenderableReceipt: async () => null,
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
@@ -111,7 +152,21 @@ const MOCK_CRAFT = {
  * snapshot's smoothed `adjustedComposite`/`tier` so the two can't be confused.
  */
 const MOCK_MATERIALIZED = {
-  displayImpact: { adjustedComposite: 69, tier: "Solid" },
+  displayImpact: { handle: "juan294", dimensions: { delivery: 69, quality: 69, consistency: 69, breadth: 69 }, adjustedComposite: 69, tier: "Solid", archetype: "Builder" },
+  // #1311 — the route reads its headline from the resolved model, since that
+  // is what the badge draws and what this field is documented to match.
+  scoring: {
+    policyVersion: "v6" as const, handle: "juan294", identity: null, window: null,
+    dimensions: {
+      delivery: { kind: "point" as const, value: 69, display: 69 },
+      quality: { kind: "point" as const, value: 69, display: 69 },
+      consistency: { kind: "point" as const, value: 69, display: 69 },
+      breadth: { kind: "point" as const, value: 69, display: 69 },
+    },
+    composite: { kind: "point" as const, value: 69, display: 69 },
+    tier: "Solid" as const, archetype: "Builder" as const, craft: null,
+    coverage: [], exclusions: [], limitations: ["legacy_aggregate" as const],
+  },
 };
 
 const LATEST_UPLOADED_CRAFT = {
@@ -134,6 +189,7 @@ beforeEach(() => {
   mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
   mockGetClientIp.mockReturnValue("127.0.0.1");
   mockMaterializeDisplayProfile.mockResolvedValue(MOCK_MATERIALIZED);
+  mockReadScoreReceiptV7.mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -170,7 +226,24 @@ describe("GET /api/profile/:handle", () => {
       computedAt: "2026-03-27T10:30:00Z",
       displayScore: 69,
       displayTier: "Solid",
+      policyVersion: "v6",
+      scoring: MOCK_MATERIALIZED.scoring,
     });
+  });
+
+  // A v7 receipt is projected through the one shared view model, so this
+  // payload names the same revision the badge and verification link resolve to.
+  it("keeps an archived v7 receipt out of the selected v6 fallback", async () => {
+    const { buildReceiptSnapshotV7 } = await import("@/lib/history/snapshot");
+    const { receiptFixtureV7 } = await import("@/lib/history/__fixtures__/receipts-v7");
+    const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 4), null);
+    mockReadScoreReceiptV7.mockResolvedValue(snapshot);
+
+    const body = await (await GET(makeRequest("juan294"), makeParams("juan294"))).json();
+
+    expect(body.scoring).toEqual(MOCK_MATERIALIZED.scoring);
+    expect(body.policyVersion).toBe("v6");
+    expect(mockReadScoreReceiptV7).not.toHaveBeenCalled();
   });
 
   // --- Success: profile without craft ---
@@ -369,7 +442,7 @@ describe("GET /api/profile/:handle", () => {
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
 
     expect(resp.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=3600",
+      "no-store",
     );
   });
 
@@ -424,6 +497,7 @@ describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () =>
 
     expect(mockMaterializeDisplayProfile).toHaveBeenCalledWith("juan294", {
       readOnly: true,
+      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6", capturedAt: Date.parse("2026-09-08T10:00:00Z") }),
     });
   });
 
@@ -476,5 +550,40 @@ describe("GET /api/profile/:handle — display vs smoothed score (#1062)", () =>
     await GET(makeRequest("juan294"), makeParams("juan294"));
 
     expect(mockGetCachedLatestSnapshot).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LE-1-1 — a warm, bound stats cache must reach a read-only caller
+// ---------------------------------------------------------------------------
+
+describe("GET /api/profile/:handle — warm read-only stats (LE-1-1)", () => {
+  // The badge route materializes live and writes `stats:v3:<handle>` under the
+  // server token's binding. This route reads with `readOnly: true`, under the
+  // same binding, so it must be served that record: a badge printing 80 beside
+  // a `displayScore: null` from this endpoint is the finding this covers.
+  it("reports the drawn headline from the bound stats cache without a live fetch", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/profile/materialize-profile")>("@/lib/profile/materialize-profile");
+    const { makeStats } = await import("@/lib/test-helpers/fixtures");
+    const { renderableScore } = await import("@/lib/profile/score-view-model");
+    mockMaterializeDisplayProfile.mockImplementation(actual.materializeDisplayProfile);
+    mockFetchStats.mockResolvedValue(makeStats({ handle: "juan294", commitsTotal: 400, prsMergedCount: 40, reviewsSubmittedCount: 20, activeDays: 200 }));
+    mockCacheGet.mockResolvedValue(null);
+
+    // What the live badge path leaves behind.
+    const warm = await actual.materializeDisplayProfile("juan294");
+    const entry = mockCacheSet.mock.calls.find(([key]) => key === "stats:v3:juan294")![1];
+    mockCacheGet.mockImplementation(async key => key === "stats:v3:juan294" ? entry : null);
+    mockFetchStats.mockClear();
+    mockCacheSet.mockClear();
+
+    const body = await (await GET(makeRequest("juan294"), makeParams("juan294"))).json();
+
+    const drawn = renderableScore(warm!.scoring);
+    expect(typeof drawn.composite).toBe("number");
+    expect(body.displayScore).toBe(drawn.composite);
+    expect(body.displayTier).toBe(drawn.tier);
+    expect(mockFetchStats).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 });

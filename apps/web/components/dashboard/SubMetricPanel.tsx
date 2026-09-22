@@ -59,7 +59,7 @@ export function SubMetricPanel({
     <div
       role="region"
       aria-label={interpolate(t('aria.dimensionBreakdown') as string, { label })}
-      className="animate-scale-in relative rounded-xl border border-stroke bg-card p-5"
+      className="animate-scale-in relative rounded-[3px] border border-stroke bg-card p-5"
     >
       <div className="mb-4 flex items-center justify-between">
         <h3

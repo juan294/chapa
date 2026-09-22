@@ -2,6 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import type { ClientImpactV6Result } from "@chapa/shared";
+import {
+  legacyViewModel,
+  type ScoreViewModel,
+} from "@/lib/profile/score-view-model";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 import {
   WEBMCP_EMPTY_INPUT_SCHEMA,
@@ -60,6 +64,35 @@ const impact: ClientImpactV6Result = {
 };
 const verification = { hash: "abc12345", date: "2026-08-27" };
 
+// The v6 aggregate the page passes as `impact` is the fresh number today, but
+// the badge draws the resolved score model (#1001/#1311). These two fixtures
+// make them disagree so a test can tell which one a tool publishes.
+const drawnScore = DEMO_IMPACT.adjustedComposite + 1;
+const smoothedImpact: ClientImpactV6Result = {
+  ...impact,
+  adjustedComposite: DEMO_IMPACT.adjustedComposite,
+  tier: "Solid",
+};
+const pointScoring: ScoreViewModel = {
+  ...legacyViewModel(impact),
+  composite: { kind: "point", value: drawnScore, display: drawnScore },
+  tier: "High",
+};
+const rangeScoring: ScoreViewModel = {
+  ...legacyViewModel(impact),
+  policyVersion: "v7",
+  composite: {
+    kind: "range",
+    lower: 61,
+    upper: 74,
+    displayLower: 61,
+    displayUpper: 74,
+  },
+  tier: null,
+  archetype: null,
+  limitations: ["pagination_incomplete"],
+};
+
 function renderHost(
   overrides: Partial<React.ComponentProps<typeof SharePageWebMcpTools>> = {},
 ) {
@@ -67,6 +100,7 @@ function renderHost(
     <SharePageWebMcpTools
       handle="developer"
       impact={impact}
+      scoring={legacyViewModel(impact)}
       stats={DEMO_STATS}
       verification={verification}
       trend={null}
@@ -191,10 +225,10 @@ describe("SharePageWebMcpTools", () => {
 
     expect(result).toMatchObject({
       handle: "developer",
-      impact: {
+      legacy: { impact: {
         adjustedComposite: DEMO_IMPACT.adjustedComposite,
         dimensions: DEMO_IMPACT.dimensions,
-      },
+      } },
       stats: {
         commitsTotal: DEMO_STATS.commitsTotal,
         prsMergedCount: DEMO_STATS.prsMergedCount,
@@ -208,7 +242,7 @@ describe("SharePageWebMcpTools", () => {
         impactComputedAt: DEMO_IMPACT.computedAt,
       },
     });
-    expect(result.impact).not.toHaveProperty("confidence");
+    expect(result.legacy.impact).not.toHaveProperty("confidence");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -319,6 +353,7 @@ describe("SharePageWebMcpTools", () => {
       displayScore: 79,
       tier: "High",
       displayTier: "High",
+      scoring: legacyViewModel({ ...impact, dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60, craft: 80 }, adjustedComposite: 79, tier: "High" }),
     });
     const { getTool } = renderHost();
 
@@ -377,6 +412,147 @@ describe("SharePageWebMcpTools", () => {
     });
   });
 
+  describe("headline is the number the badge draws (LE-7-1 twin)", () => {
+    it("get_impact_profile publishes the drawn score beside the smoothed aggregate", async () => {
+      const { getTool } = renderHost({ impact: smoothedImpact, scoring: pointScoring });
+
+      const { output } = await execute(getTool("get_impact_profile"));
+      const result = JSON.parse(output);
+
+      expect(result.displayScore).toBe(drawnScore);
+      expect(result.displayTier).toBe("High");
+      expect(result.scoring).toMatchObject({
+        policyVersion: "v6",
+        composite: { kind: "point", display: drawnScore },
+      });
+      // The v6 aggregate stays for compatibility but is never the headline.
+      expect(result.legacy.impact.adjustedComposite).toBe(DEMO_IMPACT.adjustedComposite);
+      expect(result.note).toMatch(/badge draws/);
+      expect(result.scoring).not.toHaveProperty("confidence");
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("get_impact_profile reports a v7 evidence range as null with its interval", async () => {
+      const { getTool } = renderHost({ impact: smoothedImpact, scoring: rangeScoring });
+
+      const { output } = await execute(getTool("get_impact_profile"));
+      const result = JSON.parse(output);
+
+      expect(result.displayScore).toBeNull();
+      expect(result.displayTier).toBeNull();
+      expect(result.scoring.composite).toEqual({
+        kind: "range",
+        lower: 61,
+        upper: 74,
+        displayLower: 61,
+        displayUpper: 74,
+      });
+    });
+
+    it("compare_profiles scores the current side from the drawn headline, never the smoothed aggregate", async () => {
+      respondWith({
+        handle: "other-user",
+        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
+        adjustedComposite: 70,
+        displayScore: 79,
+        tier: "Solid",
+        displayTier: "High",
+        scoring: { ...legacyViewModel(impact), composite: { kind: "point", value: 79, display: 79 }, tier: "High" },
+      });
+      const { getTool } = renderHost({ impact: smoothedImpact, scoring: pointScoring });
+
+      const { output } = await execute(getTool("compare_profiles"), {
+        other_handle: "other-user",
+      });
+      const result = JSON.parse(output);
+
+      expect(result.current).toMatchObject({
+        handle: "developer",
+        score: drawnScore,
+        tier: "High",
+      });
+      expect(result.other).toMatchObject({
+        handle: "other-user",
+        score: 79,
+        tier: "High",
+      });
+      expect(result.differences.score).toBe(79 - drawnScore);
+      expect(result.note).toMatch(/badge draws/);
+    });
+
+    it("compare_profiles reports a current-side evidence range as null with its interval", async () => {
+      respondWith({
+        handle: "other-user",
+        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
+        adjustedComposite: 70,
+        displayScore: 79,
+        displayTier: "High",
+      });
+      const { getTool } = renderHost({ impact: smoothedImpact, scoring: rangeScoring });
+
+      const { output } = await execute(getTool("compare_profiles"), {
+        other_handle: "other-user",
+      });
+      const result = JSON.parse(output);
+
+      expect(result.current.score).toBeNull();
+      expect(result.current.tier).toBeNull();
+      expect(result.current.scoring.composite).toMatchObject({
+        kind: "range",
+        displayLower: 61,
+        displayUpper: 74,
+      });
+      expect(result.differences).toBeNull();
+    });
+
+    it("compare_profiles never falls back to the other side's smoothed composite", async () => {
+      respondWith({
+        handle: "other-user",
+        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
+        adjustedComposite: 70,
+        tier: "Solid",
+        displayScore: null,
+        displayTier: "High",
+        scoring: { ...rangeScoring, tier: "High",
+          composite: { kind: "range", lower: 66, upper: 72, displayLower: 66, displayUpper: 72 },
+        },
+      });
+      const { getTool } = renderHost({ impact: smoothedImpact, scoring: pointScoring });
+
+      const { output } = await execute(getTool("compare_profiles"), {
+        other_handle: "other-user",
+      });
+      const result = JSON.parse(output);
+
+      expect(result.other.score).toBeNull();
+      expect(result.other.tier).toBe("High");
+      expect(result.other.scoring.composite).toMatchObject({
+        displayLower: 66,
+        displayUpper: 72,
+      });
+      expect(result.differences).toBeNull();
+      expect(result.status).toBe("not_comparable");
+    });
+
+    it("compare_profiles treats a payload with no headline fields at all as score null, not as unreadable", async () => {
+      respondWith({
+        handle: "other-user",
+        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
+        adjustedComposite: 70,
+        tier: "Solid",
+      });
+      const { getTool } = renderHost();
+
+      const { output } = await execute(getTool("compare_profiles"), {
+        other_handle: "other-user",
+      });
+      const result = JSON.parse(output);
+
+      expect(result.other).toMatchObject({ score: null, tier: null, scoring: null });
+      expect(result.differences).toBeNull();
+    });
+  });
+
   it("returns the canonical embed snippets from the page props verbatim", async () => {
     const embedMarkdown = "![Custom Markdown](https://example.test/custom.svg)";
     const embedHtml = '<img src="https://example.test/custom.svg" alt="Custom HTML" />';
@@ -391,4 +567,37 @@ describe("SharePageWebMcpTools", () => {
       note: "The badge image is live; embed it once and it stays current.",
     });
   });
+});
+
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
+it("exposes current dimensions and refuses a mixed-policy browser comparison", async () => {
+  const f = await scoringConsistencyFixture({ craft: 0 });
+  const host = renderHost({ impact: f.impact, stats: f.stats, scoring: f.model });
+  const profile = JSON.parse((await execute(host.getTool("get_impact_profile"))).output);
+  expect(profile).toMatchObject({ policyVersion: "v7.2", displayScore: 46, dimensions: { craft: 0 }, archetype: null });
+  respondWith({ handle: "other", policyVersion: "v6", dimensions: impact.dimensions, displayScore: 80, displayTier: "High", scoring: legacyViewModel(impact) });
+  const comparison = JSON.parse((await execute(host.getTool("compare_profiles"), { other_handle: "other" })).output);
+  expect(comparison).toMatchObject({ status: "not_comparable", reason: "policy_mismatch", differences: null });
+});
+it.each([200, 410])("preserves top-level receipt verification and revocation at HTTP%s", async status => {
+  const host = renderHost();
+  const body = { version: "v7.2", status: status === 410 ? "revoked" : "current", authentication: status === 410 ? "not_checked" : "verified", arithmetic: "verified", revisionId: "opaque-revision", receipt: status === 410 ? null : { policyVersion: "v7.2" } };
+  respondWith(body, status);
+  expect(JSON.parse((await execute(host.getTool("verify_badge"))).output)).toEqual(body);
+});
+
+it("rejects malformed comparison values without echoing unallowlisted fields", async () => {
+  const f = await scoringConsistencyFixture({ craft: 57 });
+  const host = renderHost({ impact: f.impact, scoring: f.model });
+  respondWith({ scoring: { ...f.model, composite: { kind: "point", value: "46", display: "46" }, privateToken: "secret-value" } });
+  const output = (await execute(host.getTool("compare_profiles"), { other_handle: "other" })).output;
+  expect(JSON.parse(output)).toMatchObject({ status: "not_comparable", reason: "unavailable", differences: null });
+  expect(output).not.toContain("secret-value");
+});
+it.each(["illustrative", "retracted"])("refuses %s profiles as current comparison evidence", async kind => {
+  const f = await scoringConsistencyFixture({ craft: 57 });
+  const host = renderHost({ impact: f.impact, scoring: f.model });
+  respondWith({ scoring: kind === "illustrative" ? { ...f.model, illustrative: true, identity: null } : { ...f.model, identity: { ...f.model.identity, action: "retract" } } });
+  const result = JSON.parse((await execute(host.getTool("compare_profiles"), { other_handle: "other" })).output);
+  expect(result).toMatchObject({ status: "not_comparable", reason: "unavailable", differences: null });
 });

@@ -114,7 +114,7 @@ export function AgentsDashboard() {
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-stroke border-t-amber" />
         <p className="font-heading text-sm text-text-secondary">
-          <span className="text-amber">$</span> loading agent data...
+          <span className="text-amber-text">$</span> loading agent data...
         </p>
       </div>
     );
@@ -127,9 +127,9 @@ export function AgentsDashboard() {
   if (error) {
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
-        <div className="rounded-xl border border-terminal-red/20 bg-terminal-red/5 p-6">
+        <div className="rounded-[3px] border border-terminal-red/20 bg-terminal-red/5 p-6">
           <p className="font-heading text-sm text-terminal-red">
-            <span className="text-terminal-red/50">ERR</span> {error}
+            <span className="text-terminal-red">ERR</span> {error}
           </p>
           <button
             onClick={() => {
@@ -137,7 +137,7 @@ export function AgentsDashboard() {
               setLoading(true);
               fetchData();
             }}
-            className="mt-4 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+            className="mt-4 min-h-11 rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text hover:bg-action-hover"
           >
             Retry
           </button>

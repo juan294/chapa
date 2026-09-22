@@ -381,9 +381,30 @@ jobs:
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # Supabase JS initializes its Realtime transport when the journey
+          # fixture creates a service client. Node 24 supplies native WebSocket.
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # The browser suite exercises profile, history, badge and OG routes that
+      # read and write snapshots. Give every isolated shard its own disposable
+      # database instead of letting those routes fail closed on missing env.
+      - uses: supabase/setup-cli@v3
+        with:
+          version: latest
+      - run: supabase start
+      - name: Export Supabase local env
+        run: |
+          supabase status -o env > supabase.env
+          set -a
+          . ./supabase.env
+          set +a
+          : "${API_URL:?Missing API_URL from Supabase CLI status output}"
+          : "${SERVICE_ROLE_KEY:?Missing SERVICE_ROLE_KEY from Supabase CLI status output}"
+          printf 'SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+      - run: supabase db reset
 
       - name: Cache Playwright browsers
         id: playwright-cache

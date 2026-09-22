@@ -493,3 +493,16 @@ describe("dbGetAdminUsers", () => {
     }
   });
 });
+
+describe("current-policy admin projection", () => {
+  it("sorts and filters current receipt values before pagination and preserves boundary precision", async () => {
+    terminalResolve = { data: [makeAdminRow({ current_policy_version: "v7.2", current_display_score: 69.99, current_exact_score: 69.998,
+      current_tier: "Solid", current_archetype: null, current_revision_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", current_content_hash: "a".repeat(64),
+      current_snapshot_date: "2026-09-08", current_fetched_at: "2026-09-08T10:00:00Z", current_confidence: null })], error: null, count: 1 };
+    const result = await dbGetAdminUsers(defaultQuery({ tier: "Solid" }), { observed: true });
+    expect(mockFrom).toHaveBeenCalledWith("admin_users_observed");
+    expect(mockOrder).toHaveBeenCalledWith("current_display_score", expect.objectContaining({ ascending: false }));
+    expect(mockEq).toHaveBeenCalledWith("current_tier", "Solid");
+    expect(result.users[0]).toMatchObject({ policyVersion: "v7.2", adjustedComposite: 69.99, rawScore: 69.99, exactScore: 69.998, tier: "Solid", archetype: null, confidence: null });
+  });
+});

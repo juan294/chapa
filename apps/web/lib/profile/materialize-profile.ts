@@ -1,3 +1,4 @@
+import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
@@ -10,8 +11,11 @@ import {
   type SnapshotScoreInput,
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
+import { readRenderableReceipt, scoreModelFrom } from "./score-model";
+import type { ScoreViewModel } from "./score-view-model";
 import { getStats } from "@/lib/github/client";
-import { isPoisonedStats, isScopeBlindedStats } from "@/lib/github/stats-integrity";
+import { isGitHubUserNotFound, type GitHubUserNotFound } from "@/lib/github/not-found";
+import { isValidLegacyStats } from "@/lib/github/stats-integrity";
 
 export interface MaterializeImpactStateOptions {
   craftResult?: CraftResult | null;
@@ -31,12 +35,8 @@ export interface MaterializedDisplayState {
   craftResult: CraftResult | null;
   rawImpact: ImpactV6Result;
   displayImpact: ImpactV6Result;
-  /**
-   * #1003 — False when the served stats look like the corrupt "0 merged PRs
-   * despite real commit/issue activity" shape (e.g. served from an old
-   * poisoned `stats:stale` entry). Gates permanent snapshot persistence and
-   * verification-record minting in `public-profile.ts` — a degraded payload
-   * is never attested, even though it can still be displayed.
+  /** Legacy compatibility name: structural validity for v6 persistence and
+   * lookup-record issuance. It does not certify source coverage or v7 evidence.
    */
   statsComplete: boolean;
 }
@@ -48,27 +48,16 @@ export interface MaterializedImpactState extends MaterializedDisplayState {
   inputsChanged: boolean;
 }
 
-/**
- * Thin wrapper over the shared poison predicates (Phase 4, extended by #1049)
- * so there's a single source of truth for "does this stats shape look
- * corrupted by the degraded-fetch bug" across the persist-boundary gate and
- * the `heal-poisoned-stats` repair script.
- *
- * Both corruption shapes are gated: the #1002 era (`isPoisonedStats`, count
- * collapsed to exactly 0) and the #1045 era (`isScopeBlindedStats`, a
- * plausible-but-wrong positive count from the token-scoped search with the
- * sample-derived fields collapsed). The second shape persisted three
- * poisoned snapshot rows for juan294 (2026-07-14 → 07-16) because only the
- * zero-check guarded this boundary.
- */
+/** Legacy persistence validity only. This boolean does not certify v7 source coverage. */
 function statsLookComplete(stats: StatsData): boolean {
-  return !isPoisonedStats(stats) && !isScopeBlindedStats(stats);
+  return isValidLegacyStats(stats);
 }
 
 export interface MaterializeProfileOptions
   extends Omit<MaterializeImpactStateOptions, "craftResult" | "latestSnapshot"> {
   token?: string;
   readOnly?: boolean;
+  scoringSelection?: ScoringRenderSelection;
   /**
    * #930 — Skip the snapshot lookup entirely. With no prior snapshot,
    * EMA smoothing is skipped and the raw adjusted score passes through.
@@ -81,10 +70,19 @@ export interface MaterializeProfileOptions
 
 export interface MaterializedProfile extends MaterializedImpactState {
   stats: StatsData;
+  /**
+   * What every rendering surface draws (#1311). An issued observed receipt projects
+   * to `policyVersion: "v7.2"`; a subject with no receipt gets the v6 aggregate
+   * projected into the same shape and labelled `v6`. Resolving it here rather
+   * than per surface is what stops the badge, the OG image, the share page and
+   * the warm-cache pre-render from disagreeing about one revision.
+   */
+  scoring: ScoreViewModel;
 }
 
 export interface MaterializedDisplayProfile extends MaterializedDisplayState {
   stats: StatsData;
+  scoring: ScoreViewModel;
 }
 
 interface DisplayInputs {
@@ -109,13 +107,15 @@ async function loadDisplayInputs(
   handle: string,
   token: string | undefined,
   readOnly: boolean | undefined,
-): Promise<DisplayInputs | null> {
+): Promise<DisplayInputs | GitHubUserNotFound | null> {
   const [statsSettled, craftSettled] = await Promise.allSettled([
     getStats(handle, token, { readOnly }),
     getCachedCraftScore(handle),
   ]);
 
   const stats = statsSettled.status === "fulfilled" ? statsSettled.value : null;
+  // LE-8-2 — carried, not folded into the `null` an outage produces.
+  if (isGitHubUserNotFound(stats)) return stats;
   if (!stats) return null;
 
   return {
@@ -154,7 +154,7 @@ export function materializeImpactState(
     latestSnapshot,
     // Persist the smoothed composite so the history sparkline stays smooth and
     // tomorrow's EMA has a stable prior; the headline stays fresh.
-    snapshot: buildSnapshot(stats, smoothedImpact, options.today),
+    snapshot: buildSnapshot(stats, smoothedImpact, options.today, displayState.rawImpact.adjustedComposite),
     inputsChanged,
   };
 }
@@ -171,30 +171,48 @@ export function materializeImpactState(
  * through as `true` for a public, unauthenticated caller (#1180 PE-L2) —
  * otherwise a cold-key read-only caller could trigger a live GitHub fetch,
  * which #1083 specifically forbids for that class of caller.
+ *
+ * A handle GitHub does not know is `null` here (LE-8-2): the owner's Studio,
+ * the read-only profile API, the MCP tools and the leaderboard all treat an
+ * unloadable subject the same way, and none of them is a 404 surface. The
+ * public surfaces go through `materializeProfile`, which carries the sentinel.
  */
 export async function materializeDisplayProfile(
   handle: string,
-  options: { token?: string; readOnly?: boolean } = {},
+  options: { token?: string; readOnly?: boolean; scoringSelection?: ScoringRenderSelection } = {},
 ): Promise<MaterializedDisplayProfile | null> {
-  const inputs = await loadDisplayInputs(handle, options.token, options.readOnly ?? false);
-  if (!inputs) return null;
+  const selection = options.scoringSelection ?? await readScoringRenderSelection();
+  const [inputs, receipt] = await Promise.all([
+    loadDisplayInputs(handle, options.token, options.readOnly ?? false),
+    readRenderableReceipt(handle, selection),
+  ]);
+  if (!inputs || isGitHubUserNotFound(inputs)) return null;
 
+  const displayState = materializeDisplayState(inputs.stats, inputs.craftResult);
   return {
     stats: inputs.stats,
-    ...materializeDisplayState(inputs.stats, inputs.craftResult),
+    ...displayState,
+    scoring: scoreModelFrom(handle, displayState.displayImpact, receipt, selection),
   };
 }
 
+/**
+ * Resolves to the `GitHubUserNotFound` sentinel when GitHub answered that
+ * nobody owns the handle (LE-8-2), so the share page, badge and OG routes can
+ * say so. `null` still means "could not load" — an outage, a rate limit, a
+ * rejected fetch — and must keep every consumer's "try later" state.
+ */
 export async function materializeProfile(
   handle: string,
   options: MaterializeProfileOptions = {},
-): Promise<MaterializedProfile | null> {
+): Promise<MaterializedProfile | GitHubUserNotFound | null> {
+  const selection = options.scoringSelection ?? await readScoringRenderSelection();
   // #800 — getStats and the three cache lookups all only need the handle, so
   // they run concurrently. On cache miss for stats, GitHub's GraphQL still
   // dominates; on cache hit, this saves a round-trip vs the previous serial
   // shape. Cache lookup failures fail open to defaults rather than rejecting
   // the whole profile fetch.
-  const [displayInputsSettled, snapshotSettled, dirtySettled] =
+  const [displayInputsSettled, snapshotSettled, dirtySettled, receiptSettled] =
     await Promise.allSettled([
       loadDisplayInputs(handle, options.token, options.readOnly),
       // #930 — Skip snapshot lookup when the caller wants to force-recalculate
@@ -202,12 +220,17 @@ export async function materializeProfile(
       // read so the EMA same-day lock never sees a stale today-snapshot.
       options.ignoreSnapshot ? Promise.resolve(null) : getCachedLatestSnapshot(handle),
       isStatsDirty(handle),
+      // #1311 — the issued v7 receipt, read alongside stats rather than after
+      // them. A failed read falls back to the labelled v6 aggregate, which is
+      // the same answer this surface gave before a receipt existed.
+      readRenderableReceipt(handle, selection),
     ]);
 
   const displayInputs =
     displayInputsSettled.status === "fulfilled"
       ? displayInputsSettled.value
       : null;
+  if (isGitHubUserNotFound(displayInputs)) return displayInputs;
   if (!displayInputs) {
     return null;
   }
@@ -222,14 +245,21 @@ export async function materializeProfile(
     dirtySettled.status === "fulfilled" && dirtySettled.value === true;
   const inputsChanged = options.inputsChanged ?? dirtyFromCache;
 
+  const impactState = materializeImpactState(stats, {
+    craftResult,
+    latestSnapshot,
+    policy: options.policy,
+    today: options.today,
+    inputsChanged,
+  });
   return {
     stats,
-    ...materializeImpactState(stats, {
-      craftResult,
-      latestSnapshot,
-      policy: options.policy,
-      today: options.today,
-      inputsChanged,
-    }),
+    ...impactState,
+    scoring: scoreModelFrom(
+      handle,
+      impactState.displayImpact,
+      receiptSettled.status === "fulfilled" ? receiptSettled.value : { unavailable: true },
+      selection,
+    ),
   };
 }

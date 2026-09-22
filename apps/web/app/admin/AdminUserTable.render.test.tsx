@@ -219,7 +219,7 @@ describe("AdminUserTable — render tests", () => {
       expect(screen.getByText("no data yet")).toBeDefined();
     });
 
-    it("dims users with null lastSnapshotDate via opacity", () => {
+    it("keeps actionable users without snapshots at full text contrast", () => {
       const { container } = render(
         <AdminUserTable
           {...defaultProps}
@@ -227,7 +227,8 @@ describe("AdminUserTable — render tests", () => {
         />,
       );
       const row = container.querySelector("tbody tr");
-      expect(row?.className).toContain("opacity-60");
+      expect(row?.className).not.toMatch(/opacity-/);
+      expect(row?.querySelector('a[href="/u/testuser"]')).not.toBeNull();
     });
 
     it("does not dim users with a lastSnapshotDate", () => {

@@ -1,3 +1,4 @@
+/** Legacy v6 source shapes below; v7 uses normalized evidence.ts contracts. */
 /** Event from GET /api/v4/users/{id}/events — used to reconstruct the contribution heatmap. */
 export interface GitlabEvent {
   created_at: string; // ISO timestamp

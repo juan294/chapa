@@ -27,7 +27,8 @@ export interface BadgeTheme {
 // Badge SVG renders on the server before app CSS is applied, so it cannot read
 // a CSS custom property and every palette is resolved to literals here.
 //
-// #1225 — `jade` is the app's own token set, converted. The badge always
+// Historical #1225 — `jade` was the app's token set, converted.
+// The app now uses vermilion; saved badge palettes remain independent. The badge always
 // renders dark, so the accent takes the DARK half of `--color-amber`
 // (`oklch(.76 .16 163)` -> #1BD093) and the archetypes take
 // `oklch(.62 .14 <hue>)`, which globals.css uses in both themes. They are hex
@@ -52,11 +53,10 @@ export interface BadgeTheme {
 // Taking the handoff's own hexes literally was measured and rejected three
 // times over:
 //
-//   1. Its `jade` triple (#0b2018/#123526/#2fd58e) is labelled "current badge"
+//   1. Its historical `jade` triple (#0b2018/#123526/#2fd58e) is labelled "current badge"
 //      but is the APP's forest palette. Adopting it would move the default
 //      badge's ground, changing every cached badge and every README embed —
-//      the one thing the jade default exists to avoid. Jade here is the real
-//      current badge, which is what that label actually asks for.
+//      exactly why explicitly saved Jade retains this historical ground.
 //   2. Its grounds sit lighter (oklch L .19-.23 against this family's .1615).
 //      On them the archetype pills fall below AA — Quality Champion measures
 //      4.36:1 on its jade and 4.37:1 on its amber. The handoff sets its bar at
@@ -81,9 +81,22 @@ interface PaletteDefinition {
   accentRgb: string;
   bg: string;
   card: string;
+  textPrimary?: string;
+  textSecondary?: string;
+  strokeAlpha?: number;
 }
 
 const PALETTE_DEFINITIONS: Record<BadgePalette, PaletteDefinition> = {
+  ice: {
+    accent: "#BAD9E8",
+    accentLight: "#DFEDF4",
+    accentRgb: "186, 217, 232",
+    bg: "#0C141B",
+    card: "#14222D",
+    textPrimary: "#F1EEE7",
+    textSecondary: "#ABBAC3",
+    strokeAlpha: 0.22,
+  },
   jade: {
     accent: "#1BD093",
     accentLight: "#65E7B0",
@@ -122,7 +135,7 @@ const PALETTE_DEFINITIONS: Record<BadgePalette, PaletteDefinition> = {
 };
 
 /**
- * Text sits on every ground at the same lightness, so it is palette-independent:
+ * Historical palette text defaults, retained unless a definition overrides them:
  * `textMuted` measures 7.67-7.71:1 and `textStrong` 16.37-16.45:1 across all five.
  */
 const BADGE_TEXT = {
@@ -149,12 +162,12 @@ function buildTheme(
     palette,
     bg: definition.bg,
     card: definition.card,
-    textPrimary: BADGE_TEXT.strong,
-    textSecondary: BADGE_TEXT.muted,
+    textPrimary: definition.textPrimary ?? BADGE_TEXT.strong,
+    textSecondary: definition.textSecondary ?? BADGE_TEXT.muted,
     accent: definition.accent,
     accentLight: definition.accentLight,
     accentRgb: definition.accentRgb,
-    stroke: tint(0.12),
+    stroke: tint(definition.strokeAlpha ?? 0.12),
     heatmap: [
       tint(0.12), // 0: none
       tint(0.3), // 1: low
@@ -183,19 +196,19 @@ const BADGE_THEMES: Record<BadgePalette, BadgeTheme> = Object.fromEntries(
 /**
  * Resolve a Studio palette id to its badge theme.
  *
- * An unknown id falls back to jade rather than throwing: this runs on the
+ * An unknown id falls back to Ice rather than throwing: this runs on the
  * public badge path, and a config that somehow escaped validation must render
  * the default badge, not a 500.
  */
-export function badgeTheme(palette: BadgePalette = "jade"): BadgeTheme {
-  return BADGE_THEMES[palette] ?? BADGE_THEMES.jade;
+export function badgeTheme(palette: BadgePalette = "ice"): BadgeTheme {
+  return BADGE_THEMES[palette] ?? BADGE_THEMES.ice;
 }
 
 /**
- * The default (jade) theme, for the render paths that have no Studio config to
+ * The default Ice theme (the export name is historical), for the render paths that have no Studio config to
  * resolve: the OG-image route and the badge route's error fallback.
  */
-export const WARM_AMBER: BadgeTheme = BADGE_THEMES.jade;
+export const WARM_AMBER: BadgeTheme = BADGE_THEMES.ice;
 
 /**
  * Map a daily contribution count to a heatmap cell color (accent opacity ramp).
@@ -204,7 +217,7 @@ export const WARM_AMBER: BadgeTheme = BADGE_THEMES.jade;
  * 6--10 = high (68%), 11+ = intense (92%).
  *
  * @param count - Number of contributions on a given day
- * @param theme - Resolved badge theme; defaults to jade
+ * @param theme - Resolved badge theme; defaults to Ice
  * @returns An `rgba()` color string from that theme's heatmap ramp
  */
 export function getHeatmapColor(
@@ -224,14 +237,22 @@ export function getHeatmapColor(
  * Used in the score ring and tier label on the embeddable badge SVG.
  *
  * @param tier - The Impact tier (Emerging, Solid, High, or Elite)
- * @param theme - Resolved badge theme; defaults to jade
+ * @param theme - Resolved badge theme; defaults to Ice
  * @returns A hex color string
  */
+/**
+ * A v7 range whose interval straddles a tier boundary earns no tier at all, so
+ * `null` is a real result here rather than a missing value: it takes the same
+ * neutral ink as Emerging, because the honest reading is "not labelled", not
+ * "labelled poorly".
+ */
 export function getTierColor(
-  tier: ImpactTier,
+  tier: ImpactTier | null,
   theme: BadgeTheme = WARM_AMBER,
 ): string {
   switch (tier) {
+    case null:
+      return theme.textSecondary;
     case "Emerging":
       return theme.textSecondary;
     case "Solid":
@@ -254,6 +275,6 @@ export function getTierColor(
  * @param archetype - The developer archetype label
  * @returns A hex color string unique to the archetype
  */
-export function getArchetypeColor(archetype: DeveloperArchetype): string {
-  return BADGE_ARCHETYPE_COLORS[archetype];
+export function getArchetypeColor(archetype: DeveloperArchetype | null, theme: BadgeTheme = WARM_AMBER): string {
+  return archetype === null ? theme.textSecondary : BADGE_ARCHETYPE_COLORS[archetype];
 }

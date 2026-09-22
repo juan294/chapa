@@ -1,0 +1,11 @@
+{
+  "config": {
+    "border": "solid-amber",
+    "cardStyle": "flat",
+    "background": "solid",
+    "scoreEffect": "standard",
+    "colorPalette": "indigo",
+    "tierTreatment": "standard",
+    "heatmapAnimation": "fade-in"
+  }
+}
