@@ -206,7 +206,7 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     const input = page.locator("#terminal-command-input");
     await input.fill(`/set palette ${configBefore.data!.config.colorPalette}`); await input.press("Enter");
     const restored = page.waitForResponse(r => r.url().includes("/api/studio/config") && r.request().method() === "PUT");
-    await page.getByTestId("studio-save").click(); expect((await restored).status()).toBe(200);
+    await page.locator('[data-testid="studio-save"]:visible').last().click(); expect((await restored).status()).toBe(200);
     await currentSurface(page, owner, 0, initial);
     expect((await servedImage(page)).digest).toBe(imageBeforePalette.digest);
   }

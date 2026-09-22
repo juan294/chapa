@@ -14,6 +14,9 @@ async function command(page: Page, text: string) {
   await expect(input).toHaveCount(1);
   await input.fill(text); await input.press('Enter');
 }
+function studioControl(page: Page, testId: 'studio-save' | 'studio-reset') {
+  return page.locator(`[data-testid="${testId}"]:visible`).last();
+}
 async function capture(page: Page, name: string) {
   await expect(page.getByRole('status', { name: /^(Loading|Cargando)$/ })).toHaveCount(0);
   if (await page.locator('nav').count()) {
@@ -50,7 +53,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await expect(page.getByTestId('studio-root')).toBeVisible();
     expect(await page.getByTestId('studio-stage').evaluate(e => e.getBoundingClientRect().top)).toBeGreaterThanOrEqual(69);
     await command(page, '/reset');
-    await page.getByTestId('studio-save').click();
+    await studioControl(page, 'studio-save').click();
     await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
     await capture(page, `studio-${locale}-${theme}-${width}`);
     for (const zoom of ['half', 'full', 'fit']) {
@@ -65,12 +68,12 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await expect(page.getByTestId('badge-preview').locator('[data-element=archetype] rect')).toHaveAttribute('fill', badgeTheme('jade').bg);
     expect(await page.getByTestId('badge-preview').locator('svg').evaluate((e: SVGSVGElement) => e.animationsPaused())).toBe(true);
     await page.route('**/api/studio/config', route => route.request().method() === 'PUT' ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Local test failure' }) }) : route.continue());
-    await page.getByTestId('studio-save').click();
+    await studioControl(page, 'studio-save').click();
     await expect(page.locator('[data-save-state="error"]')).toBeVisible();
     await capture(page, `studio-error-${locale}-${theme}-${width}`);
     await page.unroute('**/api/studio/config');
     const save = page.waitForResponse(r => r.url().includes('/api/studio/config') && r.request().method() === 'PUT');
-    await page.getByTestId('studio-save').click();
+    await studioControl(page, 'studio-save').click();
     const response = await save;
     expect(response.status()).toBe(200);
     const serialized = response.request().postDataJSON();
@@ -92,7 +95,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
       await route.fulfill({ response: persistedResponse });
     });
     await command(page, '/set bg particles');
-    await page.getByTestId('studio-save').click();
+    await studioControl(page, 'studio-save').click();
     await entered;
     await command(page, '/set bg solid');
     releaseSave();
@@ -101,10 +104,10 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     const persisted = await page.request.get('/api/studio/config');
     expect(await persisted.json()).toMatchObject({ config: { background: 'particles' } });
     await capture(page, `studio-save-race-${locale}-${theme}-${width}`);
-    await page.getByTestId('studio-save').click();
+    await studioControl(page, 'studio-save').click();
     await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
 
-    await command(page, '/reset'); await page.getByTestId('studio-save').click();
+    await command(page, '/reset'); await studioControl(page, 'studio-save').click();
     await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
     for (const route of ['settings', 'admin', 'cli/authorize?session=local-redesign-device']) {
       await page.goto(`/${route}${route.includes('?') ? '&' : '?'}lang=${locale}`);
@@ -147,8 +150,8 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     const controls = page.getByRole('button', { name: locale === 'en' ? 'Quick Controls' : 'Controles rápidos', exact: true });
     await controls.click();
     await expect(controls).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByTestId('studio-save')).toBeVisible();
-    await expect(page.getByTestId('studio-reset')).toBeVisible();
+    await expect(studioControl(page, 'studio-save')).toBeVisible();
+    await expect(studioControl(page, 'studio-reset')).toBeVisible();
     await capture(page, `studio-demo-collapsed-${locale}-${theme}-${width}`);
 
   });
