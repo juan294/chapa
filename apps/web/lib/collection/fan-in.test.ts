@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { maybeIssue, onJobComplete, retryPendingFanIns, type FanInDeps } from "./fan-in";
+import { maybeIssue, onJobComplete, retryPendingFanIns, productionFanInDeps, type FanInDeps } from "./fan-in";
 import type { CollectionJob, CollectionJobState } from "@/lib/db/collection-queue";
 import { EMPTY_CHECKPOINT } from "./plan";
 import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
@@ -8,6 +8,18 @@ const listPendingFanIns = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/db/collection-queue", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/db/collection-queue")>()),
   listPendingFanIns: (...args: unknown[]) => listPendingFanIns(...args),
+}));
+
+const mockCacheSetNxStatus = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/cache/redis", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/cache/redis")>()),
+  cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
+}));
+
+const mockCaptureOperationalAlert = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics/server-errors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics/server-errors")>()),
+  captureOperationalAlert: (...args: unknown[]) => mockCaptureOperationalAlert(...args),
 }));
 
 function job(provider: string, state: CollectionJobState, referenceDate = "2026-09-23"): CollectionJob {
@@ -229,6 +241,27 @@ describe("onJobComplete", () => {
     await onJobComplete({ ownerHandle: "octocat", referenceDate: "2026-09-23", referenceTime: "2026-09-23T10:00:00.000Z" }, deps);
     expect(deps.listJobsForDate).toHaveBeenCalledWith("octocat", "2026-09-23");
     expect(deps.issue).toHaveBeenCalledOnce();
+  });
+});
+
+describe("productionFanInDeps.alertFailure — scoring_issuance_failed (own signal, distinct from the worker's scoring_collection_failed)", () => {
+  beforeEach(() => {
+    mockCacheSetNxStatus.mockReset().mockResolvedValue("acquired");
+    mockCaptureOperationalAlert.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("raises scoring_issuance_failed, not scoring_collection_failed", async () => {
+    await productionFanInDeps.alertFailure("octocat", "2026-09-23", "source_error");
+    expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: "scoring_issuance_failed", severity: "P2" }),
+    );
+  });
+
+  it("dedupes a second alert for the same owner/day", async () => {
+    mockCacheSetNxStatus.mockResolvedValueOnce("acquired").mockResolvedValueOnce("exists");
+    await productionFanInDeps.alertFailure("octocat", "2026-09-23", "source_error");
+    await productionFanInDeps.alertFailure("octocat", "2026-09-23", "source_error");
+    expect(mockCaptureOperationalAlert).toHaveBeenCalledOnce();
   });
 });
 

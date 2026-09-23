@@ -25,6 +25,8 @@ export interface FanInDeps {
   readonly recordAttempt: (owner: string, referenceDate: string, outcome: ReceiptIssuanceOutcome) => Promise<boolean>;
   readonly scheduleEvent: typeof scheduleServerEvent;
   readonly captureError: typeof captureServerError;
+  /** Fires the `scoring_issuance_failed` P2 alert (own signal, distinct from
+   * the worker's job-level `scoring_collection_failed`). */
   readonly alertFailure: (owner: string, referenceDate: string, reason: string) => Promise<void>;
   /** Reads the owner's current receipt, read once before issuing (the
    * pre-issuance baseline) and once after a fresh `issued` outcome (#1335
@@ -34,13 +36,17 @@ export interface FanInDeps {
   readonly notifyScoreChange: typeof notifyObservedScoreChange;
 }
 
-/** Dedupe key mirrors the warm-cache ceiling alert's pattern (#1162 / BE-L5):
- * one page per owner per day, not one per failed fan-in attempt. */
-async function alertScoringCollectionFailed(owner: string, referenceDate: string, reason: string): Promise<void> {
+/** Own signal, distinct from the worker's job-level `scoring_collection_failed`
+ * (`lib/collection/worker.ts`) -- a job can fail without issuance ever having
+ * been attempted, and issuance can fail after every job succeeded, so the two
+ * alerts must be independently gradable/dedupable. Dedupe key mirrors the
+ * warm-cache ceiling alert's pattern (#1162 / BE-L5): one page per owner per
+ * day, not one per failed fan-in attempt. */
+async function alertScoringIssuanceFailed(owner: string, referenceDate: string, reason: string): Promise<void> {
   const guardStatus = await cacheSetNxStatus(`scoring:issuance-failed-alerted:${owner}:${referenceDate}`, 86400);
   if (guardStatus === "exists") return;
   await captureOperationalAlert({
-    signal: "scoring_collection_failed",
+    signal: "scoring_issuance_failed",
     severity: "P2",
     summary: `Score issuance failed for ${owner} (${referenceDate}): ${reason}`,
     route: "lib/collection/fan-in",
@@ -54,7 +60,7 @@ export const productionFanInDeps: FanInDeps = {
   recordAttempt: dbRecordScoringIssuanceAttempt,
   scheduleEvent: scheduleServerEvent,
   captureError: captureServerError,
-  alertFailure: alertScoringCollectionFailed,
+  alertFailure: alertScoringIssuanceFailed,
   readReceipt: readRenderableReceipt,
   notifyScoreChange: notifyObservedScoreChange,
 };

@@ -3,7 +3,6 @@ import { createScoringWindow } from "@chapa/shared";
 import { materializeObservedScoreReceipt, type ObservedReceiptMaterializationOptions } from "./score-receipt-observed";
 import { dbReadReportCraft, dbPublishObservedReceiptWithReport } from "@/lib/db/report-craft";
 import { issueReceiptVerificationV7 } from "@/lib/verification/store";
-import { captureServerError } from "@/lib/analytics/server-errors";
 import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 /** The Craft reader and publication fence share one selected report generation. */
@@ -63,6 +62,11 @@ export type ReceiptIssuanceOutcome =
  * current — never an unconsenting subject, since that state no longer
  * exists. Every other non-`issued` outcome is an explicit `failed{reason}`,
  * because a durable write that fails but reports success is always a bug.
+ *
+ * A `failed` outcome is deliberately *not* captured here: the sole caller
+ * (`lib/collection/fan-in.ts`) captures every `failed` outcome exactly once,
+ * regardless of reason. Capturing here too used to double-report every
+ * `storage_error` -- one capture point, at the caller, is enough.
  */
 export async function issueScoreReceipt(
   handle: string,
@@ -95,26 +99,14 @@ export async function issueScoreReceipt(
         // re-verifies what it is given, and the inner payload does not carry the
         // hash that verification binds to.
         await issueReceiptVerificationV7(handle, handle, result.snapshot.receipt);
-      } catch (error) {
-        void captureServerError({ route: "issue-score-receipt-observed", statusCode: 500, error });
+      } catch {
         return { status: "failed", reason: "storage_error" };
       }
       return result.status === "issued" ? { status: "issued" } : { status: "unchanged" };
     }
-    // result.status === "unavailable". A storage failure is captured here,
-    // immediately, on top of the fan-in caller's own capture — a genuine
-    // durable write failure must stay observable even if fan-in's own
-    // recording step is what later failed.
-    if (result.reason === "storage_error") {
-      void captureServerError({
-        route: "issue-score-receipt-observed",
-        statusCode: 500,
-        error: new Error(`Observed receipt storage failed for handle: ${handle}`),
-      });
-    }
+    // result.status === "unavailable".
     return { status: "failed", reason: result.reason === "no_receipt" ? "storage_error" : result.reason };
-  } catch (error) {
-    void captureServerError({ route: "issue-score-receipt-observed", statusCode: 500, error });
+  } catch {
     return { status: "failed", reason: "storage_error" };
   }
 }

@@ -6,15 +6,12 @@ const issueReceiptVerificationV7 = vi.fn();
 vi.mock("@/lib/verification/store", () => ({ issueReceiptVerificationV7: (...a: unknown[]) => issueReceiptVerificationV7(...a) }));
 const readScoringRenderSelection = vi.fn();
 vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: () => readScoringRenderSelection() }));
-const captureServerError = vi.fn();
-vi.mock("@/lib/analytics/server-errors", () => ({ captureServerError: (...a: unknown[]) => captureServerError(...a) }));
 
 import { materializeObservedScoreReceipt } from "./score-receipt-observed";
 import { issueScoreReceipt } from "./issue-receipt";
 
 beforeEach(() => {
   vi.mocked(materializeObservedScoreReceipt).mockReset();
-  captureServerError.mockReset();
   readScoringRenderSelection.mockReset().mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
   issueReceiptVerificationV7.mockReset().mockResolvedValue("v7.token");
 });
@@ -25,18 +22,16 @@ describe("issueScoreReceipt", () => {
     expect(await issueScoreReceipt("alice")).toEqual({ status: "issued" });
     // The receipt and the link that resolves it are issued together.
     expect(issueReceiptVerificationV7).toHaveBeenCalledOnce();
-    expect(captureServerError).not.toHaveBeenCalled();
   });
 
-  it("reports the specific reason, and captures it, when evidence is not yet complete — never a silent skip (the 2026-09-23 incident)", async () => {
+  it("reports the specific reason when evidence is not yet complete — never a silent skip (the 2026-09-23 incident)", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "unavailable", reason: "source_error" });
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "source_error" });
   });
 
-  it("captures a storage failure, because a failed durable write must stay observable", async () => {
+  it("reports a storage failure as an explicit failed outcome (the caller, lib/collection/fan-in.ts, is the sole capture point)", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "unavailable", reason: "storage_error" });
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
-    expect(captureServerError).toHaveBeenCalledOnce();
   });
 
   it("folds a no_receipt reason into storage_error, since it is not one of the three recorded failure reasons", async () => {
@@ -53,7 +48,6 @@ describe("issueScoreReceipt", () => {
   it("never lets a thrown error escape into the caller's response", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockRejectedValue(new Error("boom"));
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
-    expect(captureServerError).toHaveBeenCalledOnce();
   });
 });
 
@@ -79,20 +73,18 @@ describe("the receipt and its verification link are one act", () => {
     expect(issueReceiptVerificationV7.mock.calls[0]).toEqual(issueReceiptVerificationV7.mock.calls[1]);
   });
 
-  it("keeps repair failure observable, including withdrawal during repair", async () => {
+  it("keeps repair failure observable as a failed outcome, including withdrawal during repair", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "stored", freshness: "current", snapshot: { receipt: {} } as never });
     issueReceiptVerificationV7.mockRejectedValue(new Error("Publication withdrawn"));
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
-    expect(captureServerError).toHaveBeenCalledOnce();
   });
 
-  it("reports failure, and captures it, when the receipt issues but its link does not", async () => {
+  it("reports failure when the receipt issues but its link does not", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "issued", snapshot: { receipt: { receipt: {} } } as never, publication: "inserted", isCurrent: true, freshness: "current" });
     issueReceiptVerificationV7.mockRejectedValue(new Error("signing key unavailable"));
 
     // Not "issued": a receipt whose /verify link answers "not found" is a
     // badge carrying an attestation nobody can resolve.
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
-    expect(captureServerError).toHaveBeenCalledOnce();
   });
 });
