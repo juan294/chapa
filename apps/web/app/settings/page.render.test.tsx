@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   getOptionalServerSessionFromHeaders: vi.fn(),
   getServerLocale: vi.fn(),
   getServerT: vi.fn(),
-  readScoringRenderSelection: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
@@ -31,9 +30,6 @@ vi.mock("./EvidenceWorkflow", () => ({
   EvidenceWorkflow: ({ handle }: { handle: string }) => (
     <div data-testid="evidence-workflow" data-handle={handle} />
   ),
-}));
-vi.mock("@/lib/scoring-render-selection", () => ({
-  readScoringRenderSelection: mocks.readScoringRenderSelection,
 }));
 vi.mock("./ScoringStatusPanel", () => ({
   ScoringStatusPanel: () => <div data-testid="scoring-status-panel" />,
@@ -73,7 +69,6 @@ beforeEach(() => {
   mocks.getOptionalServerSessionFromHeaders.mockReturnValue(session);
   mocks.getServerLocale.mockResolvedValue("en");
   mocks.getServerT.mockReturnValue((key: string) => key);
-  mocks.readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
 });
 
 /**
@@ -131,19 +126,12 @@ describe("SettingsPage", () => {
     expect(mod.dynamic).toBe("force-dynamic");
   });
 
-  // #1335 phase 4 — the owner's scoring status panel only makes sense under
-  // the v7.2 contract; a v6 selection has nothing to show it.
-  it("shows the scoring status panel under the v7.2 selection", async () => {
-    mocks.readScoringRenderSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+  // #1335 — v7.2 is the one scoring policy, so the owner's scoring status
+  // panel always renders.
+  it("shows the scoring status panel", async () => {
     const { default: SettingsPage } = await import("./page");
     render(await SettingsPage());
     expect(screen.getByTestId("scoring-status-panel")).toBeDefined();
-  });
-
-  it("omits the scoring status panel under the v6 selection", async () => {
-    const { default: SettingsPage } = await import("./page");
-    render(await SettingsPage());
-    expect(screen.queryByTestId("scoring-status-panel")).toBeNull();
   });
 
   // An account page has nothing to offer a crawler and everything to leak.

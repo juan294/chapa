@@ -114,7 +114,7 @@ function AuroraBackground({
 function MockBadgeCard() {
   return (
     <div className="relative rounded-2xl border border-stroke bg-card/80 backdrop-blur-sm p-8 w-full max-w-[560px]">
-      <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
+      <BadgeContent stats={MOCK_STATS} scoring={MOCK_IMPACT} />
     </div>
   );
 }

@@ -1,24 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildReceiptSnapshotV7 } from "@/lib/history/snapshot";
 import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
-import { legacyViewModel, receiptViewModel, type ScoreViewModel } from "@/lib/profile/score-view-model";
+import { receiptViewModel, type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { describeScoringEvidence } from "./scoring-evidence-label";
-import type { ImpactV6Result } from "@chapa/shared";
-
-const legacy: ImpactV6Result = {
-  handle: "alice", profileType: "collaborative",
-  dimensions: { delivery: 70, quality: 60, consistency: 50, breadth: 40 },
-  archetype: "Builder", compositeScore: 55, confidence: 90, confidencePenalties: [],
-  adjustedComposite: 55, tier: "Solid", computedAt: "2026-09-01T12:00:00.000Z",
-};
 
 describe("badge accessible evidence description", () => {
   it("says nothing when there is no receipt to describe", () => {
     expect(describeScoringEvidence(undefined)).toBe("");
-  });
-
-  it("labels a v6 aggregate as legacy rather than describing v7 evidence", () => {
-    expect(describeScoringEvidence(legacyViewModel(legacy))).toBe(" Legacy v6 aggregate score.");
   });
 
   it("states complete evidence and an absent Craft portfolio explicitly", async () => {

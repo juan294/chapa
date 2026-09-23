@@ -24,7 +24,8 @@ export const REFERENCE_PNG_PATH = join(REPO_ROOT, "docs", "assets", "badge-refer
 export const REFERENCE_PNG_WIDTH = 1200;
 
 export async function renderBadgeReferencePng(): Promise<Uint8Array> {
-  const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+  const svg = renderBadgeSvg(DEMO_STATS, {
+    scoring: DEMO_IMPACT,
     includeBranding: true,
     demoMode: true,
   });
