@@ -9,6 +9,15 @@ import { interpolate } from "@/lib/i18n/interpolate";
 type StepStatus = "pending" | "active" | "done" | "error";
 type ErrorKind = "rateLimited" | "session" | "staleSource" | "generic";
 
+// #1335 phase 4 — best-effort progress polling. Bounded and self-contained:
+// it never gates the fixed step animation or the redirect below (both of
+// which fire on their own schedule regardless), it only enriches step 1's
+// label with a real percent when the backend has one. Any failure (network,
+// a non-JSON response, an unexpected shape) stops polling silently — this is
+// decoration, not a dependency the rest of the flow can be blocked on.
+const STATUS_POLL_INTERVAL_MS = 1500;
+const STATUS_POLL_MAX_ATTEMPTS = 15;
+
 /** Display names for the platforms a user can connect; the API answers with
  * the lowercase provider ids the rest of the codebase uses. */
 const PLATFORM_NAMES: Record<string, string> = { bitbucket: "Bitbucket", codeberg: "Codeberg", gitlab: "GitLab" };
@@ -53,6 +62,11 @@ export function GeneratingProgress({ handle }: { handle: string }) {
   const [staleSources, setStaleSources] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [showSlowNotice, setShowSlowNotice] = useState(false);
+  // #1335 phase 4 — set once generate succeeds; starts the best-effort
+  // status-percent poll below. `collectingPercent` stays null until a real
+  // "collecting" status with a percent has been observed.
+  const [pollingActive, setPollingActive] = useState(false);
+  const [collectingPercent, setCollectingPercent] = useState<number | null>(null);
 
   const retryHref = `/generating/${encodeURIComponent(handle)}?lang=${locale}`;
   // A same-URL retry can't re-authenticate — send the user through the
@@ -183,6 +197,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         setStepStatuses(['done', 'active', 'pending', 'pending']);
         setAnnouncedStepIndex(1);
         completeRemainingSteps(registerStepTimer);
+        setPollingActive(true);
       } catch {
         clearTimeout(timeoutId);
         if (cancelled) return;
@@ -202,6 +217,45 @@ export function GeneratingProgress({ handle }: { handle: string }) {
       stepTimerIds.forEach(clearTimeout);
     };
   }, [completeRemainingSteps, handle]);
+
+  // #1335 phase 4 — poll the owner's real scoring status once generate has
+  // succeeded, and show a real percent on step 1 when the backend reports
+  // one. Deliberately independent of the fixed step animation and redirect
+  // above: this never gates them, it only enriches what step 1 says while
+  // they run. Stops (and never schedules another poll) the moment the
+  // status is no longer "collecting", or after a bounded number of
+  // attempts, or on any fetch/parse failure — never on an infinite loop.
+  useEffect(() => {
+    if (!pollingActive) return;
+    let cancelled = false;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+
+    async function poll() {
+      attempts += 1;
+      try {
+        const res = await fetch("/api/scoring/status");
+        if (cancelled || !res.ok) return;
+        const body = (await res.json()) as { scoringStatus?: { kind?: string; percent?: number } } | null;
+        if (cancelled) return;
+        const status = body?.scoringStatus;
+        if (status?.kind !== "collecting" || typeof status.percent !== "number") return;
+        setCollectingPercent(status.percent);
+      } catch {
+        return;
+      }
+      if (!cancelled && attempts < STATUS_POLL_MAX_ATTEMPTS) {
+        timerId = setTimeout(poll, STATUS_POLL_INTERVAL_MS);
+      }
+    }
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [pollingActive]);
 
   // Reassure the user the wait is normal progress, not a freeze, once the
   // request has been in flight for a while (#1108).
@@ -319,6 +373,11 @@ export function GeneratingProgress({ handle }: { handle: string }) {
                   }
                 >
                   {label}
+                  {/* #1335 phase 4 — a real percent from /api/scoring/status,
+                      shown only for step 1 while its status is "collecting".
+                      Purely visual (this whole list is aria-hidden); the
+                      live-region announcement above stays the plain label. */}
+                  {i === 1 && collectingPercent !== null && ` — ${collectingPercent}%`}
                 </span>
               </div>
             );

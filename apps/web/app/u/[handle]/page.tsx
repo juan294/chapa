@@ -65,6 +65,10 @@ import { explainReceipt, explainObservedReceipt } from "@/lib/dashboard/receipt-
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 import { dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
+import { readScoringStatus } from "@/lib/collection/read-scoring-status";
+import { badgeStatusState, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { SharePageScoringStatus } from "./SharePageScoringStatus";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -234,6 +238,42 @@ export async function SharePageContent({
   // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
   // race where a request could read one day's key and write another.
   const scoringSelection = await readScoringRenderSelection();
+
+  // #1335 phase 4 — under the v7.2 selection, a handle with no ready receipt
+  // renders its scoring state instead of the normal materialize/breakdown
+  // pipeline: there is nothing to fetch or explain yet. Resolving the
+  // session here (rather than inside the Promise.all wave below) costs one
+  // extra sequential await only on this early-return path — session
+  // resolution is a local cookie/JWT check, not network I/O — and is what
+  // lets this branch decide `isOwner` before doing any of the heavier work
+  // below. Gated to v7.2 only; an explicit v6 selection (phase 5 deletes
+  // that branch) keeps its untouched pre-phase-4 behavior. A null status
+  // (a failed authority read, or a v6 selection) takes neither branch below
+  // and this function continues exactly as it did before this phase.
+  let scoringStatus: ScoringStatus | null = null;
+  if (scoringSelection.machinePolicy === "v7.2") {
+    try {
+      scoringStatus = await readScoringStatus(handle);
+    } catch (err) {
+      scoringStatus = null;
+      fireAndForget(() => captureServerError({ route: `/u/${handle}`, statusCode: 500, error: err }));
+    }
+  }
+  const badgeState = scoringStatus ? badgeStatusState(scoringStatus) : null;
+  if (badgeState && scoringStatus) {
+    const session = await headers().then((h) => getOptionalServerSessionFromHeaders(h));
+    const isOwner = session?.login === handle;
+    return (
+      <SharePageScoringStatus
+        handle={handle}
+        locale={locale}
+        status={scoringStatus as NonReadyScoringStatus}
+        badgeState={badgeState}
+        isOwner={isOwner}
+      />
+    );
+  }
+
   const today = toDateString(new Date(scoringSelection.capturedAt));
   // #1181 (UX-H3 follow-up) — the cache key and the rendered content below
   // MUST come from the same resolved locale, never independent defaults.

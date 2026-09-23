@@ -261,6 +261,52 @@ describe("BadgeToolbar render", () => {
         { method: "POST" },
       );
     });
+
+    // #1335 phase 4 — the response now carries `{ scoringStatus }`. A
+    // non-ready status is shown honestly rather than claiming "Refreshed!"
+    // for a page that will render a collecting/paused state.
+    it("shows 'Collecting…' instead of 'Refreshed!' when the response reports a non-ready status", async () => {
+      mockSessionAs("testuser");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ scoringStatus: { kind: "collecting", percent: 10, sources: [], hasPriorReceipt: false } }), { status: 200 }),
+      );
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      expect(screen.getByText("Collecting…")).toBeDefined();
+      expect(screen.queryByText("Refreshed!")).toBeNull();
+    });
+
+    it("still shows 'Refreshed!' when the response reports a ready status", async () => {
+      mockSessionAs("testuser");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ scoringStatus: { kind: "ready", receiptDate: "2026-09-23", updating: false } }), { status: 200 }),
+      );
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      expect(screen.getByText("Refreshed!")).toBeDefined();
+    });
+
+    it("falls back to 'Refreshed!' when the response body has no scoringStatus (e.g. a legacy v6 selection)", async () => {
+      mockSessionAndRefresh("testuser", { ok: true });
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      expect(screen.getByText("Refreshed!")).toBeDefined();
+    });
   });
 
   describe("download flow", () => {

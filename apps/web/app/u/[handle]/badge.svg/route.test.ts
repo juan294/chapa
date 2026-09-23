@@ -3,8 +3,17 @@ vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
   readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
 }));
+// #1335 phase 4 — defaults to `ready` so every pre-existing test (which never
+// mentions scoring status) keeps rendering through the normal pipeline below,
+// exactly as before this phase. Tests for the new collecting/action_needed/
+// unregistered states override this per-test.
+const { mockReadScoringStatus } = vi.hoisted(() => ({ mockReadScoringStatus: vi.fn() }));
+vi.mock("@/lib/collection/read-scoring-status", () => ({
+  readScoringStatus: (...args: unknown[]) => mockReadScoringStatus(...args),
+}));
 beforeEach(() => {
   mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+  mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
 });
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -1898,6 +1907,101 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [reqEn, ctxEn] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const resEn = await GET(reqEn, ctxEn);
       expect(await resEn.text()).toContain("Something went wrong.");
+    });
+  });
+
+  // #1335 phase 4 — status placeholder states. Gated to the v7.2 selection;
+  // an explicit v6 selection keeps its untouched pre-phase-4 behavior.
+  describe("scoring status placeholder (#1335 phase 4)", () => {
+    beforeEach(() => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+    });
+
+    it("renders the collecting state with no-store and skips materialize entirely", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 42, sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="collecting"');
+      expect(body).toContain("Scoring in progress, 42%");
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("renders the action_needed state with no-store", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="action_needed"');
+      expect(body).toContain("Scoring paused: action needed");
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("renders the unregistered state with no-store", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "unregistered" });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="unregistered"');
+      expect(body).toContain("Not on Chapa yet");
+      expect(body).toContain("chapa.thecreativetoken.com");
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("renders in Spanish when requested via ?lang=es", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 7, sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser", {}, "?lang=es");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain("Puntuación en curso, 7%");
+    });
+
+    it("falls back to the normal receipt pipeline when collecting WITH a prior receipt (stale-labelled render)", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 80, sources: [], hasPriorReceipt: true });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).not.toContain('data-chapa-state="collecting"');
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("falls back to the normal receipt pipeline when action_needed WITH a prior receipt", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: true });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      const body = await response.text();
+      expect(body).not.toContain('data-chapa-state="action_needed"');
+    });
+
+    it("renders normally (no status gating) when the receipt is ready", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
+      const [request, ctx] = makeRequest("testuser");
+      await GET(request, ctx);
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("never gates on status under an explicit v6 selection (phase 5 deletes that branch)", async () => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 1, sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser");
+      await GET(request, ctx);
+      expect(mockReadScoringStatus).not.toHaveBeenCalled();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("falls through to the normal pipeline (and reports the error) when the status read fails", async () => {
+      mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+      const [request, ctx] = makeRequest("testuser");
+      await GET(request, ctx);
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      expect(mockCaptureServerError).toHaveBeenCalledWith(
+        expect.objectContaining({ route: "/u/testuser/badge.svg" }),
+      );
     });
   });
 });

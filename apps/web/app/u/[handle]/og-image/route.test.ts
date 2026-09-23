@@ -3,8 +3,15 @@ vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
   readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
 }));
+// #1335 phase 4 — defaults to `ready` so pre-existing tests keep rendering
+// through the normal pipeline below, unaffected by this phase.
+const { mockReadScoringStatus } = vi.hoisted(() => ({ mockReadScoringStatus: vi.fn() }));
+vi.mock("@/lib/collection/read-scoring-status", () => ({
+  readScoringStatus: (...args: unknown[]) => mockReadScoringStatus(...args),
+}));
 beforeEach(() => {
   mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+  mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
 });
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -576,5 +583,73 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
 
     const key = mockCacheGet.mock.calls[0]![0] as string;
     expect(key).toContain("en");
+  });
+
+  // #1335 phase 4 — status placeholder states, gated to the v7.2 selection.
+  describe("scoring status placeholder (#1335 phase 4)", () => {
+    beforeEach(() => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+      mockSvgToPng.mockImplementation(async (svg: string) => new TextEncoder().encode(svg));
+    });
+
+    it("rasterizes the collecting state with no-store and skips materialize", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 42, sources: [], hasPriorReceipt: false });
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      const body = new TextDecoder().decode(await res.arrayBuffer());
+      expect(body).toContain('data-chapa-state="collecting"');
+      expect(body).toContain("Scoring in progress, 42%");
+      expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("rasterizes the action_needed state", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: false });
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      const body = new TextDecoder().decode(await res.arrayBuffer());
+      expect(body).toContain('data-chapa-state="action_needed"');
+      expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+    });
+
+    it("rasterizes the unregistered state", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "unregistered" });
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      const body = new TextDecoder().decode(await res.arrayBuffer());
+      expect(body).toContain('data-chapa-state="unregistered"');
+      expect(body).toContain("Not on Chapa yet");
+    });
+
+    it("renders in Spanish when requested", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: false });
+      const [req, ctx] = makeRequest("testuser", "es");
+      const res = await GET(req, ctx);
+      const body = new TextDecoder().decode(await res.arrayBuffer());
+      expect(body).toContain("Puntuación en pausa: se necesita una acción");
+    });
+
+    it("falls back to the normal pipeline when collecting WITH a prior receipt", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 80, sources: [], hasPriorReceipt: true });
+      const [req, ctx] = makeRequest("testuser");
+      await GET(req, ctx);
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("never gates on status under an explicit v6 selection", async () => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 1, sources: [], hasPriorReceipt: false });
+      const [req, ctx] = makeRequest("testuser");
+      await GET(req, ctx);
+      expect(mockReadScoringStatus).not.toHaveBeenCalled();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("falls through to the normal pipeline when the status read fails", async () => {
+      mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+      const [req, ctx] = makeRequest("testuser");
+      await GET(req, ctx);
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
   });
 });
