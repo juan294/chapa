@@ -15,7 +15,6 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
 import { dbEnsureScoringSubject } from "@/lib/db/scoring-subjects";
 import { enqueueCollection } from "@/lib/collection/enqueue";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { addContact } from "@/lib/email/audience";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { getRequestId } from "@/lib/log";
@@ -178,16 +177,12 @@ export const GET = withErrorCapture("/api/auth/callback", async (request: NextRe
       // public badge/share-page read (#1335 phase 2).
       const subjectRegistered = await dbEnsureScoringSubject(user.login);
       if (!subjectRegistered) throw new Error("Scoring subject registration failed");
-      // #1335 phase 4 — the first collection job for a brand-new subject is
+      // #1335 phase 4/5 — the first collection job for a brand-new subject is
       // enqueued right here, not on a later public read. A failed per-provider
       // enqueue is captured by enqueueCollection itself; the 5-minute
-      // collect-evidence cron tick picks the job up from here. Gated on the
-      // render flag like every other enqueue site (see issue-receipt.ts's
-      // "gated with the render half"): while v7.2 rendering is off, nothing
-      // would ever consult the collected evidence, so nothing is collected.
-      if ((await readScoringRenderSelection()).enabled) {
-        await enqueueCollection(user.login, "signup");
-      }
+      // collect-evidence cron tick picks the job up from here. v7.2 is the
+      // only rendered policy, so every signed-up subject is scored.
+      await enqueueCollection(user.login, "signup");
     } catch (error) {
       await captureServerError({
         route: "/api/auth/callback",

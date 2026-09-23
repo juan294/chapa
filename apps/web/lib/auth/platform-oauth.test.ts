@@ -19,7 +19,6 @@ const {
   mockIssueOauthState,
   mockConsumeOauthState,
   mockEnqueueCollection,
-  mockReadScoringRenderSelection,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockDbUpsertLinkedPlatform: vi.fn(),
@@ -34,7 +33,6 @@ const {
   mockIssueOauthState: vi.fn(),
   mockConsumeOauthState: vi.fn(),
   mockEnqueueCollection: vi.fn(),
-  mockReadScoringRenderSelection: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -75,10 +73,6 @@ vi.mock("@/lib/auth/oauth-state", () => ({
 
 vi.mock("@/lib/collection/enqueue", () => ({
   enqueueCollection: mockEnqueueCollection,
-}));
-
-vi.mock("@/lib/scoring-render-selection", () => ({
-  readScoringRenderSelection: mockReadScoringRenderSelection,
 }));
 
 vi.mock("next/cache", () => ({
@@ -380,7 +374,6 @@ describe("createCallbackHandler", () => {
     mockDbUpsertLinkedPlatform.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
     mockEnqueueCollection.mockResolvedValue([]);
-    mockReadScoringRenderSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
   });
 
   afterEach(() => {
@@ -392,11 +385,6 @@ describe("createCallbackHandler", () => {
     expect(mockEnqueueCollection).toHaveBeenCalledWith("testuser", "reconnect", "testplatform");
   });
 
-  it("never enqueues collection while v7.2 rendering is off", async () => {
-    mockReadScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-    await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
-    expect(mockEnqueueCollection).not.toHaveBeenCalled();
-  });
 
   it("never enqueues collection when storing the linked platform fails", async () => {
     mockDbUpsertLinkedPlatform.mockResolvedValue(false);

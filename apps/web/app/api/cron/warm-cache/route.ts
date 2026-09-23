@@ -4,14 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
 import { getWarmCachePriorityHandles } from "@/lib/env";
 import { dbGetAllUserHandles } from "@/lib/db/users";
-import {
-  dbGetLatestSnapshotBatch,
-  dbCleanOldSnapshots,
-} from "@/lib/db/snapshots";
-import { compareSnapshots } from "@/lib/history/diff";
-import { isSignificantChange } from "@/lib/history/significant-change";
-import { notifyScoreBump } from "@/lib/email/score-bump";
-import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbPurgeExpiredCraftRawV7 } from "@/lib/db/craft-v7";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet, cacheSetNxStatus } from "@/lib/cache/redis";
@@ -39,10 +31,7 @@ import {
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
 import { enqueueCollection } from "@/lib/collection/enqueue";
-import {
-  materializeOrchestratedProfile,
-  persistOrchestratedSnapshot,
-} from "@/lib/profile/orchestrated-profile";
+import { materializeOrchestratedProfile } from "@/lib/profile/orchestrated-profile";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { deferProfileCacheWork } from "@/lib/profile/public-profile";
 
@@ -109,8 +98,6 @@ const HEARTBEAT_TTL_SECONDS = 60 * 60 * 48;
 /** Per-handle result from warmHandle, used to aggregate counters. */
 interface HandleResult {
   warmed: boolean;
-  snapshotRecorded: boolean;
-  notified: boolean;
 }
 
 /**
@@ -180,13 +167,8 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     }
   }
 
-  // Pre-fetch all previous snapshots in one batch query (instead of N+1 individual calls)
-  const previousSnapshots = await dbGetLatestSnapshotBatch(toWarm);
-
   // Counters aggregated from per-handle results
   let warmed = 0;
-  let snapshots = 0;
-  let notifications = 0;
 
   // Process handles in parallel batches for throughput, checking the time
   // budget before starting each batch (#1095, mirrors process-campaigns).
@@ -209,7 +191,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       batch,
       BATCH_SIZE,
       async (handle) => {
-        const result = await warmHandle(handle, previousSnapshots, requestId);
+        const result = await warmHandle(handle, requestId);
         return { handle, ...result };
       },
     );
@@ -219,12 +201,8 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   }
 
   // Aggregate succeeded results
-  for (const { warmed: w, snapshotRecorded, notified } of warmResults) {
-    if (w) {
-      warmed++;
-      if (snapshotRecorded) snapshots++;
-      if (notified) notifications++;
-    }
+  for (const { warmed: w } of warmResults) {
+    if (w) warmed++;
   }
 
   // Recompute the offset to advance to based on how many *rotation-scanned*
@@ -347,14 +325,6 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     }
   }
 
-  // Clean expired verification records from Supabase (fire-and-forget safe)
-  let expiredVerificationsDeleted = 0;
-  try {
-    expiredVerificationsDeleted = await dbCleanExpiredVerifications();
-  } catch {
-    // Non-critical — don't fail the cron response
-  }
-
   // Clean merge_operations rows older than 90 days (fire-and-forget safe)
   let expiredMergeOpsDeleted = 0;
   try {
@@ -386,14 +356,6 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     void captureServerError({ error: new Error("Craft raw artifact purge failed"), route: "/api/cron/warm-cache", statusCode: 503 });
   }
 
-  // Clean metrics_snapshots older than retention period (fire-and-forget safe)
-  let expiredSnapshotsDeleted = 0;
-  try {
-    expiredSnapshotsDeleted = await dbCleanOldSnapshots();
-  } catch {
-    // Non-critical — don't fail the cron response
-  }
-
   const durationMs = Date.now() - start;
 
   // Emit observability event to PostHog (fire-and-forget)
@@ -410,11 +372,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       warmed,
       failed,
       failures,
-      snapshots,
-      notifications,
-      expiredVerificationsDeleted,
       expiredMergeOpsDeleted,
-      expiredSnapshotsDeleted,
       expiredCraftRawDeleted,
       revokedReceiptCaches,
       retiredSupplementalCaches,
@@ -445,12 +403,11 @@ function parsePriorityHandles(allHandles: string[]): string[] {
 }
 
 /**
- * Warm a single handle: fetch stats, record snapshot, check for score bumps.
+ * Warm a single handle: fetch stats, pre-render the badge SVG cache.
  * All errors are caught internally — this function never throws.
  */
 async function warmHandle(
   handle: string,
-  previousSnapshots: Map<string, unknown>,
   requestId?: string,
 ): Promise<HandleResult> {
   try {
@@ -485,11 +442,8 @@ async function warmHandle(
           properties: { handle, requestId },
         });
       }
-      return { warmed: false, snapshotRecorded: false, notified: false };
+      return { warmed: false };
     }
-
-    let snapshotRecorded = false;
-    let notified = false;
 
     // #1089 (PE-M2): render and publish the badge SVG cache entry here so the
     // first real visitor after the UTC date rollover gets a cache hit instead
@@ -572,11 +526,10 @@ async function warmHandle(
             }
             // LE-6-1 — this SVG is the public badge for the rest of the day,
             // and the hash it prints was minted here, by a materialization
-            // nothing else sees. The record has to be stored by the same
-            // pass: the snapshot writer below never touches
-            // `verification_records`, and the request path only stores what
-            // IT rendered. A v7 profile stores nothing here (its receipt is
-            // the attestation); `deferProfileCacheWork` enforces that.
+            // nothing else sees. The request path only stores what IT
+            // rendered, so this pass has to store its own record. A v7.2
+            // profile stores nothing here (its receipt is the attestation);
+            // `deferProfileCacheWork` enforces that.
             await deferProfileCacheWork(handle, materialized, {
               verification,
               verificationOnly: true,
@@ -588,46 +541,11 @@ async function warmHandle(
       // Badge SVG warming is opportunistic — never fail the warm over it.
     }
 
-    // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
-    try {
-      const previousSnapshot = previousSnapshots.get(handle.toLowerCase());
-
-      const recorded = await persistOrchestratedSnapshot(handle, materialized, {
-        mode: "insert",
-      });
-      if (recorded) {
-        snapshotRecorded = true;
-
-        // Score bump notification: compare new vs previous snapshot
-        if (previousSnapshot && scoringSelection.cacheable && scoringSelection.machinePolicy === "v6" && materialized.scoring?.policyVersion !== "v7.2" && materialized.scoring?.freshness !== "unavailable") {
-          try {
-            const diff = compareSnapshots(
-              previousSnapshot as Parameters<typeof compareSnapshots>[0],
-              materialized.snapshot,
-            );
-            const result = isSignificantChange(diff);
-            if (result.significant) {
-              await notifyScoreBump(handle, diff, result);
-              notified = true;
-            }
-          } catch {
-            // Notification is non-critical — don't fail the warm
-          }
-        }
-      }
-    } catch {
-      // Snapshot recording is non-critical — don't fail the warm
-    }
-
-    // #1335 phase 4 deviation: the v7.2 "score changed" email notification
-    // that used to fire here compared a receipt read before this call's own
-    // synchronous issuance against one read after it, within the same warm
-    // pass. Issuance is no longer synchronous (fan-in owns it, from a
-    // different cron), so that before/after comparison can no longer observe
-    // a change here. Re-homing this notification onto fan-in's own
-    // `scoring_issuance_outcome` "issued" outcome is out of this phase's
-    // scope; tracked as follow-up work rather than left as always-false code.
-    return { warmed: true, snapshotRecorded, notified };
+    // #1335 phase 5 — lifetime snapshot capture and the score-bump email it
+    // fed are retired along with `metrics_snapshots`. A "score changed"
+    // notification is fan-in's own concern now (`notifyObservedScoreChange`,
+    // fired from `scoring_issuance_outcome`'s "issued" case), not this cron's.
+    return { warmed: true };
   } catch (err) {
     void captureServerError({
       route: "/api/cron/warm-cache",
@@ -635,6 +553,6 @@ async function warmHandle(
       error: err,
       requestId,
     });
-    return { warmed: false, snapshotRecorded: false, notified: false };
+    return { warmed: false };
   }
 }

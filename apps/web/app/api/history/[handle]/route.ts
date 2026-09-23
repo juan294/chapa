@@ -1,22 +1,16 @@
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { readObservedScoringHistory } from "@/lib/history/observed-history";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { getSnapshots } from "@/lib/history/history";
-import {
-  compareSnapshots,
-  redactSnapshotDiffForVisitor,
-} from "@/lib/history/diff";
-import { computeTrend } from "@/lib/history/trend";
-import { redactSnapshotForVisitor } from "@/lib/history/public-snapshot";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 type Params = { params: Promise<{ handle: string }> };
 
 const VALID_INCLUDES = new Set(["snapshots", "trend", "diff"]);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+const EMPTY_HISTORY = { observations: [], trend: [], comparisons: [] };
 
 /**
  * Public (unauthenticated) history endpoint.
@@ -27,6 +21,11 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * break embeddable use-cases and third-party integrations that consume
  * historical trend data. Rate limiting (100 req/IP/60s) provides abuse
  * protection instead of authentication.
+ *
+ * #1335 phase 5 — observed (v7.2) history only. `metrics_snapshots` and its
+ * smoothed trend/diff computation are retired; `include=snapshots,trend,diff`
+ * now names the current v7.2 observations, trend anchors, and latest
+ * comparison respectively.
  */
 export const GET = withErrorCapture("/api/history/[handle]", async (request: NextRequest, ctx) => {
   const { handle } = await (ctx as Params).params;
@@ -49,7 +48,6 @@ export const GET = withErrorCapture("/api/history/[handle]", async (request: Nex
   const url = new URL(request.url);
   const from = url.searchParams.get("from") ?? undefined;
   const to = url.searchParams.get("to") ?? undefined;
-  const windowParam = url.searchParams.get("window");
   const includeParam = url.searchParams.get("include") ?? "snapshots,trend";
 
   // Validate date params
@@ -67,65 +65,17 @@ export const GET = withErrorCapture("/api/history/[handle]", async (request: Nex
       .filter((s) => VALID_INCLUDES.has(s)),
   );
 
-  // Validate window param: must be a positive integer when provided
-  let window: number | undefined;
-  if (windowParam) {
-    const parsed = parseInt(windowParam, 10);
-    if (isNaN(parsed) || parsed <= 0 || String(parsed) !== windowParam) {
-      return NextResponse.json(
-        { error: "Invalid 'window' param — must be a positive integer" },
-        { status: 400 },
-      );
-    }
-    window = parsed;
+  const stored = await readObservedScoringHistory(handle, { from, to });
+  if (stored.status === "unavailable") {
+    return NextResponse.json({ error: "Current scoring history is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
+  const history = stored.status === "found" ? stored.history : EMPTY_HISTORY;
 
-  const selection = await readScoringRenderSelection();
-  if (!selection.cacheable) return NextResponse.json({ error: "Scoring policy is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
-  if (selection.enabled) {
-    const stored = await readObservedScoringHistory(handle, { from, to });
-    if (stored.status === "unavailable") return NextResponse.json({ error: "Current scoring history is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
-    if (stored.status === "found") {
-      const history = stored.history;
-      return NextResponse.json({ handle, policyVersion: "v7.2",
-        ...(includes.has("snapshots") && { snapshots: history.observations }),
-        ...(includes.has("trend") && { trend: history.trend }),
-        ...(includes.has("diff") && { diff: history.comparisons.at(-1) ?? null }),
-      }, { headers: { "Cache-Control": "no-store" } });
-    }
-  }
-
-  // Fetch snapshots
-  const snapshots = await getSnapshots(handle, from, to);
-
-  const publicSnapshots = snapshots.map(redactSnapshotForVisitor);
-
-  // Build response
-  const response: Record<string, unknown> = { handle, policyVersion: "v6" };
-
-  if (includes.has("snapshots")) {
-    response.snapshots = publicSnapshots;
-  }
-
-  if (includes.has("trend")) {
-    response.trend = snapshots.length >= 2 ? computeTrend(snapshots, window) : null;
-  }
-
-  if (includes.has("diff")) {
-    if (snapshots.length >= 2) {
-      const prev = snapshots[snapshots.length - 2]!;
-      const curr = snapshots[snapshots.length - 1]!;
-      response.diff = redactSnapshotDiffForVisitor(
-        compareSnapshots(prev, curr),
-      );
-    } else {
-      response.diff = null;
-    }
-  }
-
-  return NextResponse.json(response, {
-    headers: {
-      "Cache-Control": "no-store",
-    },
-  });
+  return NextResponse.json({
+    handle,
+    policyVersion: "v7.2",
+    ...(includes.has("snapshots") && { snapshots: history.observations }),
+    ...(includes.has("trend") && { trend: history.trend }),
+    ...(includes.has("diff") && { diff: history.comparisons.at(-1) ?? null }),
+  }, { headers: { "Cache-Control": "no-store" } });
 });

@@ -24,18 +24,11 @@ const {
   mockVerifyCronSecret,
   mockDbGetUsers,
   mockDbGetAllUserHandles,
-  mockDbGetLatestSnapshotBatch,
-  mockDbCleanOldSnapshots,
-  mockDbCleanExpiredVerifications,
   mockDbCleanExpiredMergeOperations,
   mockCacheGet,
   mockCacheSet,
   mockCacheSetNxStatus,
-  mockCompareSnapshots,
-  mockIsSignificantChange,
-  mockNotifyScoreBump,
   mockMaterializeOrchestratedProfile,
-  mockPersistOrchestratedSnapshot,
   mockGetAvatarBase64,
   mockCaptureServerError,
   mockCaptureServerEvent,
@@ -50,18 +43,11 @@ const {
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
   mockDbGetAllUserHandles: vi.fn(),
-  mockDbGetLatestSnapshotBatch: vi.fn(),
-  mockDbCleanOldSnapshots: vi.fn(),
-  mockDbCleanExpiredVerifications: vi.fn(),
   mockDbCleanExpiredMergeOperations: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
   mockCacheSetNxStatus: vi.fn(),
-  mockCompareSnapshots: vi.fn(),
-  mockIsSignificantChange: vi.fn(),
-  mockNotifyScoreBump: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
-  mockPersistOrchestratedSnapshot: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
@@ -84,15 +70,6 @@ vi.mock("@/lib/db/users", () => ({
     mockDbGetAllUserHandles(...args),
 }));
 
-vi.mock("@/lib/db/snapshots", () => ({
-  dbGetLatestSnapshotBatch: (...args: unknown[]) => mockDbGetLatestSnapshotBatch(...args),
-  dbCleanOldSnapshots: (...args: unknown[]) => mockDbCleanOldSnapshots(...args),
-}));
-
-vi.mock("@/lib/db/verification", () => ({
-  dbCleanExpiredVerifications: (...args: unknown[]) => mockDbCleanExpiredVerifications(...args),
-}));
-
 vi.mock("@/lib/db/telemetry", () => ({
   dbCleanExpiredMergeOperations: (...args: unknown[]) => mockDbCleanExpiredMergeOperations(...args),
 }));
@@ -103,14 +80,6 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
 }));
 
-vi.mock("@/lib/history/diff", () => ({
-  compareSnapshots: (...args: unknown[]) => mockCompareSnapshots(...args),
-}));
-
-vi.mock("@/lib/history/significant-change", () => ({
-  isSignificantChange: (...args: unknown[]) => mockIsSignificantChange(...args),
-}));
-
 vi.mock("@/lib/profile/score-model", () => ({ readRenderableReceipt: vi.fn(async () => null) }));
 
 const { mockEnqueueCollection } = vi.hoisted(() => ({ mockEnqueueCollection: vi.fn(async () => []) }));
@@ -118,14 +87,11 @@ vi.mock("@/lib/collection/enqueue", () => ({ enqueueCollection: mockEnqueueColle
 
 vi.mock("@/lib/email/score-bump", () => ({
   notifyObservedScoreChange: vi.fn(async () => false),
-  notifyScoreBump: (...args: unknown[]) => mockNotifyScoreBump(...args),
 }));
 
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: (...args: unknown[]) =>
     mockMaterializeOrchestratedProfile(...args),
-  persistOrchestratedSnapshot: (...args: unknown[]) =>
-    mockPersistOrchestratedSnapshot(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
@@ -208,9 +174,6 @@ describe("GET /api/cron/warm-cache", () => {
     mockDbGetAllUserHandles.mockImplementation(async () =>
       (await mockDbGetUsers()).map((entry: { handle: string }) => entry.handle),
     );
-    mockDbGetLatestSnapshotBatch.mockResolvedValue(new Map());
-    mockDbCleanOldSnapshots.mockResolvedValue(0);
-    mockDbCleanExpiredVerifications.mockResolvedValue(0);
     mockDbCleanExpiredMergeOperations.mockResolvedValue(0);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
@@ -218,11 +181,7 @@ describe("GET /api/cron/warm-cache", () => {
     // (first run of the day) so existing ceiling-alert tests, which don't
     // exercise the guard directly, keep firing exactly as before.
     mockCacheSetNxStatus.mockResolvedValue("acquired");
-    mockCompareSnapshots.mockReturnValue({ adjustedComposite: 5, tier: null, archetype: null });
-    mockIsSignificantChange.mockReturnValue({ significant: false });
-    mockNotifyScoreBump.mockResolvedValue(undefined);
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc");
     mockCaptureServerError.mockResolvedValue(undefined);
     mockCaptureServerEvent.mockResolvedValue(undefined);
@@ -292,11 +251,6 @@ it("reports raw-retention failures without claiming deletion success", async () 
     expect(body.processedSample).toEqual(["alice", "bob"]);
     expect(body.handles).toBeUndefined();
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", { scoringSelection: expect.objectContaining({ machinePolicy: "v6" }) });
-    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
-      "alice",
-      FAKE_MATERIALIZED,
-      { mode: "insert" },
-    );
     expect(mockGetAvatarBase64).toHaveBeenCalledWith(
       "alice",
       "https://avatars.example.com/alice.png",
@@ -348,41 +302,10 @@ it("reports raw-retention failures without claiming deletion success", async () 
     expect(handleAlerts).toHaveLength(0);
   });
 
-  it("compares snapshots and notifies when an inserted canonical snapshot is significant", async () => {
-    mockDbGetLatestSnapshotBatch.mockResolvedValue(
-      new Map([
-        ["alice", { date: "2026-04-16", adjustedComposite: 55 }],
-      ]),
-    );
-    mockIsSignificantChange.mockReturnValue({
-      significant: true,
-      reason: "score_bump",
-      allReasons: ["score_bump"],
-    });
-
-    const res = await GET(makeRequest());
-    const body = await res.json();
-
-    expect(body.notifications).toBe(1);
-    expect(mockCompareSnapshots).toHaveBeenCalledWith(
-      { date: "2026-04-16", adjustedComposite: 55 },
-      FAKE_MATERIALIZED.snapshot,
-    );
-    expect(mockNotifyScoreBump).toHaveBeenCalledWith(
-      "alice",
-      expect.any(Object),
-      expect.objectContaining({ significant: true, reason: "score_bump" }),
-    );
-  });
-
-  it("never sends a legacy score bump while the observed policy is selected", async () => {
-    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
-    mockDbGetLatestSnapshotBatch.mockResolvedValue(new Map([["alice", { date: "2026-04-16", adjustedComposite: 55 }]]));
-    mockIsSignificantChange.mockReturnValue({ significant: true, reason: "score_bump", allReasons: ["score_bump"] });
-    await GET(makeRequest());
-    expect(mockCompareSnapshots).not.toHaveBeenCalled();
-    expect(mockNotifyScoreBump).not.toHaveBeenCalled();
-  });
+  // #1335 phase 5 — lifetime snapshot capture and the score-bump email it
+  // fed (compareSnapshots/isSignificantChange/notifyScoreBump) are retired
+  // along with `metrics_snapshots`. The tests that lived here covered
+  // exactly that removed comparison.
 
   // #1335 phase 4 — the "score changed" observed-revision comparison that
   // used to live here compared a receipt read before this cron's own
@@ -404,22 +327,6 @@ it("reports raw-retention failures without claiming deletion success", async () 
     expect(mockEnqueueCollection).not.toHaveBeenCalled();
   });
 
-  it("skips notifications when the snapshot was not persisted", async () => {
-    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
-    mockDbGetLatestSnapshotBatch.mockResolvedValue(
-      new Map([
-        ["alice", { date: "2026-04-16", adjustedComposite: 55 }],
-      ]),
-    );
-
-    const res = await GET(makeRequest());
-    const body = await res.json();
-
-    expect(body.snapshots).toBe(0);
-    expect(mockCompareSnapshots).not.toHaveBeenCalled();
-    expect(mockNotifyScoreBump).not.toHaveBeenCalled();
-  });
-
   it("maintains rotation metadata and persists the next offset", async () => {
     mockCacheGet.mockResolvedValue(10);
     mockDbGetUsers.mockResolvedValue(
@@ -437,33 +344,15 @@ it("reports raw-retention failures without claiming deletion success", async () 
   });
 
   it("includes cleanup counts in the response", async () => {
-    mockDbCleanExpiredVerifications.mockResolvedValue(5);
     mockDbCleanExpiredMergeOperations.mockResolvedValue(3);
-    mockDbCleanOldSnapshots.mockResolvedValue(7);
 
     const res = await GET(makeRequest());
     const body = await res.json();
 
-    expect(body.expiredVerificationsDeleted).toBe(5);
     expect(body.expiredMergeOpsDeleted).toBe(3);
-    expect(body.expiredSnapshotsDeleted).toBe(7);
   });
 
   describe("cleanup failure paths (#764)", () => {
-    it("returns 200 and zero deletions when dbCleanExpiredVerifications rejects", async () => {
-      mockDbCleanExpiredVerifications.mockRejectedValue(
-        new Error("verification cleanup boom"),
-      );
-
-      const res = await GET(makeRequest());
-      const body = await res.json();
-
-      // Cleanup is non-critical — the route still completes successfully.
-      expect(res.status).toBe(200);
-      expect(body.expiredVerificationsDeleted).toBe(0);
-      expect(body.warmed).toBe(2);
-    });
-
     it("returns 200 and zero deletions when dbCleanExpiredMergeOperations rejects", async () => {
       mockDbCleanExpiredMergeOperations.mockRejectedValue(
         new Error("merge-ops cleanup boom"),
@@ -472,41 +361,14 @@ it("reports raw-retention failures without claiming deletion success", async () 
       const res = await GET(makeRequest());
       const body = await res.json();
 
+      // Cleanup is non-critical — the route still completes successfully.
       expect(res.status).toBe(200);
       expect(body.expiredMergeOpsDeleted).toBe(0);
       expect(body.warmed).toBe(2);
     });
 
-    it("returns 200 and zero deletions when dbCleanOldSnapshots rejects", async () => {
-      mockDbCleanOldSnapshots.mockRejectedValue(
-        new Error("snapshot cleanup boom"),
-      );
-
-      const res = await GET(makeRequest());
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.expiredSnapshotsDeleted).toBe(0);
-      expect(body.warmed).toBe(2);
-    });
-
-    it("isolates each cleanup failure — a rejecting cleanup does not prevent the others from running", async () => {
-      mockDbCleanExpiredVerifications.mockRejectedValue(new Error("boom-1"));
-      mockDbCleanExpiredMergeOperations.mockResolvedValue(4);
-      mockDbCleanOldSnapshots.mockResolvedValue(9);
-
-      const res = await GET(makeRequest());
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.expiredVerificationsDeleted).toBe(0);
-      // The cleanups that did NOT reject still report their deletions.
-      expect(body.expiredMergeOpsDeleted).toBe(4);
-      expect(body.expiredSnapshotsDeleted).toBe(9);
-    });
-
     it("still emits the cron_warm_cache_complete event when a cleanup rejects", async () => {
-      mockDbCleanOldSnapshots.mockRejectedValue(new Error("snapshot cleanup boom"));
+      mockDbCleanExpiredMergeOperations.mockRejectedValue(new Error("merge-ops cleanup boom"));
 
       await GET(makeRequest());
 
@@ -543,41 +405,6 @@ it("reports raw-retention failures without claiming deletion success", async () 
       expect(mockCacheSet).toHaveBeenCalled();
     });
 
-    it("records a snapshot failure gracefully and still counts the handle as warmed", async () => {
-      // Stats fetch succeeds but snapshot persistence throws — warm should survive.
-      mockPersistOrchestratedSnapshot.mockRejectedValue(
-        new Error("snapshot insert failed"),
-      );
-
-      const res = await GET(makeRequest());
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.warmed).toBe(2);
-      // Snapshot failures are swallowed — none recorded.
-      expect(body.snapshots).toBe(0);
-      expect(body.failed).toBe(0);
-    });
-
-    it("swallows a notifyScoreBump rejection without failing the warm", async () => {
-      mockDbGetLatestSnapshotBatch.mockResolvedValue(
-        new Map([["alice", { date: "2026-04-16", adjustedComposite: 55 }]]),
-      );
-      mockIsSignificantChange.mockReturnValue({
-        significant: true,
-        reason: "score_bump",
-        allReasons: ["score_bump"],
-      });
-      mockNotifyScoreBump.mockRejectedValue(new Error("email send failed"));
-
-      const res = await GET(makeRequest());
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      // alice's notification failed but the warm itself succeeded; no crash.
-      expect(body.warmed).toBe(2);
-      expect(body.notifications).toBe(0);
-    });
   });
 
   it("includes WARM_CACHE_PRIORITY_HANDLES in the warm list even when outside the rotation slice", async () => {
