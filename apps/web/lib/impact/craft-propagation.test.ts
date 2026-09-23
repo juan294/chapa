@@ -41,11 +41,6 @@ const CRAFT_OPTOUTS: ReadonlyArray<{ file: string; reason: string }> = [
     reason:
       "Cache warm only: result is discarded; user-visible badge reads craft via materializeProfile.",
   },
-  {
-    file: "apps/web/e2e/helpers/redesign-fixtures.ts",
-    reason:
-      "Disposable fixture only: buildDerivedVerificationRow must byte-match the hash a live, non-read-only render of the same handle would independently mint (see the call site). The octocat fixture seeds no tool_insights row, so materializeProfile's own craftResult?.craftScore is undefined for it too — passing craft here would make the fixture's hash diverge from production's, not converge with it.",
-  },
 ];
 
 // Node-style path filter: skip directories that never contain runtime code.

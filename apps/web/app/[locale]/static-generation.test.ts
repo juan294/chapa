@@ -43,15 +43,16 @@ describe("locale-segmented content pages remain statically generated (#1167 / UX
     expect(source).toContain("getLeaderboard(3, selection)");
   });
 
-  it("the scoring methodology explicitly follows live policy selection instead of hourly ISR", () => {
+  it("the scoring methodology stays force-dynamic and renders the one current policy", () => {
     const source = fs.readFileSync(path.resolve(__dirname, "about/scoring/page.tsx"), "utf-8");
     expect(source).toMatch(/export const dynamic = ["']force-dynamic["']/);
     expect(source).not.toMatch(/export const revalidate\s*=/);
-    expect(source).toContain("readScoringRenderSelection");
-    expect(source).toContain("observed={selection.enabled}");
-    // Its EN/ES route render tests verify both current arithmetic and the
-    // explicitly archived off-policy content; every unrelated page above
-    // retains its original static/hourly contract.
+    // #1335 — the `scoring_v7_rendering` selector this page used to read is
+    // retired; v7.2 is the one policy, rendered unconditionally.
+    expect(source).not.toContain("readScoringRenderSelection");
+    expect(source).toContain("observed={true}");
+    // Its EN/ES route render tests verify the current arithmetic; every
+    // unrelated page above retains its original static/hourly contract.
   });
 
   it("SiteFooter has no 'use client' directive (stays server-render-safe on force-static pages)", () => {
