@@ -9,6 +9,7 @@ import { readSourceAuthorization, type SourceAuthorization, type SourceProvider 
 import { refreshSourceLink } from "@/lib/platform/source-refresh";
 import { createSourceContext, type SourceContextInput } from "@/lib/platform/source-context";
 import { emitSourceDiagnostics } from "@/lib/platform/evidence-diagnostics";
+import { captureServerError } from "@/lib/analytics/server-errors";
 import { MAX_COLLECTION_ATTEMPTS, nextBackoff } from "./backoff";
 import { collectSourceSlice } from "./collect-source-slice";
 import type { CollectSlice } from "./plan";
@@ -83,6 +84,12 @@ export interface CollectionWorkerDeps {
   readonly resolveCredential: ResolveCredential;
   readonly collect: CollectSlice;
   readonly emitDiagnostics: typeof emitSourceDiagnostics;
+  /** Reports a slice that rejected unexpectedly (a bug, or a genuine
+   * infrastructure failure below the collector's own stop classification --
+   * `runCollectionSlice` otherwise never throws for an ordinary collection
+   * outcome). Never blocks other jobs in the same tick's batch on this.
+   */
+  readonly captureError: typeof captureServerError;
   /** No-op in this phase; phase 4 fills it in with fan-in issuance. */
   readonly onJobComplete: (job: CollectionJob) => Promise<void> | void;
   readonly now: () => number;
@@ -97,6 +104,7 @@ export const productionCollectionWorkerDeps: CollectionWorkerDeps = {
   resolveCredential,
   collect: collectSourceSlice,
   emitDiagnostics: emitSourceDiagnostics,
+  captureError: captureServerError,
   onJobComplete: () => undefined,
   now: () => Date.now(),
 };
@@ -196,17 +204,27 @@ export async function runCollectionSlice(
     return;
   }
 
+  // Access was lost mid-slice (e.g. a linked platform's token was revoked
+  // between requests) -- terminal immediately, exactly like the credential-
+  // resolution stage above. Retrying on a schedule can never fix a
+  // reconnect-required failure, so this must never fall into the
+  // structural-retry bucket below.
+  if (stop.stopKind === "not_accessible") {
+    await deps.fail(lease, stop, null);
+    return;
+  }
+
   if (stop.stopKind === "http" || stop.stopKind === "network") {
     const retryAt = job.attempt < MAX_COLLECTION_ATTEMPTS - 1 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
     await deps.fail(lease, stop, retryAt);
     return;
   }
 
-  // graphql/protocol/parse/not_accessible: the provider responded but with a
-  // structural problem, not a transient infra failure -- a stricter 3-try
-  // budget, then terminal. (evidence-diagnostics.ts's reasonFor() already
-  // groups "graphql" with "protocol"/"parse" as source_error, distinct from
-  // the honest-incompleteness budget/deadline/rate_limited group.)
+  // graphql/protocol/parse: the provider responded but with a structural
+  // problem, not a transient infra failure -- a stricter 3-try budget, then
+  // terminal. (evidence-diagnostics.ts's reasonFor() already groups
+  // "graphql" with "protocol"/"parse" as source_error, distinct from the
+  // honest-incompleteness budget/deadline/rate_limited group.)
   const retryAt = job.attempt < 2 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
   await deps.fail(lease, stop, retryAt);
 }
@@ -230,7 +248,23 @@ export async function runCollectionTick(
     const jobs = await deps.claim(CLAIM_LIMIT, LEASE_SECONDS);
     if (jobs.length === 0) break;
     const sliceDeadline = Math.min(deadline, deps.now() + SLICE_TIME_BUDGET_MS);
-    await Promise.all(jobs.map((job) => runCollectionSlice(job, sliceDeadline, deps)));
+    // allSettled, not all: one job's slice throwing (an unexpected bug or
+    // infra failure below the collector's own stop classification) must
+    // never abort the sibling jobs claimed in the same batch, and must never
+    // leave their still-pending promises as unhandled rejections.
+    const settled = await Promise.allSettled(jobs.map((job) => runCollectionSlice(job, sliceDeadline, deps)));
+    for (let i = 0; i < settled.length; i++) {
+      const outcome = settled[i]!;
+      if (outcome.status !== "rejected") continue;
+      const job = jobs[i]!;
+      const message = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      const previousStop = job.lastStop ? `, previousStopKind=${job.lastStop.stopKind}` : "";
+      await deps.captureError({
+        route: "lib/collection/worker:runCollectionTick",
+        statusCode: 500,
+        error: new Error(`Collection slice failed for job ${job.id} (provider=${job.provider}${previousStop}): ${message}`),
+      });
+    }
     slicesRun += jobs.length;
   }
   return { slicesRun };
