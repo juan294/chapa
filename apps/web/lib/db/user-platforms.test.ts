@@ -219,6 +219,26 @@ describe("dbUpsertLinkedPlatform", () => {
     );
   });
 
+  // #1332 — a fresh grant from the OAuth flow always clears a prior
+  // needs-reconnect flag, so a successful reconnect resolves the prompt.
+  it("clears needs_reconnect on every upsert", async () => {
+    const { query } = mockSupabase();
+
+    await dbUpsertLinkedPlatform(
+      "testuser",
+      "bitbucket",
+      "bb-user",
+      "access-123",
+      "refresh-456",
+      new Date("2026-03-01T00:00:00Z"),
+    );
+
+    expect(query.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ needs_reconnect: false }),
+      expect.anything(),
+    );
+  });
+
   it("returns true on success", async () => {
     mockSupabase(); // default: resolves to { error: null }
 
@@ -470,6 +490,7 @@ describe("dbGetLinkedPlatforms", () => {
           platform: "bitbucket",
           remote_login: "bb-user",
           connected_at: "2026-02-23T00:00:00Z",
+          needs_reconnect: false,
         },
       ],
       error: null,
@@ -481,7 +502,26 @@ describe("dbGetLinkedPlatforms", () => {
         platform: "bitbucket",
         remoteLogin: "bb-user",
         connectedAt: "2026-02-23T00:00:00Z",
+        needsReconnect: false,
       },
+    ]);
+  });
+
+  // #1332 — the raw column reaches the caller as a real boolean either way.
+  it("surfaces needsReconnect: true, and normalizes a null (pre-backfill) column to false", async () => {
+    const { query } = mockSupabase();
+    query.order.mockResolvedValue({
+      data: [
+        { platform: "bitbucket", remote_login: "bb-user", connected_at: "2026-02-23T00:00:00Z", needs_reconnect: true },
+        { platform: "gitlab", remote_login: "gl-user", connected_at: "2026-02-23T00:00:00Z", needs_reconnect: null },
+      ],
+      error: null,
+    });
+
+    const result = await dbGetLinkedPlatforms("testuser");
+    expect(result).toEqual([
+      { platform: "bitbucket", remoteLogin: "bb-user", connectedAt: "2026-02-23T00:00:00Z", needsReconnect: true },
+      { platform: "gitlab", remoteLogin: "gl-user", connectedAt: "2026-02-23T00:00:00Z", needsReconnect: false },
     ]);
   });
 

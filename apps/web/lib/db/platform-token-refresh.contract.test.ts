@@ -52,12 +52,14 @@ async function attempts(id = link.id) {
   expect(result.error).toBeNull(); return result.data!;
 }
 describe("durable refresh barrier (requires reviewed migrations046/048)", () => {
-  it("denies browser roles table access and claim/finish execution", () => {
-    const query = "SELECT p.proname,has_function_privilege('anon',p.oid,'EXECUTE'),has_function_privilege('authenticated',p.oid,'EXECUTE'),has_function_privilege('service_role',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('platform_token_refresh_claim','platform_token_refresh_finish','platform_token_refresh_release') ORDER BY p.proname; SELECT 'table',has_table_privilege('anon','public.platform_token_refresh_attempts','SELECT'),has_table_privilege('authenticated','public.platform_token_refresh_attempts','SELECT'),has_table_privilege('service_role','public.platform_token_refresh_attempts','SELECT'); SELECT 'mutation',has_table_privilege('service_role','public.platform_token_refresh_attempts','INSERT'),has_table_privilege('service_role','public.platform_token_refresh_attempts','UPDATE'),has_table_privilege('service_role','public.platform_token_refresh_attempts','DELETE')";
+  it("denies browser roles table access and claim/finish/release/takeover execution", () => {
+    const query = "SELECT p.proname,has_function_privilege('anon',p.oid,'EXECUTE'),has_function_privilege('authenticated',p.oid,'EXECUTE'),has_function_privilege('service_role',p.oid,'EXECUTE') FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('platform_token_refresh_claim','platform_token_refresh_finish','platform_token_refresh_release','platform_token_refresh_release_attempt','platform_token_refresh_takeover') ORDER BY p.proname; SELECT 'table',has_table_privilege('anon','public.platform_token_refresh_attempts','SELECT'),has_table_privilege('authenticated','public.platform_token_refresh_attempts','SELECT'),has_table_privilege('service_role','public.platform_token_refresh_attempts','SELECT'); SELECT 'mutation',has_table_privilege('service_role','public.platform_token_refresh_attempts','INSERT'),has_table_privilege('service_role','public.platform_token_refresh_attempts','UPDATE'),has_table_privilege('service_role','public.platform_token_refresh_attempts','DELETE')";
     expect(inspectLocalSql(query).split("\n")).toEqual([
       "platform_token_refresh_claim|f|f|t",
       "platform_token_refresh_finish|f|f|t",
       "platform_token_refresh_release|f|f|t",
+      "platform_token_refresh_release_attempt|f|f|t",
+      "platform_token_refresh_takeover|f|f|t",
       "table|f|f|t",
       "mutation|f|f|f",
     ]);
@@ -124,7 +126,7 @@ describe("durable refresh barrier (requires reviewed migrations046/048)", () => 
     expect(withdrawnClaim.data).toEqual({ status: "busy" });
     expect((await db.from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-06T12:00:00Z" })).error).toBeNull();
     expect((await db.rpc("platform_token_refresh_claim", claimArgs(changed))).data).toEqual({ status: "busy" });
-    expect(Object.keys((await attempts())[0]).sort()).toEqual(["attempt_id", "link_id", "link_version", "started_at"]);
+    expect(Object.keys((await attempts())[0]).sort()).toEqual(["attempt_id", "link_id", "link_version", "started_at", "takeover_used"]);
   });
 
   it("rejects explicit false consent for both claim and completion without changing tokens or the barrier", async () => {
@@ -267,5 +269,221 @@ describe("durable refresh barrier (requires reviewed migrations046/048)", () => 
     expect(await attempts()).toEqual([]);
     expect((await db.rpc("platform_token_refresh_finish", finishArgs(args))).data).toEqual({ status: "stale" });
     expect((await db.rpc("platform_token_refresh_claim", claimArgs(await currentLink()))).data.status).toBe("claimed");
+  });
+});
+
+// #1332 / migration 053 — release a non-ambiguous attempt in the same call,
+// and allow exactly one bounded takeover of a genuinely stale ambiguous one.
+describe("claim recovery: release_attempt & takeover (#1332, migration 053)", () => {
+  function releaseAttemptArgs(needsReconnect: boolean, current = link, attempt = randomUUID()) {
+    return { p_owner: owner, p_actor: owner, p_platform: "gitlab", p_link_id: current.id,
+      p_link_version: current.updatedAt, p_attempt_id: attempt, p_needs_reconnect: needsReconnect };
+  }
+  function takeoverArgs(maxAgeSeconds: number, current = link, newAttempt = randomUUID()) {
+    return { p_owner: owner, p_actor: owner, p_platform: "gitlab", p_link_id: current.id,
+      p_link_version: current.updatedAt, p_new_attempt_id: newAttempt, p_max_age_seconds: maxAgeSeconds };
+  }
+  async function needsReconnectFlag(id = link.id) {
+    const result = await getServiceClient().from("user_platforms").select("needs_reconnect").eq("id", id).single();
+    expect(result.error).toBeNull(); return result.data!.needs_reconnect;
+  }
+  /** Backdates the durable attempt's `started_at` using the DB's own clock
+   * via a direct `psql` connection (the service role has no table-level
+   * UPDATE grant — all mutation goes through the SECURITY DEFINER RPCs), so
+   * the takeover RPC's staleness check (which also reads the DB clock) sees
+   * a genuinely old attempt without depending on wall-clock sleeps or JS
+   * `Date` mocking (irrelevant to Postgres `clock_timestamp()`). */
+  async function backdateAttempt(seconds: number, id = link.id) {
+    assertLocalSqlTarget();
+    inspectLocalSql(`UPDATE public.platform_token_refresh_attempts SET started_at = now() - interval '${seconds} seconds' WHERE link_id = '${id}'`);
+  }
+
+  describe("platform_token_refresh_release_attempt", () => {
+    it("releases a matching attempt without marking needs_reconnect by default", async () => {
+      const db = getServiceClient(); const attemptId = randomUUID();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, attemptId))).data.status).toBe("claimed");
+      const result = await db.rpc("platform_token_refresh_release_attempt", releaseAttemptArgs(false, link, attemptId));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "released", needsReconnect: false });
+      expect(await attempts()).toEqual([]);
+      expect(await needsReconnectFlag()).toBe(false);
+    });
+
+    it("releases a matching attempt AND marks needs_reconnect in the same call", async () => {
+      const db = getServiceClient(); const attemptId = randomUUID();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, attemptId))).data.status).toBe("claimed");
+      const result = await db.rpc("platform_token_refresh_release_attempt", releaseAttemptArgs(true, link, attemptId));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "released", needsReconnect: true });
+      expect(await attempts()).toEqual([]);
+      expect(await needsReconnectFlag()).toBe(true);
+    });
+
+    it("requires no consent — recovery from a known outcome stays available to a withdrawn or legacy subject", async () => {
+      const db = getServiceClient(); const attemptId = randomUUID();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, attemptId))).data.status).toBe("claimed");
+      expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
+      const result = await db.rpc("platform_token_refresh_release_attempt", releaseAttemptArgs(true, link, attemptId));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "released", needsReconnect: true });
+      expect(await needsReconnectFlag()).toBe(true);
+    });
+
+    it("is stale when the link version no longer matches", async () => {
+      const db = getServiceClient(); const attemptId = randomUUID();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, attemptId))).data.status).toBe("claimed");
+      const result = await db.rpc("platform_token_refresh_release_attempt", { ...releaseAttemptArgs(false, link, attemptId), p_link_version: "2020-01-01T00:00:00Z" });
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "stale" });
+      expect(await attempts()).toHaveLength(1);
+    });
+
+    it("is stale when the attempt id no longer matches (already released, finished, or superseded)", async () => {
+      const db = getServiceClient(); const attemptId = randomUUID();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, attemptId))).data.status).toBe("claimed");
+      const result = await db.rpc("platform_token_refresh_release_attempt", releaseAttemptArgs(false, link, randomUUID()));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "stale" });
+      expect(await attempts()).toHaveLength(1);
+    });
+
+    it("rejects invalid arguments without mutating anything", async () => {
+      const db = getServiceClient(); const attemptId = randomUUID();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, attemptId))).data.status).toBe("claimed");
+      for (const changes of [{ p_actor: "other" }, { p_owner: null }, { p_platform: "github" }, { p_needs_reconnect: null }]) {
+        expect((await db.rpc("platform_token_refresh_release_attempt", { ...releaseAttemptArgs(false, link, attemptId), ...changes })).error).not.toBeNull();
+      }
+      expect(await attempts()).toHaveLength(1);
+      expect(await needsReconnectFlag()).toBe(false);
+    });
+  });
+
+  describe("platform_token_refresh_takeover", () => {
+    it("declines a fresh attempt (never deletes a fresher claim)", async () => {
+      expect((await getServiceClient().rpc("platform_token_refresh_claim", claimArgs())).data.status).toBe("claimed");
+      const result = await getServiceClient().rpc("platform_token_refresh_takeover", takeoverArgs(3600));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "too_fresh" });
+      expect(await attempts()).toHaveLength(1);
+    });
+
+    it("takes over a genuinely stale attempt exactly once, preserving the row's identity", async () => {
+      const db = getServiceClient(); const original = randomUUID();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, original))).data.status).toBe("claimed");
+      await backdateAttempt(400);
+      const newAttempt = randomUUID();
+      const result = await db.rpc("platform_token_refresh_takeover", takeoverArgs(360, link, newAttempt));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "claimed", attemptId: newAttempt });
+      const rows = await attempts();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ link_id: link.id, attempt_id: newAttempt, takeover_used: true });
+    });
+
+    it("never allows a second takeover of an already-taken-over row (exhausted)", async () => {
+      const db = getServiceClient();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs())).data.status).toBe("claimed");
+      await backdateAttempt(400);
+      expect((await db.rpc("platform_token_refresh_takeover", takeoverArgs(360))).data.status).toBe("claimed");
+      // Even though the taken-over row is ALSO old enough by the same
+      // threshold, takeover_used permanently forbids retaking it.
+      await backdateAttempt(400);
+      const result = await db.rpc("platform_token_refresh_takeover", takeoverArgs(360));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "exhausted" });
+      expect(await attempts()).toHaveLength(1);
+    });
+
+    it("reports gone when no attempt is currently claimed", async () => {
+      const result = await getServiceClient().rpc("platform_token_refresh_takeover", takeoverArgs(1));
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "gone" });
+    });
+
+    it("is stale when the link version no longer matches", async () => {
+      const db = getServiceClient();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs())).data.status).toBe("claimed");
+      const result = await db.rpc("platform_token_refresh_takeover", { ...takeoverArgs(1), p_link_version: "2020-01-01T00:00:00Z" });
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ status: "stale" });
+    });
+
+    it("still enforces the current-consent gate a fresh claim would (same as 046/048)", async () => {
+      const db = getServiceClient();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs())).data.status).toBe("claimed");
+      await backdateAttempt(400);
+      expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
+      const result = await db.rpc("platform_token_refresh_takeover", takeoverArgs(360));
+      expect(result.error?.message).toContain("Current consent required");
+      expect(await attempts()).toHaveLength(1);
+    });
+
+    it("rejects invalid arguments without mutating anything", async () => {
+      const db = getServiceClient();
+      expect((await db.rpc("platform_token_refresh_claim", claimArgs())).data.status).toBe("claimed");
+      for (const changes of [{ p_actor: "other" }, { p_owner: null }, { p_new_attempt_id: null }, { p_max_age_seconds: 0 }, { p_max_age_seconds: -1 }]) {
+        expect((await db.rpc("platform_token_refresh_takeover", { ...takeoverArgs(360), ...changes })).error).not.toBeNull();
+      }
+      expect(await attempts()).toHaveLength(1);
+    });
+  });
+
+  describe("refreshSourceLink end-to-end through a real stale ambiguous claim", () => {
+    it("takes over and completes successfully after the threshold has passed", async () => {
+      const nativeFetch = globalThis.fetch.bind(globalThis); let calls = 0;
+      vi.stubGlobal("fetch", async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (String(url) !== "https://gitlab.com/oauth/token") return nativeFetch(url, init);
+        calls++;
+        if (calls === 1) throw new Error("Response lost after possible provider execution");
+        return new Response(JSON.stringify({ access_token: "post-takeover-access", refresh_token: "same-refresh", token_type: "bearer", expires_in: 3600 }), { status: 200 });
+      });
+      const initial = { status: "authorized" as const, consentVersion: consent, link };
+      const worker = (await import("../platform/source-refresh")).refreshSourceLink;
+      expect(await worker(initial, { owner, provider: "gitlab" })).toEqual({ status: "unavailable" });
+      expect(await attempts()).toHaveLength(1);
+      await backdateAttempt(400);
+      const result = await worker(initial, { owner, provider: "gitlab" });
+      expect(result.status).toBe("authorized");
+      const stored = await currentLink();
+      expect(stored.tokens.accessToken).toBe("post-takeover-access");
+      expect(await attempts()).toEqual([]);
+      expect(calls).toBe(2);
+    });
+
+    it("marks needs_reconnect without releasing the barrier when the takeover retry is itself ambiguous", async () => {
+      const nativeFetch = globalThis.fetch.bind(globalThis); let calls = 0;
+      vi.stubGlobal("fetch", async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (String(url) !== "https://gitlab.com/oauth/token") return nativeFetch(url, init);
+        calls++; throw new Error("Response lost after possible provider execution");
+      });
+      const initial = { status: "authorized" as const, consentVersion: consent, link };
+      const worker = (await import("../platform/source-refresh")).refreshSourceLink;
+      expect(await worker(initial, { owner, provider: "gitlab" })).toEqual({ status: "unavailable" });
+      await backdateAttempt(400);
+      expect(await worker(initial, { owner, provider: "gitlab" })).toEqual({ status: "unavailable" });
+      expect(calls).toBe(2);
+      // The barrier is still there (genuinely unknown outcome) but exhausted.
+      const rows = await attempts();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.takeover_used).toBe(true);
+      expect(await needsReconnectFlag()).toBe(true);
+      expect((await currentLink()).tokens.accessToken).toBe("old-access");
+    });
+
+    it("releases the barrier and marks needs_reconnect on a real definitive revoke", async () => {
+      const nativeFetch = globalThis.fetch.bind(globalThis);
+      vi.stubGlobal("fetch", async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (String(url) !== "https://gitlab.com/oauth/token") return nativeFetch(url, init);
+        return new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 });
+      });
+      const initial = { status: "authorized" as const, consentVersion: consent, link };
+      const worker = (await import("../platform/source-refresh")).refreshSourceLink;
+      expect(await worker(initial, { owner, provider: "gitlab" })).toEqual({ status: "unavailable" });
+      expect(await attempts()).toEqual([]);
+      expect(await needsReconnectFlag()).toBe(true);
+      expect((await currentLink()).tokens.accessToken).toBe("old-access");
+      // The barrier being released means an ordinary next claim proceeds normally.
+      expect((await getServiceClient().rpc("platform_token_refresh_claim", claimArgs(await currentLink()))).data.status).toBe("claimed");
+    });
   });
 });

@@ -72,6 +72,18 @@ const LINK_KEYS: Record<PlatformId, string> = {
   gitlab: "userMenu.linkGitlab",
 };
 
+const RECONNECT_KEYS: Record<PlatformId, string> = {
+  bitbucket: "userMenu.reconnectBitbucket",
+  codeberg: "userMenu.reconnectCodeberg",
+  gitlab: "userMenu.reconnectGitlab",
+};
+
+const RECONNECT_ARIA_KEYS: Record<PlatformId, string> = {
+  bitbucket: "aria.reconnectBitbucket",
+  codeberg: "aria.reconnectCodeberg",
+  gitlab: "aria.reconnectGitlab",
+};
+
 function Section({
   command,
   title,
@@ -216,14 +228,24 @@ export function SettingsClient({ login, name, avatarUrl, scoringPolicy = "v6" }:
                       {meta.label}
                     </div>
                     {status?.linked ? (
-                      <a
-                        href={meta.profileUrl(status.remoteLogin ?? "")}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="truncate text-xs text-complement-text transition-colors hover:text-complement-text-hover"
-                      >
-                        @{status.remoteLogin}
-                      </a>
+                      <>
+                        <a
+                          href={meta.profileUrl(status.remoteLogin ?? "")}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="truncate text-xs text-complement-text transition-colors hover:text-complement-text-hover"
+                        >
+                          @{status.remoteLogin}
+                        </a>
+                        {status.needsReconnect ? (
+                          <div
+                            data-testid={`settings-connection-${platform}-needs-reconnect`}
+                            className="mt-1 text-xs text-terminal-red"
+                          >
+                            {t("settings.needsReconnect") as string}
+                          </div>
+                        ) : null}
+                      </>
                     ) : (
                       <div className="text-xs text-text-secondary">
                         {t("settings.notConnected") as string}
@@ -231,20 +253,31 @@ export function SettingsClient({ login, name, avatarUrl, scoringPolicy = "v6" }:
                     )}
                   </div>
                   {status?.linked ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUnlinkError(null);
-                        setPendingUnlink(platform);
-                      }}
-                      disabled={unlinking}
-                      // Three rows render this button with the same visible
-                      // label, so the accessible name has to name the platform.
-                      aria-label={t(UNLINK_ARIA_KEYS[platform]) as string}
-                      className="min-h-[44px] rounded-[3px] border border-text-primary px-4 py-2 text-sm text-text-secondary transition-colors hover:border-terminal-red hover:text-terminal-red disabled:opacity-50"
-                    >
-                      {t("userMenu.unlinkBtn") as string}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {status.needsReconnect ? (
+                        <a
+                          href={`/api/auth/${platform}/connect?returnTo=/settings`}
+                          aria-label={t(RECONNECT_ARIA_KEYS[platform]) as string}
+                          className="flex min-h-[44px] items-center rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-colors hover:bg-action-hover"
+                        >
+                          {t(RECONNECT_KEYS[platform]) as string}
+                        </a>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUnlinkError(null);
+                          setPendingUnlink(platform);
+                        }}
+                        disabled={unlinking}
+                        // Three rows render this button with the same visible
+                        // label, so the accessible name has to name the platform.
+                        aria-label={t(UNLINK_ARIA_KEYS[platform]) as string}
+                        className="min-h-[44px] rounded-[3px] border border-text-primary px-4 py-2 text-sm text-text-secondary transition-colors hover:border-terminal-red hover:text-terminal-red disabled:opacity-50"
+                      >
+                        {t("userMenu.unlinkBtn") as string}
+                      </button>
+                    </div>
                   ) : (
                     <a
                       href={`/api/auth/${platform}/connect?returnTo=/settings`}

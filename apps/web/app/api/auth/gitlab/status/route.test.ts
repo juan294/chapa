@@ -121,6 +121,7 @@ describe("GET /api/auth/gitlab/status", () => {
       linked: false,
       remoteLogin: null,
       connectedAt: null,
+      needsReconnect: false,
     });
   });
 
@@ -141,6 +142,7 @@ describe("GET /api/auth/gitlab/status", () => {
       linked: true,
       remoteLogin: "gl-user",
       connectedAt: "2026-06-19T12:00:00Z",
+      needsReconnect: false,
     });
   });
 

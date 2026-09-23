@@ -8,7 +8,7 @@ import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
-import { clearPlatformStatusCache } from "@/lib/platform/use-platform-connections";
+import { clearPlatformStatusCache, usePlatformConnections } from "@/lib/platform/use-platform-connections";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { ChapaBadgeIcon } from "@/components/icons";
@@ -35,6 +35,14 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const { studioEnabled } = useClientFeatureFlags();
   const { t } = useTranslation();
   const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: login });
+  // #1332 — the menu itself no longer shows per-connection status (#1238),
+  // but a connection whose refresh grant needs reconnecting has nowhere else
+  // to surface for an owner who never opens /settings on their own. A single
+  // indicator on the existing Settings link is the smallest addition that
+  // still points somewhere actionable, without re-introducing the per-row
+  // unlink UI #1238 deliberately removed from here.
+  const { connections } = usePlatformConnections();
+  const needsReconnect = connections.some((c) => c.status?.needsReconnect);
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
@@ -176,6 +184,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               href="/settings"
               role="menuitem"
               onClick={() => setOpen(false)}
+              aria-label={needsReconnect ? (t('aria.settingsNeedsReconnect') as string) : undefined}
               className="flex min-h-11 items-center gap-3 rounded-[3px] px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-purple-tint"
             >
               <svg
@@ -192,6 +201,14 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
               </svg>
               {t('settings.settingsLink') as string}
+              {needsReconnect ? (
+                <span
+                  data-testid="usermenu-needs-reconnect"
+                  aria-hidden="true"
+                  title={t('userMenu.reconnectNeeded') as string}
+                  className="ml-auto h-2 w-2 shrink-0 rounded-full bg-terminal-red"
+                />
+              ) : null}
             </Link>
             {isAdmin && (
               <Link

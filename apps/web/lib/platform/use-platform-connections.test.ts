@@ -63,10 +63,30 @@ describe("usePlatformConnections", () => {
     await waitFor(() => expect(connection(rendered, "gitlab").status).toEqual({
       linked: true,
       remoteLogin: "octo-gl",
+      needsReconnect: false,
     }));
     expect(connection(rendered, "bitbucket").status?.remoteLogin).toBe("octo-bb");
     expect(connection(rendered, "codeberg").status?.linked).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  // #1332 — the server-reported reconnect flag must reach the connection
+  // surface, not just linked/remoteLogin.
+  it("surfaces needsReconnect from the status response", async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const platform = String(input).split("/").at(-2)!;
+      return response(true, {
+        enabled: true,
+        linked: true,
+        remoteLogin: "octo",
+        needsReconnect: platform === "bitbucket",
+      });
+    });
+
+    const rendered = renderHook(() => usePlatformConnections());
+
+    await waitFor(() => expect(connection(rendered, "bitbucket").status?.needsReconnect).toBe(true));
+    expect(connection(rendered, "gitlab").status?.needsReconnect).toBe(false);
   });
 
   it("does not call status endpoints for feature-disabled platforms", async () => {
@@ -147,7 +167,7 @@ describe("usePlatformConnections", () => {
     await act(async () => resolve(response(true, { success: true })));
     await expect(unlinkPromise).resolves.toBe(true);
     expect(fetch).toHaveBeenLastCalledWith("/api/auth/gitlab/disconnect", { method: "POST" });
-    expect(connection(rendered, "gitlab").status).toEqual({ linked: false, remoteLogin: null });
+    expect(connection(rendered, "gitlab").status).toEqual({ linked: false, remoteLogin: null, needsReconnect: false });
     expect(connection(rendered, "gitlab").unlinking).toBe(false);
   });
 
