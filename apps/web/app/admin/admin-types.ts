@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 export interface AdminUser {
-  policyVersion?: "v6" | "v7.2";
+  policyVersion?: "v7.2";
   exactScore?: number | null;
   identity?: { revisionId: string; contentHash: string } | null;
   handle: string;

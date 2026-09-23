@@ -62,7 +62,7 @@ describe("POST /api/admin/bulk-recalculate contract", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
       token: undefined,
       ignoreSnapshot: true,
-      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6" }),
+      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "octocat",

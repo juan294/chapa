@@ -11,6 +11,11 @@ const {
   mockVerifyAdminSecret,
   mockInvalidateProfileReadModels,
   mockRevalidatePath,
+  mockListCollectionJobsForDate,
+  mockMaybeIssue,
+  mockEnqueueCollection,
+  mockScheduleCollectionAdvance,
+  mockPostWriteScore,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
@@ -20,6 +25,11 @@ const {
   mockVerifyAdminSecret: vi.fn(),
   mockInvalidateProfileReadModels: vi.fn(),
   mockRevalidatePath: vi.fn(),
+  mockListCollectionJobsForDate: vi.fn(),
+  mockMaybeIssue: vi.fn(),
+  mockEnqueueCollection: vi.fn(),
+  mockScheduleCollectionAdvance: vi.fn(),
+  mockPostWriteScore: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -55,6 +65,23 @@ vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
+vi.mock("@/lib/db/collection-queue", () => ({
+  listCollectionJobsForDate: (...args: unknown[]) => mockListCollectionJobsForDate(...args),
+}));
+
+vi.mock("@/lib/collection/fan-in", () => ({
+  maybeIssue: (...args: unknown[]) => mockMaybeIssue(...args),
+}));
+
+vi.mock("@/lib/collection/enqueue", () => ({
+  enqueueCollection: (...args: unknown[]) => mockEnqueueCollection(...args),
+  scheduleCollectionAdvance: (...args: unknown[]) => mockScheduleCollectionAdvance(...args),
+}));
+
+vi.mock("@/lib/profile/post-write-score", () => ({
+  postWriteScore: (...args: unknown[]) => mockPostWriteScore(...args),
+}));
+
 const FAKE_MATERIALIZED = {
   stats: { handle: "testuser" },
   craftResult: null,
@@ -83,6 +110,18 @@ const FAKE_MATERIALIZED = {
   snapshot: { date: "2026-04-17", adjustedComposite: 42, tier: "Solid" },
   statsComplete: true,
 };
+
+/** Re-applies the collection/fan-in defaults after a mid-test vi.clearAllMocks(). */
+function resetCollectionMocksToDefaults() {
+  mockListCollectionJobsForDate.mockResolvedValue([
+    { id: "j", ownerHandle: "x", provider: "github", referenceDate: "2026-01-01", referenceTime: "2026-01-01T00:00:00.000Z",
+      state: "complete", checkpoint: {}, progress: {}, attempt: 0, nextRunAt: "", leaseToken: null, leaseExpiresAt: null, lastStop: null,
+      enqueueReason: "admin", observationId: null },
+  ]);
+  mockMaybeIssue.mockResolvedValue(undefined);
+  mockEnqueueCollection.mockResolvedValue([]);
+  mockPostWriteScore.mockResolvedValue({ kind: "ready", receiptDate: "2026-01-01", updating: false });
+}
 
 const VALID_SECRET = "test-admin-secret";
 
@@ -114,6 +153,10 @@ describe("POST /api/admin/bulk-recalculate", () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+    // v7.2 is the only rendered policy (#1335 phase 5): every successful
+    // replace also runs the fan-in decision. Default to "already complete"
+    // so the generic mechanics tests below don't need to know about it.
+    resetCollectionMocksToDefaults();
   });
 
   it("returns 401 when admin auth fails", async () => {
@@ -143,7 +186,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockDbGetUserHandlePage).toHaveBeenCalledWith({ limit: 101 });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
       ignoreSnapshot: true,
-      scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 },
+      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }),
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "alice",
@@ -191,12 +234,12 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       1,
       "mona",
-      { ignoreSnapshot: true, scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } },
+      { ignoreSnapshot: true, scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }) },
     );
     expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
       2,
       "zara",
-      { ignoreSnapshot: true, scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } },
+      { ignoreSnapshot: true, scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2", cacheable: true }) },
     );
   });
 
@@ -276,6 +319,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+    resetCollectionMocksToDefaults();
 
     const secondRequest = new NextRequest(
       "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=user099",
@@ -314,6 +358,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+    resetCollectionMocksToDefaults();
 
     const finalRequest = new NextRequest(
       "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=user199",
@@ -620,5 +665,3 @@ describe("POST /api/admin/bulk-recalculate", () => {
     });
   });
 });
-
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));

@@ -1,40 +1,23 @@
-import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { SCORING_POLICY } from "@chapa/shared";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { readPublicObservedScore } from "@/lib/profile/post-write-score";
+import { readScoringStatus } from "@/lib/collection/read-scoring-status";
 import { type NextRequest, NextResponse } from "next/server";
 import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
-import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
-import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
-import { legacyViewModel, type ScoreViewModel } from "@/lib/profile/score-view-model";
-import { snapshotDimensions } from "@/lib/profile/stored-badge-profile";
 
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
-
-/** Legacy fallback keeps its historical EMA aliases; the fresh headline is
- * explicitly v6 and uses the already captured policy clock. */
-async function getDisplayHeadline(handle: string, selection: ScoringRenderSelection): Promise<{ displayScore: number | null; displayTier: string | null; scoring: ScoreViewModel | null }> {
-  try {
-    const materialized = await materializeDisplayProfile(handle, { readOnly: true, scoringSelection: { ...selection, enabled: false, machinePolicy: "v6" } });
-    if (!materialized) return { displayScore: null, displayTier: null, scoring: null };
-    const scoring = legacyViewModel(materialized.displayImpact);
-    return { displayScore: scoring.composite.kind === "point" ? scoring.composite.display : null, displayTier: scoring.tier, scoring };
-  } catch {
-    return { displayScore: null, displayTier: null, scoring: null };
-  }
-}
+const NO_STORE_HEADERS = { ...CORS_HEADERS, "Cache-Control": "no-store" } as const;
 
 /**
  * GET /api/profile/:handle — Public impact profile snapshot.
  *
- * Returns the latest impact dimensions, archetype, tier, and optional craft
- * score for a user. Designed for external consumers (portfolio sites).
- *
- * Current v7.2 aliases share one canonical display point. Only the explicitly
- * labelled v6 fallback retains historical smoothed aliases and fresh headline.
+ * Returns the current v7.2 receipt projection (dimensions, archetype, tier,
+ * optional craft) for a scored subject, or `{ scoringStatus }` when there is
+ * no drawable current receipt yet (#1335 phase 5 — v6 and `metrics_snapshots`
+ * are retired; there is no legacy fallback left to read).
  */
 export const GET = withErrorCapture("/api/profile/[handle]", async (
   request: NextRequest,
@@ -59,69 +42,30 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
     );
   }
 
-  const selection = await readScoringRenderSelection();
+  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
+  // the only rendered policy. `readPublicObservedScore` still takes the
+  // `ScoringRenderSelection` shape, so this constant stands in for the old
+  // dynamic DB-backed read.
+  const selection: ScoringRenderSelection = {
+    enabled: true,
+    machinePolicy: SCORING_POLICY,
+    cacheable: true,
+    capturedAt: Date.now(),
+  };
   const current = await readPublicObservedScore(handle, selection);
-  if (current.status === "unavailable") return NextResponse.json({ error: "Current scoring is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
-  if (current.status === "current") return NextResponse.json({ handle, ...current.projection }, { headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } });
-
-  const snapshot = await getCachedLatestSnapshot(handle);
-
-  if (!snapshot) {
-    return NextResponse.json(
-      { error: "No profile found for this handle" },
-      { status: 404, headers: CORS_HEADERS },
-    );
+  if (current.status === "unavailable") {
+    return NextResponse.json({ error: "Current scoring is temporarily unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
+  }
+  if (current.status === "current") {
+    return NextResponse.json({ handle, ...current.projection }, { headers: NO_STORE_HEADERS });
   }
 
-  // Prefer snapshot.craft (computed at same time as other dimensions) for consistency.
-  // Fall back to the latest uploaded tool-insights report for legacy rows
-  // without the craft column.
-  const craftResult = snapshot.craft == null
-    ? await dbGetToolInsights(handle)
-    : null;
-  const craftScore = snapshot.craft ?? (craftResult ? craftResult.craftScore : undefined);
+  const scoringStatus = await readScoringStatus(handle);
+  if (scoringStatus === null) {
+    return NextResponse.json({ error: "Scoring status is temporarily unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
+  }
 
-  // Only after the 404 above — the missing-snapshot path stays a cheap cache read.
-  const { displayScore, displayTier, scoring } = await getDisplayHeadline(handle, selection);
-
-  // Shared with the stored-badge fallback (`lib/profile/stored-badge-profile.ts`)
-  // so the two never compute a stored snapshot's dimensions differently.
-  const dimensions: DimensionScores = {
-    ...snapshotDimensions(snapshot),
-    ...(craftScore != null && { craft: craftScore }),
-  };
-
-  return NextResponse.json(
-    {
-      handle,
-      policyVersion: "v6",
-      dimensions,
-      compositeScore: snapshot.compositeScore,
-      adjustedComposite: snapshot.adjustedComposite,
-      archetype: snapshot.archetype,
-      tier: snapshot.tier,
-      craft: craftResult
-        ? {
-            tool: craftResult.tool,
-            tier: craftResult.tier,
-            score: craftResult.craftScore,
-          }
-        : null,
-      snapshotDate: snapshot.date,
-      computedAt: snapshot.capturedAt,
-      // #1062 — fresh, matches the badge. Null when it cannot be computed.
-      displayScore,
-      displayTier,
-      scoring,
-    },
-    {
-      headers: {
-        ...CORS_HEADERS,
-        "Cache-Control":
-          "no-store",
-      },
-    },
-  );
+  return NextResponse.json({ handle, scoringStatus }, { headers: NO_STORE_HEADERS });
 });
 
 export async function OPTIONS() {

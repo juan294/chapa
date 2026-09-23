@@ -1,9 +1,6 @@
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "./route";
 import { NextRequest } from "next/server";
-import { makeSnapshot } from "../../../../lib/test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -21,23 +18,9 @@ vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: vi.fn().mockReturnValue("1.2.3.4"),
 }));
 
-const mockGetSnapshots = vi.fn();
-vi.mock("@/lib/history/history", () => ({
-  getSnapshots: (...args: unknown[]) => mockGetSnapshots(...args),
-}));
-
-const mockCompareSnapshots = vi.fn();
-vi.mock("@/lib/history/diff", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/history/diff")>();
-  return {
-    ...actual,
-    compareSnapshots: (...args: unknown[]) => mockCompareSnapshots(...args),
-  };
-});
-
-const mockComputeTrend = vi.fn();
-vi.mock("@/lib/history/trend", () => ({
-  computeTrend: (...args: unknown[]) => mockComputeTrend(...args),
+const mockReadObservedScoringHistory = vi.fn();
+vi.mock("@/lib/history/observed-history", () => ({
+  readObservedScoringHistory: (...args: unknown[]) => mockReadObservedScoringHistory(...args),
 }));
 
 import { isValidHandle } from "@/lib/validation";
@@ -53,14 +36,28 @@ function makeRequest(handle: string, params?: Record<string, string>): NextReque
   return new NextRequest(url);
 }
 
+const OBSERVATION = {
+  policyVersion: "v7.2",
+  identity: { revisionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+  window: { referenceDate: "2026-09-08", startInclusive: "2025-09-09", endExclusive: "2026-09-09" },
+  composite: { exact: 46, display: 46 },
+  dimensions: {},
+  tier: "Solid",
+  archetype: "Builder",
+  craft: null,
+};
+
+const HISTORY = {
+  observations: [OBSERVATION],
+  trend: [{ policyVersion: "v7.2", referenceDate: "2026-09-08", receiptRevisionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", rawPoint: 46, unroundedValue: 46, previousAnchorRevisionId: null }],
+  comparisons: [{ status: "comparable", composite: { exact: 5, display: 5 } }],
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
   vi.mocked(isValidHandle).mockReturnValue(true);
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 100 });
-  mockGetSnapshots.mockResolvedValue([]);
-  mockComputeTrend.mockReturnValue(null);
-  mockCompareSnapshots.mockReturnValue(null);
+  mockReadObservedScoringHistory.mockResolvedValue({ status: "found", history: HISTORY });
 });
 
 // ---------------------------------------------------------------------------
@@ -87,45 +84,18 @@ describe("GET /api/history/[handle]", () => {
   });
 
   it("returns snapshots and trend by default", async () => {
-    const s1 = makeSnapshot({ date: "2025-06-14", adjustedComposite: 50 });
-    const s2 = makeSnapshot({ date: "2025-06-15", adjustedComposite: 55 });
-    mockGetSnapshots.mockResolvedValue([s1, s2]);
-    mockComputeTrend.mockReturnValue({
-      direction: "improving",
-      avgDelta: 5,
-      compositeValues: [
-        { date: "2025-06-14", value: 50 },
-        { date: "2025-06-15", value: 55 },
-      ],
-      dimensions: {},
-    });
-
     const res = await GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) });
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.handle).toBe("testuser");
-    expect(body.snapshots).toHaveLength(2);
-    expect(body.trend).toBeDefined();
-    expect(body.trend.direction).toBe("improving");
+    expect(body.policyVersion).toBe("v7.2");
+    expect(body.snapshots).toEqual(HISTORY.observations);
+    expect(body.trend).toEqual(HISTORY.trend);
+    expect(body.diff).toBeUndefined();
   });
 
-  it("returns diff when include=diff", async () => {
-    const s1 = makeSnapshot({ date: "2025-06-14", adjustedComposite: 50 });
-    const s2 = makeSnapshot({ date: "2025-06-15", adjustedComposite: 55 });
-    mockGetSnapshots.mockResolvedValue([s1, s2]);
-    mockCompareSnapshots.mockReturnValue({
-      direction: "improving",
-      adjustedComposite: 5,
-      daysBetween: 1,
-    });
-    mockComputeTrend.mockReturnValue({
-      direction: "improving",
-      avgDelta: 5,
-      compositeValues: [],
-      dimensions: {},
-    });
-
+  it("returns diff (the latest comparison) when include=diff", async () => {
     const res = await GET(
       makeRequest("testuser", { include: "snapshots,trend,diff" }),
       { params: Promise.resolve({ handle: "testuser" }) },
@@ -133,44 +103,10 @@ describe("GET /api/history/[handle]", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.diff).toBeDefined();
-    expect(body.diff.direction).toBe("improving");
-  });
-
-  it("strips confidence and penalty changes from the public diff", async () => {
-    const s1 = makeSnapshot({ date: "2025-06-14", confidence: 90 });
-    const s2 = makeSnapshot({ date: "2025-06-15", confidence: 75 });
-    mockGetSnapshots.mockResolvedValue([s1, s2]);
-    mockCompareSnapshots.mockReturnValue({
-      direction: "declining",
-      adjustedComposite: -5,
-      confidence: -15,
-      penaltyChanges: {
-        added: ["burst_activity"],
-        removed: [],
-      },
-      daysBetween: 1,
-    });
-
-    const res = await GET(makeRequest("testuser", { include: "diff" }), {
-      params: Promise.resolve({ handle: "testuser" }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.diff).toMatchObject({
-      direction: "declining",
-      adjustedComposite: -5,
-      daysBetween: 1,
-    });
-    expect(body.diff).not.toHaveProperty("confidence");
-    expect(body.diff).not.toHaveProperty("penaltyChanges");
+    expect(body.diff).toEqual(HISTORY.comparisons.at(-1));
   });
 
   it("omits trend when include=snapshots", async () => {
-    const s1 = makeSnapshot({ date: "2025-06-14" });
-    mockGetSnapshots.mockResolvedValue([s1]);
-
     const res = await GET(
       makeRequest("testuser", { include: "snapshots" }),
       { params: Promise.resolve({ handle: "testuser" }) },
@@ -182,66 +118,57 @@ describe("GET /api/history/[handle]", () => {
     expect(body.trend).toBeUndefined();
   });
 
-  it("passes from/to date params to getSnapshots", async () => {
-    mockGetSnapshots.mockResolvedValue([]);
-
+  it("passes from/to date params to the observed history reader", async () => {
     await GET(
       makeRequest("testuser", { from: "2025-06-01", to: "2025-06-15" }),
       { params: Promise.resolve({ handle: "testuser" }) },
     );
 
-    expect(mockGetSnapshots).toHaveBeenCalledWith("testuser", "2025-06-01", "2025-06-15");
+    expect(mockReadObservedScoringHistory).toHaveBeenCalledWith("testuser", { from: "2025-06-01", to: "2025-06-15" });
   });
 
-  it("passes window param to computeTrend", async () => {
-    const snapshots = Array.from({ length: 10 }, (_, i) =>
-      makeSnapshot({
-        date: `2025-06-${String(i + 1).padStart(2, "0")}`,
-        adjustedComposite: 50 + i,
-      }),
-    );
-    mockGetSnapshots.mockResolvedValue(snapshots);
-    mockComputeTrend.mockReturnValue({
-      direction: "improving",
-      avgDelta: 1,
-      compositeValues: Array.from({ length: 5 }, (_, i) => ({
-        date: `2025-06-${String(i + 6).padStart(2, "0")}`,
-        value: 55 + i,
-      })),
-      dimensions: {},
-    });
-
-    await GET(
-      makeRequest("testuser", { window: "5" }),
+  it("returns 400 for an invalid 'from' date", async () => {
+    const res = await GET(
+      makeRequest("testuser", { from: "not-a-date" }),
       { params: Promise.resolve({ handle: "testuser" }) },
     );
 
-    // Verify computeTrend was called with the snapshots and parsed window
-    expect(mockComputeTrend).toHaveBeenCalledWith(snapshots, 5);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/from/i);
+  });
+
+  it("returns 400 for an invalid 'to' date", async () => {
+    const res = await GET(
+      makeRequest("testuser", { to: "not-a-date" }),
+      { params: Promise.resolve({ handle: "testuser" }) },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/to/i);
   });
 
   it("sets cache control headers", async () => {
-    mockGetSnapshots.mockResolvedValue([makeSnapshot()]);
-
     const res = await GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) });
 
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(res.headers.get("Cache-Control")).not.toContain("stale-while-revalidate");
   });
 
-  it("returns empty snapshots array when no data exists", async () => {
-    mockGetSnapshots.mockResolvedValue([]);
+  it("returns empty history when no observations exist yet (not a registered scoring subject, or never scored)", async () => {
+    mockReadObservedScoringHistory.mockResolvedValue({ status: "missing" });
 
     const res = await GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) });
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.snapshots).toEqual([]);
-    expect(body.trend).toBeNull();
+    expect(body.trend).toEqual([]);
   });
 
-  it("returns null diff when fewer than 2 snapshots", async () => {
-    mockGetSnapshots.mockResolvedValue([makeSnapshot()]);
+  it("returns null diff when there is no comparison yet", async () => {
+    mockReadObservedScoringHistory.mockResolvedValue({ status: "missing" });
 
     const res = await GET(
       makeRequest("testuser", { include: "snapshots,diff" }),
@@ -252,108 +179,18 @@ describe("GET /api/history/[handle]", () => {
     expect(body.diff).toBeNull();
   });
 
-  it("returns 400 when window param is not a valid number", async () => {
-    const res = await GET(
-      makeRequest("testuser", { window: "abc" }),
-      { params: Promise.resolve({ handle: "testuser" }) },
-    );
+  it("returns 503 when the observed history authority is unavailable", async () => {
+    mockReadObservedScoringHistory.mockResolvedValue({ status: "unavailable" });
 
-    expect(res.status).toBe(400);
+    const res = await GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) });
+
+    expect(res.status).toBe(503);
     const body = await res.json();
-    expect(body.error).toMatch(/window/i);
-  });
-
-  it("returns 400 when window param is a float", async () => {
-    const res = await GET(
-      makeRequest("testuser", { window: "3.5" }),
-      { params: Promise.resolve({ handle: "testuser" }) },
-    );
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toMatch(/window/i);
-  });
-
-  it("returns 400 when window param is negative", async () => {
-    const res = await GET(
-      makeRequest("testuser", { window: "-5" }),
-      { params: Promise.resolve({ handle: "testuser" }) },
-    );
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toMatch(/window/i);
-  });
-
-  it("returns 400 when window param is zero", async () => {
-    const res = await GET(
-      makeRequest("testuser", { window: "0" }),
-      { params: Promise.resolve({ handle: "testuser" }) },
-    );
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toMatch(/window/i);
-  });
-
-  it("accepts valid integer window param", async () => {
-    const snapshots = Array.from({ length: 10 }, (_, i) =>
-      makeSnapshot({
-        date: `2025-06-${String(i + 1).padStart(2, "0")}`,
-        adjustedComposite: 50 + i,
-      }),
-    );
-    mockGetSnapshots.mockResolvedValue(snapshots);
-    mockComputeTrend.mockReturnValue({
-      direction: "improving",
-      avgDelta: 1,
-      compositeValues: [],
-      dimensions: {},
-    });
-
-    const res = await GET(
-      makeRequest("testuser", { window: "7" }),
-      { params: Promise.resolve({ handle: "testuser" }) },
-    );
-
-    expect(res.status).toBe(200);
-    expect(mockComputeTrend).toHaveBeenCalledWith(snapshots, 7);
-  });
-
-  it("strips confidence and confidencePenalties from snapshot objects", async () => {
-    const s1 = makeSnapshot({
-      date: "2025-06-14",
-      confidence: 85,
-      confidencePenalties: [{ flag: "burst_activity", penalty: 10 }],
-    });
-    const s2 = makeSnapshot({
-      date: "2025-06-15",
-      confidence: 90,
-      confidencePenalties: [],
-    });
-    mockGetSnapshots.mockResolvedValue([s1, s2]);
-    mockComputeTrend.mockReturnValue({
-      direction: "improving",
-      avgDelta: 5,
-      compositeValues: [],
-      dimensions: {},
-    });
-
-    const res = await GET(makeRequest("testuser"), {
-      params: Promise.resolve({ handle: "testuser" }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.snapshots).toHaveLength(2);
-    for (const snapshot of body.snapshots) {
-      expect(snapshot).not.toHaveProperty("confidence");
-      expect(snapshot).not.toHaveProperty("confidencePenalties");
-    }
+    expect(body.error).toBeDefined();
   });
 
   it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {
-    mockGetSnapshots.mockRejectedValue(new Error("unexpected boom"));
+    mockReadObservedScoringHistory.mockRejectedValue(new Error("unexpected boom"));
 
     await expect(GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) })).rejects.toThrow("unexpected boom");
   });

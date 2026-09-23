@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockGetVerificationRecord, mockRateLimit } = vi.hoisted(() => ({
-  mockGetVerificationRecord: vi.fn(),
+const { mockGetReceiptVerificationV7, mockRateLimit } = vi.hoisted(() => ({
+  mockGetReceiptVerificationV7: vi.fn(),
   mockRateLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/verification/store", () => ({
-  getVerificationRecord: mockGetVerificationRecord,
+  getReceiptVerificationV7: mockGetReceiptVerificationV7,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -18,11 +18,7 @@ vi.mock("@/lib/http/client-ip", () => ({
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
 }));
 
-vi.mock("@/lib/env", () => ({
-  getBaseUrl: () => "https://chapa.thecreativetoken.com",
-}));
-
-import { GET, OPTIONS, LEGACY_PRE_V2_DEADLINE } from "./route";
+import { GET, OPTIONS } from "./route";
 import { NextRequest } from "next/server";
 
 function makeRequest(
@@ -38,29 +34,40 @@ function makeRequest(
   return [req, { params: Promise.resolve({ hash }) }];
 }
 
-const FAKE_RECORD = {
-  handle: "testuser",
-  displayName: "Test User",
-  adjustedComposite: 52,
-  confidence: 85,
-  tier: "Solid",
-  archetype: "Builder",
-  dimensions: { delivery: 70, quality: 50, consistency: 60, breadth: 40 },
-  commitsTotal: 200,
-  prsMergedCount: 30,
-  reviewsSubmittedCount: 50,
-  generatedAt: "2025-06-15",
-  profileType: "collaborative",
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
-  mockGetVerificationRecord.mockResolvedValue(null);
 });
 
 describe("GET /api/verify/[hash]", () => {
-  describe("validation", () => {
+  describe("retired v6 codes (#1335)", () => {
+    it.each(["abc12345", "abc12345abc12345", "abc12345abc12345abc12345abc12345"])(
+      "returns 410 retired_v6_code for a well-formed legacy hash %s",
+      async (hash) => {
+        const [req, ctx] = makeRequest(hash, "1.2.3.4");
+        const res = await GET(req, ctx);
+        expect(res.status).toBe(410);
+        const body = await res.json();
+        expect(body.status).toBe("retired_v6_code");
+        expect(body.message).toMatch(/retired v6 verification code/i);
+      },
+    );
+
+    it("never looks up or rate limits for a retired code", async () => {
+      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockGetReceiptVerificationV7).not.toHaveBeenCalled();
+      expect(mockRateLimit).not.toHaveBeenCalled();
+    });
+
+    it("includes CORS header on the 410 response", async () => {
+      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    });
+  });
+
+  describe("malformed input", () => {
     it("returns 400 for non-hex hash", async () => {
       const [req, ctx] = makeRequest("not-hex!", "1.2.3.4");
       const res = await GET(req, ctx);
@@ -75,127 +82,10 @@ describe("GET /api/verify/[hash]", () => {
       expect(res.status).toBe(400);
     });
 
-    it("returns 400 for hash of 24 characters (neither 8, 16, nor 32)", async () => {
-      const [req, ctx] = makeRequest("abc12345abc12345abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(400);
-    });
-
     it("returns 400 for hash longer than 32 characters", async () => {
       const [req, ctx] = makeRequest("abc12345abc12345abc12345abc12345a", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.status).toBe(400);
-    });
-
-    it("accepts valid 16-char hex hash", async () => {
-      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
-      const [req, ctx] = makeRequest("abc12345abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-    });
-
-    it("accepts valid 32-char hex hash", async () => {
-      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
-      const [req, ctx] = makeRequest("abc12345abc12345abc12345abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-    });
-
-    it("documents the legacy 32-char acceptance window through 2026-07-19", () => {
-      expect(LEGACY_PRE_V2_DEADLINE).toBe("2026-07-19");
-    });
-
-    it("returns 400 for hash shorter than 8 characters", async () => {
-      const [req, ctx] = makeRequest("abc12", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(400);
-    });
-
-    it("accepts valid 8-char hex hash", async () => {
-      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-    });
-  });
-
-  describe("rate limiting", () => {
-    it("calls rateLimit with verify-specific key", async () => {
-      const [req, ctx] = makeRequest("abc12345", "9.8.7.6");
-      await GET(req, ctx);
-      expect(mockRateLimit).toHaveBeenCalledWith(
-        "ratelimit:verify:9.8.7.6",
-        30,
-        60,
-      );
-    });
-
-    it("returns 429 when rate limited", async () => {
-      mockRateLimit.mockResolvedValue({ allowed: false, current: 31, limit: 30 });
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(429);
-    });
-  });
-
-  describe("lookup", () => {
-    it("returns 404 when record not found", async () => {
-      mockGetVerificationRecord.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(404);
-      const body = await res.json();
-      expect(body.status).toBe("not_found");
-    });
-
-    it("returns 200 with the public record when found", async () => {
-      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.status).toBe("legacy_record");
-      expect(body.version).toBe("v6");
-      expect(body.arithmetic).toBe("replay_unavailable");
-      expect(body.hash).toBe("abc12345");
-      expect(body.data).toEqual(
-        expect.objectContaining({
-          handle: FAKE_RECORD.handle,
-          adjustedComposite: FAKE_RECORD.adjustedComposite,
-        }),
-      );
-      expect(body.data).not.toHaveProperty("confidence");
-    });
-
-    it("includes verifyUrl and badgeUrl in response", async () => {
-      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      const body = await res.json();
-      expect(body.verifyUrl).toContain("/verify/abc12345");
-      expect(body.badgeUrl).toContain("/u/testuser/badge.svg");
-    });
-
-    it("looks up using the hash from params", async () => {
-      const [req, ctx] = makeRequest("deadbeef", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetVerificationRecord).toHaveBeenCalledWith("deadbeef");
-    });
-  });
-
-  describe("response headers", () => {
-    it("returns JSON content type", async () => {
-      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Content-Type")).toContain("application/json");
-    });
-
-    it("allows CORS from any origin", async () => {
-      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     });
 
     it("includes CORS header on 400 responses", async () => {
@@ -203,33 +93,6 @@ describe("GET /api/verify/[hash]", () => {
       const res = await GET(req, ctx);
       expect(res.status).toBe(400);
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    });
-
-    it("includes CORS header on 429 responses", async () => {
-      mockRateLimit.mockResolvedValue({ allowed: false, current: 31, limit: 30 });
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(429);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    });
-  });
-
-  describe("error handling", () => {
-    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-
-    beforeEach(() => {
-      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    });
-
-    afterEach(() => {
-      consoleErrorSpy.mockRestore();
-    });
-
-    it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {
-      mockGetVerificationRecord.mockRejectedValue(new Error("unexpected boom"));
-      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-
-      await expect(GET(req, ctx)).rejects.toThrow("unexpected boom");
     });
   });
 

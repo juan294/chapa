@@ -1,5 +1,6 @@
+import { SCORING_POLICY } from "@chapa/shared";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimitStrict } from "@/lib/cache/redis";
@@ -11,22 +12,21 @@ import { getRequestId } from "@/lib/log";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import {
-  materializeOrchestratedProfile,
-  persistOrchestratedSnapshot,
-} from "@/lib/profile/orchestrated-profile";
+import { materializeOrchestratedProfile } from "@/lib/profile/orchestrated-profile";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
-import {
-  deferProfileCacheWork,
-  getPublicProfileVerification,
-} from "@/lib/profile/public-profile";
+
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
 /**
  * POST /api/refresh?handle=:handle
  *
- * Force-refresh a user's badge data by clearing the cache and
- * fetching fresh stats from GitHub. Auth required — only the
- * badge owner can refresh their own badge.
+ * Force-refresh a user's badge data by clearing the cache and fetching
+ * fresh stats from GitHub, then (re-)enqueues v7.2 collection and reports
+ * the resulting scoring status (#1335 phase 5 — the v6 immediate
+ * snapshot-replace-and-return path, and the per-request verification-record
+ * write it fed, are retired along with `metrics_snapshots` and
+ * `verification_records`; issuance itself only happens from fan-in).
+ * Auth required — only the badge owner can refresh their own badge.
  *
  * Rate limited: 5 refreshes per handle per hour.
  */
@@ -76,7 +76,14 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
-  const scoringSelection = await readScoringRenderSelection();
+  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
+  // the only rendered policy.
+  const scoringSelection: ScoringRenderSelection = {
+    enabled: true,
+    machinePolicy: SCORING_POLICY,
+    cacheable: true,
+    capturedAt: Date.now(),
+  };
   const materialized = await materializeOrchestratedProfile(handle, {
     scoringSelection,
     token,
@@ -106,11 +113,6 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
-  // #1076 — persistOrchestratedSnapshot's #1003 gate would refuse to persist
-  // stats that look incomplete/poisoned anyway (and already emits its own
-  // snapshot_skipped_incomplete_stats telemetry); check it here so the
-  // intentional skip (422) is distinguishable from a genuine write failure
-  // (500) up front, rather than inferring the reason from a bare `!persisted`.
   if (!materialized.statsComplete) {
     return NextResponse.json(
       {
@@ -121,51 +123,23 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
-  const persisted = await persistOrchestratedSnapshot(handle, materialized, {
-    mode: "replace",
-  });
-  if (!persisted) {
-    void captureServerError({
-      route: "/api/refresh",
-      statusCode: 500,
-      error: new Error(`Failed to persist refreshed snapshot for handle: ${handle}`),
-      requestId,
-    });
-    return NextResponse.json(
-      { error: "Failed to save refreshed profile. Try again later." },
-      { status: 500 },
-    );
-  }
+  // Post-fetch invalidation: clear the artifacts derived from the stats
+  // just fetched. Deliberately separate from the pre-fetch call above,
+  // which exists to force the refetch — the two serve different purposes
+  // and must not be collapsed into one. Neither ever clears
+  // `stats:stale:v2:`: that is the protected GitHub-derived baseline, and
+  // dropping it would discard the scope-downgrade protection established
+  // by #1050.
+  await invalidateProfileReadModels(handle, { badgeSvg: true });
 
-  // A refresh can produce a new verification hash after today's snapshot
-  // side-effect guard has already run. Store that hash now without repeating
-  // badge telemetry, notifications, or user metadata writes.
-  await deferProfileCacheWork(handle, materialized, {
-    verification: getPublicProfileVerification(materialized),
-    verificationOnly: true,
-  });
-
-  // Post-persist invalidation: clear the artifacts derived from the snapshot
-  // just written. Deliberately separate from the pre-fetch call above, which
-  // exists to force the refetch — the two serve different purposes and must not
-  // be collapsed into one. Neither ever clears `stats:stale:v2:`: that is the
-  // protected GitHub-derived baseline, and dropping it would discard the
-  // scope-downgrade protection established by #1050.
-  await invalidateProfileReadModels(handle, {
-    badgeSvg: true,
-    snapshot: true,
-    history: true,
-  });
-
-  // #1335 phase 4 — a refresh is an owner-initiated recompute, so it is where
-  // a registered subject's v7.2 collection is (re-)enqueued. Issuance itself
-  // now happens only from fan-in, once every connected source is complete —
-  // never synchronously here. `scheduleCollectionAdvance` runs a bounded
-  // slice in the background (`after()`) so the badge doesn't wait a full
-  // 5-minute cron tick for its first progress.
+  // #1335 phase 4/5 — a refresh is an owner-initiated recompute, so it is
+  // where a registered subject's v7.2 collection is (re-)enqueued. Issuance
+  // itself now happens only from fan-in, once every connected source is
+  // complete — never synchronously here. `scheduleCollectionAdvance` runs a
+  // bounded slice in the background (`after()`) so the badge doesn't wait a
+  // full 5-minute cron tick for its first progress.
   const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh", scoringSelection);
 
-  // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
   if (craftResult) {
     fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
@@ -174,14 +148,9 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
   // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
   revalidatePath(`/u/${handle}`);
 
-  if (scoringStatus) return NextResponse.json({
-    success: true,
-    scoringStatus,
-    legacy: { impact: materialized.displayImpact },
-  }, { headers: { "Cache-Control": "no-store" } });
+  if (scoringStatus === null) {
+    return NextResponse.json({ error: "Scoring status is temporarily unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
+  }
 
-  return NextResponse.json({
-    stats: materialized.stats,
-    impact: materialized.displayImpact,
-  });
+  return NextResponse.json({ success: true, scoringStatus }, { headers: NO_STORE_HEADERS });
 });

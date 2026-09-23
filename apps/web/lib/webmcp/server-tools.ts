@@ -1,23 +1,17 @@
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { SCORING_POLICY } from "@chapa/shared";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { readPublicObservedScore } from "@/lib/profile/post-write-score";
+import { readScoringStatus } from "@/lib/collection/read-scoring-status";
 import { readObservedScoringHistory } from "@/lib/history/observed-history";
-import type { DimensionScores } from "@chapa/shared";
 import type { AgentClass } from "@/lib/analytics/agent-ua";
 import { scheduleServerEvent } from "@/lib/analytics/schedule-server-event";
-import { getCachedCraftScore } from "@/lib/cache/craft-cache";
-import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
-import { getSnapshots } from "@/lib/history/history";
-import { redactSnapshotForVisitor } from "@/lib/history/public-snapshot";
-import { computeTrend } from "@/lib/history/trend";
-import { getServerT } from "@/lib/i18n/server";
-import type { LanguageContextValue } from "@/lib/i18n";
 import { materializeDisplayProfile } from "@/lib/profile/materialize-profile";
-import { redactImpactForVisitor } from "@/lib/profile/public-profile";
-import { publicScoreProjection, comparePublicScores } from "@/lib/profile/public-score-projection";
-import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import type { PublicScoreProjection } from "@/lib/profile/public-score-projection";
+import { comparePublicScores } from "@/lib/profile/public-score-projection";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 import { isValidHandle } from "@/lib/validation";
-import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
-import { toPublicVerificationRecord } from "@/lib/verification/types";
-import { VERIFICATION_CODE_PATTERN, parseVerificationTokenV7 } from "@/lib/verification/constants";
+import { getReceiptVerificationV7 } from "@/lib/verification/store";
+import { VERIFICATION_HASH_PATTERN, parseVerificationTokenV7 } from "@/lib/verification/constants";
 import {
   COMPARE_PROFILES_SERVER_INPUT_SCHEMA,
   EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA,
@@ -25,7 +19,6 @@ import {
   PRODUCTION_BASE_URL,
   PUBLIC_PROFILE_SIGN_IN_NOTE,
   SITE_CAPABILITIES,
-  VERIFICATION_EXPLANATION,
   RECEIPT_VERIFICATION_EXPLANATION,
   VERIFY_BADGE_SERVER_INPUT_SCHEMA,
 } from "./catalog";
@@ -34,9 +27,8 @@ import {
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_ANNOTATIONS,
   WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
-  createExplainDimensionTool,
+  explainObservedDimension,
   isWebMcpRecord,
-  sanitizeFreeTextForAgent,
   type WebMcpToolAnnotations,
 } from "./shared-tools";
 
@@ -64,7 +56,20 @@ const MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS = {
   openWorldHint: false,
 } as const;
 
-const HEADLINE_NOTE = "Current scores and dimensions come from one selected policy and receipt context; legacy snapshot fields are explicitly nested.";
+const HEADLINE_NOTE = "Current scores and dimensions come from the current v7.2 receipt.";
+
+/**
+ * #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
+ * the only rendered policy. `readPublicObservedScore` still takes the
+ * `ScoringRenderSelection` shape, so this constant stands in for the old
+ * dynamic DB-backed read.
+ */
+const CONSTANT_SELECTION: ScoringRenderSelection = {
+  enabled: true,
+  machinePolicy: SCORING_POLICY,
+  cacheable: true,
+  capturedAt: Date.now(),
+};
 
 function readString(inputs: unknown, key: string): string {
   if (!isWebMcpRecord(inputs) || typeof inputs[key] !== "string") return "";
@@ -100,74 +105,21 @@ function unavailable(tool: string): string {
   return `${tool} is unavailable right now. Please try again later.`;
 }
 
-async function loadPublicProfile(handle: string) {
-  const snapshot = await getCachedLatestSnapshot(handle);
-  if (!snapshot) return null;
+type LoadedProfile =
+  | { readonly status: "current"; readonly projection: PublicScoreProjection }
+  | { readonly status: "status"; readonly scoringStatus: ScoringStatus }
+  | { readonly status: "unavailable" };
 
-  let displayScore: number | null = null;
-  let displayTier: string | null = null;
-  let scoring: ScoreViewModel | null = null;
-  let craftResult = null;
-  let materializedAvailable = false;
-  try {
-    const materialized = await materializeDisplayProfile(handle, {
-      readOnly: true,
-    });
-    if (materialized) {
-      materializedAvailable = true;
-      scoring = materialized.scoring;
-      const projection = publicScoreProjection(scoring);
-      displayScore = projection.displayScore; displayTier = projection.tier;
-      if (snapshot.craft == null) {
-        craftResult = materialized.craftResult;
-      }
-    }
-  } catch {
-    // Match /api/profile: the snapshot remains useful if fresh materialization fails.
-  }
-  if (snapshot.craft == null && !materializedAvailable) {
-    try {
-      craftResult = await getCachedCraftScore(handle);
-    } catch {
-      // The persisted snapshot remains useful if the optional craft cache fails.
-    }
-  }
-  const craftScore = snapshot.craft ?? craftResult?.craftScore;
-
-  const dimensions: DimensionScores = {
-    delivery: snapshot.delivery,
-    quality: snapshot.quality,
-    consistency: snapshot.consistency,
-    breadth: snapshot.breadth,
-    ...(craftScore != null && { craft: craftScore }),
-  };
-
-  const legacy = {
-    handle,
-    dimensions,
-    compositeScore: snapshot.compositeScore,
-    adjustedComposite: snapshot.adjustedComposite,
-    archetype: snapshot.archetype,
-    tier: snapshot.tier,
-    craft: craftResult
-      ? {
-          tool: sanitizeFreeTextForAgent(craftResult.tool),
-          tier: craftResult.tier,
-          score: craftResult.craftScore,
-        }
-      : null,
-    snapshotDate: snapshot.date,
-    computedAt: snapshot.capturedAt,
-    displayScore,
-    displayTier,
-    scoring,
-  };
-  if (!scoring) return { handle, scoring: null, displayScore: null, exactScore: null, displayTier: null,
-    dimensions: {}, exactDimensions: {}, tier: null, archetype: null, craft: null,
-    policyVersion: null, identity: null, window: null, compositeScore: null, adjustedComposite: null, freshness: "unavailable", legacy };
-  const projection = publicScoreProjection(scoring, craftScore);
-  return { handle, ...projection, displayTier: projection.tier, compositeScore: projection.displayScore,
-    adjustedComposite: projection.displayScore, legacy };
+/** The current v7.2 receipt, or the owner-visible scoring status when there
+ * is no drawable current receipt yet (#1335 phase 5 — reads the receipt
+ * directly rather than a live materialize; there is no legacy fallback). */
+async function loadPublicProfile(handle: string): Promise<LoadedProfile> {
+  const current = await readPublicObservedScore(handle, CONSTANT_SELECTION);
+  if (current.status === "unavailable") return { status: "unavailable" };
+  if (current.status === "current") return { status: "current", projection: current.projection };
+  const scoringStatus = await readScoringStatus(handle);
+  if (scoringStatus === null) return { status: "unavailable" };
+  return { status: "status", scoringStatus };
 }
 
 export async function executeServerMcpTool(
@@ -245,7 +197,7 @@ const findProfile: ServerMcpTool = {
 const getImpactProfile: ServerMcpTool = {
   name: "get_impact_profile",
   description:
-    "Return the latest public impact profile for a GitHub handle. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); legacy contains the stored trend snapshot; top-level values use the selected policy.",
+    "Return the current v7.2 receipt for a GitHub handle: displayScore and displayTier are the headline the badge draws. When there is no drawable current receipt yet, returns scoringStatus instead (collecting, action needed, unregistered, or ready-and-updating).",
   inputSchema: FIND_PROFILE_INPUT_SCHEMA,
   annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
@@ -256,13 +208,15 @@ const getImpactProfile: ServerMcpTool = {
       return invalidInput("get_impact_profile", "handle must be a public GitHub handle");
     }
     const profile = await loadPublicProfile(handle);
-    return profile ? JSON.stringify(profile) : missingProfile(handle);
+    if (profile.status === "unavailable") return unavailable("get_impact_profile");
+    if (profile.status === "status") return JSON.stringify({ handle, scoringStatus: profile.scoringStatus });
+    return JSON.stringify({ handle, ...profile.projection });
   },
 };
 
 const getImpactHistory: ServerMcpTool = {
   name: "get_impact_history",
-  description: "Return public impact snapshots and trend for a GitHub handle.",
+  description: "Return the current v7.2 observed history (daily winners and trend) for a GitHub handle.",
   inputSchema: FIND_PROFILE_INPUT_SCHEMA,
   annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
@@ -272,59 +226,47 @@ const getImpactHistory: ServerMcpTool = {
     if (!handle) {
       return invalidInput("get_impact_history", "handle must be a public GitHub handle");
     }
-    const selection = await readScoringRenderSelection();
-    if (!selection.cacheable) return JSON.stringify({ handle, status: "unavailable", reason: "policy_unavailable" });
-    if (selection.enabled) {
-      const result = await readObservedScoringHistory(handle);
-      if (result.status === "unavailable") return JSON.stringify({ handle, policyVersion: "v7.2", status: "unavailable", reason: "history_unavailable" });
-      if (result.status === "found") return JSON.stringify({ handle, policyVersion: "v7.2", snapshots: result.history.observations, trend: result.history.trend, comparisons: result.history.comparisons });
-    }
-    const snapshots = await getSnapshots(handle);
-    const publicSnapshots = snapshots.map(redactSnapshotForVisitor);
+    const result = await readObservedScoringHistory(handle);
+    if (result.status === "unavailable") return unavailable("get_impact_history");
+    if (result.status !== "found") return missingProfile(handle);
+    const { history } = result;
     return JSON.stringify({
       handle,
-      policyVersion: "v6",
-      snapshots: publicSnapshots,
-      trend: computeTrend(snapshots),
+      policyVersion: "v7.2",
+      snapshots: history.observations,
+      trend: history.trend,
+      comparisons: history.comparisons,
     });
   },
 };
 
 const verifyBadge: ServerMcpTool = {
   name: "verify_badge",
-  description: "Look up the public verification record for a Chapa badge hash.",
+  description: "Look up the public verification result for a Chapa badge hash.",
   inputSchema: VERIFY_BADGE_SERVER_INPUT_SCHEMA,
   annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("verify_badge", inputs, ["hash"]);
     if (validationError) return validationError;
     const hash = readString(inputs, "hash");
-    if (!VERIFICATION_CODE_PATTERN.test(hash)) {
-      return invalidInput(
-        "verify_badge",
-        "hash must be a complete v7 receipt token or an 8, 16, or 32 character lowercase legacy code",
-      );
-    }
     if (parseVerificationTokenV7(hash)) {
       try {
         const receipt = await getReceiptVerificationV7(hash);
         return JSON.stringify(receipt ?? { version: "v7", status: "not_found" });
       } catch { return JSON.stringify({ error: "Verification is unavailable. Retry later; no verification success is claimed." }); }
     }
-    const record = await getVerificationRecord(hash);
-    if (!record) return `No verification record was found for hash ${hash}.`;
-    const publicRecord = toPublicVerificationRecord(record);
-    return JSON.stringify({
-      version: "v6",
-      status: "legacy_record",
-      hash,
-      record: {
-        ...publicRecord,
-        displayName: sanitizeFreeTextForAgent(publicRecord.displayName),
-      },
-      verifyUrl: `${PRODUCTION_BASE_URL}/verify/${hash}`,
-      badgeUrl: `${PRODUCTION_BASE_URL}/u/${encodeURIComponent(record.handle)}/badge.svg`,
-    });
+    // #1335 phase 5 — `verification_records` is retired. A well-formed
+    // legacy hex code is terminal (a retired v6 code), not a lookup miss.
+    if (VERIFICATION_HASH_PATTERN.test(hash)) {
+      return JSON.stringify({
+        status: "retired_v6_code",
+        message: "This is a retired v6 verification code. Current badges use v7.2 receipt codes.",
+      });
+    }
+    return invalidInput(
+      "verify_badge",
+      "hash must be a complete v7 receipt token or an 8, 16, or 32 character lowercase legacy code",
+    );
   },
 };
 
@@ -335,13 +277,13 @@ const explainVerification: ServerMcpTool = {
   annotations: MCP_READ_ONLY_ANNOTATIONS,
   execute: async (inputs) => {
     const validationError = validateInputKeys("explain_verification", inputs, []);
-    return validationError ?? JSON.stringify({ algorithm: "HMAC-SHA256", v7: RECEIPT_VERIFICATION_EXPLANATION, legacy: VERIFICATION_EXPLANATION });
+    return validationError ?? JSON.stringify(RECEIPT_VERIFICATION_EXPLANATION);
   },
 };
 
 const explainDimension: ServerMcpTool = {
   name: "explain_dimension",
-  description: "Explain one impact dimension for a public profile.",
+  description: "Explain one impact dimension for a public profile's current v7.2 receipt.",
   inputSchema: EXPLAIN_DIMENSION_SERVER_INPUT_SCHEMA,
   annotations: MCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
   execute: async (inputs) => {
@@ -361,19 +303,10 @@ const explainDimension: ServerMcpTool = {
       return invalidInput("explain_dimension", "dimension must be a known dimension");
     }
     const materialized = await materializeDisplayProfile(handle, { readOnly: true });
-    if (!materialized) return missingProfile(handle);
-    const browserTwin = createExplainDimensionTool({
-      impact: redactImpactForVisitor(materialized.displayImpact),
-      scoring: materialized.scoring,
-      stats: materialized.stats,
-      craftResult: materialized.craftResult,
-      t: getServerT("en") as LanguageContextValue["t"],
-      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
-    });
-    return browserTwin.execute(
-      { dimension: dimensionKey },
-      { signal: new AbortController().signal },
-    );
+    if (!materialized?.scoring || materialized.scoring.policyVersion !== "v7.2") {
+      return missingProfile(handle);
+    }
+    return JSON.stringify(explainObservedDimension(materialized.scoring, dimensionKey));
   },
 };
 
@@ -400,10 +333,11 @@ const compareProfiles: ServerMcpTool = {
       loadPublicProfile(handle),
       loadPublicProfile(otherHandle),
     ]);
-    if (!current) return missingProfile(handle);
-    if (!other) return missingProfile(otherHandle);
-    if (!current.scoring || !other.scoring) return JSON.stringify({ current: { handle, score: current.displayScore, tier: current.displayTier, scoring: current.scoring }, other: { handle: otherHandle, score: other.displayScore, tier: other.displayTier, scoring: other.scoring }, status: "not_comparable", reason: "unavailable", differences: null });
-    const comparison = comparePublicScores(publicScoreProjection(current.scoring, current.dimensions.craft), publicScoreProjection(other.scoring, other.dimensions.craft));
+    if (current.status === "unavailable") return unavailable("compare_profiles");
+    if (other.status === "unavailable") return unavailable("compare_profiles");
+    if (current.status === "status") return JSON.stringify({ handle, scoringStatus: current.scoringStatus });
+    if (other.status === "status") return JSON.stringify({ handle: otherHandle, scoringStatus: other.scoringStatus });
+    const comparison = comparePublicScores(current.projection, other.projection);
     return JSON.stringify({ ...comparison,
       current: { handle, ...comparison.current, score: comparison.current.displayScore },
       other: { handle: otherHandle, ...comparison.other, score: comparison.other.displayScore }, note: HEADLINE_NOTE });

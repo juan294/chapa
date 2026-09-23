@@ -7,6 +7,10 @@
  *
  * Fire-and-forget: called with `void` from the badge route — never blocks
  * SVG rendering, never throws.
+ *
+ * #1335 phase 5 — receipt-only body. The v6 `ImpactV6Result`-based HTML
+ * template is retired; every notification is built from the current v7.2
+ * receipt's observation, never a legacy aggregate.
  */
 
 import { getResend, escapeHtml } from "./resend";
@@ -18,12 +22,6 @@ import { getBaseUrl, getVercelEnv, getSupportForwardEmail } from "@/lib/env";
 
 const MARKER_TTL = 31_536_000; // 365 days in seconds
 
-/**
- * #1335 phase 5 ("delete v6") — the v6 aggregate HTML template is gone; every
- * badge is now scored by a v7/v7.2 receipt, so the receipt-only plain-text
- * body (previously this function's `scoring.policyVersion !== "v6"` branch)
- * is the only body there is.
- */
 export async function notifyFirstBadge(
   handle: string,
   scoring: ScoreViewModel,
@@ -48,20 +46,31 @@ export async function notifyFirstBadge(
     const to = getSupportForwardEmail();
     if (!to) return;
 
-    // 5. Build email
+    // 5. Only a registered receipt observation carries an identity worth
+    // notifying about.
+    const observed = scoringObservation(scoring);
+    if (!observed || !observed.identity) return;
+
     const baseUrl = getBaseUrl();
     const shareUrl = `${baseUrl}/u/${lowerHandle}`;
     const badgeUrl = `${baseUrl}/u/${lowerHandle}/badge.svg`;
-
-    const observed = scoringObservation(scoring);
-    if (!observed || !observed.identity) return;
     const subject = `New badge: ${lowerHandle} — ${observed.tier ?? "Unassigned"} (${observed.policyVersion})`;
-    const text = ["CHAPA — New Badge Created", `Handle: ${lowerHandle}`, `Policy: ${observed.policyVersion}`,
-      `Score: ${observed.composite.display}`, `Exact score: ${observed.composite.exact}`, `Tier: ${observed.tier ?? "Unassigned"}`,
-      `Archetype: ${observed.archetype ?? "Unassigned"}`, ...Object.entries(observed.dimensions).map(([key, point]) => `${key}: ${point.display}`),
-      `Craft: ${observed.craft?.display ?? "Unavailable"} (separate from core)`, `Revision: ${observed.identity.revisionId}`,
-      `Content hash: ${observed.identity.contentHash}`, `Window: ${observed.window?.startInclusive} to ${observed.window?.endExclusive}`,
-      `Profile: ${shareUrl}`, `Badge: ${badgeUrl}`].join("\n");
+    const text = [
+      "CHAPA — New Badge Created",
+      `Handle: ${lowerHandle}`,
+      `Policy: ${observed.policyVersion}`,
+      `Score: ${observed.composite.display}`,
+      `Exact score: ${observed.composite.exact}`,
+      `Tier: ${observed.tier ?? "Unassigned"}`,
+      `Archetype: ${observed.archetype ?? "Unassigned"}`,
+      ...Object.entries(observed.dimensions).map(([dim, point]) => `${dim}: ${point.display}`),
+      `Craft: ${observed.craft?.display ?? "Unavailable"} (separate from core)`,
+      `Revision: ${observed.identity.revisionId}`,
+      `Content hash: ${observed.identity.contentHash}`,
+      `Window: ${observed.window?.startInclusive} to ${observed.window?.endExclusive}`,
+      `Profile: ${shareUrl}`,
+      `Badge: ${badgeUrl}`,
+    ].join("\n");
     const html = `<pre style="white-space:pre-wrap">${escapeHtml(text)}</pre>`;
 
     // 6. Send

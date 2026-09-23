@@ -99,7 +99,7 @@ describe("getSupabase", () => {
 describe("pingSupabase", () => {
   /**
    * Builds a Supabase client mock whose query chain mirrors the app's
-   * hot-path snapshot read: from().select().order().limit(). The terminal
+   * hot-path receipt read: from().select().order().limit(). The terminal
    * limit() resolves/rejects with `result`. Returns the `from` spy so tests
    * can assert which table was probed.
    */
@@ -118,7 +118,7 @@ describe("pingSupabase", () => {
     return { from, select, order, limit };
   }
 
-  it("probes the metrics_snapshots table, not users", async () => {
+  it("probes the scoring_v7_receipts table, not users", async () => {
     const { from } = mockSupabaseChain({ resolved: { error: null } });
 
     vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
@@ -126,7 +126,7 @@ describe("pingSupabase", () => {
 
     await pingSupabase();
 
-    expect(from).toHaveBeenCalledWith("metrics_snapshots");
+    expect(from).toHaveBeenCalledWith("scoring_v7_receipts");
     expect(from).not.toHaveBeenCalledWith("users");
   });
 

@@ -4,32 +4,19 @@ import { bodyAsRecord, invokeJson } from "@/test/contract/invoke";
 const {
   mockInvalidateProfileReadModels,
   mockMaterializeOrchestratedProfile,
-  mockPersistOrchestratedSnapshot,
+  mockEnqueueAndReportScoringStatus,
   mockResolveRequestAuth,
 } = vi.hoisted(() => ({
   mockInvalidateProfileReadModels: vi.fn(async () => undefined),
   mockMaterializeOrchestratedProfile: vi.fn(async () => ({
     craftResult: null,
-    // #1076: persistOrchestratedSnapshot now gates on statsComplete via the
-    // shared guardStatsComplete() — this fixture represents the happy path
-    // (complete stats), not the incomplete-stats case, so it must be true.
+    // #1076: the route gates on statsComplete before enqueueing — this
+    // fixture represents the happy path (complete stats), not the
+    // incomplete-stats case, so it must be true.
     statsComplete: true,
-    displayImpact: {
-      adjustedComposite: 72,
-      compositeScore: 75,
-      dimensions: { delivery: 80, quality: 70, consistency: 75, breadth: 65 },
-      archetype: "Builder",
-      tier: "High",
-      profileType: "collaborative",
-    },
-    rawImpact: {
-      adjustedComposite: 74,
-      compositeScore: 75,
-    },
-    snapshot: { date: "2026-07-03", adjustedComposite: 72, tier: "High" },
     stats: { handle: "octocat" },
   })),
-  mockPersistOrchestratedSnapshot: vi.fn(async () => true),
+  mockEnqueueAndReportScoringStatus: vi.fn(async (): Promise<{ kind: string; receiptDate: string; updating: boolean } | null> => ({ kind: "ready", receiptDate: "2026-07-03", updating: false })),
   mockResolveRequestAuth: vi.fn(async () => ({
     handle: "Octocat",
     token: "contract-token",
@@ -42,7 +29,10 @@ vi.mock("@/lib/auth/resolve-request-auth", () => ({
 
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: mockMaterializeOrchestratedProfile,
-  persistOrchestratedSnapshot: mockPersistOrchestratedSnapshot,
+}));
+
+vi.mock("@/lib/profile/post-write-score", () => ({
+  enqueueAndReportScoringStatus: mockEnqueueAndReportScoringStatus,
 }));
 
 vi.mock("@/lib/profile/post-write-invalidation", () => ({
@@ -60,7 +50,7 @@ vi.mock("next/cache", () => ({
 import { POST } from "./route";
 
 describe("POST /api/recalculate contract", () => {
-  it("returns a recalculated profile only after durable snapshot persistence", async () => {
+  it("returns the resulting scoring status after enqueueing collection", async () => {
     const response = await invokeJson(POST, {
       method: "POST",
       path: "/api/recalculate",
@@ -71,22 +61,19 @@ describe("POST /api/recalculate contract", () => {
     expect(bodyAsRecord(response).success).toBe(true);
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
       token: "contract-token",
-      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6" }),
+      ignoreSnapshot: true,
+      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     });
-    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("octocat", { badgeSvg: true });
+    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(
       "octocat",
+      "refresh",
       expect.any(Object),
-      { mode: "replace" },
     );
-    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("octocat", {
-      badgeSvg: true,
-      snapshot: true,
-      history: true,
-    });
   });
 
-  it("fails closed when the recalculated snapshot cannot be persisted", async () => {
-    mockPersistOrchestratedSnapshot.mockResolvedValueOnce(false);
+  it("fails closed when the scoring status authority read itself fails", async () => {
+    mockEnqueueAndReportScoringStatus.mockResolvedValueOnce(null);
 
     const response = await invokeJson(POST, {
       method: "POST",
@@ -94,7 +81,6 @@ describe("POST /api/recalculate contract", () => {
       body: {},
     });
 
-    expect(response.status).toBe(500);
-    expect(bodyAsRecord(response).error).toMatch(/save recalculated profile/i);
+    expect(response.status).toBe(503);
   });
 });

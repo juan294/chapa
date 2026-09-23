@@ -3,7 +3,6 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
 vi.mock("@/lib/verification/store", () => ({
-  getVerificationRecord: vi.fn(),
   getReceiptVerificationV7: vi.fn(),
 }));
 
@@ -18,15 +17,15 @@ vi.mock("@/lib/feature-flags", () => ({
 vi.mock("./VerifyPageWebMcpTools", () => ({
   VerifyPageWebMcpTools: ({
     hash,
-    record,
+    isV7,
   }: {
     hash: string;
-    record: { handle: string };
+    isV7: boolean;
   }) => (
     <span
       data-testid="verify-page-webmcp-tools"
       data-hash={hash}
-      data-handle={record?.handle}
+      data-is-v7={String(isV7)}
     />
   ),
 }));
@@ -114,7 +113,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
+import { getReceiptVerificationV7 } from "@/lib/verification/store";
 import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
 import { getServerLocale } from "@/lib/i18n/server";
 import VerifyPage, { generateMetadata } from "./page";
@@ -124,26 +123,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   featureFlagMocks.isWebmcpEnabled.mockResolvedValue(true);
 });
-
-const MOCK_RECORD = {
-  handle: "testuser",
-  displayName: "Test User",
-  adjustedComposite: 72,
-  confidence: 85,
-  tier: "Gold",
-  archetype: "Builder",
-  dimensions: {
-    delivery: 80,
-    quality: 70,
-    consistency: 65,
-    breadth: 55,
-  },
-  commitsTotal: 420,
-  prsMergedCount: 38,
-  reviewsSubmittedCount: 15,
-  generatedAt: "2026-03-22",
-  profileType: "verified",
-};
 
 // ---------------------------------------------------------------------------
 // generateMetadata — covers HASH_PATTERN true/false branches
@@ -235,28 +214,29 @@ describe("VerifyPage", () => {
     });
   });
 
-  describe("valid hash, no record", () => {
-    it("renders NotFoundCard when record is null", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(null);
-
+  // #1335 phase 5 — `verification_records` is retired. Any well-formed
+  // non-v7 hash reaching this branch is a retired v6 code, not a lookup.
+  describe("retired v6 code", () => {
+    it("renders the retired-code explanation for a valid 8-char legacy hash", async () => {
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4" }),
         searchParams: Promise.resolve({}),
       });
       render(jsx);
 
-      // English: verifyDetail.notFoundTitle = 'Not found'
-      expect(screen.getByText("Not found")).toBeDefined();
-      // English: verifyDetail.notFoundDescription
+      expect(screen.getByText("Retired verification code")).toBeDefined();
       expect(
-        screen.getByText("No verification record found for this hash."),
+        screen.getByText(
+          "This is a retired v6 verification code. Current badges use v7.2 receipt codes.",
+        ),
       ).toBeDefined();
       expect(screen.getByText("a1b2c3d4")).toBeDefined();
-      expect(screen.queryByTestId("verify-page-webmcp-tools")).toBeNull();
+      const webMcpHost = screen.getByTestId("verify-page-webmcp-tools");
+      expect(webMcpHost.getAttribute("data-hash")).toBe("a1b2c3d4");
+      expect(webMcpHost.getAttribute("data-is-v7")).toBe("false");
     });
 
     it("wraps a supported 32-character hash on narrow viewports", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(null);
       const hash = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 
       const jsx = await VerifyPage({
@@ -270,31 +250,8 @@ describe("VerifyPage", () => {
         document.querySelector('template[data-chapa-document-locale="en"]'),
       ).not.toBeNull();
     });
-  });
-
-  describe("valid hash with record", () => {
-    it("renders VerifiedCard with developer info", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
-
-      const jsx = await VerifyPage({
-        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
-        searchParams: Promise.resolve({}),
-      });
-      render(jsx);
-
-      // English: verifyDetail.verifiedTitle = 'Badge verified'
-      expect(screen.getByText("Legacy verification record")).toBeDefined();
-      expect(screen.getByText("@testuser")).toBeDefined();
-      expect(screen.getByText("Test User")).toBeDefined();
-      const webMcpHost = screen.getByTestId("verify-page-webmcp-tools");
-      expect(webMcpHost.getAttribute("data-hash")).toBe(
-        "a1b2c3d4e5f6a7b8",
-      );
-      expect(webMcpHost.getAttribute("data-handle")).toBe("testuser");
-    });
 
     it("omits the WebMCP host when the server kill-switch is off", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
       featureFlagMocks.isWebmcpEnabled.mockResolvedValue(false);
 
       const jsx = await VerifyPage({
@@ -304,108 +261,7 @@ describe("VerifyPage", () => {
       render(jsx);
 
       expect(screen.queryByTestId("verify-page-webmcp-tools")).toBeNull();
-      expect(screen.getByText("Legacy verification record")).toBeDefined();
-    });
-
-    it("displays impact score and tier", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
-
-      const jsx = await VerifyPage({
-        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
-        searchParams: Promise.resolve({}),
-      });
-      render(jsx);
-
-      expect(screen.getByText("72")).toBeDefined();
-      expect(screen.getByText("Gold")).toBeDefined();
-      expect(screen.getByText("Builder")).toBeDefined();
-    });
-
-    it("displays all four dimensions", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
-
-      const jsx = await VerifyPage({
-        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
-        searchParams: Promise.resolve({}),
-      });
-      render(jsx);
-
-      expect(screen.getByText("delivery")).toBeDefined();
-      expect(screen.getByText("80")).toBeDefined();
-      expect(screen.getByText("quality")).toBeDefined();
-      expect(screen.getByText("70")).toBeDefined();
-      expect(screen.getByText("consistency")).toBeDefined();
-      expect(screen.getByText("65")).toBeDefined();
-      expect(screen.getByText("breadth")).toBeDefined();
-      expect(screen.getByText("55")).toBeDefined();
-    });
-
-    it("displays key metrics", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
-
-      const jsx = await VerifyPage({
-        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
-        searchParams: Promise.resolve({}),
-      });
-      render(jsx);
-
-      expect(screen.getByText("420")).toBeDefined();
-      expect(screen.getByText("Commits")).toBeDefined();
-      expect(screen.getByText("38")).toBeDefined();
-      // English: verifyDetail.prsMerged = 'PRs merged'
-      expect(screen.getByText("PRs merged")).toBeDefined();
-      expect(screen.getByText("15")).toBeDefined();
-      // English: verifyDetail.reviews = 'Reviews'
-      expect(screen.getByText("Reviews")).toBeDefined();
-    });
-
-    it("shows generated date and View Badge link", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
-
-      const jsx = await VerifyPage({
-        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
-        searchParams: Promise.resolve({}),
-      });
-      render(jsx);
-
-      // English: verifyDetail.generatedOn = 'Generated on'
-      expect(screen.getByText("Generated on 2026-03-22")).toBeDefined();
-      // English: verifyDetail.viewBadge = 'View badge'
-      const viewBadge = screen.getByText("View badge");
-      expect(viewBadge.closest("a")?.getAttribute("href")).toBe(
-        "/u/testuser/badge.svg",
-      );
-    });
-
-    it("links developer handle to share page", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
-
-      const jsx = await VerifyPage({
-        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
-        searchParams: Promise.resolve({}),
-      });
-      render(jsx);
-
-      const handleLink = screen.getByText("@testuser");
-      expect(handleLink.closest("a")?.getAttribute("href")).toBe(
-        "/u/testuser",
-      );
-    });
-
-    it("omits display name row when not provided", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue({
-        ...MOCK_RECORD,
-        displayName: undefined,
-      });
-
-      const jsx = await VerifyPage({
-        params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
-        searchParams: Promise.resolve({}),
-      });
-      render(jsx);
-
-      // English: verifyDetail.name = 'Name'
-      expect(screen.queryByText("Name")).toBeNull();
+      expect(screen.getByText("Retired verification code")).toBeDefined();
     });
   });
 
@@ -424,9 +280,7 @@ describe("VerifyPage", () => {
       expect(screen.getByTestId("site-footer").textContent).toBe("Privacy");
     });
 
-    it("renders SiteFooter on the valid-hash-with-record branch", async () => {
-      vi.mocked(getVerificationRecord).mockResolvedValue(MOCK_RECORD);
-
+    it("renders SiteFooter on the retired-v6-code branch", async () => {
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
         searchParams: Promise.resolve({}),

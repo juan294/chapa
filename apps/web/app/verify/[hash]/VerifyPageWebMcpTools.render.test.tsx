@@ -2,7 +2,6 @@
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { VerificationRecord } from "@/lib/verification/types";
 import type { WebMcpTool } from "@/lib/webmcp/use-model-context-tools";
 import { VerifyPageWebMcpTools } from "./VerifyPageWebMcpTools";
 
@@ -20,25 +19,6 @@ vi.mock("@/lib/webmcp/use-model-context-tools", () => ({
 }));
 
 const hash = "a1b2c3d4e5f6a7b8";
-const record: VerificationRecord = {
-  handle: "testuser",
-  displayName: "Test User",
-  adjustedComposite: 72,
-  confidence: 85,
-  tier: "Gold",
-  archetype: "Builder",
-  dimensions: {
-    delivery: 80,
-    quality: 70,
-    consistency: 65,
-    breadth: 55,
-  },
-  commitsTotal: 420,
-  prsMergedCount: 38,
-  reviewsSubmittedCount: 15,
-  generatedAt: "2026-03-22",
-  profileType: "verified",
-};
 
 function registeredTools(): WebMcpTool[] {
   const call = mocks.useModelContextTools.mock.calls.at(-1);
@@ -60,7 +40,7 @@ afterEach(() => {
 describe("VerifyPageWebMcpTools", () => {
   it("registers two read-only tools behind the client WebMCP flag", () => {
     const { container } = render(
-      <VerifyPageWebMcpTools hash={hash} record={record} />,
+      <VerifyPageWebMcpTools hash={hash} isV7={false} />,
     );
 
     expect(container.childNodes).toHaveLength(0);
@@ -100,7 +80,7 @@ describe("VerifyPageWebMcpTools", () => {
   it("passes the disabled flag through to registration", () => {
     mocks.webmcpEnabled = false;
 
-    render(<VerifyPageWebMcpTools hash={hash} record={record} />);
+    render(<VerifyPageWebMcpTools hash={hash} isV7={false} />);
 
     expect(mocks.useModelContextTools).toHaveBeenCalledWith(
       [],
@@ -108,8 +88,16 @@ describe("VerifyPageWebMcpTools", () => {
     );
   });
 
-  it("serializes the on-page hash and verification record", async () => {
-    render(<VerifyPageWebMcpTools hash={hash} record={record} />);
+  it("fetches the live verification result for a retired legacy hash, including the 410", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "retired_v6_code", message: "retired" }), {
+        status: 410,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<VerifyPageWebMcpTools hash={hash} isV7={false} />);
 
     const tool = registeredTools().find(
       (candidate) => candidate.name === "get_verification_record",
@@ -117,18 +105,29 @@ describe("VerifyPageWebMcpTools", () => {
     if (!tool) throw new Error("Missing get_verification_record tool");
 
     expect(JSON.parse(await execute(tool))).toEqual({
-      version: "v6",
-      hash,
-      record: expect.not.objectContaining({ confidence: expect.anything() }),
+      status: "retired_v6_code",
+      message: "retired",
     });
-    expect(tool.annotations).toEqual({
-      readOnlyHint: true,
-      untrustedContentHint: true,
+    expect(fetchMock).toHaveBeenCalledWith(`/api/verify/${hash}`, expect.objectContaining({ cache: "no-store" }));
+  });
+
+  it("reports an unavailable result on a network failure without claiming success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    render(<VerifyPageWebMcpTools hash={hash} isV7={false} />);
+
+    const tool = registeredTools().find(
+      (candidate) => candidate.name === "get_verification_record",
+    );
+    if (!tool) throw new Error("Missing get_verification_record tool");
+
+    expect(JSON.parse(await execute(tool))).toEqual({
+      error: "Verification could not be checked. Retry later; no cached receipt is returned.",
     });
   });
 
-  it("explains HMAC-SHA256 guarantees and explicit limits", async () => {
-    render(<VerifyPageWebMcpTools hash={hash} record={record} />);
+  it("explains HMAC-SHA256 guarantees and explicit limits for a retired legacy hash", async () => {
+    render(<VerifyPageWebMcpTools hash={hash} isV7={false} />);
 
     const tool = registeredTools().find(
       (candidate) => candidate.name === "explain_verification",
@@ -173,7 +172,7 @@ describe("VerifyPageWebMcpTools", () => {
       "Legacy 32-character verification code; lookup does not replay the complete signed payload.",
     ],
   ])("describes the supported %i-character format", async (_length, code, format) => {
-    render(<VerifyPageWebMcpTools hash={code} record={record} />);
+    render(<VerifyPageWebMcpTools hash={code} isV7={false} />);
     const tool = registeredTools().find(
       (candidate) => candidate.name === "explain_verification",
     );
@@ -183,20 +182,19 @@ describe("VerifyPageWebMcpTools", () => {
       codeFormat: format,
     });
   });
-});
 
-
-it("rechecks current v7 authorization when an agent requests the displayed record", async () => {
-  const token = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
-  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ version: "v7", status: "revoked", signatureAuthenticated: false }), { status: 410, headers: { "Content-Type": "application/json" } }));
-  vi.stubGlobal("fetch", fetchMock);
-  render(<VerifyPageWebMcpTools hash={token} version="v7" />);
-  const tools = registeredTools();
-  const get = tools.find(tool => tool.name === "get_verification_record")!;
-  expect(JSON.parse(await execute(get))).toMatchObject({ version: "v7", status: "revoked", signatureAuthenticated: false });
-  expect(fetchMock).toHaveBeenCalledWith(`/api/verify/${token}`, expect.objectContaining({ cache: "no-store" }));
-  const explain = tools.find(tool => tool.name === "explain_verification")!;
-  const result = JSON.parse(await execute(explain));
-  expect(result.howItWorks).toContain("complete canonical receipt");
-  expect(result.doesNotProve.join(" ")).toMatch(/SVG/);
+  it("rechecks current v7 authorization when an agent requests the displayed record", async () => {
+    const token = `v7.11111111-1111-4111-8111-111111111111.${"a".repeat(64)}`;
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ version: "v7", status: "revoked", signatureAuthenticated: false }), { status: 410, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<VerifyPageWebMcpTools hash={token} isV7={true} />);
+    const tools = registeredTools();
+    const get = tools.find(tool => tool.name === "get_verification_record")!;
+    expect(JSON.parse(await execute(get))).toMatchObject({ version: "v7", status: "revoked", signatureAuthenticated: false });
+    expect(fetchMock).toHaveBeenCalledWith(`/api/verify/${token}`, expect.objectContaining({ cache: "no-store" }));
+    const explain = tools.find(tool => tool.name === "explain_verification")!;
+    const result = JSON.parse(await execute(explain));
+    expect(result.howItWorks).toContain("complete canonical receipt");
+    expect(result.doesNotProve.join(" ")).toMatch(/SVG/);
+  });
 });

@@ -14,10 +14,8 @@ const {
   mockUpdateCraftCache,
   mockInvalidateProfileReadModels,
   mockMaterializeOrchestratedProfile,
-  mockPersistOrchestratedSnapshot,
+  mockEnqueueAndReportScoringStatus,
   mockGetSessionGitHubToken,
-  mockGetPublicProfileVerification,
-  mockDeferProfileCacheWork,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockCacheDel: vi.fn(),
@@ -30,10 +28,8 @@ const {
   mockUpdateCraftCache: vi.fn(),
   mockInvalidateProfileReadModels: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
-  mockPersistOrchestratedSnapshot: vi.fn(),
+  mockEnqueueAndReportScoringStatus: vi.fn(),
   mockGetSessionGitHubToken: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
-  mockDeferProfileCacheWork: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -64,13 +60,6 @@ vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
-// The route issues a v7 receipt behind `scoring_v7_rendering`. Mocking the
-// flag module keeps this route test off the DB-backed flag machinery (and its
-// `unstable_cache`) and states the gate's position explicitly instead.
-vi.mock("@/lib/feature-flags", () => ({
-  isScoringV7RenderingEnabled: () => Promise.resolve(false),
-}));
-
 vi.mock("@/lib/cache/craft-cache", () => ({
   updateCraftCache: (...args: unknown[]) => mockUpdateCraftCache(...args),
 }));
@@ -78,8 +67,10 @@ vi.mock("@/lib/cache/craft-cache", () => ({
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: (...args: unknown[]) =>
     mockMaterializeOrchestratedProfile(...args),
-  persistOrchestratedSnapshot: (...args: unknown[]) =>
-    mockPersistOrchestratedSnapshot(...args),
+}));
+
+vi.mock("@/lib/profile/post-write-score", () => ({
+  enqueueAndReportScoringStatus: (...args: unknown[]) => mockEnqueueAndReportScoringStatus(...args),
 }));
 
 vi.mock("@/lib/platform/source-diagnostics", () => ({
@@ -88,13 +79,6 @@ vi.mock("@/lib/platform/source-diagnostics", () => ({
 
 vi.mock("@/lib/auth/github-session-token", () => ({
   getSessionGitHubToken: (...args: unknown[]) => mockGetSessionGitHubToken(...args),
-}));
-
-vi.mock("@/lib/profile/public-profile", () => ({
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
-  deferProfileCacheWork: (...args: unknown[]) =>
-    mockDeferProfileCacheWork(...args),
 }));
 
 const SESSION = {
@@ -114,31 +98,10 @@ const FAKE_MATERIALIZED = {
     craftScore: 74,
     tier: "Expert",
   },
-  rawImpact: {
-    adjustedComposite: 76,
-    compositeScore: 76,
-    dimensions: { delivery: 75, quality: 65, consistency: 70, breadth: 60 },
-    archetype: "Builder",
-    tier: "High",
-    profileType: "collaborative",
-    confidence: 85,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  displayImpact: {
-    adjustedComposite: 72,
-    compositeScore: 76,
-    dimensions: { delivery: 75, quality: 65, consistency: 70, breadth: 60 },
-    archetype: "Builder",
-    tier: "Solid",
-    profileType: "collaborative",
-    confidence: 85,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  snapshot: { date: "2026-04-17", adjustedComposite: 72, tier: "Solid" },
   statsComplete: true,
 };
+
+const SCORING_STATUS = { kind: "collecting" as const, percent: 40, sources: [], hasPriorReceipt: false };
 
 function makeRequest(handle?: string): NextRequest {
   const url = handle
@@ -159,13 +122,8 @@ describe("POST /api/refresh", () => {
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     mockUpdateCraftCache.mockResolvedValue(undefined);
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockGetSessionGitHubToken.mockResolvedValue("oauth-token");
-    mockGetPublicProfileVerification.mockReturnValue({
-      hash: "refreshed-hash",
-      date: "2026-04-17",
-    });
-    mockDeferProfileCacheWork.mockResolvedValue(undefined);
+    mockEnqueueAndReportScoringStatus.mockResolvedValue(SCORING_STATUS);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -221,7 +179,7 @@ describe("POST /api/refresh", () => {
     expect(res.status).toBe(429);
   });
 
-  it("materializes the public profile, persists a replace snapshot, and returns display impact", async () => {
+  it("materializes fresh stats, enqueues collection, and reports the resulting scoring status", async () => {
     const res = await POST(makeRequest("testuser"));
     const body = await res.json();
 
@@ -233,47 +191,15 @@ describe("POST /api/refresh", () => {
     });
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
-      scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 },
+      scoringSelection: expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     });
-    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", { badgeSvg: true });
+    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(
       "testuser",
-      FAKE_MATERIALIZED,
-      { mode: "replace" },
+      "refresh",
+      expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }),
     );
-    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
-      "testuser",
-      FAKE_MATERIALIZED,
-      {
-        verification: { hash: "refreshed-hash", date: "2026-04-17" },
-        verificationOnly: true,
-      },
-    );
-    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
-      badgeSvg: true,
-      history: true,
-      snapshot: true,
-    });
-    expect(body.stats).toEqual(FAKE_MATERIALIZED.stats);
-    expect(body.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
-  });
-
-  it("persists before invalidating history-backed read models", async () => {
-    await POST(makeRequest("testuser"));
-
-    const persistOrder = mockPersistOrchestratedSnapshot.mock.invocationCallOrder[0];
-    // Two invalidation calls now bracket the fetch: `{stats}` before it to force
-    // the refetch, and the snapshot-derived artifacts after the persist. Only
-    // the second is ordered against the persist.
-    const postPersistIdx = mockInvalidateProfileReadModels.mock.calls.findIndex(
-      (c) => (c[1] as { badgeSvg?: boolean } | undefined)?.badgeSvg === true,
-    );
-    const invalidateOrder =
-      mockInvalidateProfileReadModels.mock.invocationCallOrder[postPersistIdx];
-
-    expect(persistOrder).toBeDefined();
-    expect(postPersistIdx).toBeGreaterThanOrEqual(0);
-    expect(invalidateOrder).toBeDefined();
-    expect(persistOrder!).toBeLessThan(invalidateOrder!);
+    expect(body).toEqual({ success: true, scoringStatus: SCORING_STATUS });
   });
 
   it("forces the refetch before materializing, never after", async () => {
@@ -383,30 +309,21 @@ describe("POST /api/refresh", () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith("/u/testuser");
   });
 
-  it("returns 500 when the refreshed snapshot cannot be persisted", async () => {
-    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
+  it("returns 503 when the scoring status authority read itself fails", async () => {
+    mockEnqueueAndReportScoringStatus.mockResolvedValue(null);
 
     const res = await POST(makeRequest("testuser"));
 
-    expect(res.status).toBe(500);
-    // The pre-fetch `{stats}` invalidation has already run by this point; what
-    // must NOT run is the post-persist artifact invalidation.
-    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalledWith(
-      "testuser",
-      expect.objectContaining({ badgeSvg: true }),
-    );
-    expect(mockRevalidatePath).not.toHaveBeenCalled();
+    expect(res.status).toBe(503);
   });
 
   // ---------------------------------------------------------------------------
-  // #1076 — the route checks materialized.statsComplete up front (the #1003
-  // persist-boundary gate) so an intentional skip is distinguishable from a
-  // genuine write failure: no 500, no captureServerError escalation (the
-  // shared guard already emits snapshot_skipped_incomplete_stats telemetry),
-  // and persistOrchestratedSnapshot is never even called.
+  // #1076 — the route checks materialized.statsComplete up front so an
+  // intentional skip is distinguishable from a genuine failure: no 500, no
+  // captureServerError escalation, and no collection is enqueued.
   // ---------------------------------------------------------------------------
 
-  it("#1076: returns 422 with reason stats_incomplete without attempting to persist, and without escalating as a genuine failure", async () => {
+  it("#1076: returns 422 with reason stats_incomplete without enqueueing collection, and without escalating as a genuine failure", async () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue({
       ...FAKE_MATERIALIZED,
       statsComplete: false,
@@ -417,10 +334,10 @@ describe("POST /api/refresh", () => {
 
     expect(res.status).toBe(422);
     expect(body.reason).toBe("stats_incomplete");
-    expect(mockPersistOrchestratedSnapshot).not.toHaveBeenCalled();
-    // Not a genuine failure — the shared guard already reports this via
-    // snapshot_skipped_incomplete_stats telemetry, so this must not also
-    // fire captureServerError (would double-report the same skip).
+    expect(mockEnqueueAndReportScoringStatus).not.toHaveBeenCalled();
+    // Not a genuine failure — the shared guard already reports this via its
+    // own telemetry, so this must not also fire captureServerError (would
+    // double-report the same skip).
     expect(mockCaptureServerError).not.toHaveBeenCalled();
     expect(mockInvalidateProfileReadModels).not.toHaveBeenCalledWith(
       "testuser",
@@ -435,5 +352,3 @@ describe("POST /api/refresh", () => {
     await expect(POST(makeRequest("testuser"))).rejects.toThrow("unexpected boom");
   });
 });
-
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));

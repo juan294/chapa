@@ -1,8 +1,9 @@
+import { SCORING_POLICY } from "@chapa/shared";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { DEMO_STATS } from "@/lib/render/demoData";
 import { LANDING_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { LANDING_IMPACT } from "@/lib/render/landing-demo-data";
 import { LandingContent } from "./LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
@@ -25,6 +26,23 @@ type HomeProps = {
   params: Promise<{ locale: string }>;
 };
 
+/**
+ * #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
+ * the only rendered policy. `getLeaderboard` still takes the
+ * `ScoringRenderSelection` shape, so this constant stands in for the old
+ * dynamic DB-backed read. Factored out of the component body so the
+ * `Date.now()` call isn't flagged as an impure call inside render
+ * (react-hooks/purity) — this function is a plain helper, not a component.
+ */
+function currentScoringSelection(): ScoringRenderSelection {
+  return {
+    enabled: true,
+    machinePolicy: SCORING_POLICY,
+    cacheable: true,
+    capturedAt: Date.now(),
+  };
+}
+
 export async function generateMetadata({ params }: HomeProps): Promise<Metadata> {
   const { locale } = await params;
   if (!isSupportedLocale(locale)) notFound();
@@ -42,7 +60,7 @@ export default async function Home({ params }: HomeProps) {
   const { locale } = await params;
   if (!isSupportedLocale(locale)) notFound();
   const t = getServerT(locale);
-  const selection = await readScoringRenderSelection();
+  const selection = currentScoringSelection();
   const demoScoring = selection.enabled ? LANDING_OBSERVED_DEMO : undefined;
   const options = {
     scoring: demoScoring,
