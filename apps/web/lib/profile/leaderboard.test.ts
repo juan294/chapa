@@ -278,4 +278,22 @@ describe("observed leaderboard policy isolation", () => {
     expect(await getLeaderboard(3, { ...selection, cacheable: false })).toEqual([]);
     expect(mockRecorded).not.toHaveBeenCalled();
   });
+
+  // #1335 phase 4 — an owner whose collection is still in progress (no
+  // receipt has been issued yet, so `readRenderableReceipt` returns null)
+  // takes no place: semantics are unchanged from before the collection
+  // queue existed, since the board only ever ranked what had actually been
+  // issued and drawable.
+  it("skips a registered owner whose collection is still in progress (no receipt issued yet)", async () => {
+    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+    const ready = await scoringConsistencyFixture();
+    mockRegistered.mockResolvedValue(["collecting-owner", "ready-owner"]);
+    mockRecorded.mockResolvedValue([]);
+    mockReceipt.mockImplementation(async (handle) =>
+      handle === "ready-owner" ? { receipt: ready.envelope, trend: null } : null,
+    );
+    expect(await getLeaderboard(3, selection)).toEqual([
+      { rank: 1, score: 46, tier: "Solid", handles: ["ready-owner"], policyVersion: "v7.2" },
+    ]);
+  });
 });

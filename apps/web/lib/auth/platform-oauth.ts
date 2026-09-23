@@ -24,6 +24,9 @@ import { invalidateBadgeSvgCacheForHandle } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
 import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
 import { issueOauthState, consumeOauthState } from "@/lib/auth/oauth-state";
+import { enqueueCollection } from "@/lib/collection/enqueue";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import type { SourceProvider } from "@/lib/platform/source-authorization";
 
 function cookieFlags(): string {
   return buildAuthCookieFlags(getBaseUrl());
@@ -381,6 +384,17 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
       markStatsDirty(handle),
     ]);
     revalidateSharePage(handle);
+
+    // #1335 phase 4 — a freshly (re)linked platform's collection is
+    // enqueued right here, scoped to this one provider (`reconnect` resets an
+    // existing failed job for it, per migration 055's enqueue semantics).
+    // Never enqueues the owner's other providers -- those are untouched by
+    // this connect. Gated on the render flag like every other enqueue site:
+    // collecting evidence nothing will ever render is wasted GitHub API
+    // budget while v7.2 rendering is off.
+    if ((await readScoringRenderSelection()).enabled) {
+      await enqueueCollection(handle, "reconnect", config.platform as SourceProvider);
+    }
 
     // 11. Clear state cookies and redirect to share page
     const response = NextResponse.redirect(

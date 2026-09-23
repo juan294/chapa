@@ -10,7 +10,7 @@ import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { captureServerError, captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
-import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
+import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 
 /**
  * POST /api/generate
@@ -111,11 +111,16 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // Compute impact (also warms any downstream caches)
   computeImpactV6(stats);
 
-  // #1311 — first badge generation is where a registered subject acquires their
-  // first v7 receipt, so the badge they are about to see is the issued revision
-  // rather than a legacy aggregate that a later refresh would silently replace.
+  // #1335 phase 4 — first badge generation is called moments after the OAuth
+  // callback's own "signup" enqueue, so this reuses the same `signup` reason
+  // (idempotent no-op against an already-queued/running/complete job) rather
+  // than `refresh`, which would reset an already-complete day's collection
+  // back to queued and discard evidence this route did nothing to change.
   const scoringSelection = await readScoringRenderSelection();
-  const issuance = await issueScoreReceipt(handle, { token, scoringSelection });
+  if (scoringSelection.enabled) {
+    await enqueueCollection(handle, "signup");
+    scheduleCollectionAdvance();
+  }
 
   // LE-5-1 — the stats cache row is bound to the credential that fetched it
   // (source-context hashes the token into accessContextId), and the share
@@ -135,7 +140,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
     });
   }
 
-  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
+  const scoringStatus = await postWriteScore(handle, scoringSelection);
 
-  return NextResponse.json({ success: true, handle, ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : publishedScore.status === "unavailable" ? { policyVersion: "v7.2", displayScore: null, scoring: null, publication: "pending" } : { policyVersion: "v6" }) });
+  return NextResponse.json({ success: true, handle, ...(scoringStatus ? { scoringStatus } : { policyVersion: "v6" }) });
 });

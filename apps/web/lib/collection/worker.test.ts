@@ -418,4 +418,102 @@ describe("runCollectionTick", () => {
     await runCollectionTick(15_000, deps); // margin (20s) exceeds the whole budget
     expect(deps.claim).not.toHaveBeenCalled();
   });
+
+  it("re-runs fan-in for complete-but-unissued days at the start of the tick, before claiming new work", async () => {
+    const deps = harness();
+    const calls: string[] = [];
+    deps.retryPendingFanIns = vi.fn().mockImplementation(async () => { calls.push("retry"); });
+    deps.claim = vi.fn().mockImplementation(async () => { calls.push("claim"); return []; });
+    await runCollectionTick(240_000, deps);
+    expect(deps.retryPendingFanIns).toHaveBeenCalledWith(50);
+    expect(calls).toEqual(["retry", "claim"]);
+  });
+
+  it("captures, rather than throws, when the fan-in retry sweep itself fails", async () => {
+    const deps = harness();
+    deps.retryPendingFanIns = vi.fn().mockRejectedValue(new Error("db unavailable"));
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+    expect(deps.captureError).toHaveBeenCalledOnce();
+  });
+
+  it("never touches fan-in retry when the dep is omitted (existing test doubles)", async () => {
+    const deps = harness();
+    expect(deps.retryPendingFanIns).toBeUndefined();
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+  });
+
+  it("alerts scoring_queue_stuck when the oldest queued job exceeds the 2h threshold", async () => {
+    const deps = harness();
+    deps.checkQueueHealth = vi.fn().mockResolvedValue({
+      queued: 3, running: 0, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+      oldestQueuedAgeMs: 3 * 60 * 60 * 1000, expiredLeases: 0, oldestExpiredLeaseAgeMs: 0,
+    });
+    await runCollectionTick(240_000, deps);
+    expect(deps.checkQueueHealth).toHaveBeenCalledOnce();
+  });
+
+  it("does not alert when queue health is within budget", async () => {
+    const deps = harness();
+    deps.checkQueueHealth = vi.fn().mockResolvedValue({
+      queued: 1, running: 0, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+      oldestQueuedAgeMs: 1000, expiredLeases: 0, oldestExpiredLeaseAgeMs: 0,
+    });
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+  });
+
+  it("captures, rather than throws, when the queue health check itself fails", async () => {
+    const deps = harness();
+    deps.checkQueueHealth = vi.fn().mockRejectedValue(new Error("db unavailable"));
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+    expect(deps.captureError).toHaveBeenCalledOnce();
+  });
+});
+
+describe("fan-in and terminal-failure hooks", () => {
+  it("calls onJobComplete with the finished job when a slice reports done", async () => {
+    const deps = harness();
+    const onJobComplete = vi.fn().mockResolvedValue(undefined);
+    deps.onJobComplete = onJobComplete;
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(onJobComplete).toHaveBeenCalledWith(expect.objectContaining({ state: "complete", ownerHandle: "alice" }));
+  });
+
+  it("calls onJobFailed exactly once when a fail() call lands on the terminal failed state", async () => {
+    const deps = harness();
+    const onJobFailed = vi.fn().mockResolvedValue(undefined);
+    deps.onJobFailed = onJobFailed;
+    deps.fail = vi.fn().mockResolvedValue({ status: "failed" });
+    const job = makeJob({ provider: "bitbucket" });
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "bitbucket", operation: "profile", stopKind: "not_accessible", httpStatus: 403, retryAfterSeconds: null },
+    }));
+    await runCollectionSlice(job, Date.now() + 60_000, deps);
+    expect(onJobFailed).toHaveBeenCalledOnce();
+    const [failedJob, stop] = vi.mocked(onJobFailed).mock.calls[0]!;
+    expect(failedJob.id).toBe(job.id);
+    expect(stop.stopKind).toBe("not_accessible");
+  });
+
+  it("never calls onJobFailed when fail() lands on a retry state, not the terminal failed state", async () => {
+    const deps = harness();
+    const onJobFailed = vi.fn().mockResolvedValue(undefined);
+    deps.onJobFailed = onJobFailed;
+    deps.fail = vi.fn().mockResolvedValue({ status: "retrying" });
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 500, retryAfterSeconds: null },
+    }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(onJobFailed).not.toHaveBeenCalled();
+  });
+
+  it("tolerates the absence of onJobFailed (existing test doubles that omit it)", async () => {
+    const deps = harness();
+    expect(deps.onJobFailed).toBeUndefined();
+    deps.fail = vi.fn().mockResolvedValue({ status: "failed" });
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "github", operation: "profile", stopKind: "not_accessible", httpStatus: 401, retryAfterSeconds: null },
+    }));
+    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, deps)).resolves.toBeUndefined();
+  });
 });

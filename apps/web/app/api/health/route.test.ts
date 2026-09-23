@@ -30,6 +30,10 @@ vi.mock("@/lib/db/supabase", () => ({
   pingSupabase: vi.fn(),
 }));
 
+vi.mock("@/lib/db/collection-queue", () => ({
+  dbReadCollectionQueueHealth: vi.fn(),
+}));
+
 vi.mock("@/lib/auth/session", () => ({
   getOptionalRequestSession: vi.fn(),
 }));
@@ -56,6 +60,7 @@ vi.stubGlobal("fetch", mockFetch);
 import { GET } from "./route";
 import { cacheGetCronLastRun, pingRedis, rateLimit, cacheGet, cacheSet } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
+import { dbReadCollectionQueueHealth } from "@/lib/db/collection-queue";
 import { getMissingFontFiles } from "@/lib/render/font-files";
 import { probeRasterizer } from "@/lib/render/raster-probe";
 import { getOptionalRequestSession } from "@/lib/auth/session";
@@ -87,6 +92,10 @@ beforeEach(() => {
   vi.mocked(cacheSet).mockResolvedValue(true);
   vi.mocked(getOptionalRequestSession).mockReturnValue(null);
   vi.mocked(isAdminHandle).mockReturnValue(false);
+  vi.mocked(dbReadCollectionQueueHealth).mockResolvedValue({
+    queued: 0, running: 0, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+    oldestQueuedAgeMs: 0, expiredLeases: 0, oldestExpiredLeaseAgeMs: 0,
+  });
   // Default: GITHUB_TOKEN not set — skipped
   vi.stubEnv("GITHUB_TOKEN", undefined);
   vi.stubEnv("VERCEL_ENV", "preview");
@@ -138,6 +147,7 @@ describe("GET /api/health", () => {
           alertWebhook: "skipped",
           fonts: "ok",
           rasterizer: "ok",
+          scoringQueue: expect.any(Object),
         },
       },
     });
@@ -627,6 +637,125 @@ describe("GET /api/health", () => {
         remaining: 4999,
         limit: 5000,
       });
+    });
+  });
+
+  describe("scoringQueue health (#1335 phase 4)", () => {
+    beforeEach(() => {
+      vi.mocked(pingSupabase).mockResolvedValue("ok");
+      vi.mocked(pingRedis).mockResolvedValue("ok");
+    });
+
+    it("stays 'ok' when the queue is empty and the collect-evidence heartbeat is fresh", async () => {
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.status).toBe("ok");
+      expect(body.dependencies.scoringQueue).toMatchObject({ degraded: false, queued: 0, expiredLeases: 0 });
+    });
+
+    it("degrades when the oldest queued job exceeds the 2h threshold", async () => {
+      vi.mocked(dbReadCollectionQueueHealth).mockResolvedValue({
+        queued: 3, running: 0, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+        oldestQueuedAgeMs: 3 * 60 * 60 * 1000, expiredLeases: 0, oldestExpiredLeaseAgeMs: 0,
+      });
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.status).toBe("degraded");
+      expect(body.dependencies.scoringQueue.degraded).toBe(true);
+    });
+
+    it("degrades when a lease has been expired for more than 30 minutes", async () => {
+      vi.mocked(dbReadCollectionQueueHealth).mockResolvedValue({
+        queued: 0, running: 1, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+        oldestQueuedAgeMs: 0, expiredLeases: 1, oldestExpiredLeaseAgeMs: 40 * 60 * 1000,
+      });
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.dependencies.scoringQueue.degraded).toBe(true);
+    });
+
+    it("does not degrade over an expired lease under the 30-minute threshold", async () => {
+      vi.mocked(dbReadCollectionQueueHealth).mockResolvedValue({
+        queued: 0, running: 1, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+        oldestQueuedAgeMs: 0, expiredLeases: 1, oldestExpiredLeaseAgeMs: 5 * 60 * 1000,
+      });
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.dependencies.scoringQueue.degraded).toBe(false);
+    });
+
+    it("degrades when the collect-evidence heartbeat is stale (>15 min, outside grace)", async () => {
+      // The shared #1052 grace anchor: cacheGet defaults (in the top-level
+      // beforeEach) to 48h ago, so the grace window is already closed.
+      vi.mocked(cacheGetCronLastRun).mockImplementation(async (name: string) =>
+        name === "collect-evidence" ? Date.now() - 20 * 60 * 1000 : Date.now(),
+      );
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.dependencies.scoringQueue.collectEvidenceHeartbeat.stale).toBe(true);
+      expect(body.dependencies.scoringQueue.degraded).toBe(true);
+    });
+
+    it("does not degrade a fresh collect-evidence heartbeat", async () => {
+      vi.mocked(cacheGetCronLastRun).mockImplementation(async (name: string) =>
+        name === "collect-evidence" ? Date.now() - 60 * 1000 : Date.now(),
+      );
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.dependencies.scoringQueue.collectEvidenceHeartbeat.stale).toBe(false);
+    });
+
+    it("excuses a null collect-evidence heartbeat inside the first-observation grace window", async () => {
+      vi.mocked(cacheGet).mockResolvedValue(Date.now() - 60 * 1000); // freshly anchored
+      vi.mocked(cacheGetCronLastRun).mockImplementation(async (name: string) =>
+        name === "collect-evidence" ? null : Date.now(),
+      );
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.dependencies.scoringQueue.collectEvidenceHeartbeat.stale).toBe(false);
+    });
+
+    it("marks the collect-evidence heartbeat stale once the grace window has closed and it is still null", async () => {
+      vi.mocked(cacheGet).mockResolvedValue(Date.now() - 48 * 60 * 60 * 1000);
+      vi.mocked(cacheGetCronLastRun).mockImplementation(async (name: string) =>
+        name === "collect-evidence" ? null : Date.now(),
+      );
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.dependencies.scoringQueue.collectEvidenceHeartbeat.stale).toBe(true);
+    });
+
+    it("reports scoringQueue degraded, without throwing, when the queue-health read itself fails", async () => {
+      vi.mocked(dbReadCollectionQueueHealth).mockRejectedValue(new Error("db unavailable"));
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.dependencies.scoringQueue).toEqual({ status: "error" });
     });
   });
 });

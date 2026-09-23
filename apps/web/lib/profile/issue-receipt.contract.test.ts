@@ -48,9 +48,9 @@ describe("receipt verification repair against durable local state", () => {
     const envelope = await observedReceiptFixture();
     await dbPublishObservedReceipt(owner, owner, envelope, "b".repeat(64));
     vi.spyOn(env, "getChapaVerificationSecret").mockReturnValueOnce(undefined);
-    expect(await issueScoreReceipt(owner)).toBe("failed");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "failed", reason: "storage_error" });
     expect((await db().from("scoring_v7_verification").select("receipt_id").eq("receipt_id", envelope.receipt.revisionId)).data).toEqual([]);
-    expect(await issueScoreReceipt(owner)).toBe("skipped");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "unchanged" });
     expect((await db().from("scoring_v7_verification").select("receipt_id").eq("receipt_id", envelope.receipt.revisionId)).data).toHaveLength(1);
     expect((await db().from("scoring_v7_receipts").select("id").eq("owner_handle", owner)).data).toEqual([{ id: envelope.receipt.revisionId }]);
   });

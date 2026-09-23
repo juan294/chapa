@@ -50,7 +50,7 @@ describe("the v7 path with rendering enabled", () => {
     // The helper is the production entry point, and it is what binds the two:
     // a receipt whose /verify link answers "not found" is a badge carrying an
     // attestation nobody can resolve.
-    expect(await issueScoreReceipt(owner)).toBe("issued");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "issued" });
 
     const snapshot = await readRenderableReceipt(owner);
     if (!snapshot || "unavailable" in snapshot) throw new Error("Expected observed receipt");
@@ -72,12 +72,12 @@ describe("the v7 path with rendering enabled", () => {
   });
 
   it("issues nothing on a second pass over identical evidence", async () => {
-    expect(await issueScoreReceipt(owner)).toBe("issued");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "issued" });
     const first = await readRenderableReceipt(owner);
 
     // What the hourly warm-cache cron does. Without the skip this published a
     // correction every hour, each with its own verification token.
-    expect(await issueScoreReceipt(owner)).toBe("skipped");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "unchanged" });
 
     const second = await readRenderableReceipt(owner);
     if (!first || "unavailable" in first || !second || "unavailable" in second) throw new Error("Expected observed receipts");
@@ -87,7 +87,7 @@ describe("the v7 path with rendering enabled", () => {
   });
 
   it("stops attesting once publication is withdrawn", async () => {
-    expect(await issueScoreReceipt(owner)).toBe("issued");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "issued" });
     const snapshot = await readRenderableReceipt(owner);
     if (!snapshot || "unavailable" in snapshot) throw new Error("Expected observed receipt");
     const verification = await resolveBadgeVerification({
@@ -104,12 +104,12 @@ describe("the v7 path with rendering enabled", () => {
   });
 
   it("reads and issues nothing at all while the flag is off", async () => {
-    expect(await issueScoreReceipt(owner)).toBe("issued");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "issued" });
     vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T12:00:00.000Z") });
 
     // The gate is what keeps this branch inert in an environment whose schema
     // does not have these tables at all.
     expect(await readRenderableReceipt(owner)).toBeNull();
-    expect(await issueScoreReceipt(owner)).toBe("skipped");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "unchanged" });
   });
 });
