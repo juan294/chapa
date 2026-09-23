@@ -169,6 +169,10 @@ export async function dbUpsertLinkedPlatform(
             : null,
           token_expires_at: expiresAt?.toISOString() ?? null,
           updated_at: new Date().toISOString(),
+          // A fresh grant from the OAuth flow is, by construction, not
+          // waiting on reconnect any more — clear any prior #1332 flag so a
+          // successful reconnect always resolves the owner-visible prompt.
+          needs_reconnect: false,
         },
         { onConflict: "handle,platform" },
       )
@@ -303,18 +307,19 @@ export async function dbGetLinkedPlatforms(
   try {
     const { data, error } = await db
       .from("user_platforms")
-      .select("platform, remote_login, connected_at")
+      .select("platform, remote_login, connected_at, needs_reconnect")
       .eq("handle", handle.toLowerCase())
       .order("connected_at");
 
     if (error) throw error;
     if (!data) return [];
 
-    return (data as { platform: string; remote_login: string; connected_at: string }[]).map(
+    return (data as { platform: string; remote_login: string; connected_at: string; needs_reconnect: boolean | null }[]).map(
       (row) => ({
         platform: row.platform as LinkedPlatform["platform"],
         remoteLogin: row.remote_login,
         connectedAt: row.connected_at,
+        needsReconnect: row.needs_reconnect === true,
       }),
     );
   } catch (error) {

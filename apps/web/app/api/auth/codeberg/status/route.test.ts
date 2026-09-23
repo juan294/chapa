@@ -121,6 +121,7 @@ describe("GET /api/auth/codeberg/status", () => {
       linked: false,
       remoteLogin: null,
       connectedAt: null,
+      needsReconnect: false,
     });
   });
 
@@ -141,6 +142,7 @@ describe("GET /api/auth/codeberg/status", () => {
       linked: true,
       remoteLogin: "cb-user",
       connectedAt: "2026-02-25T12:00:00Z",
+      needsReconnect: false,
     });
   });
 

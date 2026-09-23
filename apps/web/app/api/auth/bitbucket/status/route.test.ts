@@ -122,6 +122,7 @@ describe("GET /api/auth/bitbucket/status", () => {
       linked: false,
       remoteLogin: null,
       connectedAt: null,
+      needsReconnect: false,
     });
   });
 
@@ -142,6 +143,7 @@ describe("GET /api/auth/bitbucket/status", () => {
       linked: true,
       remoteLogin: "bb-user",
       connectedAt: "2026-02-20T12:00:00Z",
+      needsReconnect: false,
     });
   });
 

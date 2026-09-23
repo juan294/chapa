@@ -28,13 +28,23 @@ export interface BitbucketTokenResponse {
 
 /**
  * Discriminated result for token refresh attempts.
- * - `ok: true` — refresh succeeded, new tokens available
- * - `ok: false, reason: "revoked"` — grant is dead (user revoked, token expired server-side)
- * - `ok: false, reason: "transient"` — temporary failure (network, timeout, server error)
+ * - `ok: true` — refresh succeeded, new tokens available.
+ * - `ok: false, outcome: "definitive", reason: "revoked"` — grant is dead
+ *   (a provider HTTP response was received: 400 + `invalid_grant`).
+ * - `ok: false, outcome: "definitive", reason: "transient"` — a provider HTTP
+ *   response was received, but it was an error (non-`invalid_grant` 4xx, 5xx)
+ *   or an ok response with no `access_token`. The provider definitely did NOT
+ *   issue new tokens for this request, so the refresh claim can be released.
+ * - `ok: false, outcome: "ambiguous"` — no provider HTTP response was ever
+ *   observed (network error, abort, timeout, thrown fetch). The request may
+ *   still have reached the provider and been executed there — a rotating
+ *   refresh token may already be consumed — so the caller must NOT treat this
+ *   the same as a definitive failure (#1332).
  */
 export type TokenRefreshResult<T> =
   | { ok: true; tokens: T }
-  | { ok: false; reason: "revoked" | "transient" };
+  | { ok: false; outcome: "definitive"; reason: "revoked" | "transient" }
+  | { ok: false; outcome: "ambiguous" };
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -196,22 +206,28 @@ export async function classifyOAuthError(res: Response): Promise<"revoked" | "tr
 /**
  * Refresh an expired access token.
  *
- * Returns a discriminated result distinguishing permanent revocation
- * (HTTP 400 + `invalid_grant`) from transient failures (network, timeout, 5xx).
- * Callers should only unlink the platform on `reason: "revoked"`.
+ * Returns a discriminated result distinguishing definite outcomes (a
+ * provider HTTP response was received — permanent revocation via 400 +
+ * `invalid_grant`, or another definitive error/no-token response) from a
+ * truly ambiguous one (no response was ever observed: network error, abort,
+ * timeout). Only the `fetch()` call itself is treated as ambiguous on
+ * failure — once a response exists, the outcome is always definitive, even
+ * if its body could not be parsed (#1332). Callers should only unlink the
+ * platform on `outcome: "definitive", reason: "revoked"`.
  */
 export async function refreshBitbucketToken(
   refreshToken: string,
   clientId: string,
   clientSecret: string,
 ): Promise<TokenRefreshResult<BitbucketTokenResponse>> {
-  try {
-    const body = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    });
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
 
-    const res = await fetch(BB_TOKEN_URL, {
+  let res: Response;
+  try {
+    res = await fetch(BB_TOKEN_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -220,18 +236,22 @@ export async function refreshBitbucketToken(
       body,
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
+  } catch {
+    return { ok: false, outcome: "ambiguous" };
+  }
 
-    if (!res.ok) {
-      return { ok: false, reason: await classifyOAuthError(res) };
-    }
+  if (!res.ok) {
+    return { ok: false, outcome: "definitive", reason: await classifyOAuthError(res) };
+  }
 
+  try {
     const data = await res.json();
     if (!data.access_token) {
-      return { ok: false, reason: "transient" };
+      return { ok: false, outcome: "definitive", reason: "transient" };
     }
     return { ok: true, tokens: data as BitbucketTokenResponse };
   } catch {
-    return { ok: false, reason: "transient" };
+    return { ok: false, outcome: "definitive", reason: "transient" };
   }
 }
 

@@ -845,6 +845,7 @@ describe("createStatusHandler", () => {
       linked: false,
       remoteLogin: null,
       connectedAt: null,
+      needsReconnect: false,
     });
   });
 
@@ -854,6 +855,7 @@ describe("createStatusHandler", () => {
         platform: "testplatform",
         remoteLogin: "tp-user",
         connectedAt: "2026-02-20T12:00:00Z",
+        needsReconnect: false,
       },
     ]);
 
@@ -866,6 +868,33 @@ describe("createStatusHandler", () => {
       linked: true,
       remoteLogin: "tp-user",
       connectedAt: "2026-02-20T12:00:00Z",
+      needsReconnect: false,
+    });
+  });
+
+  // #1332 — a durable refresh grant can be known dead (definitive revoke) or
+  // permanently un-refreshable (an exhausted takeover), with no other
+  // owner-visible signal to prompt a reconnect.
+  it("returns needsReconnect: true when the connection's refresh grant needs a reconnect", async () => {
+    mockDbGetLinkedPlatforms.mockResolvedValue([
+      {
+        platform: "testplatform",
+        remoteLogin: "tp-user",
+        connectedAt: "2026-02-20T12:00:00Z",
+        needsReconnect: true,
+      },
+    ]);
+
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({
+      enabled: true,
+      linked: true,
+      remoteLogin: "tp-user",
+      connectedAt: "2026-02-20T12:00:00Z",
+      needsReconnect: true,
     });
   });
 
