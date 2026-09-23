@@ -1,25 +1,27 @@
 import { describe, expect, it } from "vitest";
-import type { ImpactV6Result } from "@chapa/shared";
 import { buildReceiptSnapshotV7 } from "@/lib/history/snapshot";
 import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
-import { legacyViewModel, receiptViewModel } from "./score-view-model";
+import { receiptViewModel } from "./score-view-model";
 import { describeScoreForMetadata } from "./score-description";
-
-const legacy: ImpactV6Result = {
-  handle: "alice", profileType: "collaborative",
-  dimensions: { delivery: 70, quality: 68, consistency: 74, breadth: 66 },
-  archetype: "Builder", compositeScore: 73, confidence: 88, confidencePenalties: [],
-  adjustedComposite: 65, tier: "Solid", computedAt: "2026-04-17T12:00:00.000Z",
-};
 
 describe("describeScoreForMetadata", () => {
   it("describes nothing when there is no model", () => {
     expect(describeScoreForMetadata(null)).toBeNull();
   });
 
-  it("keeps the legacy sentence for a v6 aggregate", () => {
-    expect(describeScoreForMetadata(legacyViewModel(legacy)))
-      .toBe("Developer with a Chapa Impact Score of 65 (Solid tier).");
+  // #1335 phase 5 ("delete v6") — there is no legacy aggregate projection any
+  // more (`legacyViewModel` is gone with it); this branch is now reached by
+  // the archived, immutable "v7" machine-engine receipt's point case, which
+  // keeps its historical non-"v7.2" wording.
+  it("keeps the historical sentence for an archived v7 point receipt", async () => {
+    const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-04-17", 4), null);
+    const model = receiptViewModel("alice", snapshot);
+    expect(model.policyVersion).toBe("v7");
+    expect(model.composite.kind).toBe("point");
+
+    const composite = model.composite as { display: number };
+    expect(describeScoreForMetadata(model))
+      .toBe(`Developer with a Chapa Impact Score of ${composite.display} (${model.tier} tier).`);
   });
 
   it("names a v7 range as a range, never as a point", async () => {

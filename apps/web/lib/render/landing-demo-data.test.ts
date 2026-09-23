@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { deriveArchetype } from "@/lib/impact/v6";
 import { getTier } from "@/lib/impact/utils";
+import { makeScoring } from "../test-helpers/fixtures";
 import { DEMO_IMPACT, DEMO_STATS } from "./demoData";
 import { LANDING_IMPACT } from "./landing-demo-data";
 import { renderBadgeSvg } from "./BadgeSvg";
@@ -16,7 +16,6 @@ describe("curated landing sample", () => {
       confidencePenalties: [], tier: "Elite", archetype: "Balanced",
     });
     expect(LANDING_IMPACT.tier).toBe(getTier(LANDING_IMPACT.adjustedComposite));
-    expect(LANDING_IMPACT.archetype).toBe(deriveArchetype(LANDING_IMPACT.dimensions, LANDING_IMPACT.profileType));
   });
 
   it("cannot mutate the shared High/82 demo through any sample-owned object", () => {
@@ -31,7 +30,8 @@ describe("curated landing sample", () => {
   });
 
   it.each([false, true])("renders 92/Elite with explicit sample disclosure (static=%s)", (disableAnimation) => {
-    const svg = renderBadgeSvg(DEMO_STATS, LANDING_IMPACT, { demoMode: true, includeBranding: true, disableAnimation });
+    const scoring = makeScoring({ composite: 92, tier: "Elite", archetype: "Balanced" });
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring, demoMode: true, includeBranding: true, disableAnimation });
     expect(svg).toMatch(/data-element="score"[^>]*>92<\/text>/);
     expect(svg).toMatch(/data-element="tier"[^>]*>Elite<\/text>/);
     expect(svg).toContain("Simulated metrics");

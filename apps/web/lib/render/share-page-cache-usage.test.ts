@@ -39,6 +39,21 @@ vi.mock("@/lib/collection/read-scoring-status", () => ({
   readScoringStatus: (...args: unknown[]) => mockReadScoringStatus(...args),
 }));
 
+// #1335 phase 5 — `resolveBadgeVerification` is a real, unmocked function
+// elsewhere in this file's fixture (`FAKE_MATERIALIZED.scoring.identity` is
+// `null` specifically so it short-circuits without a receipt-store read).
+// But `cacheEligible` in page.tsx requires `!!verification`, so leaving the
+// real function wired up meant every SVG cache write this suite asserts on
+// was silently skipped. This suite is about SVG cache behavior, not
+// verification content, so mock the resolver directly instead of fabricating
+// a full receipt-store round trip.
+const { mockResolveBadgeVerification } = vi.hoisted(() => ({
+  mockResolveBadgeVerification: vi.fn(),
+}));
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) => mockResolveBadgeVerification(...args),
+}));
+
 const {
   mockMaterializePublicProfile,
   mockRunPublicProfileSideEffects,
@@ -169,6 +184,7 @@ beforeEach(() => {
   mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
   mockHasDrawableCurrentReceipt.mockResolvedValue(true);
   mockReadScoringStatus.mockResolvedValue(null);
+  mockResolveBadgeVerification.mockResolvedValue({ hash: "fixture-hash", date: "2026-05-03" });
   mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
   mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
   mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");

@@ -125,7 +125,7 @@ describe("scored-consumer value agreement", () => {
       const receipt = fixture.envelope.receipt;
       const data = publicScoreProjection(fixture.model);
       const observation = scoringObservation(fixture.model)!;
-      const svg = renderBadgeSvg(fixture.stats, fixture.impact, { scoring: fixture.model, disableAnimation: true });
+      const svg = renderBadgeSvg(fixture.stats, { scoring: fixture.model, disableAnimation: true });
       const expected = boundary ? 69.99 : 46;
       expect(receipt.core.composite.displayValue).toBe(expected);
       expect(data.displayScore).toBe(expected);
@@ -144,8 +144,6 @@ describe("scored-consumer value agreement", () => {
       expect(data.archetype).toBe(receipt.core.archetype);
       expect(data.tier).toBe(receipt.core.tier);
       expect(data).not.toHaveProperty("confidence");
-      expect(data.displayScore).not.toBe(fixture.impact.adjustedComposite);
-      expect(data.dimensions.craft).not.toBe(fixture.impact.dimensions.craft);
     }
   });
 });

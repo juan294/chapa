@@ -28,11 +28,15 @@ export const DEMO_SCORING: ScoreViewModel = {
     supersedesRevisionId: null,
     contentHash: "a".repeat(64),
   },
+  // `startInclusive`/`endExclusive` are full RFC3339 instants, matching
+  // `createScoringWindow`'s own output exactly (`packages/shared/src/
+  // scoring-window.ts`) — `readPublicComparison` re-derives the window from
+  // `referenceTime` and rejects any field that doesn't byte-match.
   window: {
     referenceTime: "2026-09-01T00:00:00.000Z",
     referenceDate: "2026-09-01",
-    startInclusive: "2025-09-02",
-    endExclusive: "2026-09-02",
+    startInclusive: "2025-09-02T00:00:00.000Z",
+    endExclusive: "2026-09-02T00:00:00.000Z",
     calendarDays: 365,
   },
   dimensions: {
@@ -54,7 +58,7 @@ export const DEMO_SCORING: ScoreViewModel = {
       inputs: {
         policyVersion: "v7.2",
         classifierRevision: "cc-outcomes-v7.2",
-        window: { referenceTime: "2026-09-01T00:00:00.000Z", referenceDate: "2026-09-01", startInclusive: "2025-09-02", endExclusive: "2026-09-02", calendarDays: 365 },
+        window: { referenceTime: "2026-09-01T00:00:00.000Z", referenceDate: "2026-09-01", startInclusive: "2025-09-02T00:00:00.000Z", endExclusive: "2026-09-02T00:00:00.000Z", calendarDays: 365 },
         reportPeriod: REPORT_PERIOD,
         totalSessions: 20,
         outcomes: { fully_achieved: 14, mostly_achieved: 4, partially_achieved: 1, not_achieved: 1 },
