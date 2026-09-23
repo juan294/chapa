@@ -459,9 +459,10 @@ async function warmHandle(
   try {
     // #1311 — issue before materializing, not after. Materialization is what
     // reads the receipt the badge is rendered from, so issuing afterwards left
-    // the warmed SVG a revision behind for a full hour. Non-consented handles
-    // skip silently — every handle until its owner opts in — and failures are
-    // captured inside the helper rather than failing the warm.
+    // the warmed SVG a revision behind for a full hour. A handle with the
+    // render flag off, no source evidence yet, or an already-current receipt
+    // skips silently, and failures are captured inside the helper rather than
+    // failing the warm.
     const scoringSelection = await readScoringRenderSelection();
     const baseline = scoringSelection.cacheable && scoringSelection.machinePolicy === "v7.2"
       ? await readRenderableReceipt(handle, scoringSelection).catch(() => null) : null;

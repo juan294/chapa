@@ -21,7 +21,7 @@ beforeEach(() => {
 describe("production current source authorization reads", () => {
   it("reads subject registration and the current database flag before selecting the exact owner's link", async () => {
     const result = await readSourceAuthorization("alice", "gitlab");
-    expect(result).toEqual({ status: "authorized", consentVersion: "2026-09-05T12:00:00.000001Z", link });
+    expect(result).toEqual({ status: "authorized", subjectVersion: "2026-09-05T12:00:00.000001Z", link });
     expect(filters).toEqual([{ table: "scoring_v7_subjects", column: "owner_handle", value: "alice" }, { table: "feature_flags", column: "key", value: "gitlab_integration" }]);
     expect(dbGetLinkedPlatformStrict).toHaveBeenCalledWith("alice", "gitlab");
   });
@@ -51,11 +51,11 @@ describe("production current source authorization reads", () => {
     }
   });
   it("authorizes GitHub only for a registered subject, without inventing a linked provider row", async () => {
-    expect(await readSourceAuthorization("alice", "github")).toEqual({ status: "authorized", consentVersion: "2026-09-05T12:00:00.000001Z", link: null });
+    expect(await readSourceAuthorization("alice", "github")).toEqual({ status: "authorized", subjectVersion: "2026-09-05T12:00:00.000001Z", link: null });
     expect(from).toHaveBeenCalledTimes(1); expect(dbGetLinkedPlatformStrict).not.toHaveBeenCalled();
   });
   it("keeps the explicitly legacy path separate without creating a v7 subject row", async () => {
-    expect(await readSourceAuthorization("alice", "gitlab", false)).toEqual({ status: "authorized", consentVersion: "legacy-unpublished", link });
+    expect(await readSourceAuthorization("alice", "gitlab", false)).toEqual({ status: "authorized", subjectVersion: "legacy-unpublished", link });
     expect(from.mock.calls).toEqual([["feature_flags"]]);
   });
   it("observes flag changes on the next call rather than retaining an authorization cache", async () => {
@@ -64,9 +64,9 @@ describe("production current source authorization reads", () => {
     expect((await readSourceAuthorization("alice", "gitlab")).status).toBe("disabled");
   });
   it("compares the full microsecond link version and consent revision", () => {
-    const initial = { status: "authorized" as const, consentVersion: "consent1", link };
+    const initial = { status: "authorized" as const, subjectVersion: "consent1", link };
     expect(sameSourceAuthorization(initial, structuredClone(initial))).toBe(true);
-    expect(sameSourceAuthorization(initial, { ...initial, consentVersion: "consent2" })).toBe(false);
+    expect(sameSourceAuthorization(initial, { ...initial, subjectVersion: "consent2" })).toBe(false);
     expect(sameSourceAuthorization(initial, { ...initial, link: { ...link, updatedAt: "2026-09-05T12:00:00.000002Z" } })).toBe(false);
     expect(sameSourceAuthorization(initial, { ...initial, link: { ...link, tokens: { ...link.tokens, accessToken: "rotated" } } })).toBe(false);
   });

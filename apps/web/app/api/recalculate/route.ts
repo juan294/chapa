@@ -100,7 +100,7 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
   });
 
   // #1311 — recalculate exists to make a subject's published numbers current
-  // after a scoring change, so a consented subject's receipt is re-issued here
+  // after a scoring change, so a registered subject's receipt is re-issued here
   // for the same reason the snapshot was rewritten above.
   const issuance = await issueScoreReceipt(handle, { token: auth.token, scoringSelection });
 

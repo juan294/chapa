@@ -17,13 +17,13 @@ import { readSourceAuthorization, sameSourceAuthorization, type SourceAuthorizat
  * call instead of left blocking forever — see `releaseNonAmbiguous` below.
  */
 export async function refreshSourceLink(initial: Extract<SourceAuthorization, { status: "authorized" }>,
-  input: { owner: string; provider: SourceProvider; readOnly?: boolean }, requireConsent = true,
+  input: { owner: string; provider: SourceProvider; readOnly?: boolean }, requireSubject = true,
 ): Promise<SourceAuthorization> {
   try {
     const link = initial.link;
     if (!link || input.readOnly || !isTokenExpired(link.tokens.expiresAt)) return initial;
     if (!link.tokens.refreshToken && link.tokens.expiresAt === null && input.provider !== "bitbucket") return initial;
-    const current = () => readSourceAuthorization(input.owner, input.provider, requireConsent);
+    const current = () => readSourceAuthorization(input.owner, input.provider, requireSubject);
     if (!sameSourceAuthorization(initial, await current())) return { status: "unavailable" };
     if (!link.tokens.refreshToken) return { status: "unavailable" };
     const [clientId, secret, refresh] = input.provider === "bitbucket"
@@ -53,9 +53,10 @@ export async function refreshSourceLink(initial: Extract<SourceAuthorization, { 
 
     // No provider request sent yet: this is a known, non-ambiguous outcome,
     // so release rather than leave the barrier for nothing (#1332 case 1).
-    // Claim storage also checks current consent for legacy callers. A pre-v7
-    // connection cannot gain new refresh permission through this compatibility
-    // path. Rechecking after the claim may abandon it, but never replays a grant.
+    // Claim storage also checks current subject registration for legacy
+    // callers. A pre-v7 connection cannot gain new refresh permission through
+    // this compatibility path. Rechecking after the claim may abandon it, but
+    // never replays a grant.
     if (!sameSourceAuthorization(initial, await current())) {
       await releasePlatformTokenRefreshAttempt(link, attemptId);
       return { status: "unavailable" };
@@ -97,7 +98,7 @@ export async function refreshSourceLink(initial: Extract<SourceAuthorization, { 
       expiresAt: result.tokens.expires_in ? new Date(Date.now() + result.tokens.expires_in * 1000) : null });
     if (committed.status !== "updated") return { status: "unavailable" };
     const after = await current();
-    if (after.status !== "authorized" || after.consentVersion !== initial.consentVersion || after.link?.id !== committed.id || databaseInstantMicros(after.link.updatedAt) !== databaseInstantMicros(committed.updatedAt) || after.link.tokens.accessToken !== result.tokens.access_token) return { status: "unavailable" };
+    if (after.status !== "authorized" || after.subjectVersion !== initial.subjectVersion || after.link?.id !== committed.id || databaseInstantMicros(after.link.updatedAt) !== databaseInstantMicros(committed.updatedAt) || after.link.tokens.accessToken !== result.tokens.access_token) return { status: "unavailable" };
     return after;
   } catch { return { status: "unavailable" }; }
 }

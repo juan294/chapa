@@ -81,7 +81,7 @@ export async function dbReadReportCraft(owner: string, window: ScoringWindow): P
   } catch { failure("read"); return { status: "unavailable" }; }
 }
 
-/** Selection fence and consent are checked under the same lock as durable receipt publication. */
+/** Selection fence and subject registration are checked under the same lock as durable receipt publication. */
 export async function dbPublishObservedReceiptWithReport(owner: string, actor: string, envelope: HashedObservedScoreReceipt, semanticDigest: string, selectedReportId: string | null, selectedGeneration: number, expectedBaselineRevisionId?: string, coreSemanticDigest?: string): Promise<ObservedReceiptPublication> {
   try {
     if (!/^[0-9a-f]{64}$/.test(semanticDigest) || !(selectedReportId === null || uuid(selectedReportId)) || !generation(selectedGeneration) || (expectedBaselineRevisionId !== undefined && !uuid(expectedBaselineRevisionId)) || (coreSemanticDigest !== undefined && !/^[0-9a-f]{64}$/.test(coreSemanticDigest))) throw new Error("Invalid publication fence");

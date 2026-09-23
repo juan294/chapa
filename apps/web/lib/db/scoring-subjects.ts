@@ -19,8 +19,10 @@ export async function dbEnsureScoringSubject(handle: string): Promise<boolean> {
   if (!db) return false;
   try {
     const { error } = await db.rpc("scoring_v7_ensure_subject", { p_owner: handle.toLowerCase() });
-    return !error;
-  } catch {
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error("[db] dbEnsureScoringSubject failed:", (error as Error).message);
     return false;
   }
 }

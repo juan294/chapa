@@ -10,7 +10,7 @@ const mockRead = vi.mocked(readSourceAuthorization);
 function link(expiresAt: Date | null): Extract<SourceAuthorization, { status: "authorized" }> {
   return {
     status: "authorized",
-    consentVersion: "legacy-unpublished",
+    subjectVersion: "legacy-unpublished",
     link: {
       id: "3f1a2b4c-1111-2222-3333-444455556666",
       updatedAt: "2026-09-06T00:00:00.000Z",

@@ -25,7 +25,7 @@ const ledgerSnapshot = {
 
 const zero = { lower: 0, upper: 0 };
 const zeroCriterion = { input: zero, cap: 8, clamped: zero, normalized: zero, multiplier: 25, weighted: zero };
-/** The shape `dbReadCraftV7` returns for a consented subject with no eligible
+/** The shape `dbReadCraftV7` returns for a registered subject with no eligible
  * episodes: a real trace, an explicit not_observed result. */
 function emptyCraftPortfolio() {
   const window = createScoringWindow(referenceTime);
@@ -230,7 +230,7 @@ describe("v7 receipt materialization", () => {
  *
  * Before this, every call minted `revision: 1` with no supersedes link and its
  * own verification token. Once the hourly warm-cache cron began calling this,
- * that was roughly 24 unrelated root receipts per consented subject per day,
+ * that was roughly 24 unrelated root receipts per registered subject per day,
  * each claiming to be the first.
  */
 describe("revision identity", () => {

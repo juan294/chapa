@@ -111,7 +111,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // Compute impact (also warms any downstream caches)
   computeImpactV6(stats);
 
-  // #1311 — first badge generation is where a consented subject acquires their
+  // #1311 — first badge generation is where a registered subject acquires their
   // first v7 receipt, so the badge they are about to see is the issued revision
   // rather than a legacy aggregate that a later refresh would silently replace.
   const scoringSelection = await readScoringRenderSelection();

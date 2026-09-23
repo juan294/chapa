@@ -159,7 +159,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
   });
 
   // #1311 — a refresh is an owner-initiated recompute, so it is where a
-  // consented subject's v7 receipt is re-issued. Awaited rather than deferred:
+  // registered subject's v7 receipt is re-issued. Awaited rather than deferred:
   // the invalidation above has already cleared the badge, and issuing after
   // that clear is what makes the next render draw the new revision.
   const issuance = await issueScoreReceipt(handle, { token, scoringSelection });
