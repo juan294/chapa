@@ -27,7 +27,7 @@ function harness() {
     discover: vi.fn<SourceCoordinatorDependencies["discover"]>().mockResolvedValue({ status: "missing" }),
     read: vi.fn<SourceCoordinatorDependencies["read"]>().mockResolvedValue(null),
     append: vi.fn<SourceCoordinatorDependencies["append"]>().mockImplementation(async (_context, value) => structuredClone(value) as StoredSourceObservation),
-    collect: vi.fn<SourceCoordinatorDependencies["collect"]>().mockResolvedValue(observation()),
+    collect: vi.fn<SourceCoordinatorDependencies["collect"]>().mockResolvedValue({ result: observation(), diagnostics: [] }),
     refreshLink: vi.fn<SourceCoordinatorDependencies["refreshLink"]>().mockImplementation(async authorization => authorization),
   };
   return { deps, select: createSourceCoordinator(deps) };
@@ -38,7 +38,7 @@ describe("independent source-coordinator acceptance", () => {
     const { deps, select } = harness();
     const started = deferred<void>();
     const finish = deferred<StoredSourceObservation>();
-    deps.collect.mockImplementation(async () => { started.resolve(); return finish.promise; });
+    deps.collect.mockImplementation(async () => { started.resolve(); return { result: await finish.promise, diagnostics: [] }; });
     const write = select(request());
     await started.promise;
     expect(await select({ ...request(), readOnly: true })).toEqual({ status: "readonlymiss" });
@@ -61,7 +61,7 @@ describe("independent source-coordinator acceptance", () => {
       await finish.promise;
       const value = observation();
       value.events[0]!.eventId = token === "pat-a" ? "event-a" : "event-b";
-      return value;
+      return { result: value, diagnostics: [] };
     });
     const first = select({ ...request(), token: "pat-a" });
     const second = select({ ...request(), token: "pat-b" });
@@ -86,7 +86,7 @@ describe("independent source-coordinator acceptance", () => {
     expect(first.status).toBe("observed");
     if (!("observation" in first)) throw new Error("Expected observation");
     first.observation.events[0]!.eventId = "caller-mutated";
-    expect((await deps.collect.mock.results[0]!.value)!.events[0]!.eventId).toBe("event1");
+    expect((await deps.collect.mock.results[0]!.value)!.result!.events[0]!.eventId).toBe("event1");
   });
 
   it("preserves a prior observation's original reference and data-through without collection", async () => {
@@ -119,7 +119,7 @@ describe("independent source-coordinator acceptance", () => {
     deps.discover.mockResolvedValue({ status: "found", source });
     deps.read.mockImplementation(async (_context, prior) => prior ? old : null);
     const zero = observation(); zero.events = [];
-    deps.collect.mockResolvedValue(zero);
+    deps.collect.mockResolvedValue({ result: zero, diagnostics: [] });
     const result = await select({ ...request(), refresh: true });
     expect(result.status).toBe("observed");
     expect(deps.append).toHaveBeenCalledTimes(1);

@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { canonicalJson, createScoringWindow, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
 import { appendSourceObservation, discoverStoredSource, readSourceObservation, type SourceStorageContext, type StoredSourceObservation } from "@/lib/db/source-context";
+import { emitSourceDiagnostics, type SourceDiagnostic } from "@/lib/platform/evidence-diagnostics";
 import { createSourceContext, type SourceContextInput } from "./source-context";
 import { readSourceAuthorization, sameSourceAuthorization, type SourceAuthorization, type SourceProvider } from "./source-authorization";
 
@@ -21,12 +22,16 @@ export interface SourceCoordinatorInput {
   readonly refresh?: boolean;
 }
 export interface SourceCollectorResult { readonly coverage: SourceCoverage; readonly events: readonly NormalizedEngineeringEvent[] }
+export interface SourceCollectionOutcome {
+  readonly result: SourceCollectorResult | null;
+  readonly diagnostics: readonly SourceDiagnostic[];
+}
 export interface SourceCoordinatorDependencies {
   authorize: typeof readSourceAuthorization;
   discover: typeof discoverStoredSource;
   read: typeof readSourceObservation;
   append: typeof appendSourceObservation;
-  collect: (input: SourceContextInput, token: string | undefined) => Promise<SourceCollectorResult | null>;
+  collect: (input: SourceContextInput, token: string | undefined) => Promise<SourceCollectionOutcome>;
   refreshLink: (authorization: Extract<SourceAuthorization, { status: "authorized" }>, input: SourceCoordinatorInput) => Promise<SourceAuthorization>;
 }
 const hosts: Record<SourceProvider, string> = { github: "github.com", gitlab: "gitlab.com", bitbucket: "bitbucket.org", codeberg: "codeberg.org" };
@@ -77,7 +82,13 @@ export function createSourceCoordinator(deps: SourceCoordinatorDependencies) {
           if (!await current()) return { status: "unavailable" };
         }
         if (request.readOnly) return prior ? { status: "stale", observation: prior } : { status: "readonlymiss" };
-        const collected = await binding.collect(token => deps.collect(detach(bindingInput), token)).catch(() => null);
+        const outcome = await binding.collect(token => deps.collect(detach(bindingInput), token))
+          .catch((): SourceCollectionOutcome => ({ result: null, diagnostics: [] }));
+        // Emitted for every attempt, including a clean run (where it is a
+        // no-op) -- diagnostics never wait on the current-authorization check
+        // below, since the collection itself already happened.
+        emitSourceDiagnostics(request.owner, outcome.diagnostics);
+        const collected = outcome.result;
         if (!await current()) return { status: "unavailable" };
         if (!collected) return prior ? { status: "stale", observation: prior } : { status: "unavailable" };
         // Never carry checkpoint URLs, raw bodies or profile objects to storage.

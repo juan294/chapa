@@ -105,7 +105,57 @@ describe("GitLab v7 evidence", () => {
     expect(vi.mocked(fetch).mock.calls.length).toBe(6);
     expect(result.requestCount).toBe(6);
     expect(result.coverage.reasonCodes).toContain("pagination_incomplete");
+    expect(result.coverage.reasonCodes).not.toContain("source_error");
     expect(result.progress.some((p) => !p.complete && p.nextPage !== null)).toBe(true);
+    expect(result.diagnostics.some((d) => d.stopKind === "budget")).toBe(true);
+  });
+  it("marks a merge_requests deadline stop as pagination_incomplete, never source_error, with a deadline diagnostic", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: string, init?: RequestInit) => {
+      const url = new URL(input); const path = url.pathname.replace("/api/v4", "");
+      if (path === "/merge_requests") {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+        });
+      }
+      if (path === "/user") return Promise.resolve(json({ id: 7, username: "alice", name: "Alice", email: "alice@example.test", confirmed_at: date }));
+      if (path === "/user/emails") return Promise.resolve(json([{ email: "alice@example.test", confirmed_at: date }]));
+      if (path === "/users/7/projects" || path === "/users/7/contributed_projects") return Promise.resolve(json([{ id: 10 }]));
+      if (path === "/projects/10/merge_requests") return Promise.resolve(json([]));
+      if (path.endsWith("/repository/commits")) return Promise.resolve(json([]));
+      if (path.endsWith("/issues")) return Promise.resolve(json([]));
+      throw new Error(`Unexpected endpoint ${path}`);
+    }));
+    const result = await fetchGitlabEvidence(7, "alice", "token", window, { timeoutMs: 50 });
+    expect(result.coverage.reasonCodes).toContain("pagination_incomplete");
+    expect(result.coverage.reasonCodes).not.toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "merge_requests", stopKind: "deadline" }));
+  });
+  it("classifies a real HTTP 500 as an http stop, still source_error", async () => {
+    api((url) => url.pathname === "/api/v4/merge_requests" ? json({}, 500) : undefined);
+    const result = await fetchGitlabEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "merge_requests", stopKind: "http", httpStatus: 500 }));
+  });
+  it("classifies a malformed (non-array) response body as a protocol stop, still source_error", async () => {
+    api((url) => url.pathname === "/api/v4/merge_requests" ? json({ not: "an array" }) : undefined);
+    const result = await fetchGitlabEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "merge_requests", stopKind: "protocol" }));
+  });
+  it("classifies an unparseable note date as a parse stop, still source_error", async () => {
+    api((url) => url.pathname.endsWith("/notes") ? json([{ id: 21, author: { id: 7 }, created_at: "", system: false, body: "Check this" }]) : undefined);
+    const result = await fetchGitlabEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "notes", stopKind: "parse" }));
+  });
+  it("keeps a note's artifact revision stable across collections despite a changed updated_at (parity with #1335 phase 1.5)", async () => {
+    api((url) => url.pathname.endsWith("/notes") ? json([{ id: 21, author: { id: 7 }, created_at: date, updated_at: date, system: false, body: "Check this" }]) : undefined);
+    const first = await fetchGitlabEvidence(7, "alice", "token", window);
+    api((url) => url.pathname.endsWith("/notes") ? json([{ id: 21, author: { id: 7 }, created_at: date, updated_at: "2026-09-05T00:00:00Z", system: false, body: "Edited" }]) : undefined);
+    const second = await fetchGitlabEvidence(7, "alice", "token", window);
+    const revision = (result: Awaited<ReturnType<typeof fetchGitlabEvidence>>) => result.events.find((e) => e.kind === "review")?.artifactRevision;
+    expect(revision(first)).toBeDefined();
+    expect(revision(first)).toBe(revision(second));
   });
   it("never promotes closure actor into teammate MR authorship", async () => {
     api((url) => url.pathname.endsWith("/merge_requests") ? json([mr(1, { author: { id: 8 } })]) : undefined);

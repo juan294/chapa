@@ -4,6 +4,10 @@ import {
   type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
 import { getGithubToken } from "@/lib/env";
+import {
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder,
+  isGraphqlRateLimited, retryAfterSeconds, type SourceDiagnostic,
+} from "@/lib/platform/evidence-diagnostics";
 import { GITHUB_EVIDENCE_QUERIES as queries } from "./evidence-queries";
 
 type ObjectData = Record<string, unknown>;
@@ -46,6 +50,7 @@ export interface GitHubEvidenceResult {
   readonly coverage: SourceCoverage;
   readonly progress: readonly GitHubEvidenceProgress[];
   readonly requestCount: number;
+  readonly diagnostics: readonly SourceDiagnostic[];
 }
 
 /**
@@ -70,19 +75,33 @@ export async function fetchGitHubEvidence(
     : (token ?? getGithubToken())?.trim();
   const progress: GitHubEvidenceProgress[] = [];
   const reasons = new Set<EvidenceReasonCode>();
+  const diag = createDiagnosticRecorder("github");
   let requestCount = 0;
   async function request(operation: keyof typeof queries, variables: Record<string, unknown>) {
-    if (requestCount >= maxRequests || signal.aborted) return { data: {}, error: "pagination_incomplete" as const };
+    // A collector's own budget or deadline is honest incompleteness, never a
+    // provider-reported or structural failure: classify before attempting.
+    const stop = budgetOrDeadlineStop(requestCount, maxRequests, signal);
+    if (stop) return { data: {}, error: diag.record(operation, stop) };
     requestCount++;
     try {
       const response = await fetch("https://api.github.com/graphql", {
         method: "POST", signal, headers: { "Content-Type": "application/json", ...(effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {}) },
         body: JSON.stringify({ query: queries[operation], variables }),
       });
-      if (!response.ok) return { data: {}, error: response.status === 401 || response.status === 403 ? "not_accessible" as const : "source_error" as const };
+      if (!response.ok) {
+        const stopKind = classifyHttpStatus(response.status, response.headers, [401, 403]);
+        return { data: {}, error: diag.record(operation, stopKind, response.status, stopKind === "rate_limited" ? retryAfterSeconds(response.headers) : null) };
+      }
       const payload = object(await response.json());
-      return { data: object(payload.data), error: Array.isArray(payload.errors) && payload.errors.length > 0 ? "source_error" as const : null };
-    } catch { return { data: {}, error: "source_error" as const }; }
+      if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+        return { data: object(payload.data), error: diag.record(operation, isGraphqlRateLimited(payload.errors) ? "rate_limited" : "graphql", response.status) };
+      }
+      return { data: object(payload.data), error: null };
+    } catch (error) {
+      // The AbortSignal.timeout deadline can fire mid-flight, rejecting fetch
+      // or json() with no HTTP response at all -- classify by signal/exception.
+      return { data: {}, error: diag.record(operation, classifyFetchFailure(error, signal)) };
+    }
   }
   const profileResponse = await request("profile", { login: handle });
   const user = object(at(profileResponse.data, "user"));
@@ -110,7 +129,7 @@ export async function fetchGitHubEvidence(
         break;
       }
       totalCount = number(search ? connection.issueCount : connection.totalCount);
-      if (totalCount === null) errors.add("source_error");
+      if (totalCount === null) errors.add(diag.record(operation, "protocol"));
       for (const node of connection.nodes) {
         if (!node || typeof node !== "object" || Array.isArray(node)) { errors.add("not_accessible"); continue; }
         nodes.push(object(node));
@@ -121,7 +140,7 @@ export async function fetchGitHubEvidence(
       if (response.error) { errors.add("pagination_incomplete"); break; }
       const page = object(connection.pageInfo);
       const next = string(page.endCursor);
-      if (typeof page.hasNextPage !== "boolean") { errors.add("source_error"); break; }
+      if (typeof page.hasNextPage !== "boolean") { errors.add(diag.record(operation, "protocol")); break; }
       if (!page.hasNextPage) {
         complete = errors.size === 0 && totalCount === nodes.length;
         if (!complete && errors.size === 0) errors.add("pagination_incomplete");
@@ -154,14 +173,14 @@ export async function fetchGitHubEvidence(
     reasons.add("discovery_incomplete");
   }
   const events = new Map<string, NormalizedEngineeringEvent>();
-  const inWindow = (date: unknown) => {
-    if (!string(date)) { reasons.add("source_error"); return false; }
-    try { return isWithinScoringWindow(date as string, window); } catch { reasons.add("source_error"); return false; }
+  const inWindow = (date: unknown, operation: string) => {
+    if (!string(date)) { reasons.add(diag.record(operation, "parse")); return false; }
+    try { return isWithinScoringWindow(date as string, window); } catch { reasons.add(diag.record(operation, "parse")); return false; }
   };
-  function event(node: ObjectData, repo: ObjectData, kind: NormalizedEngineeringEvent["kind"], date: unknown, workItemId: string): NormalizedEngineeringEvent | null {
+  function event(node: ObjectData, repo: ObjectData, kind: NormalizedEngineeringEvent["kind"], date: unknown, workItemId: string, operation: string): NormalizedEngineeringEvent | null {
     const id = string(node.id); const repositoryId = string(repo.id);
     if (!id || !repositoryId) { reasons.add("not_accessible"); return null; }
-    if (!inWindow(date)) return null;
+    if (!inWindow(date, operation)) return null;
     return {
       schemaVersion: "v7", provider: "github", host: "github.com", subjectId: subjectId!, actorId: subjectId!, repositoryId,
       eventId: id, kind, occurredAt: scoringInstant(date as string).toISOString(), dataThrough: window.referenceTime,
@@ -179,7 +198,7 @@ export async function fetchGitHubEvidence(
     if (!id || at(pr, "author", "id") !== subjectId || pr.merged !== true) { if (!id || !at(pr, "author", "id")) reasons.add("not_accessible"); continue; }
     if (options.repositoryIds && !repositories.has(String(repo.id))) continue;
     addRepo(repo);
-    const base = event(pr, repo, "accepted_change", pr.mergedAt, id);
+    const base = event(pr, repo, "accepted_change", pr.mergedAt, id, "merged");
     if (!base) continue;
     const files = await collect("files", { id }, ["node", "files"]);
     const paths = files.nodes.map((f) => string(f.path));
@@ -217,7 +236,7 @@ export async function fetchGitHubEvidence(
     for (const review of reviews.nodes) {
       if (!string(at(review, "author", "id"))) { reasons.add("not_accessible"); continue; }
       if (at(review, "author", "id") !== subjectId || review.state === "PENDING") continue;
-      addEvent(event(review, object(pr.repository), "review", review.submittedAt, id));
+      addEvent(event(review, object(pr.repository), "review", review.submittedAt, id, "reviews"));
     }
   }
   for (const [id, repo] of repositories) {
@@ -225,7 +244,7 @@ export async function fetchGitHubEvidence(
     for (const commit of commits.nodes) {
       if (!string(at(commit, "author", "user", "id"))) { reasons.add("attribution_unknown"); continue; }
       if (at(commit, "author", "user", "id") !== subjectId) continue;
-      const base = event(commit, repo, "authored_commit", commit.authoredDate, string(commit.oid) ?? String(commit.id));
+      const base = event(commit, repo, "authored_commit", commit.authoredDate, string(commit.oid) ?? String(commit.id), "commits");
       if (base) addEvent({ ...base, acceptance: unknown("unavailable", "acceptance_time_unknown"), measurements: { ...base.measurements, additions: observedNumber(commit.additions), deletions: observedNumber(commit.deletions) } });
     }
     const issues = await collect("issues", { id, since: window.startInclusive }, ["node", "issues"]);
@@ -240,7 +259,7 @@ export async function fetchGitHubEvidence(
         const closerId = string(closer.id);
         const linkedId = closer.__typename === "PullRequest" && closer.merged === true ? closerId : null;
         const authoredResult = linkedId !== null && at(closer, "author", "id") === subjectId;
-        const base = event(closure, repo, "issue_work", closure.createdAt, linkedId ?? issueId);
+        const base = event(closure, repo, "issue_work", closure.createdAt, linkedId ?? issueId, "closures");
         if (!base) continue;
         // Closing an issue establishes who operated the closure, not who did
         // its engineering work. Retain the diagnostic and its backing link.
@@ -254,7 +273,7 @@ export async function fetchGitHubEvidence(
         // actual closure diagnostic and a separate link-equivalent acceptance.
         // An authored PR already carries richer measurements, so never replace it.
         if (authoredResult && linkedId && !events.has(linkedId)) {
-          const accepted = event(closer, object(closer.repository), "accepted_change", closer.mergedAt, linkedId);
+          const accepted = event(closer, object(closer.repository), "accepted_change", closer.mergedAt, linkedId, "closures");
           if (accepted && (!options.repositoryIds || repositories.has(accepted.repositoryId))) {
             addEvent({ ...accepted, artifactReferenceIds: [...accepted.artifactReferenceIds, ...base.artifactReferenceIds],
               acceptance: observed({ method: "merged_change", acceptedAt: accepted.occurredAt, acceptedResultId: `github:${linkedId}` }, "complete", "source_observed") });
@@ -285,5 +304,5 @@ export async function fetchGitHubEvidence(
     eventKinds,
     reasonCodes: [...reasons].sort(), unknownPeriods: complete ? [] : [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
   };
-  return { profile: { login, name: string(user.name), avatarUrl: string(user.avatarUrl) }, events: [...events.values()], coverage, progress, requestCount };
+  return { profile: { login, name: string(user.name), avatarUrl: string(user.avatarUrl) }, events: [...events.values()], coverage, progress, requestCount, diagnostics: diag.diagnostics };
 }
