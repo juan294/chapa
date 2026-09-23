@@ -2,7 +2,7 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { createHash } from "node:crypto";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { setRedesignSession, redesignFixtureClient } from "./helpers/redesign-fixtures";
-import { assertScoringFixtureEnvironment, scoringReportHtml } from "./helpers/scoring-point-fixtures";
+import { assertScoringFixtureEnvironment, scoringReportHtml, enqueueGithubJob, seedFailedGithubJob } from "./helpers/scoring-point-fixtures";
 import { studioRoot, studioControl } from "./helpers/studio";
 
 const admitted = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
@@ -279,4 +279,130 @@ test("expired Craft retains five labels and boundary69.99 fits EN/ES narrow them
     expect(boundary).toMatchObject({ displayScore: 69.99, tier: "Solid" });
     await page.screenshot({ path: testInfo.outputPath(`boundary-${locale}-${theme}.png`), fullPage: true });
   }
+});
+
+// #1335 phase 4.8 — the durable collection queue end to end: a registered
+// owner with a queued job renders "collecting", driving the REAL
+// `/api/cron/collect-evidence` worker against a fetch-interception fixture
+// (never real GitHub) takes it to a "ready" v7.2 score, and every surface
+// agrees on that exact score. Distinct from every other test in this file,
+// which seeds a receipt directly and never touches the collection queue.
+test("registered owner with a queued job shows collecting, then ready with an identical score everywhere", async ({ page, context, baseURL, request }, testInfo) => {
+  test.setTimeout(120_000);
+  assertScoringFixtureEnvironment(process.env);
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) throw new Error("CRON_SECRET required to drive the local collection worker");
+  const owner = `chapa-collectq-${testInfo.project.name}`;
+  const db = redesignFixtureClient();
+  const referenceTime = new Date().toISOString();
+  await installTools(page);
+  await setRedesignSession(context, baseURL!, owner);
+
+  // (a) A queued job with no receipt yet renders "collecting" -- no score,
+  // no-store, never the legacy v6 fallback.
+  await enqueueGithubJob(db, owner, referenceTime);
+  const collectingBadge = await page.request.get(`/u/${owner}/badge.svg?lang=en`);
+  expect(collectingBadge.status()).toBe(200);
+  const collectingSvg = await collectingBadge.text();
+  expect(collectingSvg).toContain('data-chapa-state="collecting"');
+  expect(collectingSvg).not.toMatch(/data-element="score"/);
+  expect(collectingBadge.headers()["cache-control"]).toContain("no-store");
+  // The session is authenticated AS `owner` (needed for the Retry action
+  // later), so the share page renders the OWNER'S panel here, not a
+  // visitor's one-sentence summary -- SharePageScoringStatus.render.test.tsx
+  // covers the visitor branch directly.
+  await page.goto(`/u/${owner}?lang=en`);
+  await expect(page.locator('svg[data-chapa-state="collecting"]').first()).toBeVisible();
+  // .first(): the responsive layout keeps both a mobile and a desktop copy
+  // of the owner's ScoringStatusPanel heading in the DOM (CSS-hidden, not
+  // removed), so this resolves to 2 elements on the mobile project without it.
+  await expect(page.getByText("Scoring status").first()).toBeVisible();
+
+  // (b) Drive the real worker -- provider HTTP is replayed from the local
+  // fixture server (redesign-upstream.mjs), never real GitHub -- until the
+  // job completes. A zero-activity account (no repos/PRs/reviews) completes
+  // in a single slice (lib/github/evidence.ts never queues per-item
+  // operations with nothing to fan out over).
+  let completed = false;
+  for (let attempt = 0; attempt < 5 && !completed; attempt++) {
+    const tick = await request.get("/api/cron/collect-evidence", { headers: { Authorization: `Bearer ${cronSecret}` } });
+    expect(tick.status()).toBe(200);
+    const job = await db.from("scoring_collection_jobs").select("state").eq("owner_handle", owner).eq("provider", "github").single();
+    expect(job.error).toBeNull();
+    completed = job.data!.state === "complete";
+  }
+  expect(completed).toBe(true);
+
+  // The owner then shows ready with an identical v7.2 score everywhere.
+  await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 15_000 }).toBe("v7.2");
+  const profile = await api(page, owner);
+  expect(profile.archetype).toBeNull(); // Zero activity earns no archetype.
+
+  const badge = await page.request.get(`/u/${owner}/badge.svg?lang=en`);
+  expect(badge.status()).toBe(200);
+  const badgeSvg = await badge.text();
+  expect(badgeSvg).not.toContain("data-chapa-state=\"collecting\"");
+  expect(badgeSvg).not.toContain("data-chapa-state=\"unavailable\"");
+  expect(badgeSvg).toMatch(new RegExp(`data-element="score"[^>]*>${profile.displayScore}</text>`));
+
+  // #1335 phase 4.8 — this is the first navigation to /u/:handle to reach
+  // page.tsx's normal Promise.all([session, materialization, trendData,
+  // webmcpEnabled, cachedSvg]) branch for this owner (the earlier "collecting"
+  // visit above returns early through the status-placeholder branch, which
+  // never calls isWebmcpEnabled()). The App Router streams app/u/[handle]/
+  // loading.tsx's Suspense fallback ("Building the badge") first, then
+  // replaces it once this Promise.all settles -- give that settle its own
+  // generous poll rather than re-navigating (a fresh navigation just
+  // restarts the same stream and can race the fallback again).
+  await page.goto(`/u/${owner}?lang=en`);
+  await expect(page.locator('svg[data-badge-design] [data-element="score"]').first()).toHaveText(String(profile.displayScore), { timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __scoringTools: Map<string, unknown> }).__scoringTools.has("get_impact_profile")), { timeout: 15_000 }).toBe(true);
+  const tool = await page.evaluate(async () => JSON.parse(String(await (window as unknown as { __scoringTools: Map<string, { execute(input: unknown): unknown }> }).__scoringTools.get("get_impact_profile")!.execute({}))));
+  expect(tool).toMatchObject({ policyVersion: "v7.2", displayScore: profile.displayScore, identity: profile.identity });
+
+  const history = await page.request.get(`/api/history/${owner}?include=snapshots`);
+  expect(history.status()).toBe(200);
+  const historyBody = await history.json();
+  expect(historyBody.policyVersion).toBe("v7.2");
+  expect(historyBody.snapshots).toHaveLength(1);
+  expect(historyBody.snapshots[0].composite).toMatchObject({ exact: profile.exactScore, display: profile.displayScore });
+
+  await verifyIdentity(page, profile);
+});
+
+// #1335 phase 4.8 — a terminally-failed job (seeded directly -- the actual
+// failure paths are exercised by lib/collection/worker.test.ts's unit suite,
+// not this browser spec) shows the owner a reason and a working Retry action.
+test("a failed collection job shows the reason and a Retry action to the owner", async ({ page, context, baseURL }, testInfo) => {
+  assertScoringFixtureEnvironment(process.env);
+  const owner = `chapa-collectq-failed-${testInfo.project.name}`;
+  const db = redesignFixtureClient();
+  const referenceTime = new Date().toISOString();
+  await setRedesignSession(context, baseURL!, owner);
+  await seedFailedGithubJob(db, owner, referenceTime, { provider: "github", operation: "profile", stopKind: "http", httpStatus: 500, retryAfterSeconds: null });
+
+  const badge = await page.request.get(`/u/${owner}/badge.svg?lang=en`);
+  expect(badge.status()).toBe(200);
+  const svg = await badge.text();
+  expect(svg).toContain('data-chapa-state="action_needed"');
+  expect(svg).toContain("Scoring paused: action needed");
+  expect(badge.headers()["cache-control"]).toContain("no-store");
+
+  await page.goto("/settings?lang=en");
+  await expect(page.getByText("Scoring paused: action needed")).toBeVisible();
+  await expect(page.getByText("We were alerted; you can retry.")).toBeVisible();
+  const retryButton = page.getByRole("button", { name: "Retry", exact: true });
+  await expect(retryButton).toBeVisible();
+  const retried = page.waitForResponse((r) => r.url().endsWith("/api/scoring/status") && r.request().method() === "POST");
+  await retryButton.click();
+  expect((await retried).status()).toBe(200);
+  // POST /api/scoring/status re-enqueues (state -> "queued") and then calls
+  // scheduleCollectionAdvance() to run a bounded slice in the background
+  // immediately, rather than waiting for the next cron tick. Against this
+  // zero-activity fixture that background slice can complete before this
+  // poll's first read, racing straight through "queued" to "complete" --
+  // the retry succeeded either way, so assert only that it left "failed".
+  await expect
+    .poll(async () => (await db.from("scoring_collection_jobs").select("state").eq("owner_handle", owner).eq("provider", "github").single()).data?.state)
+    .not.toBe("failed");
 });

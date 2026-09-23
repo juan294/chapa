@@ -8,7 +8,7 @@ import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY, type 
 import { buildRedesignGitHubFixture } from './redesign-github';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
 import { DEMO_STATS } from '../../lib/render/demoData';
-import { SCORING_POINT_HANDLES, fixtureStatsCacheEntry } from "./scoring-point-fixtures";
+import { SCORING_POINT_HANDLES, COLLECTION_QUEUE_HANDLES, fixtureStatsCacheEntry } from "./scoring-point-fixtures";
 import { computeImpactV6 } from '../../lib/impact/v6';
 import { buildPayload, computeHash } from '../../lib/verification/hmac-payload';
 import { VERIFICATION_RECORD_TTL_MS } from '../../lib/verification/constants';
@@ -28,7 +28,7 @@ export function assertLocalFixtureTarget(url: string): void {
 
 export async function setRedesignSession(context: BrowserContext, baseURL: string, handle: string): Promise<void> {
   assertLocalFixtureTarget(baseURL);
-  if (!([...REDESIGN_HANDLES, ...SCORING_POINT_HANDLES] as readonly string[]).includes(handle)) throw new Error('Unknown redesign session');
+  if (!([...REDESIGN_HANDLES, ...SCORING_POINT_HANDLES, ...COLLECTION_QUEUE_HANDLES] as readonly string[]).includes(handle)) throw new Error('Unknown redesign session');
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error('Local session secret required');
   const iv = randomBytes(12);

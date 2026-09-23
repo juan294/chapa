@@ -95,6 +95,16 @@ export function createRedesignFetch(fixtures, localFetch = globalThis.fetch, onU
         // durable snapshot/config assertions remain in the real journey test.
         return Response.json({ data: { user: null } });
       }
+      // #1335 phase 4.8 — the real v7.2 collection engine (lib/github/
+      // evidence.ts), never the legacy stats path above. Keyed by the exact
+      // query TEXT (scoring-point-fixtures.ts's githubZeroActivityResponses,
+      // built from GITHUB_EVIDENCE_QUERIES) rather than the operation name or
+      // variables, so a query shape this fixture doesn't have a response for
+      // still falls through to "Unexpected redesign upstream" below instead
+      // of a silently wrong match.
+      if (method === 'POST' && fixtures.githubCollectionResponses && Object.hasOwn(fixtures.githubCollectionResponses, request.query)) {
+        return Response.json(fixtures.githubCollectionResponses[request.query]);
+      }
     }
     if (method === 'GET' && url.href === 'https://api.bitbucket.org/2.0/user/permissions/workspaces') {
       const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));

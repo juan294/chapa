@@ -1,6 +1,9 @@
 import { CONTRIBUTION_QUERY } from '@chapa/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { createRedesignFetch } from './redesign-upstream.mjs';
+import { GITHUB_EVIDENCE_QUERIES } from '../../lib/github/evidence-queries';
+import { withRateLimit } from '../../lib/github/evidence-rate-limit';
+import { githubZeroActivityResponses } from './scoring-point-fixtures';
 
 describe('redesign test-process upstream boundary', () => {
   it('reports the current cache key count after deleting and expiring entries', async () => {
@@ -129,4 +132,33 @@ it('classifies denied GraphQL without logging query bodies, credentials or arbit
   await expect(replay('https://api.github.com/graphql', { method: 'POST', body: JSON.stringify({ query: 'query PrivateCustomer { x }', variables: { login: 'private-customer' } }) })).rejects.toThrow(/Unexpected/);
   expect(unexpected.mock.calls[1]?.[0]).toMatch(/operation=other querySha256=[a-f0-9]{64} login=not_allowlisted/);
   expect(unexpected.mock.calls[1]?.[0]).not.toMatch(/PrivateCustomer|private-customer/);
+});
+
+// #1335 phase 4.8 — the real v7.2 collection-queue engine's fixture path.
+// The real collector (lib/github/evidence.ts) injects a `rateLimit { ... }`
+// selection into every query via `withRateLimit` before sending it, so every
+// simulated request below wraps its query text the same way the collector
+// actually does — matching on the raw GITHUB_EVIDENCE_QUERIES constant alone
+// would never hit what production sends.
+describe('collection-queue GraphQL replay', () => {
+  it('serves the exact zero-activity fixture for each of the 5 queries the collector sends, by query text alone', async () => {
+    const responses = githubZeroActivityResponses();
+    const replay = createRedesignFetch({ cache: {}, github: {}, githubCollectionResponses: responses });
+    for (const [key, query] of Object.entries(GITHUB_EVIDENCE_QUERIES)) {
+      const sent = withRateLimit(query);
+      if (!Object.hasOwn(responses, sent)) continue; // files/reviews/commits/issues/closures: no fixture needed
+      const response = await replay('https://api.github.com/graphql', { method: 'POST', body: JSON.stringify({ query: sent, variables: { login: 'chapa-collectq-chromium', after: null } }) });
+      expect(await response.json(), key).toEqual(responses[sent]);
+    }
+  });
+
+  it('never matches on operation name alone — an unfixtured collector query (files) still falls through to Unexpected', async () => {
+    const replay = createRedesignFetch({ cache: {}, github: {}, githubCollectionResponses: githubZeroActivityResponses() });
+    await expect(replay('https://api.github.com/graphql', { method: 'POST', body: JSON.stringify({ query: withRateLimit(GITHUB_EVIDENCE_QUERIES.files), variables: { id: 'PR_1', after: null } }) })).rejects.toThrow(/Unexpected redesign upstream/);
+  });
+
+  it('ignores collection responses entirely when the fixture omits githubCollectionResponses', async () => {
+    const replay = createRedesignFetch({ cache: {}, github: {} });
+    await expect(replay('https://api.github.com/graphql', { method: 'POST', body: JSON.stringify({ query: withRateLimit(GITHUB_EVIDENCE_QUERIES.profile), variables: { login: 'chapa-collectq-chromium' } }) })).rejects.toThrow(/Unexpected redesign upstream/);
+  });
 });
