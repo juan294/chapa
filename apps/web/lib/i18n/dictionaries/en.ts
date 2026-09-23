@@ -308,6 +308,7 @@ export const en: Translations = {
     badgeAlt: 'Chapa Badge',
     badgeAltOf: 'Chapa Badge of',
     ariaBusy: 'Regenerating badge',
+    staleDataNotice: 'Showing the last successful snapshot from {date}. Live sources are temporarily unavailable.',
   },
   content: {
     onThisPage: 'On this page',

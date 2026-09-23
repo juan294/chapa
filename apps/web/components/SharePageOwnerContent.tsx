@@ -139,6 +139,8 @@ interface SharePageOwnerContentProps {
    *  this surface off the v6 explanation. */
   receiptExplanation?: ReceiptExplanation | null;
   scoring?: ScoreViewModel | null;
+  /** #1331 — see SharePageOwnerContentLazy. */
+  staleFallback?: { observedAt: string } | null;
 }
 
 export function SharePageOwnerContent({
@@ -153,6 +155,7 @@ export function SharePageOwnerContent({
   embedHtml: embedHtmlProp,
   receiptExplanation = null,
   scoring,
+  staleFallback = null,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -175,6 +178,23 @@ export function SharePageOwnerContent({
   return (
     <>
       <hr className="border-stroke mb-10" />
+
+      {/* #1331 — a durable stored-badge fallback: live sources were
+          unavailable, so everything below is drawn from the last committed
+          receipt/snapshot rather than a fresh fetch. Named honestly here
+          rather than silently rendering as if it were current. */}
+      {staleFallback && (
+        <section
+          role="status"
+          className="mb-10 rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up motion-reduce:animate-none [animation-delay:240ms]"
+        >
+          <p className="text-sm text-text-secondary">
+            {interpolate(t('shareOwner.staleDataNotice') as string, {
+              date: staleFallback.observedAt.slice(0, 10),
+            })}
+          </p>
+        </section>
+      )}
 
       {/* Data Sources */}
       {stats && (
@@ -199,6 +219,7 @@ export function SharePageOwnerContent({
             craftResult={craftResult}
             trend={trend}
             diff={diff}
+            activityUnavailable={!!staleFallback}
           />
         </section>
       ) : (

@@ -38,6 +38,12 @@ interface ImpactDashboardProps {
    */
   trend?: TrendSummary | null;
   diff?: ClientSnapshotDiff | null;
+  /** #1331 — set for a durable stored-badge fallback. The heatmap is never
+   *  drawn in this state: `stats.heatmapData` is `[]` for a stored
+   *  projection (never persisted per-day), and an empty grid would read as
+   *  "no activity" rather than "unknown" — the stale notice above this
+   *  component already discloses the outage and the stored date. */
+  activityUnavailable?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,6 +57,7 @@ export function ImpactDashboard({
   scoring, receiptExplanation, isOwner = false,
   trend = null,
   diff = null,
+  activityUnavailable = false,
 }: ImpactDashboardProps) {
   const { t } = useTranslation();
 
@@ -75,7 +82,9 @@ export function ImpactDashboard({
         <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-3">{t("observedScoring.coaching") as string}</h3>
         <p className="text-sm text-text-secondary leading-relaxed">{missing.map(row => t(`observedScoring.steps.${row.label}`) as string).join(", ")}. {t("observedScoring.missingEvidence") as string}</p>
       </section>}
-      <ActivityHeatmap heatmapData={stats.heatmapData} activeDays={stats.activeDays} descriptiveOnly />
+      {!activityUnavailable && (
+        <ActivityHeatmap heatmapData={stats.heatmapData} activeDays={stats.activeDays} descriptiveOnly />
+      )}
       <StatsGrid stats={stats} diff={null} />
     </div>;
   }
@@ -103,11 +112,13 @@ export function ImpactDashboard({
 
       <CoachingInsights impact={impact} trend={trend} diff={diff} />
 
-      <ActivityHeatmap
-        heatmapData={stats.heatmapData}
-        activeDays={stats.activeDays}
-        dimensions={impact.dimensions}
-      />
+      {!activityUnavailable && (
+        <ActivityHeatmap
+          heatmapData={stats.heatmapData}
+          activeDays={stats.activeDays}
+          dimensions={impact.dimensions}
+        />
+      )}
 
       <StatsGrid stats={stats} diff={diff} />
     </div>

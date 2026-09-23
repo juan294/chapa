@@ -302,6 +302,7 @@ export const es: Translations = {
     badgeAlt: 'Chapa',
     badgeAltOf: 'Chapa de',
     ariaBusy: 'Regenerando Chapa',
+    staleDataNotice: 'Mostrando la última instantánea correcta del {date}. Las fuentes en vivo no están disponibles temporalmente.',
   },
   content: {
     onThisPage: 'En esta página',

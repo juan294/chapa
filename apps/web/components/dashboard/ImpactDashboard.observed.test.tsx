@@ -26,6 +26,15 @@ it.each([57, 0] as const)("shows the exact receipt core46 and fifth Craft%s inst
   expect(within(craftCard).queryByText(/proficiency|sophistication|Master|Expert/i)).toBeNull();
   expect(within(craftCard).getAllByText(/report/i).length).toBeGreaterThan(0);
 });
+// #1331 — the v7.2 branch draws ActivityHeatmap unconditionally too; a
+// stored-badge fallback must hide it here exactly like the v6 branch.
+it("hides the activity heatmap for a v7.2 model when activityUnavailable is set", async () => {
+  const f = await scoringConsistencyFixture({ craft: "none" });
+  render(<ImpactDashboard impact={f.impact} stats={f.stats} scoring={f.model} activityUnavailable />);
+  expect(screen.queryByText("Descriptive activity")).toBeNull();
+  expect(screen.getByText("Descriptive source counts")).toBeDefined();
+});
+
 it("keeps no report at four cards and expired Craft unlocked without a fabricated zero", async () => {
   const absent = await scoringConsistencyFixture({ craft: "none" });
   const view = render(<ImpactDashboard impact={absent.impact} stats={absent.stats} scoring={absent.model} />);

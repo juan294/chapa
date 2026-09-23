@@ -15,7 +15,12 @@ vi.mock("@/lib/cache/snapshot-cache", () => ({
   getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
 }));
 
-import { readStoredBadgeProfile, storedBadgeRenderInputs, snapshotDimensions } from "./stored-badge-profile";
+import {
+  readStoredBadgeProfile,
+  storedBadgeRenderInputs,
+  snapshotDimensions,
+  storedBadgeActivityUnavailable,
+} from "./stored-badge-profile";
 
 const V6_SELECTION: ScoringRenderSelection = {
   enabled: false,
@@ -212,5 +217,17 @@ describe("storedBadgeRenderInputs", () => {
     expect(inputs.stats.avatarUrl).toBeUndefined();
     expect(inputs.stats.displayName).toBeUndefined();
     expect(inputs.impact).toBe(stored!.legacyImpact);
+  });
+});
+
+describe("storedBadgeActivityUnavailable", () => {
+  it("interpolates the caller's translator with the observed date, truncated to YYYY-MM-DD", () => {
+    const t = (key: string) => (key === "badge.activityUnavailable"
+      ? "Last successful snapshot: {date}. Live sources are temporarily unavailable."
+      : key);
+
+    const result = storedBadgeActivityUnavailable(t, "2026-09-20T14:32:00.000Z");
+
+    expect(result).toBe("Last successful snapshot: 2026-09-20. Live sources are temporarily unavailable.");
   });
 });
