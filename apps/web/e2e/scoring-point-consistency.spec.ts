@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { setRedesignSession, redesignFixtureClient } from "./helpers/redesign-fixtures";
 import { assertScoringFixtureEnvironment, scoringReportHtml } from "./helpers/scoring-point-fixtures";
+import { studioRoot, studioControl } from "./helpers/studio";
 
 const admitted = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
 if (process.env.RELEASE_VERIFICATION_MODE === "local-candidate" && !admitted) throw new Error("Local scoring qualification requires disposable fixtures");
@@ -193,7 +194,7 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     await expect(page.getByTestId("agent-save-confirm")).toBeVisible();
     expect((await db.from("studio_configs").select("config").eq("handle", owner).single()).data!.config).toEqual(configBefore.data!.config);
     await page.getByTestId("agent-save-confirm").click(); expect((await saved).status()).toBe(200);
-    await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="saved"]')).toBeVisible();
     await page.getByTestId("studio-zoom-half").click();
     const config = await db.from("studio_configs").select("config").eq("handle", owner).single();
     expect(config.data!.config).toEqual({ ...DEFAULT_BADGE_CONFIG, colorPalette: "jade" });
@@ -206,7 +207,7 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     const input = page.locator("#terminal-command-input");
     await input.fill(`/set palette ${configBefore.data!.config.colorPalette}`); await input.press("Enter");
     const restored = page.waitForResponse(r => r.url().includes("/api/studio/config") && r.request().method() === "PUT");
-    await page.locator('[data-testid="studio-save"]:visible').last().click(); expect((await restored).status()).toBe(200);
+    await studioControl(page, "studio-save").click(); expect((await restored).status()).toBe(200);
     await currentSurface(page, owner, 0, initial);
     expect((await servedImage(page)).digest).toBe(imageBeforePalette.digest);
   }

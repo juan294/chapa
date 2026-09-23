@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { badgeTheme } from '../lib/render/theme';
 import { DEFAULT_BADGE_CONFIG } from '@chapa/shared';
 import { REDESIGN_VALID_HASH, setRedesignSession, redesignFixtureClient } from './helpers/redesign-fixtures';
+import { studioRoot, studioControl } from './helpers/studio';
 
 // These checks require the explicit disposable bootstrap and server-only replay.
 // The final local gate enables them; ordinary unseeded CI does not claim them.
@@ -13,9 +14,6 @@ async function command(page: Page, text: string) {
   const input = page.locator('#terminal-command-input:visible');
   await expect(input).toHaveCount(1);
   await input.fill(text); await input.press('Enter');
-}
-function studioControl(page: Page, testId: 'studio-save' | 'studio-reset') {
-  return page.locator(`[data-testid="${testId}"]:visible`).last();
 }
 async function capture(page: Page, name: string) {
   await expect(page.getByRole('status', { name: /^(Loading|Cargando)$/ })).toHaveCount(0);
@@ -50,11 +48,11 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await expect(page.locator('#terminal-command-input')).toBeVisible();
     await expect(page.getByTestId('badge-preview').locator('svg')).toHaveCount(1);
     await expect(page.getByTestId('badge-preview').locator('svg')).toBeVisible();
-    await expect(page.getByTestId('studio-root')).toBeVisible();
+    await expect(studioRoot(page)).toBeVisible();
     expect(await page.getByTestId('studio-stage').evaluate(e => e.getBoundingClientRect().top)).toBeGreaterThanOrEqual(69);
     await command(page, '/reset');
     await studioControl(page, 'studio-save').click();
-    await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="saved"]')).toBeVisible();
     await capture(page, `studio-${locale}-${theme}-${width}`);
     for (const zoom of ['half', 'full', 'fit']) {
       await page.getByTestId(`studio-zoom-${zoom}`).click();
@@ -64,12 +62,12 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await command(page, '/set bg aurora');
     await command(page, '/set palette jade');
     for (const change of ['/set card frost', '/set border gradient-rotating', '/set score chrome', '/set heatmap ripple', '/set tier enhanced']) await command(page, change);
-    await expect(page.locator('[data-save-state="dirty"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="dirty"]')).toBeVisible();
     await expect(page.getByTestId('badge-preview').locator('[data-element=archetype] rect')).toHaveAttribute('fill', badgeTheme('jade').bg);
     expect(await page.getByTestId('badge-preview').locator('svg').evaluate((e: SVGSVGElement) => e.animationsPaused())).toBe(true);
     await page.route('**/api/studio/config', route => route.request().method() === 'PUT' ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Local test failure' }) }) : route.continue());
     await studioControl(page, 'studio-save').click();
-    await expect(page.locator('[data-save-state="error"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="error"]')).toBeVisible();
     await capture(page, `studio-error-${locale}-${theme}-${width}`);
     await page.unroute('**/api/studio/config');
     const save = page.waitForResponse(r => r.url().includes('/api/studio/config') && r.request().method() === 'PUT');
@@ -79,7 +77,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     const serialized = response.request().postDataJSON();
     expect(Object.keys(serialized).sort()).toEqual(Object.keys(DEFAULT_BADGE_CONFIG).sort());
     expect(serialized.colorPalette).toBe('jade');
-    await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="saved"]')).toBeVisible();
     await page.reload();
     await expect(page.getByTestId('badge-preview').locator('[data-element=archetype] rect')).toHaveAttribute('fill', badgeTheme('jade').bg);
     // Hold the real save response after the local DB write, then edit again.
@@ -99,16 +97,16 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await entered;
     await command(page, '/set bg solid');
     releaseSave();
-    await expect(page.locator('[data-save-state="dirty"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="dirty"]')).toBeVisible();
     await page.unroute('**/api/studio/config');
     const persisted = await page.request.get('/api/studio/config');
     expect(await persisted.json()).toMatchObject({ config: { background: 'particles' } });
     await capture(page, `studio-save-race-${locale}-${theme}-${width}`);
     await studioControl(page, 'studio-save').click();
-    await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="saved"]')).toBeVisible();
 
     await command(page, '/reset'); await studioControl(page, 'studio-save').click();
-    await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="saved"]')).toBeVisible();
     for (const route of ['settings', 'admin', 'cli/authorize?session=local-redesign-device']) {
       await page.goto(`/${route}${route.includes('?') ? '&' : '?'}lang=${locale}`);
       await expect(page.locator('h1').first()).toBeVisible();
@@ -144,7 +142,7 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await expect(page.getByRole('link', { name: '@chapa-redesign-owner', exact: true })).toBeVisible();
     await capture(page, `verify-${locale}-${theme}-${width}`);
     await page.goto(`/studio?demo=1&lang=${locale}`);
-    await expect(page.getByTestId('studio-demo-marker')).toBeVisible();
+    await expect(studioRoot(page).getByTestId('studio-demo-marker')).toBeVisible();
     await expect(page.getByTestId('badge-preview').locator('[data-element=score]')).toHaveText('82');
     await capture(page, `studio-demo-${locale}-${theme}-${width}`);
     const controls = page.getByRole('button', { name: locale === 'en' ? 'Quick Controls' : 'Controles rápidos', exact: true });
