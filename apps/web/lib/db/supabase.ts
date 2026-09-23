@@ -38,12 +38,14 @@ export function getSupabase(): SupabaseClient | null {
  * Returns "ok" if a representative query succeeds, "skipped" if env vars are
  * not configured, or "error" if the query fails.
  *
- * Probes `metrics_snapshots` (the app's hottest Supabase read — lifetime score
- * history) rather than `users`, mirroring the shape of the real hot-path read
- * in `dbGetLatestSnapshot` (select + order by date + limit). This validates the
- * service role's actual access to the table the app depends on most: a revoked
- * grant or misconfigured RLS policy scoped to `metrics_snapshots` would be
- * caught here, whereas a bare `users` connectivity check would miss it (#976).
+ * Probes `scoring_v7_receipts` (#1335 phase 5 — the app's hottest Supabase
+ * read is now the current-policy receipt store, not `metrics_snapshots`,
+ * which is retired) rather than `users`, mirroring the shape of a real
+ * receipt read (select + order by reference time + limit). This validates
+ * the service role's actual access to the table the app depends on most: a
+ * revoked grant or misconfigured RLS policy scoped to `scoring_v7_receipts`
+ * would be caught here, whereas a bare `users` connectivity check would
+ * miss it (#976).
  */
 export async function pingSupabase(): Promise<"ok" | "error" | "skipped"> {
   const db = getSupabase();
@@ -53,9 +55,9 @@ export async function pingSupabase(): Promise<"ok" | "error" | "skipped"> {
     const result = await withTimeout(
       Promise.resolve().then(() =>
         db
-          .from("metrics_snapshots")
-          .select("date")
-          .order("date", { ascending: false })
+          .from("scoring_v7_receipts")
+          .select("id")
+          .order("reference_time", { ascending: false })
           .limit(1),
       ),
       5000,

@@ -1,4 +1,3 @@
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
@@ -146,7 +145,7 @@ describe("GET /api/admin/users", () => {
       search: undefined,
       tier: undefined,
       archetype: undefined,
-    }, { observed: false });
+    });
   });
 
   it("passes custom query params from URL", async () => {
@@ -166,7 +165,7 @@ describe("GET /api/admin/users", () => {
       search: "juan",
       tier: undefined,
       archetype: undefined,
-    }, { observed: false });
+    });
   });
 
   it("returns 400 for invalid sort field", async () => {
@@ -182,7 +181,6 @@ describe("GET /api/admin/users", () => {
 
     expect(dbGetAdminUsers).toHaveBeenCalledWith(
       expect.objectContaining({ tier: "Elite" }),
-      { observed: false },
     );
   });
 
@@ -191,7 +189,6 @@ describe("GET /api/admin/users", () => {
 
     expect(dbGetAdminUsers).toHaveBeenCalledWith(
       expect.objectContaining({ archetype: "Builder" }),
-      { observed: false },
     );
   });
 

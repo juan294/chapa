@@ -80,23 +80,14 @@ function makeAdminRow(overrides: Record<string, unknown> = {}) {
     registered_at: "2025-06-01T00:00:00Z",
     display_name: "Test User",
     avatar_url: "https://example.com/avatar.png",
-    snapshot_date: "2025-06-01",
-    snapshot_captured_at: "2025-06-01T12:00:00Z",
-    commits_total: 100,
-    prs_merged_count: 20,
-    reviews_submitted: 15,
-    repos_contributed: 8,
-    active_days: 180,
-    total_stars: 50,
-    archetype: "Builder",
-    tier: "Solid",
-    adjusted_composite: 65,
-    composite_score: 60,
-    confidence: 85,
-    building: 70,
-    guarding: 60,
-    consistency_score: 80,
-    breadth: 50,
+    current_revision_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    current_content_hash: "a".repeat(64),
+    current_display_score: 65,
+    current_exact_score: 64.5,
+    current_tier: "Solid",
+    current_archetype: "Builder",
+    current_snapshot_date: "2025-06-01",
+    current_fetched_at: "2025-06-01T12:00:00Z",
     ...overrides,
   };
 }
@@ -111,6 +102,14 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("dbGetAdminUsers", () => {
+  it("always queries the admin_users_observed view", async () => {
+    terminalResolve = { data: [], error: null, count: 0 };
+
+    await dbGetAdminUsers(defaultQuery());
+
+    expect(mockFrom).toHaveBeenCalledWith("admin_users_observed");
+  });
+
   it("returns paginated users with correct range offsets", async () => {
     terminalResolve = {
       data: [makeAdminRow()],
@@ -120,7 +119,6 @@ describe("dbGetAdminUsers", () => {
 
     const result = await dbGetAdminUsers(defaultQuery({ page: 2, limit: 10 }));
 
-    expect(mockFrom).toHaveBeenCalledWith("admin_users");
     expect(mockRange).toHaveBeenCalledWith(10, 19); // page 2, limit 10
     expect(result.page).toBe(2);
     expect(result.limit).toBe(10);
@@ -138,12 +136,12 @@ describe("dbGetAdminUsers", () => {
     expect(result.total).toBe(42);
   });
 
-  it("sorts by adjusted_composite desc by default", async () => {
+  it("sorts by the current receipt's display score by default", async () => {
     terminalResolve = { data: [], error: null, count: 0 };
 
     await dbGetAdminUsers(defaultQuery());
 
-    expect(mockOrder).toHaveBeenCalledWith("adjusted_composite", {
+    expect(mockOrder).toHaveBeenCalledWith("current_display_score", {
       ascending: false,
       nullsFirst: false,
     });
@@ -160,13 +158,13 @@ describe("dbGetAdminUsers", () => {
     });
   });
 
-  it("sorts with nullsFirst false to push users without snapshots to bottom", async () => {
+  it("sorts with nullsFirst false to push not-yet-scored subjects to the bottom", async () => {
     terminalResolve = { data: [], error: null, count: 0 };
 
-    await dbGetAdminUsers(defaultQuery({ sort: "totalStars", dir: "desc" }));
+    await dbGetAdminUsers(defaultQuery({ sort: "tier", dir: "desc" }));
 
     expect(mockOrder).toHaveBeenCalledWith(
-      "total_stars",
+      "current_tier",
       expect.objectContaining({ nullsFirst: false }),
     );
   });
@@ -210,29 +208,25 @@ describe("dbGetAdminUsers", () => {
     const calls = mockOr.mock.calls;
     expect(calls.length).toBeGreaterThan(0);
     const [filterString] = calls[0]!;
-    // The literal comma between the two OR clauses is expected and safe —
-    // only characters coming from the user-supplied term must be absent.
-    // "handle.eq.juan" (the injected clause) must not appear as a distinct
-    // predicate; the whole term collapses into the ilike value instead.
     expect(filterString).not.toContain("handle.eq.juan)");
     expect(filterString).not.toContain("(");
     expect(filterString).not.toContain(")");
   });
 
-  it("applies tier filter", async () => {
+  it("applies tier filter against the current receipt projection", async () => {
     terminalResolve = { data: [], error: null, count: 0 };
 
     await dbGetAdminUsers(defaultQuery({ tier: "Elite" }));
 
-    expect(mockEq).toHaveBeenCalledWith("tier", "Elite");
+    expect(mockEq).toHaveBeenCalledWith("current_tier", "Elite");
   });
 
-  it("applies archetype filter", async () => {
+  it("applies archetype filter against the current receipt projection", async () => {
     terminalResolve = { data: [], error: null, count: 0 };
 
     await dbGetAdminUsers(defaultQuery({ archetype: "Builder" }));
 
-    expect(mockEq).toHaveBeenCalledWith("archetype", "Builder");
+    expect(mockEq).toHaveBeenCalledWith("current_archetype", "Builder");
   });
 
   it("clamps page to minimum 1", async () => {
@@ -273,25 +267,20 @@ describe("dbGetAdminUsers", () => {
     expect(result.page).toBe(1);
   });
 
-  it("maps row fields to AdminUserEntry correctly", async () => {
+  it("maps a row with a current receipt to a v7.2 AdminUserEntry", async () => {
     const row = makeAdminRow({
       handle: "alice",
       display_name: "Alice Dev",
       avatar_url: "https://example.com/alice.png",
       registered_at: "2025-01-15T00:00:00Z",
-      snapshot_date: "2025-06-01",
-      snapshot_captured_at: "2025-06-01T12:00:00Z",
-      commits_total: 200,
-      prs_merged_count: 30,
-      reviews_submitted: 25,
-      repos_contributed: 12,
-      active_days: 220,
-      total_stars: 100,
-      archetype: "Polymath",
-      tier: "Elite",
-      adjusted_composite: 90,
-      composite_score: 85,
-      confidence: 95,
+      current_revision_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      current_content_hash: "b".repeat(64),
+      current_display_score: 90,
+      current_exact_score: 89.7,
+      current_tier: "Elite",
+      current_archetype: "Polymath",
+      current_snapshot_date: "2025-06-01",
+      current_fetched_at: "2025-06-01T12:00:00Z",
     });
 
     terminalResolve = { data: [row], error: null, count: 1 };
@@ -305,18 +294,50 @@ describe("dbGetAdminUsers", () => {
       registeredAt: "2025-01-15T00:00:00Z",
       lastSnapshotDate: "2025-06-01",
       fetchedAt: "2025-06-01T12:00:00Z",
-      commitsTotal: 200,
-      prsMergedCount: 30,
-      reviewsSubmittedCount: 25,
-      activeDays: 220,
-      reposContributed: 12,
-      totalStars: 100,
+      commitsTotal: null,
+      prsMergedCount: null,
+      reviewsSubmittedCount: null,
+      activeDays: null,
+      reposContributed: null,
+      totalStars: null,
       archetype: "Polymath",
       tier: "Elite",
       adjustedComposite: 90,
-      rawScore: 85,
-      confidence: 95,
+      rawScore: 90,
+      confidence: null,
+      policyVersion: "v7.2",
+      exactScore: 89.7,
+      identity: { revisionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", contentHash: "b".repeat(64) },
     });
+  });
+
+  it("treats a subject with no current receipt as unscored, never the legacy fallback", async () => {
+    const row = makeAdminRow({
+      current_revision_id: null,
+      current_content_hash: null,
+      // These would be the legacy v6 CASE-fallback values on the
+      // pre-contract-migration view; they must never surface.
+      current_display_score: 42,
+      current_tier: "Solid",
+      current_archetype: "Builder",
+      current_snapshot_date: "2024-01-01",
+      current_fetched_at: "2024-01-01T00:00:00Z",
+    });
+
+    terminalResolve = { data: [row], error: null, count: 1 };
+
+    const result = await dbGetAdminUsers(defaultQuery());
+    const user = result.users[0]!;
+
+    expect(user.policyVersion).toBeUndefined();
+    expect(user.identity).toBeUndefined();
+    expect(user.exactScore).toBeUndefined();
+    expect(user.lastSnapshotDate).toBeNull();
+    expect(user.fetchedAt).toBeNull();
+    expect(user.archetype).toBeNull();
+    expect(user.tier).toBeNull();
+    expect(user.adjustedComposite).toBeNull();
+    expect(user.rawScore).toBeNull();
   });
 
   it("falls back to GitHub avatar URL when avatar_url is null", async () => {
@@ -397,7 +418,6 @@ describe("dbGetAdminUsers", () => {
     terminalResolve = { data: [], error: null, count: 27 };
 
     const result = await dbGetAdminUsers(defaultQuery({ limit: 10 }));
-
     expect(result.totalPages).toBe(3); // ceil(27 / 10)
   });
 
@@ -410,46 +430,12 @@ describe("dbGetAdminUsers", () => {
     expect(mockRange).toHaveBeenCalledWith(0, 24);
   });
 
-  it("maps null snapshot fields correctly in admin user entry", async () => {
-    const rowWithNulls = makeAdminRow({
-      display_name: null,
-      snapshot_date: null,
-      snapshot_captured_at: null,
-      commits_total: null,
-      prs_merged_count: null,
-      reviews_submitted: null,
-      repos_contributed: null,
-      active_days: null,
-      total_stars: null,
-      archetype: null,
-      tier: null,
-      adjusted_composite: null,
-      composite_score: null,
-      confidence: null,
-    });
-
-    terminalResolve = { data: [rowWithNulls], error: null, count: 1 };
-
-    const result = await dbGetAdminUsers(defaultQuery());
-
-    expect(result.users[0]!.displayName).toBeNull();
-    expect(result.users[0]!.lastSnapshotDate).toBeNull();
-    expect(result.users[0]!.fetchedAt).toBeNull();
-    expect(result.users[0]!.commitsTotal).toBeNull();
-    expect(result.users[0]!.archetype).toBeNull();
-    expect(result.users[0]!.tier).toBeNull();
-    expect(result.users[0]!.adjustedComposite).toBeNull();
-    expect(result.users[0]!.rawScore).toBeNull();
-    expect(result.users[0]!.confidence).toBeNull();
-  });
-
   it("does not apply tier filter when tier is undefined", async () => {
     terminalResolve = { data: [], error: null, count: 0 };
 
     await dbGetAdminUsers(defaultQuery({ tier: undefined }));
 
-    // mockEq should not be called for tier
-    expect(mockEq).not.toHaveBeenCalledWith("tier", expect.anything());
+    expect(mockEq).not.toHaveBeenCalledWith("current_tier", expect.anything());
   });
 
   it("does not apply archetype filter when archetype is undefined", async () => {
@@ -457,25 +443,24 @@ describe("dbGetAdminUsers", () => {
 
     await dbGetAdminUsers(defaultQuery({ archetype: undefined }));
 
-    // mockEq should not be called for archetype
-    expect(mockEq).not.toHaveBeenCalledWith("archetype", expect.anything());
+    expect(mockEq).not.toHaveBeenCalledWith("current_archetype", expect.anything());
   });
 
-  it("maps all sort fields to valid DB columns", async () => {
+  it("maps every sort field to a current-receipt-projection column, never a dropped admin_users column", async () => {
     const sortFields: Array<{ field: string; dbCol: string }> = [
       { field: "handle", dbCol: "handle" },
-      { field: "adjustedComposite", dbCol: "adjusted_composite" },
-      { field: "rawScore", dbCol: "composite_score" },
-      { field: "confidence", dbCol: "confidence" },
-      { field: "commitsTotal", dbCol: "commits_total" },
-      { field: "prsMergedCount", dbCol: "prs_merged_count" },
-      { field: "reviewsSubmittedCount", dbCol: "reviews_submitted" },
-      { field: "activeDays", dbCol: "active_days" },
-      { field: "totalStars", dbCol: "total_stars" },
-      { field: "tier", dbCol: "tier" },
-      { field: "archetype", dbCol: "archetype" },
+      { field: "adjustedComposite", dbCol: "current_display_score" },
+      { field: "rawScore", dbCol: "current_display_score" },
+      { field: "confidence", dbCol: "current_display_score" },
+      { field: "commitsTotal", dbCol: "current_display_score" },
+      { field: "prsMergedCount", dbCol: "current_display_score" },
+      { field: "reviewsSubmittedCount", dbCol: "current_display_score" },
+      { field: "activeDays", dbCol: "current_display_score" },
+      { field: "totalStars", dbCol: "current_display_score" },
+      { field: "tier", dbCol: "current_tier" },
+      { field: "archetype", dbCol: "current_archetype" },
       { field: "registeredAt", dbCol: "registered_at" },
-      { field: "lastSnapshotDate", dbCol: "snapshot_date" },
+      { field: "lastSnapshotDate", dbCol: "current_snapshot_date" },
     ];
 
     for (const { field, dbCol } of sortFields) {
@@ -491,18 +476,5 @@ describe("dbGetAdminUsers", () => {
         expect.any(Object),
       );
     }
-  });
-});
-
-describe("current-policy admin projection", () => {
-  it("sorts and filters current receipt values before pagination and preserves boundary precision", async () => {
-    terminalResolve = { data: [makeAdminRow({ current_policy_version: "v7.2", current_display_score: 69.99, current_exact_score: 69.998,
-      current_tier: "Solid", current_archetype: null, current_revision_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", current_content_hash: "a".repeat(64),
-      current_snapshot_date: "2026-09-08", current_fetched_at: "2026-09-08T10:00:00Z", current_confidence: null })], error: null, count: 1 };
-    const result = await dbGetAdminUsers(defaultQuery({ tier: "Solid" }), { observed: true });
-    expect(mockFrom).toHaveBeenCalledWith("admin_users_observed");
-    expect(mockOrder).toHaveBeenCalledWith("current_display_score", expect.objectContaining({ ascending: false }));
-    expect(mockEq).toHaveBeenCalledWith("current_tier", "Solid");
-    expect(result.users[0]).toMatchObject({ policyVersion: "v7.2", adjustedComposite: 69.99, rawScore: 69.99, exactScore: 69.998, tier: "Solid", archetype: null, confidence: null });
   });
 });

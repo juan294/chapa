@@ -1,8 +1,9 @@
+import { SCORING_POLICY } from "@chapa/shared";
 import { postWriteScore } from "@/lib/profile/post-write-score";
 import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 import { maybeIssue } from "@/lib/collection/fan-in";
 import { listCollectionJobsForDate } from "@/lib/db/collection-queue";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { verifyAdminSecret } from "@/lib/auth/admin";
@@ -59,7 +60,18 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  const scoringSelection = await readScoringRenderSelection();
+  // #1335 phase 5 — the `scoring_v7_rendering` selector is retired; v7.2 is
+  // the only rendered policy now. `materializeOrchestratedProfile` and
+  // `postWriteScore` (owned elsewhere in this phase) still take the
+  // `ScoringRenderSelection` shape, so this constant stands in for the old
+  // dynamic DB-backed read rather than every downstream signature changing
+  // in lockstep with this route.
+  const scoringSelection: ScoringRenderSelection = {
+    enabled: true,
+    machinePolicy: SCORING_POLICY,
+    cacheable: true,
+    capturedAt: Date.now(),
+  };
   const publications: { handle: string; result: Awaited<ReturnType<typeof postWriteScore>> }[] = [];
 
   // Optional cursor: ?after=<handle> continues an all-user page or resumes a
