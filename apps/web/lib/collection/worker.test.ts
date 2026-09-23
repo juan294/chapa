@@ -63,6 +63,7 @@ function harness(): MutableCollectionWorkerDeps {
     resolveCredential,
     collect: vi.fn().mockResolvedValue(sliceResult()),
     emitDiagnostics: vi.fn(),
+    captureError: vi.fn().mockResolvedValue(undefined),
     onJobComplete: vi.fn().mockResolvedValue(undefined),
     now: vi.fn(() => Date.parse("2026-09-05T12:00:00.000Z")),
   };
@@ -75,6 +76,20 @@ describe("runCollectionSlice", () => {
     deps.resolveCredential = vi.fn().mockResolvedValue({ status: "not_accessible" });
     await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
     expect(deps.collect).not.toHaveBeenCalled();
+    expect(deps.fail).toHaveBeenCalledWith(
+      { id: "job-1", leaseToken: "lease-1" },
+      expect.objectContaining({ stopKind: "not_accessible" }),
+      null,
+    );
+  });
+
+  it("fails immediately with retryAt null for a MID-SLICE not_accessible stop too, not just the credential-resolution stage", async () => {
+    const deps = harness();
+    const stop = { provider: "github" as const, operation: "profile", stopKind: "not_accessible" as const, httpStatus: 401, retryAfterSeconds: null };
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ stop }));
+    await runCollectionSlice(makeJob({ attempt: 0 }), Date.now() + 60_000, deps);
+    // Must not fall into the protocol/parse 3-try retry bucket, which would
+    // compute a non-null backoff retryAt for attempt 0.
     expect(deps.fail).toHaveBeenCalledWith(
       { id: "job-1", leaseToken: "lease-1" },
       expect.objectContaining({ stopKind: "not_accessible" }),
@@ -215,6 +230,43 @@ describe("runCollectionTick", () => {
     expect(deps.claim).toHaveBeenCalledTimes(3);
     expect(result.slicesRun).toBe(2);
     expect(deps.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it("captures a rejected slice via captureError and still runs the other jobs in the same batch", async () => {
+    const deps = harness();
+    const failingJob = makeJob({ id: "job-fail", leaseToken: "lease-fail", provider: "gitlab",
+      lastStop: { provider: "gitlab", operation: "merged", stopKind: "http", httpStatus: 500, retryAfterSeconds: null } });
+    const okJob = makeJob({ id: "job-ok", leaseToken: "lease-ok", provider: "github" });
+    deps.claim = vi.fn().mockResolvedValueOnce([failingJob, okJob]).mockResolvedValueOnce([]);
+    deps.resolveCredential = vi.fn().mockImplementation(async (_owner: string, provider: string) => {
+      if (provider === "gitlab") throw new Error("unexpected credential blowup");
+      return {
+        status: "ok",
+        resolved: {
+          context: { owner: "alice", requestedSource: { provider: "github", host: "github.com", login: "alice" }, window, scope: { discovery: "owned_and_contributed", repositoryIds: [], eventKinds: [] } },
+          token: "fake-token", accessContextId: "a".repeat(64),
+          requested: { provider: "github", host: "github.com", login: "alice" }, link: null,
+        },
+      };
+    });
+
+    const result = await runCollectionTick(240_000, deps);
+
+    // Both jobs in the batch were attempted -- the failing one didn't abort the other.
+    expect(result.slicesRun).toBe(2);
+    expect(deps.checkpoint).toHaveBeenCalledTimes(1); // only okJob reached a checkpoint call
+    expect(deps.captureError).toHaveBeenCalledTimes(1);
+    const [captured] = vi.mocked(deps.captureError).mock.calls[0]!;
+    expect(captured.route).toContain("collection");
+    expect(captured.statusCode).toBe(500);
+    const message = (captured.error as Error).message;
+    expect(message).toContain("job-fail");
+    expect(message).toContain("gitlab");
+    expect(message).toContain("previousStopKind=http");
+    expect(message).toContain("unexpected credential blowup");
+    // No secrets: never the token or access-context HMAC.
+    expect(message).not.toContain("fake-token");
+    expect(message).not.toContain("a".repeat(64));
   });
 
   it("stops claiming inside the tick's safety margin, even if jobs remain", async () => {
