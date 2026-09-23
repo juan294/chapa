@@ -1,16 +1,25 @@
 import "server-only";
 import type { CollectSlice } from "./plan";
+import { collectGitHubSlice } from "@/lib/github/evidence";
+import { collectBitbucketSlice } from "@/lib/bitbucket/evidence";
+import { collectGitlabSlice } from "@/lib/gitlab/evidence";
+import { collectCodebergSlice } from "@/lib/codeberg/evidence";
 
 /**
- * Placeholder for #1335 phase 3 (part B: provider slice collectors). The real
- * implementation dispatches to `lib/{github,bitbucket,gitlab,codeberg}/evidence.ts`'s
- * `collectXSlice` functions, mirroring `lib/platform/source-collectors.ts`'s
- * existing `collectSource` dispatch. Replaced at merge with that
- * implementation -- this branch (part A: queue, worker, cron) only needs the
- * `CollectSlice` shape to exist so `worker.ts` can depend on it.
- *
- * Tests must inject a fake `CollectSlice`, never call this placeholder.
+ * The worker's single entry point into per-provider collection (#1335 phase
+ * 3). A pure dispatch: each provider's own `collectXSlice` is fully
+ * self-contained, including its own canonical identity check as the first
+ * checkpoint operation ("profile" for GitHub, the equivalent `/user` fetch
+ * for the other three) -- so a credential or identity failure surfaces as an
+ * ordinary `stop` on the first slice, through the same checkpoint/budget
+ * mechanics as every other operation, rather than as a one-off call outside
+ * the checkpoint model.
  */
-export const collectSourceSlice: CollectSlice = () => {
-  throw new Error("collectSourceSlice is provided by the provider slice collectors (#1335 phase 3, part B)");
+export const collectSourceSlice: CollectSlice = (input, credential, checkpoint, budget, staged) => {
+  switch (input.requestedSource.provider) {
+    case "github": return collectGitHubSlice(input, credential, checkpoint, budget, staged);
+    case "bitbucket": return collectBitbucketSlice(input, credential, checkpoint, budget, staged);
+    case "gitlab": return collectGitlabSlice(input, credential, checkpoint, budget, staged);
+    case "codeberg": return collectCodebergSlice(input, credential, checkpoint, budget, staged);
+  }
 };

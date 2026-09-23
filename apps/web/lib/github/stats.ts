@@ -11,6 +11,8 @@ import { assessRawFetchIntegrity } from "./stats-integrity";
 export { fetchGitHubEvidence } from "./evidence";
 /** @public Compatibility types for v7 evidence consumers. */
 export type { GitHubEvidenceOptions, GitHubEvidenceResult } from "./evidence";
+/** @public Checkpointed, resumable collector slice API (#1335 phase 3). */
+export { collectGitHubSlice, githubMergedSearchRanges } from "./evidence";
 
 // ---------------------------------------------------------------------------
 // fetchStats — main aggregation function
