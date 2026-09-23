@@ -40,6 +40,8 @@ export { computePlatformStats } from "./platform-stats";
 export type { PlatformStatsInput, NormalizedRepo, NormalizedMergedPr } from "./platform-stats";
 export { computePrWeight } from "./scoring";
 export { formatCompact } from "./format";
+export { SCORING_POLICY } from "./scoring-policy";
+export type { ScoringPolicy } from "./scoring-policy";
 export {
   SCORING_WINDOW_DAYS,
   PR_WEIGHT_AGG_CAP,

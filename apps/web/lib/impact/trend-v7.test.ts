@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateTrendV7 } from "./smoothing";
+import { calculateTrendV7 } from "./trend-v7";
 import type { TrendAnchor, PublicScoringReceipt } from "@chapa/shared";
 const prior: TrendAnchor = { policyVersion: "v7", referenceDate: "2026-09-01", receiptRevisionId: "prior", rawPoint: 60, unroundedValue: 60, previousAnchorRevisionId: null };
 function receipt(date: string, value: number): Pick<PublicScoringReceipt, "policyVersion" | "revisionId" | "window" | "core" | "action"> {
