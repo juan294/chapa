@@ -8,11 +8,23 @@ const { mockDbIsScoringSubject, mockListCollectionJobsForDate, mockDbReadObserve
 }));
 
 vi.mock("@/lib/db/scoring-subjects", () => ({ dbIsScoringSubject: mockDbIsScoringSubject }));
-vi.mock("@/lib/db/collection-queue", () => ({ listCollectionJobsForDate: mockListCollectionJobsForDate }));
+// #1335 phase 4 perf fix — a partial mock: hasDrawableCurrentReceipt's new
+// import chain (score-model -> score-receipt-observed -> score-receipt-v7 ->
+// source-collectors) references several other exports of this module (e.g.
+// enqueueCollectionJob) at import time, even though this test's flow never
+// calls them. importOriginal keeps those real (unused) while still
+// overriding listCollectionJobsForDate.
+vi.mock("@/lib/db/collection-queue", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/db/collection-queue")>(),
+  listCollectionJobsForDate: (...args: unknown[]) => mockListCollectionJobsForDate(...args),
+}));
 vi.mock("@/lib/db/score-receipts-observed", () => ({ dbReadObservedReceipt: mockDbReadObservedReceipt }));
 vi.mock("@/lib/analytics/server-errors", () => ({ captureServerError: mockCaptureServerError }));
 
-import { readScoringStatus } from "./read-scoring-status";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "./read-scoring-status";
+
+const V72 = { enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt: Date.now() };
+const V6 = { enabled: false, machinePolicy: "v6" as const, cacheable: true, capturedAt: Date.now() };
 
 beforeEach(() => {
   mockDbIsScoringSubject.mockReset();
@@ -100,5 +112,57 @@ describe("readScoringStatus", () => {
     expect(captured.route).toBe("lib/collection/read-scoring-status");
     expect((captured.error as Error).message).toContain("octocat");
     expect(Object.keys(captured).sort()).toEqual(["error", "route", "statusCode"]);
+  });
+});
+
+// #1335 phase 4 perf fix — badge.svg/og-image/the share page must not pay
+// readScoringStatus's 3 DB reads (subject + jobs + receipt) on a warm
+// cache hit for a ready receipt. `hasDrawableCurrentReceipt` reuses the same
+// single-read authority (`readRenderableReceipt`, via the mocked
+// `dbReadObservedReceipt` above) that `materializeProfile` itself already
+// relies on, so a caller can decide to skip `readScoringStatus` entirely
+// without inventing a second receipt-reading code path.
+describe("hasDrawableCurrentReceipt", () => {
+  it("is true for a found, non-retracted receipt", async () => {
+    mockDbReadObservedReceipt.mockResolvedValue({
+      status: "found",
+      isCurrent: true,
+      envelope: { receipt: { action: "publish", window: { referenceDate: "2026-09-22" } } },
+    });
+    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(true);
+  });
+
+  it("is false when no receipt has ever been published", async () => {
+    mockDbReadObservedReceipt.mockResolvedValue({ status: "missing" });
+    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(false);
+  });
+
+  it("is false for a retracted receipt", async () => {
+    mockDbReadObservedReceipt.mockResolvedValue({
+      status: "found",
+      isCurrent: true,
+      envelope: { receipt: { action: "retract", window: { referenceDate: "2026-09-20" } } },
+    });
+    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(false);
+  });
+
+  it("is false when the receipt authority read itself fails", async () => {
+    mockDbReadObservedReceipt.mockResolvedValue({ status: "unavailable" });
+    expect(await hasDrawableCurrentReceipt("octocat", V72)).toBe(false);
+  });
+
+  it("is false when the read throws unexpectedly, never bubbling the error", async () => {
+    mockDbReadObservedReceipt.mockRejectedValue(new Error("boom"));
+    await expect(hasDrawableCurrentReceipt("octocat", V72)).resolves.toBe(false);
+  });
+
+  it("is false under an explicit v6 selection, without even reading the receipt", async () => {
+    mockDbReadObservedReceipt.mockResolvedValue({
+      status: "found",
+      isCurrent: true,
+      envelope: { receipt: { action: "publish", window: { referenceDate: "2026-09-22" } } },
+    });
+    expect(await hasDrawableCurrentReceipt("octocat", V6)).toBe(false);
+    expect(mockDbReadObservedReceipt).not.toHaveBeenCalled();
   });
 });

@@ -26,7 +26,7 @@ import { isGitHubUserNotFound } from "@/lib/github/not-found";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { getServerT } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
-import { readScoringStatus } from "@/lib/collection/read-scoring-status";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "@/lib/collection/read-scoring-status";
 import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, needsUnavailablePlaceholder, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
@@ -106,8 +106,14 @@ export async function GET(
   // instead of a legacy fallback or an empty materialize. Gated to v7.2 only;
   // a null status (a failed authority read, or a v6 selection) leaves this
   // route's existing behavior untouched.
+  //
+  // #1335 phase 4 perf fix — skip `readScoringStatus` (3 DB reads) whenever
+  // `hasDrawableCurrentReceipt` (the same single receipt read the normal
+  // materialize pipeline already does) finds a drawable current receipt; a
+  // warm cache hit just below must not pay for it. See badge.svg's own
+  // comment for the full rationale.
   let scoringStatus: ScoringStatus | null = null;
-  if (scoringSelection.machinePolicy === "v7.2") {
+  if (scoringSelection.machinePolicy === "v7.2" && !(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
     try {
       scoringStatus = await readScoringStatus(handle);
     } catch (err) {

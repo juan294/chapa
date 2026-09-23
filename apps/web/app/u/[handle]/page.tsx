@@ -65,7 +65,7 @@ import { explainReceipt, explainObservedReceipt } from "@/lib/dashboard/receipt-
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 import { dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
-import { readScoringStatus } from "@/lib/collection/read-scoring-status";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "@/lib/collection/read-scoring-status";
 import { badgeStatusState, needsUnavailablePlaceholder, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import { SharePageScoringStatus } from "./SharePageScoringStatus";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
@@ -250,8 +250,13 @@ export async function SharePageContent({
   // that branch) keeps its untouched pre-phase-4 behavior. A null status
   // (a failed authority read, or a v6 selection) takes neither branch below
   // and this function continues exactly as it did before this phase.
+  //
+  // #1335 phase 4 perf fix — skip `readScoringStatus` (3 DB reads) whenever
+  // `hasDrawableCurrentReceipt` (the same single receipt read
+  // `materializePublicProfile` below already does) finds a drawable current
+  // receipt. See badge.svg's own comment for the full rationale.
   let scoringStatus: ScoringStatus | null = null;
-  if (scoringSelection.machinePolicy === "v7.2") {
+  if (scoringSelection.machinePolicy === "v7.2" && !(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
     try {
       scoringStatus = await readScoringStatus(handle);
     } catch (err) {

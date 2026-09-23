@@ -47,7 +47,7 @@ import {
   type ServerTimingEntry,
 } from "@/lib/monitoring/latency-slo";
 import { interpolate } from "@/lib/i18n/interpolate";
-import { readScoringStatus } from "@/lib/collection/read-scoring-status";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "@/lib/collection/read-scoring-status";
 import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, needsUnavailablePlaceholder, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
@@ -504,8 +504,18 @@ export async function GET(
   // authority read failed, or this is a v6 selection — takes neither branch
   // below and the route continues exactly as it did before this phase: no new
   // cache-header behavior is invented for a failed status read.
+  //
+  // #1335 phase 4 perf fix — `readScoringStatus` runs 3 DB reads (subject +
+  // jobs + receipt). `hasDrawableCurrentReceipt` reuses the SAME single
+  // receipt read the normal materialize pipeline already does, so a handle
+  // with a drawable current receipt skips `readScoringStatus` entirely: the warm
+  // cache-hit branch just below never pays for it, which is what put this
+  // route's 800ms cache-hit SLO (lib/monitoring/latency-slo.ts) at risk. The
+  // cache itself (exact receipt manifest in the key, forced before/after-
+  // write checks) already fences a retraction without needing the status
+  // read — see CLAUDE.md's "Caching rules".
   let scoringStatus: ScoringStatus | null = null;
-  if (scoringSelection.machinePolicy === "v7.2") {
+  if (scoringSelection.machinePolicy === "v7.2" && !(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
     try {
       scoringStatus = await readScoringStatus(handle);
     } catch (err) {

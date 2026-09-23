@@ -7,13 +7,22 @@ vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
 // mentions scoring status) keeps rendering through the normal pipeline below,
 // exactly as before this phase. Tests for the new collecting/action_needed/
 // unregistered states override this per-test.
-const { mockReadScoringStatus } = vi.hoisted(() => ({ mockReadScoringStatus: vi.fn() }));
+// #1335 phase 4 perf fix — `mockHasDrawableCurrentReceipt` defaults to
+// `false` so every pre-existing test (none of which mock it) keeps calling
+// `readScoringStatus` exactly as before; tests proving the perf fix itself
+// override it to `true` and assert `readScoringStatus` was never called.
+const { mockReadScoringStatus, mockHasDrawableCurrentReceipt } = vi.hoisted(() => ({
+  mockReadScoringStatus: vi.fn(),
+  mockHasDrawableCurrentReceipt: vi.fn(),
+}));
 vi.mock("@/lib/collection/read-scoring-status", () => ({
   readScoringStatus: (...args: unknown[]) => mockReadScoringStatus(...args),
+  hasDrawableCurrentReceipt: (...args: unknown[]) => mockHasDrawableCurrentReceipt(...args),
 }));
 beforeEach(() => {
   mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
   mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
+  mockHasDrawableCurrentReceipt.mockResolvedValue(false);
 });
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -1983,6 +1992,29 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [request, ctx] = makeRequest("testuser");
       await GET(request, ctx);
       expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    // #1335 phase 4 perf fix.
+    describe("readScoringStatus skipped for a drawable current receipt", () => {
+      it("never calls readScoringStatus on a cache MISS when a drawable receipt exists", async () => {
+        mockHasDrawableCurrentReceipt.mockResolvedValue(true);
+        const [request, ctx] = makeRequest("testuser");
+        await GET(request, ctx);
+        expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser", expect.objectContaining({ machinePolicy: "v7.2" }));
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      });
+
+      it("never calls readScoringStatus, and never runs materialize, on a warm cache HIT for a ready receipt", async () => {
+        mockHasDrawableCurrentReceipt.mockResolvedValue(true);
+        mockCacheGet.mockResolvedValue(FAKE_SVG);
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+        expect(await response.text()).toBe(FAKE_SVG);
+        expect(response.headers.get("Server-Timing")).toContain('cache;desc="hit"');
+      });
     });
 
     it("never gates on status under an explicit v6 selection (phase 5 deletes that branch)", async () => {

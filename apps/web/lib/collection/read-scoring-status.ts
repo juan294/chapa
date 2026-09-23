@@ -4,8 +4,29 @@ import { listCollectionJobsForDate } from "@/lib/db/collection-queue";
 import { dbIsScoringSubject } from "@/lib/db/scoring-subjects";
 import { dbReadObservedReceipt } from "@/lib/db/score-receipts-observed";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { readRenderableReceipt } from "@/lib/profile/score-model";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { deriveScoringStatus, type ReceiptSummary } from "./status";
 import type { ScoringStatus } from "./scoring-status";
+
+/**
+ * True when the existing current-receipt authority (`readRenderableReceipt`
+ * — the same single read `materializeProfile` itself already relies on)
+ * finds a drawable, non-retracted v7.2 receipt for `handle`. Callers use
+ * this to decide whether `readScoringStatus` below is even necessary: a
+ * drawable receipt already proves the render is "ready", so paying for
+ * `readScoringStatus`'s extra subject + jobs reads (3 DB reads total) would
+ * be redundant — and a warm cache hit for a ready receipt must never pay
+ * for them at all (#1335 phase 4 perf fix, `lib/monitoring/latency-slo.ts`'s
+ * 800ms cache-hit budget). `false` — no receipt, a retracted one, or the
+ * read itself failing — is the only case that should still call
+ * `readScoringStatus`. See badge.svg/og-image/the share page's status-
+ * gating blocks for the call site.
+ */
+export async function hasDrawableCurrentReceipt(handle: string, scoringSelection: ScoringRenderSelection): Promise<boolean> {
+  const receipt = await readRenderableReceipt(handle, scoringSelection);
+  return !!(receipt && "receipt" in receipt);
+}
 
 /**
  * Reads the owner-visible `ScoringStatus` for a handle (#1335 phase 4):
