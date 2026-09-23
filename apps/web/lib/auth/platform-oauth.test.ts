@@ -18,6 +18,8 @@ const {
   mockComputeTokenExpiry,
   mockIssueOauthState,
   mockConsumeOauthState,
+  mockEnqueueCollection,
+  mockReadScoringRenderSelection,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockDbUpsertLinkedPlatform: vi.fn(),
@@ -31,6 +33,8 @@ const {
   mockComputeTokenExpiry: vi.fn(),
   mockIssueOauthState: vi.fn(),
   mockConsumeOauthState: vi.fn(),
+  mockEnqueueCollection: vi.fn(),
+  mockReadScoringRenderSelection: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -67,6 +71,14 @@ vi.mock("@/lib/auth/bitbucket", () => ({
 vi.mock("@/lib/auth/oauth-state", () => ({
   issueOauthState: mockIssueOauthState,
   consumeOauthState: mockConsumeOauthState,
+}));
+
+vi.mock("@/lib/collection/enqueue", () => ({
+  enqueueCollection: mockEnqueueCollection,
+}));
+
+vi.mock("@/lib/scoring-render-selection", () => ({
+  readScoringRenderSelection: mockReadScoringRenderSelection,
 }));
 
 vi.mock("next/cache", () => ({
@@ -367,10 +379,29 @@ describe("createCallbackHandler", () => {
     mockComputeTokenExpiry.mockReturnValue(new Date("2026-03-01T00:00:00Z"));
     mockDbUpsertLinkedPlatform.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
+    mockEnqueueCollection.mockResolvedValue([]);
+    mockReadScoringRenderSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
   });
 
   afterEach(() => {
     clearEnvVars();
+  });
+
+  it("enqueues a reconnect collection job scoped to this one provider after a successful link (#1335 phase 4)", async () => {
+    await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
+    expect(mockEnqueueCollection).toHaveBeenCalledWith("testuser", "reconnect", "testplatform");
+  });
+
+  it("never enqueues collection while v7.2 rendering is off", async () => {
+    mockReadScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+    await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
+  });
+
+  it("never enqueues collection when storing the linked platform fails", async () => {
+    mockDbUpsertLinkedPlatform.mockResolvedValue(false);
+    await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
   });
 
   it("returns 404 when feature flag is disabled", async () => {

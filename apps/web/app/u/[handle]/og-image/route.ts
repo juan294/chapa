@@ -24,6 +24,11 @@ import {
 } from "@/lib/profile/public-profile";
 import { isGitHubUserNotFound } from "@/lib/github/not-found";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
+import { getServerT } from "@/lib/i18n/server";
+import { interpolate } from "@/lib/i18n/interpolate";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "@/lib/collection/read-scoring-status";
+import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, needsUnavailablePlaceholder, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000;
@@ -95,6 +100,47 @@ export async function GET(
   const badgeLocale = resolveBadgeLocale(locale, scoringSelection.machinePolicy);
   const ogCacheKey = buildOgImageCacheKey(handle, today, locale, scoringSelection.machinePolicy);
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+
+  // #1335 phase 4 — same status gating as badge.svg: under the v7.2
+  // selection, a handle with no ready receipt renders its scoring state
+  // instead of a legacy fallback or an empty materialize. Gated to v7.2 only;
+  // a null status (a failed authority read, or a v6 selection) leaves this
+  // route's existing behavior untouched.
+  //
+  // #1335 phase 4 perf fix — skip `readScoringStatus` (3 DB reads) whenever
+  // `hasDrawableCurrentReceipt` (the same single receipt read the normal
+  // materialize pipeline already does) finds a drawable current receipt; a
+  // warm cache hit just below must not pay for it. See badge.svg's own
+  // comment for the full rationale.
+  let scoringStatus: ScoringStatus | null = null;
+  if (scoringSelection.machinePolicy === "v7.2" && !(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
+    try {
+      scoringStatus = await readScoringStatus(handle);
+    } catch (err) {
+      scoringStatus = null;
+      void captureServerError({ route: `/u/${handle}/og-image`, statusCode: 500, error: err });
+    }
+  }
+  const badgeState = scoringStatus ? badgeStatusState(scoringStatus) : null;
+  if (badgeState && scoringStatus) {
+    try {
+      const t = getServerT(locale);
+      const statusSvg = renderBadgeStatusSvg(badgeState, {
+        handle,
+        percent: scoringStatus.kind === "collecting" ? scoringStatus.percent : undefined,
+        config: configSnapshot.config,
+        disableAnimation: true,
+        strings: buildBadgeStatusStrings((key) => t(key) as string, scoringStatus as NonReadyScoringStatus, interpolate),
+      });
+      const statusPng = await withTimeout(svgToPng(statusSvg, 1200), SVG_TO_PNG_TIMEOUT_MS, "svgToPng");
+      return new NextResponse(Buffer.from(statusPng), { headers: ogImageNoStoreHeaders(scoringSelection) });
+    } catch (err) {
+      console.error("[og-image] failed to render status placeholder:", err);
+      // Fall through to the normal pipeline below rather than fail the whole
+      // request over a status-placeholder rendering hiccup.
+    }
+  }
+
   const expectedVersion = configSnapshot.cacheable && scoringSelection.cacheable
     ? buildOgImageCacheVersion(today, configSnapshot.revision, scoringSelection.machinePolicy)
     : null;
@@ -144,6 +190,32 @@ export async function GET(
     }
     if (!materialized) {
       return new NextResponse("Could not load data", { status: 404, headers: ERROR_CACHE_HEADERS });
+    }
+
+    // #1335 phase 4 fix — `scoringStatus === null` means the
+    // `readScoringStatus` authority read itself failed under v7.2 (not "no
+    // receipt found"; that is its own real `ScoringStatus`). "Failed
+    // authority reads are unavailable": this must never silently fall
+    // through to whatever the normal materialize pipeline's OWN independent
+    // receipt lookup produces when THAT also has no v7.2 receipt to draw. A
+    // handle WITH a drawable receipt (found independently right here) still
+    // rasterizes it normally below — reuses the exact same status-
+    // placeholder path as `collecting`/`action_needed`/`unregistered`.
+    if (needsUnavailablePlaceholder(scoringSelection, scoringStatus, materialized.scoring?.policyVersion)) {
+      try {
+        const t = getServerT(locale);
+        const statusSvg = renderBadgeStatusSvg("unavailable", {
+          handle,
+          disableAnimation: true,
+          strings: buildBadgeUnavailableStrings((key) => t(key) as string),
+        });
+        const statusPng = await withTimeout(svgToPng(statusSvg, 1200), SVG_TO_PNG_TIMEOUT_MS, "svgToPng");
+        return new NextResponse(Buffer.from(statusPng), { headers: ogImageNoStoreHeaders(scoringSelection) });
+      } catch (err) {
+        console.error("[og-image] failed to render unavailable placeholder:", err);
+        // Fall through to the normal pipeline below rather than fail the
+        // whole request over a rendering hiccup on the placeholder.
+      }
     }
 
     const avatarDataUri = materialized.stats.avatarUrl

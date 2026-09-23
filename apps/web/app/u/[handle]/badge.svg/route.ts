@@ -47,6 +47,9 @@ import {
   type ServerTimingEntry,
 } from "@/lib/monitoring/latency-slo";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "@/lib/collection/read-scoring-status";
+import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, needsUnavailablePlaceholder, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 export const maxDuration = 35;
 
@@ -492,6 +495,70 @@ export async function GET(
   // overhead (#882 — rate limit moved to cache-MISS branch only).
   const readOnly = request.nextUrl.searchParams.get(READ_ONLY_SMOKE_PARAM) === "1";
   const scoringSelection = await readScoringRenderSelection();
+
+  // #1335 phase 4 — under the current v7.2 selection, a handle with no ready
+  // receipt renders its scoring STATE (collecting/action_needed/unregistered)
+  // instead of falling through to a legacy v6 render or an empty materialize.
+  // Gated to v7.2 only: an explicit v6 selection (phase 5 deletes that branch
+  // entirely) keeps its existing behavior untouched. A null status — the
+  // authority read failed, or this is a v6 selection — takes neither branch
+  // below and the route continues exactly as it did before this phase: no new
+  // cache-header behavior is invented for a failed status read.
+  //
+  // #1335 phase 4 perf fix — `readScoringStatus` runs 3 DB reads (subject +
+  // jobs + receipt). `hasDrawableCurrentReceipt` reuses the SAME single
+  // receipt read the normal materialize pipeline already does, so a handle
+  // with a drawable current receipt skips `readScoringStatus` entirely: the warm
+  // cache-hit branch just below never pays for it, which is what put this
+  // route's 800ms cache-hit SLO (lib/monitoring/latency-slo.ts) at risk. The
+  // cache itself (exact receipt manifest in the key, forced before/after-
+  // write checks) already fences a retraction without needing the status
+  // read — see CLAUDE.md's "Caching rules".
+  let scoringStatus: ScoringStatus | null = null;
+  if (scoringSelection.machinePolicy === "v7.2" && !(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
+    try {
+      scoringStatus = await readScoringStatus(handle);
+    } catch (err) {
+      scoringStatus = null;
+      fireAndForget(() => captureServerError({
+        route: `/u/${handle}/badge.svg`,
+        statusCode: 500,
+        error: err,
+      }));
+    }
+  }
+  const badgeState = scoringStatus ? badgeStatusState(scoringStatus) : null;
+  if (badgeState && scoringStatus) {
+    try {
+      const t = getServerT(locale);
+      const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+      const svg = renderBadgeStatusSvg(badgeState, {
+        handle,
+        percent: scoringStatus.kind === "collecting" ? scoringStatus.percent : undefined,
+        config: configSnapshot.config,
+        disableAnimation: true,
+        strings: buildBadgeStatusStrings((key) => t(key) as string, scoringStatus as NonReadyScoringStatus, interpolate),
+      });
+      // Every non-ready state is sent no-store (phase-4 plan, "Surfaces"):
+      // there is nothing to cache yet, and the state can change on the next
+      // collection tick.
+      return badgeSvgResponse(svg, {
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "private, no-store, max-age=0",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }, startedAt, []);
+    } catch (err) {
+      fireAndForget(() => captureServerError({
+        route: `/u/${handle}/badge.svg`,
+        statusCode: 500,
+        error: err,
+      }));
+      // Fall through to the normal pipeline below rather than 500ing on a
+      // legal handle — a rendering hiccup on the status placeholder is not
+      // a reason to fail the whole request.
+    }
+  }
+
   const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
   // #1181 — locale is part of the shared SVG cache key so an es- and
   // en-rendered badge for the same handle/day never collide. Doubles cache
@@ -790,6 +857,50 @@ export async function GET(
     // Re-bind to a `const` now that `materialized` is known non-null — `let`
     // narrowing does not persist into the `after()` closure below.
     const profile = materialized;
+
+    // #1335 phase 4 fix — `scoringStatus === null` means the
+    // `readScoringStatus` authority read itself failed under v7.2 (not "no
+    // receipt found"; that is its own real `ScoringStatus`). The plan's
+    // invariant is "failed authority reads are unavailable": this must never
+    // silently fall through to a legacy v6 render just because the normal
+    // materialize pipeline's OWN independent receipt lookup also came up
+    // without a v7.2 receipt. A handle WITH a drawable receipt (found
+    // independently right here) still renders it normally below — this
+    // reuses the exact same status-placeholder path as `collecting`/
+    // `action_needed`/`unregistered` rather than inventing a second one.
+    if (needsUnavailablePlaceholder(scoringSelection, scoringStatus, profile.scoring?.policyVersion)) {
+      try {
+        const t = getServerT(locale);
+        const svg = renderBadgeStatusSvg("unavailable", {
+          handle,
+          disableAnimation: true,
+          strings: buildBadgeUnavailableStrings((key) => t(key) as string),
+        });
+        const unavailableResult = {
+          svg,
+          headers: {
+            "Content-Type": "image/svg+xml",
+            "Cache-Control": "private, no-store, max-age=0",
+            "Vercel-CDN-Cache-Control": "no-store",
+          },
+          selection: scoringSelection,
+        } satisfies BadgeRenderResult;
+        deferred.resolve(unavailableResult);
+        return badgeSvgResponse(unavailableResult.svg, unavailableResult.headers, startedAt, [
+          ...cacheTimeoutMetric,
+          { name: "materialize", durMs: materializeMs },
+        ]);
+      } catch (err) {
+        fireAndForget(() => captureServerError({
+          route: `/u/${handle}/badge.svg`,
+          statusCode: 500,
+          error: err,
+        }));
+        // Fall through to the normal render below rather than 500 on a
+        // legal handle over a rendering hiccup on the unavailable placeholder.
+      }
+    }
+
     const { svg, verification, renderMs, avatarCachePolicy, configCacheable, configRevision } = await finalizeMaterializedBadge(
       handle,
       profile,

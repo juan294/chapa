@@ -6,6 +6,7 @@ import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { SettingsClient } from "./SettingsClient";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
+import { ScoringStatusPanel } from "./ScoringStatusPanel";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 // Session-gated like /studio, not a public content page (#1223): it reads the
@@ -58,7 +59,17 @@ export default async function SettingsPage() {
           {/* Server-rendered: the evidence ledger is owner-only data and must
               never cross into the client tree for anyone else (#1067's rule,
               applied to evidence rather than confidence). */}
-          <div className="mx-auto max-w-4xl px-6 pb-16">
+          <div className="mx-auto max-w-4xl px-6 pb-16 space-y-8">
+            {/* #1335 phase 4 — the owner's own scoring status. The panel
+                fetches GET /api/scoring/status itself (no server-resolved
+                status passed here); a v6 selection has no such contract yet,
+                so this section is skipped entirely rather than showing a
+                panel with nothing meaningful to say. */}
+            {scoringSelection.machinePolicy === "v7.2" && (
+              <div className="border-t border-stroke pt-8">
+                <ScoringStatusPanel />
+              </div>
+            )}
             <EvidenceWorkflow handle={session.login} locale={locale} />
           </div>
         </div>

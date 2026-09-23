@@ -113,6 +113,9 @@ vi.mock("@/lib/history/significant-change", () => ({
 
 vi.mock("@/lib/profile/score-model", () => ({ readRenderableReceipt: vi.fn(async () => null) }));
 
+const { mockEnqueueCollection } = vi.hoisted(() => ({ mockEnqueueCollection: vi.fn(async () => []) }));
+vi.mock("@/lib/collection/enqueue", () => ({ enqueueCollection: mockEnqueueCollection }));
+
 vi.mock("@/lib/email/score-bump", () => ({
   notifyObservedScoreChange: vi.fn(async () => false),
   notifyScoreBump: (...args: unknown[]) => mockNotifyScoreBump(...args),
@@ -381,19 +384,24 @@ it("reports raw-retention failures without claiming deletion success", async () 
     expect(mockNotifyScoreBump).not.toHaveBeenCalled();
   });
 
-  it("compares published observed revisions captured around issuance, never legacy snapshots", async () => {
-    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
-    const { readRenderableReceipt } = await import("@/lib/profile/score-model");
-    const { notifyObservedScoreChange } = await import("@/lib/email/score-bump");
-    const before = await scoringConsistencyFixture();
-    const after = await scoringConsistencyFixture({ boundary: true });
-    const model = { ...after.model, identity: { ...after.model.identity!, revisionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } };
-    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
-    vi.mocked(readRenderableReceipt).mockResolvedValueOnce({ receipt: before.envelope, trend: null });
-    mockMaterializeOrchestratedProfile.mockResolvedValue({ ...FAKE_MATERIALIZED, scoring: model });
+  // #1335 phase 4 — the "score changed" observed-revision comparison that
+  // used to live here compared a receipt read before this cron's own
+  // synchronous issuance against one read after it, within the same warm
+  // pass. Issuance is no longer synchronous (fan-in owns it, from the
+  // collect-evidence cron); see the deviation note beside warmHandle's
+  // `enqueueCollection` call in route.ts. This test covered exactly that
+  // removed comparison and is retired with it.
+
+  it("enqueues a daily collection job for every warmed handle while v7.2 rendering is on (#1335 phase 4)", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
     await GET(makeRequest());
-    expect(notifyObservedScoreChange).toHaveBeenCalledWith("alice", expect.objectContaining({ status: "comparable", current: expect.objectContaining({ identity: model.identity, composite: expect.objectContaining({ display: 69.99 }) }) }));
-    expect(mockCompareSnapshots).not.toHaveBeenCalled();
+    expect(mockEnqueueCollection).toHaveBeenCalledWith("alice", "daily");
+  });
+
+  it("never enqueues collection while v7.2 rendering is off", async () => {
+    mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+    await GET(makeRequest());
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
   });
 
   it("skips notifications when the snapshot was not persisted", async () => {

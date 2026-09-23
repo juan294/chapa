@@ -1,4 +1,4 @@
-import { postWriteScore } from "@/lib/profile/post-write-score";
+import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
@@ -8,7 +8,6 @@ import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -99,12 +98,11 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     history: true,
   });
 
-  // #1311 — recalculate exists to make a subject's published numbers current
-  // after a scoring change, so a registered subject's receipt is re-issued here
-  // for the same reason the snapshot was rewritten above.
-  const issuance = await issueScoreReceipt(handle, { token: auth.token, scoringSelection });
-
-  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
+  // #1335 phase 4 — recalculate exists to make a subject's published numbers
+  // current after a scoring change, so it (re-)enqueues collection for the
+  // same reason the snapshot was rewritten above. Issuance itself happens
+  // only from fan-in, once every connected source is complete.
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh", scoringSelection);
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
@@ -114,9 +112,9 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
 
   revalidatePath(`/u/${handle}`);
 
-  if (publishedScore.status !== "legacy") return NextResponse.json({
+  if (scoringStatus) return NextResponse.json({
     success: true,
-    ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : { policyVersion: "v7.2", displayScore: null, exactScore: null, compositeScore: null, adjustedComposite: null, scoring: null, publication: "pending" }),
+    scoringStatus,
     legacy: { impact: materialized.displayImpact },
   }, { headers: { "Cache-Control": "no-store" } });
 

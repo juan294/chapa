@@ -504,6 +504,91 @@ describe("GeneratingProgress", () => {
     vi.unstubAllGlobals();
   });
 
+  // #1335 phase 4 — best-effort status-percent polling after a successful
+  // generate. Purely additive decoration: the fixed step animation and
+  // redirect (covered above) never depend on it.
+  describe("scoring status polling (#1335 phase 4)", () => {
+    it("polls /api/scoring/status after generate succeeds and shows a real percent on step 1", async () => {
+      vi.stubGlobal("fetch", vi.fn((url: string) => {
+        if (url === "/api/scoring/status") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ scoringStatus: { kind: "collecting", percent: 37 } }),
+          });
+        }
+        return Promise.resolve({ ok: true });
+      }));
+      render(<GeneratingProgress handle="testuser" />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(document.querySelector('[data-step="1"]')?.textContent).toContain("37%");
+      expect(fetch).toHaveBeenCalledWith("/api/scoring/status");
+      vi.unstubAllGlobals();
+    });
+
+    it("stops polling (schedules no further timer) once the status is ready", async () => {
+      vi.stubGlobal("fetch", vi.fn((url: string) => {
+        if (url === "/api/scoring/status") {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ scoringStatus: { kind: "ready" } }),
+          });
+        }
+        return Promise.resolve({ ok: true });
+      }));
+      const { unmount } = render(<GeneratingProgress handle="testuser" />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // No percent shown for a ready status.
+      expect(document.querySelector('[data-step="1"]')?.textContent).not.toContain("%");
+
+      unmount();
+      // Every timer — including any the poll effect might have scheduled —
+      // is cancelled on unmount; a ready status schedules none in the first
+      // place, so this is 0 either way.
+      expect(vi.getTimerCount()).toBe(0);
+      vi.unstubAllGlobals();
+    });
+
+    it("degrades silently (no crash, no percent) when the status endpoint fails", async () => {
+      vi.stubGlobal("fetch", vi.fn((url: string) => {
+        if (url === "/api/scoring/status") return Promise.reject(new Error("network"));
+        return Promise.resolve({ ok: true });
+      }));
+      render(<GeneratingProgress handle="testuser" />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(document.querySelector('[data-step="1"]')?.textContent).not.toContain("%");
+      expect(screen.queryByRole("alert")).toBeNull();
+      vi.unstubAllGlobals();
+    });
+
+    it("never starts polling when generate itself fails", async () => {
+      const fetchMock = vi.fn((url: string) => {
+        if (url === "/api/scoring/status") throw new Error("should not be called");
+        return Promise.resolve({ ok: false });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      render(<GeneratingProgress handle="testuser" />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(fetchMock).not.toHaveBeenCalledWith("/api/scoring/status");
+      vi.unstubAllGlobals();
+    });
+  });
+
   it("activates each generation step before marking it done", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
     render(<GeneratingProgress handle="testuser" />);

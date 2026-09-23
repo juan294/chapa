@@ -124,7 +124,7 @@ export async function launchLocalScoringQualification(root: string, evidenceDir:
   // Fixture helpers read only this explicitly constructed local environment.
   process.env = environment;
   const { bootstrapRedesignFixtures } = await import("../../apps/web/e2e/helpers/redesign-fixtures");
-  const { bootstrapScoringPointFixtures } = await import("../../apps/web/e2e/helpers/scoring-point-fixtures");
+  const { bootstrapScoringPointFixtures, bootstrapCollectionQueueFixtures, githubZeroActivityResponses } = await import("../../apps/web/e2e/helpers/scoring-point-fixtures");
   const referenceTime = new Date().toISOString();
   const cleanupTasks: (() => Promise<void>)[] = [];
   const cleanup = async () => {
@@ -139,14 +139,26 @@ export async function launchLocalScoringQualification(root: string, evidenceDir:
     cleanupTasks.push(redesign.cleanup);
     const scoring = await bootstrapScoringPointFixtures(redesign.db, { referenceTime });
     cleanupTasks.push(scoring.cleanup);
+    // #1335 phase 4.8 — the durable collection-queue spec's fixture owners.
+    // Distinct from `scoring` above: these seed a receipt via the real
+    // collector (a queued job + `/api/cron/collect-evidence` against
+    // `githubCollectionResponses`), never a direct receipt write.
+    const collectionQueue = await bootstrapCollectionQueueFixtures(redesign.db, { referenceTime });
+    cleanupTasks.push(collectionQueue.cleanup);
     const upstream = JSON.parse(await readFile(environment.REDESIGN_FIXTURE_FILE!, "utf8"));
     upstream.qualificationHealth = true;
     // Redis is real. This file contains provider replay only; the legacy in-memory cache branch stays unused.
-    const cache = { ...upstream.cache, ...scoring.cache };
+    const cache = { ...upstream.cache, ...scoring.cache, ...collectionQueue.cache };
     upstream.cache = {};
     // Use the same captured raw ancillary dataset as the scoring stats seed.
     const { buildRedesignGitHubFixture } = await import("../../apps/web/e2e/helpers/redesign-github");
     for (const handle of Object.keys(scoring.publicManifest.owners)) upstream.github[handle] = buildRedesignGitHubFixture(handle, referenceTime).response;
+    // The profile materializer's getStats() call needs a CONTRIBUTION_QUERY
+    // answer for these handles too, even though their v7.2 score comes from
+    // the collection queue, not this stats fetch (see
+    // bootstrapCollectionQueueFixtures's header comment).
+    Object.assign(upstream.github, collectionQueue.github);
+    upstream.githubCollectionResponses = githubZeroActivityResponses();
     await writeFile(environment.REDESIGN_FIXTURE_FILE!, JSON.stringify(upstream), { mode: 0o600 });
     cleanupTasks.push(await seedQualificationCache(environment.UPSTASH_REDIS_REST_URL!, environment.UPSTASH_REDIS_REST_TOKEN!, cache));
     const preload = join(root, "apps/web/e2e/helpers/redesign-upstream.mjs");

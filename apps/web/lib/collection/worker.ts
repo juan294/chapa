@@ -3,17 +3,21 @@ import { randomUUID } from "node:crypto";
 import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import {
   checkpointCollectionJob, claimCollectionJobs, failCollectionJob, finishCollectionJob, listStagedEventKeys,
-  type CollectionJob, type CollectionProgress,
+  dbReadCollectionQueueHealth, type CollectionJob, type CollectionProgress, type CollectionQueueHealth,
 } from "@/lib/db/collection-queue";
 import { discoverStoredSource, readSourceObservation, type SourceStorageContext } from "@/lib/db/source-context";
 import { readSourceAuthorization, type SourceAuthorization, type SourceProvider } from "@/lib/platform/source-authorization";
 import { refreshSourceLink } from "@/lib/platform/source-refresh";
 import { createSourceContext, type SourceContextInput } from "@/lib/platform/source-context";
-import { emitSourceDiagnostics } from "@/lib/platform/evidence-diagnostics";
-import { captureServerError } from "@/lib/analytics/server-errors";
+import { emitSourceDiagnostics, type SourceDiagnostic } from "@/lib/platform/evidence-diagnostics";
+import { captureServerError, captureOperationalAlert } from "@/lib/analytics/server-errors";
+import { scheduleServerEvent } from "@/lib/analytics/schedule-server-event";
+import { cacheSetNxStatus } from "@/lib/cache/redis";
 import { MAX_COLLECTION_ATTEMPTS, nextBackoff } from "./backoff";
+import { isQueueOldestQueuedStuck, isQueueLeaseStuck } from "./queue-health";
 import { collectSourceSlice } from "./collect-source-slice";
 import { seedFromPrior } from "./seed";
+import { onJobComplete as fanInOnJobComplete, retryPendingFanIns } from "./fan-in";
 import type { CollectorCheckpoint, CollectSlice } from "./plan";
 
 /**
@@ -99,9 +103,62 @@ export interface CollectionWorkerDeps {
    * outcome). Never blocks other jobs in the same tick's batch on this.
    */
   readonly captureError: typeof captureServerError;
-  /** No-op in this phase; phase 4 fills it in with fan-in issuance. */
+  /** Fires fan-in issuance once this job reaches `complete` (#1335 phase 4). */
   readonly onJobComplete: (job: CollectionJob) => Promise<void> | void;
+  /** Fires the `scoring_collection_failed` P2 alert when this job reaches
+   * its terminal `failed` state (#1335 phase 4). Optional so existing test
+   * doubles that build a `CollectionWorkerDeps` literal without it keep
+   * compiling; the production default always alerts.
+   */
+  readonly onJobFailed?: (job: CollectionJob, stop: SourceDiagnostic) => Promise<void> | void;
+  /** Re-runs fan-in for every complete-but-unissued day at the start of each
+   * tick (#1335 phase 4: "the job stays complete; the fan-in marker is not
+   * set until publication succeeds"). Optional for the same reason as
+   * `onJobFailed` above -- existing test doubles omit it and get a no-op.
+   */
+  readonly retryPendingFanIns?: (limit: number) => Promise<void>;
+  /** Backs the `scoring_queue_stuck` P2 alert, checked once per tick
+   * (#1335 phase 4). Optional for the same reason as the two deps above.
+   */
+  readonly checkQueueHealth?: () => Promise<CollectionQueueHealth>;
   readonly now: () => number;
+}
+
+/** Dedupes the alert to once per hour rather than once per 5-minute tick. */
+const QUEUE_STUCK_ALERT_DEDUPE_SECONDS = 3600;
+
+async function alertIfQueueStuck(health: CollectionQueueHealth): Promise<void> {
+  const stuckQueued = isQueueOldestQueuedStuck(health);
+  const stuckLease = isQueueLeaseStuck(health);
+  if (!stuckQueued && !stuckLease) return;
+  const guardStatus = await cacheSetNxStatus("scoring:queue-stuck-alerted", QUEUE_STUCK_ALERT_DEDUPE_SECONDS);
+  if (guardStatus === "exists") return;
+  await captureOperationalAlert({
+    signal: "scoring_queue_stuck",
+    severity: "P2",
+    summary: stuckQueued
+      ? `Collection queue stuck: oldest queued job is ${Math.round(health.oldestQueuedAgeMs / 60000)}min old`
+      : `Collection queue stuck: a lease has been expired for ${Math.round(health.oldestExpiredLeaseAgeMs / 60000)}min`,
+    route: "lib/collection/worker",
+    properties: { ...health },
+  });
+}
+
+/** Dedupe key mirrors the warm-cache ceiling alert's pattern (#1162 / BE-L5):
+ * one page per owner/provider/day, not one per retry that lands on `failed`. */
+async function alertScoringCollectionFailed(job: CollectionJob, stop: SourceDiagnostic): Promise<void> {
+  const guardStatus = await cacheSetNxStatus(
+    `scoring:collection-failed-alerted:${job.ownerHandle}:${job.provider}:${job.referenceDate}`,
+    86400,
+  );
+  if (guardStatus === "exists") return;
+  await captureOperationalAlert({
+    signal: "scoring_collection_failed",
+    severity: "P2",
+    summary: `Collection failed terminally for ${job.ownerHandle}/${job.provider} (${job.referenceDate}): ${stop.operation} (${stop.stopKind})`,
+    route: "lib/collection/worker",
+    properties: { owner: job.ownerHandle, provider: job.provider, referenceDate: job.referenceDate, operation: stop.operation, stopKind: stop.stopKind, httpStatus: stop.httpStatus },
+  });
 }
 
 export const productionCollectionWorkerDeps: CollectionWorkerDeps = {
@@ -116,7 +173,10 @@ export const productionCollectionWorkerDeps: CollectionWorkerDeps = {
   readPriorObservation: readSourceObservation,
   emitDiagnostics: emitSourceDiagnostics,
   captureError: captureServerError,
-  onJobComplete: () => undefined,
+  onJobComplete: (job) => fanInOnJobComplete(job),
+  onJobFailed: (job, stop) => alertScoringCollectionFailed(job, stop),
+  retryPendingFanIns: (limit) => retryPendingFanIns(limit),
+  checkQueueHealth: () => dbReadCollectionQueueHealth(),
   now: () => Date.now(),
 };
 
@@ -197,9 +257,29 @@ export async function runCollectionSlice(
   if (!job.leaseToken) throw new Error(`runCollectionSlice: job ${job.id} has no lease token`);
   const lease = { id: job.id, leaseToken: job.leaseToken };
 
+  // Wraps deps.fail: a terminal outcome (retryAt === null landing on
+  // "failed") fires the scoring_collection_failed event and P2 alert exactly
+  // once, from the one place every fail() call in this function funnels
+  // through (#1335 phase 4, observability step 4.7).
+  const failJob: typeof deps.fail = async (leaseArg, stop, retryAt) => {
+    const outcome = await deps.fail(leaseArg, stop, retryAt);
+    if (outcome.status === "failed") {
+      scheduleServerEvent("scoring_collection_failed", {
+        handle: job.ownerHandle,
+        provider: stop.provider,
+        stopKind: stop.stopKind,
+        httpStatus: stop.httpStatus,
+        operation: stop.operation,
+        attempt: job.attempt,
+      });
+      void deps.onJobFailed?.(job, stop);
+    }
+    return outcome;
+  };
+
   const credentialResult = await deps.resolveCredential(job.ownerHandle, job.provider, job.referenceTime);
   if (credentialResult.status !== "ok") {
-    await deps.fail(lease, { provider: job.provider, operation: "resolve_credential", stopKind: "not_accessible", httpStatus: null, retryAfterSeconds: null }, null);
+    await failJob(lease, { provider: job.provider, operation: "resolve_credential", stopKind: "not_accessible", httpStatus: null, retryAfterSeconds: null }, null);
     return;
   }
   const { resolved } = credentialResult;
@@ -245,6 +325,15 @@ export async function runCollectionSlice(
     requests: result.requests,
   };
 
+  scheduleServerEvent("scoring_collection_slice", {
+    handle: job.ownerHandle,
+    provider: job.provider,
+    stopKind: result.stop?.stopKind ?? null,
+    requests: result.requests,
+    events: result.events.length,
+    done: result.done,
+  });
+
   if (result.done) {
     await deps.checkpoint(lease, result.checkpoint, result.events, progress, false);
     if (!result.coverage) throw new Error(`runCollectionSlice: job ${job.id} reported done with no coverage`);
@@ -288,7 +377,7 @@ export async function runCollectionSlice(
 
   if (stop.stopKind === "rate_limited") {
     const retryAt = new Date(deps.now() + (stop.retryAfterSeconds ?? 60) * 1000).toISOString();
-    await deps.fail(lease, stop, retryAt);
+    await failJob(lease, stop, retryAt);
     return;
   }
 
@@ -298,13 +387,13 @@ export async function runCollectionSlice(
   // reconnect-required failure, so this must never fall into the
   // structural-retry bucket below.
   if (stop.stopKind === "not_accessible") {
-    await deps.fail(lease, stop, null);
+    await failJob(lease, stop, null);
     return;
   }
 
   if (stop.stopKind === "http" || stop.stopKind === "network") {
     const retryAt = job.attempt < MAX_COLLECTION_ATTEMPTS - 1 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
-    await deps.fail(lease, stop, retryAt);
+    await failJob(lease, stop, retryAt);
     return;
   }
 
@@ -314,7 +403,7 @@ export async function runCollectionSlice(
   // "graphql" with "protocol"/"parse" as source_error, distinct from the
   // honest-incompleteness budget/deadline/rate_limited group.)
   const retryAt = job.attempt < 2 ? new Date(deps.now() + nextBackoff(job.attempt) * 1000).toISOString() : null;
-  await deps.fail(lease, stop, retryAt);
+  await failJob(lease, stop, retryAt);
 }
 
 /**
@@ -331,6 +420,28 @@ export async function runCollectionTick(
 ): Promise<{ readonly slicesRun: number }> {
   const start = deps.now();
   const deadline = start + budgetMs;
+  if (deps.retryPendingFanIns) {
+    try {
+      await deps.retryPendingFanIns(50);
+    } catch (error) {
+      await deps.captureError({
+        route: "lib/collection/worker:runCollectionTick",
+        statusCode: 500,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }
+  if (deps.checkQueueHealth) {
+    try {
+      await alertIfQueueStuck(await deps.checkQueueHealth());
+    } catch (error) {
+      await deps.captureError({
+        route: "lib/collection/worker:runCollectionTick",
+        statusCode: 500,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }
   let slicesRun = 0;
   while (deps.now() < deadline - TICK_SAFETY_MARGIN_MS) {
     const jobs = await deps.claim(CLAIM_LIMIT, LEASE_SECONDS);

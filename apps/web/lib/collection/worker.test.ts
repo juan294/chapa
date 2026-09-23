@@ -1,9 +1,33 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
-import type { CollectionJob } from "@/lib/db/collection-queue";
+import type { CollectionJob, CollectionQueueHealth } from "@/lib/db/collection-queue";
 import type { StoredSourceObservation } from "@/lib/db/source-context";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint, type SliceResult } from "./plan";
-import { runCollectionSlice, runCollectionTick, type CollectionWorkerDeps, type CredentialResolution } from "./worker";
+
+// #1335 phase 4.7 — mocked, not injected: these three modules are the only
+// hardwired (non-deps-injected) I/O `runCollectionSlice`/`runCollectionTick`
+// touch, since the alert helpers (`alertScoringCollectionFailed`,
+// `alertIfQueueStuck`) and the inline `scheduleServerEvent` calls import them
+// directly rather than going through `CollectionWorkerDeps`. `importOriginal`
+// keeps every other export (e.g. `captureServerError`, used by the `captureError`
+// dep in every existing test in this file) real.
+const mockCacheSetNxStatus = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/cache/redis", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/cache/redis")>()),
+  cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
+}));
+const mockCaptureOperationalAlert = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics/server-errors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics/server-errors")>()),
+  captureOperationalAlert: (...args: unknown[]) => mockCaptureOperationalAlert(...args),
+}));
+const mockScheduleServerEvent = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics/schedule-server-event", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics/schedule-server-event")>()),
+  scheduleServerEvent: (...args: unknown[]) => mockScheduleServerEvent(...args),
+}));
+
+import { runCollectionSlice, runCollectionTick, productionCollectionWorkerDeps, type CollectionWorkerDeps, type CredentialResolution } from "./worker";
 
 const window = createScoringWindow("2026-09-05T12:00:00Z");
 const source = { provider: "github" as const, host: "github.com", subjectId: "canonical" };
@@ -417,5 +441,303 @@ describe("runCollectionTick", () => {
     });
     await runCollectionTick(15_000, deps); // margin (20s) exceeds the whole budget
     expect(deps.claim).not.toHaveBeenCalled();
+  });
+
+  it("re-runs fan-in for complete-but-unissued days at the start of the tick, before claiming new work", async () => {
+    const deps = harness();
+    const calls: string[] = [];
+    deps.retryPendingFanIns = vi.fn().mockImplementation(async () => { calls.push("retry"); });
+    deps.claim = vi.fn().mockImplementation(async () => { calls.push("claim"); return []; });
+    await runCollectionTick(240_000, deps);
+    expect(deps.retryPendingFanIns).toHaveBeenCalledWith(50);
+    expect(calls).toEqual(["retry", "claim"]);
+  });
+
+  it("captures, rather than throws, when the fan-in retry sweep itself fails", async () => {
+    const deps = harness();
+    deps.retryPendingFanIns = vi.fn().mockRejectedValue(new Error("db unavailable"));
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+    expect(deps.captureError).toHaveBeenCalledOnce();
+  });
+
+  it("never touches fan-in retry when the dep is omitted (existing test doubles)", async () => {
+    const deps = harness();
+    expect(deps.retryPendingFanIns).toBeUndefined();
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+  });
+
+  it("alerts scoring_queue_stuck when the oldest queued job exceeds the 2h threshold", async () => {
+    const deps = harness();
+    deps.checkQueueHealth = vi.fn().mockResolvedValue({
+      queued: 3, running: 0, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+      oldestQueuedAgeMs: 3 * 60 * 60 * 1000, expiredLeases: 0, oldestExpiredLeaseAgeMs: 0,
+    });
+    await runCollectionTick(240_000, deps);
+    expect(deps.checkQueueHealth).toHaveBeenCalledOnce();
+  });
+
+  it("does not alert when queue health is within budget", async () => {
+    const deps = harness();
+    deps.checkQueueHealth = vi.fn().mockResolvedValue({
+      queued: 1, running: 0, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+      oldestQueuedAgeMs: 1000, expiredLeases: 0, oldestExpiredLeaseAgeMs: 0,
+    });
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+  });
+
+  it("captures, rather than throws, when the queue health check itself fails", async () => {
+    const deps = harness();
+    deps.checkQueueHealth = vi.fn().mockRejectedValue(new Error("db unavailable"));
+    await expect(runCollectionTick(240_000, deps)).resolves.toEqual({ slicesRun: 0 });
+    expect(deps.captureError).toHaveBeenCalledOnce();
+  });
+});
+
+describe("fan-in and terminal-failure hooks", () => {
+  it("calls onJobComplete with the finished job when a slice reports done", async () => {
+    const deps = harness();
+    const onJobComplete = vi.fn().mockResolvedValue(undefined);
+    deps.onJobComplete = onJobComplete;
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(onJobComplete).toHaveBeenCalledWith(expect.objectContaining({ state: "complete", ownerHandle: "alice" }));
+  });
+
+  it("calls onJobFailed exactly once when a fail() call lands on the terminal failed state", async () => {
+    const deps = harness();
+    const onJobFailed = vi.fn().mockResolvedValue(undefined);
+    deps.onJobFailed = onJobFailed;
+    deps.fail = vi.fn().mockResolvedValue({ status: "failed" });
+    const job = makeJob({ provider: "bitbucket" });
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "bitbucket", operation: "profile", stopKind: "not_accessible", httpStatus: 403, retryAfterSeconds: null },
+    }));
+    await runCollectionSlice(job, Date.now() + 60_000, deps);
+    expect(onJobFailed).toHaveBeenCalledOnce();
+    const [failedJob, stop] = vi.mocked(onJobFailed).mock.calls[0]!;
+    expect(failedJob.id).toBe(job.id);
+    expect(stop.stopKind).toBe("not_accessible");
+  });
+
+  it("never calls onJobFailed when fail() lands on a retry state, not the terminal failed state", async () => {
+    const deps = harness();
+    const onJobFailed = vi.fn().mockResolvedValue(undefined);
+    deps.onJobFailed = onJobFailed;
+    deps.fail = vi.fn().mockResolvedValue({ status: "retrying" });
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "github", operation: "merged", stopKind: "http", httpStatus: 500, retryAfterSeconds: null },
+    }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(onJobFailed).not.toHaveBeenCalled();
+  });
+
+  it("tolerates the absence of onJobFailed (existing test doubles that omit it)", async () => {
+    const deps = harness();
+    expect(deps.onJobFailed).toBeUndefined();
+    deps.fail = vi.fn().mockResolvedValue({ status: "failed" });
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({
+      stop: { provider: "github", operation: "profile", stopKind: "not_accessible", httpStatus: 401, retryAfterSeconds: null },
+    }));
+    await expect(runCollectionSlice(makeJob(), Date.now() + 60_000, deps)).resolves.toBeUndefined();
+  });
+});
+
+describe("observability (#1335 phase 4.7)", () => {
+  beforeEach(() => {
+    mockCacheSetNxStatus.mockReset().mockResolvedValue("acquired");
+    mockCaptureOperationalAlert.mockReset().mockResolvedValue(undefined);
+    mockScheduleServerEvent.mockReset();
+  });
+
+  describe("scoring_collection_failed alert (worker's own, job-level)", () => {
+    function terminalFailureDeps(job: CollectionJob) {
+      const deps = harness();
+      deps.onJobFailed = productionCollectionWorkerDeps.onJobFailed;
+      deps.fail = vi.fn().mockResolvedValue({ status: "failed" });
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({
+        stop: { provider: job.provider, operation: "profile", stopKind: "not_accessible", httpStatus: 403, retryAfterSeconds: null },
+      }));
+      return deps;
+    }
+
+    it("raises scoring_collection_failed exactly once on a terminal job failure", async () => {
+      const job = makeJob({ provider: "bitbucket" });
+      const deps = terminalFailureDeps(job);
+
+      await runCollectionSlice(job, Date.now() + 60_000, deps);
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledOnce();
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: "scoring_collection_failed", severity: "P2" }),
+      );
+    });
+
+    it("dedupes a second terminal failure for the same owner/provider/day", async () => {
+      const job = makeJob({ provider: "bitbucket" });
+      mockCacheSetNxStatus.mockResolvedValueOnce("acquired").mockResolvedValueOnce("exists");
+
+      await runCollectionSlice(job, Date.now() + 60_000, terminalFailureDeps(job));
+      await runCollectionSlice(job, Date.now() + 60_000, terminalFailureDeps(job));
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledOnce();
+    });
+
+    it("does not dedupe across different owners, providers, or days (independent keys)", async () => {
+      const jobA = makeJob({ provider: "bitbucket", ownerHandle: "alice" });
+      const jobB = makeJob({ provider: "gitlab", ownerHandle: "alice" });
+      // Every call in this test acquires -- distinct dedupe keys, never "exists".
+      mockCacheSetNxStatus.mockResolvedValue("acquired");
+
+      await runCollectionSlice(jobA, Date.now() + 60_000, terminalFailureDeps(jobA));
+      await runCollectionSlice(jobB, Date.now() + 60_000, terminalFailureDeps(jobB));
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledTimes(2);
+      const keys = mockCacheSetNxStatus.mock.calls.map((call) => call[0]);
+      expect(new Set(keys).size).toBe(2);
+    });
+  });
+
+  describe("scoring_queue_stuck alert", () => {
+    function tickDeps(health: CollectionQueueHealth) {
+      const deps = harness();
+      deps.claim = vi.fn().mockResolvedValue([]);
+      deps.checkQueueHealth = vi.fn().mockResolvedValue(health);
+      return deps;
+    }
+    const healthy: CollectionQueueHealth = {
+      queued: 1, running: 0, retrying: 0, waitingRateLimit: 0, failedToday: 0,
+      oldestQueuedAgeMs: 1000, expiredLeases: 0, oldestExpiredLeaseAgeMs: 0,
+    };
+
+    it("fires when the oldest queued job exceeds the 2h threshold", async () => {
+      await runCollectionTick(240_000, tickDeps({ ...healthy, oldestQueuedAgeMs: 2 * 60 * 60 * 1000 + 1 }));
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: "scoring_queue_stuck", severity: "P2" }),
+      );
+    });
+
+    it("does not fire at exactly the 2h threshold", async () => {
+      await runCollectionTick(240_000, tickDeps({ ...healthy, oldestQueuedAgeMs: 2 * 60 * 60 * 1000 }));
+      expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+    });
+
+    it("fires when a lease has been expired for more than 30 minutes", async () => {
+      await runCollectionTick(240_000, tickDeps({ ...healthy, expiredLeases: 1, oldestExpiredLeaseAgeMs: 30 * 60 * 1000 + 1 }));
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: "scoring_queue_stuck" }),
+      );
+    });
+
+    it("does not fire for an expired-lease age at or under the 30-minute threshold", async () => {
+      await runCollectionTick(240_000, tickDeps({ ...healthy, expiredLeases: 1, oldestExpiredLeaseAgeMs: 30 * 60 * 1000 }));
+      expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+    });
+
+    it("does not fire when healthy", async () => {
+      await runCollectionTick(240_000, tickDeps(healthy));
+      expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+    });
+
+    it("dedupes a second stuck tick", async () => {
+      mockCacheSetNxStatus.mockResolvedValueOnce("acquired").mockResolvedValueOnce("exists");
+      const stuck = { ...healthy, oldestQueuedAgeMs: 3 * 60 * 60 * 1000 };
+
+      await runCollectionTick(240_000, tickDeps(stuck));
+      await runCollectionTick(240_000, tickDeps(stuck));
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("scoring_collection_slice and scoring_collection_failed event payload shapes", () => {
+    /** No URL, request/response body, or token/credential-shaped field in any
+     * event payload -- these events are provider/operation/stop-kind
+     * telemetry only (mirrors evidence-diagnostics.ts's SourceDiagnostic
+     * contract). Matches key names, not values, since a legitimate field
+     * name like `stopKind` must not itself trip a substring match on "kind". */
+    const FORBIDDEN_KEY_PATTERN = /url|token|credential|authorization|secret|body|cookie/i;
+    function assertNoSensitiveFields(payload: Record<string, unknown>): void {
+      for (const key of Object.keys(payload)) {
+        expect(key).not.toMatch(FORBIDDEN_KEY_PATTERN);
+      }
+    }
+
+    it("emits scoring_collection_slice with the documented shape on every slice, done or not", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage, requests: 12, events: [] }));
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      expect(mockScheduleServerEvent).toHaveBeenCalledWith("scoring_collection_slice", {
+        handle: "alice",
+        provider: "github",
+        stopKind: null,
+        requests: 12,
+        events: 0,
+        done: true,
+      });
+      assertNoSensitiveFields(vi.mocked(mockScheduleServerEvent).mock.calls[0]![1] as Record<string, unknown>);
+    });
+
+    it("emits scoring_collection_slice reporting the stop kind on an incomplete slice", async () => {
+      const deps = harness();
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({
+        stop: { provider: "github", operation: "merged", stopKind: "budget", httpStatus: null, retryAfterSeconds: null },
+      }));
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      expect(mockScheduleServerEvent).toHaveBeenCalledWith("scoring_collection_slice", expect.objectContaining({
+        stopKind: "budget",
+        done: false,
+      }));
+    });
+
+    it("emits scoring_collection_failed with the documented shape on a terminal job failure", async () => {
+      const deps = harness();
+      deps.fail = vi.fn().mockResolvedValue({ status: "failed" });
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({
+        stop: { provider: "bitbucket", operation: "profile", stopKind: "not_accessible", httpStatus: 403, retryAfterSeconds: null },
+      }));
+      const job = makeJob({ provider: "bitbucket", attempt: 2 });
+
+      await runCollectionSlice(job, Date.now() + 60_000, deps);
+
+      const failedCall = vi.mocked(mockScheduleServerEvent).mock.calls.find((call) => call[0] === "scoring_collection_failed");
+      expect(failedCall).toBeDefined();
+      expect(failedCall![1]).toEqual({
+        handle: "alice",
+        provider: "bitbucket",
+        stopKind: "not_accessible",
+        httpStatus: 403,
+        operation: "profile",
+        attempt: 2,
+      });
+      assertNoSensitiveFields(failedCall![1] as Record<string, unknown>);
+    });
+
+    it("never leaks the resolved token or access-context id into either event", async () => {
+      const deps = harness();
+      deps.resolveCredential = vi.fn().mockResolvedValue({
+        status: "ok",
+        resolved: {
+          context: { owner: "alice", requestedSource: { provider: "github", host: "github.com", login: "alice" }, window, scope: { discovery: "owned_and_contributed", repositoryIds: [], eventKinds: [] } },
+          token: "super-secret-token-value",
+          accessContextId: "a".repeat(64),
+          requested: { provider: "github", host: "github.com", login: "alice" },
+          link: null,
+        },
+      } satisfies CredentialResolution);
+      deps.fail = vi.fn().mockResolvedValue({ status: "failed" });
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({
+        stop: { provider: "github", operation: "profile", stopKind: "not_accessible", httpStatus: 401, retryAfterSeconds: null },
+      }));
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      for (const call of mockScheduleServerEvent.mock.calls) {
+        const serialized = JSON.stringify(call[1]);
+        expect(serialized).not.toContain("super-secret-token-value");
+        expect(serialized).not.toContain("a".repeat(64));
+      }
+    });
   });
 });

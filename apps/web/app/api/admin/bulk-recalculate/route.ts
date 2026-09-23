@@ -1,5 +1,7 @@
 import { postWriteScore } from "@/lib/profile/post-write-score";
-import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
+import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
+import { maybeIssue } from "@/lib/collection/fan-in";
+import { listCollectionJobsForDate } from "@/lib/db/collection-queue";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -9,6 +11,7 @@ import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUserHandlePage } from "@/lib/db/users";
 import { isValidHandle } from "@/lib/validation";
+import { toDateString } from "@/lib/utils/date";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -127,6 +130,11 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       // silently if batch ordering ever diverges from handles order. A Set-based filter
       // is correct regardless of insertion order.
       const completedSet = new Set(completed);
+      // #1335 phase 4 — one bounded background tick per response, not one
+      // per enqueued handle: this route can enqueue dozens of handles in a
+      // single batch, and scheduling a full tick after every one of them
+      // would be redundant work for the same `after()` callback.
+      if (scoringSelection.enabled && recalculated > 0) scheduleCollectionAdvance();
       return NextResponse.json(
         {
           partial: true,
@@ -165,8 +173,31 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
-            const issuance = await issueScoreReceipt(handle, { scoringSelection });
-            publications.push({ handle, result: await postWriteScore(handle, scoringSelection, issuance) });
+            // #1335 phase 4 — bulk-recalculate exists to make published
+            // numbers current after a scoring-code fix, which needs no new
+            // evidence: when every one of today's jobs is already complete,
+            // call fan-in's issuance directly (it recomputes the receipt
+            // fresh from already-stored observations and republishes if the
+            // result differs — no collection required). Only a subject with
+            // no job yet, or one still in progress, gets an `admin`-reason
+            // enqueue instead; `admin` is idempotent against an
+            // already-queued/running/complete job for today, since forcing a
+            // full re-collection for every handle in a batch would be a very
+            // different (and far more expensive) operation than "recompute
+            // the score from what's already known". Either path records its
+            // outcome through the same scoring_issuance_attempts table.
+            if (scoringSelection.enabled) {
+              const today = toDateString(new Date());
+              const referenceTime = new Date().toISOString();
+              const jobs = await listCollectionJobsForDate(handle, today);
+              const allComplete = jobs.length > 0 && jobs.every((job) => job.state === "complete");
+              if (allComplete) {
+                await maybeIssue(handle, today, referenceTime);
+              } else {
+                await enqueueCollection(handle, "admin");
+              }
+            }
+            publications.push({ handle, result: await postWriteScore(handle, scoringSelection) });
             await invalidateProfileReadModels(handle, {
               stats: true,
               badgeSvg: true,
@@ -197,6 +228,8 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       }),
     );
   }
+
+  if (scoringSelection.enabled && recalculated > 0) scheduleCollectionAdvance();
 
   return NextResponse.json(
     {

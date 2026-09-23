@@ -13,6 +13,7 @@ import {
   isGraphqlRateLimited, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 import { GITHUB_EVIDENCE_QUERIES as queries } from "./evidence-queries";
+import { withRateLimit } from "./evidence-rate-limit";
 
 type ObjectData = Record<string, unknown>;
 const object = (value: unknown): ObjectData => value !== null && typeof value === "object" && !Array.isArray(value) ? value as ObjectData : {};
@@ -33,15 +34,13 @@ const emptyMeasurements = emptySliceMeasurements;
 // diagnostic helpers (evidence-diagnostics.ts) that phase 1 established.
 // ---------------------------------------------------------------------------
 
-/** Inserts a `rateLimit { remaining resetAt cost }` selection into a query's
- * top-level selection set. Every GITHUB_EVIDENCE_QUERIES body opens with
- * `query Name(...args...) { ... }` and no `{` appears before that first
- * brace (arguments use only `(...)`), so this is a safe, generic transform.
- */
-function withRateLimit(query: string): string {
-  const brace = query.indexOf("{");
-  return `${query.slice(0, brace + 1)} rateLimit { remaining resetAt cost }${query.slice(brace + 1)}`;
-}
+// withRateLimit lives in evidence-rate-limit.ts (a dependency-free module,
+// imported above) and is re-exported here for existing importers -- see that
+// file for why it is not defined in this one. The E2E collection-queue
+// fixture (#1335 phase 4.8) imports it directly from evidence-rate-limit.ts
+// instead, so it never pulls in this module's lib/collection/slice-helpers.ts
+// ("server-only") chain.
+export { withRateLimit };
 
 /** Monthly `merged:YYYY-MM-DD..YYYY-MM-DD` boundaries covering the whole
  * scoring window (inclusive both ends, per GitHub's search date syntax).

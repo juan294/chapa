@@ -9,6 +9,7 @@ import { useSession } from "@/hooks/useSession";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useTranslation } from "@/lib/i18n";
 import { Toast } from "@/components/Toast";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 interface BadgeToolbarProps {
   handle: string;
@@ -40,7 +41,7 @@ export function BadgeToolbar({
   const { session } = useSession();
   const isOwner = isOwnerProp ?? session?.login === handle;
   const [refreshStatus, setRefreshStatus] = useState<
-    "idle" | "loading" | "success" | "error"
+    "idle" | "loading" | "success" | "collecting" | "error"
   >("idle");
   const shareRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
@@ -65,7 +66,17 @@ export function BadgeToolbar({
         { method: "POST" },
       );
       if (res.ok) {
-        setRefreshStatus("success");
+        // #1335 phase 4 — the response now reports the owner's real scoring
+        // status. Refresh always re-renders the page (which itself now
+        // knows how to draw every non-ready state honestly), but the
+        // toolbar's own label reflects what actually happened rather than
+        // always claiming "Refreshed" when nothing is ready yet — the plan's
+        // "never reload into an unchanged page silently" rule.
+        const body = await res
+          .json()
+          .catch(() => null) as { scoringStatus?: ScoringStatus } | null;
+        const kind = body?.scoringStatus?.kind;
+        setRefreshStatus(kind && kind !== "ready" ? "collecting" : "success");
         setTimeout(() => {
           if (mountedRef.current) router.refresh();
         }, 500);
@@ -170,7 +181,7 @@ export function BadgeToolbar({
       {isOwner && (
         <button
           onClick={handleRefresh}
-          disabled={refreshStatus === "loading" || refreshStatus === "success"}
+          disabled={refreshStatus === "loading" || refreshStatus === "success" || refreshStatus === "collecting"}
           aria-busy={refreshStatus === "loading"}
           title={
             refreshStatus === "idle"
@@ -179,7 +190,9 @@ export function BadgeToolbar({
                 ? t('badgeToolbar.refreshing') as string
                 : refreshStatus === "success"
                   ? t('badgeToolbar.refreshed') as string
-                  : t('badgeToolbar.failed') as string
+                  : refreshStatus === "collecting"
+                    ? t('badgeToolbar.collecting') as string
+                    : t('badgeToolbar.failed') as string
           }
           aria-label={t('aria.refreshBadge') as string}
           className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -202,6 +215,7 @@ export function BadgeToolbar({
           {refreshStatus === "idle" && t('badgeToolbar.refresh') as string}
           {refreshStatus === "loading" && t('badgeToolbar.refreshing') as string}
           {refreshStatus === "success" && t('badgeToolbar.refreshed') as string}
+          {refreshStatus === "collecting" && t('badgeToolbar.collecting') as string}
           {refreshStatus === "error" && t('badgeToolbar.failed') as string}
         </button>
       )}

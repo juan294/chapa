@@ -35,3 +35,18 @@
 - **Staged keys.** Plan said: slices receive staged events. Chose: `CollectSlice` takes `stagedKeys: ReadonlySet<string>`, read from the `event_key` column. Why: engines only deduplicate by key, and coverage never needs event content. This avoids reloading up to 10,000 JSONB rows on every slice.
 - **Daily reuse.** `seedFromPrior` is in `lib/collection/seed.ts`, not `plan.ts`, and the worker applies it on a job's first slice. A seeding failure is captured, and the job then collects from scratch.
 - **Coordinator.** `SourceCoordinatorDependencies` lost `collect`, `append` and `refreshLink` and gained `enqueue` and `jobInProgress`. `SourceSelection` carries `inProgress`. The coordinator enqueues only for `refresh && !readOnly`. No production caller enqueues yet; phase 4 wires the enqueue sites.
+
+### Phase 4
+
+- **Split into two halves.** A types-only contract (`lib/collection/scoring-status.ts`) was committed first, then the backend (status, fan-in, enqueue, status API, health) and the render/UI half were built in parallel.
+- **`scoring_status` RPC.** Plan said: `scoring_status(owner)`. Chose: it also takes `p_reference_date`, because the fan-in retry sweep reads past unissued days.
+- **Enqueue gate.** Every enqueue site is gated on the v7.2 selection, matching the old issuance gate. Phase 5 retires the selector, and the gate goes with it.
+- **Enqueue reasons.** Generate enqueues `signup`, not `refresh`, because the OAuth callback has just enqueued, and `refresh` would reset a finished job. Admin bulk-recalculate calls the fan-in issuance directly when today's jobs are complete (re-publishing from stored observations after a scoring-code fix) and enqueues `admin` otherwise.
+- **Score-change email.** Plan said: remove the warm-cache comparison. Chose: move `notifyObservedScoreChange` onto fan-in's `issued` outcome, comparing against the receipt that was current before issuance.
+- **Alert names.** Issuance failure raises `scoring_issuance_failed`, separate from the job-level `scoring_collection_failed`. `issue-receipt.ts` no longer captures errors itself; fan-in, its only caller, captures each failure once.
+- **Badge placeholder renderer.** Plan said: add variants to `BadgeSvg.tsx`. Chose: a separate scoreless renderer in `lib/render/badge-state.ts`, allowlisted in the one-badge boundary test next to the existing fallback SVG. It draws no score, radar, heatmap or tier.
+- **Share page.** Plan said: edit `SharePageOwnerContent.tsx`. Chose: return `SharePageScoringStatus` early, before materialization, so a subject with nothing to score does not trigger a GitHub fetch.
+- **Failed status read.** Under v7.2, a failed status read renders a new `unavailable` placeholder (no-store) unless the separate receipt authority finds a drawable v7.2 receipt. It never renders a v6 score.
+- **Status read order.** The status is read only when there is no drawable current receipt, so a warm ready cache hit keeps the 800 ms budget. Ready renders are already fenced by the receipt manifest.
+- **E2E.** The provider replay is keyed by exact GraphQL query text. The GraphQL rate-limit transform moved into a dependency-free module so Playwright can import the fixtures without `server-only`.
+- **Deferred to phase 5.** The badge route's stored-badge outage fallback can still show a historical v6 snapshot. Phase 5 step 5.4 rebuilds it on receipts.

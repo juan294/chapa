@@ -3,8 +3,26 @@ vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
   readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
 }));
+// #1335 phase 4 — defaults to `ready` so every pre-existing test (which never
+// mentions scoring status) keeps rendering through the normal pipeline below,
+// exactly as before this phase. Tests for the new collecting/action_needed/
+// unregistered states override this per-test.
+// #1335 phase 4 perf fix — `mockHasDrawableCurrentReceipt` defaults to
+// `false` so every pre-existing test (none of which mock it) keeps calling
+// `readScoringStatus` exactly as before; tests proving the perf fix itself
+// override it to `true` and assert `readScoringStatus` was never called.
+const { mockReadScoringStatus, mockHasDrawableCurrentReceipt } = vi.hoisted(() => ({
+  mockReadScoringStatus: vi.fn(),
+  mockHasDrawableCurrentReceipt: vi.fn(),
+}));
+vi.mock("@/lib/collection/read-scoring-status", () => ({
+  readScoringStatus: (...args: unknown[]) => mockReadScoringStatus(...args),
+  hasDrawableCurrentReceipt: (...args: unknown[]) => mockHasDrawableCurrentReceipt(...args),
+}));
 beforeEach(() => {
   mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+  mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
+  mockHasDrawableCurrentReceipt.mockResolvedValue(false);
 });
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -1898,6 +1916,181 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [reqEn, ctxEn] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const resEn = await GET(reqEn, ctxEn);
       expect(await resEn.text()).toContain("Something went wrong.");
+    });
+  });
+
+  // #1335 phase 4 — status placeholder states. Gated to the v7.2 selection;
+  // an explicit v6 selection keeps its untouched pre-phase-4 behavior.
+  describe("scoring status placeholder (#1335 phase 4)", () => {
+    beforeEach(() => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+    });
+
+    it("renders the collecting state with no-store and skips materialize entirely", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 42, sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="collecting"');
+      expect(body).toContain("Scoring in progress, 42%");
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("renders the action_needed state with no-store", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="action_needed"');
+      expect(body).toContain("Scoring paused: action needed");
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("renders the unregistered state with no-store", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "unregistered" });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="unregistered"');
+      expect(body).toContain("Not on Chapa yet");
+      expect(body).toContain("chapa.thecreativetoken.com");
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("renders in Spanish when requested via ?lang=es", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 7, sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser", {}, "?lang=es");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).toContain("Puntuación en curso, 7%");
+    });
+
+    it("falls back to the normal receipt pipeline when collecting WITH a prior receipt (stale-labelled render)", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 80, sources: [], hasPriorReceipt: true });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      const body = await response.text();
+      expect(body).not.toContain('data-chapa-state="collecting"');
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("falls back to the normal receipt pipeline when action_needed WITH a prior receipt", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "action_needed", sources: [], hasPriorReceipt: true });
+      const [request, ctx] = makeRequest("testuser");
+      const response = await GET(request, ctx);
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      const body = await response.text();
+      expect(body).not.toContain('data-chapa-state="action_needed"');
+    });
+
+    it("renders normally (no status gating) when the receipt is ready", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-04-17", updating: false });
+      const [request, ctx] = makeRequest("testuser");
+      await GET(request, ctx);
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    // #1335 phase 4 perf fix.
+    describe("readScoringStatus skipped for a drawable current receipt", () => {
+      it("never calls readScoringStatus on a cache MISS when a drawable receipt exists", async () => {
+        mockHasDrawableCurrentReceipt.mockResolvedValue(true);
+        const [request, ctx] = makeRequest("testuser");
+        await GET(request, ctx);
+        expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser", expect.objectContaining({ machinePolicy: "v7.2" }));
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      });
+
+      it("never calls readScoringStatus, and never runs materialize, on a warm cache HIT for a ready receipt", async () => {
+        mockHasDrawableCurrentReceipt.mockResolvedValue(true);
+        mockCacheGet.mockResolvedValue(FAKE_SVG);
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+        expect(await response.text()).toBe(FAKE_SVG);
+        expect(response.headers.get("Server-Timing")).toContain('cache;desc="hit"');
+      });
+    });
+
+    it("never gates on status under an explicit v6 selection (phase 5 deletes that branch)", async () => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 1, sources: [], hasPriorReceipt: false });
+      const [request, ctx] = makeRequest("testuser");
+      await GET(request, ctx);
+      expect(mockReadScoringStatus).not.toHaveBeenCalled();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    // #1335 phase 4 fix — `scoringStatus === null` (the authority read
+    // itself failed) must never fall through to whatever the normal
+    // materialize pipeline's OWN receipt lookup produces when THAT comes up
+    // without a real v7.2 receipt (`FAKE_MATERIALIZED.scoring.policyVersion`
+    // is "v6"): rendering that would be exactly the legacy v6 fallback the
+    // plan's "failed authority reads are unavailable" invariant forbids.
+    describe("authority read failure (scoringStatus === null)", () => {
+      it("still runs materialize (to check for an independently-drawable receipt) and reports the read failure", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        const [request, ctx] = makeRequest("testuser");
+        await GET(request, ctx);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+        expect(mockCaptureServerError).toHaveBeenCalledWith(
+          expect.objectContaining({ route: "/u/testuser/badge.svg" }),
+        );
+      });
+
+      it("renders the unavailable placeholder (never the v6 fallback) when materialize also has no drawable v7.2 receipt", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        // FAKE_MATERIALIZED.scoring.policyVersion is "v6" — no real receipt.
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(body).toContain('data-chapa-state="unavailable"');
+        expect(body).toContain("Scoring status unavailable");
+        expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+        expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+        // Never the v6-shaped render: renderBadgeSvg (mocked to FAKE_SVG) is
+        // the ONLY thing that could have drawn a v6 score, and it must never
+        // be reached for this state.
+        expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+        expect(body).not.toBe(FAKE_SVG);
+      });
+
+      it("renders that receipt normally (not the unavailable placeholder) when materialize independently finds a real v7.2 receipt", async () => {
+        mockReadScoringStatus.mockResolvedValue(null);
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: { ...FAKE_MATERIALIZED.scoring, policyVersion: "v7.2" as const },
+        });
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(body).not.toContain('data-chapa-state="unavailable"');
+        expect(mockRenderBadgeSvg).toHaveBeenCalled();
+        expect(body).toBe(FAKE_SVG);
+      });
+
+      it("renders in Spanish when requested", async () => {
+        mockReadScoringStatus.mockResolvedValue(null);
+        const [request, ctx] = makeRequest("testuser", {}, "?lang=es");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(body).toContain("Estado de la puntuación no disponible");
+      });
+
+      it("never fires for an explicit v6 selection", async () => {
+        mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(body).not.toContain('data-chapa-state="unavailable"');
+        expect(mockRenderBadgeSvg).toHaveBeenCalled();
+      });
     });
   });
 });

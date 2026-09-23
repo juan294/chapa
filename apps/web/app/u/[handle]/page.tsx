@@ -65,6 +65,10 @@ import { explainReceipt, explainObservedReceipt } from "@/lib/dashboard/receipt-
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 import { dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "@/lib/collection/read-scoring-status";
+import { badgeStatusState, needsUnavailablePlaceholder, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { SharePageScoringStatus } from "./SharePageScoringStatus";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -234,6 +238,47 @@ export async function SharePageContent({
   // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
   // race where a request could read one day's key and write another.
   const scoringSelection = await readScoringRenderSelection();
+
+  // #1335 phase 4 — under the v7.2 selection, a handle with no ready receipt
+  // renders its scoring state instead of the normal materialize/breakdown
+  // pipeline: there is nothing to fetch or explain yet. Resolving the
+  // session here (rather than inside the Promise.all wave below) costs one
+  // extra sequential await only on this early-return path — session
+  // resolution is a local cookie/JWT check, not network I/O — and is what
+  // lets this branch decide `isOwner` before doing any of the heavier work
+  // below. Gated to v7.2 only; an explicit v6 selection (phase 5 deletes
+  // that branch) keeps its untouched pre-phase-4 behavior. A null status
+  // (a failed authority read, or a v6 selection) takes neither branch below
+  // and this function continues exactly as it did before this phase.
+  //
+  // #1335 phase 4 perf fix — skip `readScoringStatus` (3 DB reads) whenever
+  // `hasDrawableCurrentReceipt` (the same single receipt read
+  // `materializePublicProfile` below already does) finds a drawable current
+  // receipt. See badge.svg's own comment for the full rationale.
+  let scoringStatus: ScoringStatus | null = null;
+  if (scoringSelection.machinePolicy === "v7.2" && !(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
+    try {
+      scoringStatus = await readScoringStatus(handle);
+    } catch (err) {
+      scoringStatus = null;
+      fireAndForget(() => captureServerError({ route: `/u/${handle}`, statusCode: 500, error: err }));
+    }
+  }
+  const badgeState = scoringStatus ? badgeStatusState(scoringStatus) : null;
+  if (badgeState && scoringStatus) {
+    const session = await headers().then((h) => getOptionalServerSessionFromHeaders(h));
+    const isOwner = session?.login === handle;
+    return (
+      <SharePageScoringStatus
+        handle={handle}
+        locale={locale}
+        status={scoringStatus as NonReadyScoringStatus}
+        badgeState={badgeState}
+        isOwner={isOwner}
+      />
+    );
+  }
+
   const today = toDateString(new Date(scoringSelection.capturedAt));
   // #1181 (UX-H3 follow-up) — the cache key and the rendered content below
   // MUST come from the same resolved locale, never independent defaults.
@@ -261,6 +306,28 @@ export async function SharePageContent({
   if (isGitHubUserNotFound(materialization)) notFound();
   const materialized = materialization;
   const isOwner = session?.login === handle;
+
+  // #1335 phase 4 fix — `scoringStatus === null` means the `readScoringStatus`
+  // authority read itself failed under v7.2 (not "no receipt found"; that is
+  // its own real `ScoringStatus`, handled above). "Failed authority reads are
+  // unavailable": this must never silently fall through to whatever the
+  // normal materialize pipeline above already produced when THAT also has no
+  // v7.2 receipt to draw. A handle WITH a drawable receipt (found
+  // independently by that same materialize call) still renders it normally
+  // below — reuses the exact same status-placeholder component as
+  // `collecting`/`action_needed`/`unregistered` rather than inventing a
+  // second one.
+  if (materialized && needsUnavailablePlaceholder(scoringSelection, scoringStatus, materialized.scoring?.policyVersion)) {
+    return (
+      <SharePageScoringStatus
+        handle={handle}
+        locale={locale}
+        status={null}
+        badgeState="unavailable"
+        isOwner={isOwner}
+      />
+    );
+  }
 
   // #1332 — owner-only, cheap (single indexed SELECT on `user_platforms` by
   // handle, no token decryption): a linked source whose refresh grant needs
