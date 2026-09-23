@@ -9,7 +9,7 @@
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { SCORING_OBSERVED_POLICY } from "@chapa/shared";
 import type { MetricsSnapshot } from "../history/types";
-import type { CoreDimensionKey, ScoreViewModel } from "../profile/score-view-model";
+import type { CoreDimensionKey, ScoreValue, ScoreViewModel } from "../profile/score-view-model";
 
 // ---------------------------------------------------------------------------
 // makeStats — builds a valid StatsData with sensible defaults
@@ -137,6 +137,13 @@ function makeReportCraft(displayValue: number): ScoreViewModel["reportCraft"] {
   };
 }
 
+/** A plain number is treated as a point's displayed value; a pre-built
+ * `ScoreValue` (e.g. a range, or one copied from another model's output) is
+ * kept as-is. Callers use whichever is more convenient for their case. */
+function toScoreValue(value: number | ScoreValue): ScoreValue {
+  return typeof value === "number" ? { kind: "point", value, display: value } : value;
+}
+
 /**
  * Factory for a v7.2 `ScoreViewModel` (#1335 phase 5 — "delete v6").
  * `renderBadgeSvg` and every other scored consumer take this model, never a
@@ -146,18 +153,23 @@ function makeReportCraft(displayValue: number): ScoreViewModel["reportCraft"] {
  * `composite` defaults to 58 — the historical `adjustedComposite` value the
  * badge actually drew (v6's raw `compositeScore` was never rendered).
  *
- * Shorthand overrides accept plain numbers/strings rather than the full
- * `ScoreValue`/nested-report shapes, since almost every call site only wants
- * to nudge one displayed magnitude:
- * - `composite`: a point composite's displayed value.
- * - `dimensions`: a partial map of plain numbers, merged over the defaults.
+ * `composite` and each `dimensions` entry accept either a plain number
+ * (wrapped as a point's displayed value — the common case, one magnitude at
+ * a time) or a whole `ScoreValue` (a range, or a value copied from another
+ * fixture's output), so both calling styles used across the suite work
+ * without a caller-side conversion:
+ * - `composite`: a point composite's displayed value, or a `ScoreValue`.
+ * - `dimensions`: a partial map of numbers and/or `ScoreValue`s, merged over
+ *   the defaults.
  * - `craftDisplay`: builds a "scored" `reportCraft` at this displayed value
- *   (undefined leaves the default "no_report" — no Craft axis).
+ *   (undefined leaves the default "no_report" — no Craft axis). A caller
+ *   that needs a specific custom `reportCraft` (not just one displayed
+ *   value) passes `reportCraft` directly through the rest of `overrides`.
  */
 export function makeScoring(
   overrides: Partial<Omit<ScoreViewModel, "dimensions" | "composite" | "reportCraft">> & {
-    composite?: number;
-    dimensions?: Partial<Record<CoreDimensionKey, number>>;
+    composite?: number | ScoreValue;
+    dimensions?: Partial<Record<CoreDimensionKey, number | ScoreValue>>;
     craftDisplay?: number;
   } = {},
 ): ScoreViewModel {
@@ -170,14 +182,18 @@ export function makeScoring(
   };
   const mergedDimensions = { ...defaultDimensions, ...dimensions };
   return {
+    // Always a synthetic fixture, never a real issued receipt — matches the
+    // one condition (identity or illustrative) simulateObservedScore
+    // requires of its baseline.
+    illustrative: true,
     policyVersion: "v7.2",
     handle: "testuser",
     identity: null,
     window: null,
     dimensions: Object.fromEntries(
-      Object.entries(mergedDimensions).map(([key, value]) => [key, { kind: "point", value, display: value }]),
-    ) as Record<CoreDimensionKey, ScoreViewModel["dimensions"][CoreDimensionKey]>,
-    composite: { kind: "point", value: composite ?? 58, display: composite ?? 58 },
+      Object.entries(mergedDimensions).map(([key, value]) => [key, toScoreValue(value)]),
+    ) as Record<CoreDimensionKey, ScoreValue>,
+    composite: toScoreValue(composite ?? 58),
     tier: "Solid",
     archetype: "Builder",
     craft: null,

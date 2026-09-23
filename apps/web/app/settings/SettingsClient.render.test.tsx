@@ -18,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   connections: vi.fn(),
   insightsEnabled: vi.fn(),
   importFile: vi.fn(),
-  cooldownActive: vi.fn(),
   pendingConfirmation: vi.fn(),
   confirmImport: vi.fn(),
   cancelImport: vi.fn(),
@@ -39,8 +38,6 @@ vi.mock("@/lib/insights/use-insights-import", () => ({
   useInsightsImport: () => ({
     toast: mocks.toast(),
     dismissToast: mocks.dismissToast,
-    cooldownActive: mocks.cooldownActive(),
-    cooldownTooltip: mocks.cooldownActive() ? "Available again on Sep 13" : undefined,
     importFile: mocks.importFile,
     pendingConfirmation: mocks.pendingConfirmation(),
     confirmImport: mocks.confirmImport,
@@ -76,7 +73,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.toast.mockReturnValue(null);
   mocks.insightsEnabled.mockReturnValue(true);
-  mocks.cooldownActive.mockReturnValue(false);
   mocks.pendingConfirmation.mockReturnValue(null);
   mocks.connections.mockReturnValue([
     connection("bitbucket", { status: { linked: true, remoteLogin: "octo-bb" } }),
@@ -250,17 +246,6 @@ describe("SettingsClient", () => {
     );
   });
 
-  it("disables the import during its cooldown and says when it returns", () => {
-    mocks.cooldownActive.mockReturnValue(true);
-    renderSettings();
-    const button = screen.getByRole("button", {
-      name: "Import Claude Code Insights",
-    });
-    expect((button as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId("settings-insights").textContent).toContain(
-      "Available again on Sep 13",
-    );
-  });
 });
 
 

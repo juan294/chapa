@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEMO_STATS, DEMO_IMPACT } from "./demoData";
-import { DEMO_SCORING } from "./__fixtures__/demo-scoring";
-import { renderBadgeSvg } from "./BadgeSvg";
+import { renderableScore } from "@/lib/profile/score-view-model";
 
 describe("DEMO_STATS", () => {
   it("has a valid handle", () => {
@@ -40,32 +39,29 @@ describe("DEMO_STATS", () => {
   });
 });
 
+// #1335 phase 5 — v6 is retired, so DEMO_IMPACT is now the same v7.2
+// illustrative ScoreViewModel STUDIO_OBSERVED_DEMO composes (CLAUDE.md:
+// Studio sample stays 82 / High / Balanced).
 describe("DEMO_IMPACT", () => {
-  it("has a valid tier", () => {
-    expect(["Emerging", "Solid", "High", "Elite"]).toContain(DEMO_IMPACT.tier);
-  });
-
-  it("has a valid archetype", () => {
-    expect(["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"]).toContain(
-      DEMO_IMPACT.archetype,
-    );
-  });
-
-  it("has adjustedComposite in 0-100", () => {
-    expect(DEMO_IMPACT.adjustedComposite).toBeGreaterThanOrEqual(0);
-    expect(DEMO_IMPACT.adjustedComposite).toBeLessThanOrEqual(100);
-  });
-
-  it("has confidence in 50-100", () => {
-    expect(DEMO_IMPACT.confidence).toBeGreaterThanOrEqual(50);
-    expect(DEMO_IMPACT.confidence).toBeLessThanOrEqual(100);
+  it("is the curated High/82/Balanced v7.2 sample", () => {
+    const drawn = renderableScore(DEMO_IMPACT);
+    expect(drawn.composite).toBe(82);
+    expect(drawn.tier).toBe("High");
+    expect(drawn.archetype).toBe("Balanced");
   });
 
   it("has dimension scores each in 0-100", () => {
+    const drawn = renderableScore(DEMO_IMPACT);
     for (const key of ["delivery", "quality", "consistency", "breadth"] as const) {
-      expect(DEMO_IMPACT.dimensions[key]).toBeGreaterThanOrEqual(0);
-      expect(DEMO_IMPACT.dimensions[key]).toBeLessThanOrEqual(100);
+      expect(drawn.dimensions[key]).toBeGreaterThanOrEqual(0);
+      expect(drawn.dimensions[key]).toBeLessThanOrEqual(100);
     }
+  });
+
+  it("is explicitly illustrative, with no publication identity", () => {
+    expect(DEMO_IMPACT.illustrative).toBe(true);
+    expect(DEMO_IMPACT.identity).toBeNull();
+    expect(DEMO_IMPACT.policyVersion).toBe("v7.2");
   });
 });
 
@@ -103,48 +99,15 @@ describe("DEMO_STATS linked platforms", () => {
   });
 });
 
-describe("DEMO_IMPACT craft dimension", () => {
-  it("includes craft dimension score", () => {
-    expect(DEMO_IMPACT.dimensions.craft).toBe(72);
-  });
-
-  it("has profileType collaborative", () => {
-    expect(DEMO_IMPACT.profileType).toBe("collaborative");
+describe("DEMO_IMPACT report Craft channel", () => {
+  it("includes a scored report Craft channel", () => {
+    expect(DEMO_IMPACT.reportCraft).toMatchObject({
+      status: "scored",
+      report: { result: { point: { displayValue: 72 } } },
+    });
   });
 });
 
-// #1335 phase 5 ("delete v6") — `renderBadgeSvg` no longer accepts a legacy
-// `ImpactV6Result`; every call needs a `scoring` option instead. `DEMO_SCORING`
-// (`__fixtures__/demo-scoring.ts`) mirrors `DEMO_IMPACT`'s historical values
-// (82/High/Builder) so this suite's assertions keep holding.
-describe("renderBadgeSvg with demo data", () => {
-  it("returns a valid SVG string", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, {
-      scoring: DEMO_SCORING,
-      includeBranding: true,
-    });
-    expect(svg).toContain("<svg");
-    expect(svg).toContain("</svg>");
-  });
-
-  it("does not contain undefined or NaN values", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING });
-    expect(svg).not.toContain("undefined");
-    expect(svg).not.toContain("NaN");
-  });
-
-  it("includes the demo handle in the output", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING });
-    expect(svg).toContain("Bertram Gilfoyle");
-  });
-
-  it("includes verification strip when hash and date are provided", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, {
-      scoring: DEMO_SCORING,
-      verificationHash: "a1b2c3d4",
-      verificationDate: "2025-01-01",
-    });
-    expect(svg).toContain("VERIFIED");
-    expect(svg).toContain("a1b2c3d4");
-  });
-});
+// renderBadgeSvg integration coverage for DEMO_STATS/DEMO_IMPACT now lives
+// with lib/render/BadgeSvg.tsx's own render test suite (owned outside this
+// workstream), which exercises the renderer's real (post-#1335) signature.

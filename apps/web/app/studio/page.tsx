@@ -21,7 +21,7 @@ import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListene
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { STUDIO_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
-import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
+import { DEMO_STATS } from "@/lib/render/demoData";
 
 export const dynamic = "force-dynamic";
 
@@ -96,12 +96,10 @@ export default async function StudioPage(
 
   const params = searchParams ? await searchParams : {};
   if (params.demo === "1" && await isStudioDemoEnabled()) {
-    const scoringSelection = await readScoringRenderSelection();
     return renderStudio({
       initialConfig: DEFAULT_BADGE_CONFIG,
       stats: DEMO_STATS,
-      impact: DEMO_IMPACT,
-      ...(scoringSelection.enabled ? { scoring: STUDIO_OBSERVED_DEMO } : {}),
+      scoring: STUDIO_OBSERVED_DEMO,
       craftResult: null,
       handle: DEMO_STATS.handle,
       verification: null,
@@ -141,7 +139,10 @@ export default async function StudioPage(
   const materialized =
     sessionMaterialized ?? (await materializeDisplayProfile(session.login, { scoringSelection }));
 
-  if (!materialized) {
+  // #1335 — v7.2 is the one scoring policy Studio renders; a materialization
+  // that produced no current receipt model is treated the same as a failed
+  // materialization rather than falling back to a v6 aggregate.
+  if (!materialized || !materialized.scoring) {
     throw new Error(`Unable to load Studio profile for ${session.login}`);
   }
 
@@ -164,7 +165,6 @@ export default async function StudioPage(
   return renderStudio({
     initialConfig,
     stats: materialized.stats,
-    impact: materialized.displayImpact,
     scoring: materialized.scoring,
     craftResult: materialized.craftResult,
     handle: session.login,

@@ -432,95 +432,15 @@ describe("generateMetadata (about/index)", () => {
   });
 });
 
-describe("ScoringPage render (en)", () => {
-  it("renders the scoring page heading in en", async () => {
-    const { getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerT).mockReturnValue((key: string) => {
-      // Return arrays for table headers/rows, strings for everything else
-      if (key.endsWith("TableHeaders")) return ["Col1", "Col2", "Col3"];
-      if (key.endsWith("TableRows")) return [["Cell1", "Cell2", "Cell3"]];
-      const strMap: Record<string, string> = {
-        "about.scoring.h1": "Scoring Methodology",
-        "about.scoring.sectionPhilosophy": "Philosophy",
-        "about.scoring.sectionNormalization": "Normalization",
-        "about.scoring.sectionCaps": "Signal caps",
-        "about.scoring.sectionDimensions": "The core dimensions",
-        "about.scoring.ctaHeading": "Help us improve this",
-        "landing.footer.privacy": "Privacy",
-        "landing.footer.terms": "Terms",
-      };
-      return strMap[key] ?? (key.split('.').pop() ?? key);
-    });
-    const { default: ScoringPage } = await import("./scoring/page");
-    render(await ScoringPage({ params: Promise.resolve({ locale: "en" }) }));
-    expect(screen.getByTestId("navbar")).toBeDefined();
-    expect(screen.getByText("Scoring Methodology")).toBeDefined();
-  });
-
-  // #1167 (UX-B1, launch blocker) — /about/scoring previously dead-ended
-  // with no footer at all.
-  it("renders Privacy and Terms links via the site-wide footer", async () => {
-    const { getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerT).mockReturnValue((key: string) => {
-      const strMap: Record<string, string> = {
-        "landing.footer.privacy": "Privacy",
-        "landing.footer.terms": "Terms",
-      };
-      return strMap[key] ?? (key.split('.').pop() ?? key);
-    });
-    const { default: ScoringPage } = await import("./scoring/page");
-    render(await ScoringPage({ params: Promise.resolve({ locale: "en" }) }));
-    expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
-    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
-  });
-});
-
-describe("ScoringPage render (es)", () => {
-  it("renders the scoring page heading in es", async () => {
-    const { getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerT).mockReturnValue((key: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const map: Record<string, any> = {
-        "about.scoring.h1": "Metodología de puntuación",
-        "about.scoring.sectionPhilosophy": "Filosofía",
-        "about.scoring.sectionNormalization": "Normalización",
-        "about.scoring.sectionCaps": "Límites de señal",
-        "about.scoring.sectionDimensions": "Las dimensiones base",
-        "about.scoring.capsTableHeaders": ["Señal", "Límite", "Justificación"],
-        "about.scoring.capsTableRows": [["Commits", "300", "150 commits/año"]],
-        "about.scoring.deliveryTableHeaders": ["Señal", "Peso", "Justificación"],
-        "about.scoring.deliveryTableRows": [["Peso de PR", "70%", "La señal más fuerte"]],
-        "about.scoring.collaborativeQualityTableHeaders": ["Señal", "Peso", "Justificación"],
-        "about.scoring.collaborativeQualityTableRows": [["Revisiones enviadas", "60%", "La señal principal"]],
-        "about.scoring.soloQualityTableHeaders": ["Señal", "Peso", "Justificación"],
-        "about.scoring.soloQualityTableRows": [["Tasa de descripción de PR", "40%", "La señal más fuerte"]],
-        "about.scoring.consistencyTableHeaders": ["Señal", "Peso", "Justificación"],
-        "about.scoring.consistencyTableRows": [["Días activos (curva sqrt)", "45%", "Recompensa el inicio"]],
-        "about.scoring.breadthTableHeaders": ["Señal", "Peso", "Justificación"],
-        "about.scoring.breadthTableRows": [["Repos contribuidos", "40%", "Cuántos repos"]],
-        "about.scoring.craftTableHeaders": ["Subdimensión", "Qué mide", "Señales clave"],
-        "about.scoring.craftTableRows": [["Competencia", "Dominio de herramientas", "Diversidad"]],
-        "about.scoring.archetypesTableHeaders": ["Arquetipo", "Regla", "Qué significa"],
-        "about.scoring.archetypesTableRows": [["Emerging", "Promedio < 25", "Comenzando"]],
-        "about.scoring.tiersTableHeaders": ["Nivel", "Rango", "Descripción"],
-        "about.scoring.tiersTableRows": [["Emerging", "0-29", "Comenzando"]],
-        "about.scoring.confidenceTableHeaders": ["Patrón", "Penalización", "Desencadenante", "Qué significa"],
-        "about.scoring.confidenceTableRows": [["Actividad en ráfaga", "-15", "100+ contribuciones", "Ráfagas extremas"]],
-        "about.scoring.intro": "Transparencia total sobre cómo Chapa decodifica tu impacto.",
-        "about.scoring.videoHeading": "Ver el vídeo explicativo",
-        "about.scoring.videoTitle": "Cómo puntúa Chapa el impacto",
-        "about.scoring.videoReadingNote": "Prefiero leer? La metodología está abajo.",
-      };
-      return map[key] ?? (key.split('.').pop() ?? key);
-    });
-    const { default: ScoringPage } = await import("./scoring/page");
-    render(await ScoringPage({ params: Promise.resolve({ locale: "es" }) }));
-    expect(screen.getByText("Metodología de puntuación")).toBeDefined();
-    // #1218 — section labels appear twice now: in the heading and in the
-    // sticky index that reads the same dictionary keys.
-    expect(screen.getByRole("heading", { name: "Filosofía" })).toBeDefined();
-  });
-});
+// #1335 — the retired `scoring_v7_rendering` selector this page used to read
+// is gone; `/about/scoring` now always renders the observed (v7.2) content,
+// against the real en/es dictionaries. That is covered exhaustively (heading,
+// navbar, footer links, section index, tables, both locales) by
+// `./scoring/page.render.test.tsx`'s "current observed methodology" suite,
+// which replaces the two mocked-legacy-heading smoke tests that used to live
+// here — a hand-mocked `about.scoring.*`-only `getServerT` can no longer
+// render this page at all, since it only ever takes the `about.scoringObserved.*`
+// branch now.
 
 describe("VerificationPage render (en)", () => {
   it("renders the verification page heading in en", async () => {

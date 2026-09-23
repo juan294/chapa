@@ -2,9 +2,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { CraftResult, StatsData } from "@chapa/shared";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 
 const mocks = vi.hoisted(() => ({
@@ -85,7 +86,6 @@ vi.mock("./StudioClient", () => ({
   StudioClient: ({
     handle,
     stats,
-    impact,
     craftResult,
     scoring,
     initialConfig,
@@ -95,9 +95,8 @@ vi.mock("./StudioClient", () => ({
   }: {
     handle: string;
     stats: StatsData;
-    impact: ImpactV6Result;
     craftResult: CraftResult | null;
-    scoring?: ScoreViewModel;
+    scoring: ScoreViewModel;
     initialConfig: { theme?: string; background?: string };
     verification: { hash: string; date: string } | null;
     avatarDataUri?: string;
@@ -110,7 +109,6 @@ vi.mock("./StudioClient", () => ({
         data-handle={handle}
         data-commits={String(stats.commitsTotal)}
         data-scoring={JSON.stringify(scoring)}
-        data-impact-score={String(impact.adjustedComposite)}
         data-craft-score={String(craftResult?.craftScore ?? "none")}
         data-config-theme={initialConfig.theme ?? "none"}
         data-config-background={initialConfig.background ?? "none"}
@@ -175,7 +173,7 @@ beforeEach(() => {
   mocks.materializeDisplayProfile.mockResolvedValue({
     stats,
     craftResult,
-    displayImpact: { compositeScore: 80 },
+    scoring: makeScoring({ handle: "octocat" }),
     statsComplete: true,
   });
   mocks.getPublicProfileVerification.mockReturnValue({
@@ -220,9 +218,12 @@ describe("StudioPage render", () => {
     expect(client.getAttribute("data-commits")).toBe(
       String(DEMO_STATS.commitsTotal),
     );
-    expect(client.getAttribute("data-impact-score")).toBe(
-      String(DEMO_IMPACT.adjustedComposite),
-    );
+    const demoModel = JSON.parse(client.getAttribute("data-scoring")!);
+    expect(DEMO_IMPACT.composite.kind).toBe("point");
+    expect(demoModel).toMatchObject({
+      policyVersion: "v7.2",
+      composite: { display: 82 },
+    });
     expect(client.getAttribute("data-craft-score")).toBe("none");
     expect(client.getAttribute("data-config-background")).toBe("solid");
     expect(client.getAttribute("data-verification")).toBe("none");
@@ -236,15 +237,12 @@ describe("StudioPage render", () => {
     expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
   });
 
-  it("uses an explicitly illustrative current demo model only while observed rendering is selected", async () => {
+  it("uses an explicitly illustrative current demo model unconditionally (#1335 — v7.2 is the one policy)", async () => {
     mocks.isStudioDemoEnabled.mockResolvedValue(true);
     const { default: StudioPage } = await import("./page");
-    const view = render(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
+    render(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
     const model = JSON.parse(screen.getByTestId("studio-client").getAttribute("data-scoring")!);
     expect(model).toMatchObject({ policyVersion: "v7.2", illustrative: true, identity: null, composite: { kind: "point", display: 82 }, archetype: "Balanced" });
-    mocks.readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 });
-    view.rerender(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
-    expect(screen.getByTestId("studio-client").getAttribute("data-scoring")).toBeNull();
   });
 
   it("remounts Studio state when navigation crosses the demo boundary", async () => {
@@ -415,7 +413,7 @@ describe("StudioPage render", () => {
       .mockResolvedValueOnce({
         stats: fallbackStats,
         craftResult,
-        displayImpact: { compositeScore: 80 },
+        scoring: makeScoring({ handle: "octocat" }),
         statsComplete: true,
       });
     const { default: StudioPage } = await import("./page");

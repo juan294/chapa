@@ -3,26 +3,27 @@ import { ArchetypePageContent } from "./ArchetypePageContent";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import {
-  BUILDER_STATS, BUILDER_IMPACT,
-  GUARDIAN_STATS, GUARDIAN_IMPACT,
-  MARATHONER_STATS, MARATHONER_IMPACT,
-  POLYMATH_STATS, POLYMATH_IMPACT,
-  ARTIFICER_STATS, ARTIFICER_IMPACT,
-  BALANCED_STATS, BALANCED_IMPACT,
-  EMERGING_STATS, EMERGING_IMPACT,
+  BUILDER_STATS, BUILDER_SCORING,
+  GUARDIAN_STATS, GUARDIAN_SCORING,
+  MARATHONER_STATS, MARATHONER_SCORING,
+  POLYMATH_STATS, POLYMATH_SCORING,
+  ARTIFICER_STATS, ARTIFICER_SCORING,
+  BALANCED_STATS, BALANCED_SCORING,
+  EMERGING_STATS, EMERGING_SCORING,
 } from "@/lib/render/archetypeDemoData";
-import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 
 export type ArchetypeKey = 'builder' | 'guardian' | 'marathoner' | 'polymath' | 'artificer' | 'balanced' | 'emerging';
 
-const DEMO_DATA: Record<ArchetypeKey, { stats: StatsData; impact: ImpactV6Result }> = {
-  builder: { stats: BUILDER_STATS, impact: BUILDER_IMPACT },
-  guardian: { stats: GUARDIAN_STATS, impact: GUARDIAN_IMPACT },
-  marathoner: { stats: MARATHONER_STATS, impact: MARATHONER_IMPACT },
-  polymath: { stats: POLYMATH_STATS, impact: POLYMATH_IMPACT },
-  artificer: { stats: ARTIFICER_STATS, impact: ARTIFICER_IMPACT },
-  balanced: { stats: BALANCED_STATS, impact: BALANCED_IMPACT },
-  emerging: { stats: EMERGING_STATS, impact: EMERGING_IMPACT },
+const DEMO_DATA: Record<ArchetypeKey, { stats: StatsData; scoring: ScoreViewModel }> = {
+  builder: { stats: BUILDER_STATS, scoring: BUILDER_SCORING },
+  guardian: { stats: GUARDIAN_STATS, scoring: GUARDIAN_SCORING },
+  marathoner: { stats: MARATHONER_STATS, scoring: MARATHONER_SCORING },
+  polymath: { stats: POLYMATH_STATS, scoring: POLYMATH_SCORING },
+  artificer: { stats: ARTIFICER_STATS, scoring: ARTIFICER_SCORING },
+  balanced: { stats: BALANCED_STATS, scoring: BALANCED_SCORING },
+  emerging: { stats: EMERGING_STATS, scoring: EMERGING_SCORING },
 };
 
 interface Props {
@@ -40,7 +41,8 @@ interface Props {
 export async function ArchetypePage({ archetypeKey, locale }: Props) {
   const demoData = DEMO_DATA[archetypeKey];
   // SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded archetype demo data — no user input reaches this point. See lib/render/escape.ts for escaping.
-  const badgeSvg = renderBadgeSvg(demoData.stats, demoData.impact, {
+  const badgeSvg = renderBadgeSvg(demoData.stats, {
+    scoring: demoData.scoring,
     includeBranding: true,
     demoMode: true,
   });

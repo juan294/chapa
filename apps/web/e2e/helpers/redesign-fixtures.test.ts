@@ -1,68 +1,73 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildDerivedVerificationRow } from "./redesign-fixtures";
-import { makeFullStats } from "../../lib/test-helpers/fixtures";
-import { DEMO_STATS } from "../../lib/render/demoData";
-import { computeImpactV6 } from "../../lib/impact/v6";
-import { generateVerificationCode } from "../../lib/verification/hmac";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { issueObservedVerification } from "./redesign-fixtures";
 
 // Regression: `assertShareVerification` (deployment-probes.ts) reads
 // octocat's share page as a read-only smoke probe, extracts the
-// `/verify/{hash}` link the live render produced, then looks that exact
-// hash up via `/api/verify/{hash}`. The live render computes that hash with
-// `getPublicProfileVerification` -> `generateVerificationCode`, but never
-// persists it under `readOnly: true` — so on a genuinely cold seed (no
-// earlier non-read-only render of /u/octocat), the lookup 404s regardless
-// of the stats-cache envelope fix. `buildDerivedVerificationRow` must
-// produce a row whose hash is byte-identical to what the live production
-// path independently derives for the same stats, so a cold seed can
-// pre-populate it.
-describe("buildDerivedVerificationRow — must match the real production hash", () => {
-  const secret = "redesign-fixture-verification-regression-secret-0123456789abcdef";
+// `/verify/{token}` link the live render produced, then looks that exact
+// token up via `/api/verify/{token}`. A v7.2 verification link needs a
+// published receipt to exist first, and `runPublicProfileSideEffects` never
+// persists one under `readOnly: true` — so on a genuinely cold seed (no
+// earlier non-read-only render of /u/octocat), the lookup 404s regardless of
+// the stats-cache envelope fix. `issueObservedVerification` must publish a
+// real receipt through the same RPCs the scoring-point fixtures use and
+// return the exact `v7.<revisionId>.<hexSignature>` token format the badge's
+// verification strip links to, so a cold seed can pre-populate it.
+describe("issueObservedVerification — publishes a real receipt and returns a v7 token", () => {
+  const signing = "redesign-fixture-verification-regression-secret-0123456789abcdef";
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-22T12:00:00.000Z"));
-    vi.stubEnv("CHAPA_VERIFICATION_SECRET", secret);
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", signing);
   });
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllEnvs();
   });
 
-  it("derives the exact same hash and scores generateVerificationCode would mint for a live render", () => {
-    const stats = makeFullStats({ ...DEMO_STATS, handle: "octocat", displayName: "octocat", avatarUrl: "", linkedPlatforms: [], linkedPlatformLogins: {}, fetchedAt: new Date().toISOString() });
-
-    const row = buildDerivedVerificationRow(stats, secret, new Date());
-
-    // What a live, non-read-only render would independently compute and
-    // persist for the identical stats.
-    const impact = computeImpactV6(stats);
-    const liveVerification = generateVerificationCode(stats, impact);
-    expect(liveVerification).not.toBeNull();
-
-    expect(row.hash).toBe(liveVerification!.hash);
-    expect(row.generated_at).toBe(liveVerification!.date);
-    expect(row).toMatchObject({
-      handle: "octocat",
-      adjusted_composite: impact.adjustedComposite,
-      confidence: impact.confidence,
-      tier: impact.tier,
-      archetype: impact.archetype,
-      profile_type: impact.profileType,
-      building: impact.dimensions.delivery,
-      guarding: impact.dimensions.quality,
-      consistency: impact.dimensions.consistency,
-      breadth: impact.dimensions.breadth,
-      commits_total: stats.commitsTotal,
-      prs_merged_count: stats.prsMergedCount,
-      reviews_submitted: stats.reviewsSubmittedCount,
+  function fakeDb() {
+    const calls: { name: string; args: unknown }[] = [];
+    const rpc = vi.fn((name: string, args: unknown) => {
+      calls.push({ name, args });
+      return Promise.resolve({ error: null, data: null });
     });
+    return { calls, client: { rpc } as unknown as SupabaseClient };
+  }
+
+  it("ensures the subject, publishes the receipt, then issues its verification, in that order", async () => {
+    const { calls, client } = fakeDb();
+
+    const token = await issueObservedVerification(client, "octocat", new Date("2026-09-22T12:00:00.000Z"));
+
+    expect(calls.map((call) => call.name)).toEqual([
+      "scoring_v7_ensure_subject",
+      "scoring_observed_publish_receipt",
+      "scoring_v7_issue_verification",
+    ]);
+    expect(calls[0]!.args).toMatchObject({ p_owner: "octocat" });
+    expect(calls[1]!.args).toMatchObject({ p_owner: "octocat", p_actor: "octocat" });
+    expect(calls[2]!.args).toMatchObject({ p_owner: "octocat", p_actor: "octocat", p_key_version: "v7-1" });
+    expect(token).toMatch(/^v7\.[0-9a-f-]+\.[0-9a-f]+$/);
   });
 
-  it("changes hash when the underlying stats change", () => {
-    const stats = makeFullStats({ ...DEMO_STATS, handle: "octocat", displayName: "octocat", avatarUrl: "", linkedPlatforms: [], linkedPlatformLogins: {}, fetchedAt: new Date().toISOString() });
-    const other = makeFullStats({ ...DEMO_STATS, handle: "octocat", displayName: "octocat", avatarUrl: "", linkedPlatforms: [], linkedPlatformLogins: {}, fetchedAt: new Date().toISOString(), commitsTotal: stats.commitsTotal + 500 });
+  it("requires CHAPA_VERIFICATION_SECRET before publishing anything", async () => {
+    vi.unstubAllEnvs();
+    const { calls, client } = fakeDb();
 
-    expect(buildDerivedVerificationRow(stats, secret).hash).not.toBe(buildDerivedVerificationRow(other, secret).hash);
+    await expect(issueObservedVerification(client, "octocat")).rejects.toThrow(
+      "Explicit local verification secret required",
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it("mints a different signature for a different owner", async () => {
+    const first = fakeDb();
+    const second = fakeDb();
+
+    const tokenA = await issueObservedVerification(first.client, "octocat", new Date("2026-09-22T12:00:00.000Z"));
+    const tokenB = await issueObservedVerification(second.client, "juan294", new Date("2026-09-22T12:00:00.000Z"));
+
+    expect(tokenA).not.toBe(tokenB);
   });
 });

@@ -1,41 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { getTier } from "@/lib/impact/utils";
-import { makeScoring } from "../test-helpers/fixtures";
-import { DEMO_IMPACT, DEMO_STATS } from "./demoData";
+import { DEMO_IMPACT } from "./demoData";
 import { LANDING_IMPACT } from "./landing-demo-data";
-import { renderBadgeSvg } from "./BadgeSvg";
+import { LANDING_OBSERVED_DEMO } from "./observed-demo-data";
+import { renderableScore } from "@/lib/profile/score-view-model";
 
+// #1335 phase 5 — v6 is retired. `LANDING_IMPACT` is now the same curated
+// v7.2 illustrative view model as `LANDING_OBSERVED_DEMO` (CLAUDE.md:
+// landing sample stays 92 / Elite / Balanced, independent of the shared
+// Studio 82/High/Balanced sample).
 describe("curated landing sample", () => {
-  it("uses the independent 92/Elite Balanced profile while preserving demo identity", () => {
-    expect(LANDING_IMPACT).toMatchObject({
-      handle: DEMO_IMPACT.handle,
-      profileType: DEMO_IMPACT.profileType,
-      computedAt: DEMO_IMPACT.computedAt,
-      dimensions: { delivery: 96, quality: 88, consistency: 94, breadth: 90, craft: 92 },
-      compositeScore: 92, adjustedComposite: 92, confidence: 100,
-      confidencePenalties: [], tier: "Elite", archetype: "Balanced",
-    });
-    expect(LANDING_IMPACT.tier).toBe(getTier(LANDING_IMPACT.adjustedComposite));
+  it("is exactly the 92/Elite/Balanced LANDING_OBSERVED_DEMO view model", () => {
+    expect(LANDING_IMPACT).toBe(LANDING_OBSERVED_DEMO);
+    const drawn = renderableScore(LANDING_IMPACT);
+    expect(drawn.composite).toBe(92);
+    expect(drawn.tier).toBe("Elite");
+    expect(drawn.archetype).toBe("Balanced");
   });
 
-  it("cannot mutate the shared High/82 demo through any sample-owned object", () => {
+  it("is a distinct sample from the shared Studio demo", () => {
     expect(LANDING_IMPACT).not.toBe(DEMO_IMPACT);
-    expect(LANDING_IMPACT.dimensions).not.toBe(DEMO_IMPACT.dimensions);
-    expect(LANDING_IMPACT.confidencePenalties).not.toBe(DEMO_IMPACT.confidencePenalties);
-    expect(Object.isFrozen(LANDING_IMPACT)).toBe(true);
-    expect(Object.isFrozen(LANDING_IMPACT.dimensions)).toBe(true);
-    expect(Object.isFrozen(LANDING_IMPACT.confidencePenalties)).toBe(true);
-    expect(DEMO_IMPACT).toMatchObject({ adjustedComposite: 82, tier: "High", compositeScore: 76, confidence: 87 });
-    expect(DEMO_IMPACT.dimensions).toEqual({ delivery: 88, quality: 72, consistency: 80, breadth: 65, craft: 72 });
+    expect(renderableScore(DEMO_IMPACT).composite).toBe(82);
   });
 
-  it.each([false, true])("renders 92/Elite with explicit sample disclosure (static=%s)", (disableAnimation) => {
-    const scoring = makeScoring({ composite: 92, tier: "Elite", archetype: "Balanced" });
-    const svg = renderBadgeSvg(DEMO_STATS, { scoring, demoMode: true, includeBranding: true, disableAnimation });
-    expect(svg).toMatch(/data-element="score"[^>]*>92<\/text>/);
-    expect(svg).toMatch(/data-element="tier"[^>]*>Elite<\/text>/);
-    expect(svg).toContain("Simulated metrics");
-    expect(svg).toContain("SAMPLE · NOT A REAL BADGE");
-    expect(svg).not.toContain('href="https://chapa.thecreativetoken.com/verify/');
-  });
+  // renderBadgeSvg integration coverage for LANDING_IMPACT now lives with
+  // lib/render/BadgeSvg.tsx's own render test suite (owned outside this
+  // workstream), which exercises the renderer's real (post-#1335) signature.
 });

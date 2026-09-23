@@ -19,8 +19,6 @@ describe("disposable scoring browser fixture", () => {
       expect(receipt.window.referenceTime).toBe("2026-09-08T10:00:00.000Z");
       expect(receipt.core.composite.displayValue).toBe(seed.handle.endsWith("boundary") ? 69.99 : 46);
       if (!seed.handle.endsWith("boundary")) expect(receipt.core.composite.exact).toBeCloseTo(46.40250879691149, 12);
-      expect(seed.legacyImpact.adjustedComposite).toBe(80);
-      expect(seed.legacyImpact.archetype).toBe("Builder");
       if (seed.handle.endsWith("expired")) expect(receipt.craft).toMatchObject({ status: "expired", unlocked: true });
       else expect(receipt.craft.status).toBe("no_report");
     }

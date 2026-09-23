@@ -32,7 +32,8 @@ it("pauses every SMIL effect locally, handles live preference/config changes and
     unpauseAnimations: { configurable: true, value: unpause },
     setCurrentTime: { configurable: true, value: seek },
   });
-  const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+  const svg = renderBadgeSvg(DEMO_STATS, {
+    scoring: DEMO_IMPACT,
     config: { ...DEFAULT_BADGE_CONFIG, background: "aurora", border: "gradient-rotating", scoreEffect: "gold-shimmer" },
   });
   expect(svg).toContain("animateTransform");
@@ -48,7 +49,7 @@ it("pauses every SMIL effect locally, handles live preference/config changes and
   reduced = true;
   listeners.forEach(listener => listener());
   expect(pause).toHaveBeenCalledTimes(2);
-  const next = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, { config: { ...DEFAULT_BADGE_CONFIG, background: "particles" } });
+  const next = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_IMPACT, config: { ...DEFAULT_BADGE_CONFIG, background: "particles" } });
   rerender(<InlineBadgeSvg svg={next} />);
   expect(pause).toHaveBeenCalledTimes(3);
   expect(listeners.size).toBe(1);

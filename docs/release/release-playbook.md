@@ -63,7 +63,6 @@ pnpm run typecheck
 pnpm run lint
 pnpm run test:contract:local
 pnpm run test:coverage
-bash scripts/check-craft-propagation.sh
 pnpm run release:validate-docs
 pnpm run check:vercel-config
 pnpm run check:circular

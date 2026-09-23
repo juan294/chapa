@@ -41,7 +41,13 @@ type Translate = LanguageContextValue["t"];
 
 interface ExplainDimensionToolOptions {
   scoring?: ScoreViewModel | null;
-  impact: ClientImpactV6Result;
+  /**
+   * #1335 — optional now that Studio and the share page only ever supply a
+   * v7.2 `scoring`, which the tool branches on first. `impact` remains for
+   * the legacy fallback branch below, reached only when `scoring` is absent
+   * or not v7.2.
+   */
+  impact?: ClientImpactV6Result;
   stats: StatsData;
   craftResult?: CraftResult | null;
   t: Translate;
@@ -141,6 +147,7 @@ export function createExplainDimensionTool({
 
       const key = dimension as DimensionKey;
       if (scoring?.policyVersion === "v7.2") return JSON.stringify(explainObservedDimension(scoring, key));
+      if (!impact) return invalidInput("explain_dimension", "no current profile is available to explain");
       const dimensionExplanation = buildDimensionExplanation(
         impact,
         stats,
