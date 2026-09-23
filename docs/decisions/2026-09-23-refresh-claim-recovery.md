@@ -80,37 +80,93 @@ could recover it.
    definitive revoke, it releases via `platform_token_refresh_release_attempt`
    exactly like a first-attempt revoke would.
 
-4. **Surface `needs_reconnect` to the owner.** `dbGetLinkedPlatforms` and
-   `createStatusHandler` (`/api/auth/{provider}/status`) now report
+4. **Surface `needs_reconnect` to the owner — on `/settings` and on the
+   owner's own share page, never in `UserMenu`.** `dbGetLinkedPlatforms` and
+   `createStatusHandler` (`/api/auth/{provider}/status`) report
    `needsReconnect: boolean` per connection — never an attempt id or token
    material. `/settings` shows a reconnect prompt and CTA (reusing the
    existing `/api/auth/:platform/connect` OAuth flow — no new write endpoint)
-   alongside the existing unlink control; `UserMenu` shows a small indicator
-   on the Settings link, since #1238 deliberately removed per-connection
-   status from the menu itself and a reconnect action still belongs on
-   `/settings`. A fresh OAuth grant (`dbUpsertLinkedPlatform`'s upsert) always
-   clears `needs_reconnect`, so a successful reconnect resolves the prompt.
+   alongside the existing unlink control. An earlier revision of this change
+   also added a `usePlatformConnections()` call and a small indicator to
+   `UserMenu`; that was reverted after review, because #1238 deliberately
+   removed per-page connection-status fetches from that menu (up to 3
+   `fetch()` calls to `/api/auth/*/status` on every authenticated page load),
+   and reintroducing even a read-only one regresses that decision. Instead,
+   `/u/[handle]/page.tsx` reads `dbGetLinkedPlatforms(handle)` directly —
+   server-side, gated strictly to `isOwner`, so it is a single indexed
+   `user_platforms` SELECT that never runs for a visitor and adds no new
+   client request — and threads a filtered `reconnectNeeded` list down to
+   `SharePageOwnerContent`, which renders the same reconnect CTAs `/settings`
+   uses (`userMenu.reconnectBitbucket`/`Codeberg`/`Gitlab`) and gates its own
+   render on `isOwner` again as defense in depth. This was deliberately NOT
+   threaded through `StatsData`/the scoring composition pipeline
+   (`getStats`/`_compose` in `apps/web/lib/github/client.ts`) even though that
+   pipeline already computes something adjacent (`linkedPlatforms`,
+   `linkedPlatformLogins`) — that pipeline carries its own cache-binding and
+   scoring-integrity invariants (see CLAUDE.md's "stats cache" section) that a
+   cosmetic UI flag has no reason to touch, and reaching into it would have
+   been a much larger, riskier change than a second small owner-gated read. A
+   fresh OAuth grant (`dbUpsertLinkedPlatform`'s upsert) always clears
+   `needs_reconnect`, so a successful reconnect resolves the prompt on both
+   surfaces.
 
 5. **046 and 048 are unmodified.** This migration adds new functions and new
    columns only; the historical claim/finish/release behavior described there
    is untouched. Their "No timeout takeover exists" comment is now narrowly
    corrected by this ADR and by 053's own comments — future readers land here.
 
+6. **Every durable write this change adds is observable, not just
+   error-swallowed.** `releasePlatformTokenRefreshAttempt`,
+   `takeoverPlatformTokenRefresh` and `markPlatformNeedsReconnect`
+   (`apps/web/lib/db/platform-token-refresh.ts`) each call `captureServerError`
+   on every failure path — no Supabase client, an RPC/update `{ error }`
+   result, a malformed reply, or a thrown exception — before returning or
+   rethrowing. This matters specifically because `refreshSourceLink` wraps
+   its entire body in one top-level `try { } catch { return { status:
+   "unavailable" }; }`: without an explicit capture inside these functions, a
+   broken release or takeover path (e.g. a bad grant on the new RPCs) would
+   have been entirely silent, which is exactly the observability gap
+   CLAUDE.md's "a durable write that fails but reports success is always a
+   bug" rule exists to close. `markPlatformNeedsReconnect` additionally
+   treats a zero-row version-guard match (the link changed concurrently) as
+   observable rather than a quiet no-op, since the owner never got the flag
+   that call intended to set.
+
 ## Threshold
 
 `REFRESH_CLAIM_TAKEOVER_THRESHOLD_SECONDS = 360` (300 + 60), derived from:
 
-- **300s** — the largest `maxDuration` among any route that can reach
-  `refreshSourceLink` (via `getStats` → the platform source-collection path):
-  `apps/web/vercel.json`'s `functions` block declares `maxDuration: 300` for
-  `warm-cache`, `sync-audience` and `process-campaigns`;
+- **300s** — the largest function duration any route that can reach
+  `refreshSourceLink` (via `getStats` → the platform source-collection path)
+  can actually run for. `apps/web/vercel.json`'s `functions` block declares
+  `maxDuration: 300` for `warm-cache`, `sync-audience` and `process-campaigns`;
   `app/api/admin/bulk-recalculate/route.ts` also declares
   `export const maxDuration = 300`. The badge route itself declares only 35s
   (`app/u/[handle]/badge.svg/route.ts`), so it is not the binding constraint.
-  Once a function's `maxDuration` has elapsed, the platform has torn it down —
-  nothing it started can still be "in flight" from the platform's point of
-  view, so a response for the original provider request can no longer arrive
-  through that process.
+  **Verified, not just inferred, for the remaining reachable routes with no
+  explicit `maxDuration`** (`/api/refresh`, `/api/generate`,
+  `/api/recalculate`, `/studio`, `/u/[handle]` SSR): a read-only query against
+  the live Vercel project on 2026-09-23 —
+
+  ```
+  vercel api "/v9/projects/prj_hht2ez82Ucm4wAiKlGmBj4WOi2bV?teamId=team_eJRc3uJPBTvXknc9WbVr4nlh"
+  -> defaultResourceConfig.functionDefaultTimeout: 300
+  -> resourceConfig.fluid: true                          (Fluid Compute active)
+  vercel api /v2/teams
+  -> billing.plan: "pro"
+  ```
+
+  confirms the project's own configured default for a route with no explicit
+  `maxDuration` is the SAME 300s, not the higher ceiling Fluid Compute on Pro
+  would *allow* configuring (up to 800s) — that ceiling was never actually
+  set. So every route that can reach the claim, labeled or not, shares one
+  300s ceiling today. Once a function's timeout has elapsed, the platform has
+  torn it down — nothing it started can still be "in flight" from the
+  platform's point of view, so a response for the original provider request
+  can no longer arrive through that process. Re-verify this figure (same
+  `vercel api` query, read-only) if the project's default timeout, its Fluid
+  Compute setting, or any reachable route's explicit `maxDuration` ever
+  changes.
 - **+60s margin** — absorbs clock skew between Postgres's own
   `clock_timestamp()` (used for both `started_at` and the staleness
   comparison — the comparison never depends on the calling process's clock)

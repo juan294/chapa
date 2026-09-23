@@ -5,7 +5,7 @@ import { ReceiptExplanationPanel } from "@/components/dashboard/ReceiptExplanati
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
 import { useState } from "react";
-import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
+import type { ClientImpactV6Result, CraftResult, Platform, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { DataSources } from "@/components/ImpactBreakdown";
@@ -33,6 +33,14 @@ import { interpolate } from "@/lib/i18n/interpolate";
 
 /** Display names for connectable platforms; the API answers with lowercase ids. */
 const PLATFORM_NAMES: Record<string, string> = { bitbucket: "Bitbucket", codeberg: "Codeberg", gitlab: "GitLab" };
+
+/** #1332 — reuses the same dictionary keys Settings' reconnect CTA uses, so
+ * the two owner-facing surfaces read identically. */
+const RECONNECT_KEYS: Partial<Record<Platform, string>> = {
+  bitbucket: "userMenu.reconnectBitbucket",
+  codeberg: "userMenu.reconnectCodeberg",
+  gitlab: "userMenu.reconnectGitlab",
+};
 
 function EmptyImpactState({ handle }: { handle: string }) {
   const { t } = useTranslation();
@@ -141,6 +149,9 @@ interface SharePageOwnerContentProps {
   scoring?: ScoreViewModel | null;
   /** #1331 — see SharePageOwnerContentLazy. */
   staleFallback?: { observedAt: string } | null;
+  /** #1332 — owner-only; see SharePageOwnerContentLazy. Always `[]` when the
+   *  server did not compute it for this viewer (a visitor). */
+  reconnectNeeded?: Platform[];
 }
 
 export function SharePageOwnerContent({
@@ -156,6 +167,7 @@ export function SharePageOwnerContent({
   receiptExplanation = null,
   scoring,
   staleFallback = null,
+  reconnectNeeded = [],
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -193,6 +205,39 @@ export function SharePageOwnerContent({
               date: staleFallback.observedAt.slice(0, 10),
             })}
           </p>
+        </section>
+      )}
+
+      {/* #1332 — owner-only: a linked source's refresh grant needs the owner
+          to reconnect. `reconnectNeeded` is populated server-side only when
+          `isOwner` is true (see /u/[handle]/page.tsx), but this component
+          still gates on `isOwner` itself so a visitor can never see it even
+          if this component is ever reused with a differently-sourced prop. */}
+      {isOwner && reconnectNeeded.length > 0 && (
+        <section
+          role="status"
+          data-testid="share-page-reconnect-notice"
+          className="mb-10 rounded-[3px] border border-stroke bg-card p-4 animate-fade-in-up motion-reduce:animate-none [animation-delay:250ms]"
+        >
+          <p className="text-sm text-text-secondary mb-3">
+            {t('shareOwner.reconnectNeeded') as string}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {reconnectNeeded.map((platform) => {
+              const key = RECONNECT_KEYS[platform];
+              if (!key) return null;
+              return (
+                <a
+                  key={platform}
+                  href={`/api/auth/${platform}/connect?returnTo=${encodeURIComponent(`/u/${handle}`)}`}
+                  data-testid={`share-page-reconnect-${platform}`}
+                  className="inline-flex min-h-[44px] items-center rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-colors hover:bg-action-hover"
+                >
+                  {t(key) as string}
+                </a>
+              );
+            })}
+          </div>
         </section>
       )}
 

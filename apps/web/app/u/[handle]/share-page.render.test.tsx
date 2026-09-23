@@ -35,6 +35,7 @@ const {
   mockSharePageWebMcpToolsComponent,
   mockIsWebmcpEnabled,
   mockResolveBadgeConfigSnapshot,
+  mockDbGetLinkedPlatforms,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -55,6 +56,7 @@ const {
   mockSharePageWebMcpToolsComponent: vi.fn(),
   mockIsWebmcpEnabled: vi.fn(),
   mockResolveBadgeConfigSnapshot: vi.fn(),
+  mockDbGetLinkedPlatforms: vi.fn(),
 }));
 
 // The badge's verification strip is wrapped in next/link, whose module object
@@ -77,6 +79,13 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/auth/session", () => ({
   getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
     mockGetOptionalServerSessionFromHeaders(...args),
+}));
+
+// #1332 — dbGetLinkedPlatforms backs the owner-only reconnect notice; must
+// never be called for a visitor (see the two tests near the bottom of this
+// file).
+vi.mock("@/lib/db/user-platforms", () => ({
+  dbGetLinkedPlatforms: (...args: unknown[]) => mockDbGetLinkedPlatforms(...args),
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -179,6 +188,7 @@ vi.mock("./SharePageWebMcpTools", () => ({
 }));
 
 import { generateMetadata, SharePageContent } from "./page";
+import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
 
 async function flushAfterCallbacks(): Promise<void> {
   const callbacks = mockAfter.mock.calls.map(
@@ -321,6 +331,7 @@ beforeEach(() => {
   mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
   mockHeaders.mockResolvedValue({ get: () => null });
   mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+  mockDbGetLinkedPlatforms.mockResolvedValue([]);
   mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
@@ -635,6 +646,37 @@ describe("Phase 4d — Share page i18n", () => {
       const parsed = parseJsonLdScript(result);
 
       expect(parsed).not.toHaveProperty("potentialAction");
+    });
+  });
+
+  // #1332 — a linked source whose refresh grant needs reconnecting has no
+  // other owner-visible surface on this page. The lookup must be gated to
+  // the owner alone: it is a real Supabase read (dbGetLinkedPlatforms), and
+  // a visitor causing it on every page view would be an unwanted new query
+  // on the by-far most common share-page render.
+  describe("SharePageContent — #1332 owner-only reconnect notice", () => {
+    it("never reads linked platforms for a visitor, and passes an empty reconnectNeeded", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "someone-else" });
+
+      const result = await SharePageContent({ handle: "testuser" });
+
+      expect(mockDbGetLinkedPlatforms).not.toHaveBeenCalled();
+      const host = findElementByType(result, SharePageOwnerContentLazy);
+      expect(host?.props.reconnectNeeded).toEqual([]);
+    });
+
+    it("reads linked platforms for the owner and passes only the ones needing reconnect", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+      mockDbGetLinkedPlatforms.mockResolvedValue([
+        { platform: "bitbucket", remoteLogin: "bb-user", connectedAt: "2026-02-20T12:00:00Z", needsReconnect: true },
+        { platform: "gitlab", remoteLogin: "gl-user", connectedAt: "2026-02-20T12:00:00Z", needsReconnect: false },
+      ]);
+
+      const result = await SharePageContent({ handle: "testuser" });
+
+      expect(mockDbGetLinkedPlatforms).toHaveBeenCalledWith("testuser");
+      const host = findElementByType(result, SharePageOwnerContentLazy);
+      expect(host?.props.reconnectNeeded).toEqual(["bitbucket"]);
     });
   });
 

@@ -33,16 +33,6 @@ vi.mock("@/hooks/useSession", () => ({
   clearSessionCache: mockClearSessionCache,
 }));
 
-// #1332 — the menu now reads connection status only to surface a reconnect
-// indicator; mocked deterministically so existing tests don't trigger real
-// fetch() calls to /api/auth/*/status.
-const mockUsePlatformConnections = vi.hoisted(() => vi.fn(() => ({ connections: [] as Array<{ platform: string; status: { needsReconnect: boolean } | null }>, unlink: vi.fn() })));
-const mockClearPlatformStatusCache = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/platform/use-platform-connections", () => ({
-  usePlatformConnections: mockUsePlatformConnections,
-  clearPlatformStatusCache: mockClearPlatformStatusCache,
-}));
-
 // Static import gets the mocked module (vi.mock is hoisted)
 import * as featureFlags from "@/lib/feature-flags-sync";
 
@@ -592,54 +582,15 @@ describe("UserMenu — trimmed to navigation (#1238)", () => {
       expect(screen.queryByText(label)).toBeNull();
     }
   });
-});
 
-/**
- * #1332 — a connection whose refresh grant needs reconnecting has no other
- * surface here since #1238 removed per-connection status from the menu. A
- * small indicator on the existing Settings link is the only addition; the
- * actual reconnect action still lives on /settings.
- */
-describe("UserMenu — reconnect indicator on Settings link (#1332)", () => {
-  beforeEach(() => {
-    dropdownOpen = true;
-  });
-
-  afterEach(() => {
-    mockUsePlatformConnections.mockReturnValue({ connections: [], unlink: vi.fn() });
-  });
-
-  it("shows no indicator when no connection needs reconnecting", () => {
-    mockUsePlatformConnections.mockReturnValue({
-      connections: [
-        { platform: "bitbucket", status: { needsReconnect: false } },
-        { platform: "gitlab", status: null },
-      ],
-      unlink: vi.fn(),
-    });
-    render(<UserMenu {...baseProps} />);
-
-    expect(screen.queryByTestId("usermenu-needs-reconnect")).toBeNull();
-  });
-
-  it("shows the indicator when a connection needs reconnecting", () => {
-    mockUsePlatformConnections.mockReturnValue({
-      connections: [
-        { platform: "bitbucket", status: { needsReconnect: true } },
-        { platform: "gitlab", status: { needsReconnect: false } },
-      ],
-      unlink: vi.fn(),
-    });
-    render(<UserMenu {...baseProps} />);
-
-    expect(screen.getByTestId("usermenu-needs-reconnect")).toBeTruthy();
-    const settingsLink = screen.getByText("Settings").closest("a");
-    expect(settingsLink?.getAttribute("aria-label")).toBe(
-      "Settings — a connection needs to be reconnected",
-    );
-  });
-
-  it("never fetches platform connection status directly — the mocked hook owns that", () => {
+  // #1332 review — a UserMenu-owned reconnect indicator was tried and reverted:
+  // #1238 deliberately removed per-page connection status fetches from this
+  // menu (Settings is the one place that owns them), and reintroducing even a
+  // read-only usePlatformConnections() call here would add up to 3 status
+  // requests to every authenticated page load. The reconnect prompt now lives
+  // on /settings (full detail) and the owner's own /u/[handle] share page
+  // (a small notice, computed server-side with no extra client request).
+  it("never fetches platform connection status", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     render(<UserMenu {...baseProps} />);
 

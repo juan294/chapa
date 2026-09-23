@@ -64,6 +64,7 @@ import { readObservedScoreReceipt } from "@/lib/profile/score-receipt-observed";
 import { explainReceipt, explainObservedReceipt } from "@/lib/dashboard/receipt-explanation";
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
+import { dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -260,6 +261,20 @@ export async function SharePageContent({
   if (isGitHubUserNotFound(materialization)) notFound();
   const materialized = materialization;
   const isOwner = session?.login === handle;
+
+  // #1332 — owner-only, cheap (single indexed SELECT on `user_platforms` by
+  // handle, no token decryption): a linked source whose refresh grant needs
+  // reconnecting has no other owner-visible surface on this dynamic (never
+  // statically cached) page. Deliberately NOT threaded through `StatsData`/
+  // the scoring composition pipeline (`getStats`/`_compose`) — that pipeline
+  // carries its own cache-binding and integrity invariants (see CLAUDE.md's
+  // "stats cache" section) that a cosmetic UI flag has no reason to touch.
+  // Never runs for a visitor, so it adds no read to the common case.
+  const reconnectNeeded = isOwner
+    ? (await dbGetLinkedPlatforms(handle))
+        .filter((platform) => platform.needsReconnect)
+        .map((platform) => platform.platform)
+    : [];
 
   // badge-source-outage-resilience (2026-09-22) / #1331 — live materialization
   // failed (a linked-source refresh outage, a GitHub rejection, etc.), but a
@@ -610,6 +625,7 @@ export async function SharePageContent({
           receiptExplanation={receiptExplanation}
           scoring={scoringModel}
           staleFallback={stored ? { observedAt: stored.observedAt } : null}
+          reconnectNeeded={reconnectNeeded}
         />
       </div>
 

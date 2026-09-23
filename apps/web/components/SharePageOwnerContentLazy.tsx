@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
-import type { ClientImpactV6Result, CraftResult, StatsData } from "@chapa/shared";
+import type { ClientImpactV6Result, CraftResult, Platform, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { useTranslation } from "@/lib/i18n";
@@ -68,6 +68,10 @@ interface Props {
    *  the breakdown's stale notice and hides the activity heatmap, which would
    *  otherwise draw an empty (falsely "no activity") grid. */
   staleFallback?: { observedAt: string } | null;
+  /** #1332 — owner-only list of linked platforms whose refresh grant needs
+   *  the owner to reconnect. Always empty for a visitor (the server never
+   *  computes it for one); see SharePageOwnerContent. */
+  reconnectNeeded?: Platform[];
 }
 
 export function SharePageOwnerContentLazy(props: Props) {

@@ -580,6 +580,64 @@ describe("SharePageOwnerContent — render", () => {
       screen.getByTestId("impact-dashboard").getAttribute("data-activity-unavailable"),
     ).toBe("false");
   });
+
+  // #1332 — a linked source whose refresh grant needs reconnecting has no
+  // other owner-visible surface on this page (UserMenu deliberately does not
+  // show it — see #1238).
+  it("shows the reconnect notice and a CTA per platform for the owner", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={MOCK_IMPACT}
+        isOwner={true}
+        reconnectNeeded={["bitbucket", "gitlab"]}
+      />,
+    );
+
+    expect(screen.getByTestId("share-page-reconnect-notice")).toBeTruthy();
+    const bitbucketLink = screen.getByTestId("share-page-reconnect-bitbucket");
+    expect(bitbucketLink.getAttribute("href")).toBe(
+      `/api/auth/bitbucket/connect?returnTo=${encodeURIComponent("/u/testuser")}`,
+    );
+    expect(screen.getByTestId("share-page-reconnect-gitlab")).toBeTruthy();
+  });
+
+  it("shows no reconnect notice for the owner when reconnectNeeded is empty", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={MOCK_IMPACT}
+        isOwner={true}
+      />,
+    );
+
+    expect(screen.queryByTestId("share-page-reconnect-notice")).toBeNull();
+  });
+
+  // Defense in depth: the server only ever computes `reconnectNeeded` for the
+  // owner (see /u/[handle]/page.tsx), but this component must never render
+  // it for a visitor even if that invariant were ever violated by a caller.
+  it("never shows the reconnect notice for a visitor, even with a non-empty reconnectNeeded", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={MOCK_IMPACT}
+        isOwner={false}
+        reconnectNeeded={["bitbucket"]}
+      />,
+    );
+
+    expect(screen.queryByTestId("share-page-reconnect-notice")).toBeNull();
+  });
 });
 
 it("never falls back to legacy arithmetic when the current receipt explanation is unavailable", async () => {
