@@ -1,38 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
-import { makeSnapshot } from "@/lib/test-helpers/fixtures";
 
-const { mockReadPublicObservedScore, mockGetCachedLatestSnapshot } = vi.hoisted(() => ({
+const { mockReadPublicObservedScore, mockReadStats } = vi.hoisted(() => ({
   mockReadPublicObservedScore: vi.fn(),
-  mockGetCachedLatestSnapshot: vi.fn(),
+  mockReadStats: vi.fn(),
 }));
 
 vi.mock("./post-write-score", () => ({
   readPublicObservedScore: mockReadPublicObservedScore,
 }));
 
-vi.mock("@/lib/cache/snapshot-cache", () => ({
-  getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
+vi.mock("@/lib/github/client", () => ({
+  readStats: mockReadStats,
 }));
 
 import {
   readStoredBadgeProfile,
   storedBadgeRenderInputs,
-  snapshotDimensions,
   storedBadgeActivityUnavailable,
 } from "./stored-badge-profile";
 
-const V6_SELECTION: ScoringRenderSelection = {
-  enabled: false,
-  machinePolicy: "v6",
-  cacheable: true,
-  capturedAt: Date.parse("2026-09-22T10:00:00Z"),
-};
-
 const V72_SELECTION: ScoringRenderSelection = {
-  ...V6_SELECTION,
   enabled: true,
   machinePolicy: "v7.2",
+  cacheable: true,
+  capturedAt: Date.parse("2026-09-22T10:00:00Z"),
 };
 
 const RECEIPT_MODEL = {
@@ -71,86 +63,73 @@ const RECEIPT_MODEL = {
   limitations: [],
 };
 
+const STALE_STATS = {
+  handle: "juan294",
+  commitsTotal: 100,
+  activeDays: 40,
+  prsMergedCount: 10,
+  prsMergedWeight: 10,
+  reviewsSubmittedCount: 5,
+  issuesClosedCount: 2,
+  linesAdded: 1000,
+  linesDeleted: 200,
+  reposContributed: 9,
+  topRepoShare: 0.4,
+  maxCommitsIn10Min: 3,
+  totalStars: 42,
+  totalForks: 3,
+  totalWatchers: 1,
+  heatmapData: [{ date: "2026-09-19", count: 2 }],
+  fetchedAt: "2026-09-19T00:00:00.000Z",
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("readStoredBadgeProfile", () => {
   it("returns null when the selection is not cacheable (unknown policy authority is not a fallback opportunity)", async () => {
-    const result = await readStoredBadgeProfile("juan294", { ...V6_SELECTION, cacheable: false });
+    const result = await readStoredBadgeProfile("juan294", { ...V72_SELECTION, cacheable: false });
 
     expect(result).toBeNull();
     expect(mockReadPublicObservedScore).not.toHaveBeenCalled();
-    expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
+    expect(mockReadStats).not.toHaveBeenCalled();
   });
 
-  it("returns null when neither a current receipt nor a durable snapshot exists", async () => {
+  it("returns null when there is no current receipt", async () => {
     mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
-    mockGetCachedLatestSnapshot.mockResolvedValue(null);
 
-    const result = await readStoredBadgeProfile("ghost", V6_SELECTION);
+    const result = await readStoredBadgeProfile("ghost", V72_SELECTION);
 
     expect(result).toBeNull();
+    expect(mockReadStats).not.toHaveBeenCalled();
   });
 
-  it("builds a v6 stored profile from the durable snapshot alone when no current receipt exists", async () => {
-    mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
-    const snapshot = makeSnapshot({ archetype: "Builder", tier: "High", adjustedComposite: 68 });
-    mockGetCachedLatestSnapshot.mockResolvedValue(snapshot);
-
-    const result = await readStoredBadgeProfile("juan294", V6_SELECTION);
-
-    expect(result?.kind).toBe("stored");
-    expect(result?.policyVersion).toBe("v6");
-    expect(result?.handle).toBe("juan294");
-    expect(result?.observedAt).toBe(snapshot.capturedAt);
-    expect(result?.scoring.policyVersion).toBe("v6");
-    expect(result?.scoring.tier).toBe("High");
-    expect(result?.scoring.archetype).toBe("Builder");
-    expect(result?.scoring.composite).toEqual({ kind: "point", value: 68, display: 68 });
-    // Never recomputed from a partial StatsData — copied straight from the snapshot.
-    expect(result?.legacyImpact.dimensions).toEqual(snapshotDimensions(snapshot));
-    expect(result?.legacyImpact.archetype).toBe("Builder");
-  });
-
-  it("marks a v6 stored profile's scoring as stale, never current", async () => {
-    mockReadPublicObservedScore.mockResolvedValue({ status: "unavailable" });
-    mockGetCachedLatestSnapshot.mockResolvedValue(makeSnapshot());
-
-    const result = await readStoredBadgeProfile("juan294", V6_SELECTION);
-
-    expect(result?.scoring.freshness).toBe("stale");
-  });
-
-  it("uses the current v7.2 receipt as the sole scoring authority when one exists, never mixing v7 dimensions with a v6 headline", async () => {
+  it("uses the current v7.2 receipt as the sole scoring authority", async () => {
     mockReadPublicObservedScore.mockResolvedValue({
       status: "current",
       projection: { scoring: RECEIPT_MODEL },
     });
-    const snapshot = makeSnapshot({ archetype: "Marathoner", tier: "Solid", adjustedComposite: 40 });
-    mockGetCachedLatestSnapshot.mockResolvedValue(snapshot);
+    mockReadStats.mockResolvedValue({ status: "stale", stats: STALE_STATS, capturedAt: "2026-09-19T00:00:00.000Z" });
 
     const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
 
-    expect(result?.policyVersion).toBe("v7.2");
+    expect(result?.kind).toBe("stored");
     expect(result?.scoring.policyVersion).toBe("v7.2");
-    // The receipt's own numbers, not the snapshot's legacy aggregate.
     expect(result?.scoring.composite).toEqual({ kind: "point", value: 62, display: 62 });
     expect(result?.scoring.tier).toBe("High");
     expect(result?.scoring.archetype).toBe("Builder");
-    // The snapshot still supplies non-scoring context (repo/star counts etc.),
-    // never scoring dimensions.
-    expect(result?.context.reposContributed).toBe(snapshot.reposContributed);
-    // The disclosed date comes from the receipt, the scoring authority.
+    expect(result?.stats?.reposContributed).toBe(9);
     expect(result?.observedAt).toBe("2026-09-20T00:00:00.000Z");
+    expect(mockReadStats).toHaveBeenCalledWith("juan294", undefined, { readOnly: true });
   });
 
-  it("forces a current receipt's freshness to stale for the stored projection", async () => {
+  it("forces the receipt's own current freshness to stale for the stored projection", async () => {
     mockReadPublicObservedScore.mockResolvedValue({
       status: "current",
       projection: { scoring: { ...RECEIPT_MODEL, freshness: "current" } },
     });
-    mockGetCachedLatestSnapshot.mockResolvedValue(makeSnapshot());
+    mockReadStats.mockResolvedValue({ status: "unavailable" });
 
     const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
 
@@ -162,61 +141,48 @@ describe("readStoredBadgeProfile", () => {
       status: "current",
       projection: { scoring: { ...RECEIPT_MODEL, freshness: "unavailable" } },
     });
-    mockGetCachedLatestSnapshot.mockResolvedValue(makeSnapshot());
+    mockReadStats.mockResolvedValue({ status: "unavailable" });
 
     const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
 
     expect(result?.scoring.freshness).toBe("unavailable");
   });
 
-  it("returns null when a current receipt exists but no durable snapshot backs its context", async () => {
+  it("still returns a profile when a current receipt exists but no stats envelope backs it — never refuses the fallback", async () => {
     mockReadPublicObservedScore.mockResolvedValue({
       status: "current",
       projection: { scoring: RECEIPT_MODEL },
     });
-    mockGetCachedLatestSnapshot.mockResolvedValue(null);
+    mockReadStats.mockResolvedValue({ status: "unavailable" });
 
     const result = await readStoredBadgeProfile("juan294", V72_SELECTION);
 
-    expect(result).toBeNull();
-  });
-
-  it("never creates heatmapData — the type has no field for it", async () => {
-    mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
-    mockGetCachedLatestSnapshot.mockResolvedValue(makeSnapshot());
-
-    const result = await readStoredBadgeProfile("juan294", V6_SELECTION);
-
-    expect(result).not.toHaveProperty("heatmapData");
-    expect(result?.context).not.toHaveProperty("heatmapData");
-  });
-
-  it("does not fetch a receipt when v7.2 is not enabled (v6 selection)", async () => {
-    mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
-    mockGetCachedLatestSnapshot.mockResolvedValue(makeSnapshot());
-
-    await readStoredBadgeProfile("juan294", V6_SELECTION);
-
-    expect(mockReadPublicObservedScore).toHaveBeenCalledWith("juan294", V6_SELECTION);
+    expect(result).not.toBeNull();
+    expect(result?.stats).toBeNull();
   });
 });
 
 describe("storedBadgeRenderInputs", () => {
-  it("builds renderBadgeSvg inputs with an empty heatmap — never zero-filled per-day activity", async () => {
-    mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
-    const snapshot = makeSnapshot({ reposContributed: 9, totalStars: 42 });
-    mockGetCachedLatestSnapshot.mockResolvedValue(snapshot);
-    const stored = await readStoredBadgeProfile("juan294", V6_SELECTION);
+  it("builds renderBadgeSvg inputs with an empty heatmap — never zero-filled per-day activity", () => {
+    const stored = { kind: "stored" as const, handle: "juan294", observedAt: "2026-09-20T00:00:00.000Z", scoring: RECEIPT_MODEL, stats: STALE_STATS };
 
-    const inputs = storedBadgeRenderInputs(stored!);
+    const inputs = storedBadgeRenderInputs(stored);
 
     expect(inputs.stats.handle).toBe("juan294");
     expect(inputs.stats.heatmapData).toEqual([]);
     expect(inputs.stats.reposContributed).toBe(9);
     expect(inputs.stats.totalStars).toBe(42);
-    expect(inputs.stats.avatarUrl).toBeUndefined();
-    expect(inputs.stats.displayName).toBeUndefined();
-    expect(inputs.impact).toBe(stored!.legacyImpact);
+    expect(inputs.countsAvailable).toBe(true);
+  });
+
+  it("renders counts as unavailable, never as a fabricated zero, when no stats envelope exists", () => {
+    const stored = { kind: "stored" as const, handle: "juan294", observedAt: "2026-09-20T00:00:00.000Z", scoring: RECEIPT_MODEL, stats: null };
+
+    const inputs = storedBadgeRenderInputs(stored);
+
+    expect(inputs.countsAvailable).toBe(false);
+    expect(inputs.stats.heatmapData).toEqual([]);
+    expect(inputs.stats.handle).toBe("juan294");
   });
 });
 

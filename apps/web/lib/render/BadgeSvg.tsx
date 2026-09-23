@@ -1,4 +1,4 @@
-import type { StatsData, ImpactV6Result, Platform, BadgeConfig } from "@chapa/shared";
+import type { StatsData, Platform, BadgeConfig } from "@chapa/shared";
 import { formatCompact, DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { badgeTheme, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
@@ -16,7 +16,7 @@ import { renderVerificationStrip, renderDemoVerificationStrip } from "./Verifica
 import { BADGE_RENDER_VARIANT } from "./badge-render-variant";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 import { describeScoringEvidence, type ScoringEvidenceLabels } from "./scoring-evidence-label";
-import { legacyViewModel, renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
+import { renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
 
 /**
  * Locale-resolved strings for the ~10 literals rendered directly onto the
@@ -58,16 +58,16 @@ export interface BadgeI18nStrings {
 
 interface BadgeOptions {
   /**
-   * The issued v7 receipt projection, when this subject has one (#1310/#1311).
-   *
-   * The drawn artwork is unchanged; what this adds is truth in the accessible
-   * name. A screen reader otherwise hears a composite and an archetype with no
-   * way to tell a point from an evidence-completion range, an absent Craft
-   * portfolio from a zero one, or complete coverage from partial. The badge is
-   * consumed as an `<img>` in READMEs, where that description is the only text
-   * a reader gets.
+   * The issued receipt projection this badge draws (#1310/#1311, #1335 phase
+   * 5 — "delete v6": there is no legacy aggregate fallback left, so this is
+   * now required). Every drawn magnitude, tier and archetype comes from this
+   * one projection via `renderableScore`, and the accessible name describes
+   * it: whether a composite is a point or an evidence-completion range, an
+   * absent Craft portfolio versus a zero one, complete coverage versus
+   * partial. The badge is consumed as an `<img>` in READMEs, where that
+   * description is the only text a reader gets.
    */
-  scoring?: ScoreViewModel;
+  scoring: ScoreViewModel;
   includeBranding?: boolean;
   avatarDataUri?: string;
   verificationHash?: string;
@@ -114,6 +114,16 @@ interface BadgeOptions {
     /** ISO timestamp of the last successful snapshot/receipt capture. */
     observedAt: string;
     activityAvailable: false;
+    /**
+     * #1335 phase 5 — `stored-badge-profile.ts`'s stored-badge fallback is
+     * rebuilt on the receipt plus an exact-bound stale `StatsData` envelope,
+     * which is not always available. `false` means even that stale envelope
+     * is missing: every repo/star/fork/watch count is unknown, not zero, so
+     * the pill row is replaced with an explicit "unavailable" glyph instead
+     * of drawing a fabricated 0. Defaults to `true` (the stats passed in are
+     * real, just possibly stale).
+     */
+    countsAvailable?: boolean;
   };
 }
 
@@ -161,14 +171,13 @@ function renderActivityUnavailableNotice(text: string, color: string): string {
  * The badge always renders in dark theme regardless of the site's current theme.
  *
  * @param stats - Aggregated GitHub stats providing handle, metrics, and heatmap data
- * @param impact - Computed Impact v6 result with dimensions, archetype, tier, and score
- * @param options - Visual options: branding toggle, avatar data URI, verification hash/date, demo mode
+ * @param options - Visual options: the receipt projection to draw, branding toggle,
+ *   avatar data URI, verification hash/date, demo mode
  * @returns A complete SVG document as a string, ready for HTTP response or embedding
  */
 export function renderBadgeSvg(
   stats: StatsData,
-  impact: ImpactV6Result,
-  options: BadgeOptions = {},
+  options: BadgeOptions,
 ): string {
   const { scoring, includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false, strings = {}, config = DEFAULT_BADGE_CONFIG, degraded } = options;
   const hasVerification = Boolean(verificationHash && verificationDate);
@@ -185,12 +194,12 @@ export function renderBadgeSvg(
   const nameFit = Array.from(stats.displayName || `@${stats.handle}`).length * 32 * 0.6 > 820
     ? ' textLength="820" lengthAdjust="spacingAndGlyphs"'
     : "";
-  // #1311 — every drawn magnitude comes from the one projection, so an issued
-  // v7 receipt and the legacy v6 aggregate cannot disagree about the same
-  // revision. `renderableScore` draws a range at its lower bound, which is the
-  // only claim the evidence supports, and names the ranged keys so the
-  // accessible description can disclose the interval.
-  const model = scoring ?? legacyViewModel(impact);
+  // #1311/#1335 phase 5 — every drawn magnitude comes from the one receipt
+  // projection; there is no legacy aggregate to disagree with any more.
+  // `renderableScore` draws a range at its lower bound, which is the only
+  // claim the evidence supports, and names the ranged keys so the accessible
+  // description can disclose the interval.
+  const model = scoring;
   const score = renderableScore(model);
   const tierColor = getTierColor(score.tier, t);
   const archetypeColor = getArchetypeColor(score.archetype, t);
@@ -228,10 +237,14 @@ export function renderBadgeSvg(
 
   // ── Archetype + repo metrics pill row (above heatmap, left-aligned) ─
   const metaRowY = 173;
-  const reposStr = formatCompact(stats.reposContributed ?? 0);
-  const watchStr = formatCompact(stats.totalWatchers ?? 0);
-  const forkStr = formatCompact(stats.totalForks ?? 0);
-  const starsStr = formatCompact(stats.totalStars ?? 0);
+  // #1335 phase 5 — a stored-badge fallback with no exact-bound stats
+  // envelope has no honest count to draw; "—" reads as unknown, never as the
+  // false claim of zero activity a fabricated 0 would make.
+  const countsUnavailable = degraded?.countsAvailable === false;
+  const reposStr = countsUnavailable ? "—" : formatCompact(stats.reposContributed ?? 0);
+  const watchStr = countsUnavailable ? "—" : formatCompact(stats.totalWatchers ?? 0);
+  const forkStr = countsUnavailable ? "—" : formatCompact(stats.totalForks ?? 0);
+  const starsStr = countsUnavailable ? "—" : formatCompact(stats.totalStars ?? 0);
 
   // Pill dimensions
   const pillH = 34;
@@ -301,9 +314,7 @@ export function renderBadgeSvg(
     ? { ...score.dimensions, craft: reportCraft.report.result.point.displayValue }
     : reportCraft?.unlocked
       ? { ...score.dimensions, craft: null }
-      : model.policyVersion === "v6" && impact.dimensions.craft != null
-        ? { ...score.dimensions, craft: impact.dimensions.craft }
-        : score.dimensions;
+      : score.dimensions;
   const radarSvg = renderRadarChart(radarDimensions, radarCX, radarCY, radarR, radarLabels, t, { observed: model.policyVersion === "v7.2" });
 
   // ── Hero score ring (right column, below radar) ───────────

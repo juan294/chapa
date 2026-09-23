@@ -4,7 +4,8 @@ import { createHash } from "node:crypto";
 import { DEFAULT_BADGE_CONFIG, type BadgeConfig } from "@chapa/shared";
 import { renderBadgeSvg } from "./BadgeSvg";
 import { renderBorderEffect, renderCardStyleEffect } from "./badge-effects";
-import { DEMO_STATS, DEMO_IMPACT } from "./demoData";
+import { DEMO_STATS } from "./demoData";
+import { DEMO_SCORING } from "./__fixtures__/demo-scoring";
 import { WARM_AMBER, badgeTheme, getArchetypeColor } from "./theme";
 import { VERIFICATION_CORAL } from "../badge-visual-metadata";
 
@@ -54,8 +55,8 @@ describe("historical jade-v1 artifact and current default equivalence", () => {
   });
 
   it("omitting config is identical to passing the default explicitly", () => {
-    const implicit = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, { demoMode: true });
-    const explicit = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    const implicit = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING, demoMode: true });
+    const explicit = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
       demoMode: true,
       config: DEFAULT_BADGE_CONFIG,
     });
@@ -66,15 +67,21 @@ describe("historical jade-v1 artifact and current default equivalence", () => {
 // Reviewed Ice outputs are a deliberate version event; retain historical locks above.
 describe("ice-terminal-v2 reviewed artifacts", () => {
   it.each([
-    // badge-source-outage-resilience (2026-09-22) — lengths/hashes re-baselined
-    // for the new `data-chapa-state`/`data-chapa-freshness` root attributes
-    // (+59 bytes: ` data-chapa-state="rendered" data-chapa-freshness="current"`).
-    // No other byte changed — verified by diffing before/after output.
-    ["plain", {}, "6aba0efddec77c11", 31533],
-    ["demo", { includeBranding: true, demoMode: true }, "665041ce30d60195", 32077],
-    ["static", { disableAnimation: true }, "337244e8303ad0a9", 23062],
+    // #1335 phase 5 ("delete v6") — lengths/hashes re-baselined because the
+    // fixture feeding this render changed shape, not because any drawn byte
+    // changed on purpose: `renderBadgeSvg` no longer accepts a legacy
+    // `ImpactV6Result`, so this suite's fixture moved from `DEMO_IMPACT` to
+    // `DEMO_SCORING` (`__fixtures__/demo-scoring.ts`), a v7.2 receipt view
+    // model carrying the same documented values (82 / High / Builder,
+    // dimensions 88/72/80/65, Craft 72) but through the receipt-shaped
+    // report-Craft radar path instead of the retired v6 direct-dimension
+    // path. Verified by diffing before/after output: only the Craft report
+    // metadata threaded through differs.
+    ["plain", {}, "f41aecb3078fb261", 31716],
+    ["demo", { includeBranding: true, demoMode: true }, "7b6c0bdf881171f0", 32260],
+    ["static", { disableAnimation: true }, "908093ccf525c269", 23500],
   ] as const)("%s", (_label, options, expectedHash, expectedLength) => {
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, options);
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING, ...options });
     expect(svg.length).toBe(expectedLength);
     expect(hash(svg)).toBe(expectedHash);
   });
@@ -94,10 +101,10 @@ describe("renderBorderEffect (#1191)", () => {
   });
 
   it("actually removes the border from the rendered badge", () => {
-    const withBorder = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    const withBorder = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
       config: { ...DEFAULT_BADGE_CONFIG, border: "solid-amber" },
     });
-    const without = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    const without = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
       config: { ...DEFAULT_BADGE_CONFIG, border: "none" },
     });
     expect(without).not.toBe(withBorder);
@@ -126,7 +133,7 @@ describe("renderBorderEffect (#1191)", () => {
   });
 
   it("puts the gradient definition inside the document's defs", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
       config: { ...DEFAULT_BADGE_CONFIG, border: "gradient-rotating" },
     });
     const defsEnd = svg.indexOf("</defs>");
@@ -149,11 +156,11 @@ describe("renderBorderEffect (#1191)", () => {
  */
 describe("categories that cross to SVG (#1191)", () => {
   const render = (config: Partial<typeof DEFAULT_BADGE_CONFIG>) =>
-    renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
       config: { ...DEFAULT_BADGE_CONFIG, ...config },
     });
 
-  const baseline = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+  const baseline = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
     config: DEFAULT_BADGE_CONFIG,
   });
 
@@ -175,16 +182,16 @@ describe("categories that cross to SVG (#1191)", () => {
   });
 
   it("tierTreatment enhanced decorates a High tier", () => {
-    // DEMO_IMPACT is the High tier, which is one of the two that earn it.
+    // DEMO_SCORING is the High tier, which is one of the two that earn it.
     expect(render({ tierTreatment: "enhanced" })).not.toBe(baseline);
   });
 
   it("tierTreatment enhanced adds nothing to a tier that has not earned it", () => {
-    const solid = { ...DEMO_IMPACT, tier: "Solid" as const };
-    const plain = renderBadgeSvg(DEMO_STATS, solid, {
+    const solid = { ...DEMO_SCORING, tier: "Solid" as const };
+    const plain = renderBadgeSvg(DEMO_STATS, { scoring: solid,
       config: DEFAULT_BADGE_CONFIG,
     });
-    const enhanced = renderBadgeSvg(DEMO_STATS, solid, {
+    const enhanced = renderBadgeSvg(DEMO_STATS, { scoring: solid,
       config: { ...DEFAULT_BADGE_CONFIG, tierTreatment: "enhanced" },
     });
     expect(enhanced).toBe(plain);
@@ -211,7 +218,7 @@ describe("categories that cross to SVG (#1191)", () => {
       { scoreEffect: "gold-shimmer" as const },
       { scoreEffect: "holographic" as const },
     ]) {
-      const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+      const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
         disableAnimation: true,
         config: { ...DEFAULT_BADGE_CONFIG, ...config },
       });
@@ -255,7 +262,7 @@ describe("categories that cross to SVG (#1191)", () => {
 // here, because #1191 made Studio render this very SVG.
 describe("a palette recolours the artifact (#1242)", () => {
   const render = (palette: BadgeConfig["colorPalette"]) =>
-    renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
       config: { ...DEFAULT_BADGE_CONFIG, colorPalette: palette },
     });
 
@@ -272,7 +279,7 @@ describe("a palette recolours the artifact (#1242)", () => {
   );
 
   it("leaves the archetype colour alone — it is a signal, not decoration", () => {
-    const builder = getArchetypeColor(DEMO_IMPACT.archetype);
+    const builder = getArchetypeColor(DEMO_SCORING.archetype);
     for (const palette of ["ice", "jade", "indigo", "amber", "crimson", "mono"] as const) {
       expect(render(palette)).toContain(builder);
     }
@@ -282,7 +289,7 @@ describe("a palette recolours the artifact (#1242)", () => {
     // The strip carries the badge's one "verified" colour (#1168/#1183), so it
     // must render the same coral whatever the palette is.
     for (const palette of ["ice", "jade", "indigo", "amber", "crimson", "mono"] as const) {
-      const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+      const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
         demoMode: true,
         config: { ...DEFAULT_BADGE_CONFIG, colorPalette: palette },
       });
@@ -292,7 +299,7 @@ describe("a palette recolours the artifact (#1242)", () => {
 
   it("recolours the effects too, not just the base badge", () => {
     // A jade shimmer on a violet badge is the failure this guards.
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING,
       config: {
         ...DEFAULT_BADGE_CONFIG,
         colorPalette: "indigo",

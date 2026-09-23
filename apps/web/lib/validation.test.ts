@@ -312,8 +312,8 @@ describe("isValidStatsShape", () => {
     });
   });
 
-  // #984: optional numeric fields also flow into computeImpactV6 and persist
-  // into snapshots/history, so they need the same non-negative + range guards.
+  // #984: optional numeric fields also flow into the scoring pipeline, so
+  // they need the same non-negative + range guards.
   describe("optional numeric field caps (#984)", () => {
     it("accepts realistic medianPrLeadTimeHours", () => {
       expect(isValidStatsShape({ ...validStats, medianPrLeadTimeHours: 36 })).toBe(true);

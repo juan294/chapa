@@ -52,7 +52,7 @@ describe("v7 fixed four-dimension arithmetic", () => {
   });
   it("rejects wrong versions and invalid count/reference inputs", () => {
     const base = createCoreScoringInputs(window, counts());
-    expect(() => calculateCoreV7({ ...base, policyVersion: "v6" as "v7" })).toThrow();
+    expect(() => calculateCoreV7({ ...base, policyVersion: "v5" as "v7" })).toThrow();
     expect(() => calculateCoreV7({ ...base, counts: { ...base.counts, deliveryUnits: bound(-1) } })).toThrow();
     expect(() => calculateCoreV7({ ...base, window: { ...window, referenceDate: "2026-09-04" } })).toThrow();
   });

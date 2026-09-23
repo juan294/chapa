@@ -153,8 +153,6 @@ score has far more surfaces than a badge does.
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/lib/impact/simulate.ts` | `apps/web/lib/impact/simulate.test.ts` |
-| `apps/web/lib/impact/smoothing.ts` | `apps/web/lib/impact/smoothing.test.ts` |
-| `apps/web/lib/impact/v6.ts` | `apps/web/lib/impact/v6.test.ts` |
 
 ### lifetime history
 

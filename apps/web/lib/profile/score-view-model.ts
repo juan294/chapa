@@ -1,5 +1,4 @@
 import type {
-  ClientImpactV6Result,
   PublicObservedCraft,
   ObservedCoreInputs,
   DeveloperArchetype,
@@ -59,19 +58,26 @@ export interface ScoreIdentityView {
  * Two rules hold this surface together. A consumer reads this model and never
  * recomputes a dimension, tier or archetype of its own: the receipt already
  * carries the displayed integers, so a second derivation is a second answer.
- * And `policyVersion` is load-bearing — a v6 model carries legacy aggregate
- * semantics and must never be labelled or explained as v7 arithmetic.
+ * And `policyVersion` is load-bearing — an archived `"v7"` receipt carries
+ * different aggregate semantics than the current `"v7.2"` policy and must
+ * never be labelled or explained as the same arithmetic.
  */
 export interface ScoreViewModel {
   /** Explicit synthetic demo; no issued receipt or personal evidence claim. */
   readonly illustrative?: boolean;
   /** Replay-safe public count inputs, bound to this model's exact receipt context. */
   readonly observedInputs?: ObservedCoreInputs;
-  readonly policyVersion: "v6" | "v7" | "v7.2";
+  /**
+   * `"v7"` is the archived machine-v7/algorithm-v7.1 receipt engine — its
+   * receipts remain immutable and replayable (CLAUDE.md goal #2), but it is
+   * never the current policy. `"v6"` was retired in #1335 phase 5 ("delete
+   * v6"): there is no legacy aggregate projection any more.
+   */
+  readonly policyVersion: "v7" | "v7.2";
   readonly reportCraft?: PublicObservedCraft | null;
   readonly freshness?: "current" | "stale" | "unavailable";
   readonly handle: string;
-  /** Present only for an issued v7 receipt. A v6 aggregate has no receipt identity. */
+  /** Present for every model — there is no receipt-less projection any more. */
   readonly identity: ScoreIdentityView | null;
   readonly window: ScoreWindowView | null;
   readonly dimensions: Readonly<Record<CoreDimensionKey, ScoreValue>>;
@@ -80,17 +86,11 @@ export interface ScoreViewModel {
    * non-point dimension set where no definitive archetype may be assigned. */
   readonly tier: ImpactTier | null;
   readonly archetype: DeveloperArchetype | null;
-  /** Null when the v7 Craft channel was not evaluated at all (a v6 model). */
+  /** Null when the v7 Craft channel was not evaluated at all (the archived `"v7"` policy). */
   readonly craft: CraftViewModel | null;
   readonly coverage: readonly PublicCoverageSummary[];
   readonly exclusions: ScoringScope["excludedSources"];
   readonly limitations: readonly EvidenceReasonCode[];
-}
-
-const clampDisplay = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
-
-function point(value: number): ScoreValue {
-  return { kind: "point", value, display: clampDisplay(value) };
 }
 
 /** Receipt scores already carry their displayed integers; copy, never re-round. */
@@ -166,38 +166,6 @@ export function observedReceiptViewModel(handle: string, snapshot: ObservedRecei
     composite: { kind: "point", value: receipt.core.composite.exact, display: receipt.core.composite.displayValue }, tier: receipt.core.tier, archetype: receipt.core.archetype,
     craft: null, reportCraft, freshness: receipt.window.referenceDate === currentWindow.referenceDate ? "current" : "stale",
     coverage: receipt.coverage, exclusions: receipt.exclusions, limitations: receipt.limitations,
-  };
-}
-
-/**
- * Project a v6 aggregate into the same shape so consumers have one branch
- * instead of two. The result is deliberately labelled `v6`: its dimensions are
- * legacy aggregates, it has no receipt identity, no evidence coverage and no
- * Craft channel, and `legacy_aggregate` is its standing limitation.
- */
-export function legacyViewModel(
-  impact: ClientImpactV6Result,
-  options: { readonly freshness?: "current" | "stale" } = {},
-): ScoreViewModel {
-  return {
-    policyVersion: "v6",
-    handle: impact.handle.toLowerCase(),
-    identity: null,
-    window: null,
-    dimensions: {
-      delivery: point(impact.dimensions.delivery),
-      quality: point(impact.dimensions.quality),
-      consistency: point(impact.dimensions.consistency),
-      breadth: point(impact.dimensions.breadth),
-    },
-    composite: point(impact.adjustedComposite),
-    tier: impact.tier,
-    archetype: impact.archetype,
-    craft: null,
-    coverage: [],
-    exclusions: [],
-    limitations: ["legacy_aggregate"],
-    ...(options.freshness ? { freshness: options.freshness } : {}),
   };
 }
 

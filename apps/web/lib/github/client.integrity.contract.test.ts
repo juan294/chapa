@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStats, _resetInflight } from "./client";
 import { materializeProfile } from "@/lib/profile/materialize-profile";
-import { persistProfileSnapshot, getPublicProfileVerification } from "@/lib/profile/public-profile";
 import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { getServiceClient } from "@/test/contract/invoke";
@@ -71,15 +70,15 @@ describe("source integrity through actual legacy collection and local persistenc
     expect(await getStats(handle)).toMatchObject({ prsMergedCount: 936, hasSupplementalData: true });
     expect(await redisFake.cacheGet(`stats:v2:merged:${handle}`)).toBeNull();
   });
-  it.each([0, 1])("persists an actually fetched valid legacy PR count of %i", async prsMergedCount => {
+  // #1335 phase 5 ("delete v6") — `persistProfileSnapshot` and
+  // `getPublicProfileVerification` (the v6 snapshot/HMAC path this test
+  // exercised) are deleted; the receipt is the durable, attestable artifact
+  // now, minted at issuance rather than on the render path.
+  it.each([0, 1])("materializes an actually fetched valid legacy PR count of %i without recomputing v6 aggregates", async prsMergedCount => {
     const handle = `contract-valid-pr-${prsMergedCount}`; stubLegacyGitHub(handle, prsMergedCount);
     const materialized = expectFound(await materializeProfile(handle));
     expect(materialized.statsComplete).toBe(true);
-    expect(await persistProfileSnapshot(handle, materialized)).toBe(true);
-    expect(await dbGetLatestSnapshot(handle)).toMatchObject({ prsMergedCount, prsMergedWeight: 0 });
-    // This remains explicitly legacy verification; it cannot mint a v7 receipt.
-    const verification = getPublicProfileVerification(materialized);
-    expect(verification).not.toBeNull(); expect(verification!.hash.startsWith("v7.")).toBe(false);
+    expect(materialized.stats.prsMergedCount).toBe(prsMergedCount);
   });
   it("never turns a malformed unbound hot-cache row into a snapshot on a read-only call", async () => {
     const handle = handles[5]!;

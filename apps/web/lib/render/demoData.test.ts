@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEMO_STATS, DEMO_IMPACT } from "./demoData";
+import { DEMO_SCORING } from "./__fixtures__/demo-scoring";
 import { renderBadgeSvg } from "./BadgeSvg";
 
 describe("DEMO_STATS", () => {
@@ -112,9 +113,14 @@ describe("DEMO_IMPACT craft dimension", () => {
   });
 });
 
+// #1335 phase 5 ("delete v6") — `renderBadgeSvg` no longer accepts a legacy
+// `ImpactV6Result`; every call needs a `scoring` option instead. `DEMO_SCORING`
+// (`__fixtures__/demo-scoring.ts`) mirrors `DEMO_IMPACT`'s historical values
+// (82/High/Builder) so this suite's assertions keep holding.
 describe("renderBadgeSvg with demo data", () => {
   it("returns a valid SVG string", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    const svg = renderBadgeSvg(DEMO_STATS, {
+      scoring: DEMO_SCORING,
       includeBranding: true,
     });
     expect(svg).toContain("<svg");
@@ -122,18 +128,19 @@ describe("renderBadgeSvg with demo data", () => {
   });
 
   it("does not contain undefined or NaN values", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT);
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING });
     expect(svg).not.toContain("undefined");
     expect(svg).not.toContain("NaN");
   });
 
   it("includes the demo handle in the output", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT);
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING });
     expect(svg).toContain("Bertram Gilfoyle");
   });
 
   it("includes verification strip when hash and date are provided", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+    const svg = renderBadgeSvg(DEMO_STATS, {
+      scoring: DEMO_SCORING,
       verificationHash: "a1b2c3d4",
       verificationDate: "2025-01-01",
     });

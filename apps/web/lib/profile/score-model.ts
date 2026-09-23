@@ -1,32 +1,32 @@
 import "server-only";
-import type { ClientImpactV6Result } from "@chapa/shared";
 import { readObservedScoreReceipt, type ObservedReceiptSnapshot } from "./score-receipt-observed";
-import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
-import { legacyViewModel, observedReceiptViewModel, type ScoreViewModel } from "./score-view-model";
+import { observedReceiptViewModel, type ScoreViewModel } from "./score-view-model";
 
-/** Capture policy once, then use only that policy's durable receipt authority. */
-export async function resolveScoreModel(handle: string, impact: ClientImpactV6Result, selection?: ScoringRenderSelection): Promise<ScoreViewModel> {
-  const captured = selection ?? await readScoringRenderSelection();
-  return scoreModelFrom(handle, impact, await readRenderableReceipt(handle, captured), captured);
-}
-export type RenderableReceipt = ObservedReceiptSnapshot | { readonly unavailable: true } | null;
-export async function readRenderableReceipt(handle: string, selection?: ScoringRenderSelection): Promise<RenderableReceipt> {
-  const captured = selection ?? await readScoringRenderSelection();
-  if (!captured.enabled) return null;
-  const result = await readObservedScoreReceipt(handle).catch(() => ({ status: "unavailable" as const }));
-  if (result.status === "unavailable") return { unavailable: true };
-  return result.status === "found" && result.envelope.receipt.action !== "retract"
-    ? { receipt: result.envelope, trend: result.trend } : null;
-}
 /**
- * `statsFreshness` — from `readStats`/`materializeProfile`'s
- * `current`/`stale` distinction (badge-source-outage-resilience, 2026-09-22)
- * — only ever reaches the labelled v6 aggregate: a committed v7/v7.2 receipt
- * carries its own freshness authority (`observedReceiptViewModel` derives it
- * from the receipt's own window), and a receipt-read failure keeps the
- * existing `"unavailable"` signal regardless of the stats underneath it.
+ * The sole v7.2 receipt authority every scored surface shares (#1335 phase
+ * 5 — "delete v6"). `null` covers a genuine "no receipt yet", a retracted
+ * receipt, and a failed authority read alike: by the time any of badge.svg,
+ * og-image or the share page reaches this, it has already resolved its own
+ * `ScoringStatus` placeholder (collecting/action_needed/unregistered/
+ * unavailable) for exactly those cases — this is the second, narrower read
+ * those surfaces themselves already perform to decide whether there is a
+ * drawable receipt at all.
  */
-export function scoreModelFrom(handle: string, impact: ClientImpactV6Result, receipt: RenderableReceipt, selection?: ScoringRenderSelection, statsFreshness?: "current" | "stale"): ScoreViewModel {
-  if (receipt && "unavailable" in receipt) return { ...legacyViewModel(impact), freshness: "unavailable" };
-  return receipt ? observedReceiptViewModel(handle, receipt, selection?.capturedAt) : legacyViewModel(impact, { freshness: statsFreshness });
+export type RenderableReceipt = ObservedReceiptSnapshot | null;
+
+export async function readRenderableReceipt(handle: string): Promise<RenderableReceipt> {
+  const result = await readObservedScoreReceipt(handle).catch(() => ({ status: "unavailable" as const }));
+  if (result.status !== "found" || result.envelope.receipt.action === "retract") return null;
+  return { receipt: result.envelope, trend: result.trend };
+}
+
+/** Capture the receipt once, then project it. `undefined` means there is
+ * nothing to draw — the caller's own `ScoringStatus` placeholder governs
+ * what renders instead. */
+export async function resolveScoreModel(handle: string): Promise<ScoreViewModel | undefined> {
+  return scoreModelFrom(handle, await readRenderableReceipt(handle));
+}
+
+export function scoreModelFrom(handle: string, receipt: RenderableReceipt): ScoreViewModel | undefined {
+  return receipt ? observedReceiptViewModel(handle, receipt) : undefined;
 }
