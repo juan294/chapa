@@ -97,11 +97,14 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/app/verify/[hash]/page.tsx` | `apps/web/lib/verification/store.test.ts` |
-| `apps/web/lib/db/verification.ts` | `apps/web/lib/db/verification.test.ts` |
-| `apps/web/lib/verification/hmac-payload.ts` | `apps/web/lib/verification/hmac.test.ts` |
-| `apps/web/lib/verification/hmac.ts` | `apps/web/lib/verification/hmac.test.ts` |
-| `apps/web/lib/verification/types.ts` | `apps/web/lib/verification/store.test.ts` |
+
+<!-- #1335 phase 5 — `verification_records`, v6 HMAC (`hmac-payload.ts`) and the
+     legacy static-record verify page are retired. `/verify/[hash]` now
+     resolves every hash through `getReceiptVerificationV7` (a 410
+     `retired_v6_code` for anything else), which no longer names any
+     SCORED_SYMBOLS token in its own source — the v7.2 receipt read lives in
+     `lib/verification/store.ts`'s v7 half, already covered by
+     `lib/verification/store-v7.test.ts` and `v7.test.ts`. -->
 
 ### cron
 
@@ -128,7 +131,13 @@ score has far more surfaces than a badge does.
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/lib/email/notifications.ts` | `apps/web/lib/email/notifications.test.ts` |
-| `apps/web/lib/email/score-bump.ts` | `apps/web/lib/email/score-bump.test.ts` |
+
+<!-- #1335 phase 5 — `notifyScoreBump` (the SnapshotDiff-based v6 notifier) is
+     retired along with `metrics_snapshots`. `score-bump.ts` now holds only
+     `notifyObservedScoreChange`, which reads a `ScoringComparison`, not a
+     SCORED_SYMBOLS token, so its own file text no longer matches; it is
+     covered by `apps/web/lib/email/score-bump.test.ts` and
+     `apps/web/lib/history/scoring-observations.test.ts`. -->
 
 ### experiments (flag-gated)
 
@@ -160,11 +169,16 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/lib/db/snapshots.ts` | `apps/web/lib/db/snapshots.test.ts` |
-| `apps/web/lib/history/diff.ts` | `apps/web/lib/history/diff.test.ts` |
-| `apps/web/lib/history/significant-change.ts` | `apps/web/lib/history/significant-change.test.ts` |
-| `apps/web/lib/history/snapshot.ts` | `apps/web/lib/history/snapshot.test.ts` |
-| `apps/web/lib/history/trend.ts` | `apps/web/lib/history/trend.test.ts` |
+| `apps/web/lib/history/get-trend-data.ts` | `apps/web/lib/history/get-trend-data.test.ts` |
+
+<!-- #1335 phase 5 — `metrics_snapshots` is retired. `lib/db/snapshots.ts`
+     (now the archived v7/v7.1 receipt-history RPC bridge only),
+     `lib/history/diff.ts` and `lib/history/trend.ts` (both deleted — the v6
+     SnapshotDiff comparator and computeTrend), `lib/history/significant-change.ts`
+     (`isSignificantScoringChange` takes a `ScoringComparison`, not a
+     SCORED_SYMBOLS token) and `lib/history/snapshot.ts` (`buildReceiptSnapshotV7`,
+     likewise) no longer read a score by this inventory's SCORED_SYMBOLS test,
+     even though the latter two remain genuine v7.2 consumers in spirit. -->
 
 ### maintenance scripts
 
@@ -194,7 +208,13 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/app/api/profile/[handle]/route.ts` | `apps/web/app/api/profile/[handle]/route.observed.test.ts` |
+
+<!-- #1335 phase 5 — `/api/profile/[handle]` now reads the current receipt
+     through `readPublicObservedScore` (`lib/profile/post-write-score.ts`),
+     not a SCORED_SYMBOLS token directly, so its own file text no longer
+     matches this inventory's scan. Covered by
+     `apps/web/app/api/profile/[handle]/route.test.ts` and
+     `route.observed.test.ts`. -->
 
 ### scoring view model
 
