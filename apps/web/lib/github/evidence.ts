@@ -174,14 +174,14 @@ export async function fetchGitHubEvidence(
     reasons.add("discovery_incomplete");
   }
   const events = new Map<string, NormalizedEngineeringEvent>();
-  const inWindow = (date: unknown) => {
-    if (!string(date)) { reasons.add("source_error"); return false; }
-    try { return isWithinScoringWindow(date as string, window); } catch { reasons.add("source_error"); return false; }
+  const inWindow = (date: unknown, operation: string) => {
+    if (!string(date)) { reasons.add(diag.record(operation, "parse")); return false; }
+    try { return isWithinScoringWindow(date as string, window); } catch { reasons.add(diag.record(operation, "parse")); return false; }
   };
-  function event(node: ObjectData, repo: ObjectData, kind: NormalizedEngineeringEvent["kind"], date: unknown, workItemId: string): NormalizedEngineeringEvent | null {
+  function event(node: ObjectData, repo: ObjectData, kind: NormalizedEngineeringEvent["kind"], date: unknown, workItemId: string, operation: string): NormalizedEngineeringEvent | null {
     const id = string(node.id); const repositoryId = string(repo.id);
     if (!id || !repositoryId) { reasons.add("not_accessible"); return null; }
-    if (!inWindow(date)) return null;
+    if (!inWindow(date, operation)) return null;
     return {
       schemaVersion: "v7", provider: "github", host: "github.com", subjectId: subjectId!, actorId: subjectId!, repositoryId,
       eventId: id, kind, occurredAt: scoringInstant(date as string).toISOString(), dataThrough: window.referenceTime,
@@ -199,7 +199,7 @@ export async function fetchGitHubEvidence(
     if (!id || at(pr, "author", "id") !== subjectId || pr.merged !== true) { if (!id || !at(pr, "author", "id")) reasons.add("not_accessible"); continue; }
     if (options.repositoryIds && !repositories.has(String(repo.id))) continue;
     addRepo(repo);
-    const base = event(pr, repo, "accepted_change", pr.mergedAt, id);
+    const base = event(pr, repo, "accepted_change", pr.mergedAt, id, "merged");
     if (!base) continue;
     const files = await collect("files", { id }, ["node", "files"]);
     const paths = files.nodes.map((f) => string(f.path));
@@ -237,7 +237,7 @@ export async function fetchGitHubEvidence(
     for (const review of reviews.nodes) {
       if (!string(at(review, "author", "id"))) { reasons.add("not_accessible"); continue; }
       if (at(review, "author", "id") !== subjectId || review.state === "PENDING") continue;
-      addEvent(event(review, object(pr.repository), "review", review.submittedAt, id));
+      addEvent(event(review, object(pr.repository), "review", review.submittedAt, id, "reviews"));
     }
   }
   for (const [id, repo] of repositories) {
@@ -245,7 +245,7 @@ export async function fetchGitHubEvidence(
     for (const commit of commits.nodes) {
       if (!string(at(commit, "author", "user", "id"))) { reasons.add("attribution_unknown"); continue; }
       if (at(commit, "author", "user", "id") !== subjectId) continue;
-      const base = event(commit, repo, "authored_commit", commit.authoredDate, string(commit.oid) ?? String(commit.id));
+      const base = event(commit, repo, "authored_commit", commit.authoredDate, string(commit.oid) ?? String(commit.id), "commits");
       if (base) addEvent({ ...base, acceptance: unknown("unavailable", "acceptance_time_unknown"), measurements: { ...base.measurements, additions: observedNumber(commit.additions), deletions: observedNumber(commit.deletions) } });
     }
     const issues = await collect("issues", { id, since: window.startInclusive }, ["node", "issues"]);
@@ -260,7 +260,7 @@ export async function fetchGitHubEvidence(
         const closerId = string(closer.id);
         const linkedId = closer.__typename === "PullRequest" && closer.merged === true ? closerId : null;
         const authoredResult = linkedId !== null && at(closer, "author", "id") === subjectId;
-        const base = event(closure, repo, "issue_work", closure.createdAt, linkedId ?? issueId);
+        const base = event(closure, repo, "issue_work", closure.createdAt, linkedId ?? issueId, "closures");
         if (!base) continue;
         // Closing an issue establishes who operated the closure, not who did
         // its engineering work. Retain the diagnostic and its backing link.
@@ -274,7 +274,7 @@ export async function fetchGitHubEvidence(
         // actual closure diagnostic and a separate link-equivalent acceptance.
         // An authored PR already carries richer measurements, so never replace it.
         if (authoredResult && linkedId && !events.has(linkedId)) {
-          const accepted = event(closer, object(closer.repository), "accepted_change", closer.mergedAt, linkedId);
+          const accepted = event(closer, object(closer.repository), "accepted_change", closer.mergedAt, linkedId, "closures");
           if (accepted && (!options.repositoryIds || repositories.has(accepted.repositoryId))) {
             addEvent({ ...accepted, artifactReferenceIds: [...accepted.artifactReferenceIds, ...base.artifactReferenceIds],
               acceptance: observed({ method: "merged_change", acceptedAt: accepted.occurredAt, acceptedResultId: `github:${linkedId}` }, "complete", "source_observed") });

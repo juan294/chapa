@@ -194,12 +194,12 @@ export async function fetchGitlabEvidence(
   const mrByGlobalId = new Map<string, Row>();
   const projectKey = (projectId: string) => `gitlab.com:project:${projectId}`;
   const mrKey = (projectId: string, iid: string) => `${projectKey(projectId)}:mr:${iid}`;
-  function inWindow(value: unknown) {
-    if (!text(value)) { reasons.add("source_error"); return false; }
-    try { return isWithinScoringWindow(String(value), window); } catch { reasons.add("source_error"); return false; }
+  function inWindow(value: unknown, operation: string) {
+    if (!text(value)) { reasons.add(diag.record(operation, "parse")); return false; }
+    try { return isWithinScoringWindow(String(value), window); } catch { reasons.add(diag.record(operation, "parse")); return false; }
   }
-  function event(projectId: string, eventId: string, kind: NormalizedEngineeringEvent["kind"], date: unknown, workItemId: string, revision: string): NormalizedEngineeringEvent | null {
-    if (!inWindow(date)) return null;
+  function event(projectId: string, eventId: string, kind: NormalizedEngineeringEvent["kind"], date: unknown, workItemId: string, revision: string, operation: string): NormalizedEngineeringEvent | null {
+    if (!inWindow(date, operation)) return null;
     return {
       schemaVersion: "v7", provider: "gitlab", host: "gitlab.com", subjectId, actorId: subjectId,
       repositoryId: projectId, eventId, kind, occurredAt: scoringInstant(String(date)).toISOString(), dataThrough: window.referenceTime,
@@ -225,8 +225,8 @@ export async function fetchGitlabEvidence(
   for (const [key, mr] of mrs) {
     const projectId = String(mr.project_id); const iid = String(mr.iid);
     const path = `/projects/${projectId}/merge_requests/${iid}`;
-    if (row(mr.author).id === userId && mr.state === "merged" && inWindow(mr.merged_at)) {
-      const base = event(projectId, `${key}:merged`, "accepted_change", mr.merged_at, key, text(mr.sha) ?? key)!;
+    if (row(mr.author).id === userId && mr.state === "merged" && inWindow(mr.merged_at, "merge_requests")) {
+      const base = event(projectId, `${key}:merged`, "accepted_change", mr.merged_at, key, text(mr.sha) ?? key, "merge_requests")!;
       const detailsResponse = await request(path); const details = row(detailsResponse.data);
       if (detailsResponse.error) reasons.add(detailsResponse.error);
       const diffs = await collect(`${path}/diffs`);
@@ -265,7 +265,7 @@ export async function fetchGitlabEvidence(
       // collections and trips the immutable-identity guard when events merge
       // (packages/shared/src/scoring-aggregation-v7.ts; the same hazard fixed
       // for Bitbucket comments in #1335 phase 1.5).
-      const base = event(projectId, `${key}:note:${noteId}`, "review", note.created_at, key, `${noteId}:${text(note.created_at) ?? "unknown"}`);
+      const base = event(projectId, `${key}:note:${noteId}`, "review", note.created_at, key, `${noteId}:${text(note.created_at) ?? "unknown"}`, "notes");
       if (base) events.set(base.eventId, base); // Empty approvals/notes receive no rubric/category credit.
     }
   }
@@ -277,7 +277,7 @@ export async function fetchGitlabEvidence(
       if (!sha || !email) { reasons.add("attribution_unknown"); continue; }
       if (!verifiedEmails.has(email)) continue;
       const key = `${projectKey(projectId)}:commit:${sha}`;
-      const base = event(projectId, key, "authored_commit", commit.authored_date, key, sha);
+      const base = event(projectId, key, "authored_commit", commit.authored_date, key, sha, "commits");
       if (base) {
         events.set(key, { ...base, acceptance: unknown("unavailable", "acceptance_time_unknown"), measurements: { ...base.measurements, additions: measurement(row(commit.stats).additions), deletions: measurement(row(commit.stats).deletions) } });
       }
@@ -296,7 +296,7 @@ export async function fetchGitlabEvidence(
           ...(linkedKey ? [linkedKey] : id(closure.source_merge_request_id) ? [`gitlab.com:mr-id:${closure.source_merge_request_id}`] : []),
           ...(text(closure.source_commit) ? [`${projectKey(projectId)}:commit:${closure.source_commit}`] : []),
         ];
-        const base = event(projectId, `${key}:state:${closureId}`, "issue_work", closure.created_at, linkedKey ?? key, closureId);
+        const base = event(projectId, `${key}:state:${closureId}`, "issue_work", closure.created_at, linkedKey ?? key, closureId, "resource_state_events");
         if (base) {
           reasons.add("attribution_unknown");
           events.set(base.eventId, { ...base, artifactReferenceIds: [...base.artifactReferenceIds, ...refs], acceptance: unknown("partial", "attribution_unknown") });

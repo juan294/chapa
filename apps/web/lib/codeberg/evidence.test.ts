@@ -164,6 +164,24 @@ describe("Codeberg v7 evidence", () => {
     expect(result.coverage.reasonCodes).not.toContain("source_error");
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "codeberg", operation: "repos", stopKind: "deadline" }));
   });
+  it("classifies a real HTTP 500 as an http stop, still source_error", async () => {
+    api((url) => url.pathname.endsWith("/commits") ? json({}, 500) : undefined);
+    const result = await fetchCodebergEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "codeberg", operation: "commits", stopKind: "http", httpStatus: 500 }));
+  });
+  it("classifies a malformed (non-array) response body as a protocol stop, still source_error", async () => {
+    api((url) => url.pathname.endsWith("/commits") ? json({ not: "an array" }) : undefined);
+    const result = await fetchCodebergEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "codeberg", operation: "commits", stopKind: "protocol" }));
+  });
+  it("classifies an unparseable authored-commit date as a parse stop, still source_error", async () => {
+    api((url) => url.pathname.endsWith("/commits") ? json([{ sha: "dddddddddddd", author: actor, commit: { author: { date: "" } } }]) : undefined);
+    const result = await fetchCodebergEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "codeberg", operation: "commits", stopKind: "parse" }));
+  });
   it("keeps a review's artifact revision stable across collections despite a changed updated_at (parity with #1335 phase 1.5)", async () => {
     api((url) => url.pathname.endsWith("/reviews") ? json([{ id: 20, user: actor, state: "APPROVED", submitted_at: date, updated_at: date, commit_id: "aaaaaaaaaaaa", body: "" }]) : undefined);
     const first = await fetchCodebergEvidence(7, "alice", "token", window);
@@ -178,6 +196,7 @@ describe("Codeberg v7 evidence", () => {
     const result = await fetchCodebergEvidence(7, "alice", "token", window);
     expect(vi.mocked(fetch).mock.calls.every(([url, options]) => new URL(String(url)).origin === "https://codeberg.org" && options?.redirect === "error")).toBe(true);
     expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "codeberg", operation: "commits", stopKind: "protocol" }));
     expect(JSON.stringify(result)).not.toContain("evil.test");
   });
   it("reconciles actual GitHub and Codeberg adapters after verified project/work mappings", async () => {

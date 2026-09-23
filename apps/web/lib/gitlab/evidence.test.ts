@@ -130,6 +130,24 @@ describe("GitLab v7 evidence", () => {
     expect(result.coverage.reasonCodes).not.toContain("source_error");
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "merge_requests", stopKind: "deadline" }));
   });
+  it("classifies a real HTTP 500 as an http stop, still source_error", async () => {
+    api((url) => url.pathname === "/api/v4/merge_requests" ? json({}, 500) : undefined);
+    const result = await fetchGitlabEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "merge_requests", stopKind: "http", httpStatus: 500 }));
+  });
+  it("classifies a malformed (non-array) response body as a protocol stop, still source_error", async () => {
+    api((url) => url.pathname === "/api/v4/merge_requests" ? json({ not: "an array" }) : undefined);
+    const result = await fetchGitlabEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "merge_requests", stopKind: "protocol" }));
+  });
+  it("classifies an unparseable note date as a parse stop, still source_error", async () => {
+    api((url) => url.pathname.endsWith("/notes") ? json([{ id: 21, author: { id: 7 }, created_at: "", system: false, body: "Check this" }]) : undefined);
+    const result = await fetchGitlabEvidence(7, "alice", "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "gitlab", operation: "notes", stopKind: "parse" }));
+  });
   it("keeps a note's artifact revision stable across collections despite a changed updated_at (parity with #1335 phase 1.5)", async () => {
     api((url) => url.pathname.endsWith("/notes") ? json([{ id: 21, author: { id: 7 }, created_at: date, updated_at: date, system: false, body: "Check this" }]) : undefined);
     const first = await fetchGitlabEvidence(7, "alice", "token", window);

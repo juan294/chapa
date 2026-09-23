@@ -246,6 +246,30 @@ describe("GitHub v7 dated evidence adapter", () => {
     expect(result?.coverage.reasonCodes).not.toContain("source_error");
     expect(result?.diagnostics).toContainEqual(expect.objectContaining({ provider: "github", operation: "merged", stopKind: "rate_limited", httpStatus: 403 }));
   });
+  it("classifies an unparseable accepted-change date as a parse stop, still source_error", async () => {
+    mockApi({ V7MergedChanges: () => ({ search: { ...page([{ ...pr(), mergedAt: "" }]), issueCount: 1 } }) });
+    const result = await fetchGitHubEvidence("alice", window);
+    expect(result?.coverage.reasonCodes).toContain("source_error");
+    expect(result?.diagnostics).toContainEqual(expect.objectContaining({ provider: "github", operation: "merged", stopKind: "parse" }));
+  });
+  it("classifies an unparseable review date as a parse stop, still source_error", async () => {
+    mockApi({ V7Reviews: () => ({ node: { reviews: page([{ id: "REV1", author: actor, submittedAt: "", state: "COMMENTED" }]) } }) });
+    const result = await fetchGitHubEvidence("alice", window);
+    expect(result?.coverage.reasonCodes).toContain("source_error");
+    expect(result?.diagnostics).toContainEqual(expect.objectContaining({ provider: "github", operation: "reviews", stopKind: "parse" }));
+  });
+  it("classifies an unparseable authored-commit date as a parse stop, still source_error", async () => {
+    mockApi({ V7Commits: () => ({ node: { defaultBranchRef: { target: { history: page([{ id: "C1", oid: "sha1", author: { user: actor }, authoredDate: "" }]) } } } }) });
+    const result = await fetchGitHubEvidence("alice", window);
+    expect(result?.coverage.reasonCodes).toContain("source_error");
+    expect(result?.diagnostics).toContainEqual(expect.objectContaining({ provider: "github", operation: "commits", stopKind: "parse" }));
+  });
+  it("classifies an unparseable issue-closure date as a parse stop, still source_error", async () => {
+    mockApi({ V7Closures: ({ id }) => ({ node: { timelineItems: page(id === "I1" ? [{ id: "CLOSE1", actor, createdAt: "", closer: null }] : []) } }) });
+    const result = await fetchGitHubEvidence("alice", window);
+    expect(result?.coverage.reasonCodes).toContain("source_error");
+    expect(result?.diagnostics).toContainEqual(expect.objectContaining({ provider: "github", operation: "closures", stopKind: "parse" }));
+  });
   it("keeps acceptance coverage unknown for old-authored commits that could reach default branch in-window", async () => {
     mockApi({
       V7MergedChanges: () => ({ search: { ...page([]), issueCount: 0 } }),
