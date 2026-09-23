@@ -46,7 +46,8 @@ export interface SliceResult {
   readonly checkpoint: CollectorCheckpoint;
   /** Every operation in the checkpoint is complete. */
   readonly done: boolean;
-  /** Present only when `done`; computed from the full staged event set. */
+  /** Present only when `done`; assembled from checkpoint operations and
+   * reasons, never from staged event content (see `CollectSlice`). */
   readonly coverage: SourceCoverage | null;
   /** Why this slice ended before `done`; null when it finished or had nothing to do. */
   readonly stop: SourceDiagnostic | null;
@@ -55,16 +56,21 @@ export interface SliceResult {
 }
 
 /**
- * One provider's slice collector. `staged` is every event already staged for
- * this job by earlier slices, so the final slice can compute coverage over the
- * complete set and skip events it has already emitted.
+ * One provider's slice collector. `stagedKeys` is the `engineeringEventKey`
+ * of every event already staged for this job by earlier slices -- used only
+ * to dedupe against events this slice rediscovers (`newSliceEvents` in
+ * `slice-helpers.ts`). Coverage is assembled purely from checkpoint
+ * operations/reasons (`assembleSliceCoverage`), never from event content, so
+ * a slice never needs the full staged event bodies to finish -- only their
+ * keys. The worker persists full bodies via `checkpoint()`/`finish()`, which
+ * read them back from storage server-side.
  */
 export type CollectSlice = (
   input: SourceContextInput,
   credential: { readonly token: string | null },
   checkpoint: CollectorCheckpoint,
   budget: SliceBudget,
-  staged: readonly NormalizedEngineeringEvent[],
+  stagedKeys: ReadonlySet<string>,
 ) => Promise<SliceResult>;
 
 export const EMPTY_CHECKPOINT: CollectorCheckpoint = { version: 1, operations: [], discovered: { repositoryIds: [] } };

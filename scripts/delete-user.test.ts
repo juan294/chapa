@@ -449,6 +449,7 @@ describe("SUPABASE_TABLES", () => {
       "metrics_snapshots.handle",
       "report_craft_reports.owner_handle",
       "report_craft_selection.owner_handle",
+      "scoring_collection_jobs.owner_handle",
       "scoring_observed_current.owner_handle",
       "scoring_v7_assessments.evaluator_handle",
       "scoring_v7_assessments.owner_handle",

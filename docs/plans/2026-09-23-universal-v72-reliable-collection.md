@@ -57,7 +57,7 @@ render surfaces ◄── receipt (ready) | scoring status (collecting / failed 
 |---|---|---|---|
 | 1 | [Honest stop classification and diagnostics](2026-09-23-universal-v72-reliable-collection-phases/phase-1.md) — [x] done | none | `[batch-eligible]` with 2 |
 | 2 | [Remove publication consent](2026-09-23-universal-v72-reliable-collection-phases/phase-2.md) — [x] done | none | `[batch-eligible]` with 1 |
-| 3 | [Durable resumable collection](2026-09-23-universal-v72-reliable-collection-phases/phase-3.md) | 1, 2 | no |
+| 3 | [Durable resumable collection](2026-09-23-universal-v72-reliable-collection-phases/phase-3.md) — [x] done | 1, 2 | no |
 | 4 | [Issuance fan-in, pending states and no silent failure](2026-09-23-universal-v72-reliable-collection-phases/phase-4.md) | 3 | no |
 | 5 | [Delete v6](2026-09-23-universal-v72-reliable-collection-phases/phase-5.md) | 4 | no |
 | 6 | [Reverse the docs](2026-09-23-universal-v72-reliable-collection-phases/phase-6.md) | 5 | no |

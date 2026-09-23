@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/latency-check",
       "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron/collect-evidence",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {
@@ -34,6 +38,9 @@
     },
     "app/api/cron/latency-check/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/cron/collect-evidence/route.ts": {
+      "maxDuration": 300
     }
   }
 }

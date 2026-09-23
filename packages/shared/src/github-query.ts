@@ -1,7 +1,7 @@
 /**
  * Legacy v6 GraphQL activity contract. Repository history is intentionally a
  * separate request: large accounts can make GitHub time out when both expensive
- * fields share one operation. New scoring consumes fetchGitHubEvidence
+ * fields share one operation. New scoring consumes collectGitHubSlice
  * (apps/web/lib/github/evidence.ts), never these historical scalar proxies.
  *
  * Variables:

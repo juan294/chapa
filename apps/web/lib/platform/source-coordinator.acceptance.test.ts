@@ -26,55 +26,52 @@ function harness() {
     authorize: vi.fn<SourceCoordinatorDependencies["authorize"]>().mockResolvedValue({ status: "authorized", subjectVersion: "consent1", link: null }),
     discover: vi.fn<SourceCoordinatorDependencies["discover"]>().mockResolvedValue({ status: "missing" }),
     read: vi.fn<SourceCoordinatorDependencies["read"]>().mockResolvedValue(null),
-    append: vi.fn<SourceCoordinatorDependencies["append"]>().mockImplementation(async (_context, value) => structuredClone(value) as StoredSourceObservation),
-    collect: vi.fn<SourceCoordinatorDependencies["collect"]>().mockResolvedValue({ result: observation(), diagnostics: [] }),
-    refreshLink: vi.fn<SourceCoordinatorDependencies["refreshLink"]>().mockImplementation(async authorization => authorization),
+    enqueue: vi.fn<SourceCoordinatorDependencies["enqueue"]>().mockResolvedValue(undefined),
+    jobInProgress: vi.fn<SourceCoordinatorDependencies["jobInProgress"]>().mockResolvedValue(false),
   };
   return { deps, select: createSourceCoordinator(deps) };
 }
 
-describe("independent source-coordinator acceptance", () => {
-  it("keeps a read-only miss separate from an already collecting write", async () => {
+describe("independent source-coordinator acceptance (read-only, #1335 phase 3)", () => {
+  it("a read-only caller never races an in-flight refresh's enqueue -- they use disjoint inflight keys", async () => {
     const { deps, select } = harness();
-    const started = deferred<void>();
-    const finish = deferred<StoredSourceObservation>();
-    deps.collect.mockImplementation(async () => { started.resolve(); return { result: await finish.promise, diagnostics: [] }; });
-    const write = select(request());
-    await started.promise;
-    expect(await select({ ...request(), readOnly: true })).toEqual({ status: "readonlymiss" });
-    expect(deps.collect).toHaveBeenCalledTimes(1);
-    expect(deps.append).not.toHaveBeenCalled();
-    expect(deps.refreshLink).not.toHaveBeenCalled();
-    finish.resolve(observation());
-    expect((await write).status).toBe("observed");
-    expect(deps.append).toHaveBeenCalledTimes(1);
+    deps.discover.mockResolvedValue({ status: "found", source });
+    deps.read.mockResolvedValue(observation());
+    const gate = deferred<unknown>();
+    deps.enqueue.mockImplementation(() => gate.promise as Promise<unknown>);
+    const refresh = select({ ...request(), refresh: true });
+    const readOnly = await select({ ...request(), readOnly: true });
+    expect(readOnly).toEqual({ status: "observed", observation: observation(), inProgress: false });
+    expect(deps.enqueue).toHaveBeenCalledTimes(1);
+    gate.resolve(undefined);
+    await refresh;
   });
 
-  it("never shares concurrent work between two actual PAT principals", async () => {
+  it("never shares in-flight reads between two distinct owners", async () => {
     const { deps, select } = harness();
     const bothStarted = deferred<void>();
     const finish = deferred<void>();
-    const tokens: string[] = [];
-    deps.collect.mockImplementation(async (_input, token) => {
-      tokens.push(token!);
-      if (tokens.length === 2) bothStarted.resolve();
+    const owners: string[] = [];
+    deps.discover.mockImplementation(async (context) => {
+      owners.push(context.owner);
+      if (owners.length === 2) bothStarted.resolve();
       await finish.promise;
-      const value = observation();
-      value.events[0]!.eventId = token === "pat-a" ? "event-a" : "event-b";
-      return { result: value, diagnostics: [] };
+      return { status: "found", source: { ...source, subjectId: `canonical-${context.owner}` } };
     });
-    const first = select({ ...request(), token: "pat-a" });
-    const second = select({ ...request(), token: "pat-b" });
+    deps.read.mockImplementation(async () => observation());
+    const first = select({ ...request(), owner: "alice" });
+    const second = select({ ...request(), owner: "bob" });
     await bothStarted.promise;
     finish.resolve();
     const results = await Promise.all([first, second]);
-    expect(tokens.sort()).toEqual(["pat-a", "pat-b"]);
-    expect(results.map(result => "observation" in result ? result.observation.events[0]!.eventId : result.status)).toEqual(["event-a", "event-b"]);
-    expect(JSON.stringify(results)).not.toMatch(/pat-a|pat-b|accessContextId|selectionId/);
+    expect(owners.sort()).toEqual(["alice", "bob"]);
+    for (const result of results) expect(result.status).toBe("observed");
   });
 
-  it("detaches the request before awaiting authorization and detaches every returned result", async () => {
+  it("detaches the request before awaiting authorization -- a caller mutation after calling select() cannot reach the in-flight read", async () => {
     const { deps, select } = harness();
+    deps.discover.mockResolvedValue({ status: "found", source });
+    deps.read.mockResolvedValue(observation());
     const gate = deferred<Awaited<ReturnType<SourceCoordinatorDependencies["authorize"]>>>();
     deps.authorize.mockImplementationOnce(() => gate.promise);
     const input = request();
@@ -82,50 +79,43 @@ describe("independent source-coordinator acceptance", () => {
     (input.scope.repositoryIds as string[])[0] = "mutated-after-call";
     gate.resolve({ status: "authorized", subjectVersion: "consent1", link: null });
     const first = await pending;
-    expect(deps.collect.mock.calls[0]![0].scope.repositoryIds).toEqual(["known"]);
+    expect(deps.discover.mock.calls[0]![0].scope.repositoryIds).toEqual(["known"]);
     expect(first.status).toBe("observed");
     if (!("observation" in first)) throw new Error("Expected observation");
     first.observation.events[0]!.eventId = "caller-mutated";
-    expect((await deps.collect.mock.results[0]!.value)!.result!.events[0]!.eventId).toBe("event1");
+    // A second, fresh read is unaffected by the first result's mutation.
+    const second = await select(request());
+    if (!("observation" in second)) throw new Error("Expected observation");
+    expect(second.observation.events[0]!.eventId).toBe("event1");
   });
 
-  it("preserves a prior observation's original reference and data-through without collection", async () => {
+  it("preserves a prior observation's original reference and data-through without any enqueue on a plain read", async () => {
     const { deps, select } = harness();
     const old = observation(createScoringWindow("2026-09-04T11:00:00Z"));
     deps.discover.mockResolvedValue({ status: "found", source });
     deps.read.mockImplementation(async (_context, prior) => prior ? old : null);
     const result = await select({ ...request(), readOnly: true });
-    expect(result).toEqual({ status: "stale", observation: old });
-    expect(deps.collect).not.toHaveBeenCalled();
-    expect(deps.append).not.toHaveBeenCalled();
-    expect(deps.refreshLink).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: "stale", observation: old, inProgress: false });
+    expect(deps.enqueue).not.toHaveBeenCalled();
   });
 
-  it("withholds an in-memory result when consent is withdrawn during append", async () => {
+  it("withholds an in-memory result when authorization changes during the read", async () => {
     const { deps, select } = harness();
-    deps.append.mockImplementation(async (_context, value) => {
+    deps.discover.mockResolvedValue({ status: "found", source });
+    deps.read.mockImplementation(async () => {
       deps.authorize.mockResolvedValue({ status: "unavailable" });
-      return structuredClone(value) as StoredSourceObservation;
+      return observation();
     });
     expect(await select(request())).toEqual({ status: "unavailable" });
-    expect(deps.append).toHaveBeenCalledTimes(1);
   });
 
-  it("writes a complete zero when the last prior annual event expires", async () => {
+  it("enqueues a refresh job and still returns the current read once it settles", async () => {
     const { deps, select } = harness();
-    const old = observation(createScoringWindow("2026-09-04T11:00:00Z"));
-    old.events[0]!.occurredAt = old.window.startInclusive;
-    if (old.events[0]!.acceptance.status === "observed") old.events[0]!.acceptance.value.acceptedAt = old.window.startInclusive;
     deps.discover.mockResolvedValue({ status: "found", source });
-    deps.read.mockImplementation(async (_context, prior) => prior ? old : null);
-    const zero = observation(); zero.events = [];
-    deps.collect.mockResolvedValue({ result: zero, diagnostics: [] });
+    deps.read.mockResolvedValue(observation());
     const result = await select({ ...request(), refresh: true });
     expect(result.status).toBe("observed");
-    expect(deps.append).toHaveBeenCalledTimes(1);
-    if (!("observation" in result)) throw new Error("Expected observation");
-    expect(result.observation.events).toEqual([]);
-    expect(result.observation.coverage.status).toBe("complete");
-    expect(result.observation.window).toEqual(window);
+    expect(deps.enqueue).toHaveBeenCalledTimes(1);
+    expect(deps.enqueue).toHaveBeenCalledWith("alice", "github", "refresh", window.referenceTime);
   });
 });

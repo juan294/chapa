@@ -38,6 +38,7 @@ export const DEFAULT_KNOWN_WRITE_GETS = new Set<string>([
   "GET /api/cron/warm-cache",
   "GET /api/cron/sync-audience",
   "GET /api/cron/process-campaigns",
+  "GET /api/cron/collect-evidence",
 ]);
 
 export const DEFAULT_EXEMPTIONS: Readonly<Record<string, string>> = {
@@ -48,6 +49,7 @@ export const DEFAULT_EXEMPTIONS: Readonly<Record<string, string>> = {
     "CRON_SECRET, no body — freshness gated by heartbeat health checks",
   "GET /api/cron/sync-audience": "CRON_SECRET, no body",
   "GET /api/cron/process-campaigns": "CRON_SECRET, no body",
+  "GET /api/cron/collect-evidence": "CRON_SECRET, no body",
   "POST /api/admin/agents/run": "dev-only, prod-blocked",
   "DELETE /api/admin/agents/run": "dev-only, prod-blocked",
 };
