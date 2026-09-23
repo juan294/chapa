@@ -1,8 +1,7 @@
 import "server-only";
-import { canonicalJson, createScoringWindow, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
+import { canonicalJson, createScoringWindow } from "@chapa/shared";
 import { discoverStoredSource, readSourceObservation, type SourceStorageContext, type StoredSourceObservation } from "@/lib/db/source-context";
 import type { EnqueueReason } from "@/lib/db/collection-queue";
-import type { SourceDiagnostic } from "@/lib/platform/evidence-diagnostics";
 import { createSourceContext, type SourceContextInput } from "./source-context";
 import { readSourceAuthorization, type SourceAuthorization, type SourceProvider } from "./source-authorization";
 
@@ -33,13 +32,6 @@ export interface SourceCoordinatorInput {
   /** Enqueues a fresh collection job instead of collecting inline. */
   readonly refresh?: boolean;
 }
-/** Pre-phase-3 collector result shape. Kept here only because
- * `source-collectors.ts`'s still-tested `collectSource` function (its own
- * per-provider fetch dispatch, not wired into this coordinator anymore)
- * returns it; this coordinator's own dependencies no longer reference it.
- */
-export interface SourceCollectorResult { readonly coverage: SourceCoverage; readonly events: readonly NormalizedEngineeringEvent[] }
-export interface SourceCollectionOutcome { readonly result: SourceCollectorResult | null; readonly diagnostics: readonly SourceDiagnostic[] }
 export interface SourceCoordinatorDependencies {
   authorize: typeof readSourceAuthorization;
   discover: typeof discoverStoredSource;

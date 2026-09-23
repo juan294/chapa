@@ -65,10 +65,9 @@ function setupFetch(options: { readonly repos?: readonly string[]; readonly comm
       ], next: null }), { status: 200 });
     }
     if (path.endsWith("/diffstat")) {
-      const repositoryId = path.split("/")[2]!;
-      return new Response(null, { status: 302, headers: { location: `https://api.bitbucket.org/2.0/repositories/${repositoryId}/diffstat/base..head` } });
+      return new Response(null, { status: 302, headers: { location: "https://api.bitbucket.org/2.0/repositories/workspace/project/diffstat/aaaaaaa..bbbbbbb" } });
     }
-    if (path.includes("/diffstat/base..head")) {
+    if (path.includes("/diffstat/aaaaaaa..bbbbbbb")) {
       return new Response(JSON.stringify({ values: [{ old: { path: "a.ts" }, new: { path: "a.ts" }, lines_added: 3, lines_removed: 1 }], next: null }), { status: 200 });
     }
     void init;
@@ -97,6 +96,21 @@ describe("collectBitbucketSlice", () => {
     const result = await runToCompletion(ownedInput(), 1);
     const keys = result.events.map((e) => `${e.repositoryId}:${e.actorId}:${e.kind}:${e.eventId}`);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("converges to complete file measurements even at maxRequests: 1, never reporting partial_files for available data", async () => {
+    setupFetch({ repos: [REPO_A] });
+    const result = await runToCompletion(explicitInput(REPO_A), 1);
+    expect(result.slices).toBeGreaterThan(1);
+    const accepted = result.events.find((e) => e.kind === "accepted_change")!;
+    expect(accepted.measurements.changedFiles).toMatchObject({ status: "observed", value: ["a.ts"] });
+    expect(accepted.measurements.additions).toMatchObject({ status: "observed", value: 3 });
+    expect(accepted.measurements.deletions).toMatchObject({ status: "observed", value: 1 });
+    // The bug this regresses: a tight per-slice budget used to abandon the
+    // diffstat redirect + diff pages every retry (never persisting progress),
+    // so file measurements landed unknown/partial_files even though the data
+    // was fully available. They must land complete here instead.
+    expect(result.coverage?.reasonCodes).not.toContain("partial_files");
   });
 
   it("supports the juan294 single-repo explicit shape without enumerating workspaces", async () => {

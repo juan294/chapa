@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
-import { collectGitHubSlice, fetchGitHubEvidence, githubMergedSearchRanges } from "./evidence";
+import { collectGitHubSlice, githubMergedSearchRanges } from "./evidence";
 
 vi.mock("@/lib/env", () => ({ getGithubToken: () => undefined }));
 
@@ -157,14 +157,6 @@ describe("collectGitHubSlice", () => {
     const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, []);
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("budget");
-  });
-
-  it("fetchGitHubEvidence is unaffected: it still returns a single-run result", async () => {
-    mockApi({
-      V7MergedChanges: () => ({ search: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } }),
-    });
-    const result = await fetchGitHubEvidence("alice", window);
-    expect(result?.profile.login).toBe("alice");
   });
 });
 
