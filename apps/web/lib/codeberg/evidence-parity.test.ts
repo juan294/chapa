@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectCodebergSlice } from "./evidence";
@@ -54,8 +54,10 @@ function explicitInput(repositoryIds: readonly string[]): SourceContextInput {
 async function runToCompletion(initInput = ownedInput(), maxRequests = 400) {
   let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
   let staged: NormalizedEngineeringEvent[] = [];
+  const stagedKeys = new Set<string>();
   for (let slices = 0; slices < 500; slices++) {
-    const result = await collectCodebergSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectCodebergSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events];
     checkpoint = result.checkpoint;
     if (result.done) return { events: staged, coverage: result.coverage! };
@@ -67,14 +69,14 @@ async function runToCompletion(initInput = ownedInput(), maxRequests = 400) {
 describe("collectCodebergSlice -- ported diagnostic matrix (hard stops)", () => {
   it("classifies a real HTTP 500 as an http stop, still source_error-equivalent", async () => {
     api((url) => url.pathname.endsWith("/commits") ? json({}, 500) : undefined);
-    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.coverage).toBeNull();
     expect(result.stop).toMatchObject({ provider: "codeberg", operation: "commits", stopKind: "http", httpStatus: 500 });
   });
   it("classifies a malformed (non-array) response body as a protocol stop, still source_error-equivalent", async () => {
     api((url) => url.pathname.endsWith("/commits") ? json({ not: "an array" }) : undefined);
-    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.stop).toMatchObject({ provider: "codeberg", operation: "commits", stopKind: "protocol" });
   });
   it("classifies an unparseable authored-commit date as a soft, non-halting source_error reason", async () => {
@@ -91,7 +93,7 @@ describe("collectCodebergSlice -- ported diagnostic matrix (hard stops)", () => 
   it("does not follow a foreign pagination link, classifying it as a protocol stop", async () => {
     api((url) => url.pathname.endsWith("/commits") ? json([], 200, { link: '<https://evil.test/steal?page=2>; rel="next"' }) : undefined);
     const fetcher = vi.mocked(fetch);
-    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(fetcher.mock.calls.every(([url, options]) => new URL(String(url)).origin === "https://codeberg.org" && (options as RequestInit)?.redirect === "error")).toBe(true);
     expect(result.stop).toMatchObject({ provider: "codeberg", operation: "commits", stopKind: "protocol" });
     expect(JSON.stringify(result)).not.toContain("evil.test");
@@ -105,7 +107,7 @@ describe("collectCodebergSlice -- ported diagnostic matrix (hard stops)", () => 
       if (path === "/users/alice/activities/feeds") return Promise.resolve(json([]));
       throw new Error(`Unexpected endpoint ${path}`);
     }));
-    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 50 }, []);
+    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 50 }, new Set());
     expect(result.done).toBe(false);
     expect(result.coverage).toBeNull();
     expect(result.stop).toMatchObject({ provider: "codeberg", operation: "repos", stopKind: "deadline" });
@@ -228,7 +230,7 @@ describe("collectCodebergSlice -- ported business-logic parity (soft reasons, co
   });
   it("only the identity (profile / /user) operation can produce a terminal not_accessible stop", async () => {
     api((url) => url.pathname === "/api/v1/user" ? json({}, 403) : undefined);
-    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "codeberg", operation: "profile", stopKind: "not_accessible" });
   });

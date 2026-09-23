@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectGitlabSlice } from "./evidence";
@@ -55,8 +55,10 @@ function explicitInput(projectIds: readonly string[]): SourceContextInput {
 async function runToCompletion(initInput = ownedInput(), maxRequests = 200) {
   let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
   let staged: NormalizedEngineeringEvent[] = [];
+  const stagedKeys = new Set<string>();
   for (let slices = 0; slices < 500; slices++) {
-    const result = await collectGitlabSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectGitlabSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events];
     checkpoint = result.checkpoint;
     if (result.done) return { events: staged, coverage: result.coverage! };
@@ -68,14 +70,14 @@ async function runToCompletion(initInput = ownedInput(), maxRequests = 200) {
 describe("collectGitlabSlice -- ported diagnostic matrix (hard stops)", () => {
   it("classifies a real HTTP 500 as an http stop, still source_error-equivalent", async () => {
     api((url) => url.pathname === "/api/v4/merge_requests" ? json({}, 500) : undefined);
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.coverage).toBeNull();
     expect(result.stop).toMatchObject({ provider: "gitlab", operation: "merge_requests", stopKind: "http", httpStatus: 500 });
   });
   it("classifies a malformed (non-array) response body as a protocol stop, still source_error-equivalent", async () => {
     api((url) => url.pathname === "/api/v4/merge_requests" ? json({ not: "an array" }) : undefined);
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.stop).toMatchObject({ provider: "gitlab", operation: "merge_requests", stopKind: "protocol" });
   });
   it("classifies an unparseable note date as a soft, non-halting source_error reason", async () => {
@@ -85,7 +87,7 @@ describe("collectGitlabSlice -- ported diagnostic matrix (hard stops)", () => {
   });
   it("classifies a transient diffs-page HTTP failure as a retryable http stop rather than silently downgrading to measured zero", async () => {
     api((url) => url.pathname.endsWith("/diffs") ? json({}, 500) : undefined);
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "gitlab", operation: "diffs", stopKind: "http", httpStatus: 500 });
   });
@@ -100,7 +102,7 @@ describe("collectGitlabSlice -- ported diagnostic matrix (hard stops)", () => {
       if (url.pathname !== "/api/v4/merge_requests") return;
       return url.searchParams.get("page") === "1" ? json([mr()], 200, { "x-next-page": "2" }) : json({}, 500);
     });
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "gitlab", stopKind: "http" });
     expect(result.checkpoint.operations.some((op) => op.cursor === "2")).toBe(true);
@@ -117,7 +119,7 @@ describe("collectGitlabSlice -- ported diagnostic matrix (hard stops)", () => {
       if (path.endsWith("/issues")) return Promise.resolve(json([]));
       throw new Error(`Unexpected endpoint ${path}`);
     }));
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 50 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 50 }, new Set());
     expect(result.done).toBe(false);
     expect(result.coverage).toBeNull();
     expect(result.stop).toMatchObject({ provider: "gitlab", operation: "merge_requests", stopKind: "deadline" });
@@ -250,7 +252,7 @@ describe("collectGitlabSlice -- ported business-logic parity (soft reasons, comp
   });
   it("only the identity (profile / /user) operation can produce a terminal not_accessible stop", async () => {
     api((url) => url.pathname === "/api/v4/user" ? json({}, 403) : undefined);
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "gitlab", operation: "profile", stopKind: "not_accessible" });
   });

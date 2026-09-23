@@ -1,8 +1,8 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import {
-  checkpointCollectionJob, claimCollectionJobs, failCollectionJob, finishCollectionJob, listStagedEvents,
+  checkpointCollectionJob, claimCollectionJobs, failCollectionJob, finishCollectionJob, listStagedEventKeys,
   type CollectionJob, type CollectionProgress,
 } from "@/lib/db/collection-queue";
 import { discoverStoredSource, readSourceObservation, type SourceStorageContext } from "@/lib/db/source-context";
@@ -82,7 +82,7 @@ export interface CollectionWorkerDeps {
   readonly checkpoint: typeof checkpointCollectionJob;
   readonly finish: typeof finishCollectionJob;
   readonly fail: typeof failCollectionJob;
-  readonly listStaged: typeof listStagedEvents;
+  readonly listStagedKeys: typeof listStagedEventKeys;
   readonly resolveCredential: ResolveCredential;
   readonly collect: CollectSlice;
   /** Incremental daily reuse (phase-3.md "Incremental daily reuse"): reads
@@ -109,7 +109,7 @@ export const productionCollectionWorkerDeps: CollectionWorkerDeps = {
   checkpoint: checkpointCollectionJob,
   finish: finishCollectionJob,
   fail: failCollectionJob,
-  listStaged: listStagedEvents,
+  listStagedKeys: listStagedEventKeys,
   resolveCredential,
   collect: collectSourceSlice,
   discoverSource: discoverStoredSource,
@@ -205,16 +205,17 @@ export async function runCollectionSlice(
   const { resolved } = credentialResult;
 
   let checkpoint = job.checkpoint;
-  let staged = await deps.listStaged(job.id);
+  let stagedKeys = await deps.listStagedKeys(job.id);
 
   // Incremental daily reuse (phase-3.md): only on this job's very first
   // slice -- an empty checkpoint and nothing staged yet. Seeding later would
   // silently reset progress a real slice already made.
-  if (checkpoint.operations.length === 0 && staged.length === 0) {
+  if (checkpoint.operations.length === 0 && stagedKeys.size === 0) {
     const seed = await trySeedFromPrior(deps, resolved, job);
     if (seed && (seed.checkpoint.operations.length > 0 || seed.seededEvents.length > 0)) {
-      // The staged events must go through the same checkpoint RPC as any
-      // other slice's events, so the eventual `finish` call appends them too.
+      // The seeded events must go through the same checkpoint RPC as any
+      // other slice's events (full bodies), so the eventual `finish` call
+      // appends them too. Only their keys carry forward into `collect()`.
       const seedProgress: CollectionProgress = {
         operationsDone: seed.checkpoint.operations.filter((op) => op.done).length,
         operationsKnown: seed.checkpoint.operations.length,
@@ -224,7 +225,7 @@ export async function runCollectionSlice(
       const outcome = await deps.checkpoint(lease, seed.checkpoint, seed.seededEvents, seedProgress, false);
       if (outcome.status !== "lease_mismatch") {
         checkpoint = seed.checkpoint;
-        staged = [...staged, ...seed.seededEvents];
+        stagedKeys = new Set([...stagedKeys, ...seed.seededEvents.map(engineeringEventKey)]);
       }
     }
   }
@@ -234,13 +235,13 @@ export async function runCollectionSlice(
     { token: resolved.token },
     checkpoint,
     { maxRequests: MAX_REQUESTS_PER_SLICE, deadlineAt },
-    staged,
+    stagedKeys,
   );
 
   const progress: CollectionProgress = {
     operationsDone: result.checkpoint.operations.filter((op) => op.done).length,
     operationsKnown: result.checkpoint.operations.length,
-    events: staged.length + result.events.length,
+    events: stagedKeys.size + result.events.length,
     requests: result.requests,
   };
 

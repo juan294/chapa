@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { aggregateEngineeringEvidence, createScoringWindow, type EngineeringEvidenceInput, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
+import { aggregateEngineeringEvidence, createScoringWindow, engineeringEventKey, type EngineeringEvidenceInput, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectGitHubSlice } from "../github/evidence";
@@ -31,17 +31,19 @@ function githubInput(): SourceContextInput {
   return { owner: "alice", requestedSource: { provider: "github", host: "github.com", login: "alice" }, window, scope: { discovery: "explicit_repositories", repositoryIds: ["R1"], eventKinds: [] } };
 }
 async function runBitbucket() {
-  let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT; let staged: NormalizedEngineeringEvent[] = [];
+  let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT; let staged: NormalizedEngineeringEvent[] = []; const stagedKeys = new Set<string>();
   for (;;) {
-    const result = await collectBitbucketSlice(bitbucketInput(), credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectBitbucketSlice(bitbucketInput(), credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events]; checkpoint = result.checkpoint;
     if (result.done) return { events: staged, coverage: result.coverage! };
   }
 }
 async function runGitHub() {
-  let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT; let staged: NormalizedEngineeringEvent[] = [];
+  let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT; let staged: NormalizedEngineeringEvent[] = []; const stagedKeys = new Set<string>();
   for (;;) {
-    const result = await collectGitHubSlice(githubInput(), credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectGitHubSlice(githubInput(), credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events]; checkpoint = result.checkpoint;
     if (result.done) return { events: staged, coverage: result.coverage! };
   }

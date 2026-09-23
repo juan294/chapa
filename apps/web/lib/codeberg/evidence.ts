@@ -43,7 +43,7 @@ interface CodebergPrMeta {
 type MutableCodebergOperation = MutableSliceOperation;
 interface CodebergListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
 
-export const collectCodebergSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
+export const collectCodebergSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
   if (!credential.token || !credential.token.trim()) throw new RangeError("Codeberg collection requires a credential");
   const token = credential.token.trim();
@@ -62,7 +62,6 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
   state.repoFullNames = repoFullNames;
   const reasons = new Set<EvidenceReasonCode>((state.reasons as EvidenceReasonCode[] | undefined) ?? []);
   const newEvents = new Map<string, NormalizedEngineeringEvent>();
-  const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
   const makeStop = makeSliceStopFactory(diag, "codeberg");

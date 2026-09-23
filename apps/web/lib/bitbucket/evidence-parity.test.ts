@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectBitbucketSlice } from "./evidence";
@@ -58,8 +58,10 @@ function explicitInput(repositoryIds: readonly string[]): SourceContextInput {
 async function runToCompletion(initInput = ownedInput(), maxRequests = 200) {
   let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
   let staged: NormalizedEngineeringEvent[] = [];
+  const stagedKeys = new Set<string>();
   for (let slices = 0; slices < 500; slices++) {
-    const result = await collectBitbucketSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectBitbucketSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events];
     checkpoint = result.checkpoint;
     if (result.done) return { events: staged, coverage: result.coverage! };
@@ -71,28 +73,28 @@ async function runToCompletion(initInput = ownedInput(), maxRequests = 200) {
 describe("collectBitbucketSlice -- ported diagnostic matrix (hard stops)", () => {
   it("classifies an HTTP 500 as an http stop, still source_error-equivalent", async () => {
     api((url) => url.pathname.endsWith("/commits") ? json({}, 500) : undefined);
-    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.coverage).toBeNull();
     expect(result.stop).toMatchObject({ provider: "bitbucket", operation: "commits", stopKind: "http", httpStatus: 500 });
   });
   it("classifies a 2xx provider error body as a protocol stop, still source_error-equivalent, without leaking its text", async () => {
     api((url) => url.pathname.endsWith("/commits") ? json({ type: "error", error: { message: "internal" } }) : undefined);
-    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.stop).toMatchObject({ provider: "bitbucket", operation: "commits", stopKind: "protocol" });
     expect(JSON.stringify(result)).not.toContain("internal");
   });
   it("classifies a foreign next URL as a protocol stop before sending credentials", async () => {
     api((url) => url.pathname.endsWith("/commits") ? page([], "https://evil.test/steal") : undefined);
     const fetcher = vi.mocked(fetch);
-    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(fetcher.mock.calls.every(([url]) => new URL(String(url)).origin === "https://api.bitbucket.org")).toBe(true);
     expect(result.stop).toMatchObject({ provider: "bitbucket", operation: "commits", stopKind: "protocol" });
     expect(JSON.stringify(result)).not.toContain("evil.test");
   });
   it("classifies a transient diff-page HTTP failure as a retryable http stop rather than silently downgrading file measurements to unknown forever (the new architecture's whole point -- retry a real failure instead of smoothing over it)", async () => {
     api((url) => url.pathname.includes("/diffstat/") ? json({}, 555) : undefined);
-    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "bitbucket", operation: "diff", stopKind: "http", httpStatus: 555 });
   });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectGitlabSlice } from "./evidence";
@@ -18,11 +18,13 @@ function explicitInput(projectId: string): SourceContextInput {
 async function runToCompletion(input: SourceContextInput, maxRequests: number) {
   let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
   let staged: NormalizedEngineeringEvent[] = [];
+  const stagedKeys = new Set<string>();
   let slices = 0;
   for (;;) {
     slices++;
     if (slices > 500) throw new Error("runaway slice loop");
-    const result = await collectGitlabSlice(input, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectGitlabSlice(input, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events];
     checkpoint = result.checkpoint;
     if (result.done) return { events: staged, slices, coverage: result.coverage };
@@ -89,14 +91,14 @@ describe("collectGitlabSlice", () => {
 
   it("stops on budget exhaustion, never as a source_error", async () => {
     setupFetch();
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("budget");
   });
 
   it("classifies a 429 response as rate_limited with retryAfterSeconds", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 429, headers: { "retry-after": "15" } })));
-    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 10, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 10, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.stop?.stopKind).toBe("rate_limited");
     expect(result.stop?.retryAfterSeconds).toBe(15);
   });

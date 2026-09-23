@@ -97,7 +97,7 @@ const RATE_LIMIT_FLOOR = 200;
  * on every query stops the slice once `remaining` drops below 200, with
  * `retryAfterSeconds` computed from `resetAt`.
  */
-export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
+export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
   const login = input.requestedSource.login;
   if (!/^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i.test(login)) throw new RangeError("Invalid GitHub handle");
@@ -122,7 +122,6 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   const reasons = new Set<EvidenceReasonCode>((state.reasons as EvidenceReasonCode[] | undefined) ?? []);
   const seededDataThrough = state.seededDataThrough as string | null | undefined;
   const newEvents = new Map<string, NormalizedEngineeringEvent>();
-  const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
   const makeStop = makeSliceStopFactory(diag, "github");
@@ -465,7 +464,7 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
   }
 
-  // Every operation is done: compute coverage from the full staged + new set.
+  // Every operation is done: assemble coverage from operations/reasons.
   if (!explicit) reasons.add("discovery_incomplete");
   reasons.add("acceptance_time_unknown");
   const commitsComplete = operations.filter((op) => op.key.startsWith("commits:")).every((op) => op.done);

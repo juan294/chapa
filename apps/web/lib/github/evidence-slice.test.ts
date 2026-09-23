@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectGitHubSlice, githubMergedSearchRanges } from "./evidence";
@@ -43,16 +43,16 @@ afterEach(() => vi.unstubAllGlobals());
 async function runToCompletion(maxRequests: number, initial: CollectorCheckpoint = EMPTY_CHECKPOINT) {
   let checkpoint = initial;
   let staged: NormalizedEngineeringEvent[] = [];
+  const stagedKeys = new Set<string>();
   let slices = 0;
   for (;;) {
     slices++;
     if (slices > 5000) throw new Error("runaway slice loop");
-    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 120_000 }, staged);
-    const keys = new Set(staged.map((e) => `${e.repositoryId}:${e.actorId}:${e.kind}:${e.eventId}`));
+    const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 120_000 }, stagedKeys);
     for (const event of result.events) {
-      const key = `${event.repositoryId}:${event.actorId}:${event.kind}:${event.eventId}`;
-      if (keys.has(key)) throw new Error(`Duplicate event key across slices: ${key}`);
-      keys.add(key);
+      const key = engineeringEventKey(event);
+      if (stagedKeys.has(key)) throw new Error(`Duplicate event key across slices: ${key}`);
+      stagedKeys.add(key);
     }
     staged = [...staged, ...result.events];
     checkpoint = result.checkpoint;
@@ -145,7 +145,7 @@ describe("collectGitHubSlice", () => {
 
   it("stops with a rate-limited diagnostic and retryAfterSeconds when GraphQL rateLimit.remaining drops below the floor", async () => {
     mockApi({ V7Profile: () => ({ user: { ...actor, name: "Alice", avatarUrl: null }, rateLimit: { remaining: 5, resetAt: new Date(Date.now() + 3_600_000).toISOString(), cost: 1 } }) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 100, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 100, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("rate_limited");
     expect(result.stop?.retryAfterSeconds).toBeGreaterThan(0);
@@ -154,7 +154,7 @@ describe("collectGitHubSlice", () => {
 
   it("stops on budget exhaustion, never as a source_error", async () => {
     mockApi({ V7Repositories: () => ({ user: { repositories: page([{ id: "R1", nameWithOwner: "a/b" }]) } }) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("budget");
   });

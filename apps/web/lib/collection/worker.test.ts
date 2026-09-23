@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
 import type { CollectionJob } from "@/lib/db/collection-queue";
 import type { StoredSourceObservation } from "@/lib/db/source-context";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint, type SliceResult } from "./plan";
@@ -106,7 +106,7 @@ function harness(): MutableCollectionWorkerDeps {
     checkpoint: vi.fn().mockResolvedValue({ status: "ok", stagedCount: 0 }),
     finish: vi.fn().mockResolvedValue({ status: "ok", observationId: "obs-1" }),
     fail: vi.fn().mockResolvedValue({ status: "failed" }),
-    listStaged: vi.fn().mockResolvedValue([]),
+    listStagedKeys: vi.fn().mockResolvedValue(new Set()),
     resolveCredential,
     collect: vi.fn().mockResolvedValue(sliceResult()),
     discoverSource: vi.fn().mockResolvedValue({ status: "missing" }),
@@ -285,14 +285,14 @@ describe("runCollectionSlice", () => {
         state: { seededDataThrough: "2026-09-04T12:00:00.000Z" },
       };
       expect(deps.checkpoint).toHaveBeenNthCalledWith(1, { id: "job-1", leaseToken: "lease-1" }, seededCheckpoint, [merged], expect.any(Object), false);
-      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), [merged]);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), new Set([engineeringEventKey(merged)]));
     });
 
     it("does not seed when the checkpoint already has progress or events are already staged (not the job's first slice)", async () => {
       const deps = harness();
       deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
       deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" })] }));
-      deps.listStaged = vi.fn().mockResolvedValue([event({ eventId: "already-staged", occurredAt: "2026-09-01T00:00:00.000Z" })]);
+      deps.listStagedKeys = vi.fn().mockResolvedValue(new Set([engineeringEventKey(event({ eventId: "already-staged", occurredAt: "2026-09-01T00:00:00.000Z" }))]));
 
       await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
 
@@ -313,7 +313,7 @@ describe("runCollectionSlice", () => {
       // pre-write, and collect() runs with the job's original empty state.
       expect(deps.checkpoint).toHaveBeenCalledTimes(1);
       expect(deps.checkpoint).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" }, EMPTY_CHECKPOINT, [], expect.any(Object), false);
-      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), []);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), new Set());
     });
 
     it("never lets a seeding failure (discovery/storage error) block the slice -- collection still proceeds from scratch, but the failure is captured, not silent", async () => {
@@ -323,7 +323,7 @@ describe("runCollectionSlice", () => {
 
       await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
 
-      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), []);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), new Set());
       expect(deps.fail).not.toHaveBeenCalled();
 
       // The no-silent-failure rule: seeding is an optimization whose failure

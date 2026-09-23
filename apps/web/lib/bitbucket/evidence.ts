@@ -59,7 +59,7 @@ function commitsPath(repositoryId: string, sinceIso: string): string {
   return url.toString();
 }
 
-export const collectBitbucketSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
+export const collectBitbucketSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
   if (!credential.token || !credential.token.trim()) throw new RangeError("Bitbucket collection requires a credential");
   const token = credential.token.trim();
@@ -75,7 +75,6 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
   state.pr = prMeta;
   const reasons = new Set<EvidenceReasonCode>((state.reasons as EvidenceReasonCode[] | undefined) ?? []);
   const newEvents = new Map<string, NormalizedEngineeringEvent>();
-  const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
   const makeStop = makeSliceStopFactory(diag, "bitbucket");

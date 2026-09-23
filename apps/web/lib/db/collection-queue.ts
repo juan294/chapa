@@ -249,16 +249,21 @@ export async function finishCollectionJob(
   }
 }
 
-/** Every event staged for this job by earlier slices (and this one, once its
- * own checkpoint call has landed), so the worker can pass `staged` to the
- * next `CollectSlice` call per `lib/collection/plan.ts`.
+/**
+ * The `engineeringEventKey` of every event staged for this job by earlier
+ * slices (and this one, once its own checkpoint call has landed), so the
+ * worker can pass `stagedKeys` to the next `CollectSlice` call per
+ * `lib/collection/plan.ts`. A `CollectSlice` only ever dedupes against these
+ * keys -- it never needs the staged rows' full JSONB bodies (up to 10,000
+ * per job), which `checkpoint()`/`finish()` read and write server-side --
+ * so this reads the `event_key` column only, not `event`.
  */
-export async function listStagedEvents(jobId: string): Promise<NormalizedEngineeringEvent[]> {
+export async function listStagedEventKeys(jobId: string): Promise<ReadonlySet<string>> {
   const db = getSupabase();
-  if (!db) throw new Error("listStagedEvents: Supabase client unavailable");
-  const { data, error } = await db.from("scoring_collection_staged_events").select("event").eq("job_id", jobId);
-  if (error) throw new Error(`listStagedEvents failed: ${error.message}`);
-  return z.array(z.object({ event: z.unknown() }).strict()).parse(data ?? []).map((row) => row.event as NormalizedEngineeringEvent);
+  if (!db) throw new Error("listStagedEventKeys: Supabase client unavailable");
+  const { data, error } = await db.from("scoring_collection_staged_events").select("event_key").eq("job_id", jobId);
+  if (error) throw new Error(`listStagedEventKeys failed: ${error.message}`);
+  return new Set(z.array(z.object({ event_key: z.string() }).strict()).parse(data ?? []).map((row) => row.event_key));
 }
 
 /** In-progress states: a job the owner or a visitor should see as "collection

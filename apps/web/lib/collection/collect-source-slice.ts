@@ -15,11 +15,11 @@ import { collectCodebergSlice } from "@/lib/codeberg/evidence";
  * mechanics as every other operation, rather than as a one-off call outside
  * the checkpoint model.
  */
-export const collectSourceSlice: CollectSlice = (input, credential, checkpoint, budget, staged) => {
+export const collectSourceSlice: CollectSlice = (input, credential, checkpoint, budget, stagedKeys) => {
   switch (input.requestedSource.provider) {
-    case "github": return collectGitHubSlice(input, credential, checkpoint, budget, staged);
-    case "bitbucket": return collectBitbucketSlice(input, credential, checkpoint, budget, staged);
-    case "gitlab": return collectGitlabSlice(input, credential, checkpoint, budget, staged);
-    case "codeberg": return collectCodebergSlice(input, credential, checkpoint, budget, staged);
+    case "github": return collectGitHubSlice(input, credential, checkpoint, budget, stagedKeys);
+    case "bitbucket": return collectBitbucketSlice(input, credential, checkpoint, budget, stagedKeys);
+    case "gitlab": return collectGitlabSlice(input, credential, checkpoint, budget, stagedKeys);
+    case "codeberg": return collectCodebergSlice(input, credential, checkpoint, budget, stagedKeys);
   }
 };

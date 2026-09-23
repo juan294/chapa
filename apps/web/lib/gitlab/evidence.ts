@@ -64,7 +64,7 @@ interface GitlabListOutcome { readonly kind: "done" | "stop"; readonly stop?: So
 /** Bounds an otherwise-unbounded commit history to the scoring window via
  * GitLab's native `since`/`until` commit list filters, per #1335 phase 3.
  */
-export const collectGitlabSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
+export const collectGitlabSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
   if (!credential.token || !credential.token.trim()) throw new RangeError("GitLab collection requires a credential");
   const token = credential.token.trim();
@@ -83,7 +83,6 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
   const reasons = new Set<EvidenceReasonCode>((state.reasons as EvidenceReasonCode[] | undefined) ?? []);
   const verifiedEmails = new Set<string>((state.verifiedEmails as string[] | undefined) ?? []);
   const newEvents = new Map<string, NormalizedEngineeringEvent>();
-  const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
   const makeStop = makeSliceStopFactory(diag, "gitlab");

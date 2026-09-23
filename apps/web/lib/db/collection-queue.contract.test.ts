@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createScoringWindow } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey } from "@chapa/shared";
 import { getServiceClient } from "@/test/contract/invoke";
 import { sourceEventFixture } from "./source-context-fixture";
 import { EMPTY_CHECKPOINT } from "@/lib/collection/plan";
 import { EMPTY_PROGRESS,
   claimCollectionJobs, checkpointCollectionJob, enqueueCollectionJob, failCollectionJob, finishCollectionJob,
-  isCollectionJobInProgress, listStagedEvents,
+  isCollectionJobInProgress, listStagedEventKeys,
 } from "./collection-queue";
 
 const owner = "contract-collection-queue";
@@ -130,7 +130,7 @@ describe("collection queue (real local database)", () => {
     const claimed = (await claimCollectionJobs(1, 120))[0]!;
     const event = sourceEventFixture(source, window);
     await checkpointCollectionJob({ id: claimed.id, leaseToken: claimed.leaseToken! }, EMPTY_CHECKPOINT, [event], { ...EMPTY_PROGRESS, events: 1 }, false);
-    expect(await listStagedEvents(job.id)).toEqual([event]);
+    expect(await listStagedEventKeys(job.id)).toEqual(new Set([engineeringEventKey(event)]));
     const observationId = randomUUID();
     const outcome = await finishCollectionJob(
       { id: claimed.id, leaseToken: claimed.leaseToken! },

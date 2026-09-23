@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectBitbucketSlice } from "./evidence";
@@ -21,11 +21,13 @@ function explicitInput(repositoryId: string): SourceContextInput {
 async function runToCompletion(input: SourceContextInput, maxRequests: number) {
   let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
   let staged: NormalizedEngineeringEvent[] = [];
+  const stagedKeys = new Set<string>();
   let slices = 0;
   for (;;) {
     slices++;
     if (slices > 500) throw new Error("runaway slice loop");
-    const result = await collectBitbucketSlice(input, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectBitbucketSlice(input, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events];
     checkpoint = result.checkpoint;
     if (result.done) return { events: staged, slices, coverage: result.coverage };
@@ -117,13 +119,15 @@ describe("collectBitbucketSlice", () => {
     setupFetch();
     let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
     let staged: NormalizedEngineeringEvent[] = [];
+    const stagedKeys = new Set<string>();
     for (let slices = 0; slices < 500; slices++) {
-      const result = await collectBitbucketSlice(ownedInput(), credential, checkpoint, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, staged);
+      const result = await collectBitbucketSlice(ownedInput(), credential, checkpoint, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, stagedKeys);
       for (const op of result.checkpoint.operations) {
         if (op.cursor === null) continue;
         expect(op.cursor).not.toContain("https://");
         expect(op.cursor).not.toContain("http://");
       }
+      for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
       staged = [...staged, ...result.events];
       checkpoint = result.checkpoint;
       if (result.done) break;
@@ -162,7 +166,7 @@ describe("collectBitbucketSlice", () => {
 
   it("stops on budget exhaustion, never as a source_error", async () => {
     setupFetch();
-    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("budget");
   });
@@ -170,7 +174,7 @@ describe("collectBitbucketSlice", () => {
   it("classifies a 429 response as rate_limited with retryAfterSeconds", async () => {
     const fetcher = vi.fn(async () => new Response(null, { status: 429, headers: { "retry-after": "30" } }));
     vi.stubGlobal("fetch", fetcher);
-    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 10, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectBitbucketSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 10, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.stop?.stopKind).toBe("rate_limited");
     expect(result.stop?.retryAfterSeconds).toBe(30);
   });

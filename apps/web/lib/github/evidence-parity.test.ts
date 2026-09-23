@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
+import { createScoringWindow, engineeringEventKey, type NormalizedEngineeringEvent } from "@chapa/shared";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint } from "@/lib/collection/plan";
 import type { SourceContextInput } from "@/lib/platform/source-context";
 import { collectGitHubSlice } from "./evidence";
@@ -75,8 +75,10 @@ afterEach(() => vi.unstubAllGlobals());
 async function runToCompletion(initInput: SourceContextInput = input, maxRequests = 200) {
   let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
   let staged: NormalizedEngineeringEvent[] = [];
+  const stagedKeys = new Set<string>();
   for (let slices = 0; slices < 500; slices++) {
-    const result = await collectGitHubSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, staged);
+    const result = await collectGitHubSlice(initInput, credential, checkpoint, { maxRequests, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events];
     checkpoint = result.checkpoint;
     if (result.done) return { events: staged, coverage: result.coverage! };
@@ -103,21 +105,21 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
       return new Response(JSON.stringify({ data: result }), { status: 200 });
     });
     vi.stubGlobal("fetch", fetcher);
-    const result = await collectGitHubSlice(explicitInput, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 50 }, []);
+    const result = await collectGitHubSlice(explicitInput, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 50 }, new Set());
     expect(result.done).toBe(false);
     expect(result.coverage).toBeNull();
     expect(result.stop).toMatchObject({ provider: "github", operation: "files", stopKind: "deadline" });
   });
   it("classifies a real HTTP 500 as an http stop, still source_error-equivalent", async () => {
     mockApi({ V7MergedChanges: () => new Response("failure", { status: 500 }) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.coverage).toBeNull();
     expect(result.stop).toMatchObject({ provider: "github", operation: "merged", stopKind: "http", httpStatus: 500 });
   });
   it("classifies a GraphQL errors array as a graphql stop, still source_error-equivalent, without discarding that page's usable node", async () => {
     mockApi({ V7MergedChanges: () => new Response(JSON.stringify({ data: { search: { ...page([pr()]), issueCount: 1 } }, errors: [{ message: "private upstream detail" }] })) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "github", operation: "merged", stopKind: "graphql" });
     // The event itself is built later, at the deferred files: op (never from
@@ -129,13 +131,13 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
   });
   it("classifies a malformed page-info shape as a protocol stop, still source_error-equivalent", async () => {
     mockApi({ V7MergedChanges: () => ({ search: { ...page([pr()]), pageInfo: { hasNextPage: "not-a-boolean", endCursor: null }, issueCount: 1 } }) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "github", operation: "merged", stopKind: "protocol" });
   });
   it("classifies a GitHub rate-limit response (403 + x-ratelimit-remaining: 0) as rate_limited", async () => {
     mockApi({ V7MergedChanges: () => new Response("rate limited", { status: 403, headers: { "x-ratelimit-remaining": "0" } }) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "github", operation: "merged", stopKind: "rate_limited", httpStatus: 403 });
   });
@@ -163,7 +165,7 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
   });
   it("a rate-limited V7Files response stops the slice as rate_limited (the old test's search-cap case, minus the removed 1,000-node cap)", async () => {
     mockApi({ V7Files: () => new Response("rate limited", { status: 429 }) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "github", operation: "files", stopKind: "rate_limited", httpStatus: 429 });
   });
@@ -226,16 +228,19 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
     } });
     let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
     let staged: NormalizedEngineeringEvent[] = [];
-    let result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, staged);
+    const stagedKeys = new Set<string>();
+    let result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, stagedKeys);
     expect(result.done).toBe(false);
     expect(result.stop?.stopKind).toBe("http");
     // The cursor after the successful first page is retained, not reset --
     // the next slice resumes from page two instead of re-fetching page one.
     expect(result.checkpoint.operations.some((op) => op.cursor === "resume-here")).toBe(true);
     expect(result.checkpoint.operations.some((op) => op.key === "files:github:PR1")).toBe(true);
+    for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
     staged = [...staged, ...result.events]; checkpoint = result.checkpoint;
     while (!result.done) {
-      result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, staged);
+      result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+      for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
       staged = [...staged, ...result.events]; checkpoint = result.checkpoint;
     }
     expect(staged.filter((e) => e.eventId === "PR1")).toHaveLength(1);
@@ -332,7 +337,7 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
   });
   it("only the identity (profile) operation can produce a terminal not_accessible stop", async () => {
     mockApi({ V7Profile: () => new Response("unauthorized", { status: 403 }) });
-    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "github", operation: "profile", stopKind: "not_accessible" });
   });
