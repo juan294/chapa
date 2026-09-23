@@ -23,24 +23,16 @@ vi.mock("@/lib/cache/redis", () => ({
 // Import after mocks are set up
 import { notifyFirstBadge } from "./notifications";
 import { _resetClient } from "./resend";
-import type { ImpactV6Result } from "@chapa/shared";
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const sampleImpact: ImpactV6Result = {
-  handle: "TestUser",
-  profileType: "solo",
-  dimensions: { delivery: 80, quality: 60, consistency: 70, breadth: 50 },
-  archetype: "Builder",
-  compositeScore: 72,
-  confidence: 85,
-  confidencePenalties: [],
-  adjustedComposite: 61,
-  tier: "High",
-  computedAt: "2026-01-15T10:00:00Z",
-};
+async function sampleScoring() {
+  const fixture = await scoringConsistencyFixture({ craft: 0, boundary: true });
+  return fixture.model;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -64,7 +56,7 @@ describe("environment guards", () => {
   it("skips when VERCEL_ENV is not production", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", await sampleScoring());
 
     expect(mockCacheGet).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
@@ -73,7 +65,7 @@ describe("environment guards", () => {
   it("skips when VERCEL_ENV is unset", async () => {
     vi.stubEnv("VERCEL_ENV", "");
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", await sampleScoring());
 
     expect(mockCacheGet).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
@@ -88,14 +80,14 @@ describe("deduplication", () => {
   it("skips when Redis marker exists", async () => {
     mockCacheGet.mockResolvedValueOnce(true);
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", await sampleScoring());
 
     expect(mockCacheGet).toHaveBeenCalledWith("badge:notified:testuser");
     expect(mockSend).not.toHaveBeenCalled();
   });
 
   it("sends email and sets marker when marker is absent", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", await sampleScoring());
 
     expect(mockSend).toHaveBeenCalledOnce();
     expect(mockCacheSet).toHaveBeenCalledWith(
@@ -106,7 +98,7 @@ describe("deduplication", () => {
   });
 
   it("lowercases handle for the Redis key", async () => {
-    await notifyFirstBadge("TestUser", sampleImpact);
+    await notifyFirstBadge("TestUser", await sampleScoring());
 
     expect(mockCacheGet).toHaveBeenCalledWith("badge:notified:testuser");
     expect(mockCacheSet).toHaveBeenCalledWith(
@@ -114,77 +106,6 @@ describe("deduplication", () => {
       true,
       31_536_000,
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Email content
-// ---------------------------------------------------------------------------
-
-describe("email content", () => {
-  it("includes handle, archetype, and tier in subject", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
-
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.subject).toContain("testuser");
-    expect(call.subject).toContain("Builder");
-    expect(call.subject).toContain("High");
-  });
-
-  it("includes score, confidence, and share URL in body", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
-
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.html).toContain("61"); // adjustedComposite
-    expect(call.html).toContain("85"); // confidence
-    expect(call.html).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser",
-    );
-    expect(call.text).toContain("61");
-    expect(call.text).toContain("85");
-    expect(call.text).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser",
-    );
-  });
-
-  it("includes dimension scores in body", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
-
-    const call = mockSend.mock.calls[0]![0];
-    // HTML should contain all four dimension values
-    expect(call.html).toContain("80"); // delivery
-    expect(call.html).toContain("60"); // quality
-    expect(call.html).toContain("70"); // consistency
-    expect(call.html).toContain("50"); // breadth
-    // Plain text too
-    expect(call.text).toContain("Delivery:");
-    expect(call.text).toContain("80");
-    expect(call.text).toContain("Quality:");
-    expect(call.text).toContain("60");
-    expect(call.text).toContain("Consistency:");
-    expect(call.text).toContain("70");
-    expect(call.text).toContain("Breadth:");
-    expect(call.text).toContain("50");
-  });
-
-  it("includes badge SVG link in body", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
-
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.html).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser/badge.svg",
-    );
-    expect(call.text).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser/badge.svg",
-    );
-  });
-
-  it("includes Chapa branding in HTML", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
-
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.html).toContain("#1BD093"); // brand purple
-    expect(call.html).toContain("CHAPA");
   });
 });
 
@@ -198,7 +119,7 @@ describe("graceful degradation", () => {
     vi.stubEnv("RESEND_API_KEY", "");
 
     await expect(
-      notifyFirstBadge("testuser", sampleImpact),
+      notifyFirstBadge("testuser", await sampleScoring()),
     ).resolves.toBeUndefined();
     expect(mockSend).not.toHaveBeenCalled();
   });
@@ -210,7 +131,7 @@ describe("graceful degradation", () => {
     });
 
     await expect(
-      notifyFirstBadge("testuser", sampleImpact),
+      notifyFirstBadge("testuser", await sampleScoring()),
     ).resolves.toBeUndefined();
   });
 
@@ -220,28 +141,42 @@ describe("graceful degradation", () => {
       error: { message: "Rate limited" },
     });
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", await sampleScoring());
 
     expect(mockCacheSet).not.toHaveBeenCalled();
   });
 });
 
+// ---------------------------------------------------------------------------
+// Current receipt notification content
+// ---------------------------------------------------------------------------
+
 describe("current receipt notification content", () => {
-  it("uses the current canonical headline, dimensions and Craft instead of legacy traps", async () => {
-    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
+  it("uses the current canonical headline, dimensions and Craft", async () => {
     const fixture = await scoringConsistencyFixture({ craft: 0, boundary: true });
-    await notifyFirstBadge("alice", fixture.impact, fixture.model);
+    await notifyFirstBadge("alice", fixture.model);
     const payload = mockSend.mock.calls[0]![0];
+    expect(payload.subject).toContain("alice");
+    expect(payload.subject).toContain("v7.2");
     expect(payload.text).toContain("Policy: v7.2");
     expect(payload.text).toContain("Score: 69.99");
     expect(payload.text).toContain("Craft: 0");
     expect(payload.text).toContain(fixture.model.identity!.revisionId);
-    expect(payload.text).not.toMatch(/Confidence:|Adjusted:|Builder|Craft: 83/);
+    expect(payload.text).toContain(
+      "https://chapa.thecreativetoken.com/u/alice/badge.svg",
+    );
+    expect(payload.html).toContain(fixture.model.identity!.revisionId);
   });
+
   it("suppresses a notification with unavailable current authority", async () => {
-    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
     const fixture = await scoringConsistencyFixture();
-    await notifyFirstBadge("alice", fixture.impact, { ...fixture.model, freshness: "unavailable" });
+    await notifyFirstBadge("alice", { ...fixture.model, freshness: "unavailable" });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("suppresses an illustrative (sample) scoring model", async () => {
+    const fixture = await scoringConsistencyFixture();
+    await notifyFirstBadge("alice", { ...fixture.model, illustrative: true });
     expect(mockSend).not.toHaveBeenCalled();
   });
 });

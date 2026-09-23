@@ -1,57 +1,50 @@
-import { getSnapshots } from "./history";
-import { computeTrend, type TrendSummary } from "./trend";
-import { compareSnapshots, type SnapshotDiff } from "./diff";
+import { readObservedScoringHistory } from "./observed-history";
 
 // ---------------------------------------------------------------------------
-// getTrendData — server-side trend/diff fetch (#1034)
+// getTrendData — server-side observed-history fetch (#1034, rebuilt #1335
+// phase 5 on the durable v7.2 receipt history — `metrics_snapshots` and its
+// smoothed-trend/diff pair are retired)
 //
-// Mirrors the `?include=trend,diff` behavior of GET /api/history/:handle so
-// the share page's server component can fetch this data directly instead of
-// the ImpactDashboard client component triggering its own post-hydration
-// fetch. This removes the static-shell -> hydrate -> lazy-chunk -> client
-// fetch waterfall for data that's already fetchable at render time.
+// Mirrors the share page's need for a developer's scoring history so the
+// server component can fetch this data directly instead of a client
+// component triggering its own post-hydration fetch.
 //
 // Pure from the caller's perspective: no dynamic request APIs (headers/
 // cookies) are touched, so calling this from an ISR page does not force
 // `force-dynamic` rendering.
 //
-// Degrades gracefully: any failure reading history (Redis/Supabase down,
-// unexpected errors) resolves to `{ trend: null, diff: null }` rather than
-// throwing, matching the tolerance the client `useTrendData` hook already
-// had for missing/unavailable history data.
+// Degrades gracefully: any failure reading history (Supabase down,
+// unexpected errors) resolves to `{ history: null }` rather than throwing.
 // ---------------------------------------------------------------------------
 
-const TREND_WINDOW = 30;
+/** Fewer than two observations can't show a trend. */
+const MIN_OBSERVATIONS = 2;
+
+export type ObservedScoringHistory = NonNullable<
+  Awaited<ReturnType<typeof readObservedScoringHistory>>["history"]
+>;
 
 export interface TrendData {
-  trend: TrendSummary | null;
-  diff: SnapshotDiff | null;
+  history: ObservedScoringHistory | null;
 }
 
 /**
- * Fetch trend and diff data for a developer's impact history, server-side.
+ * Fetch a developer's observed scoring history, server-side.
  *
  * @param handle - GitHub handle to fetch history for
- * @returns `{ trend, diff }` — both null when fewer than 2 snapshots exist
- *   or the history store is unavailable
+ * @returns `{ history }` — null when fewer than 2 observations exist, the
+ *   subject was never scored, or the history store is unavailable
  */
 export async function getTrendData(handle: string): Promise<TrendData> {
   try {
-    const snapshots = await getSnapshots(handle);
-
-    if (snapshots.length < 2) {
-      return { trend: null, diff: null };
+    const result = await readObservedScoringHistory(handle);
+    if (result.status !== "found" || result.history.observations.length < MIN_OBSERVATIONS) {
+      return { history: null };
     }
-
-    const trend = computeTrend(snapshots, TREND_WINDOW);
-    const previous = snapshots[snapshots.length - 2]!;
-    const current = snapshots[snapshots.length - 1]!;
-    const diff = compareSnapshots(previous, current);
-
-    return { trend, diff };
+    return { history: result.history };
   } catch {
-    // Fail open — same tolerance as the client-side useTrendData hook had
-    // for a missing/unavailable history store.
-    return { trend: null, diff: null };
+    // Fail open — same tolerance the v6 wrapper had for a missing/
+    // unavailable history store.
+    return { history: null };
   }
 }
