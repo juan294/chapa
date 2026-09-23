@@ -3,14 +3,14 @@ import { fetchGitHubEvidence } from "@/lib/github/evidence";
 import { fetchGitlabEvidence } from "@/lib/gitlab/evidence";
 import { fetchCodebergEvidence } from "@/lib/codeberg/evidence";
 import { fetchBitbucketEvidence } from "@/lib/bitbucket/evidence";
-import { appendSourceObservation, discoverStoredSource, readSourceObservation } from "@/lib/db/source-context";
+import { discoverStoredSource, readSourceObservation } from "@/lib/db/source-context";
+import { enqueueCollectionJob, isCollectionJobInProgress } from "@/lib/db/collection-queue";
 import {
   classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds,
 } from "@/lib/platform/evidence-diagnostics";
 import { createSourceCoordinator, type SourceCollectionOutcome, type SourceCollectorResult } from "./source-coordinator";
 import type { SourceContextInput } from "./source-context";
 import { readSourceAuthorization } from "./source-authorization";
-import { refreshSourceLink } from "./source-refresh";
 
 const clean = (result: SourceCollectorResult | null): SourceCollectionOutcome => ({ result, diagnostics: [] });
 
@@ -55,7 +55,17 @@ export async function collectSource(input: SourceContextInput, token: string | u
   return { result: evidence, diagnostics: evidence.diagnostics };
 }
 
-/** Live v7 entry point; legacy scalar consumers remain a separate boundary. */
-export const selectSourceEvidence = createSourceCoordinator({ authorize: readSourceAuthorization,
-  discover: discoverStoredSource, read: readSourceObservation, append: appendSourceObservation,
-  refreshLink: refreshSourceLink, collect: collectSource });
+/** Live v7.2 entry point; legacy scalar consumers remain a separate boundary.
+ * Read-only since #1335 phase 3 -- `collectSource` above (and the provider
+ * fetch functions it dispatches to) is no longer wired into it; collection
+ * happens exclusively in the durable queue worker (`lib/collection/worker.ts`).
+ * `collectSource` itself stays exported/tested here for phase 3 part B, which
+ * owns rewiring this file's collection path onto the new slice API.
+ */
+export const selectSourceEvidence = createSourceCoordinator({
+  authorize: readSourceAuthorization,
+  discover: discoverStoredSource,
+  read: readSourceObservation,
+  enqueue: enqueueCollectionJob,
+  jobInProgress: isCollectionJobInProgress,
+});

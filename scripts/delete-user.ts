@@ -74,6 +74,11 @@ export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; del
     { table: "report_craft_reports", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "report_craft_selection", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "scoring_observed_current", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    // scoring_collection_jobs.owner_handle REFERENCES scoring_v7_subjects
+    // ON DELETE CASCADE (migration 055, #1335 phase 3); staged events cascade
+    // again from the job row. Enumerated for discovery only -- the withdrawal
+    // RPC's cascade already removes both, same as every other row above.
+    { table: "scoring_collection_jobs", column: "owner_handle", deletion: "scoring_v7_rpc" },
   ];
 
 export interface Args {

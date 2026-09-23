@@ -144,10 +144,10 @@ it("reprojects retained normalized evidence with honest old dataThrough on UTC r
     coverage: { source: { provider: "github" as const, host: "github.com", subjectId: "alice" }, window: oldWindow,
       dataThrough: referenceTime, status: "complete" as const, discovery: "owned_and_contributed" as const,
       repositoryIds: [], repositoryDiscoveryComplete: true, eventKinds: {}, reasonCodes: [], unknownPeriods: [] }, events: [] };
-  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "observed", observation } : { status: "unlinked" });
+  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "observed", observation, inProgress: false } : { status: "unlinked" });
   await materializeObservedScoreReceipt("alice", { referenceTime, readCraft });
   const original = saved!.envelope;
-  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "stale", observation } : { status: "unlinked" });
+  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "stale", observation, inProgress: false } : { status: "unlinked" });
   const result = await materializeObservedScoreReceipt("alice", { referenceTime: "2026-09-09T12:00:00.000Z", reportUpdate: { endExclusive: "2026-09-09T11:00:00.000Z" }, readCraft });
   expect(result.status).toBe("issued");
   expect(saved!.envelope.receipt.receiptId).not.toBe(original.receipt.receiptId);
