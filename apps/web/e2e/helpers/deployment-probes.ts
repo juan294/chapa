@@ -30,6 +30,25 @@ export async function assertCoreDependencies(
   expect(body.dependencies.github).toBe("ok");
 }
 
+/**
+ * Pure body assertion, part of the badge-source-outage-resilience fix.
+ * v3.0.0's release probe accepted any HTTP 200 SVG wrapper, so the generic
+ * load-error fallback (also a 200, also valid SVG) passed release
+ * verification while `/u/juan294/badge.svg` showed no data. This requires
+ * the rendered-artifact machine marker `data-chapa-state="rendered"` and
+ * rejects `data-chapa-state="fallback"`, never by parsing localized copy,
+ * since a translation edit must never change what the probe checks. A
+ * `data-chapa-freshness="stale"` rendered badge is still an available
+ * product artifact and passes; the stricter production recovery check
+ * (requiring `"current"`) lives in the incident-specific proof, not here.
+ */
+export function assertRenderableBadgeBody(body: string): void {
+  expect(body).toContain("<svg");
+  expect(body).toContain("</svg>");
+  expect(body).not.toContain('data-chapa-state="fallback"');
+  expect(body).toContain('data-chapa-state="rendered"');
+}
+
 export async function assertBadgeSvg(
   request: APIRequestContext,
 ): Promise<void> {
@@ -37,8 +56,7 @@ export async function assertBadgeSvg(
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"] ?? "").toContain("image/svg+xml");
   const body = await response.text();
-  expect(body).toContain("<svg");
-  expect(body).toContain("</svg>");
+  assertRenderableBadgeBody(body);
 }
 
 export async function assertSharePage(page: Page): Promise<void> {

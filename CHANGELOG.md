@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-09-22
+
+### Fixed
+
+- **A public badge no longer shows the load-error card when one linked source
+  cannot refresh its token.** In v3.0.0, an ambiguous (busy) Bitbucket token
+  refresh made `/u/:handle/badge.svg` return "Could not load data" while the
+  profile API still had a durable score. The refresh barrier is unchanged: an
+  ambiguous refresh is never retried, and a connected source never disappears
+  from a newly computed aggregate.
+- **The stats cache keeps an exact-bound last-known-good aggregate.** A
+  complete aggregate stays fresh for six hours and can be served as stale for
+  up to seven days, but only while the GitHub access context and every linked
+  source authorization are exactly the same. Stale data renders but never
+  writes a snapshot, a verification record or the normal daily badge cache.
+- **A known profile with no safe aggregate renders its stored score.** The
+  badge projects the committed v7.2 receipt or the latest metrics snapshot and
+  states, visibly and in its accessible description, the date of that record
+  and that live sources are temporarily unavailable. It never draws invented
+  activity. A handle with no stored profile still gets the load-error card, and
+  a handle GitHub does not know still returns 404.
+- **The release badge probe rejects a fallback SVG.** Badge roots now carry
+  `data-chapa-state` and `data-chapa-freshness`, and the release probe requires
+  `data-chapa-state="rendered"` instead of accepting any HTTP 200 SVG.
+
 ## [3.0.0] - 2026-09-22
 
 ### Added
@@ -1671,7 +1696,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/juan294/chapa/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/juan294/chapa/compare/v2.29.5...v3.0.0
 [2.24.1]: https://github.com/juan294/chapa/compare/v2.24.0...v2.24.1
 [2.24.0]: https://github.com/juan294/chapa/compare/v2.23.0...v2.24.0

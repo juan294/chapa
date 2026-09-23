@@ -62,6 +62,36 @@ and detection falls back to:
 curl https://chapa.thecreativetoken.com/api/health | jq '{status, dependencies}'
 ```
 
+### Checking a badge's machine-readable state
+
+A badge SVG can return HTTP 200 and still not be the intended artifact: a
+generic load-error fallback and a stored-badge last-known-good render are
+both valid, cacheable SVG. Do not infer badge health from status code or
+localized copy alone (a translation change would silently break a check keyed
+on English or Spanish text). Every badge root carries a machine-readable
+state instead (`docs/logs/2026-09-22-badge-load-error-linked-source-refresh.md`):
+
+```bash
+curl -s "https://chapa.thecreativetoken.com/u/<handle>/badge.svg" | grep -o 'data-chapa-[a-z]*="[a-z-]*"'
+```
+
+- `data-chapa-state="rendered"`: a real badge, either the live profile or
+  the durable stored-badge fallback. `data-chapa-freshness="current"` means
+  a live, exactly-authorized aggregate; `data-chapa-freshness="stale"` means
+  a last-known-good aggregate or a stored fallback, and the handle needs
+  investigation if that persists past its normal refresh window.
+- `data-chapa-state="fallback"`: the generic load-error artifact. It
+  carries `data-chapa-reason` (`invalid-handle`, `not-found`, `load-error`,
+  or `render-error`) instead of a real render. `load-error` on a handle with
+  a known durable profile is the P1 signal this class of incident produces,
+  so check linked-source authorization state before assuming the outage is
+  in GitHub or Redis.
+
+The release-required badge probe (`assertRenderableBadgeBody` in
+`apps/web/e2e/helpers/deployment-probes.ts`) rejects `data-chapa-state="fallback"`
+so this class of 200-but-broken response cannot pass release verification
+again.
+
 Alert payloads are JSON and include `source`, `timestamp`, `signal`, `severity`, `summary`, optional `route`, and redacted `properties`. Tokens, secrets, API keys, and bearer headers are scrubbed before delivery.
 
 ## Escalation

@@ -32,6 +32,9 @@ ALLOWED=(
   # Studio preview computes a same-day display from primary stats; the share
   # page (which goes through materializePublicProfile) is the source of truth.
   "apps/web/app/studio/page.tsx"
+  # Disposable E2E fixture only: the derived verification row must match the
+  # hash a live render mints for a handle that has no Craft report.
+  "apps/web/e2e/helpers/redesign-fixtures.ts"
 )
 
 # Resolve repo root (this script lives at <repo>/scripts/).

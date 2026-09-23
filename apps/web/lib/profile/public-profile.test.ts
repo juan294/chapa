@@ -120,6 +120,8 @@ function makeMaterializedProfile(): MaterializedProfile {
     }),
     inputsChanged: false,
     statsComplete: true,
+    statsFreshness: "current",
+    statsCapturedAt: "2026-04-17T12:00:00.000Z",
     scoring: legacyViewModel({
       handle: "testuser",
       profileType: "collaborative",
@@ -204,6 +206,26 @@ describe("getPublicProfileVerification", () => {
     expect(result).toBeNull();
     expect(mockGenerateVerificationCode).not.toHaveBeenCalled();
   });
+
+  // badge-source-outage-resilience (2026-09-22) — a stale exact-bound
+  // last-known-good aggregate is structurally renderable, but
+  // `materializeImpactState` unconditionally sets `statsComplete: false` for
+  // it (see materialize-profile.ts). This mirrors that real shape rather than
+  // constructing an artificial `statsComplete: false` in isolation, proving
+  // the freshness label itself is what blocks a v6 HMAC from a stale serve.
+  it("mints no v6 verification for a stale last-known-good aggregate", () => {
+    const materialized = {
+      ...makeMaterializedProfile(),
+      statsFreshness: "stale" as const,
+      statsComplete: false,
+    };
+    mockGenerateVerificationCode.mockReturnValue({ hash: "abc123", date: "2026-04-17" });
+
+    const result = getPublicProfileVerification(materialized);
+
+    expect(result).toBeNull();
+    expect(mockGenerateVerificationCode).not.toHaveBeenCalled();
+  });
 });
 
 describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () => {
@@ -219,6 +241,25 @@ describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () =>
   it("returns false and writes nothing when stats are incomplete (corrupt shape)", async () => {
     const materialized = {
       ...makeMaterializedProfile(),
+      statsComplete: false,
+    };
+
+    const result = await persistProfileSnapshot("testuser", materialized);
+
+    expect(result).toBe(false);
+    expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
+    expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
+    expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
+    expect(mockCacheSetNxStatus).not.toHaveBeenCalled();
+  });
+
+  // badge-source-outage-resilience (2026-09-22) — same real shape a stale
+  // exact-bound last-known-good aggregate materializes to: renderable, but
+  // never eligible to become a new durable snapshot.
+  it("persists no snapshot for a stale last-known-good aggregate", async () => {
+    const materialized = {
+      ...makeMaterializedProfile(),
+      statsFreshness: "stale" as const,
       statsComplete: false,
     };
 

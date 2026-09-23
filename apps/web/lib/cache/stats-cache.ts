@@ -1,10 +1,16 @@
 import "server-only";
 import { createHmac } from "node:crypto";
-import { canonicalJson } from "@chapa/shared";
 import type { StatsData } from "@chapa/shared";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getNextauthSecret } from "@/lib/env";
 import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found";
+import {
+  buildStatsCacheEnvelope,
+  statsCacheBindingBytes,
+  type CachedStatsEnvelopeV2,
+  type StatsCacheBindingInput,
+} from "@/lib/cache/stats-cache-envelope";
+export type { StatsCacheBindingInput } from "@/lib/cache/stats-cache-envelope";
 
 /**
  * The read-through cache for composed legacy stats.
@@ -19,10 +25,10 @@ import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found
  * `stats:v3:<handle>` keeps invalidation exactly as simple as it was — one
  * `cacheDel` per handle, which is what every `invalidateProfileReadModels`
  * caller already does — while `readCachedStats` refuses any entry whose
- * binding or scoring day does not match the caller's. Putting the binding in
- * the key instead would make a targeted delete impossible without a per-handle
- * index or an epoch counter, and would cost a second Redis round trip on every
- * read to resolve it.
+ * binding does not match the caller's. Putting the binding in the key instead
+ * would make a targeted delete impossible without a per-handle index or an
+ * epoch counter, and would cost a second Redis round trip on every read to
+ * resolve it.
  *
  * The cost of that choice: one handle holds one binding at a time, so an owner
  * fetching with their session token and the badge route fetching with the
@@ -34,63 +40,114 @@ import { githubUserNotFound, isGitHubUserNotFound } from "@/lib/github/not-found
  * The binding itself is a domain-separated HMAC, so `accessContextId` (an HMAC
  * over the credential itself) never leaves the process, per the rule stated on
  * `PrivateSourceContext`. The fingerprint is still an equality oracle over
- * "same handle, same grant, same day" for anyone who can read Redis; that is
+ * "same handle, same grant" for anyone who can read Redis; that is
  * unavoidable for any correct authorization-bound cache and is the point.
+ *
+ * **Fresh vs. stale (2026-09-22, the badge-source-outage-resilience plan).**
+ * A production outage on one linked source's token refresh (an ambiguous,
+ * durably-claimed "busy" result — see `source-refresh.ts`) used to turn the
+ * whole badge into the generic load-error artifact, even though a complete
+ * aggregate had been collected minutes earlier under the exact same grants.
+ * The envelope below is versioned and carries its own capture/freshness
+ * timestamps so a caller can serve that last-known-good aggregate as
+ * explicitly stale rather than nothing at all:
+ *
+ * - `referenceDate` LEFT the authorization binding. The binding now covers
+ *   only the GitHub access context and the exact linked-source states, so a
+ *   record written yesterday is still exactly-bound today — it is just no
+ *   longer "fresh" by clock time.
+ * - A same-`referenceDate` record is `fresh` for `FRESH_SECONDS` after
+ *   capture (six hours, the pre-existing TTL).
+ * - Any exactly-bound record is eligible as `stale` for up to
+ *   `RETENTION_SECONDS` after capture (seven days) — old enough that Redis
+ *   itself, not this module, is the outer bound (the key's TTL is set to the
+ *   retention window).
+ * - `schemaVersion` is checked exactly. An old `{ binding, referenceDate,
+ *   stats }` row, or anything with a missing/invalid field, is a miss rather
+ *   than an implicit upgrade. `statsCacheBinding`'s HMAC domain string was
+ *   also bumped (`-v2`), so even a byte-identical old row cannot collide with
+ *   a new binding.
+ *
+ * Serving `stale` is a cache-module concern only: this module does not decide
+ * whether a caller may act on a stale read. `client.ts` re-checks the exact
+ * current authorization before trusting either result, and the profile
+ * materializer (`lib/profile/materialize-profile.ts`) propagates the
+ * distinction so publication/verification gates can refuse anything not
+ * `current`.
  */
-export const STATS_CACHE_TTL_SECONDS = 21_600; // 6 hours, the pre-S08 TTL.
+export const FRESH_SECONDS = 6 * 60 * 60; // 6 hours: a same-day hit stays "fresh".
+export const RETENTION_SECONDS = 7 * 24 * 60 * 60; // 7 days: the outer bound for a "stale" last-known-good serve.
 
 export function buildStatsCacheKey(handle: string): string {
   return `stats:v3:${handle.toLowerCase()}`;
-}
-
-interface CachedStatsEntry {
-  readonly binding: string;
-  readonly referenceDate: string;
-  readonly stats: StatsData;
-}
-
-export interface StatsCacheBindingInput {
-  /** The private access context ID. Hashed again here; never stored as-is. */
-  readonly accessContextId: string;
-  /** The linked-platform grant versions, as `getStats` already computes them. */
-  readonly links: string;
-  /** The UTC scoring day, so a cached entry cannot outlive its own window. */
-  readonly referenceDate: string;
 }
 
 /**
  * Returns the cache binding for a source context, or `null` when the signing
  * secret is unavailable — in which case the caller skips caching rather than
  * falling back to an unbound key.
+ *
+ * Deliberately excludes the scoring day: the day now lives only in the
+ * envelope's `referenceDate`/freshness fields, so the same grant's binding is
+ * stable across a UTC-day rollover and a stale-but-exactly-bound record from
+ * yesterday can still be matched and served as stale.
  */
 export function statsCacheBinding(input: StatsCacheBindingInput): string | null {
   const secret = getNextauthSecret();
   if (!secret) return null;
 
-  return createHmac("sha256", secret)
-    .update(
-      canonicalJson({
-        version: "stats-cache-binding-v1",
-        accessContextId: input.accessContextId,
-        links: input.links,
-        referenceDate: input.referenceDate,
-      }),
-      "utf8",
-    )
-    .digest("hex");
+  return createHmac("sha256", secret).update(statsCacheBindingBytes(input), "utf8").digest("hex");
 }
 
-/** A hit only when the stored entry was written by this exact binding on this
- * exact scoring day. Anything else is a miss, never a downgrade. */
+export type CachedStatsRead =
+  | { readonly status: "fresh"; readonly stats: StatsData; readonly capturedAt: string }
+  | { readonly status: "stale"; readonly stats: StatsData; readonly capturedAt: string }
+  | { readonly status: "miss" };
+
+function isValidEnvelope(value: unknown): value is CachedStatsEnvelopeV2 {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Partial<CachedStatsEnvelopeV2>;
+  return (
+    entry.schemaVersion === 2 &&
+    typeof entry.authorizationBinding === "string" &&
+    typeof entry.referenceDate === "string" &&
+    typeof entry.capturedAt === "string" &&
+    typeof entry.freshUntil === "string" &&
+    !Number.isNaN(Date.parse(entry.capturedAt)) &&
+    !Number.isNaN(Date.parse(entry.freshUntil)) &&
+    !!entry.stats &&
+    typeof entry.stats === "object"
+  );
+}
+
+/**
+ * A `fresh` result only when the stored entry was written by this exact
+ * binding, on this exact scoring day, within the fresh window. A `stale`
+ * result for any other exactly-bound entry still inside the retention window.
+ * Anything else — a foreign binding, an unversioned/legacy row, a corrupt
+ * timestamp, an expired entry — is a `miss`, never a silent downgrade.
+ */
 export async function readCachedStats(
   handle: string,
   binding: string,
   referenceDate: string,
-): Promise<StatsData | null> {
-  const entry = await cacheGet<CachedStatsEntry>(buildStatsCacheKey(handle));
-  if (!entry || typeof entry !== "object") return null;
-  if (entry.binding !== binding || entry.referenceDate !== referenceDate) return null;
-  return entry.stats ?? null;
+  now: Date = new Date(),
+): Promise<CachedStatsRead> {
+  const entry = await cacheGet<unknown>(buildStatsCacheKey(handle));
+  if (!isValidEnvelope(entry)) return { status: "miss" };
+  if (entry.authorizationBinding !== binding) return { status: "miss" };
+
+  const nowMs = now.getTime();
+  const capturedMs = Date.parse(entry.capturedAt);
+  const freshUntilMs = Date.parse(entry.freshUntil);
+
+  if (entry.referenceDate === referenceDate && nowMs <= freshUntilMs) {
+    return { status: "fresh", stats: structuredClone(entry.stats), capturedAt: entry.capturedAt };
+  }
+  if (nowMs - capturedMs <= RETENTION_SECONDS * 1000) {
+    return { status: "stale", stats: structuredClone(entry.stats), capturedAt: entry.capturedAt };
+  }
+  return { status: "miss" };
 }
 
 export async function writeCachedStats(
@@ -98,9 +155,13 @@ export async function writeCachedStats(
   binding: string,
   referenceDate: string,
   stats: StatsData,
+  now: Date = new Date(),
 ): Promise<void> {
-  const entry: CachedStatsEntry = { binding, referenceDate, stats };
-  await cacheSet(buildStatsCacheKey(handle), entry, STATS_CACHE_TTL_SECONDS);
+  const entry: CachedStatsEnvelopeV2 = buildStatsCacheEnvelope(binding, referenceDate, stats, now, FRESH_SECONDS);
+  // The Redis TTL is the outer retention bound, not the fresh window — a
+  // record must survive past `freshUntil` so a later failure can still serve
+  // it as stale.
+  await cacheSet(buildStatsCacheKey(handle), entry, RETENTION_SECONDS);
 }
 
 // ---------------------------------------------------------------------------

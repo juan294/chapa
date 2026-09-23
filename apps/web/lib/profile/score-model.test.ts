@@ -73,3 +73,37 @@ it("distinguishes an unavailable authority from genuine receipt absence", async 
   vi.mocked(readObservedScoreReceipt).mockResolvedValue({ status: "unavailable" });
   expect(await resolveScoreModel("Alice", legacy)).toMatchObject({ policyVersion: "v6", freshness: "unavailable" });
 });
+
+// badge-source-outage-resilience (2026-09-22) — `scoreModelFrom`'s explicit
+// `statsFreshness` param only ever reaches the labelled v6 aggregate; a
+// committed receipt keeps its own freshness authority regardless of it.
+describe("scoreModelFrom stats freshness (badge-source-outage-resilience)", () => {
+  it("labels the legacy v6 model with the caller's current/stale stats freshness", async () => {
+    const { scoreModelFrom } = await import("./score-model");
+    vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+
+    expect(scoreModelFrom("Alice", legacy, null, undefined, "current").freshness).toBe("current");
+    expect(scoreModelFrom("Alice", legacy, null, undefined, "stale").freshness).toBe("stale");
+    expect(scoreModelFrom("Alice", legacy, null, undefined).freshness).toBeUndefined();
+  });
+
+  it("never lets stats freshness override a receipt-read failure's unavailable signal", async () => {
+    const { scoreModelFrom } = await import("./score-model");
+    const model = scoreModelFrom("Alice", legacy, { unavailable: true }, undefined, "current");
+    expect(model.policyVersion).toBe("v6");
+    expect(model.freshness).toBe("unavailable");
+  });
+
+  it("leaves a committed receipt's own freshness untouched by the stats freshness param", async () => {
+    const { scoreModelFrom } = await import("./score-model");
+    const envelope = await observedReceiptFixture();
+
+    const withCurrentStats = scoreModelFrom("Alice", legacy, { receipt: envelope, trend: null }, undefined, "current");
+    const withStaleStats = scoreModelFrom("Alice", legacy, { receipt: envelope, trend: null }, undefined, "stale");
+
+    expect(withCurrentStats.policyVersion).toBe("v7.2");
+    // Derived from the receipt's own window/capture time, never the stats
+    // freshness param — identical either way it is called.
+    expect(withCurrentStats.freshness).toBe(withStaleStats.freshness);
+  });
+});

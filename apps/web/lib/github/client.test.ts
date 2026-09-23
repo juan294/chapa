@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StatsData } from "@chapa/shared";
-import { getStats, _resetInflight } from "./client";
+import { getStats, readStats, _resetInflight } from "./client";
 import { fetchStats } from "./stats";
 import { getGithubToken } from "@/lib/env";
 import { readSourceAuthorization, type SourceAuthorization } from "@/lib/platform/source-authorization";
@@ -107,8 +107,10 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     expect(expectFound(await getStats("alice", undefined, options)).prsMergedCount).toBe(prsMergedCount);
     expect(cacheGet).toHaveBeenCalledWith("stats:v3:alice"); expect(dbUpsertUser).not.toHaveBeenCalled();
     expect(cacheSet).toHaveBeenCalledWith("stats:v3:alice", expect.objectContaining({
-      binding: expect.any(String), referenceDate: "2026-09-05", stats: expect.objectContaining({ prsMergedCount }),
-    }), 21_600);
+      schemaVersion: 2, authorizationBinding: expect.any(String), referenceDate: "2026-09-05",
+      capturedAt: expect.any(String), freshUntil: expect.any(String),
+      stats: expect.objectContaining({ prsMergedCount }),
+    }), 604_800);
   });
   it("captures the server credential before asynchronous source checks and forwards one reference", async () => {
     vi.mocked(readSourceAuthorization).mockImplementation(async () => { vi.mocked(getGithubToken).mockReturnValue("rotated-token"); return { status: "unlinked" }; });
@@ -161,8 +163,9 @@ describe("uncached v6 compatibility during the receipt migration", () => {
     expect(result.commitsTotal).toBe(20); expect(result.hasSupplementalData).toBe(true); expect(primary.commitsTotal).toBe(0);
     // The composed value is what callers receive, so it is what gets cached.
     expect(cacheSet).toHaveBeenCalledWith("stats:v3:alice", expect.objectContaining({
+      schemaVersion: 2,
       stats: expect.objectContaining({ commitsTotal: 20, hasSupplementalData: true }),
-    }), 21_600);
+    }), 604_800);
   });
   it("deduplicates only the same exact principal/window and returns separate objects", async () => {
     const started = deferred<void>(); const finish = deferred<StatsData>();
@@ -249,5 +252,157 @@ describe("a handle GitHub does not know (LE-8-2)", () => {
     expect(fetchStats).not.toHaveBeenCalled();
     expect(cacheSet).not.toHaveBeenCalled();
     expect(refreshSourceLink).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// badge-source-outage-resilience (2026-09-22) — the production incident:
+// production `/u/juan294/badge.svg` returned the generic load-error SVG
+// because one linked source's token refresh hit an ambiguous, durably-claimed
+// "busy" outcome (`refreshSourceLink` -> `{status:"unavailable"}`, never
+// retried), even though a complete aggregate had been collected minutes
+// earlier under the exact same grants. `readStats` now reads raw
+// authorization first (never refreshing) and tries the exact-bound cache
+// before ever attempting a refresh, so a `fresh` hit needs no provider call
+// at all, and a refresh failure can still serve that same exact-bound entry
+// as `stale` rather than nothing.
+// ---------------------------------------------------------------------------
+describe("last-known-good stale aggregate (badge-source-outage-resilience)", () => {
+  /** Backdates a captured cache envelope so it reads as `stale` (past its
+   * six-hour fresh window) but still well inside the seven-day retention
+   * window, without needing fake timers. */
+  function backdateToStale<T extends { capturedAt: string; freshUntil: string }>(entry: T): T {
+    return { ...entry, capturedAt: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(), freshUntil: new Date(Date.now() - 60 * 60 * 1000).toISOString() };
+  }
+  async function warmWithBitbucket(overlay: StatsData = makeStats({ handle: "remote-bitbucket", commitsTotal: 1, prsMergedCount: 0 })): Promise<{ entry: { capturedAt: string; freshUntil: string }; stats: StatsData }> {
+    const linked = authorization("bitbucket");
+    vi.mocked(readSourceAuthorization).mockImplementation(async (_owner, provider) => provider === "bitbucket" ? linked : { status: "unlinked" });
+    vi.mocked(fetchers.bitbucket).mockResolvedValue(overlay);
+    const stats = expectFound(await getStats("alice", undefined, options));
+    const entry = vi.mocked(cacheSet).mock.calls.find(([key]) => key === "stats:v3:alice")![1] as { capturedAt: string; freshUntil: string };
+    _resetInflight();
+    for (const fn of [fetchStats, refreshSourceLink, dbGetSupplemental, cacheSet, ...Object.values(fetchers)]) vi.mocked(fn).mockClear();
+    return { entry, stats };
+  }
+
+  it("serves a matching fresh aggregate before ever attempting refresh, with no provider or GitHub call", async () => {
+    const { entry, stats } = await warmWithBitbucket();
+    vi.mocked(cacheGet).mockResolvedValue(entry);
+
+    const result = expectFound(await getStats("alice", undefined, options));
+
+    expect(result).toEqual(stats);
+    expect(refreshSourceLink).not.toHaveBeenCalled();
+    expect(fetchStats).not.toHaveBeenCalled();
+  });
+
+  it("reproduces the production incident: an ambiguous (busy) refresh serves the exact-bound stale aggregate instead of the generic error", async () => {
+    const { entry, stats } = await warmWithBitbucket();
+    vi.mocked(cacheGet).mockResolvedValue(backdateToStale(entry));
+    // The durable-claim RPC returned "busy" — the public result of an
+    // ambiguous provider outcome that must never be retried.
+    vi.mocked(refreshSourceLink).mockResolvedValue({ status: "unavailable" });
+
+    const result = await readStats("alice", undefined, options);
+
+    expect(result).toMatchObject({ status: "stale", stats });
+    expect(fetchStats).not.toHaveBeenCalled();
+    expect(dbGetSupplemental).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
+    // The compatibility wrapper still returns usable stats, not null.
+    expect(await getStats("alice", undefined, options)).toEqual(stats);
+  });
+
+  it("with no trusted aggregate at all, a busy refresh remains unavailable and never computes GitHub-only", async () => {
+    const linked = authorization("bitbucket");
+    vi.mocked(readSourceAuthorization).mockImplementation(async (_owner, provider) => provider === "bitbucket" ? linked : { status: "unlinked" });
+    vi.mocked(refreshSourceLink).mockResolvedValue({ status: "unavailable" });
+    vi.mocked(cacheGet).mockResolvedValue(null);
+
+    expect(await getStats("alice", undefined, options)).toBeNull();
+    expect(fetchStats).not.toHaveBeenCalled();
+  });
+
+  it("rejects the stale entry when the linked source's link UUID/version changed (reconnect) and the refresh still fails", async () => {
+    const { entry, stats } = await warmWithBitbucket();
+    vi.mocked(cacheGet).mockResolvedValue(backdateToStale(entry));
+    const reconnected = { ...authorization("bitbucket") };
+    reconnected.link = { ...reconnected.link!, id: "22222222-2222-4222-8222-222222222222", updatedAt: "2026-09-05T13:00:00.000001Z" };
+    vi.mocked(readSourceAuthorization).mockImplementation(async (_owner, provider) => provider === "bitbucket" ? reconnected : { status: "unlinked" });
+    vi.mocked(refreshSourceLink).mockResolvedValue({ status: "unavailable" });
+
+    const result = await getStats("alice", undefined, options);
+
+    expect(result).toBeNull();
+    expect(result).not.toEqual(stats);
+  });
+
+  it("rejects the stale entry when the GitHub access context changed and the refresh still fails", async () => {
+    const { entry, stats } = await warmWithBitbucket();
+    vi.mocked(cacheGet).mockResolvedValue(backdateToStale(entry));
+    vi.mocked(readSourceAuthorization).mockImplementation(async (_owner, provider) => provider === "bitbucket" ? authorization("bitbucket") : { status: "unlinked" });
+    vi.mocked(refreshSourceLink).mockResolvedValue({ status: "unavailable" });
+
+    // A different token changes `accessContextId`, and so the raw binding.
+    const result = await getStats("alice", "a-different-token", options);
+
+    expect(result).toBeNull();
+    expect(result).not.toEqual(stats);
+  });
+
+  it("never reuses the old grant's stale aggregate after a disconnect — it recomputes fresh without that source instead", async () => {
+    const overlay = makeStats({ handle: "remote-bitbucket", commitsTotal: 500, prsMergedCount: 0 });
+    const { entry, stats } = await warmWithBitbucket(overlay);
+    expect(stats.commitsTotal).toBeGreaterThanOrEqual(500);
+    vi.mocked(cacheGet).mockResolvedValue(backdateToStale(entry));
+    // Disconnected: no longer authorized, so refresh is never attempted for it.
+    vi.mocked(readSourceAuthorization).mockResolvedValue({ status: "unlinked" });
+    vi.mocked(fetchers.bitbucket).mockClear();
+
+    const result = expectFound(await getStats("alice", undefined, options));
+
+    // The 500-commit bitbucket overlay from the stale, now-disconnected grant
+    // never reappears in the newly computed aggregate.
+    expect(result.commitsTotal).toBeLessThan(500);
+    expect(result.linkedPlatforms ?? []).not.toContain("bitbucket");
+    expect(fetchers.bitbucket).not.toHaveBeenCalled();
+  });
+
+  it("rebinds after a successful refresh, so a later collection failure cannot fall back to the pre-refresh stale envelope", async () => {
+    const { entry: staleUnderOldBinding } = await warmWithBitbucket();
+    vi.mocked(cacheGet).mockResolvedValue(backdateToStale(staleUnderOldBinding));
+    // Raw authorization is unchanged (same link row) — the OLD binding still
+    // matches — but this time the refresh actually succeeds and rotates the
+    // link's version, which must change the binding used going forward.
+    const refreshed = authorization("bitbucket");
+    refreshed.link = { ...refreshed.link!, updatedAt: "2026-09-05T18:00:00.000001Z", tokens: { ...refreshed.link!.tokens, accessToken: "rotated-bitbucket-token" } };
+    vi.mocked(refreshSourceLink).mockResolvedValue(refreshed);
+    // The subsequent live collection also fails (e.g. GitHub itself is down).
+    vi.mocked(fetchStats).mockResolvedValue(null);
+
+    const result = await getStats("alice", undefined, options);
+
+    // No stale entry exists under the NEW (post-refresh) binding, and the old
+    // binding's entry must not be reused once the grant has moved on.
+    expect(result).toBeNull();
+  });
+
+  it("read-only: a stale hit performs no refresh, HTTP collection, write, or inflight join", async () => {
+    const { entry, stats } = await warmWithBitbucket();
+    vi.mocked(cacheGet).mockResolvedValue(backdateToStale(entry));
+    const forbidden = [fetchStats, refreshSourceLink, dbGetSupplemental, cacheSet, ...Object.values(fetchers)];
+
+    const result = await getStats("alice", undefined, { ...options, readOnly: true });
+
+    expect(result).toEqual(stats);
+    for (const fn of forbidden) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("read-only: a stale hit whose grant changed underneath it is refused, not served", async () => {
+    const { entry } = await warmWithBitbucket();
+    vi.mocked(cacheGet).mockResolvedValue(backdateToStale(entry));
+    vi.mocked(readSourceAuthorization).mockResolvedValue({ status: "unlinked" });
+
+    expect(await getStats("alice", undefined, { ...options, readOnly: true })).toBeNull();
   });
 });

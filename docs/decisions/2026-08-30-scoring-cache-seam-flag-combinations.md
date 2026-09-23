@@ -21,6 +21,21 @@ paragraphs in CLAUDE.md rather than joining them, because a duplicate
 description of the same rules makes drift worse rather than better - that exact
 failure produced the stale `stats:stale:` comment fixed in Wave 1. (S08, #1302, later removed the `stats:v2:merged:`/`stats:stale:v2:` keys altogether; 8fcc0371 restored a single grant-bound `stats:v3:<handle>` record, and the read-only row below was rewritten on 2026-09-07 to match.)
 
+**2026-09-22 (badge-source-outage-resilience, phase 1)** — production
+`/u/juan294/badge.svg` returned the generic load-error SVG because one linked
+source's token refresh hit an ambiguous, durably-claimed "busy" outcome
+(`refreshSourceLink` mapping it to `unavailable`, correctly never retried),
+even though a complete aggregate had been collected minutes earlier under the
+exact same grants. The old single-pass `getStats` read and refreshed every
+linked source's authorization together, before ever consulting the cache, so
+one ambiguous refresh turned a handle with a perfectly good aggregate into a
+hard `null`. `getStats` is now a compatibility wrapper over `readStats`
+(`apps/web/lib/github/client.ts`), which reads raw (unrefreshed) authorization
+first, tries the exact-bound cache, and only then refreshes — with an
+exact-bound `stale` last-known-good fallback at both the refresh-failure and
+collection-failure points. The `readOnly`/`readOnly: false` rows below are
+rewritten for this; the other flags are unaffected.
+
 ## Decision
 
 One table. Rows are the flags; columns are the five effects that matter at this
@@ -30,13 +45,14 @@ seam.
 
 | Flag | Cache keys READ | Cache keys WRITTEN | Live GitHub fetch? | Snapshot may persist? | Verification record may persist? |
 |---|---|---|---|---|---|
-| `readOnly: true`<br>(#1083, #1180; rewritten for `stats:v3`, 2026-09-07) | `stats:v3:h` only, and only when the record's binding (access context + linked-grant versions + UTC day) matches the caller's | **none** — no cache write, no token refresh, no inflight entry | **No.** Returns `null` on a miss or a foreign binding | No - `persistProfileSnapshot` returns `false` immediately | No - `runPublicProfileSideEffects` returns before `deferProfileCacheWork` |
-| `readOnly: false` (default) | `stats:v3:h` on a matching binding, otherwise a GitHub GraphQL fetch (deduplicated per binding through the inflight map) | `stats:v3:h`, bound to the caller's grant and day (6 h TTL) | Yes, on miss | Yes, subject to `statsComplete` and the once-per-day SETNX guard | Yes, subject to `statsComplete` |
+| `readOnly: true`<br>(#1083, #1180; rewritten for the fresh/stale envelope, 2026-09-22) | `stats:v3:h`, bound to the RAW (unrefreshed) access context + linked-grant state. A same-day hit inside the 6 h fresh window is `current`; an exactly-bound hit up to 7 days old is `stale`. Anything else — foreign binding, expired retention, unversioned row — is a miss | **none** — no cache write, no token refresh, no provider/GitHub call, no inflight entry, either way | **No.** Never, `current` or `stale` | No — `statsComplete` is unconditionally `false` for a `stale` read, so `persistProfileSnapshot` refuses it the same as `readOnly: false` would refuse a genuinely incomplete one | No — same `statsComplete` gate |
+| `readOnly: false` (default) | Same RAW-bound `stats:v3:h` read first. A `current` hit needs no refresh at all. On a miss/`stale` hit, each raw-authorized linked source is refreshed; a refresh failure (e.g. a durably-claimed "busy" token-refresh outcome) falls back to the SAME raw-bound entry as `stale` rather than `null`. A successful refresh rebuilds the binding (a link's `updatedAt` may have changed) and re-tries the cache under the new binding before collecting live; a collection failure falls back to `stale` under that new binding | `stats:v3:h`, bound to the caller's POST-refresh grant state (`referenceDate` inside the envelope, not the binding; 7-day Redis TTL, only 6 h of it `current`) | Only when no `current` hit exists anywhere in the sequence above | Yes for `current`, subject to `statsComplete` and the once-per-day SETNX guard. **Never for `stale`** — `statsComplete` is unconditionally `false` for it | Yes for `current`, subject to `statsComplete`. Never for `stale`, same gate |
 | `inputsChanged: true`<br>(#826) | `stats:dirty:h` supplies the default when the option is absent | clears `stats:dirty:h` after the write | no effect | Yes, and **replaces** today's row (`dbReplaceSnapshot` UPSERT) instead of skipping on the `UNIQUE(handle, date)` conflict; also bypasses the same-day EMA lock for the value written | no effect |
 | `ignoreSnapshot: true`<br>(#930) | **skips** the `getCachedLatestSnapshot` read entirely | none | no effect | Yes. With no prior, the EMA has nothing to smooth toward, so the persisted value equals the fresh score | no effect |
 | `policy`<br>(EMA) | none | none | no effect | Selects the smoothing branch applied to the **snapshot** value only | no effect |
 | `today`<br>(EMA) | none | none | no effect | The date the same-day lock compares against, and the date the snapshot is written under | no effect |
 | `statsComplete`<br>(#1003, #1049) - *derived, not an input* | none | none | no effect | **Gate.** False blocks the write and emits `snapshot_skipped_incomplete_stats` | **Gate.** False makes `getPublicProfileVerification` return `null` |
+| `statsFreshness`<br>(`"current" \| "stale"`, badge-source-outage-resilience, 2026-09-22) - *derived from `readStats`, not an input* | none | none | no effect | Folds into `statsComplete`: `statsComplete = statsFreshness === "current" && <structural validity>`, so `stale` alone is sufficient to block persistence regardless of how healthy the underlying counts look | Folds into `statsComplete` the same way. The v6 `ScoreViewModel.freshness` field also carries this label through to every renderer (badge, OG, share page); a committed v7/v7.2 receipt keeps its own independent freshness derived from its window, never this one |
 | `fetchScope`<br>(#1004, #1050) - *derived, not an input* | none | **Gate on writes.** A lower-scoped fetch (`public`) never clobbers a higher-scoped entry (`authenticated`) | classified from the token on the fetch that produced it | indirectly - a rejected fetch never becomes the value a snapshot is built from | indirectly, same reason |
 
 ### The combinations that actually bite
@@ -57,6 +73,21 @@ Three pairings account for most of the issue history above:
    the guards ran: a rejected fetch discarded a fresh EMU merge, and a large
    supplemental could lift a scope-blinded fetch over both detection
    signatures. `_compose` runs after the guards, never before.
+4. **`readOnly: false` + a refresh/collection failure.** This is the new one
+   (2026-09-22). The rule is exact-authorization equality, not merely "some
+   cache entry exists": a `stale` serve is only ever allowed when the raw (or,
+   after a successful refresh, the post-refresh) authorization state used to
+   attempt the failed operation is byte-for-byte the SAME as what wrote the
+   cached entry. A changed link UUID/version, a disabled flag, a disconnect,
+   or a different GitHub access context all change the binding, so the old
+   entry becomes an unrelated miss rather than a wrongly-served stale read —
+   the system falls through to live collection (which may itself succeed with
+   a legitimately different aggregate, or fail to `unavailable`) instead of
+   the old entry ever being returned.
+
+Invalidation is unaffected by any of this: `stats:v3:h` is still the single
+key `buildStatsCacheKey`/`invalidateProfileReadModels` delete, whether the row
+they are clearing was `current`, `stale`, or absent.
 
 ### The not-found marker (LE-8-2, 2026-09-07)
 

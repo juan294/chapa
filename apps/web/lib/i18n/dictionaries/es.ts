@@ -635,6 +635,7 @@ export const es: Translations = {
     userNotFound: 'No existe ningún usuario de GitHub con este nombre.',
     renderError: 'Algo salió mal. Inténtalo de nuevo más tarde.',
     tagline: 'Chapa de impacto para desarrolladores',
+    activityUnavailable: 'Última instantánea correcta: {date}. Las fuentes en vivo no están disponibles temporalmente.',
   },
   archetypes: {
     dominantDimensionLabel: 'Dimensión dominante:',

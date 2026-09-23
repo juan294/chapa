@@ -45,7 +45,8 @@ describe("source integrity through actual legacy collection and local persistenc
     expect(await redisFake.cacheGet(`stats:v2:merged:${handle}`)).toBeNull();
     expect(await redisFake.cacheGet(`stats:stale:v2:${handle}`)).toBeNull();
     expect(await redisFake.cacheGet(`stats:v3:${handle}`)).toMatchObject({
-      binding: expect.any(String), referenceDate: expect.any(String), stats: { prsMergedCount: 904 },
+      schemaVersion: 2, authorizationBinding: expect.any(String), referenceDate: expect.any(String),
+      capturedAt: expect.any(String), freshUntil: expect.any(String), stats: { prsMergedCount: 904 },
     });
     // Same grant, same scoring day: the second read is served from that entry.
     const before = http.mock.calls.filter(([input]) => isGitHubApiRequest(input)).length;

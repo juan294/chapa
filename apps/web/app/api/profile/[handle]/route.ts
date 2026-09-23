@@ -10,6 +10,7 @@ import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { legacyViewModel, type ScoreViewModel } from "@/lib/profile/score-view-model";
+import { snapshotDimensions } from "@/lib/profile/stored-badge-profile";
 
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
 
@@ -83,11 +84,10 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
   // Only after the 404 above — the missing-snapshot path stays a cheap cache read.
   const { displayScore, displayTier, scoring } = await getDisplayHeadline(handle, selection);
 
+  // Shared with the stored-badge fallback (`lib/profile/stored-badge-profile.ts`)
+  // so the two never compute a stored snapshot's dimensions differently.
   const dimensions: DimensionScores = {
-    delivery: snapshot.delivery,
-    quality: snapshot.quality,
-    consistency: snapshot.consistency,
-    breadth: snapshot.breadth,
+    ...snapshotDimensions(snapshot),
     ...(craftScore != null && { craft: craftScore }),
   };
 
