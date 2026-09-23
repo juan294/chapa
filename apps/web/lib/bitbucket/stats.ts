@@ -6,6 +6,8 @@ import type { StatsData } from "@chapa/shared";
 export { fetchBitbucketEvidence } from "./evidence";
 /** @public Compatibility types for v7 evidence consumers. */
 export type { BitbucketEvidenceOptions, BitbucketEvidenceProgress, BitbucketEvidenceResult } from "./evidence";
+/** @public Checkpointed, resumable collector slice API (#1335 phase 3). */
+export { collectBitbucketSlice } from "./evidence";
 
 /** User profile info passed from the OAuth token store */
 interface UserProfile {
