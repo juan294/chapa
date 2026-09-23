@@ -102,7 +102,7 @@ function existsInRepo(path: string): boolean {
  * catch a scored consumer going unregistered.
  */
 describe("retired publication consent", () => {
-  const RETIRED_CONSENT = /\b(publicConsent|public_evidence_consent|PublicationConsent)\b/;
+  const RETIRED_CONSENT = /\b(publicConsent|public_evidence_consent|PublicationConsent|publicationAcknowledged)\b/;
   const allSourceFiles = () => sourceFiles(join(repoRoot, "apps/web"));
 
   it("appears nowhere under apps/web", () => {

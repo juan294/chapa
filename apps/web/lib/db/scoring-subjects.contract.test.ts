@@ -28,4 +28,9 @@ describe("dbEnsureScoringSubject", () => {
   it("grants scoring_v7_ensure_subject only to service role", () => {
     expect(inspectLocalSql("SELECT has_function_privilege('anon','public.scoring_v7_ensure_subject(text)','EXECUTE'),has_function_privilege('authenticated','public.scoring_v7_ensure_subject(text)','EXECUTE'),has_function_privilege('service_role','public.scoring_v7_ensure_subject(text)','EXECUTE')")).toBe("f|f|t");
   });
+  // Plan step 2.1: no function body may reference the retired consent
+  // column, not just the ones this file happens to exercise directly.
+  it("leaves no function body referencing the retired public_evidence_consent column", () => {
+    expect(inspectLocalSql("SELECT count(*) FROM pg_proc WHERE prosrc ILIKE '%public_evidence_consent%'")).toBe("0");
+  });
 });

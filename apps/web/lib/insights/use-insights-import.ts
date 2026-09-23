@@ -32,7 +32,7 @@ export interface InsightsImport {
   cooldownTooltip: string | undefined;
   importFile: (file: File) => Promise<void>;
   processing: boolean;
-  pendingConfirmation: "publication" | "replacement" | "retry" | null;
+  pendingConfirmation: "replacement" | "retry" | null;
   confirmImport: () => Promise<void>;
   cancelImport: () => void;
 }
@@ -71,8 +71,8 @@ export function useInsightsImport(login: string, scoringPolicy: "v6" | "v7.2" = 
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<InsightsToast | null>(null);
   const [processing, setProcessing] = useState(false);
-  type Draft = { report: ReportCraftImport; publicationAcknowledged?: boolean; supersedesReportId?: string };
-  const [pending, setPending] = useState<(Draft & { kind: "publication" | "replacement" | "retry" }) | null>(null);
+  type Draft = { report: ReportCraftImport; supersedesReportId?: string };
+  const [pending, setPending] = useState<(Draft & { kind: "replacement" | "retry" }) | null>(null);
   const context = `${login}:${scoringPolicy}`;
   const activeContext = useRef(context);
   const busy = useRef(false);
@@ -147,11 +147,6 @@ export function useInsightsImport(login: string, scoringPolicy: "v6" | "v7.2" = 
       });
       const result = await response.json();
       if (activeContext.current !== context) return;
-      if (response.status === 409 && result.error === "publication_acknowledgment_required") {
-        setPending({ ...draft, kind: "publication" });
-        showToast({ message: t("userMenu.insightsPublicationTitle") as string, type: "info" });
-        return;
-      }
       if (response.status === 409 && result.error === "same_period_requires_explicit_correction" && typeof result.supersedesReportId === "string") {
         setPending({ ...draft, supersedesReportId: result.supersedesReportId, kind: "replacement" });
         showToast({ message: t("userMenu.insightsReplacementTitle") as string, type: "info" });
@@ -183,9 +178,9 @@ export function useInsightsImport(login: string, scoringPolicy: "v6" | "v7.2" = 
   const confirmImport = useCallback(async () => {
     if (!pending || busy.current || scoringPolicy !== "v7.2" || activeContext.current !== context) return;
     busy.current = true;
-    const { kind, ...draft } = pending;
+    const { kind: _kind, ...draft } = pending;
     try {
-      await uploadObserved({ ...draft, ...(kind === "publication" ? { publicationAcknowledged: true } : {}) });
+      await uploadObserved(draft);
     } finally { if (activeContext.current === context) busy.current = false; }
   }, [pending, scoringPolicy, context, uploadObserved]);
   const cancelImport = useCallback(() => { setPending(null); setToast(null); }, []);

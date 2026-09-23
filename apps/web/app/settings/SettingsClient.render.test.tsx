@@ -85,12 +85,12 @@ beforeEach(() => {
   ]);
 });
 
-it("keeps first-publication acknowledgment inside the existing import section", () => {
-  mocks.pendingConfirmation.mockReturnValue("publication");
+it("keeps the same-period replacement confirmation inside the existing import section", () => {
+  mocks.pendingConfirmation.mockReturnValue("replacement");
   renderSettings();
   const section = screen.getByTestId("settings-insights");
-  expect(within(section).getByText(/Your derived numerical scores and reproducible receipt will be public/)).toBeDefined();
-  fireEvent.click(within(section).getByRole("button", { name: "Publish and unlock Craft" }));
+  expect(within(section).getByText(/explicitly corrects the existing report for the same period/)).toBeDefined();
+  fireEvent.click(within(section).getByRole("button", { name: "Replace report" }));
   expect(mocks.confirmImport).toHaveBeenCalledOnce();
   expect(screen.queryByRole("alertdialog")).toBeNull();
 });
