@@ -16,7 +16,7 @@ function rootReceipt(referenceTime: string, exact: number) {
 }
 const publish = (value: ReturnType<typeof receipt>, semantic = "a".repeat(64), actor: string | null = owner) => db().rpc("scoring_observed_publish_receipt", { p_owner: owner, p_actor: actor, p_receipt: value, p_canonical: canonicalJson(value), p_semantic_digest: semantic });
 async function cleanup() { assertLocalSqlTarget(); expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); }
-beforeEach(async () => { await cleanup(); expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-01T00:00:00Z" })).error).toBeNull(); });
+beforeEach(async () => { await cleanup(); expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull(); });
 afterEach(cleanup);
 
 describe("v7.2 atomic publication and policy history", () => {
@@ -85,13 +85,10 @@ describe("v7.2 atomic publication and policy history", () => {
     expect((await publish(restored)).data.status).toBe("inserted");
     expect((await db().rpc("scoring_observed_read_receipt", { p_owner: owner })).data.revisionId).toBe(restored.revisionId);
   });
-  it("C16 denies mismatched/missing actors, false consent and withdrawn retries", async () => {
+  it("C16 denies mismatched/missing actors and withdrawn retries", async () => {
     const a = receipt();
     expect((await publish(a, undefined, null)).error).not.toBeNull();
     expect((await publish(a, undefined, "other")).error).not.toBeNull();
-    expect((await db().from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
-    expect((await publish(a)).error).not.toBeNull();
-    expect((await db().from("scoring_v7_subjects").update({ public_evidence_consent: true }).eq("owner_handle", owner)).error).toBeNull();
     expect((await publish(a)).error).toBeNull();
     await cleanup();
     expect((await publish(a)).error).not.toBeNull();

@@ -1,5 +1,5 @@
 import { postWriteScore } from "@/lib/profile/post-write-score";
-import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
+import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -165,7 +165,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
-            const issuance = await issueScoreReceiptIfConsented(handle, { scoringSelection });
+            const issuance = await issueScoreReceipt(handle, { scoringSelection });
             publications.push({ handle, result: await postWriteScore(handle, scoringSelection, issuance) });
             await invalidateProfileReadModels(handle, {
               stats: true,

@@ -8,7 +8,7 @@ const publish = async (receipt: Awaited<ReturnType<typeof receiptFixtureV7>>) =>
 const anchors = async () => (await db().from("scoring_v7_trend_anchors").select("*").eq("owner_handle", owner).order("date")).data ?? [];
 beforeEach(async () => {
   expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull();
-  expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-01T00:00:00Z" })).error).toBeNull();
+  expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
 });
 afterEach(async () => { expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); });
 describe("atomic v7 receipt history", () => {
@@ -23,7 +23,7 @@ describe("atomic v7 receipt history", () => {
   it("atomically permits only one root publication for a family across concurrent owners", async () => {
     const other = `${owner}-other`;
     expect((await db().rpc("scoring_v7_withdraw", { p_owner: other })).error).toBeNull();
-    expect((await db().from("scoring_v7_subjects").insert({ owner_handle: other, public_evidence_consent: true, consent_recorded_at: "2026-09-01T00:00:00Z" })).error).toBeNull();
+    expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: other })).error).toBeNull();
     try {
       const first = await receiptFixtureV7(), independent = await receiptFixtureV7();
       const second = await sealScoreReceipt({ ...independent.receipt, receiptId: first.receipt.receiptId });

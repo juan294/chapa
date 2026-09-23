@@ -39,7 +39,7 @@ export async function dbWriteEngineeringEvidence(actor: string, command: LedgerC
 interface ClaimRow { id: string; owner_handle: string; claim_id: string; revision: number; supersedes_id: string | null; action: PrivateEvidenceClaim["action"]; recorded_at: string; work_item_id: string; channel: "core" | "craft"; category: string; occurred_at: string; payload: PrivateEvidenceClaim }
 interface LedgerAssessmentRow extends AssessmentRow { ledger_payload: { authorization?: unknown; facts?: VerifiedLedgerFacts | null; conflicts?: string[] } }
 interface ReferenceRow { reference_id: string; owner_handle: string; artifact_uri: string; artifact_revision: string; observed_at: string; retention: "until_owner_withdrawal"; expires_at: null }
-interface SnapshotRows { ownerId: string; publicConsent: boolean; claims: ClaimRow[]; assessments: LedgerAssessmentRow[]; references: ReferenceRow[] }
+interface SnapshotRows { ownerId: string; claims: ClaimRow[]; assessments: LedgerAssessmentRow[]; references: ReferenceRow[] }
 
 /** Owner/reviewer private read. The RPC checks current access; captured authority determines historical scoring. */
 export async function dbReadEngineeringEvidence(owner: string, actor: string, window: ScoringWindow): Promise<EngineeringLedgerSnapshot> {
@@ -63,7 +63,7 @@ export async function dbReadEngineeringEvidence(owner: string, actor: string, wi
     if (row.owner_handle !== owner || row.retention !== "until_owner_withdrawal" || row.expires_at !== null) throw new LedgerStorageError("contract");
     return { referenceId: row.reference_id, ownerId: owner, artifactUri: row.artifact_uri, artifactRevision: row.artifact_revision, observedAt: databaseInstant(row.observed_at), retention: row.retention, expiresAt: null };
   });
-  return { ownerId: owner, publicConsent: rows.publicConsent === true, claims, assessments, references };
+  return { ownerId: owner, claims, assessments, references };
 }
 export async function dbReadEngineeringArtifact(owner: string, actor: string, referenceId: string) {
   const { data, error } = await client().rpc("scoring_v7_ledger_artifact", { p_owner: owner, p_actor: actor.toLowerCase(), p_reference_id: referenceId });

@@ -1,4 +1,4 @@
-import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
+import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import { POST } from "./route";
@@ -232,7 +232,7 @@ describe("POST /api/refresh", () => {
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
       stats: true,
     });
-    expect(issueScoreReceiptIfConsented).toHaveBeenCalledWith("testuser", expect.objectContaining({ scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } }));
+    expect(issueScoreReceipt).toHaveBeenCalledWith("testuser", expect.objectContaining({ scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } }));
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
       scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 },
@@ -439,4 +439,4 @@ describe("POST /api/refresh", () => {
 });
 
 vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));
-vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceiptIfConsented: vi.fn(async () => "skipped") }));
+vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceipt: vi.fn(async () => "skipped") }));

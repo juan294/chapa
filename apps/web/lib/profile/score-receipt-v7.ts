@@ -44,7 +44,7 @@ export interface ReceiptMaterializationOptions {
 export type ReceiptMaterialization =
   | { readonly status: "issued"; readonly snapshot: ReceiptSnapshotV7; readonly publication: "inserted" | "duplicate" }
   | { readonly status: "stored"; readonly snapshot: ReceiptSnapshotV7 }
-  | { readonly status: "unavailable"; readonly reason: "no_receipt" | "not_consented" | "storage_error" };
+  | { readonly status: "unavailable"; readonly reason: "no_receipt" | "storage_error" };
 
 interface CollectedEvidence {
   readonly sources: SourceCoverage[];
@@ -169,7 +169,6 @@ export async function materializeScoreReceiptV7(
 
   try {
     const ledgerSnapshot = await dbReadEngineeringEvidence(handle, handle, window);
-    if (!ledgerSnapshot.publicConsent) return { status: "unavailable", reason: "not_consented" };
     const ledger = projectEngineeringLedger(ledgerSnapshot, window);
     const collected = await collectSources(handle, window, options);
 

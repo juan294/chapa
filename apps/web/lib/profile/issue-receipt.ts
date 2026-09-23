@@ -32,21 +32,21 @@ export async function materializeCurrentObservedReceipt(handle: string, options:
 }
 
 /**
- * Issue an observed v7.2 receipt for a subject who has consented to publication.
+ * Issue an observed v7.2 receipt for a registered subject.
  *
  * Called from the authenticated write paths — refresh, recalculate, generate —
  * and the warm-cache cron, never from a public read. Issuing on a public badge
  * hit would publish a durable artifact for whoever happened to be embedded,
  * which is the same mistake #1239 fixed for the `users` table.
  *
- * `not_consented` is the normal answer for the overwhelming majority of
- * subjects and is deliberately silent: consent is opt-in, and a subject who has
- * not opted in keeps their labelled v6 aggregate rather than acquiring a
- * published evidence receipt as a side effect of pressing Refresh. Only a
+ * Publication consent is retired (#1335 phase 2): a registered subject needs
+ * no opt-in to be published. `skipped` now means the render flag is off, the
+ * subject has no source evidence yet, or the receipt is already up to date —
+ * never an unconsenting subject, since that state no longer exists. Only a
  * genuine storage failure is captured, because that one is a durable write that
  * failed and must stay observable.
  */
-export async function issueScoreReceiptIfConsented(
+export async function issueScoreReceipt(
   handle: string,
   options: { token?: string; referenceTime?: string; scoringSelection?: ScoringRenderSelection } = {},
 ): Promise<"issued" | "skipped" | "failed"> {

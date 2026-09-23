@@ -15,7 +15,6 @@ export interface LedgerAssessmentRecord {
 }
 export interface EngineeringLedgerSnapshot {
   readonly ownerId: string;
-  readonly publicConsent: boolean;
   readonly claims: readonly LedgerClaimRecord[];
   readonly assessments: readonly LedgerAssessmentRecord[];
   readonly references: readonly PrivateEvidenceReference[];

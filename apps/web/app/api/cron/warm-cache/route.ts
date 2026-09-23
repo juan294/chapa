@@ -41,7 +41,7 @@ import {
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
-import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
+import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -467,7 +467,7 @@ async function warmHandle(
       ? await readRenderableReceipt(handle, scoringSelection).catch(() => null) : null;
     const previousObserved = baseline && !("unavailable" in baseline)
       ? scoringObservation(observedReceiptViewModel(handle, baseline, scoringSelection.capturedAt)) : null;
-    await issueScoreReceiptIfConsented(handle, { scoringSelection });
+    await issueScoreReceipt(handle, { scoringSelection });
 
     const materialized = await materializeOrchestratedProfile(handle, { scoringSelection });
     if (!materialized) {

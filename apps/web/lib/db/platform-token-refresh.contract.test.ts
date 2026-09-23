@@ -9,8 +9,11 @@ import { databaseInstantMicros } from "./source-time";
 import { readSourceAuthorization } from "../platform/source-authorization";
 
 // Keep real DB claim/finish, real token encryption and real provider HTTP code.
-// The feature/consent presentation seam is controlled; the RPC independently
-// enforces current DB consent and exact linkage on every mutation.
+// The feature/authorization presentation seam is controlled; the RPC
+// independently enforces exact linkage on every mutation. Publication consent
+// is retired (#1335 phase 2) — claim/finish/takeover no longer read
+// `scoring_v7_subjects` at all, so a refresh works the same whether or not
+// the owner has a registered subject row.
 vi.mock("../platform/source-authorization", async original => ({
   ...await original<typeof import("../platform/source-authorization")>(), readSourceAuthorization: vi.fn(),
 }));
@@ -33,7 +36,7 @@ async function cleanup() {
 beforeEach(async () => {
   await cleanup();
   const db = getServiceClient(); const secret = getNextauthSecret()!;
-  expect((await db.from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: consent })).error).toBeNull();
+  expect((await db.rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
   expect((await db.from("user_platforms").insert({ id: randomUUID(), handle: owner, platform: "gitlab", remote_login: "remote-fixture",
     access_token: encryptToken("old-access", secret), refresh_token: encryptToken("same-refresh", secret), token_expires_at: "2020-01-01T00:00:00Z" })).error).toBeNull();
   link = await currentLink();
@@ -124,24 +127,9 @@ describe("durable refresh barrier (requires reviewed migrations046/048)", () => 
     const withdrawnClaim = await db.rpc("platform_token_refresh_claim", claimArgs(changed));
     expect(withdrawnClaim.error).toBeNull();
     expect(withdrawnClaim.data).toEqual({ status: "busy" });
-    expect((await db.from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-06T12:00:00Z" })).error).toBeNull();
+    expect((await db.rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
     expect((await db.rpc("platform_token_refresh_claim", claimArgs(changed))).data).toEqual({ status: "busy" });
     expect(Object.keys((await attempts())[0]).sort()).toEqual(["attempt_id", "link_id", "link_version", "started_at", "takeover_used"]);
-  });
-
-  it("rejects explicit false consent for both claim and completion without changing tokens or the barrier", async () => {
-    const db = getServiceClient();
-    expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
-    expect((await db.rpc("platform_token_refresh_claim", claimArgs())).error?.message).toContain("Current consent required");
-    expect(await attempts()).toEqual([]);
-    expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: true }).eq("owner_handle", owner)).error).toBeNull();
-    const args = claimArgs();
-    expect((await db.rpc("platform_token_refresh_claim", args)).data.status).toBe("claimed");
-    const barrier = await attempts();
-    expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
-    expect((await db.rpc("platform_token_refresh_finish", finishArgs(args))).error?.message).toContain("Current consent required");
-    expect(await attempts()).toEqual(barrier);
-    expect((await currentLink()).tokens.accessToken).toBe("old-access");
   });
 
   it("renews an absent-subject legacy connection through one real provider adapter request", async () => {
@@ -180,7 +168,7 @@ describe("durable refresh barrier (requires reviewed migrations046/048)", () => 
     vi.mocked(readSourceAuthorization).mockImplementation(async () => ({ status: "authorized", consentVersion: "legacy-unpublished", link: await currentLink() }));
     expect(await worker({ status: "authorized", consentVersion: "legacy-unpublished", link }, { owner, provider: "gitlab" }, false)).toEqual({ status: "unavailable" });
     const reconsent = "2026-09-06T12:00:00Z";
-    expect((await db.from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: reconsent })).error).toBeNull();
+    expect((await db.rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
     vi.mocked(readSourceAuthorization).mockImplementation(async () => ({ status: "authorized", consentVersion: reconsent, link: await currentLink() }));
     expect(await worker({ status: "authorized", consentVersion: reconsent, link }, { owner, provider: "gitlab" })).toEqual({ status: "unavailable" });
     expect(await attempts()).toEqual(barrier);
@@ -319,10 +307,10 @@ describe("claim recovery: release_attempt & takeover (#1332, migration 053)", ()
       expect(await needsReconnectFlag()).toBe(true);
     });
 
-    it("requires no consent — recovery from a known outcome stays available to a withdrawn or legacy subject", async () => {
+    it("requires no registered subject — recovery from a known outcome stays available to a withdrawn or legacy subject", async () => {
       const db = getServiceClient(); const attemptId = randomUUID();
       expect((await db.rpc("platform_token_refresh_claim", claimArgs(link, attemptId))).data.status).toBe("claimed");
-      expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
+      expect((await db.from("scoring_v7_subjects").delete().eq("owner_handle", owner)).error).toBeNull();
       const result = await db.rpc("platform_token_refresh_release_attempt", releaseAttemptArgs(true, link, attemptId));
       expect(result.error).toBeNull();
       expect(result.data).toEqual({ status: "released", needsReconnect: true });
@@ -406,16 +394,6 @@ describe("claim recovery: release_attempt & takeover (#1332, migration 053)", ()
       const result = await db.rpc("platform_token_refresh_takeover", { ...takeoverArgs(1), p_link_version: "2020-01-01T00:00:00Z" });
       expect(result.error).toBeNull();
       expect(result.data).toEqual({ status: "stale" });
-    });
-
-    it("still enforces the current-consent gate a fresh claim would (same as 046/048)", async () => {
-      const db = getServiceClient();
-      expect((await db.rpc("platform_token_refresh_claim", claimArgs())).data.status).toBe("claimed");
-      await backdateAttempt(400);
-      expect((await db.from("scoring_v7_subjects").update({ public_evidence_consent: false }).eq("owner_handle", owner)).error).toBeNull();
-      const result = await db.rpc("platform_token_refresh_takeover", takeoverArgs(360));
-      expect(result.error?.message).toContain("Current consent required");
-      expect(await attempts()).toHaveLength(1);
     });
 
     it("rejects invalid arguments without mutating anything", async () => {

@@ -8,15 +8,19 @@ export type SourceAuthorization =
   | { status: "disabled" | "unlinked" | "unavailable" };
 
 /** Deliberately bypasses feature-flag caches, including their read backfills. */
-export async function readSourceAuthorization(owner: string, provider: SourceProvider, requireConsent = true): Promise<SourceAuthorization> {
+export async function readSourceAuthorization(owner: string, provider: SourceProvider, requireSubject = true): Promise<SourceAuthorization> {
   try {
     const db = getSupabase();
     if (!db) return { status: "unavailable" };
+    // `consentVersion` no longer tracks a consent grant (publication consent
+    // is retired, #1335 phase 2) — it tracks subject registration instead, so
+    // an in-flight comparison still detects the one way this can now change:
+    // full account deletion followed by a fresh re-registration.
     let consentVersion = "legacy-unpublished";
-    if (requireConsent) {
-      const subject = await db.from("scoring_v7_subjects").select("public_evidence_consent,consent_recorded_at").eq("owner_handle", owner).maybeSingle();
-      if (subject.error || subject.data?.public_evidence_consent !== true || typeof subject.data.consent_recorded_at !== "string") return { status: "unavailable" };
-      consentVersion = subject.data.consent_recorded_at;
+    if (requireSubject) {
+      const subject = await db.from("scoring_v7_subjects").select("created_at").eq("owner_handle", owner).maybeSingle();
+      if (subject.error || typeof subject.data?.created_at !== "string") return { status: "unavailable" };
+      consentVersion = subject.data.created_at;
     }
     if (provider === "github") return { status: "authorized", consentVersion, link: null };
     const flag = await db.from("feature_flags").select("enabled").eq("key", `${provider}_integration`).maybeSingle();

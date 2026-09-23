@@ -7,9 +7,9 @@ import { getSupabase } from "./supabase";
 export type ReportCraftStorage = {
   status: "stored"; persisted: true; reportId: string; selectedReportId: string | null; generation: number; consented: boolean;
   selection: "selected" | "unchanged" | "insufficient" | "outside_window" | "older";
-} | { status: "consent_required" | "correction_required" | "failed"; persisted: false; supersedesReportId?: string };
+} | { status: "correction_required" | "failed"; persisted: false; supersedesReportId?: string };
 export type ReportCraftRead = { status: "found"; craft: PublicObservedCraft; selectedReportId: string | null; generation: number }
-  | { status: "not_consented" | "unavailable" };
+  | { status: "not_registered" | "unavailable" };
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const generation = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 function record(value: unknown): Record<string, unknown> { if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid report storage response"); return value as Record<string, unknown>; }
@@ -19,15 +19,16 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
 }
 function failure(operation: string) { console.error(`[TABLE_FALLBACK] report Craft ${operation} failed`); }
 
-/** Revalidates the private DTO before entering one consent/selection transaction. */
-export async function dbStoreReportCraft(owner: string, actor: string, prepared: PreparedReportCraftImport, options: { publicationAcknowledged: boolean; supersedesReportId?: string }): Promise<ReportCraftStorage> {
+/** Revalidates the private DTO before entering one selection transaction. */
+export async function dbStoreReportCraft(owner: string, actor: string, prepared: PreparedReportCraftImport, options: { supersedesReportId?: string } = {}): Promise<ReportCraftStorage> {
   try {
     const verified = await prepareReportCraftImport(JSON.parse(prepared.canonicalBody), prepared.capturedAt);
     if (canonicalJson(verified) !== canonicalJson(prepared)) throw new Error("Report preparation mismatch");
     if (options.supersedesReportId !== undefined && !uuid(options.supersedesReportId)) throw new Error("Invalid report correction");
+    // `p_acknowledged` is ignored by the RPC now that publication is not
+    // opt-in; the argument stays only for service-role signature stability.
     const result = record(await rpc("scoring_report_craft_store", { p_owner: owner.toLowerCase(), p_actor: actor.toLowerCase(), p_prepared: verified,
-      p_acknowledged: options.publicationAcknowledged, p_supersedes: options.supersedesReportId ?? null }));
-    if (result.status === "consent_required") return { status: "consent_required", persisted: false };
+      p_acknowledged: true, p_supersedes: options.supersedesReportId ?? null }));
     if (result.status === "correction_required") return { status: "correction_required", persisted: false, ...(uuid(result.supersedesReportId) ? { supersedesReportId: result.supersedesReportId } : {}) };
     if (result.status !== "stored" || result.persisted !== true || !uuid(result.reportId) || !(result.selectedReportId === null || uuid(result.selectedReportId))
       || !generation(result.generation) || result.consented !== true || !["selected", "unchanged", "insufficient", "outside_window", "older"].includes(String(result.selection))) throw new Error("Invalid report admission");
@@ -47,7 +48,7 @@ export async function dbReadReportCraft(owner: string, window: ScoringWindow): P
   try {
     if (canonicalJson(createScoringWindow(window.referenceTime)) !== canonicalJson(window)) throw new Error("Invalid report window");
     const value = await rpc("scoring_report_craft_read", { p_owner: owner.toLowerCase(), p_reference: window.referenceTime });
-    if (value === null) return { status: "not_consented" };
+    if (value === null) return { status: "not_registered" };
     const row = record(value);
     if (!(row.selectedReportId === null || uuid(row.selectedReportId)) || !generation(row.generation)) throw new Error("Invalid report selection");
     let craft: PublicObservedCraft = { status: "no_report", unlocked: false, report: null };

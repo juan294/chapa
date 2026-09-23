@@ -11,7 +11,7 @@ async function clear() { assertLocalSqlTarget(); expect((await getServiceClient(
 beforeEach(clear); afterEach(clear);
 describe("durable observed public history", () => {
   it("lists only the final daily current receipt with original exact/display values and durable trend", async () => {
-    await getServiceClient().rpc("scoring_v7_ledger_write", { p_owner: owner, p_actor: owner, p_action: "consent", p_data: { enabled: true, publicationAcknowledged: true } });
+    await getServiceClient().rpc("scoring_v7_ensure_subject", { p_owner: owner });
     const original = await observedReceiptFixture({ referenceTime: "2026-09-08T10:00:00.000Z" });
     expect((await dbPublishObservedReceipt(owner, owner, original, "a".repeat(64))).status).toBe("inserted");
     const winner = await observedReceiptFixture({ referenceTime: original.receipt.window.referenceTime, delivery: 1 });

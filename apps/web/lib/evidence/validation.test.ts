@@ -39,8 +39,12 @@ describe("ledger input boundary", () => {
     expect(validateArtifactLocator("https://git.example.org/private/repo/1")).toBe("https://git.example.org/private/repo/1");
     expect(() => parseLedgerCommand({ ...claim, references: [{ ...claim.references[0], body: "x".repeat(65537) }] }, now)).toThrow();
   });
-  it("public aggregate consent requires acknowledging historic downloaded copies", () => {
+  it("no longer recognizes the retired consent action at all", () => {
     expect(() => parseLedgerCommand({ action: "consent", owner: "owner", enabled: true }, now)).toThrow();
-    expect(parseLedgerCommand({ action: "consent", owner: "owner", enabled: true, publicationAcknowledged: true }, now)).toMatchObject({ enabled: true });
+    expect(() => parseLedgerCommand({ action: "consent", owner: "owner", enabled: true, publicationAcknowledged: true }, now)).toThrow();
+  });
+  it("keeps withdraw as a recognizable but unacknowledged, argument-free shape", () => {
+    expect(parseLedgerCommand({ action: "withdraw", owner: "owner" }, now)).toEqual({ action: "withdraw", owner: "owner" });
+    expect(() => parseLedgerCommand({ action: "withdraw", owner: "owner", publicationAcknowledged: true }, now)).toThrow();
   });
 });
