@@ -1,11 +1,15 @@
 import {
-  createScoringWindow, engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
-  type EvidenceReasonCode, type EventMeasurements, type NormalizedEngineeringEvent,
+  engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
+  type EvidenceReasonCode, type NormalizedEngineeringEvent,
   type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
-import type { CollectorCheckpoint, CollectorOperation, CollectSlice } from "@/lib/collection/plan";
+import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic, type StopKind,
+  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
+  validateSliceWindow, type MutableSliceOperation,
+} from "@/lib/collection/slice-helpers";
+import {
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 
 /**
@@ -22,11 +26,7 @@ const id = (v: unknown): string | null => typeof v === "number" && Number.isSafe
 const hash = (v: unknown): string | null => typeof v === "string" && /^[a-f\d]{7,64}$/i.test(v) ? v.toLowerCase() : null;
 const count = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 const measuredCount = (v: unknown): Observation<number> => count(v) ? observed(v, "complete", "source_observed") : unknown("partial", "source_error");
-const emptyMeasurements = (): EventMeasurements => ({
-  changedFiles: unknown("unavailable", "not_supported"), additions: unknown("unavailable", "not_supported"), deletions: unknown("unavailable", "not_supported"),
-  leadTimeHours: unknown("unavailable", "not_supported"), hasDescription: unknown("unavailable", "not_supported"),
-  hasIssueLink: unknown("unavailable", "not_supported"), usesFeatureBranch: unknown("unavailable", "not_supported"),
-});
+const emptyMeasurements = emptySliceMeasurements;
 const API = "https://codeberg.org/api/v1";
 // ---------------------------------------------------------------------------
 // collectCodebergSlice (#1335 phase 3) -- checkpointed, resumable slice API,
@@ -40,12 +40,11 @@ interface CodebergPrMeta {
   authorIsSubject: boolean; merged: boolean; mergedAt?: string | null; createdAt?: string | null; description?: string | null;
   mergeCommitSha?: string | null; headSha?: string | null; changedFiles?: number | null; additions?: number | null; deletions?: number | null;
 }
-interface MutableCodebergOperation { key: string; cursor: string | null; done: boolean }
+type MutableCodebergOperation = MutableSliceOperation;
 interface CodebergListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
 
 export const collectCodebergSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
-  const window = createScoringWindow(input.window.referenceTime);
-  if (window.startInclusive !== input.window.startInclusive || window.endExclusive !== input.window.endExclusive || window.referenceDate !== input.window.referenceDate || input.window.calendarDays !== 365) throw new RangeError("Inconsistent scoring window");
+  const window = validateSliceWindow(input);
   if (!credential.token || !credential.token.trim()) throw new RangeError("Codeberg collection requires a credential");
   const token = credential.token.trim();
   const login = input.requestedSource.login;
@@ -66,11 +65,8 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
   const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
-  function makeStop(operation: string, stopKind: StopKind, httpStatus: number | null = null, retryAfter: number | null = null): SourceDiagnostic {
-    diag.record(operation, stopKind, httpStatus, retryAfter);
-    return { provider: "codeberg", operation, stopKind, httpStatus, retryAfterSeconds: retryAfter };
-  }
-  function ensureOp(key: string): void { if (!operations.some((op) => op.key === key)) operations.push({ key, cursor: null, done: false }); }
+  const makeStop = makeSliceStopFactory(diag, "codeberg");
+  function ensureOp(key: string): void { ensureSliceOperation(operations, key); }
   function registerRepo(repositoryId: string, fullName?: string | null): void {
     if (fullName) repoFullNames[repositoryId] = fullName;
     if (repositoryIds.has(repositoryId)) return;
@@ -255,7 +251,7 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
   async function runFiles(op: MutableCodebergOperation): Promise<"done" | "stop"> {
     const key = op.key.slice("files:".length);
     const meta = prMeta[key];
-    if (!meta || !meta.mergedAt || !isWithinScoringWindow2(meta.mergedAt, window)) { op.done = true; op.cursor = null; return "done"; }
+    if (!meta || !meta.mergedAt || !isMergedDateInWindow(meta.mergedAt, window)) { op.done = true; op.cursor = null; return "done"; }
     const path = repoPath(meta.repositoryId);
     if (!path) { op.done = true; op.cursor = null; return "done"; }
     const acc: { paths: Set<string>; additions: number; deletions: number; full: boolean; count: number } =
@@ -389,15 +385,8 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
     if (outcome === "stop") break;
   }
 
-  function buildCheckpoint(): CollectorCheckpoint {
-    return {
-      version: 1,
-      operations: operations.map((op): CollectorOperation => ({ key: op.key, cursor: op.cursor, done: op.done })),
-      discovered: { repositoryIds: [...repositoryIds].sort() },
-      state: { ...state, reasons: [...reasons] },
-    };
-  }
-  function newEventsForCaller(): NormalizedEngineeringEvent[] { return [...newEvents.values()].filter((event) => !stagedKeys.has(engineeringEventKey(event))); }
+  function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
+  function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
 
   if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
 
@@ -410,16 +399,16 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
     review: explicit && reviewsComplete ? "complete" : "partial", issue_work: explicit && timelineComplete ? "complete" : "partial",
     practice_evidence: "unavailable", documentation_design: "unavailable", maintenance: "unavailable",
   };
-  const complete = Object.values(eventKinds).every((status) => status === "complete") && reasons.size === 0;
-  const coverage: SourceCoverage = {
-    source: { provider: "codeberg", host: "codeberg.org", subjectId: subjectId()! }, window, dataThrough: window.referenceTime,
-    status: complete ? "complete" : "partial", discovery: explicit ? "explicit_repositories" : "owned_and_contributed",
-    repositoryIds: [...repositoryIds].sort(), repositoryDiscoveryComplete: explicit,
-    eventKinds, reasonCodes: [...reasons].sort(), unknownPeriods: complete ? [] : [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
-  };
+  const coverage = assembleSliceCoverage({
+    provider: "codeberg", host: "codeberg.org", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
+  });
   return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
 };
 
-function isWithinScoringWindow2(value: string, window: ScoringWindow): boolean {
+/** `meta.mergedAt` is a raw provider timestamp string that has not yet been
+ * through `instant()`'s own parse-diagnostic path -- this is a cheap gate
+ * ("is it even worth fetching files for this merge?"), so a malformed date
+ * here safely reads as "not in window" rather than throwing. */
+function isMergedDateInWindow(value: string, window: ScoringWindow): boolean {
   try { return isWithinScoringWindow(value, window); } catch { return false; }
 }

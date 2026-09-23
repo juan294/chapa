@@ -1,12 +1,16 @@
 import {
-  createScoringWindow, engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
-  type EvidenceReasonCode, type EventMeasurements, type NormalizedEngineeringEvent,
+  engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
+  type EvidenceReasonCode, type NormalizedEngineeringEvent,
   type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
-import type { CollectorCheckpoint, CollectorOperation, CollectSlice } from "@/lib/collection/plan";
+import type { CollectSlice } from "@/lib/collection/plan";
+import {
+  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
+  validateSliceWindow, type MutableSliceOperation,
+} from "@/lib/collection/slice-helpers";
 import {
   budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder,
-  isGraphqlRateLimited, retryAfterSeconds, type SourceDiagnostic, type StopKind,
+  isGraphqlRateLimited, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 import { GITHUB_EVIDENCE_QUERIES as queries } from "./evidence-queries";
 
@@ -16,11 +20,7 @@ const at = (value: unknown, ...keys: string[]): unknown => keys.reduce<unknown>(
 const string = (value: unknown): string | null => typeof value === "string" && value.length > 0 ? value : null;
 const number = (value: unknown): number | null => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 const observedNumber = (value: unknown): Observation<number> => number(value) === null ? unknown("partial", "source_error") : observed(value as number, "complete", "source_observed");
-const emptyMeasurements = (): EventMeasurements => ({
-  changedFiles: unknown("unavailable", "not_supported"), additions: unknown("unavailable", "not_supported"),
-  deletions: unknown("unavailable", "not_supported"), leadTimeHours: unknown("unavailable", "not_supported"),
-  hasDescription: unknown("unavailable", "not_supported"), hasIssueLink: unknown("unavailable", "not_supported"), usesFeatureBranch: unknown("unavailable", "not_supported"),
-});
+const emptyMeasurements = emptySliceMeasurements;
 
 // ---------------------------------------------------------------------------
 // collectGitHubSlice (#1335 phase 3) -- the checkpointed, resumable slice API,
@@ -84,7 +84,7 @@ interface GitHubPrMeta {
   changedFiles?: number | null;
   revision?: string | null;
 }
-interface MutableCollectorOperation { key: string; cursor: string | null; done: boolean }
+type MutableCollectorOperation = MutableSliceOperation;
 interface ListOutcome { readonly kind: "done" | "stop" | "split"; readonly stop?: SourceDiagnostic; readonly totalCount?: number | null }
 
 const RATE_LIMIT_FLOOR = 200;
@@ -98,8 +98,7 @@ const RATE_LIMIT_FLOOR = 200;
  * `retryAfterSeconds` computed from `resetAt`.
  */
 export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
-  const window = createScoringWindow(input.window.referenceTime);
-  if (window.startInclusive !== input.window.startInclusive || window.endExclusive !== input.window.endExclusive || window.referenceDate !== input.window.referenceDate || input.window.calendarDays !== 365) throw new RangeError("Inconsistent scoring window");
+  const window = validateSliceWindow(input);
   const login = input.requestedSource.login;
   if (!/^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i.test(login)) throw new RangeError("Invalid GitHub handle");
   const explicit = input.scope.discovery === "explicit_repositories";
@@ -126,11 +125,8 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
   const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
-  function makeStop(operation: string, stopKind: StopKind, httpStatus: number | null = null, retryAfter: number | null = null): SourceDiagnostic {
-    diag.record(operation, stopKind, httpStatus, retryAfter);
-    return { provider: "github", operation, stopKind, httpStatus, retryAfterSeconds: retryAfter };
-  }
-  function ensureOp(key: string): void { if (!operations.some((op) => op.key === key)) operations.push({ key, cursor: null, done: false }); }
+  const makeStop = makeSliceStopFactory(diag, "github");
+  function ensureOp(key: string): void { ensureSliceOperation(operations, key); }
   function registerRepo(repositoryId: string): void {
     if (repositoryIds.has(repositoryId)) return;
     repositoryIds.add(repositoryId);
@@ -462,17 +458,8 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     index++;
   }
 
-  function buildCheckpoint(): CollectorCheckpoint {
-    return {
-      version: 1,
-      operations: operations.map((op): CollectorOperation => ({ key: op.key, cursor: op.cursor, done: op.done })),
-      discovered: { repositoryIds: [...repositoryIds].sort() },
-      state: { ...state, reasons: [...reasons] },
-    };
-  }
-  function newEventsForCaller(): NormalizedEngineeringEvent[] {
-    return [...newEvents.values()].filter((event) => !stagedKeys.has(engineeringEventKey(event)));
-  }
+  function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
+  function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
 
   if (pendingStop) {
     return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
@@ -492,12 +479,8 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     practice_evidence: "unavailable", documentation_design: "unavailable", maintenance: "unavailable",
   };
   reasons.add("not_supported");
-  const complete = Object.values(eventKinds).every((status) => status === "complete") && reasons.size === 0;
-  const coverage: SourceCoverage = {
-    source: { provider: "github", host: "github.com", subjectId: subjectId()! }, window, dataThrough: window.referenceTime,
-    status: complete ? "complete" : "partial", discovery: explicit ? "explicit_repositories" : "owned_and_contributed",
-    repositoryIds: [...repositoryIds].sort(), repositoryDiscoveryComplete: explicit,
-    eventKinds, reasonCodes: [...reasons].sort(), unknownPeriods: complete ? [] : [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
-  };
+  const coverage = assembleSliceCoverage({
+    provider: "github", host: "github.com", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
+  });
   return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
 };

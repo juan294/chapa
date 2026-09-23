@@ -136,11 +136,16 @@ const TICK_SAFETY_MARGIN_MS = 20_000;
  * pre-seeds a checkpoint from it (`lib/collection/seed.ts`). Seeding is
  * strictly an optimization: any failure here (no observation, discovery
  * ambiguity, a storage error) must never block or fail the job -- it just
- * means this job collects from scratch, exactly as it always has.
+ * means this job collects from scratch, exactly as it always has. That
+ * fallback must still be observable, not silent: a genuine failure (as
+ * opposed to the ordinary "nothing to seed from" cases below, which return
+ * `null` without any error) is reported via `deps.captureError` -- job id
+ * and provider only, never the owner handle, a token, or a storage payload.
  */
 async function trySeedFromPrior(
   deps: CollectionWorkerDeps,
   resolved: ResolvedCredential,
+  job: Pick<CollectionJob, "id" | "provider">,
 ): Promise<{ readonly checkpoint: CollectorCheckpoint; readonly seededEvents: readonly NormalizedEngineeringEvent[] } | null> {
   try {
     const discovery = await deps.discoverSource({
@@ -167,7 +172,13 @@ async function trySeedFromPrior(
     if (!prior || prior.coverage.status !== "complete") return null;
     const { checkpoint, seededEvents } = seedFromPrior({ dataThrough: prior.coverage.dataThrough, events: prior.events }, resolved.context.window);
     return { checkpoint, seededEvents };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await deps.captureError({
+      route: "lib/collection/worker:trySeedFromPrior",
+      statusCode: 500,
+      error: new Error(`Seed-from-prior failed for job ${job.id} (provider=${job.provider}): ${message}`),
+    });
     return null;
   }
 }
@@ -200,7 +211,7 @@ export async function runCollectionSlice(
   // slice -- an empty checkpoint and nothing staged yet. Seeding later would
   // silently reset progress a real slice already made.
   if (checkpoint.operations.length === 0 && staged.length === 0) {
-    const seed = await trySeedFromPrior(deps, resolved);
+    const seed = await trySeedFromPrior(deps, resolved, job);
     if (seed && (seed.checkpoint.operations.length > 0 || seed.seededEvents.length > 0)) {
       // The staged events must go through the same checkpoint RPC as any
       // other slice's events, so the eventual `finish` call appends them too.

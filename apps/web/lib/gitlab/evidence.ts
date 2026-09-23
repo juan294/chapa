@@ -1,11 +1,15 @@
 import {
-  createScoringWindow, engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
-  type EvidenceReasonCode, type EventMeasurements,
+  engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
+  type EvidenceReasonCode,
   type NormalizedEngineeringEvent, type Observation, type SourceCoverage,
 } from "@chapa/shared";
-import type { CollectorCheckpoint, CollectorOperation, CollectSlice } from "@/lib/collection/plan";
+import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic, type StopKind,
+  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
+  validateSliceWindow, type MutableSliceOperation,
+} from "@/lib/collection/slice-helpers";
+import {
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 
 /**
@@ -21,12 +25,7 @@ const row = (v: unknown): Row => v !== null && typeof v === "object" && !Array.i
 const text = (v: unknown): string | null => typeof v === "string" && v.length > 0 ? v : null;
 const id = (v: unknown): string | null => typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? String(v) : null;
 const measurement = (v: unknown): Observation<number> => typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? observed(v, "complete", "source_observed") : unknown("partial", "source_error");
-const emptyMeasurements = (): EventMeasurements => ({
-  changedFiles: unknown("unavailable", "not_supported"), additions: unknown("unavailable", "not_supported"),
-  deletions: unknown("unavailable", "not_supported"), leadTimeHours: unknown("unavailable", "not_supported"),
-  hasDescription: unknown("unavailable", "not_supported"), hasIssueLink: unknown("unavailable", "not_supported"),
-  usesFeatureBranch: unknown("unavailable", "not_supported"),
-});
+const emptyMeasurements = emptySliceMeasurements;
 
 /** Count only complete unified hunks; header-like source lines remain content. */
 function diffLines(value: unknown): { additions: number; deletions: number } | null {
@@ -59,15 +58,14 @@ interface GitlabMrMeta {
   readonly projectId: string; readonly iid: string; readonly globalId: string;
   authorIsSubject: boolean; merged: boolean; mergedAt?: string | null; createdAt?: string | null; sha?: string | null; description?: string | null;
 }
-interface MutableGitlabOperation { key: string; cursor: string | null; done: boolean }
+type MutableGitlabOperation = MutableSliceOperation;
 interface GitlabListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
 
 /** Bounds an otherwise-unbounded commit history to the scoring window via
  * GitLab's native `since`/`until` commit list filters, per #1335 phase 3.
  */
 export const collectGitlabSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
-  const window = createScoringWindow(input.window.referenceTime);
-  if (window.startInclusive !== input.window.startInclusive || window.endExclusive !== input.window.endExclusive || window.referenceDate !== input.window.referenceDate || input.window.calendarDays !== 365) throw new RangeError("Inconsistent scoring window");
+  const window = validateSliceWindow(input);
   if (!credential.token || !credential.token.trim()) throw new RangeError("GitLab collection requires a credential");
   const token = credential.token.trim();
   const explicit = input.scope.discovery === "explicit_repositories";
@@ -88,11 +86,8 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
   const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
-  function makeStop(operation: string, stopKind: StopKind, httpStatus: number | null = null, retryAfter: number | null = null): SourceDiagnostic {
-    diag.record(operation, stopKind, httpStatus, retryAfter);
-    return { provider: "gitlab", operation, stopKind, httpStatus, retryAfterSeconds: retryAfter };
-  }
-  function ensureOp(key: string): void { if (!operations.some((op) => op.key === key)) operations.push({ key, cursor: null, done: false }); }
+  const makeStop = makeSliceStopFactory(diag, "gitlab");
+  function ensureOp(key: string): void { ensureSliceOperation(operations, key); }
   function registerRepo(projectId: string): void {
     if (repositoryIds.has(projectId)) return;
     repositoryIds.add(projectId);
@@ -418,15 +413,8 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
     if (outcome === "stop") break;
   }
 
-  function buildCheckpoint(): CollectorCheckpoint {
-    return {
-      version: 1,
-      operations: operations.map((op): CollectorOperation => ({ key: op.key, cursor: op.cursor, done: op.done })),
-      discovered: { repositoryIds: [...repositoryIds].sort() },
-      state: { ...state, reasons: [...reasons], verifiedEmails: [...verifiedEmails] },
-    };
-  }
-  function newEventsForCaller(): NormalizedEngineeringEvent[] { return [...newEvents.values()].filter((event) => !stagedKeys.has(engineeringEventKey(event))); }
+  function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons, { verifiedEmails: [...verifiedEmails] }); }
+  function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
 
   if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
 
@@ -443,12 +431,8 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
     issue_work: explicit && resourceStateComplete ? "complete" : "partial",
     practice_evidence: "unavailable", documentation_design: "unavailable", maintenance: "unavailable",
   };
-  const complete = Object.values(eventKinds).every((status) => status === "complete") && reasons.size === 0;
-  const coverage: SourceCoverage = {
-    source: { provider: "gitlab", host: "gitlab.com", subjectId: subjectId()! }, window, dataThrough: window.referenceTime,
-    status: complete ? "complete" : "partial", discovery: explicit ? "explicit_repositories" : "owned_and_contributed",
-    repositoryIds: [...repositoryIds].sort(), repositoryDiscoveryComplete: explicit,
-    eventKinds, reasonCodes: [...reasons].sort(), unknownPeriods: complete ? [] : [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
-  };
+  const coverage = assembleSliceCoverage({
+    provider: "gitlab", host: "gitlab.com", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
+  });
   return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
 };

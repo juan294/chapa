@@ -1,11 +1,15 @@
 import {
-  createScoringWindow, engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
-  type EvidenceReasonCode, type EventMeasurements, type NormalizedEngineeringEvent,
+  engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
+  type EvidenceReasonCode, type NormalizedEngineeringEvent,
   type Observation, type SourceCoverage,
 } from "@chapa/shared";
-import type { CollectorCheckpoint, CollectorOperation, CollectSlice } from "@/lib/collection/plan";
+import type { CollectSlice } from "@/lib/collection/plan";
 import {
-  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic, type StopKind,
+  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
+  validateSliceWindow, type MutableSliceOperation,
+} from "@/lib/collection/slice-helpers";
+import {
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 
 /**
@@ -22,11 +26,7 @@ const uuid = (value: unknown): string | null => typeof value === "string" && /^\
 const hash = (value: unknown): string | null => typeof value === "string" && /^[\da-f]{7,64}$/i.test(value) ? value.toLowerCase() : null;
 const numericId = (value: unknown): string | null => typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? String(value) : null;
 const nonnegative = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-const emptyMeasurements = (): EventMeasurements => ({
-  changedFiles: unknown("unavailable", "not_supported"), additions: unknown("unavailable", "not_supported"),
-  deletions: unknown("unavailable", "not_supported"), leadTimeHours: unknown("unavailable", "not_supported"),
-  hasDescription: unknown("unavailable", "not_supported"), hasIssueLink: unknown("unavailable", "not_supported"), usesFeatureBranch: unknown("unavailable", "not_supported"),
-});
+const emptyMeasurements = emptySliceMeasurements;
 const API = "https://api.bitbucket.org/2.0";
 // ---------------------------------------------------------------------------
 // collectBitbucketSlice (#1335 phase 3) -- checkpointed, resumable slice API,
@@ -46,7 +46,7 @@ interface BitbucketPrMeta {
   description?: string | null;
   mergeCommitHash?: string | null;
 }
-interface MutableBitbucketOperation { key: string; cursor: string | null; done: boolean }
+type MutableBitbucketOperation = MutableSliceOperation;
 interface BitbucketListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
 
 /** Bounds an otherwise-unbounded commit history to the scoring window via
@@ -60,8 +60,7 @@ function commitsPath(repositoryId: string, sinceIso: string): string {
 }
 
 export const collectBitbucketSlice: CollectSlice = async (input, credential, checkpoint, budget, staged) => {
-  const window = createScoringWindow(input.window.referenceTime);
-  if (window.startInclusive !== input.window.startInclusive || window.endExclusive !== input.window.endExclusive || window.referenceDate !== input.window.referenceDate || input.window.calendarDays !== 365) throw new RangeError("Inconsistent scoring window");
+  const window = validateSliceWindow(input);
   if (!credential.token || !credential.token.trim()) throw new RangeError("Bitbucket collection requires a credential");
   const token = credential.token.trim();
   const explicit = input.scope.discovery === "explicit_repositories";
@@ -79,11 +78,8 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
   const stagedKeys = new Set(staged.map(engineeringEventKey));
 
   function subjectId(): string | undefined { return state.subjectId as string | undefined; }
-  function makeStop(operation: string, stopKind: StopKind, httpStatus: number | null = null, retryAfter: number | null = null): SourceDiagnostic {
-    diag.record(operation, stopKind, httpStatus, retryAfter);
-    return { provider: "bitbucket", operation, stopKind, httpStatus, retryAfterSeconds: retryAfter };
-  }
-  function ensureOp(key: string): void { if (!operations.some((op) => op.key === key)) operations.push({ key, cursor: null, done: false }); }
+  const makeStop = makeSliceStopFactory(diag, "bitbucket");
+  function ensureOp(key: string): void { ensureSliceOperation(operations, key); }
   function registerRepo(repositoryId: string): void {
     if (repositoryIds.has(repositoryId)) return;
     repositoryIds.add(repositoryId);
@@ -421,15 +417,8 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     if (outcome === "stop") break;
   }
 
-  function buildCheckpoint(): CollectorCheckpoint {
-    return {
-      version: 1,
-      operations: operations.map((op): CollectorOperation => ({ key: op.key, cursor: op.cursor, done: op.done })),
-      discovered: { repositoryIds: [...repositoryIds].sort() },
-      state: { ...state, reasons: [...reasons] },
-    };
-  }
-  function newEventsForCaller(): NormalizedEngineeringEvent[] { return [...newEvents.values()].filter((event) => !stagedKeys.has(engineeringEventKey(event))); }
+  function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
+  function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
 
   if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
 
@@ -442,12 +431,8 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     review: explicit && activityComplete ? "complete" : "partial",
     issue_work: "unavailable", practice_evidence: "unavailable", documentation_design: "unavailable", maintenance: "unavailable",
   };
-  const complete = Object.values(eventKinds).every((status) => status === "complete") && reasons.size === 0;
-  const coverage: SourceCoverage = {
-    source: { provider: "bitbucket", host: "bitbucket.org", subjectId: subjectId()! }, window, dataThrough: window.referenceTime,
-    status: complete ? "complete" : "partial", discovery: explicit ? "explicit_repositories" : "owned_and_contributed",
-    repositoryIds: [...repositoryIds].sort(), repositoryDiscoveryComplete: explicit,
-    eventKinds, reasonCodes: [...reasons].sort(), unknownPeriods: complete ? [] : [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
-  };
+  const coverage = assembleSliceCoverage({
+    provider: "bitbucket", host: "bitbucket.org", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
+  });
   return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
 };

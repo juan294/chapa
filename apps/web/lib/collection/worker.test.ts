@@ -316,7 +316,7 @@ describe("runCollectionSlice", () => {
       expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), []);
     });
 
-    it("never lets a seeding failure (discovery/storage error) block the slice -- collection still proceeds from scratch", async () => {
+    it("never lets a seeding failure (discovery/storage error) block the slice -- collection still proceeds from scratch, but the failure is captured, not silent", async () => {
       const deps = harness();
       deps.discoverSource = vi.fn().mockRejectedValue(new Error("storage unavailable"));
       deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
@@ -325,6 +325,20 @@ describe("runCollectionSlice", () => {
 
       expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), []);
       expect(deps.fail).not.toHaveBeenCalled();
+
+      // The no-silent-failure rule: seeding is an optimization whose failure
+      // must never block the job, but it must still be observable.
+      expect(deps.captureError).toHaveBeenCalledTimes(1);
+      const [captured] = vi.mocked(deps.captureError).mock.calls[0]!;
+      expect(captured.route).toContain("trySeedFromPrior");
+      expect(captured.statusCode).toBe(500);
+      const message = (captured.error as Error).message;
+      expect(message).toContain("job-1");
+      expect(message).toContain("github");
+      expect(message).toContain("storage unavailable");
+      // No secrets: never the owner handle, a token, or an access-context HMAC.
+      expect(message).not.toContain("alice");
+      expect(message).not.toContain("fake-token");
     });
   });
 });
