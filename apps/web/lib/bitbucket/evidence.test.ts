@@ -71,7 +71,7 @@ describe("Bitbucket v7 evidence", () => {
     const result = await fetchBitbucketEvidence(U, "token", window);
     expect(result.events.filter((e) => e.kind === "review")).toHaveLength(2);
   });
-  it("retains page-one facts and the incoming cursor after a page-two 429", async () => {
+  it("retains page-one facts and the incoming cursor after a page-two 429, honestly as rate_limited", async () => {
     api((url) => {
       if (!url.pathname.endsWith("/commits")) return;
       return url.searchParams.has("page") ? json({}, 429) : page([{ hash: "dddddddddddd", date, author: { user: subject } }], `${url.origin}${url.pathname}?page=2`);
@@ -80,7 +80,9 @@ describe("Bitbucket v7 evidence", () => {
     expect(result.events.some((e) => e.kind === "authored_commit")).toBe(true);
     expect(result.progress.find((p) => p.initialUrl.includes("/commits"))).toMatchObject({ complete: false, collectedNodes: 1 });
     expect(result.progress.find((p) => p.initialUrl.includes("/commits"))?.nextUrl).toContain("page=2");
-    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.coverage.reasonCodes).toContain("pagination_incomplete");
+    expect(result.coverage.reasonCodes).not.toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "commits", stopKind: "rate_limited", httpStatus: 429 }));
   });
   it("does not claim a merge timestamp from a truncated activity history", async () => {
     api((url) => url.pathname.endsWith("/1/activity") ? (url.searchParams.has("page") ? json({}, 500) : page([merge()], `${url.origin}${url.pathname}?page=2`)) : undefined);
@@ -131,6 +133,7 @@ describe("Bitbucket v7 evidence", () => {
     const result = await fetchBitbucketEvidence(U, "token", window);
     expect(vi.mocked(fetch).mock.calls.every(([url]) => new URL(String(url)).origin === "https://api.bitbucket.org")).toBe(true);
     expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "commits", stopKind: "protocol" }));
     expect(JSON.stringify(result)).not.toContain("evil.test");
   });
   it("does not follow HTTP redirects with credentials", async () => {
@@ -181,12 +184,78 @@ describe("Bitbucket v7 evidence", () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(5); expect(result.requestCount).toBe(5);
     expect(result.progress.some((p) => !p.complete && p.nextUrl !== null)).toBe(true);
     expect(result.coverage.reasonCodes).toContain("pagination_incomplete");
+    expect(result.diagnostics.some((d) => d.stopKind === "budget")).toBe(true);
+  });
+  it("marks a commits deadline stop as pagination_incomplete, never source_error, with a deadline diagnostic", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: string, init?: RequestInit) => {
+      const url = new URL(input); const path = decodeURIComponent(url.pathname).replace("/2.0", "");
+      if (path.endsWith("/commits")) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+        });
+      }
+      if (path === "/user") return Promise.resolve(json({ ...subject, display_name: "Alice" }));
+      if (path === "/user/workspaces") return Promise.resolve(page([{ workspace: { uuid: W } }]));
+      if (path === `/repositories/${W}`) return Promise.resolve(page([repository]));
+      if (path.endsWith("/pullrequests")) return Promise.resolve(page([]));
+      throw new Error(`Unexpected path ${path}`);
+    }));
+    const result = await fetchBitbucketEvidence(U, "token", window, { timeoutMs: 50 });
+    expect(result.coverage.reasonCodes).toContain("pagination_incomplete");
+    expect(result.coverage.reasonCodes).not.toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "commits", stopKind: "deadline" }));
   });
   it("cannot use a later valid merge date when an earlier merge timestamp is malformed", async () => {
     api((url) => url.pathname.endsWith("/1/activity") ? page([merge(), merge("invalid-date")]) : undefined);
     const result = await fetchBitbucketEvidence(U, "token", window);
     expect(result.events.some((e) => e.kind === "accepted_change")).toBe(false);
     expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "activity", stopKind: "parse" }));
+  });
+  it("resolves a declared repository whose metadata mismatches as a protocol stop", async () => {
+    api((url) => url.pathname === `/2.0/repositories/%7B%7D/${encodeURIComponent(R)}` ? json({ uuid: "{99999999-9999-9999-9999-999999999999}", workspace: { uuid: W } }) : undefined);
+    const result = await fetchBitbucketEvidence(U, "token", window, { repositoryIds: [R] });
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.coverage.repositoryDiscoveryComplete).toBe(false);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "repository", stopKind: "protocol" }));
+  });
+  it("classifies a non-numeric pull request id as a protocol stop", async () => {
+    api((url) => url.pathname.endsWith("/pullrequests") ? page([{ ...pr(), id: "not-a-number" }]) : undefined);
+    const result = await fetchBitbucketEvidence(U, "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "pullrequests", stopKind: "protocol" }));
+  });
+  it("classifies a deleted activity comment/approval body as not_accessible", async () => {
+    api((url) => url.pathname.endsWith("/2/activity") ? page([{ approval: { user: subject, date, deleted: true } }]) : undefined);
+    const result = await fetchBitbucketEvidence(U, "token", window);
+    expect(result.coverage.reasonCodes).toContain("not_accessible");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "activity", stopKind: "not_accessible" }));
+  });
+  it("classifies an HTTP 500 as an http stop, still source_error", async () => {
+    api((url) => url.pathname.endsWith("/commits") ? json({}, 500) : undefined);
+    const result = await fetchBitbucketEvidence(U, "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "commits", stopKind: "http", httpStatus: 500 }));
+  });
+  it("classifies a 2xx provider error body as a protocol stop, still source_error", async () => {
+    api((url) => url.pathname.endsWith("/commits") ? json({ type: "error", error: { message: "internal" } }) : undefined);
+    const result = await fetchBitbucketEvidence(U, "token", window);
+    expect(result.coverage.reasonCodes).toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "commits", stopKind: "protocol" }));
+    expect(JSON.stringify(result)).not.toContain("internal");
+  });
+  it("keeps a comment's artifact revision stable across collections despite a changed updated_on (#1335 phase 1.5)", async () => {
+    api((url) => url.pathname.endsWith("/2/activity")
+      ? page([{ comment: { id: 12, created_on: date, updated_on: date, user: subject, content: { raw: "Check this" } } }])
+      : undefined);
+    const first = await fetchBitbucketEvidence(U, "token", window);
+    api((url) => url.pathname.endsWith("/2/activity")
+      ? page([{ comment: { id: 12, created_on: date, updated_on: "2026-09-05T00:00:00Z", user: subject, content: { raw: "Edited" } } }])
+      : undefined);
+    const second = await fetchBitbucketEvidence(U, "token", window);
+    const revision = (result: Awaited<ReturnType<typeof fetchBitbucketEvidence>>) => result.events.find((e) => e.kind === "review" && e.eventId.includes(":comment:"))?.artifactRevision;
+    expect(revision(first)).toBeDefined();
+    expect(revision(first)).toBe(revision(second));
   });
   it("does not match null UUIDs when the account_id belongs to another subject", async () => {
     api((url) => url.pathname === "/2.0/user" ? json({ account_id: "someone-else" }) : undefined);
@@ -199,6 +268,7 @@ describe("Bitbucket v7 evidence", () => {
     const progress = result.progress.find((p) => p.initialUrl.includes("/commits"))!;
     expect(progress.complete).toBe(false); expect(progress.nextUrl).toBe(progress.initialUrl);
     expect(result.events.some((e) => e.kind === "authored_commit")).toBe(true);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "bitbucket", operation: "commits", stopKind: "protocol" }));
   });
   it("reconciles actual GitHub and Bitbucket adapters through verified project/work mappings", async () => {
     api((url) => {

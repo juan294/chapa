@@ -3,6 +3,9 @@ import {
   type CoverageStatus, type EvidenceReasonCode, type EventMeasurements,
   type NormalizedEngineeringEvent, type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
+import {
+  classifyFetchFailure, createDiagnosticRecorder, isRateLimitedResponse, retryAfterSeconds, type SourceDiagnostic,
+} from "@/lib/platform/evidence-diagnostics";
 
 /**
  * v7 provider facts only; no v6 totals or automated practice classifications.
@@ -66,6 +69,23 @@ export interface GitlabEvidenceResult {
   readonly coverage: SourceCoverage;
   readonly progress: readonly GitlabEvidenceProgress[];
   readonly requestCount: number;
+  readonly diagnostics: readonly SourceDiagnostic[];
+}
+/** Stable operation name for a diagnostic, derived from the request path this
+ * module itself constructs (query parameters excluded).
+ */
+function operationFor(path: string): string {
+  if (path === "/user") return "profile";
+  if (path === "/user/emails") return "emails";
+  if (path.endsWith("/projects") || path.endsWith("/contributed_projects")) return "projects";
+  if (/\/merge_requests\/\d+\/diffs$/.test(path)) return "diffs";
+  if (/\/merge_requests\/\d+\/notes$/.test(path)) return "notes";
+  if (/\/merge_requests\/\d+$/.test(path)) return "merge_request";
+  if (path.endsWith("/merge_requests")) return "merge_requests";
+  if (path.endsWith("/repository/commits")) return "commits";
+  if (/\/issues\/\d+\/resource_state_events$/.test(path)) return "resource_state_events";
+  if (path.endsWith("/issues")) return "issues";
+  return "unknown";
 }
 
 export async function fetchGitlabEvidence(
@@ -80,27 +100,41 @@ export async function fetchGitlabEvidence(
   const signal = AbortSignal.timeout(timeoutMs);
   const reasons = new Set<EvidenceReasonCode>();
   const progress: GitlabEvidenceProgress[] = [];
+  const diag = createDiagnosticRecorder("gitlab");
   let requestCount = 0;
   async function request(path: string, parameters: Record<string, string> = {}) {
-    if (requestCount >= maxRequests || signal.aborted) return { data: null, headers: new Headers(), error: "pagination_incomplete" as const };
+    const operation = operationFor(path);
+    // A collector's own budget or deadline is honest incompleteness, never a
+    // provider-reported or structural failure: classify before attempting.
+    if (requestCount >= maxRequests) return { data: null, headers: new Headers(), error: diag.record(operation, "budget") };
+    if (signal.aborted) return { data: null, headers: new Headers(), error: diag.record(operation, "deadline") };
     requestCount++;
     try {
       const url = new URL(`https://gitlab.com/api/v4${path}`);
       for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
       const response = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token.trim()}` }, signal, redirect: "error" });
-      if (!response.ok) return { data: null, headers: response.headers, error: [401, 403, 404].includes(response.status) ? "not_accessible" as const : "source_error" as const };
+      if (!response.ok) {
+        if (isRateLimitedResponse(response.status, response.headers)) return { data: null, headers: response.headers, error: diag.record(operation, "rate_limited", response.status, retryAfterSeconds(response.headers)) };
+        if ([401, 403, 404].includes(response.status)) return { data: null, headers: response.headers, error: diag.record(operation, "not_accessible", response.status) };
+        return { data: null, headers: response.headers, error: diag.record(operation, "http", response.status) };
+      }
       return { data: await response.json() as unknown, headers: response.headers, error: null };
-    } catch { return { data: null, headers: new Headers(), error: "source_error" as const }; }
+    } catch (error) {
+      // The AbortSignal.timeout deadline can fire mid-flight, rejecting fetch
+      // or json() with no HTTP response at all -- classify by signal/exception.
+      return { data: null, headers: new Headers(), error: diag.record(operation, classifyFetchFailure(error, signal)) };
+    }
   }
   async function collect(path: string, parameters: Record<string, string> = {}) {
     const nodes: Row[] = []; const errors = new Set<EvidenceReasonCode>();
+    const operation = operationFor(path);
     let page = 1; let complete = false;
     for (;;) {
       const response = await request(path, { ...parameters, per_page: "100", page: String(page) });
       if (response.error) { errors.add(response.error); break; }
-      if (!Array.isArray(response.data)) { errors.add("source_error"); break; }
+      if (!Array.isArray(response.data)) { errors.add(diag.record(operation, "protocol")); break; }
       for (const item of response.data) {
-        if (item === null || typeof item !== "object" || Array.isArray(item)) errors.add("source_error");
+        if (item === null || typeof item !== "object" || Array.isArray(item)) errors.add(diag.record(operation, "protocol"));
         else nodes.push(row(item));
       }
       // Retain the incoming page on malformed/partial data, not its successor.
@@ -149,7 +183,7 @@ export async function fetchGitlabEvidence(
   if (!explicit) {
     for (const path of [`/users/${userId}/projects`, `/users/${userId}/contributed_projects`]) {
       for (const project of (await collect(path)).nodes) {
-        const projectId = id(project.id); if (projectId) repositories.add(projectId); else reasons.add("source_error");
+        const projectId = id(project.id); if (projectId) repositories.add(projectId); else reasons.add(diag.record("projects", "protocol"));
       }
     }
     // Current visible/project-contribution lists cannot prove annual private scope.
@@ -176,7 +210,7 @@ export async function fetchGitlabEvidence(
   }
   function addMr(mr: Row) {
     const projectId = id(mr.project_id); const iid = id(mr.iid); const globalId = id(mr.id);
-    if (!projectId || !iid || !globalId) { reasons.add("source_error"); return; }
+    if (!projectId || !iid || !globalId) { reasons.add(diag.record("merge_requests", "protocol")); return; }
     if (explicit && !repositories.has(projectId)) return;
     repositories.add(projectId); mrs.set(mrKey(projectId, iid), mr); mrByGlobalId.set(globalId, mr);
   }
@@ -225,8 +259,13 @@ export async function fetchGitlabEvidence(
     for (const note of (await collect(`${path}/notes`, { order_by: "created_at", sort: "desc" })).nodes) {
       if (!id(row(note.author).id)) { reasons.add("attribution_unknown"); continue; }
       if (row(note.author).id !== userId || note.system !== false) continue;
-      const noteId = id(note.id); if (!noteId) { reasons.add("source_error"); continue; }
-      const base = event(projectId, `${key}:note:${noteId}`, "review", note.created_at, key, `${noteId}:${text(note.updated_at) ?? text(note.created_at) ?? "unknown"}`);
+      const noteId = id(note.id); if (!noteId) { reasons.add(diag.record("notes", "protocol")); continue; }
+      // Build the revision from the note's stable id + created_at only (never
+      // updated_at): an edited note's updated_at otherwise changes between
+      // collections and trips the immutable-identity guard when events merge
+      // (packages/shared/src/scoring-aggregation-v7.ts; the same hazard fixed
+      // for Bitbucket comments in #1335 phase 1.5).
+      const base = event(projectId, `${key}:note:${noteId}`, "review", note.created_at, key, `${noteId}:${text(note.created_at) ?? "unknown"}`);
       if (base) events.set(base.eventId, base); // Empty approvals/notes receive no rubric/category credit.
     }
   }
@@ -245,11 +284,11 @@ export async function fetchGitlabEvidence(
     }
     // Include reopened issues; their earlier closed state remains a dated event.
     for (const issue of (await collect(`/projects/${projectId}/issues`, { scope: "all", state: "all", updated_after: window.startInclusive })).nodes) {
-      const iid = id(issue.iid); if (!iid) { reasons.add("source_error"); continue; }
+      const iid = id(issue.iid); if (!iid) { reasons.add(diag.record("issues", "protocol")); continue; }
       for (const closure of (await collect(`/projects/${projectId}/issues/${iid}/resource_state_events`)).nodes) {
         if (!id(row(closure.user).id)) { reasons.add("attribution_unknown"); continue; }
         if (row(closure.user).id !== userId || closure.state !== "closed") continue;
-        const closureId = id(closure.id); if (!closureId) { reasons.add("source_error"); continue; }
+        const closureId = id(closure.id); if (!closureId) { reasons.add(diag.record("resource_state_events", "protocol")); continue; }
         const linked = mrByGlobalId.get(id(closure.source_merge_request_id) ?? "");
         const linkedKey = linked ? mrKey(String(linked.project_id), String(linked.iid)) : null;
         const key = `${projectKey(projectId)}:issue:${iid}`;
@@ -287,7 +326,7 @@ export async function fetchGitlabEvidence(
   const complete = Object.values(eventKinds).every((status) => status === "complete") && reasons.size === 0;
   return {
     profile: { userId, username: text(profile.username) ?? username, name: text(profile.name), avatarUrl: text(profile.avatar_url) },
-    events: [...events.values()], progress, requestCount,
+    events: [...events.values()], progress, requestCount, diagnostics: diag.diagnostics,
     coverage: { source: { provider: "gitlab", host: "gitlab.com", subjectId }, window,
       dataThrough: profileResponse.error ? null : window.referenceTime, status: complete ? "complete" : "partial",
       discovery: explicit ? "explicit_repositories" : "owned_and_contributed", repositoryIds: [...repositories].sort(), repositoryDiscoveryComplete: explicit,

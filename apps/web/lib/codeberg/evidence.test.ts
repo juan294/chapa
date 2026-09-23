@@ -144,6 +144,34 @@ describe("Codeberg v7 evidence", () => {
     api(); const result = await fetchCodebergEvidence(7, "alice", "token", window, { maxRequests: 5 });
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(5); expect(result.requestCount).toBe(5);
     expect(result.progress.some((p) => !p.complete && p.nextPage !== null)).toBe(true);
+    expect(result.diagnostics.some((d) => d.stopKind === "budget")).toBe(true);
+  });
+  it("marks a repos deadline stop as pagination_incomplete, never source_error, with a deadline diagnostic", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: string, init?: RequestInit) => {
+      const url = new URL(input); const path = decodeURIComponent(url.pathname).replace("/api/v1", "");
+      if (path === "/users/alice/repos") {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+        });
+      }
+      if (path === "/user") return Promise.resolve(json(actor));
+      if (path === "/user/repos") return Promise.resolve(json([]));
+      if (path === "/users/alice/activities/feeds") return Promise.resolve(json([]));
+      throw new Error(`Unexpected endpoint ${path}`);
+    }));
+    const result = await fetchCodebergEvidence(7, "alice", "token", window, { timeoutMs: 50 });
+    expect(result.coverage.reasonCodes).toContain("pagination_incomplete");
+    expect(result.coverage.reasonCodes).not.toContain("source_error");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ provider: "codeberg", operation: "repos", stopKind: "deadline" }));
+  });
+  it("keeps a review's artifact revision stable across collections despite a changed updated_at (parity with #1335 phase 1.5)", async () => {
+    api((url) => url.pathname.endsWith("/reviews") ? json([{ id: 20, user: actor, state: "APPROVED", submitted_at: date, updated_at: date, commit_id: "aaaaaaaaaaaa", body: "" }]) : undefined);
+    const first = await fetchCodebergEvidence(7, "alice", "token", window);
+    api((url) => url.pathname.endsWith("/reviews") ? json([{ id: 20, user: actor, state: "APPROVED", submitted_at: date, updated_at: "2026-09-05T00:00:00Z", commit_id: "aaaaaaaaaaaa", body: "" }]) : undefined);
+    const second = await fetchCodebergEvidence(7, "alice", "token", window);
+    const revision = (result: Awaited<ReturnType<typeof fetchCodebergEvidence>>) => result.events.find((e) => e.kind === "review")?.artifactRevision;
+    expect(revision(first)).toBeDefined();
+    expect(revision(first)).toBe(revision(second));
   });
   it("does not follow credential redirects or foreign pagination links", async () => {
     api((url) => url.pathname.endsWith("/commits") ? json([], 200, { link: '<https://evil.test/steal?page=2>; rel="next"' }) : undefined);

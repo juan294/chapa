@@ -3,6 +3,9 @@ import {
   type CoverageStatus, type EvidenceReasonCode, type EventMeasurements, type NormalizedEngineeringEvent,
   type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
+import {
+  classifyFetchFailure, createDiagnosticRecorder, isRateLimitedResponse, retryAfterSeconds, type SourceDiagnostic,
+} from "@/lib/platform/evidence-diagnostics";
 
 /**
  * v7 only. Primary semantics: developer.atlassian.com/cloud/bitbucket/rest/
@@ -47,6 +50,25 @@ export interface BitbucketEvidenceResult {
   readonly coverage: SourceCoverage;
   readonly progress: readonly BitbucketEvidenceProgress[];
   readonly requestCount: number;
+  readonly diagnostics: readonly SourceDiagnostic[];
+}
+/** Stable operation name for a diagnostic, derived from the URL shape this
+ * module itself constructs (never a caller-supplied or provider-redirected
+ * URL). Path segments only -- never logged or published with the URL itself.
+ */
+function operationFor(url: string): string {
+  const path = new URL(url).pathname.replace(/^\/2\.0/, "");
+  const segments = path.split("/").filter(Boolean);
+  if (segments[0] === "user" && segments.length === 1) return "profile";
+  if (segments[0] === "user" && segments[1] === "workspaces") return "workspaces";
+  if (segments[0] === "repositories" && segments.length === 2) return "repositories";
+  if (segments[0] === "repositories" && segments.length === 3) return "repository";
+  if (segments.includes("diffstat") && segments.indexOf("diffstat") < segments.length - 1) return "diff";
+  if (path.endsWith("/diffstat")) return "diffstat";
+  if (path.endsWith("/commits")) return "commits";
+  if (path.endsWith("/pullrequests")) return "pullrequests";
+  if (path.endsWith("/activity")) return "activity";
+  return "unknown";
 }
 export async function fetchBitbucketEvidence(
   stableAccountId: string, token: string, inputWindow: ScoringWindow, options: BitbucketEvidenceOptions = {},
@@ -62,17 +84,31 @@ export async function fetchBitbucketEvidence(
   const signal = AbortSignal.timeout(timeoutMs);
   const reasons = new Set<EvidenceReasonCode>();
   const progress: BitbucketEvidenceProgress[] = [];
+  const diag = createDiagnosticRecorder("bitbucket");
   let requestCount = 0;
   async function request(url: string, inspectRedirect = false): Promise<{ data: Row; error: EvidenceReasonCode | null; location?: string | null }> {
-    if (requestCount >= maxRequests || signal.aborted) return { data: {}, error: "pagination_incomplete" as const };
+    const operation = operationFor(url);
+    // A collector's own budget or deadline is honest incompleteness, never a
+    // provider-reported or structural failure: classify before attempting.
+    if (requestCount >= maxRequests) return { data: {}, error: diag.record(operation, "budget") };
+    if (signal.aborted) return { data: {}, error: diag.record(operation, "deadline") };
     requestCount++;
     try {
       const response = await fetch(url, { headers: { Authorization: `Bearer ${token.trim()}`, Accept: "application/json" }, signal, redirect: inspectRedirect ? "manual" : "error" });
       if (inspectRedirect && response.status === 302) return { data: {}, error: null, location: response.headers.get("location") };
-      if (!response.ok) return { data: {}, error: [401, 403, 404].includes(response.status) ? "not_accessible" as const : "source_error" as const };
+      if (!response.ok) {
+        if (isRateLimitedResponse(response.status, response.headers)) return { data: {}, error: diag.record(operation, "rate_limited", response.status, retryAfterSeconds(response.headers)) };
+        if ([401, 403, 404].includes(response.status)) return { data: {}, error: diag.record(operation, "not_accessible", response.status) };
+        return { data: {}, error: diag.record(operation, "http", response.status) };
+      }
       const data = row(await response.json());
-      return { data, error: data.type === "error" || data.error ? "source_error" as const : null };
-    } catch { return { data: {}, error: "source_error" as const }; }
+      if (data.type === "error" || data.error) return { data, error: diag.record(operation, "protocol", response.status) };
+      return { data, error: null };
+    } catch (error) {
+      // The AbortSignal.timeout deadline can fire mid-flight, rejecting fetch
+      // or json() with no HTTP response at all -- classify by signal/exception.
+      return { data: {}, error: diag.record(operation, classifyFetchFailure(error, signal)) };
+    }
   }
   const makeUrl = (path: string, parameters: readonly (readonly [string, string])[] = []) => {
     const url = new URL(`${API}${path}`); url.searchParams.set("pagelen", "100");
@@ -82,14 +118,15 @@ export async function fetchBitbucketEvidence(
   async function collect(initialUrl: string) {
     const nodes: Row[] = []; const errors = new Set<EvidenceReasonCode>(); const seen = new Set<string>();
     const initial = new URL(initialUrl);
+    const operation = operationFor(initialUrl);
     let nextUrl: string | null = initialUrl; let complete = false;
     for (;;) {
       seen.add(nextUrl!);
       const response = await request(nextUrl!);
       if (response.error) { errors.add(response.error); break; }
-      if (!Array.isArray(response.data.values)) { errors.add("source_error"); break; }
+      if (!Array.isArray(response.data.values)) { errors.add(diag.record(operation, "protocol")); break; }
       for (const value of response.data.values) {
-        if (value === null || typeof value !== "object" || Array.isArray(value)) errors.add("source_error");
+        if (value === null || typeof value !== "object" || Array.isArray(value)) errors.add(diag.record(operation, "protocol"));
         else nodes.push(row(value));
       }
       if (response.data.truncated === true || response.data.is_truncated === true || response.data.overflow === true) errors.add("pagination_incomplete");
@@ -102,7 +139,7 @@ export async function fetchBitbucketEvidence(
             if (key !== "pagelen" && JSON.stringify(next.searchParams.getAll(key)) !== JSON.stringify(initial.searchParams.getAll(key))) throw new Error("Changed query scope");
           }
           nextUrl = next.toString();
-        } catch { errors.add("source_error"); break; }
+        } catch { errors.add(diag.record(operation, "protocol")); break; }
         continue;
       }
       if (response.data.size !== undefined && (!nonnegative(response.data.size) || response.data.size !== nodes.length)) { errors.add("pagination_incomplete"); break; }
@@ -139,7 +176,7 @@ export async function fetchBitbucketEvidence(
       const initialUrl = `${API}/repositories/%7B%7D/${encodeURIComponent(repositoryId)}`;
       const metadata = await request(initialUrl);
       const repo = row(metadata.data); const workspaceId = uuid(row(repo.workspace).uuid);
-      const reason = metadata.error ?? (uuid(repo.uuid) !== repositoryId || !workspaceId ? "source_error" : null);
+      const reason = metadata.error ?? (uuid(repo.uuid) !== repositoryId || !workspaceId ? diag.record("repository", "protocol") : null);
       progress.push({ initialUrl, nextUrl: reason ? initialUrl : null, collectedNodes: reason ? 0 : 1,
         complete: reason === null, reasonCodes: reason ? [reason] : [] });
       if (reason) { reasons.add(reason); repositoryDiscoveryComplete = false; continue; }
@@ -154,9 +191,9 @@ export async function fetchBitbucketEvidence(
       for (const repo of (await collect(makeUrl(`/repositories/${encodeURIComponent(workspaceId)}`))).nodes) addRepo(repo, workspaceId);
     }
   }
-  function instant(value: unknown): string | null {
-    if (!text(value)) { reasons.add("source_error"); return null; }
-    try { return scoringInstant(String(value)).toISOString(); } catch { reasons.add("source_error"); return null; }
+  function instant(value: unknown, operation: string): string | null {
+    if (!text(value)) { reasons.add(diag.record(operation, "parse")); return null; }
+    try { return scoringInstant(String(value)).toISOString(); } catch { reasons.add(diag.record(operation, "parse")); return null; }
   }
   const events = new Map<string, NormalizedEngineeringEvent>();
   const projectKey = (repo: string) => `bitbucket.org:repository:${repo}`;
@@ -176,14 +213,15 @@ export async function fetchBitbucketEvidence(
       const metadata = await request(`${API}${path}`); const repo = row(metadata.data);
       if (metadata.error) reasons.add(metadata.error);
       else if (uuid(repo.uuid) === repositoryId && uuid(row(repo.workspace).uuid) === workspaceId) fullName = text(repo.full_name) ?? undefined;
-      else reasons.add("source_error");
+      else reasons.add(diag.record("repository", "protocol"));
     }
     // Bitbucket exposes actual commit objects across all refs. date is its
     // provider commit timestamp, never a first-default-branch reachability time.
     for (const commit of (await collect(makeUrl(`${path}/commits`))).nodes) {
       if (!isSubject(row(commit.author).user)) continue;
-      const sha = hash(commit.hash); const date = instant(commit.date);
-      if (!sha || !date) { reasons.add("source_error"); continue; }
+      const sha = hash(commit.hash); const date = instant(commit.date, "commits");
+      if (!sha) reasons.add(diag.record("commits", "protocol"));
+      if (!sha || !date) continue;
       const key = `${projectKey(repositoryId)}:commit:${sha}`;
       const base = event(repositoryId, key, "authored_commit", date, key, sha);
       if (base) events.set(key, { ...base, acceptance: unknown("unavailable", "acceptance_time_unknown") });
@@ -192,7 +230,7 @@ export async function fetchBitbucketEvidence(
       ["state", "OPEN"], ["state", "MERGED"], ["state", "DECLINED"], ["state", "SUPERSEDED"],
     ]));
     for (const pr of prs.nodes) {
-      const prId = numericId(pr.id); if (!prId) { reasons.add("source_error"); continue; }
+      const prId = numericId(pr.id); if (!prId) { reasons.add(diag.record("pullrequests", "protocol")); continue; }
       const key = `${projectKey(repositoryId)}:pr:${prId}`;
       const activity = await collect(makeUrl(`${path}/pullrequests/${prId}/activity`));
       const mergeUpdates: { update: Row; date: string }[] = [];
@@ -200,18 +238,22 @@ export async function fetchBitbucketEvidence(
       for (const entry of activity.nodes) {
         const update = row(entry.update);
         if (update.state === "MERGED") {
-          const date = instant(update.date); if (date) mergeUpdates.push({ update, date }); else invalidMergeDate = true;
+          const date = instant(update.date, "activity"); if (date) mergeUpdates.push({ update, date }); else invalidMergeDate = true;
         }
         for (const kind of ["approval", "changes_requested", "comment"] as const) {
           if (!entry[kind]) continue;
           const detail = row(entry[kind]);
           if (!isSubject(detail.user)) continue;
-          if (detail.deleted === true) { reasons.add("not_accessible"); continue; }
-          const date = instant(kind === "comment" ? detail.created_on : detail.date); if (!date) continue;
+          if (detail.deleted === true) { reasons.add(diag.record("activity", "not_accessible")); continue; }
+          const date = instant(kind === "comment" ? detail.created_on : detail.date, "activity"); if (!date) continue;
           const identity = kind === "comment" ? numericId(detail.id) : `${subjectId}:${date}`;
-          if (!identity) { reasons.add("source_error"); continue; }
+          if (!identity) { reasons.add(diag.record("activity", "protocol")); continue; }
           const eventId = `${key}:${kind}:${identity}`;
-          const base = event(repositoryId, eventId, "review", date, key, kind === "comment" ? `${identity}:${instant(detail.updated_on ?? detail.created_on) ?? date}` : eventId);
+          // Build the revision from the comment's stable id + created_on only
+          // (never updated_on): an edited comment's updated_on otherwise
+          // changes between collections and trips the immutable-identity guard
+          // (packages/shared/src/scoring-aggregation-v7.ts) when events merge.
+          const base = event(repositoryId, eventId, "review", date, key, kind === "comment" ? `${identity}:${date}` : eventId);
           if (base) events.set(eventId, base); // Rubric assessment is separate, including empty approvals.
         }
       }
@@ -232,6 +274,7 @@ export async function fetchBitbucketEvidence(
       const redirectUrl = `${API}${path}/pullrequests/${prId}/diffstat`;
       const redirect = await request(redirectUrl, true);
       let diffUrl: string | null = null;
+      let structuralReason: EvidenceReasonCode | null = null;
       if (redirect.error) reasons.add(redirect.error);
       else {
         try {
@@ -243,10 +286,10 @@ export async function fetchBitbucketEvidence(
             !/^[a-f\d]{7,64}(?:\.\.[a-f\d]{7,64})?$/i.test(decoded.slice(prefix.length)) ||
             [...target.searchParams.keys()].some((key) => !["topic", "pagelen"].includes(key))) throw new Error("Invalid diff comparison");
           target.searchParams.set("pagelen", "100"); diffUrl = target.toString();
-        } catch { reasons.add("source_error"); }
+        } catch { structuralReason = diag.record("diffstat", "protocol"); reasons.add(structuralReason); }
       }
       progress.push({ initialUrl: redirectUrl, nextUrl: diffUrl ? null : redirectUrl, collectedNodes: 0, complete: diffUrl !== null,
-        reasonCodes: diffUrl ? [] : [redirect.error ?? "source_error"] });
+        reasonCodes: diffUrl ? [] : [redirect.error ?? structuralReason ?? "source_error"] });
       if (diffUrl) {
         const diffs = await collect(diffUrl);
         const paths = new Set<string>(); let additions = 0; let deletions = 0; let full = diffs.complete;
@@ -270,7 +313,7 @@ export async function fetchBitbucketEvidence(
         };
       } else reasons.add("partial_files");
       let leadTimeHours: Observation<number> = unknown("partial", "source_error");
-      const createdAt = instant(pr.created_on);
+      const createdAt = instant(pr.created_on, "pullrequests");
       if (createdAt) {
         const hours = (scoringInstant(first.date).getTime() - scoringInstant(createdAt).getTime()) / 3_600_000;
         if (hours >= 0) leadTimeHours = observed(hours, "complete", "source_observed");
@@ -297,7 +340,7 @@ export async function fetchBitbucketEvidence(
   };
   return {
     profile: { uuid: profileUuid, accountId, displayName: text(profile.display_name) },
-    events: [...events.values()], progress, requestCount,
+    events: [...events.values()], progress, requestCount, diagnostics: diag.diagnostics,
     coverage: { source: { provider: "bitbucket", host: "bitbucket.org", subjectId }, window,
       dataThrough: profileResponse.error ? null : window.referenceTime, status: "partial",
       discovery: explicit ? "explicit_repositories" : "owned_and_contributed", repositoryIds: [...repositories.keys()].sort(), repositoryDiscoveryComplete,

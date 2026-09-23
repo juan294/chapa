@@ -4,6 +4,10 @@ import {
   type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
 import { getGithubToken } from "@/lib/env";
+import {
+  classifyFetchFailure, createDiagnosticRecorder, isGraphqlRateLimited, isRateLimitedResponse,
+  retryAfterSeconds, type SourceDiagnostic,
+} from "@/lib/platform/evidence-diagnostics";
 import { GITHUB_EVIDENCE_QUERIES as queries } from "./evidence-queries";
 
 type ObjectData = Record<string, unknown>;
@@ -46,6 +50,7 @@ export interface GitHubEvidenceResult {
   readonly coverage: SourceCoverage;
   readonly progress: readonly GitHubEvidenceProgress[];
   readonly requestCount: number;
+  readonly diagnostics: readonly SourceDiagnostic[];
 }
 
 /**
@@ -70,19 +75,34 @@ export async function fetchGitHubEvidence(
     : (token ?? getGithubToken())?.trim();
   const progress: GitHubEvidenceProgress[] = [];
   const reasons = new Set<EvidenceReasonCode>();
+  const diag = createDiagnosticRecorder("github");
   let requestCount = 0;
   async function request(operation: keyof typeof queries, variables: Record<string, unknown>) {
-    if (requestCount >= maxRequests || signal.aborted) return { data: {}, error: "pagination_incomplete" as const };
+    // A collector's own budget or deadline is honest incompleteness, never a
+    // provider-reported or structural failure: classify before attempting.
+    if (requestCount >= maxRequests) return { data: {}, error: diag.record(operation, "budget") };
+    if (signal.aborted) return { data: {}, error: diag.record(operation, "deadline") };
     requestCount++;
     try {
       const response = await fetch("https://api.github.com/graphql", {
         method: "POST", signal, headers: { "Content-Type": "application/json", ...(effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {}) },
         body: JSON.stringify({ query: queries[operation], variables }),
       });
-      if (!response.ok) return { data: {}, error: response.status === 401 || response.status === 403 ? "not_accessible" as const : "source_error" as const };
+      if (!response.ok) {
+        if (isRateLimitedResponse(response.status, response.headers)) return { data: {}, error: diag.record(operation, "rate_limited", response.status, retryAfterSeconds(response.headers)) };
+        if (response.status === 401 || response.status === 403) return { data: {}, error: diag.record(operation, "not_accessible", response.status) };
+        return { data: {}, error: diag.record(operation, "http", response.status) };
+      }
       const payload = object(await response.json());
-      return { data: object(payload.data), error: Array.isArray(payload.errors) && payload.errors.length > 0 ? "source_error" as const : null };
-    } catch { return { data: {}, error: "source_error" as const }; }
+      if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+        return { data: object(payload.data), error: diag.record(operation, isGraphqlRateLimited(payload.errors) ? "rate_limited" : "graphql", response.status) };
+      }
+      return { data: object(payload.data), error: null };
+    } catch (error) {
+      // The AbortSignal.timeout deadline can fire mid-flight, rejecting fetch
+      // or json() with no HTTP response at all -- classify by signal/exception.
+      return { data: {}, error: diag.record(operation, classifyFetchFailure(error, signal)) };
+    }
   }
   const profileResponse = await request("profile", { login: handle });
   const user = object(at(profileResponse.data, "user"));
@@ -110,7 +130,7 @@ export async function fetchGitHubEvidence(
         break;
       }
       totalCount = number(search ? connection.issueCount : connection.totalCount);
-      if (totalCount === null) errors.add("source_error");
+      if (totalCount === null) errors.add(diag.record(operation, "protocol"));
       for (const node of connection.nodes) {
         if (!node || typeof node !== "object" || Array.isArray(node)) { errors.add("not_accessible"); continue; }
         nodes.push(object(node));
@@ -121,7 +141,7 @@ export async function fetchGitHubEvidence(
       if (response.error) { errors.add("pagination_incomplete"); break; }
       const page = object(connection.pageInfo);
       const next = string(page.endCursor);
-      if (typeof page.hasNextPage !== "boolean") { errors.add("source_error"); break; }
+      if (typeof page.hasNextPage !== "boolean") { errors.add(diag.record(operation, "protocol")); break; }
       if (!page.hasNextPage) {
         complete = errors.size === 0 && totalCount === nodes.length;
         if (!complete && errors.size === 0) errors.add("pagination_incomplete");
@@ -285,5 +305,5 @@ export async function fetchGitHubEvidence(
     eventKinds,
     reasonCodes: [...reasons].sort(), unknownPeriods: complete ? [] : [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
   };
-  return { profile: { login, name: string(user.name), avatarUrl: string(user.avatarUrl) }, events: [...events.values()], coverage, progress, requestCount };
+  return { profile: { login, name: string(user.name), avatarUrl: string(user.avatarUrl) }, events: [...events.values()], coverage, progress, requestCount, diagnostics: diag.diagnostics };
 }
