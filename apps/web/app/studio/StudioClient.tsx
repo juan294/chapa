@@ -263,6 +263,25 @@ export function StudioClient({
   const hasTrackedOpen = useRef(false);
   const saveInFlightRef = useRef(false);
 
+  // #1329 — a stale, pre-hydration copy of this SSR-rendered subtree can
+  // briefly linger in the live DOM alongside the freshly committed client
+  // copy during `/studio`'s hydration handoff (`force-dynamic` +
+  // `loading.tsx`; see `e2e/smoke.spec.ts`'s documented `#main-content`
+  // precedent for the same class of transient dual-tree window). That stale
+  // copy is discarded without ever hydrating, so it never runs a mount
+  // effect. `hydrated` therefore only ever becomes true on the one real,
+  // committed tree — an anchor other code (tests, WebMCP tools) can scope
+  // through to find the current tree unambiguously, instead of guessing
+  // with a positional `.first()`/`.last()` locator.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    // This is the intended, one-shot "mounted" flip -- the effect body IS
+    // the signal (a committed mount), not a subscription to an external
+    // store, so there is nothing else for it to synchronize with.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHydrated(true);
+  }, []);
+
   useEffect(() => {
     configRef.current = config;
   }, [config]);
@@ -660,6 +679,7 @@ export function StudioClient({
     // rather than collapsing. Narrow viewports keep the flowing layout.
     <div
       data-testid="studio-root"
+      data-studio-hydrated={hydrated ? "true" : "false"}
       className="flex min-h-[calc(100dvh-69px)] flex-col lg:h-[calc(100dvh-69px)]"
     >
       <h1 className="sr-only">{t("studio.title") as string}</h1>

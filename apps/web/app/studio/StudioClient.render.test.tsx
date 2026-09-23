@@ -426,6 +426,34 @@ describe("StudioClient render", () => {
 
       expect(studioWebMcpMocks.options?.craftResult).toBe(craftResult);
     });
+
+    // #1329 — e2e observed `[data-save-state="saved"]`, `studio-demo-marker`,
+    // `studio-save` and `studio-reset` each resolving to TWO DOM nodes under
+    // load, always all sourced from this single mounted `<StudioClient>` tree
+    // (there is exactly one JSX site for each). The most likely mechanism,
+    // consistent with `e2e/smoke.spec.ts`'s documented and accepted
+    // `#main-content` case ("loading.tsx and page.tsx both have
+    // id=\"main-content\" and may briefly coexist in the DOM during
+    // hydration"), is a stale pre-hydration copy of this same subtree
+    // lingering in the live DOM for one paint alongside the freshly
+    // committed client copy during the `/studio` route's hydration handoff
+    // (`force-dynamic` + `loading.tsx` Suspense boundary). A stale,
+    // un-hydrated copy never runs a post-mount effect (React discards it
+    // without hydrating it), so gating a marker behind `useEffect` gives
+    // test code (and any other consumer) an anchor that can only ever match
+    // the one real, committed tree — never a stale leftover, and never a
+    // positional guess like `.first()`/`.last()`.
+    it("marks studio-root as hydrated only after mount effects have run", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      const root = screen.getByTestId("studio-root");
+      expect(root.getAttribute("data-studio-hydrated")).toBe("true");
+    });
   });
 
   describe("responsive layout", () => {
