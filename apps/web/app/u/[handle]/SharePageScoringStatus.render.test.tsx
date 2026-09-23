@@ -80,4 +80,38 @@ describe("SharePageScoringStatus", () => {
       "La puntuación de este perfil todavía se está calculando.",
     );
   });
+
+  // #1335 phase 4 fix — `status: null` is the "authority read failed"
+  // case: there is no real ScoringStatus to show a per-provider panel for,
+  // so both owner and visitor see the same one-sentence message.
+  describe("unavailable (status: null — authority read failed)", () => {
+    it("renders data-chapa-state=unavailable and the same sentence for a visitor", async () => {
+      render(
+        await SharePageScoringStatus({ handle: "octocat", locale: "en", status: null, badgeState: "unavailable", isOwner: false }),
+      );
+      expect(document.querySelector('[data-chapa-state="unavailable"]')).not.toBeNull();
+      expect(screen.getByTestId("share-status-visitor-sentence").textContent).toBe(
+        "Scoring status is temporarily unavailable. Try again shortly.",
+      );
+    });
+
+    it("shows the SAME one-sentence message to the owner (no ScoringStatusPanel — no real status to detail)", async () => {
+      render(
+        await SharePageScoringStatus({ handle: "octocat", locale: "en", status: null, badgeState: "unavailable", isOwner: true }),
+      );
+      expect(screen.getByTestId("share-status-visitor-sentence").textContent).toBe(
+        "Scoring status is temporarily unavailable. Try again shortly.",
+      );
+      expect(screen.queryByText("Scoring status")).toBeNull();
+    });
+
+    it("renders in Spanish when requested", async () => {
+      render(
+        await SharePageScoringStatus({ handle: "octocat", locale: "es", status: null, badgeState: "unavailable", isOwner: false }),
+      );
+      expect(screen.getByTestId("share-status-visitor-sentence").textContent).toBe(
+        "El estado de la puntuación no está disponible temporalmente. Vuelve a intentarlo en breve.",
+      );
+    });
+  });
 });

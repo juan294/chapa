@@ -1994,14 +1994,71 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockMaterializePublicProfile).toHaveBeenCalled();
     });
 
-    it("falls through to the normal pipeline (and reports the error) when the status read fails", async () => {
-      mockReadScoringStatus.mockRejectedValue(new Error("boom"));
-      const [request, ctx] = makeRequest("testuser");
-      await GET(request, ctx);
-      expect(mockMaterializePublicProfile).toHaveBeenCalled();
-      expect(mockCaptureServerError).toHaveBeenCalledWith(
-        expect.objectContaining({ route: "/u/testuser/badge.svg" }),
-      );
+    // #1335 phase 4 fix — `scoringStatus === null` (the authority read
+    // itself failed) must never fall through to whatever the normal
+    // materialize pipeline's OWN receipt lookup produces when THAT comes up
+    // without a real v7.2 receipt (`FAKE_MATERIALIZED.scoring.policyVersion`
+    // is "v6"): rendering that would be exactly the legacy v6 fallback the
+    // plan's "failed authority reads are unavailable" invariant forbids.
+    describe("authority read failure (scoringStatus === null)", () => {
+      it("still runs materialize (to check for an independently-drawable receipt) and reports the read failure", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        const [request, ctx] = makeRequest("testuser");
+        await GET(request, ctx);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+        expect(mockCaptureServerError).toHaveBeenCalledWith(
+          expect.objectContaining({ route: "/u/testuser/badge.svg" }),
+        );
+      });
+
+      it("renders the unavailable placeholder (never the v6 fallback) when materialize also has no drawable v7.2 receipt", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        // FAKE_MATERIALIZED.scoring.policyVersion is "v6" — no real receipt.
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(body).toContain('data-chapa-state="unavailable"');
+        expect(body).toContain("Scoring status unavailable");
+        expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+        expect(response.headers.get("Vercel-CDN-Cache-Control")).toBe("no-store");
+        // Never the v6-shaped render: renderBadgeSvg (mocked to FAKE_SVG) is
+        // the ONLY thing that could have drawn a v6 score, and it must never
+        // be reached for this state.
+        expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+        expect(body).not.toBe(FAKE_SVG);
+      });
+
+      it("renders that receipt normally (not the unavailable placeholder) when materialize independently finds a real v7.2 receipt", async () => {
+        mockReadScoringStatus.mockResolvedValue(null);
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: { ...FAKE_MATERIALIZED.scoring, policyVersion: "v7.2" as const },
+        });
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(body).not.toContain('data-chapa-state="unavailable"');
+        expect(mockRenderBadgeSvg).toHaveBeenCalled();
+        expect(body).toBe(FAKE_SVG);
+      });
+
+      it("renders in Spanish when requested", async () => {
+        mockReadScoringStatus.mockResolvedValue(null);
+        const [request, ctx] = makeRequest("testuser", {}, "?lang=es");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(body).toContain("Estado de la puntuación no disponible");
+      });
+
+      it("never fires for an explicit v6 selection", async () => {
+        mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+        const [request, ctx] = makeRequest("testuser");
+        const response = await GET(request, ctx);
+        const body = await response.text();
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(body).not.toContain('data-chapa-state="unavailable"');
+        expect(mockRenderBadgeSvg).toHaveBeenCalled();
+      });
     });
   });
 });

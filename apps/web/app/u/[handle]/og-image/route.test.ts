@@ -645,11 +645,62 @@ describe("GET /u/[handle]/og-image — locale (#1190)", () => {
       expect(mockMaterializePublicProfile).toHaveBeenCalled();
     });
 
-    it("falls through to the normal pipeline when the status read fails", async () => {
-      mockReadScoringStatus.mockRejectedValue(new Error("boom"));
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    // #1335 phase 4 fix — a failed authority read must never fall through
+    // to whatever the normal materialize pipeline's OWN receipt lookup
+    // produces when THAT also has no v7.2 receipt (FAKE_MATERIALIZED has no
+    // `scoring` field at all here). See badge.svg's equivalent describe
+    // block for the full rationale.
+    describe("authority read failure (scoringStatus === null)", () => {
+      it("still runs materialize and reports the read failure", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        const [req, ctx] = makeRequest("testuser");
+        await GET(req, ctx);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      });
+
+      it("rasterizes the unavailable placeholder (never the v6 fallback) when materialize also has no drawable v7.2 receipt", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        const [req, ctx] = makeRequest("testuser");
+        const res = await GET(req, ctx);
+        const body = new TextDecoder().decode(await res.arrayBuffer());
+        expect(body).toContain('data-chapa-state="unavailable"');
+        expect(body).toContain("Scoring status unavailable");
+        expect(res.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
+        expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+        expect(body).not.toBe(FAKE_SVG);
+      });
+
+      it("rasterizes that receipt normally when materialize independently finds a real v7.2 receipt", async () => {
+        mockReadScoringStatus.mockResolvedValue(null);
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: { policyVersion: "v7.2" as const, tier: "Solid" },
+        });
+        const [req, ctx] = makeRequest("testuser");
+        const res = await GET(req, ctx);
+        const body = new TextDecoder().decode(await res.arrayBuffer());
+        expect(body).not.toContain('data-chapa-state="unavailable"');
+        expect(mockRenderBadgeSvg).toHaveBeenCalled();
+        expect(body).toBe(FAKE_SVG);
+      });
+
+      it("renders in Spanish when requested", async () => {
+        mockReadScoringStatus.mockResolvedValue(null);
+        const [req, ctx] = makeRequest("testuser", "es");
+        const res = await GET(req, ctx);
+        const body = new TextDecoder().decode(await res.arrayBuffer());
+        expect(body).toContain("Estado de la puntuación no disponible");
+      });
+
+      it("never fires for an explicit v6 selection", async () => {
+        mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+        const [req, ctx] = makeRequest("testuser");
+        const res = await GET(req, ctx);
+        const body = new TextDecoder().decode(await res.arrayBuffer());
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(body).not.toContain('data-chapa-state="unavailable"');
+        expect(mockRenderBadgeSvg).toHaveBeenCalled();
+      });
     });
   });
 });

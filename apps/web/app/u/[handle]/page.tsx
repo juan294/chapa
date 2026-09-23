@@ -302,6 +302,28 @@ export async function SharePageContent({
   const materialized = materialization;
   const isOwner = session?.login === handle;
 
+  // #1335 phase 4 fix — `scoringStatus === null` means the `readScoringStatus`
+  // authority read itself failed under v7.2 (not "no receipt found"; that is
+  // its own real `ScoringStatus`, handled above). "Failed authority reads are
+  // unavailable": this must never silently fall through to whatever the
+  // normal materialize pipeline above already produced when THAT also has no
+  // v7.2 receipt to draw. A handle WITH a drawable receipt (found
+  // independently by that same materialize call) still renders it normally
+  // below — reuses the exact same status-placeholder component as
+  // `collecting`/`action_needed`/`unregistered` rather than inventing a
+  // second one.
+  if (scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && materialized && materialized.scoring?.policyVersion !== "v7.2") {
+    return (
+      <SharePageScoringStatus
+        handle={handle}
+        locale={locale}
+        status={null}
+        badgeState="unavailable"
+        isOwner={isOwner}
+      />
+    );
+  }
+
   // #1332 — owner-only, cheap (single indexed SELECT on `user_platforms` by
   // handle, no token decryption): a linked source whose refresh grant needs
   // reconnecting has no other owner-visible surface on this dynamic (never

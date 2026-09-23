@@ -1,7 +1,7 @@
 import { getServerT } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
 import type { Locale } from "@/lib/i18n";
-import { renderBadgeStatusSvg, buildBadgeStatusStrings, type BadgeStatusState, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { renderBadgeStatusSvg, buildBadgeStatusStrings, buildBadgeUnavailableStrings, type BadgeStatusState, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import { InlineBadgeSvg } from "@/components/badge/InlineBadgeSvg";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
@@ -13,19 +13,23 @@ const VISITOR_KEYS: Record<BadgeStatusState, string> = {
   collecting: "scoring.status.visitorCollecting",
   action_needed: "scoring.status.visitorActionNeeded",
   unregistered: "scoring.status.visitorUnregistered",
+  unavailable: "scoring.status.visitorUnavailable",
 };
 
 /**
  * The share page's content when there is no receipt to draw yet (#1335
  * phase 4) — a handle that is collecting evidence, paused on an owner
- * action, or has never signed up. Rendered by `SharePageContent` in place
+ * action, has never signed up, or (`status: null`) whose scoring-status
+ * authority read itself failed. Rendered by `SharePageContent` in place
  * of the normal materialize/breakdown pipeline: there is no score to
  * fetch or explain, so this is a deliberately smaller subtree, not a
  * variant of `SharePageOwnerContent`.
  *
  * Visitors see the badge state plus one sentence. The owner sees the full
  * per-provider `ScoringStatusPanel` — the same component `/settings` uses,
- * given the exact status this page already resolved (no second fetch).
+ * given the exact status this page already resolved (no second fetch) —
+ * except for `status: null`, where there is no real `ScoringStatus` to
+ * detail, so the owner sees the same one-sentence message as a visitor.
  */
 export async function SharePageScoringStatus({
   handle,
@@ -36,7 +40,7 @@ export async function SharePageScoringStatus({
 }: {
   handle: string;
   locale: Locale;
-  status: NonReadyScoringStatus;
+  status: NonReadyScoringStatus | null;
   badgeState: BadgeStatusState;
   isOwner: boolean;
 }) {
@@ -44,10 +48,12 @@ export async function SharePageScoringStatus({
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
   const svg = renderBadgeStatusSvg(badgeState, {
     handle,
-    percent: status.kind === "collecting" ? status.percent : undefined,
+    percent: status?.kind === "collecting" ? status.percent : undefined,
     config: configSnapshot.config,
     disableAnimation: false,
-    strings: buildBadgeStatusStrings((key) => t(key) as string, status, interpolate),
+    strings: status
+      ? buildBadgeStatusStrings((key) => t(key) as string, status, interpolate)
+      : buildBadgeUnavailableStrings((key) => t(key) as string),
   });
   const badgeLabelId = `share-badge-status-label-${handle}`;
 
@@ -74,7 +80,7 @@ export async function SharePageScoringStatus({
         <BadgeToolbar handle={handle} isOwner={isOwner} />
       </div>
 
-      {isOwner ? (
+      {isOwner && status ? (
         <ScoringStatusPanel initialStatus={status} />
       ) : (
         <p className="text-sm text-text-secondary text-pretty" data-testid="share-status-visitor-sentence">

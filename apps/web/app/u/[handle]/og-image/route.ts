@@ -27,7 +27,7 @@ import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { getServerT } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
-import { badgeStatusState, buildBadgeStatusStrings, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 const OG_CACHE_TTL = 172800; // 48 hours
@@ -184,6 +184,32 @@ export async function GET(
     }
     if (!materialized) {
       return new NextResponse("Could not load data", { status: 404, headers: ERROR_CACHE_HEADERS });
+    }
+
+    // #1335 phase 4 fix — `scoringStatus === null` means the
+    // `readScoringStatus` authority read itself failed under v7.2 (not "no
+    // receipt found"; that is its own real `ScoringStatus`). "Failed
+    // authority reads are unavailable": this must never silently fall
+    // through to whatever the normal materialize pipeline's OWN independent
+    // receipt lookup produces when THAT also has no v7.2 receipt to draw. A
+    // handle WITH a drawable receipt (found independently right here) still
+    // rasterizes it normally below — reuses the exact same status-
+    // placeholder path as `collecting`/`action_needed`/`unregistered`.
+    if (scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && materialized.scoring?.policyVersion !== "v7.2") {
+      try {
+        const t = getServerT(locale);
+        const statusSvg = renderBadgeStatusSvg("unavailable", {
+          handle,
+          disableAnimation: true,
+          strings: buildBadgeUnavailableStrings((key) => t(key) as string),
+        });
+        const statusPng = await withTimeout(svgToPng(statusSvg, 1200), SVG_TO_PNG_TIMEOUT_MS, "svgToPng");
+        return new NextResponse(Buffer.from(statusPng), { headers: ogImageNoStoreHeaders(scoringSelection) });
+      } catch (err) {
+        console.error("[og-image] failed to render unavailable placeholder:", err);
+        // Fall through to the normal pipeline below rather than fail the
+        // whole request over a rendering hiccup on the placeholder.
+      }
     }
 
     const avatarDataUri = materialized.stats.avatarUrl

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { badgeStatusState, renderBadgeStatusSvg, buildBadgeStatusStrings } from "./badge-state";
+import { badgeStatusState, renderBadgeStatusSvg, buildBadgeStatusStrings, buildBadgeUnavailableStrings } from "./badge-state";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 import { interpolate } from "@/lib/i18n/interpolate";
 
@@ -103,6 +103,36 @@ describe("renderBadgeStatusSvg", () => {
     });
   });
 
+  // #1335 phase 4 fix — a failed `readScoringStatus` authority read (the
+  // read itself failed, not "no receipt") reuses this exact placeholder path
+  // rather than falling through to a legacy v6 render. See badge.svg/
+  // og-image/page.tsx: this is drawn ONLY when the normal pipeline's own
+  // independent receipt lookup also failed to find a real v7.2 receipt.
+  describe("unavailable (authority read failed)", () => {
+    it("carries data-chapa-state=unavailable and the English default heading", () => {
+      const svg = renderBadgeStatusSvg("unavailable", { handle: "octocat" });
+      expect(svg).toContain('data-chapa-state="unavailable"');
+      expect(svg).toContain("Scoring status unavailable");
+    });
+
+    it("shows the identity header but no score/radar/heatmap elements", () => {
+      const svg = renderBadgeStatusSvg("unavailable", { handle: "octocat" });
+      expect(svg).toContain("@octocat");
+      expect(svg).not.toContain('data-element="score"');
+      expect(svg).not.toContain('data-element="dimensions"');
+      expect(svg).not.toContain('data-element="activity"');
+    });
+
+    it("prefers a locale-resolved heading over the English default", () => {
+      const svg = renderBadgeStatusSvg("unavailable", {
+        handle: "octocat",
+        strings: { unavailableHeading: "Estado de la puntuación no disponible" },
+      });
+      expect(svg).toContain("Estado de la puntuación no disponible");
+      expect(svg).not.toContain("Scoring status unavailable");
+    });
+  });
+
   describe("XSS boundary", () => {
     it("escapes a hostile handle", () => {
       const svg = renderBadgeStatusSvg("unregistered", { handle: "user<script>alert(1)</script>" });
@@ -150,5 +180,12 @@ describe("buildBadgeStatusStrings", () => {
     const strings = buildBadgeStatusStrings(t, { kind: "unregistered" }, interpolate);
     expect(strings.unregisteredHeading).toBe("[scoring.status.badgeUnregistered]");
     expect(strings.unregisteredDomain).toBe("[scoring.status.badgeUnregisteredDomain]");
+  });
+});
+
+describe("buildBadgeUnavailableStrings", () => {
+  it("resolves the unavailable heading", () => {
+    const strings = buildBadgeUnavailableStrings((key) => `[${key}]`);
+    expect(strings.unavailableHeading).toBe("[scoring.status.badgeUnavailable]");
   });
 });

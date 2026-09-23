@@ -48,7 +48,7 @@ import {
 } from "@/lib/monitoring/latency-slo";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
-import { badgeStatusState, buildBadgeStatusStrings, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 export const maxDuration = 35;
@@ -847,6 +847,50 @@ export async function GET(
     // Re-bind to a `const` now that `materialized` is known non-null — `let`
     // narrowing does not persist into the `after()` closure below.
     const profile = materialized;
+
+    // #1335 phase 4 fix — `scoringStatus === null` means the
+    // `readScoringStatus` authority read itself failed under v7.2 (not "no
+    // receipt found"; that is its own real `ScoringStatus`). The plan's
+    // invariant is "failed authority reads are unavailable": this must never
+    // silently fall through to a legacy v6 render just because the normal
+    // materialize pipeline's OWN independent receipt lookup also came up
+    // without a v7.2 receipt. A handle WITH a drawable receipt (found
+    // independently right here) still renders it normally below — this
+    // reuses the exact same status-placeholder path as `collecting`/
+    // `action_needed`/`unregistered` rather than inventing a second one.
+    if (scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && profile.scoring?.policyVersion !== "v7.2") {
+      try {
+        const t = getServerT(locale);
+        const svg = renderBadgeStatusSvg("unavailable", {
+          handle,
+          disableAnimation: true,
+          strings: buildBadgeUnavailableStrings((key) => t(key) as string),
+        });
+        const unavailableResult = {
+          svg,
+          headers: {
+            "Content-Type": "image/svg+xml",
+            "Cache-Control": "private, no-store, max-age=0",
+            "Vercel-CDN-Cache-Control": "no-store",
+          },
+          selection: scoringSelection,
+        } satisfies BadgeRenderResult;
+        deferred.resolve(unavailableResult);
+        return badgeSvgResponse(unavailableResult.svg, unavailableResult.headers, startedAt, [
+          ...cacheTimeoutMetric,
+          { name: "materialize", durMs: materializeMs },
+        ]);
+      } catch (err) {
+        fireAndForget(() => captureServerError({
+          route: `/u/${handle}/badge.svg`,
+          statusCode: 500,
+          error: err,
+        }));
+        // Fall through to the normal render below rather than 500 on a
+        // legal handle over a rendering hiccup on the unavailable placeholder.
+      }
+    }
+
     const { svg, verification, renderMs, avatarCachePolicy, configCacheable, configRevision } = await finalizeMaterializedBadge(
       handle,
       profile,

@@ -794,11 +794,48 @@ describe("Phase 4d — Share page i18n", () => {
       expect(mockMaterializePublicProfile).toHaveBeenCalled();
     });
 
-    it("falls through to the normal pipeline when the status read fails", async () => {
-      mockReadScoringStatus.mockRejectedValue(new Error("boom"));
-      const result = await SharePageContent({ handle: "testuser" });
-      expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
-      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    // #1335 phase 4 fix — a failed authority read must never fall through
+    // to whatever the normal materialize pipeline's OWN receipt lookup
+    // produces when THAT also has no v7.2 receipt (this file's
+    // FAKE_MATERIALIZED.scoring.policyVersion is "v6"): rendering that would
+    // be exactly the legacy v6 fallback the plan's "failed authority reads
+    // are unavailable" invariant forbids. See badge.svg/og-image's
+    // equivalent describe blocks for the full rationale.
+    describe("authority read failure (scoringStatus === null)", () => {
+      it("still runs materialize (to check for an independently-drawable receipt)", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        await SharePageContent({ handle: "testuser" });
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      });
+
+      it("renders SharePageScoringStatus with badgeState=unavailable, status=null when materialize also has no drawable v7.2 receipt", async () => {
+        mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+        mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+        const result = await SharePageContent({ handle: "testuser" });
+        const found = findElementByType(result, mockSharePageScoringStatusComponent);
+        expect(found).not.toBeNull();
+        expect(found?.props).toMatchObject({ handle: "testuser", badgeState: "unavailable", status: null, isOwner: true });
+      });
+
+      it("renders normally (not the unavailable placeholder) when materialize independently finds a real v7.2 receipt", async () => {
+        mockReadScoringStatus.mockResolvedValue(null);
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: { ...FAKE_MATERIALIZED.scoring, policyVersion: "v7.2" },
+        });
+        const result = await SharePageContent({ handle: "testuser" });
+        expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      });
+
+      it("never fires for an explicit v6 selection", async () => {
+        mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+        mockReadScoringStatus.mockResolvedValue(null);
+        const result = await SharePageContent({ handle: "testuser" });
+        expect(mockReadScoringStatus).not.toHaveBeenCalled();
+        expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      });
     });
 
     it("renders normally (no gating) when the receipt is ready", async () => {

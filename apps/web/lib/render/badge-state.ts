@@ -16,12 +16,20 @@ import type { ScoringStatus, ScoringStatusKind } from "@/lib/collection/scoring-
  * - `action_needed` — collection stalled on something only the owner can fix
  *   (a lost connection, an exhausted retry budget).
  * - `unregistered` — the handle has never signed up.
+ * - `unavailable` — the `readScoringStatus` authority read itself failed (a
+ *   genuine DB error, never "no receipt found"). Under the plan's invariant
+ *   ("failed authority reads are unavailable"), this must never fall through
+ *   to a legacy v6 render: drawn ONLY when the normal materialize pipeline's
+ *   own independent receipt lookup also failed to find a real v7.2 receipt
+ *   (a handle WITH a drawable receipt still renders it normally — see each
+ *   route's post-materialize check). Not derived from a `ScoringStatus` at
+ *   all, since the whole point is that no `ScoringStatus` could be read.
  *
- * These states intentionally reuse `ScoringStatusKind`'s own string values as
- * the `data-chapa-state` attribute, so the release probe and monitoring never
- * need a second vocabulary for the same fact.
+ * These states intentionally reuse `ScoringStatusKind`'s own string values
+ * (plus `unavailable`) as the `data-chapa-state` attribute, so the release
+ * probe and monitoring never need a second vocabulary for the same fact.
  */
-export type BadgeStatusState = Exclude<ScoringStatusKind, "ready">;
+export type BadgeStatusState = Exclude<ScoringStatusKind, "ready"> | "unavailable";
 
 /** A `ScoringStatus` known not to be `ready` — what every placeholder-drawing
  * helper below actually consumes, since a `ready` status never reaches them
@@ -61,6 +69,7 @@ export interface BadgeStatusStrings {
   actionNeededHeading?: string;
   unregisteredHeading?: string;
   unregisteredDomain?: string;
+  unavailableHeading?: string;
   tagline?: string;
 }
 
@@ -140,6 +149,9 @@ export function renderBadgeStatusSvg(state: BadgeStatusState, options: BadgeStat
       heading = strings.unregisteredHeading ?? "Not on Chapa yet";
       body = strings.unregisteredDomain ?? "chapa.thecreativetoken.com";
       break;
+    case "unavailable":
+      heading = strings.unavailableHeading ?? "Scoring status unavailable";
+      break;
   }
 
   const accessibleTitle = `${displayName ? escapeXml(displayName) : `@${safeHandle}`} — Chapa ${escapeXml(heading)}`;
@@ -175,4 +187,14 @@ export function buildBadgeStatusStrings(t: (key: string) => string, status: NonR
         unregisteredDomain: t("scoring.status.badgeUnregisteredDomain"),
       };
   }
+}
+
+/**
+ * Locale-resolved strings for the `unavailable` state — no interpolation
+ * needed (no percent, no receipt-derived data), so this takes no
+ * `ScoringStatus` at all: there is no status to read from when the read
+ * itself is what failed.
+ */
+export function buildBadgeUnavailableStrings(t: (key: string) => string): BadgeStatusStrings {
+  return { unavailableHeading: t("scoring.status.badgeUnavailable") };
 }
