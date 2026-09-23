@@ -1,7 +1,7 @@
 import { createScoringWindow, sealObservedScoreReceipt, type CoreCountInputs, type ImpactV6Result, type PublicObservedCraft } from "@chapa/shared";
 import { observedReceiptFixture } from "@/lib/history/__fixtures__/receipts-observed";
 import { calculateReportCraftInputs } from "@/lib/insights/report-craft";
-import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
+import { DEMO_STATS } from "@/lib/render/demoData";
 import { observedReceiptViewModel } from "../score-view-model";
 
 /** Synthetic, replayable current receipt beside deliberately contradictory legacy fields. */
@@ -29,7 +29,10 @@ export async function scoringConsistencyFixture(options: { craft?: "none" | 57 |
     receiptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", revisionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" });
   const envelope = await sealObservedScoreReceipt({ ...base.receipt, coverage: [{ sourceRef: "source-1", provider: "github", status: "partial", dataThrough: referenceTime, discovery: "owned_and_contributed", accessibleRepositoryCount: 4, repositoryDiscoveryComplete: false, reasonCodes: ["discovery_incomplete"], unknownPeriods: [] }] });
   const model = observedReceiptViewModel("alice", { receipt: envelope, trend: null }, Date.parse(referenceTime));
-  const impact: ImpactV6Result = { ...DEMO_IMPACT, handle: "alice", dimensions: { delivery: 88, quality: 72, consistency: 80, breadth: 65, craft: 83 }, archetype: "Builder", compositeScore: 80, adjustedComposite: 80, tier: "High", computedAt: referenceTime };
+  // #1335 — this legacy v6 literal no longer spreads DEMO_IMPACT (now a v7.2
+  // ScoreViewModel, lib/render/demoData.ts); every ImpactV6Result field is
+  // explicit here instead, preserving the fixture's prior values.
+  const impact: ImpactV6Result = { handle: "alice", profileType: "collaborative", dimensions: { delivery: 88, quality: 72, consistency: 80, breadth: 65, craft: 83 }, archetype: "Builder", compositeScore: 80, confidence: 87, confidencePenalties: [], adjustedComposite: 80, tier: "High", computedAt: referenceTime };
   const stats = { ...DEMO_STATS, handle: "alice", displayName: "Alice Example", fetchedAt: referenceTime };
   return { impact, stats, model, envelope };
 }

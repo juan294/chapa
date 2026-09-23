@@ -270,8 +270,8 @@ import type {
   BadgeConfig,
   CraftResult,
   StatsData,
-  ImpactV6Result,
 } from "@chapa/shared";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 
 // ---------- Test fixtures ----------
 
@@ -297,23 +297,11 @@ const stats: StatsData = {
   fetchedAt: new Date().toISOString(),
 };
 
-const impact: ImpactV6Result = {
+const scoring: ScoreViewModel = makeScoring({
   handle: "testuser",
-  profileType: "solo",
-  dimensions: {
-    delivery: 60,
-    quality: 70,
-    consistency: 80,
-    breadth: 50,
-  },
-  archetype: "Builder",
-  compositeScore: 65,
-  confidence: 85,
-  confidencePenalties: [],
-  adjustedComposite: 65,
   tier: "Solid",
-  computedAt: new Date().toISOString(),
-};
+  archetype: "Builder",
+});
 
 const craftResult: CraftResult = {
   tool: "claude-code",
@@ -353,7 +341,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           handle="testuser"
         />,
       );
@@ -365,7 +353,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const heading = screen.getByRole("heading", { level: 1 });
@@ -382,7 +370,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       expect(screen.getByTestId("studio-visible-title").textContent).toBe(
@@ -398,16 +386,16 @@ describe("StudioClient render", () => {
         ? "Changes preview locally until you save. Save updates your public badge, share page, and social preview."
         : "Los cambios se previsualizan aquí hasta que guardas. Guardar actualiza tu Chapa pública, página compartida y vista previa social.";
       const demoText = locale === "en" ? "Illustrative demo. Changes stay in this preview; Save does not publish them." : "Demo ilustrativa. Los cambios se quedan en esta vista previa; Guardar no los publica.";
-      const { rerender } = render(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} /></LanguageContext.Provider>);
+      const { rerender } = render(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} /></LanguageContext.Provider>);
       expect(screen.getByTestId("studio-visible-subtitle").textContent).toBe(live);
-      rerender(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} demo /></LanguageContext.Provider>);
+      rerender(<LanguageContext.Provider value={languageValue(locale)}><StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} demo /></LanguageContext.Provider>);
       expect(screen.getByTestId("studio-visible-subtitle").textContent).toBe(demoText);
       expect(screen.getByText(locale === "en" ? "Demo preview only" : "Solo vista previa de demo")).toBeDefined();
     });
 
     it("forwards observed core46 and report0 unchanged to the real preview boundary", async () => {
       const fixture = await scoringConsistencyFixture({ craft: 0 });
-      render(<StudioClient initialConfig={defaultConfig} stats={fixture.stats} impact={fixture.impact} scoring={fixture.model} />);
+      render(<StudioClient initialConfig={defaultConfig} stats={fixture.stats} scoring={fixture.model} />);
       const model = JSON.parse(screen.getByTestId("badge-preview").getAttribute("data-scoring")!);
       expect(model).toEqual(fixture.model);
       expect(model.composite.display).toBe(46);
@@ -419,7 +407,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           craftResult={craftResult}
         />,
       );
@@ -448,7 +436,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const root = screen.getByTestId("studio-root");
@@ -462,7 +450,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const stage = screen.getByTestId("studio-stage");
@@ -482,7 +470,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       // Applying an effect used to grow the session log, grow the page, and
@@ -522,7 +510,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const log = screen.getByTestId("studio-session-log");
@@ -539,7 +527,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           demo
         />,
       );
@@ -550,7 +538,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -562,7 +550,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const preview = screen.getByTestId("badge-preview");
@@ -575,7 +563,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           verification={{ hash: "abc123", date: "2026-08-26" }}
         />,
       );
@@ -593,7 +581,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           avatarDataUri="data:image/png;base64,AAAA"
         />,
       );
@@ -608,7 +596,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -630,7 +618,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const initialInstanceId = screen
@@ -651,7 +639,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const output = screen.getByTestId("terminal-output");
@@ -664,7 +652,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const input = screen.getByLabelText("Terminal command input");
@@ -676,7 +664,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const qc = screen.getByTestId("quick-controls");
@@ -694,7 +682,7 @@ describe("StudioClient render", () => {
 
       const { rerender } = render(
         <LanguageContext.Provider value={languageValue("es")}>
-          <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />
+          <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />
         </LanguageContext.Provider>,
       );
       expect(screen.getByTestId("terminal-output").textContent).toContain(
@@ -706,7 +694,7 @@ describe("StudioClient render", () => {
 
       rerender(
         <LanguageContext.Provider value={languageValue("en")}>
-          <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />
+          <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />
         </LanguageContext.Provider>,
       );
 
@@ -741,7 +729,7 @@ describe("StudioClient render", () => {
       }));
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
 
       act(() => {
@@ -771,7 +759,7 @@ describe("StudioClient render", () => {
       vi.mocked(executeCommand).mockReturnValue(commandResult);
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
 
       let returned: unknown;
@@ -794,7 +782,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const input = screen.getByLabelText("Terminal command input");
@@ -808,7 +796,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const input = screen.getByLabelText("Terminal command input");
@@ -827,7 +815,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const input = screen.getByLabelText("Terminal command input");
@@ -852,7 +840,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const qc = screen.getByTestId("quick-controls");
@@ -864,7 +852,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const toggle = screen.getByTestId("qc-toggle");
@@ -879,7 +867,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
@@ -895,7 +883,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe(
@@ -908,7 +896,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       const cmdBtn = screen.getByTestId("qc-command");
@@ -930,7 +918,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           demo
         />,
       );
@@ -956,7 +944,7 @@ describe("StudioClient render", () => {
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(new Response("{}", { status: 200 }));
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
 
       act(() => studioWebMcpMocks.options?.proposeSave());
@@ -986,7 +974,7 @@ describe("StudioClient render", () => {
     it("dismisses an agent save proposal without persisting", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
 
       act(() => studioWebMcpMocks.options?.proposeSave());
@@ -1018,7 +1006,7 @@ describe("StudioClient render", () => {
       });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       expect(screen.getByText("Configuration saved")).toBeDefined();
 
@@ -1039,7 +1027,7 @@ describe("StudioClient render", () => {
       });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/set bg solid" } });
@@ -1067,7 +1055,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1116,7 +1104,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1174,7 +1162,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1202,7 +1190,7 @@ describe("StudioClient render", () => {
       });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       fireEvent.click(screen.getByTestId("studio-save"));
 
@@ -1232,7 +1220,7 @@ describe("StudioClient render", () => {
       });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       fireEvent.click(screen.getByTestId("studio-save"));
 
@@ -1262,7 +1250,7 @@ describe("StudioClient render", () => {
       });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       fireEvent.click(screen.getByTestId("studio-save"));
 
@@ -1283,7 +1271,7 @@ describe("StudioClient render", () => {
       });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       const save = screen.getByTestId("studio-save");
       fireEvent.click(save);
@@ -1305,7 +1293,7 @@ describe("StudioClient render", () => {
       );
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       fireEvent.click(screen.getByTestId("studio-save"));
 
@@ -1331,7 +1319,7 @@ describe("StudioClient render", () => {
       }));
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/save" } });
@@ -1360,7 +1348,7 @@ describe("StudioClient render", () => {
       });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       fireEvent.click(screen.getByTestId("studio-save"));
 
@@ -1394,7 +1382,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={{ ...defaultConfig, background: "aurora" }}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1428,7 +1416,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1459,7 +1447,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1487,7 +1475,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1517,7 +1505,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1545,7 +1533,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1571,7 +1559,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1593,7 +1581,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1616,7 +1604,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1639,7 +1627,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           handle="testuser"
         />,
       );
@@ -1661,7 +1649,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           demo
         />,
       );
@@ -1684,7 +1672,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1712,7 +1700,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1724,7 +1712,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1743,7 +1731,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1762,7 +1750,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1786,7 +1774,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1809,7 +1797,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
       expect(screen.getAllByText("Creator Studio").length).toBeGreaterThanOrEqual(1);
@@ -1835,7 +1823,7 @@ describe("StudioClient render", () => {
           <StudioClient
             initialConfig={defaultConfig}
             stats={stats}
-            impact={impact}
+            scoring={scoring}
           />,
         );
 
@@ -1852,7 +1840,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
         />,
       );
 
@@ -1886,7 +1874,7 @@ describe("StudioClient render", () => {
 
     it("does not warn on unload in the initial 'saved' state", () => {
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       const event = dispatchBeforeUnload();
       expect(event.defaultPrevented).toBe(false);
@@ -1901,7 +1889,7 @@ describe("StudioClient render", () => {
         action: { type: "set", category: "background", value: "aurora" },
       });
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/set bg aurora" } });
@@ -1927,7 +1915,7 @@ describe("StudioClient render", () => {
         .mockReturnValueOnce({ lines: [], action: { type: "save" } });
 
       render(
-        <StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />,
+        <StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />,
       );
       const input = screen.getByLabelText("Terminal command input");
       fireEvent.change(input, { target: { value: "/set bg aurora" } });
@@ -1955,7 +1943,7 @@ describe("StudioClient render", () => {
         <StudioClient
           initialConfig={defaultConfig}
           stats={stats}
-          impact={impact}
+          scoring={scoring}
           demo
         />,
       );
@@ -1981,7 +1969,7 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
       <StudioClient
         initialConfig={defaultConfig}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
         handle="testuser"
       />,
     );
@@ -2141,7 +2129,7 @@ describe("StudioClient — v3 horizontal split (#1241)", () => {
       <StudioClient
         initialConfig={{ ...defaultConfig, background: "aurora" }}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
         handle="testuser"
       />,
     );
@@ -2196,21 +2184,21 @@ describe("persisted configuration and pending response bodies", () => {
       if (failure === "transport") throw new Error("offline");
       return new Response("{}", { status: failure as number });
     });
-    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />);
     await command({ type: "set", category: "background", value: "aurora" });
     await command({ type: "save" });
     await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
     expect(unload()).toBe(true);
   });
   it("clears unsaved protection when edits return to the persisted config", async () => {
-    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />);
     await command({ type: "set", category: "background", value: "aurora" });
     expect(unload()).toBe(true);
     await command({ type: "set", category: "background", value: defaultConfig.background });
     expect(unload()).toBe(false);
   });
   it("reset to the persisted defaults clears both dirty status and protection", async () => {
-    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />);
     await command({ type: "set", category: "background", value: "aurora" });
     await command({ type: "reset" });
     expect(screen.getByText("Configuration saved")).toBeDefined();
@@ -2220,7 +2208,7 @@ describe("persisted configuration and pending response bodies", () => {
     let finishBody!: (value: unknown) => void;
     const json = vi.fn(() => new Promise((resolve) => { finishBody = resolve; }));
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json } as unknown as Response);
-    render(<StudioClient initialConfig={defaultConfig} stats={stats} impact={impact} />);
+    render(<StudioClient initialConfig={defaultConfig} stats={stats} scoring={scoring} />);
     await command({ type: "set", category: "background", value: "aurora" });
     await command({ type: "save" });
     await waitFor(() => expect(json).toHaveBeenCalled());

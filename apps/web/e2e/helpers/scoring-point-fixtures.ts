@@ -7,7 +7,6 @@ import { canonicalJson, canonicalSha256, createScoringWindow, DEFAULT_BADGE_CONF
 import { observedReceiptFixture } from "../../lib/history/__fixtures__/receipts-observed";
 import { calculateReportCraftInputs } from "../../lib/insights/report-craft";
 import { observedSemanticIdentity } from "../../lib/profile/receipt-semantic-identity";
-import { DEMO_IMPACT } from "../../lib/render/demoData";
 import { buildStatsCacheEnvelope, statsCacheBindingBytes } from "../../lib/cache/stats-cache-envelope";
 import { buildRedesignGitHubFixture } from "./redesign-github";
 import { localCandidateTarget } from "./local-candidate";
@@ -48,8 +47,7 @@ export async function buildScoringPointSeeds(referenceTime: string) {
     const counts: CoreCountInputs | undefined = handle.endsWith("boundary") ? { deliveryUnits: fixed(14), quality: { rationale: fixed(1), verification: fixed(1), review_or_correction: fixed(1), outcome_followup: fixed(1) }, activeIsoWeeks: fixed(35), eligibleProjects: fixed(4), eligibleCategories: fixed(4) } : undefined;
     const envelope = await observedReceiptFixture({ referenceTime: window.referenceTime, craft, counts });
     const stats = buildRedesignGitHubFixture(handle, referenceTime).stats;
-    const legacyImpact = { ...DEMO_IMPACT, handle, adjustedComposite: 80, compositeScore: 80, archetype: "Builder" as const, dimensions: { delivery: 100, quality: 74, consistency: 67, breadth: 71, craft: 83 }, computedAt: referenceTime };
-    return { handle, envelope, stats, legacyImpact };
+    return { handle, envelope, stats };
   }));
 }
 /** The existing fixture session uses the same local-only token as the server.
@@ -99,11 +97,10 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
     const cache: Record<string, string> = {};
     const owners: Record<string, { revisionId: string; receiptId: string; contentHash: string; verificationToken: string }> = {};
     for (const seed of seeds) {
-      const { handle, envelope, stats, legacyImpact } = seed; const receipt = envelope.receipt;
+      const { handle, envelope, stats } = seed; const receipt = envelope.receipt;
       await check(db.from("users").insert({ handle, display_name: handle }));
       await check(db.from("studio_configs").insert({ handle, config: DEFAULT_BADGE_CONFIG }));
       await check(db.from("tool_insights").insert({ handle, tool: "claude-code", report_start: receipt.window.referenceDate, report_end: receipt.window.referenceDate, raw_data: { sentinel: "SCORING_PRIVATE_SENTINEL" }, proficiency: 83, effectiveness: 83, sophistication: 83, craft_score: 83, craft_tier: "Expert" }));
-      await check(db.from("metrics_snapshots").insert({ handle, date: receipt.window.referenceDate, captured_at: options.referenceTime, commits_total: stats.commitsTotal, prs_merged_count: stats.prsMergedCount, prs_merged_weight: stats.prsMergedWeight, reviews_submitted: stats.reviewsSubmittedCount, issues_closed: stats.issuesClosedCount, repos_contributed: stats.reposContributed, active_days: stats.activeDays, lines_added: stats.linesAdded, lines_deleted: stats.linesDeleted, total_stars: stats.totalStars, total_forks: stats.totalForks, total_watchers: stats.totalWatchers, top_repo_share: stats.topRepoShare, building: 100, guarding: 74, consistency: 67, breadth: 71, archetype: "Builder", profile_type: legacyImpact.profileType, composite_score: 80, adjusted_composite: 80, confidence: 90, tier: "High", craft: 83 }));
       await check(db.rpc("scoring_v7_ensure_subject", { p_owner: handle }));
       const coreDigest = await canonicalSha256({ fixture: "scoring-point-v1", counts: receipt.inputs.counts });
       await check(db.rpc("scoring_observed_publish_receipt", { p_owner: handle, p_actor: handle, p_receipt: receipt, p_canonical: canonicalJson(receipt), p_semantic_digest: await observedSemanticIdentity(coreDigest, receipt.craft), p_core_semantic_digest: coreDigest }));

@@ -306,7 +306,7 @@ describe("landing badge locale", () => {
     const { renderBadgeSvg } = await import("@/lib/render/BadgeSvg");
     vi.mocked(renderBadgeSvg).mockClear();
     await renderHome(locale);
-    expect(renderBadgeSvg).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({
+    expect(renderBadgeSvg).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       demoMode: true,
       strings: expect.objectContaining({ activityHeading, impactHeading, heatmapCaption }),
     }));
@@ -320,27 +320,25 @@ describe("landing badge locale", () => {
     const calls = vi.mocked(renderBadgeSvg).mock.calls;
     expect(calls).toHaveLength(2);
     const [hero, readme] = calls;
-    expect(hero![1]).toMatchObject({ adjustedComposite: 92, tier: "Elite", archetype: "Balanced" });
+    expect(hero![1]?.scoring).toMatchObject({ composite: { display: 92 }, tier: "Elite", archetype: "Balanced" });
     expect(readme![0]).toBe(hero![0]);
-    expect(readme![1]).toBe(hero![1]);
-    expect(readme![2]?.strings).toBe(hero![2]?.strings);
-    expect(hero![2]).toMatchObject({ demoMode: true, includeBranding: true });
-    expect(hero![2]?.disableAnimation).not.toBe(true);
-    expect(readme![2]).toMatchObject({ demoMode: true, includeBranding: true, disableAnimation: true });
-    expect(hero![2]).not.toHaveProperty("verificationHash");
-    expect(readme![2]).not.toHaveProperty("verificationHash");
+    expect(readme![1]?.scoring).toBe(hero![1]?.scoring);
+    expect(readme![1]?.strings).toBe(hero![1]?.strings);
+    expect(hero![1]).toMatchObject({ demoMode: true, includeBranding: true });
+    expect(hero![1]?.disableAnimation).not.toBe(true);
+    expect(readme![1]).toMatchObject({ demoMode: true, includeBranding: true, disableAnimation: true });
+    expect(hero![1]).not.toHaveProperty("verificationHash");
+    expect(readme![1]).not.toHaveProperty("verificationHash");
   });
 });
 
 it("uses the current calculated illustrative sample for both badge renderings", async () => {
-  const { readScoringRenderSelection } = await import("@/lib/scoring-render-selection");
   const { renderBadgeSvg } = await import("@/lib/render/BadgeSvg");
   const { LANDING_OBSERVED_DEMO } = await import("@/lib/render/observed-demo-data");
-  vi.mocked(readScoringRenderSelection).mockResolvedValueOnce({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: 1788861600000 });
   vi.mocked(renderBadgeSvg).mockClear();
   const { container } = await renderHome();
   expect(container.querySelector('[data-dimension="quality"] summary')?.textContent).toContain("81");
   expect(container.querySelector('[data-dimension="breadth"] summary')?.textContent).toContain("100");
   expect(vi.mocked(renderBadgeSvg).mock.calls).toHaveLength(2);
-  for (const call of vi.mocked(renderBadgeSvg).mock.calls) expect(call[2]?.scoring).toEqual(LANDING_OBSERVED_DEMO);
+  for (const call of vi.mocked(renderBadgeSvg).mock.calls) expect(call[1]?.scoring).toEqual(LANDING_OBSERVED_DEMO);
 });

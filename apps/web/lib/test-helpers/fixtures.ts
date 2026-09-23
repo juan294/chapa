@@ -8,6 +8,7 @@
 
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import type { MetricsSnapshot } from "../history/types";
+import type { ScoreViewModel } from "../profile/score-view-model";
 
 // ---------------------------------------------------------------------------
 // makeStats — builds a valid StatsData with sensible defaults
@@ -86,6 +87,48 @@ export function makeImpact(
     adjustedComposite: 58,
     tier: "Solid",
     computedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// makeScoring — builds a valid v7.2 ScoreViewModel with sensible defaults
+// ---------------------------------------------------------------------------
+
+/**
+ * #1335 — the v7.2-only counterpart to `makeImpact`. Every scored consumer
+ * (Studio, dashboard, share page) now renders exactly this shape; a partial
+ * override still needs its own `dimensions`/`composite` as whole `ScoreValue`
+ * objects (`{ kind: "point", value, display }`), since those don't merge
+ * field-by-field the way `overrides` does for the rest of the model.
+ */
+export function makeScoring(
+  overrides: Partial<ScoreViewModel> = {},
+): ScoreViewModel {
+  const point = (value: number) => ({ kind: "point" as const, value, display: value });
+  return {
+    // Always a synthetic fixture, never a real issued receipt — matches the
+    // one condition (identity or illustrative) simulateObservedScore
+    // requires of its baseline.
+    illustrative: true,
+    policyVersion: "v7.2",
+    handle: "testuser",
+    identity: null,
+    window: null,
+    dimensions: {
+      delivery: point(60),
+      quality: point(70),
+      consistency: point(80),
+      breadth: point(50),
+    },
+    composite: point(65),
+    tier: "Solid",
+    archetype: "Builder",
+    craft: null,
+    reportCraft: { status: "no_report", unlocked: false, report: null },
+    coverage: [],
+    exclusions: [],
+    limitations: [],
     ...overrides,
   };
 }

@@ -24,9 +24,12 @@ export function hasRenderedText(html: string, label: string): boolean {
   return renderedTextPattern(label).test(html);
 }
 
-const VERIFY_HASH_PATTERN = /\/verify\/([0-9a-f]{32}|[0-9a-f]{16}|[0-9a-f]{8})(?![0-9a-f])/;
+// #1335 — a v7 verification token (`v7.<revisionId>.<hexSignature>`) is tried
+// first: it is the only current-policy shape, and its own dots and hex
+// signature would otherwise falsely match the bare hex alternatives below.
+const VERIFY_HASH_PATTERN = /\/verify\/(v7\.[0-9a-f-]+\.[0-9a-f]+|[0-9a-f]{32}|[0-9a-f]{16}|[0-9a-f]{8})(?![0-9a-f])/;
 
-/** The full verification hash of the first `/verify/{hash}` link, or null. */
+/** The full verification token/hash of the first `/verify/{hash}` link, or null. */
 export function verifyHashFromHtml(html: string): string | null {
   return VERIFY_HASH_PATTERN.exec(html)?.[1] ?? null;
 }

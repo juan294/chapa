@@ -1,9 +1,8 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { DEMO_STATS } from "@/lib/render/demoData";
-import { LANDING_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { LANDING_IMPACT } from "@/lib/render/landing-demo-data";
+import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { LandingContent } from "./LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/dictionaries/en";
@@ -42,16 +41,17 @@ export default async function Home({ params }: HomeProps) {
   const { locale } = await params;
   if (!isSupportedLocale(locale)) notFound();
   const t = getServerT(locale);
+  // #1335 — v7.2 is the one scoring policy; the selector this used to branch
+  // on is retired. `getLeaderboard` still takes the reader's result shape.
   const selection = await readScoringRenderSelection();
-  const demoScoring = selection.enabled ? LANDING_OBSERVED_DEMO : undefined;
   const options = {
-    scoring: demoScoring,
+    scoring: LANDING_IMPACT,
     includeBranding: true,
     demoMode: true,
-    strings: buildBadgeI18nStrings(t, demoScoring ? demoScoring.tier : LANDING_IMPACT.tier),
+    strings: buildBadgeI18nStrings(t, LANDING_IMPACT.tier),
   };
-  const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, LANDING_IMPACT, options);
-  const readmeBadgeSvg = renderBadgeSvg(DEMO_STATS, LANDING_IMPACT, {
+  const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, options);
+  const readmeBadgeSvg = renderBadgeSvg(DEMO_STATS, {
     ...options,
     disableAnimation: true,
   });
@@ -78,7 +78,7 @@ export default async function Home({ params }: HomeProps) {
       >
         <LangSync />
         <LandingWebMcpTools />
-        <LandingContent demoBadgeSvg={demoBadgeSvg} readmeBadgeSvg={readmeBadgeSvg} demoImpact={LANDING_IMPACT} demoScoring={demoScoring} topScored={topScored} t={t} />
+        <LandingContent demoBadgeSvg={demoBadgeSvg} readmeBadgeSvg={readmeBadgeSvg} demoScoring={LANDING_IMPACT} topScored={topScored} t={t} />
       </LanguageProvider>
     </>
   );
