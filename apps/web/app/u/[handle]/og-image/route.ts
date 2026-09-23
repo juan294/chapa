@@ -27,7 +27,7 @@ import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { getServerT } from "@/lib/i18n/server";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
-import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, needsUnavailablePlaceholder, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 const OG_CACHE_TTL = 172800; // 48 hours
@@ -195,7 +195,7 @@ export async function GET(
     // handle WITH a drawable receipt (found independently right here) still
     // rasterizes it normally below — reuses the exact same status-
     // placeholder path as `collecting`/`action_needed`/`unregistered`.
-    if (scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && materialized.scoring?.policyVersion !== "v7.2") {
+    if (needsUnavailablePlaceholder(scoringSelection, scoringStatus, materialized.scoring?.policyVersion)) {
       try {
         const t = getServerT(locale);
         const statusSvg = renderBadgeStatusSvg("unavailable", {

@@ -48,7 +48,7 @@ import {
 } from "@/lib/monitoring/latency-slo";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
-import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { badgeStatusState, buildBadgeStatusStrings, buildBadgeUnavailableStrings, needsUnavailablePlaceholder, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 export const maxDuration = 35;
@@ -858,7 +858,7 @@ export async function GET(
     // independently right here) still renders it normally below — this
     // reuses the exact same status-placeholder path as `collecting`/
     // `action_needed`/`unregistered` rather than inventing a second one.
-    if (scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && profile.scoring?.policyVersion !== "v7.2") {
+    if (needsUnavailablePlaceholder(scoringSelection, scoringStatus, profile.scoring?.policyVersion)) {
       try {
         const t = getServerT(locale);
         const svg = renderBadgeStatusSvg("unavailable", {

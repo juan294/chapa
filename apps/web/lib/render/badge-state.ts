@@ -3,6 +3,7 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { badgeTheme } from "./theme";
 import { escapeXml } from "./escape";
 import type { ScoringStatus, ScoringStatusKind } from "@/lib/collection/scoring-status";
+import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 /**
  * Badge/OG placeholder states (#1335 phase 4). A `ready` `ScoringStatus`
@@ -54,6 +55,26 @@ export function badgeStatusState(status: ScoringStatus | null): BadgeStatusState
     case "ready":
       return null;
   }
+}
+
+/**
+ * True when a v7.2-selected render must show the "unavailable" placeholder
+ * rather than whatever the normal materialize pipeline's own independent
+ * receipt lookup produced (#1335 phase 4). `scoringStatus === null` means
+ * the `readScoringStatus` authority read itself failed — never "no receipt
+ * found", which is its own real `ScoringStatus` already handled earlier by
+ * `badgeStatusState`. A handle WITH a drawable receipt (found independently
+ * by the normal pipeline) still renders it normally: that is what the
+ * `policyVersion !== "v7.2"` half of this check protects. Shared by
+ * badge.svg, og-image and the share page, whose post-materialize check was
+ * previously three independently-drifting copies of the same condition.
+ */
+export function needsUnavailablePlaceholder(
+  scoringSelection: Pick<ScoringRenderSelection, "machinePolicy">,
+  scoringStatus: ScoringStatus | null,
+  policyVersion: string | undefined,
+): boolean {
+  return scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && policyVersion !== "v7.2";
 }
 
 /**

@@ -1,4 +1,4 @@
-import { postWriteScore } from "@/lib/profile/post-write-score";
+import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
@@ -11,7 +11,6 @@ import { getRequestId } from "@/lib/log";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -164,11 +163,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
   // never synchronously here. `scheduleCollectionAdvance` runs a bounded
   // slice in the background (`after()`) so the badge doesn't wait a full
   // 5-minute cron tick for its first progress.
-  if (scoringSelection.enabled) {
-    await enqueueCollection(handle, "refresh");
-    scheduleCollectionAdvance();
-  }
-  const scoringStatus = await postWriteScore(handle, scoringSelection);
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh", scoringSelection);
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;

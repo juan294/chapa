@@ -11,6 +11,7 @@ import { getMissingFontFiles } from "@/lib/render/font-files";
 import { probeRasterizer, type RasterProbe } from "@/lib/render/raster-probe";
 import { withTimeout } from "@/lib/async/with-timeout";
 import { dbReadCollectionQueueHealth, type CollectionQueueHealth } from "@/lib/db/collection-queue";
+import { isCollectionQueueStuck } from "@/lib/collection/queue-health";
 
 /** Shape returned for a successful GitHub probe. */
 interface GitHubRateLimit {
@@ -217,21 +218,20 @@ async function getCollectEvidenceHeartbeatStatus(): Promise<CronHeartbeatStatus>
   };
 }
 
-const SCORING_QUEUE_STUCK_OLDEST_QUEUED_MS = 2 * 60 * 60 * 1000;
-const SCORING_QUEUE_STUCK_EXPIRED_LEASE_MS = 30 * 60 * 1000;
-
 interface ScoringQueueReport extends CollectionQueueHealth {
   readonly collectEvidenceHeartbeat: CronHeartbeatStatus;
   readonly degraded: boolean;
 }
 
 /**
- * `scoringQueue` health block (#1335 phase 4). Degraded when the oldest
- * queued job has waited more than 2h, a lease has been expired for more than
- * 30 min, or the collect-evidence cron heartbeat itself is stale (>15 min,
- * outside the shared first-observation grace window) — any of these means
- * collection has stalled for reasons a `scoring_queue_stuck` alert alone
- * might not have caught yet (e.g. the cron itself stopped invoking).
+ * `scoringQueue` health block (#1335 phase 4). Degraded when the collection
+ * queue looks stuck by the same thresholds `lib/collection/worker.ts`'s own
+ * `scoring_queue_stuck` alert uses (`isCollectionQueueStuck`, shared via
+ * `lib/collection/queue-health.ts` so the two can never drift apart), or the
+ * collect-evidence cron heartbeat itself is stale (>15 min, outside the
+ * shared first-observation grace window) — either means collection has
+ * stalled for reasons the alert alone might not have caught yet (e.g. the
+ * cron itself stopped invoking).
  */
 async function getScoringQueueReport(): Promise<ScoringQueueReport | { status: "error" }> {
   try {
@@ -239,10 +239,7 @@ async function getScoringQueueReport(): Promise<ScoringQueueReport | { status: "
       dbReadCollectionQueueHealth(),
       getCollectEvidenceHeartbeatStatus(),
     ]);
-    const degraded =
-      queue.oldestQueuedAgeMs > SCORING_QUEUE_STUCK_OLDEST_QUEUED_MS ||
-      (queue.expiredLeases > 0 && queue.oldestExpiredLeaseAgeMs > SCORING_QUEUE_STUCK_EXPIRED_LEASE_MS) ||
-      collectEvidenceHeartbeat.stale;
+    const degraded = isCollectionQueueStuck(queue) || collectEvidenceHeartbeat.stale;
     return { ...queue, collectEvidenceHeartbeat, degraded };
   } catch {
     return { status: "error" };

@@ -1,4 +1,4 @@
-import { postWriteScore } from "@/lib/profile/post-write-score";
+import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
@@ -10,7 +10,6 @@ import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { captureServerError, captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
-import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 
 /**
  * POST /api/generate
@@ -117,10 +116,6 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // than `refresh`, which would reset an already-complete day's collection
   // back to queued and discard evidence this route did nothing to change.
   const scoringSelection = await readScoringRenderSelection();
-  if (scoringSelection.enabled) {
-    await enqueueCollection(handle, "signup");
-    scheduleCollectionAdvance();
-  }
 
   // LE-5-1 — the stats cache row is bound to the credential that fetched it
   // (source-context hashes the token into accessContextId), and the share
@@ -140,7 +135,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
     });
   }
 
-  const scoringStatus = await postWriteScore(handle, scoringSelection);
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "signup", scoringSelection);
 
   return NextResponse.json({ success: true, handle, ...(scoringStatus ? { scoringStatus } : { policyVersion: "v6" }) });
 });

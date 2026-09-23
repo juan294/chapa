@@ -24,6 +24,12 @@ const ALL_PROVIDERS: readonly SourceProvider[] = ["github", "bitbucket", "gitlab
  * A per-provider enqueue failure is captured and skipped rather than failing
  * the whole call -- one platform's transient DB error must not stop the
  * owner's GitHub collection from being enqueued.
+ *
+ * The per-candidate authorization check + enqueue runs concurrently across
+ * providers (`Promise.all`), not one after another: each candidate is an
+ * independent `(owner, provider)` row with its own try/catch, so there is
+ * nothing sequential about them to preserve, and warm-cache's per-handle
+ * call to this function is itself on a hot batch path.
  */
 export async function enqueueCollection(
   owner: string,
@@ -32,23 +38,25 @@ export async function enqueueCollection(
 ): Promise<readonly CollectionJob[]> {
   const referenceTime = new Date().toISOString();
   const candidates = provider ? [provider] : ALL_PROVIDERS;
-  const jobs: CollectionJob[] = [];
 
-  for (const candidate of candidates) {
-    try {
-      const authorization = await readSourceAuthorization(owner, candidate);
-      if (authorization.status !== "authorized") continue;
-      jobs.push(await enqueueCollectionJob(owner, candidate, reason, referenceTime));
-    } catch (error) {
-      void captureServerError({
-        route: "lib/collection/enqueue",
-        statusCode: 500,
-        error: new Error(`enqueueCollection failed for ${owner}/${candidate}: ${(error as Error).message}`),
-      });
-    }
-  }
+  const results = await Promise.all(
+    candidates.map(async (candidate): Promise<CollectionJob | null> => {
+      try {
+        const authorization = await readSourceAuthorization(owner, candidate);
+        if (authorization.status !== "authorized") return null;
+        return await enqueueCollectionJob(owner, candidate, reason, referenceTime);
+      } catch (error) {
+        void captureServerError({
+          route: "lib/collection/enqueue",
+          statusCode: 500,
+          error: new Error(`enqueueCollection failed for ${owner}/${candidate}: ${(error as Error).message}`),
+        });
+        return null;
+      }
+    }),
+  );
 
-  return jobs;
+  return results.filter((job): job is CollectionJob => job !== null);
 }
 
 /** Bounded enough to leave headroom under a route's own response deadline;

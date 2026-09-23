@@ -66,7 +66,7 @@ import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 import { dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
-import { badgeStatusState, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { badgeStatusState, needsUnavailablePlaceholder, type NonReadyScoringStatus } from "@/lib/render/badge-state";
 import { SharePageScoringStatus } from "./SharePageScoringStatus";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
@@ -312,7 +312,7 @@ export async function SharePageContent({
   // below — reuses the exact same status-placeholder component as
   // `collecting`/`action_needed`/`unregistered` rather than inventing a
   // second one.
-  if (scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && materialized && materialized.scoring?.policyVersion !== "v7.2") {
+  if (materialized && needsUnavailablePlaceholder(scoringSelection, scoringStatus, materialized.scoring?.policyVersion)) {
     return (
       <SharePageScoringStatus
         handle={handle}

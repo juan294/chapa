@@ -3,6 +3,8 @@ import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { observedReceiptViewModel } from "./score-view-model";
 import { publicScoreProjection } from "./public-score-projection";
 import { readScoringStatus } from "@/lib/collection/read-scoring-status";
+import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
+import type { EnqueueReason } from "@/lib/db/collection-queue";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 /** Read the committed current receipt; private publication metadata never
@@ -40,4 +42,31 @@ export async function readPublicObservedScore(handle: string, selection: Scoring
 export async function postWriteScore(handle: string, selection: ScoringRenderSelection): Promise<ScoringStatus | null> {
   if (!selection.enabled) return null;
   return readScoringStatus(handle);
+}
+
+/**
+ * The enqueue-then-report shape shared by refresh, recalculate and generate
+ * (#1335 phase 4): (re-)enqueue collection for `reason` when v7.2 rendering
+ * is on, run a bounded background slice (`scheduleCollectionAdvance`) so the
+ * caller doesn't wait a full 5-minute cron tick for first progress, then
+ * report back the same `ScoringStatus` every other surface renders.
+ *
+ * `/api/admin/bulk-recalculate` and `/api/scoring/status`'s retry action stay
+ * on their own path rather than this helper: bulk-recalculate chooses per
+ * handle between a direct `maybeIssue` (when today's jobs are already
+ * complete) and an `admin`-reason enqueue, and paces `scheduleCollectionAdvance`
+ * once per batch rather than once per handle; a status retry has no
+ * `selection.enabled` gate to apply, since retrying only makes sense for an
+ * already-registered subject.
+ */
+export async function enqueueAndReportScoringStatus(
+  handle: string,
+  reason: EnqueueReason,
+  selection: ScoringRenderSelection,
+): Promise<ScoringStatus | null> {
+  if (selection.enabled) {
+    await enqueueCollection(handle, reason);
+    scheduleCollectionAdvance();
+  }
+  return postWriteScore(handle, selection);
 }

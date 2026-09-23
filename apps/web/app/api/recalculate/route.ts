@@ -1,4 +1,4 @@
-import { postWriteScore } from "@/lib/profile/post-write-score";
+import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
@@ -8,7 +8,6 @@ import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -103,11 +102,7 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
   // current after a scoring change, so it (re-)enqueues collection for the
   // same reason the snapshot was rewritten above. Issuance itself happens
   // only from fan-in, once every connected source is complete.
-  if (scoringSelection.enabled) {
-    await enqueueCollection(handle, "refresh");
-    scheduleCollectionAdvance();
-  }
-  const scoringStatus = await postWriteScore(handle, scoringSelection);
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh", scoringSelection);
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;

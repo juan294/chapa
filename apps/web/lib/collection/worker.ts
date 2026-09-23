@@ -14,6 +14,7 @@ import { captureServerError, captureOperationalAlert } from "@/lib/analytics/ser
 import { scheduleServerEvent } from "@/lib/analytics/schedule-server-event";
 import { cacheSetNxStatus } from "@/lib/cache/redis";
 import { MAX_COLLECTION_ATTEMPTS, nextBackoff } from "./backoff";
+import { isQueueOldestQueuedStuck, isQueueLeaseStuck } from "./queue-health";
 import { collectSourceSlice } from "./collect-source-slice";
 import { seedFromPrior } from "./seed";
 import { onJobComplete as fanInOnJobComplete, retryPendingFanIns } from "./fan-in";
@@ -123,14 +124,12 @@ export interface CollectionWorkerDeps {
   readonly now: () => number;
 }
 
-const QUEUE_STUCK_OLDEST_QUEUED_MS = 2 * 60 * 60 * 1000;
-const QUEUE_STUCK_EXPIRED_LEASE_MS = 30 * 60 * 1000;
 /** Dedupes the alert to once per hour rather than once per 5-minute tick. */
 const QUEUE_STUCK_ALERT_DEDUPE_SECONDS = 3600;
 
 async function alertIfQueueStuck(health: CollectionQueueHealth): Promise<void> {
-  const stuckQueued = health.oldestQueuedAgeMs > QUEUE_STUCK_OLDEST_QUEUED_MS;
-  const stuckLease = health.expiredLeases > 0 && health.oldestExpiredLeaseAgeMs > QUEUE_STUCK_EXPIRED_LEASE_MS;
+  const stuckQueued = isQueueOldestQueuedStuck(health);
+  const stuckLease = isQueueLeaseStuck(health);
   if (!stuckQueued && !stuckLease) return;
   const guardStatus = await cacheSetNxStatus("scoring:queue-stuck-alerted", QUEUE_STUCK_ALERT_DEDUPE_SECONDS);
   if (guardStatus === "exists") return;
