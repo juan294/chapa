@@ -26,3 +26,28 @@ export async function dbEnsureScoringSubject(handle: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Whether a handle is a registered scoring subject -- the sharp test every
+ * scored surface uses to distinguish "not on Chapa yet" from "signed up, no
+ * receipt yet" (#1335 phase 4, decision 5). Three states, not two: a genuine
+ * DB read failure ("unavailable") must never be reported as "unregistered" --
+ * `lib/collection/read-scoring-status.ts` maps it to an authority-read
+ * failure (a `null` `ScoringStatus`), never to the unregistered state.
+ */
+export async function dbIsScoringSubject(handle: string): Promise<"registered" | "unregistered" | "unavailable"> {
+  const db = getSupabase();
+  if (!db) return "unavailable";
+  try {
+    const { data, error } = await db
+      .from("scoring_v7_subjects")
+      .select("owner_handle")
+      .eq("owner_handle", handle.toLowerCase())
+      .maybeSingle();
+    if (error) throw error;
+    return data ? "registered" : "unregistered";
+  } catch (error) {
+    console.error("[db] dbIsScoringSubject failed:", (error as Error).message);
+    return "unavailable";
+  }
+}

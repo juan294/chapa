@@ -79,6 +79,11 @@ export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; del
     // again from the job row. Enumerated for discovery only -- the withdrawal
     // RPC's cascade already removes both, same as every other row above.
     { table: "scoring_collection_jobs", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    // scoring_issuance_attempts.owner_handle REFERENCES scoring_v7_subjects
+    // ON DELETE CASCADE (migration 056, #1335 phase 4). Enumerated for
+    // discovery only -- the withdrawal RPC's cascade already removes it, same
+    // as every other row above.
+    { table: "scoring_issuance_attempts", column: "owner_handle", deletion: "scoring_v7_rpc" },
   ];
 
 export interface Args {

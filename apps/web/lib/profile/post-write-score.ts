@@ -2,8 +2,14 @@ import { dbReadObservedReceipt } from "@/lib/db/score-receipts-observed";
 import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { observedReceiptViewModel } from "./score-view-model";
 import { publicScoreProjection } from "./public-score-projection";
+import { readScoringStatus } from "@/lib/collection/read-scoring-status";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
-/** Read the committed current receipt; private publication metadata never leaves this seam. */
+/** Read the committed current receipt; private publication metadata never
+ * leaves this seam. Unchanged by #1335 phase 4 -- this backs public reads
+ * (`/api/profile/:handle`, `/api/insights/:handle`, the share page's stored
+ * profile), a different concern from `postWriteScore` below (a write route's
+ * own scoring status after enqueueing collection). */
 export async function readPublicObservedScore(handle: string, selection: ScoringRenderSelection) {
   if (!selection.cacheable) return { status: "unavailable" } as const;
   if (!selection.enabled) return { status: "missing" } as const;
@@ -15,16 +21,23 @@ export async function readPublicObservedScore(handle: string, selection: Scoring
   return { status: "current", projection: { ...projection, compositeScore: projection.displayScore, adjustedComposite: projection.displayScore, displayAdjustedComposite: projection.displayScore, displayTier: projection.tier } } as const;
 }
 
-/** Publication can fail after a legacy snapshot write. Return the last committed
- * current score as stale, never the newly computed legacy value as current. */
-export async function postWriteScore(handle: string, selection: ScoringRenderSelection, issuance: "issued" | "skipped" | "failed") {
-  if (!selection.cacheable) return { status: "unavailable", publication: "pending" } as const;
-  if (!selection.enabled) return { status: "legacy" } as const;
-  const published = await readPublicObservedScore(handle, selection);
-  if (published.status === "current") {
-    const projection = issuance === "failed" ? { ...published.projection, freshness: "stale" as const, scoring: { ...published.projection.scoring, freshness: "stale" as const } } : published.projection;
-    return { status: "current", publication: issuance === "failed" ? "pending" : issuance === "issued" ? "published" : "unchanged", projection } as const;
-  }
-  if (published.status === "missing" && issuance === "skipped") return { status: "legacy" } as const;
-  return { status: "unavailable", publication: "pending" } as const;
+/**
+ * The owner-visible scoring status a write route (refresh, recalculate,
+ * generate, admin bulk-recalculate) reports after enqueueing collection
+ * (#1335 phase 4). Replaces the old `{status:"legacy"|"current"|"unavailable"}`
+ * shape: issuance is no longer synchronous with the write (it happens only
+ * from fan-in, once collection completes), so there is nothing left for a
+ * write route to read back except the same `ScoringStatus` every other
+ * surface renders.
+ *
+ * `null` means either the render flag is off (legacy v6 still governs this
+ * handle, so the route's caller falls back to its plain v6 response) or the
+ * status authority read itself failed -- the caller cannot tell those apart
+ * from this return value alone, which is fine: both cases mean "nothing new
+ * to report from the v7.2 side", and a failed authority read is already
+ * `readScoringStatus`'s own captured/observable failure mode.
+ */
+export async function postWriteScore(handle: string, selection: ScoringRenderSelection): Promise<ScoringStatus | null> {
+  if (!selection.enabled) return null;
+  return readScoringStatus(handle);
 }

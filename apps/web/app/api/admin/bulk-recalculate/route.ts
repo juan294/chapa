@@ -1,5 +1,5 @@
 import { postWriteScore } from "@/lib/profile/post-write-score";
-import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
+import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -127,6 +127,11 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       // silently if batch ordering ever diverges from handles order. A Set-based filter
       // is correct regardless of insertion order.
       const completedSet = new Set(completed);
+      // #1335 phase 4 — one bounded background tick per response, not one
+      // per enqueued handle: this route can enqueue dozens of handles in a
+      // single batch, and scheduling a full tick after every one of them
+      // would be redundant work for the same `after()` callback.
+      if (scoringSelection.enabled && recalculated > 0) scheduleCollectionAdvance();
       return NextResponse.json(
         {
           partial: true,
@@ -165,8 +170,17 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
-            const issuance = await issueScoreReceipt(handle, { scoringSelection });
-            publications.push({ handle, result: await postWriteScore(handle, scoringSelection, issuance) });
+            // #1335 phase 4 — enqueues an `admin`-reason collection so a
+            // subject with no job yet (or a failed one) gets one; issuance
+            // itself happens only from fan-in once every connected source is
+            // complete. Unlike /api/refresh's `refresh` reason, `admin` is
+            // idempotent against an already-queued/running/complete job for
+            // today — bulk-recalculate is a batch operation over many
+            // handles at once, and forcing a full re-collection for every one
+            // of them would be a very different (and far more expensive)
+            // operation than "recompute the score from what's already known".
+            if (scoringSelection.enabled) await enqueueCollection(handle, "admin");
+            publications.push({ handle, result: await postWriteScore(handle, scoringSelection) });
             await invalidateProfileReadModels(handle, {
               stats: true,
               badgeSvg: true,
@@ -197,6 +211,8 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       }),
     );
   }
+
+  if (scoringSelection.enabled && recalculated > 0) scheduleCollectionAdvance();
 
   return NextResponse.json(
     {

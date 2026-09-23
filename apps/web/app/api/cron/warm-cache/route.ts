@@ -1,6 +1,3 @@
-import { readRenderableReceipt } from "@/lib/profile/score-model";
-import { observedReceiptViewModel } from "@/lib/profile/score-view-model";
-import { scoringObservation, compareScoringObservations } from "@/lib/history/scoring-observations";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { sweepRevokedReceiptCachesV7, sweepRetiredSupplementalCachesV7 } from "@/lib/verification/cleanup";
 import { NextRequest, NextResponse } from "next/server";
@@ -13,7 +10,7 @@ import {
 } from "@/lib/db/snapshots";
 import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
-import { notifyScoreBump, notifyObservedScoreChange } from "@/lib/email/score-bump";
+import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbPurgeExpiredCraftRawV7 } from "@/lib/db/craft-v7";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
@@ -41,7 +38,7 @@ import {
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { toDateString } from "@/lib/utils/date";
-import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
+import { enqueueCollection } from "@/lib/collection/enqueue";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -457,18 +454,16 @@ async function warmHandle(
   requestId?: string,
 ): Promise<HandleResult> {
   try {
-    // #1311 — issue before materializing, not after. Materialization is what
-    // reads the receipt the badge is rendered from, so issuing afterwards left
-    // the warmed SVG a revision behind for a full hour. A handle with the
-    // render flag off, no source evidence yet, or an already-current receipt
-    // skips silently, and failures are captured inside the helper rather than
-    // failing the warm.
+    // #1335 phase 4 — the warm-cache cron no longer issues receipts inline.
+    // It enqueues a `daily` collection job for every connected provider (a
+    // no-op against an already-queued/running/complete job for today); the
+    // collect-evidence cron's own 5-minute tick runs the actual slices, and
+    // fan-in issues once every one of them completes. This is the one
+    // registered-handle enumeration point that is safe to enqueue from — see
+    // enqueueCollection's own doc comment on why a public read must never do
+    // this.
     const scoringSelection = await readScoringRenderSelection();
-    const baseline = scoringSelection.cacheable && scoringSelection.machinePolicy === "v7.2"
-      ? await readRenderableReceipt(handle, scoringSelection).catch(() => null) : null;
-    const previousObserved = baseline && !("unavailable" in baseline)
-      ? scoringObservation(observedReceiptViewModel(handle, baseline, scoringSelection.capturedAt)) : null;
-    await issueScoreReceipt(handle, { scoringSelection });
+    if (scoringSelection.enabled) await enqueueCollection(handle, "daily");
 
     const materialized = await materializeOrchestratedProfile(handle, { scoringSelection });
     if (!materialized) {
@@ -624,12 +619,14 @@ async function warmHandle(
       // Snapshot recording is non-critical — don't fail the warm
     }
 
-    if (previousObserved && materialized.scoring && scoringSelection.cacheable) {
-      const current = scoringObservation(materialized.scoring);
-      if (current && current.identity?.revisionId !== previousObserved.identity?.revisionId) {
-        notified = await notifyObservedScoreChange(handle, compareScoringObservations(previousObserved, current)).catch(() => false);
-      }
-    }
+    // #1335 phase 4 deviation: the v7.2 "score changed" email notification
+    // that used to fire here compared a receipt read before this call's own
+    // synchronous issuance against one read after it, within the same warm
+    // pass. Issuance is no longer synchronous (fan-in owns it, from a
+    // different cron), so that before/after comparison can no longer observe
+    // a change here. Re-homing this notification onto fan-in's own
+    // `scoring_issuance_outcome` "issued" outcome is out of this phase's
+    // scope; tracked as follow-up work rather than left as always-false code.
     return { warmed: true, snapshotRecorded, notified };
   } catch (err) {
     void captureServerError({

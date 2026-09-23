@@ -11,7 +11,7 @@ import { getRequestId } from "@/lib/log";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
+import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -158,13 +158,17 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     history: true,
   });
 
-  // #1311 — a refresh is an owner-initiated recompute, so it is where a
-  // registered subject's v7 receipt is re-issued. Awaited rather than deferred:
-  // the invalidation above has already cleared the badge, and issuing after
-  // that clear is what makes the next render draw the new revision.
-  const issuance = await issueScoreReceipt(handle, { token, scoringSelection });
-
-  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
+  // #1335 phase 4 — a refresh is an owner-initiated recompute, so it is where
+  // a registered subject's v7.2 collection is (re-)enqueued. Issuance itself
+  // now happens only from fan-in, once every connected source is complete —
+  // never synchronously here. `scheduleCollectionAdvance` runs a bounded
+  // slice in the background (`after()`) so the badge doesn't wait a full
+  // 5-minute cron tick for its first progress.
+  if (scoringSelection.enabled) {
+    await enqueueCollection(handle, "refresh");
+    scheduleCollectionAdvance();
+  }
+  const scoringStatus = await postWriteScore(handle, scoringSelection);
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
@@ -175,9 +179,9 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
   // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
   revalidatePath(`/u/${handle}`);
 
-  if (publishedScore.status !== "legacy") return NextResponse.json({
+  if (scoringStatus) return NextResponse.json({
     success: true,
-    ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : { policyVersion: "v7.2", displayScore: null, exactScore: null, compositeScore: null, adjustedComposite: null, scoring: null, publication: "pending" }),
+    scoringStatus,
     legacy: { impact: materialized.displayImpact },
   }, { headers: { "Cache-Control": "no-store" } });
 

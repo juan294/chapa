@@ -10,6 +10,7 @@ import { captureOperationalAlert, withErrorCapture } from "@/lib/analytics/serve
 import { getMissingFontFiles } from "@/lib/render/font-files";
 import { probeRasterizer, type RasterProbe } from "@/lib/render/raster-probe";
 import { withTimeout } from "@/lib/async/with-timeout";
+import { dbReadCollectionQueueHealth, type CollectionQueueHealth } from "@/lib/db/collection-queue";
 
 /** Shape returned for a successful GitHub probe. */
 interface GitHubRateLimit {
@@ -195,6 +196,60 @@ async function getCronHeartbeatStatuses(): Promise<
 }
 
 /**
+ * The collect-evidence cron ticks every 5 minutes (#1335 phase 3/4) — far
+ * tighter than the daily/hourly cadence the four crons above share, so it
+ * gets its own, much shorter staleness threshold. It reuses the same
+ * first-observation grace anchor: a fresh deploy that has not yet been
+ * observed for 26h is excused the same way for every cron, since the app has
+ * not been up long enough to prove any of them broken.
+ */
+const COLLECT_EVIDENCE_HEARTBEAT_TTL_MS = 15 * 60 * 1000;
+
+async function getCollectEvidenceHeartbeatStatus(): Promise<CronHeartbeatStatus> {
+  const now = Date.now();
+  const missingHeartbeatIsStale = !(await isWithinCronGraceWindow(now));
+  const lastRun = await cacheGetCronLastRun("collect-evidence");
+  const ageMs = lastRun == null ? null : now - lastRun;
+  return {
+    lastRun,
+    ageMs,
+    stale: lastRun == null ? missingHeartbeatIsStale : ageMs! > COLLECT_EVIDENCE_HEARTBEAT_TTL_MS,
+  };
+}
+
+const SCORING_QUEUE_STUCK_OLDEST_QUEUED_MS = 2 * 60 * 60 * 1000;
+const SCORING_QUEUE_STUCK_EXPIRED_LEASE_MS = 30 * 60 * 1000;
+
+interface ScoringQueueReport extends CollectionQueueHealth {
+  readonly collectEvidenceHeartbeat: CronHeartbeatStatus;
+  readonly degraded: boolean;
+}
+
+/**
+ * `scoringQueue` health block (#1335 phase 4). Degraded when the oldest
+ * queued job has waited more than 2h, a lease has been expired for more than
+ * 30 min, or the collect-evidence cron heartbeat itself is stale (>15 min,
+ * outside the shared first-observation grace window) — any of these means
+ * collection has stalled for reasons a `scoring_queue_stuck` alert alone
+ * might not have caught yet (e.g. the cron itself stopped invoking).
+ */
+async function getScoringQueueReport(): Promise<ScoringQueueReport | { status: "error" }> {
+  try {
+    const [queue, collectEvidenceHeartbeat] = await Promise.all([
+      dbReadCollectionQueueHealth(),
+      getCollectEvidenceHeartbeatStatus(),
+    ]);
+    const degraded =
+      queue.oldestQueuedAgeMs > SCORING_QUEUE_STUCK_OLDEST_QUEUED_MS ||
+      (queue.expiredLeases > 0 && queue.oldestExpiredLeaseAgeMs > SCORING_QUEUE_STUCK_EXPIRED_LEASE_MS) ||
+      collectEvidenceHeartbeat.stale;
+    return { ...queue, collectEvidenceHeartbeat, degraded };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+/**
  * GET /api/health
  *
  * Health check endpoint for monitoring.
@@ -222,12 +277,13 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     );
   }
 
-  const [redisStatus, supabaseStatus, githubResult, cronHeartbeats, rasterProbe] = await Promise.all([
+  const [redisStatus, supabaseStatus, githubResult, cronHeartbeats, rasterProbe, scoringQueue] = await Promise.all([
     pingRedis(),
     pingSupabase(),
     cachedPingGitHub(),
     getCronHeartbeatStatuses(),
     runRasterProbe(),
+    getScoringQueueReport(),
   ]);
   const session = getOptionalRequestSession(request);
   const isAdmin = session ? isAdminHandle(session.login) : false;
@@ -257,12 +313,14 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     githubResult.status === "ok" &&
     githubResult.rateLimit !== undefined &&
     githubResult.rateLimit.remaining < GITHUB_RATE_LIMIT_FLOOR;
+  const scoringQueueUnhealthy = "status" in scoringQueue || scoringQueue.degraded;
   const status =
     isHealthy(redisStatus) &&
     isHealthy(supabaseStatus) &&
     isHealthy(githubResult.status) &&
     staleCrons.length === 0 &&
-    !githubQuotaLow
+    !githubQuotaLow &&
+    !scoringQueueUnhealthy
       ? "ok"
       : "degraded";
   const httpStatus = status === "ok" ? 200 : 503;
@@ -276,6 +334,7 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     fonts: fontsStatus,
     ...(missingFonts.length > 0 && { missingFonts }),
     rasterizer: rasterizerStatus,
+    scoringQueue,
     ...(isAdmin && rasterProbe.status !== "error" && { rasterizerProbe: rasterProbe }),
     ...(isAdmin && githubResult.rateLimit && {
       githubRateLimit: githubResult.rateLimit,

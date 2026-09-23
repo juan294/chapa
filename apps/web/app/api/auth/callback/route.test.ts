@@ -19,6 +19,8 @@ const {
   mockCaptureServerError,
   mockStoreGitHubToken,
   mockAfter,
+  mockEnqueueCollection,
+  mockReadScoringRenderSelection,
 } = vi.hoisted(() => ({
   mockExchangeCodeForToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
@@ -34,6 +36,8 @@ const {
   mockCaptureServerError: vi.fn(),
   mockStoreGitHubToken: vi.fn(),
   mockAfter: vi.fn((cb: () => Promise<void>) => { void cb(); }),
+  mockEnqueueCollection: vi.fn(),
+  mockReadScoringRenderSelection: vi.fn(),
 }));
 
 vi.mock("next/server", async (importOriginal) => ({
@@ -70,6 +74,14 @@ vi.mock("@/lib/db/users", () => ({
 
 vi.mock("@/lib/db/scoring-subjects", () => ({
   dbEnsureScoringSubject: mockDbEnsureScoringSubject,
+}));
+
+vi.mock("@/lib/collection/enqueue", () => ({
+  enqueueCollection: mockEnqueueCollection,
+}));
+
+vi.mock("@/lib/scoring-render-selection", () => ({
+  readScoringRenderSelection: mockReadScoringRenderSelection,
 }));
 
 vi.mock("@/lib/email/audience", () => ({
@@ -124,6 +136,8 @@ function allowRateLimit() {
   mockFetchGitHubUserEmail.mockResolvedValue(null);
   mockDbUpsertUser.mockResolvedValue(true);
   mockDbEnsureScoringSubject.mockResolvedValue(true);
+  mockEnqueueCollection.mockResolvedValue([]);
+  mockReadScoringRenderSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
   mockAddContact.mockResolvedValue(undefined);
   mockCaptureServerError.mockResolvedValue(undefined);
   mockStoreGitHubToken.mockResolvedValue(true);
@@ -1024,6 +1038,68 @@ describe("GET /api/auth/callback — audience sync", () => {
 
     expect(mockDbEnsureScoringSubject).toHaveBeenCalledWith("octocat");
     expect(mockDbUpsertUser.mock.invocationCallOrder[0]).toBeLessThan(mockDbEnsureScoringSubject.mock.invocationCallOrder[0]!);
+  });
+
+  it("enqueues a signup collection job for the signed-up handle after the subject is registered (#1335 phase 4)", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockEnqueueCollection).toHaveBeenCalledWith("octocat", "signup");
+    expect(mockDbEnsureScoringSubject.mock.invocationCallOrder[0]).toBeLessThan(mockEnqueueCollection.mock.invocationCallOrder[0]!);
+  });
+
+  it("never enqueues collection while v7.2 rendering is off", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+    mockReadScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
+  });
+
+  it("never enqueues collection when subject registration itself failed", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+    mockDbEnsureScoringSubject.mockResolvedValue(false);
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
   });
 
   it("swallows dbEnsureScoringSubject rejection and calls captureServerError (fire-and-forget)", async () => {

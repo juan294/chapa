@@ -90,7 +90,6 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/app/api/generate/route.ts` | `apps/web/app/api/generate/route.test.ts` |
 | `apps/web/app/api/recalculate/route.ts` | `apps/web/app/api/recalculate/route.test.ts` |
 | `apps/web/app/api/refresh/route.ts` | `apps/web/app/api/refresh/route.test.ts` |
 
@@ -173,6 +172,13 @@ score has far more surfaces than a badge does.
 | --- | --- |
 | `scripts/backfill-parsers.ts` | `scripts/backfill-parsers.test.ts` |
 | `scripts/recalculate-handles.ts` | `scripts/recalculate-handles.test.ts` |
+
+### collection (#1335 phase 4)
+
+| Consumer | Shared-receipt regression |
+| --- | --- |
+| `apps/web/lib/collection/fan-in.ts` | `apps/web/lib/collection/fan-in.test.ts` |
+| `apps/web/lib/collection/read-scoring-status.ts` | `apps/web/lib/collection/read-scoring-status.test.ts` |
 
 ### profile materialization
 

@@ -298,6 +298,98 @@ export async function isCollectionJobInProgress(
   return state.success && IN_PROGRESS_STATES.has(state.data);
 }
 
+/**
+ * An owner's collection jobs for one reference date, across every connected
+ * provider -- backs `lib/collection/read-scoring-status.ts` (called with
+ * today's UTC date) and fan-in's retry sweep (called with a possibly-earlier
+ * pending day). Reads via the `scoring_status` RPC (migration 056).
+ */
+export async function listCollectionJobsForDate(owner: string, referenceDate: string): Promise<CollectionJob[]> {
+  try {
+    const data = await rpc("scoring_status", { p_owner: owner.toLowerCase(), p_reference_date: referenceDate });
+    return z.array(z.unknown()).parse(data).map(mapJobRow);
+  } catch (error) {
+    throw new Error(`Collection status unavailable: ${(error as Error).message}`, { cause: error });
+  }
+}
+
+export interface PendingFanIn {
+  readonly ownerHandle: string;
+  readonly referenceDate: string;
+  readonly referenceTime: string;
+}
+const pendingFanInRowSchema = z.object({
+  owner_handle: z.string().min(1),
+  reference_date: z.string(),
+  reference_time: z.string(),
+}).strict();
+
+/**
+ * Every (owner, day) whose jobs are all complete but has no recorded
+ * issued/unchanged issuance attempt yet -- fan-in either never ran (a worker
+ * crash between the last job completing and `onJobComplete`) or ran and
+ * failed every time so far. `runCollectionTick` retries each of these at the
+ * start of every tick (#1335 phase 4).
+ */
+export async function listPendingFanIns(limit: number): Promise<PendingFanIn[]> {
+  try {
+    const data = await rpc("scoring_collection_pending_fan_in", { p_limit: limit });
+    return z.array(pendingFanInRowSchema).parse(data).map((row) => ({
+      ownerHandle: row.owner_handle,
+      referenceDate: row.reference_date,
+      referenceTime: row.reference_time,
+    }));
+  } catch (error) {
+    throw new Error(`Pending fan-in list unavailable: ${(error as Error).message}`, { cause: error });
+  }
+}
+
+export interface CollectionQueueHealth {
+  readonly queued: number;
+  readonly running: number;
+  readonly retrying: number;
+  readonly waitingRateLimit: number;
+  readonly failedToday: number;
+  readonly oldestQueuedAgeMs: number;
+  readonly expiredLeases: number;
+  readonly oldestExpiredLeaseAgeMs: number;
+}
+const bigintish = z.union([z.number(), z.string()]).transform((v) => Number(v));
+const queueHealthRowSchema = z.object({
+  queued: bigintish,
+  running: bigintish,
+  retrying: bigintish,
+  waiting_rate_limit: bigintish,
+  failed_today: bigintish,
+  oldest_queued_age_ms: bigintish,
+  expired_leases: bigintish,
+  oldest_expired_lease_age_ms: bigintish,
+}).loose();
+
+/** Shared by `/api/health`'s `scoringQueue` block and `runCollectionTick`'s
+ * `scoring_queue_stuck` check (#1335 phase 4) -- one read, not two
+ * independently-maintained queries over the same table.
+ */
+export async function dbReadCollectionQueueHealth(): Promise<CollectionQueueHealth> {
+  try {
+    const data = await rpc("scoring_collection_queue_health", {});
+    const rows = z.array(z.unknown()).parse(data);
+    const row = queueHealthRowSchema.parse(rows[0] ?? {});
+    return {
+      queued: row.queued,
+      running: row.running,
+      retrying: row.retrying,
+      waitingRateLimit: row.waiting_rate_limit,
+      failedToday: row.failed_today,
+      oldestQueuedAgeMs: row.oldest_queued_age_ms,
+      expiredLeases: row.expired_leases,
+      oldestExpiredLeaseAgeMs: row.oldest_expired_lease_age_ms,
+    };
+  } catch (error) {
+    throw new Error(`Collection queue health unavailable: ${(error as Error).message}`, { cause: error });
+  }
+}
+
 export type FailOutcome =
   | { readonly status: "failed" | "retrying" | "waiting_rate_limit" }
   | { readonly status: "lease_mismatch" };
