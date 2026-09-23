@@ -82,11 +82,11 @@ describe("collectCodebergSlice -- ported diagnostic matrix (hard stops)", () => 
     const result = await runToCompletion();
     expect(result.coverage.reasonCodes).toContain("source_error");
   });
-  it("classifies an unavailable (403) reviews endpoint as a not_accessible stop -- a lost-access job failure now recovers via reconnect, not a silently downgraded permanent unavailable (see the report)", async () => {
+  it("absorbs an unavailable (403) reviews endpoint as a soft not_accessible reason: the job completes with partial coverage rather than blocking forever", async () => {
     api((url) => url.pathname.endsWith("/reviews") ? json({}, 403) : undefined);
-    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
-    expect(result.done).toBe(false);
-    expect(result.stop).toMatchObject({ provider: "codeberg", operation: "reviews", stopKind: "not_accessible", httpStatus: 403 });
+    const result = await runToCompletion();
+    expect(result.coverage.status).toBe("partial");
+    expect(result.coverage.reasonCodes).toContain("not_accessible");
   });
   it("does not follow a foreign pagination link, classifying it as a protocol stop", async () => {
     api((url) => url.pathname.endsWith("/commits") ? json([], 200, { link: '<https://evil.test/steal?page=2>; rel="next"' }) : undefined);
@@ -209,5 +209,27 @@ describe("collectCodebergSlice -- ported business-logic parity (soft reasons, co
     const revision = (result: { events: readonly NormalizedEngineeringEvent[] }) => result.events.find((e) => e.kind === "review")?.artifactRevision;
     expect(revision(first)).toBeDefined();
     expect(revision(first)).toBe(revision(second));
+  });
+  it("absorbs a not_accessible fan-out item (one PR's ref became inaccessible, e.g. the repo went private) as a soft reason: the slice completes, coverage is partial with not_accessible, and the other PR is still collected", async () => {
+    api((url) => {
+      if (url.pathname.endsWith("/pulls")) return json([pr(1), pr(2)]);
+      if (url.pathname.includes("/git/refs/pull/1/")) return json({}, 403);
+      if (url.pathname.endsWith("/pulls/1/reviews") || url.pathname.endsWith("/pulls/2/reviews")) return json([]);
+    });
+    const result = await runToCompletion();
+    expect(result.coverage.status).toBe("partial");
+    expect(result.coverage.reasonCodes).toContain("not_accessible");
+    const accepted = result.events.filter((e) => e.kind === "accepted_change");
+    expect(accepted).toHaveLength(2);
+    const pr1 = accepted.find((e) => e.workItemId.endsWith(":pr:1"));
+    const pr2 = accepted.find((e) => e.workItemId.endsWith(":pr:2"));
+    expect(pr1?.measurements.changedFiles.status).toBe("unknown");
+    expect(pr2?.measurements.changedFiles).toMatchObject({ status: "observed", value: ["docs/a.md"] });
+  });
+  it("only the identity (profile / /user) operation can produce a terminal not_accessible stop", async () => {
+    api((url) => url.pathname === "/api/v1/user" ? json({}, 403) : undefined);
+    const result = await collectCodebergSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    expect(result.done).toBe(false);
+    expect(result.stop).toMatchObject({ provider: "codeberg", operation: "profile", stopKind: "not_accessible" });
   });
 });

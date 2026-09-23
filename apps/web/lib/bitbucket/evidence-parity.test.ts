@@ -102,11 +102,12 @@ describe("collectBitbucketSlice -- ported diagnostic matrix (hard stops)", () =>
     expect(result.events.some((e) => e.kind === "accepted_change")).toBe(false);
     expect(result.coverage.reasonCodes).toContain("source_error");
   });
-  it("surfaces an invalid explicit repository id as a real not_accessible stop rather than a silent success (no dedicated pre-resolution step in this engine, unlike the single-run adapter -- see the report)", async () => {
+  it("surfaces an invalid explicit repository id as a soft not_accessible reason on its own fan-out operations, completing with partial coverage rather than blocking the job (no dedicated pre-resolution step in this engine, unlike the single-run adapter -- see the report)", async () => {
     const missing = "{99999999-9999-9999-9999-999999999999}";
     api((url) => url.pathname.includes(encodeURIComponent(missing)) ? json({ type: "error", error: { message: "not found" } }, 404) : undefined);
-    const result = await collectBitbucketSlice(explicitInput([missing]), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
-    expect(result.stop).toMatchObject({ provider: "bitbucket", stopKind: "not_accessible", httpStatus: 404 });
+    const result = await runToCompletion(explicitInput([missing]));
+    expect(result.coverage?.status).toBe("partial");
+    expect(result.coverage?.reasonCodes).toContain("not_accessible");
   });
   it("classifies a non-numeric pull request id as a soft, non-halting source_error reason", async () => {
     api((url) => url.pathname.endsWith("/pullrequests") ? page([{ ...pr(), id: "not-a-number" }]) : undefined);

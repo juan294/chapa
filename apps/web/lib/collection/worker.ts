@@ -1,10 +1,11 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { createScoringWindow } from "@chapa/shared";
+import { createScoringWindow, type NormalizedEngineeringEvent } from "@chapa/shared";
 import {
   checkpointCollectionJob, claimCollectionJobs, failCollectionJob, finishCollectionJob, listStagedEvents,
   type CollectionJob, type CollectionProgress,
 } from "@/lib/db/collection-queue";
+import { discoverStoredSource, readSourceObservation, type SourceStorageContext } from "@/lib/db/source-context";
 import { readSourceAuthorization, type SourceAuthorization, type SourceProvider } from "@/lib/platform/source-authorization";
 import { refreshSourceLink } from "@/lib/platform/source-refresh";
 import { createSourceContext, type SourceContextInput } from "@/lib/platform/source-context";
@@ -12,7 +13,8 @@ import { emitSourceDiagnostics } from "@/lib/platform/evidence-diagnostics";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { MAX_COLLECTION_ATTEMPTS, nextBackoff } from "./backoff";
 import { collectSourceSlice } from "./collect-source-slice";
-import type { CollectSlice } from "./plan";
+import { seedFromPrior } from "./seed";
+import type { CollectorCheckpoint, CollectSlice } from "./plan";
 
 /**
  * Durable resumable collection worker (#1335 phase 3). `runCollectionTick`
@@ -83,6 +85,13 @@ export interface CollectionWorkerDeps {
   readonly listStaged: typeof listStagedEvents;
   readonly resolveCredential: ResolveCredential;
   readonly collect: CollectSlice;
+  /** Incremental daily reuse (phase-3.md "Incremental daily reuse"): reads
+   * yesterday's complete observation for the same source, if any, so the
+   * first slice of a fresh job can seed its checkpoint instead of starting
+   * from scratch. Both are read-only -- this worker remains the only writer.
+   */
+  readonly discoverSource: typeof discoverStoredSource;
+  readonly readPriorObservation: typeof readSourceObservation;
   readonly emitDiagnostics: typeof emitSourceDiagnostics;
   /** Reports a slice that rejected unexpectedly (a bug, or a genuine
    * infrastructure failure below the collector's own stop classification --
@@ -103,6 +112,8 @@ export const productionCollectionWorkerDeps: CollectionWorkerDeps = {
   listStaged: listStagedEvents,
   resolveCredential,
   collect: collectSourceSlice,
+  discoverSource: discoverStoredSource,
+  readPriorObservation: readSourceObservation,
   emitDiagnostics: emitSourceDiagnostics,
   captureError: captureServerError,
   onJobComplete: () => undefined,
@@ -119,6 +130,47 @@ const SLICE_TIME_BUDGET_MS = 60_000;
  * last claimed batch has time to finish and the response can still return.
  */
 const TICK_SAFETY_MARGIN_MS = 20_000;
+
+/**
+ * Reads yesterday's complete observation for this exact source, if any, and
+ * pre-seeds a checkpoint from it (`lib/collection/seed.ts`). Seeding is
+ * strictly an optimization: any failure here (no observation, discovery
+ * ambiguity, a storage error) must never block or fail the job -- it just
+ * means this job collects from scratch, exactly as it always has.
+ */
+async function trySeedFromPrior(
+  deps: CollectionWorkerDeps,
+  resolved: ResolvedCredential,
+): Promise<{ readonly checkpoint: CollectorCheckpoint; readonly seededEvents: readonly NormalizedEngineeringEvent[] } | null> {
+  try {
+    const discovery = await deps.discoverSource({
+      owner: resolved.context.owner,
+      requestedSource: resolved.requested,
+      accessContextId: resolved.accessContextId,
+      scope: resolved.context.scope,
+      window: resolved.context.window,
+      link: resolved.link,
+    });
+    if (discovery.status !== "found") return null;
+    const storageContext: SourceStorageContext = {
+      owner: resolved.context.owner,
+      requestedSource: resolved.requested,
+      source: discovery.source,
+      accessContextId: resolved.accessContextId,
+      scope: resolved.context.scope,
+      window: resolved.context.window,
+      link: resolved.link,
+    };
+    // `prior: true` -- the latest observation strictly earlier than today's
+    // window, never today's own (there isn't one yet on a job's first slice).
+    const prior = await deps.readPriorObservation(storageContext, true);
+    if (!prior || prior.coverage.status !== "complete") return null;
+    const { checkpoint, seededEvents } = seedFromPrior({ dataThrough: prior.coverage.dataThrough, events: prior.events }, resolved.context.window);
+    return { checkpoint, seededEvents };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Advances one durable job by exactly one collector slice: resolve
@@ -141,11 +193,35 @@ export async function runCollectionSlice(
   }
   const { resolved } = credentialResult;
 
-  const staged = await deps.listStaged(job.id);
+  let checkpoint = job.checkpoint;
+  let staged = await deps.listStaged(job.id);
+
+  // Incremental daily reuse (phase-3.md): only on this job's very first
+  // slice -- an empty checkpoint and nothing staged yet. Seeding later would
+  // silently reset progress a real slice already made.
+  if (checkpoint.operations.length === 0 && staged.length === 0) {
+    const seed = await trySeedFromPrior(deps, resolved);
+    if (seed && (seed.checkpoint.operations.length > 0 || seed.seededEvents.length > 0)) {
+      // The staged events must go through the same checkpoint RPC as any
+      // other slice's events, so the eventual `finish` call appends them too.
+      const seedProgress: CollectionProgress = {
+        operationsDone: seed.checkpoint.operations.filter((op) => op.done).length,
+        operationsKnown: seed.checkpoint.operations.length,
+        events: seed.seededEvents.length,
+        requests: 0,
+      };
+      const outcome = await deps.checkpoint(lease, seed.checkpoint, seed.seededEvents, seedProgress, false);
+      if (outcome.status !== "lease_mismatch") {
+        checkpoint = seed.checkpoint;
+        staged = [...staged, ...seed.seededEvents];
+      }
+    }
+  }
+
   const result = await deps.collect(
     resolved.context,
     { token: resolved.token },
-    job.checkpoint,
+    checkpoint,
     { maxRequests: MAX_REQUESTS_PER_SLICE, deadlineAt },
     staged,
   );

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createScoringWindow, type SourceCoverage } from "@chapa/shared";
+import { createScoringWindow, type NormalizedEngineeringEvent, type SourceCoverage } from "@chapa/shared";
 import type { CollectionJob } from "@/lib/db/collection-queue";
+import type { StoredSourceObservation } from "@/lib/db/source-context";
 import { EMPTY_CHECKPOINT, type CollectorCheckpoint, type SliceResult } from "./plan";
 import { runCollectionSlice, runCollectionTick, type CollectionWorkerDeps, type CredentialResolution } from "./worker";
 
@@ -36,6 +37,52 @@ function sliceResult(overrides: Partial<SliceResult> = {}): SliceResult {
   return { events: [], checkpoint: EMPTY_CHECKPOINT, done: false, coverage: null, stop: null, requests: 1, ...overrides };
 }
 
+/** Mirrors `seed.test.ts`'s helper -- a minimal but schema-shaped
+ * `NormalizedEngineeringEvent` for building prior-observation fixtures.
+ */
+function event(overrides: Partial<NormalizedEngineeringEvent> & { readonly eventId: string; readonly occurredAt: string }): NormalizedEngineeringEvent {
+  return {
+    schemaVersion: "v7", provider: "github", host: "github.com", subjectId: "canonical", actorId: "canonical",
+    repositoryId: "R1", kind: "accepted_change", dataThrough: window.referenceTime,
+    canonicalProjectId: "github:R1", workItemId: `github:${overrides.eventId}`, artifactRevision: "rev",
+    artifactReferenceIds: [`github:${overrides.eventId}`], attribution: "individual", provenance: "source_observed",
+    coverage: "complete", categories: [],
+    measurements: {
+      changedFiles: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
+      additions: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
+      deletions: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
+      leadTimeHours: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
+      hasDescription: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
+      hasIssueLink: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
+      usesFeatureBranch: { status: "unknown", coverage: "unavailable", reasonCode: "not_supported" },
+    },
+    acceptance: { status: "unknown", coverage: "unavailable", reasonCode: "not_assessed" },
+    ...overrides,
+  };
+}
+
+/** A `StoredSourceObservation`-shaped fixture for a prior day's complete
+ * observation. Only `coverage.status`/`dataThrough` and `events` are read by
+ * the worker's seeding path; the rest exists to satisfy the storage type.
+ */
+function priorObservation(overrides: { readonly dataThrough: string | null; readonly events: readonly NormalizedEngineeringEvent[] }): StoredSourceObservation {
+  const priorWindow = createScoringWindow("2026-09-04T12:00:00Z");
+  return {
+    id: "11111111-1111-1111-1111-111111111111",
+    window: priorWindow,
+    coverage: {
+      source, window: priorWindow, dataThrough: overrides.dataThrough, status: "complete", discovery: "owned_and_contributed",
+      repositoryIds: [], repositoryDiscoveryComplete: true, eventKinds: {}, reasonCodes: [], unknownPeriods: [],
+    },
+    events: [...overrides.events],
+    // `provider` here is always one of the four forge providers this test
+    // constructs (`event()` defaults to "github"); the shared
+    // `NormalizedEngineeringEvent` type widens it to `EvidenceProvider`
+    // (which also allows "supplemental"/"portfolio") for non-forge evidence,
+    // so a cast is needed to satisfy the storage schema's narrower type.
+  } as unknown as StoredSourceObservation;
+}
+
 /** A mutable version of the deps bag, so a test can reassign one field
  * (e.g. `deps.collect = ...`) without fighting `CollectionWorkerDeps`'s
  * `readonly` modifiers -- those exist to keep production callers from
@@ -62,6 +109,8 @@ function harness(): MutableCollectionWorkerDeps {
     listStaged: vi.fn().mockResolvedValue([]),
     resolveCredential,
     collect: vi.fn().mockResolvedValue(sliceResult()),
+    discoverSource: vi.fn().mockResolvedValue({ status: "missing" }),
+    readPriorObservation: vi.fn().mockResolvedValue(null),
     emitDiagnostics: vi.fn(),
     captureError: vi.fn().mockResolvedValue(undefined),
     onJobComplete: vi.fn().mockResolvedValue(undefined),
@@ -105,6 +154,19 @@ describe("runCollectionSlice", () => {
     expect(deps.finish).toHaveBeenCalledWith(
       { id: "job-1", leaseToken: "lease-1" },
       expect.objectContaining({ coverage: sampleCoverage, requested: { provider: "github", host: "github.com", login: "alice" } }),
+    );
+    expect(deps.onJobComplete).toHaveBeenCalledWith(expect.objectContaining({ state: "complete", observationId: "obs-1" }));
+    expect(deps.fail).not.toHaveBeenCalled();
+  });
+
+  it("still reaches complete when an absorbed not_accessible fan-out item left coverage partial, not just on full complete coverage", async () => {
+    const deps = harness();
+    const partialCoverage: SourceCoverage = { ...sampleCoverage, status: "partial", reasonCodes: ["not_accessible"] };
+    deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: partialCoverage }));
+    await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+    expect(deps.finish).toHaveBeenCalledWith(
+      { id: "job-1", leaseToken: "lease-1" },
+      expect.objectContaining({ coverage: partialCoverage }),
     );
     expect(deps.onJobComplete).toHaveBeenCalledWith(expect.objectContaining({ state: "complete", observationId: "obs-1" }));
     expect(deps.fail).not.toHaveBeenCalled();
@@ -202,6 +264,68 @@ describe("runCollectionSlice", () => {
     deps.finish = vi.fn().mockResolvedValue({ status: "ok", observationId: "obs-2" });
     await runCollectionSlice(resumedJob, Date.now() + 60_000, deps);
     expect(deps.collect).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), midCheckpoint, expect.anything(), expect.anything());
+  });
+
+  describe("incremental daily reuse (seedFromPrior wiring)", () => {
+    it("seeds the checkpoint from a prior complete observation and skips its immutable ops before the first collect call", async () => {
+      const deps = harness();
+      const merged = event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" });
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [merged] }));
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      // The seed goes through the same checkpoint RPC as any other slice's
+      // events, before collect() is ever called with the seeded state.
+      const seededCheckpoint: CollectorCheckpoint = {
+        version: 1,
+        operations: [{ key: "files:github:PR1", cursor: null, done: true }],
+        discovered: { repositoryIds: ["R1"], itemIds: { seededWorkItemIds: ["github:PR1"] } },
+        state: { seededDataThrough: "2026-09-04T12:00:00.000Z" },
+      };
+      expect(deps.checkpoint).toHaveBeenNthCalledWith(1, { id: "job-1", leaseToken: "lease-1" }, seededCheckpoint, [merged], expect.any(Object), false);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), seededCheckpoint, expect.anything(), [merged]);
+    });
+
+    it("does not seed when the checkpoint already has progress or events are already staged (not the job's first slice)", async () => {
+      const deps = harness();
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [event({ eventId: "PR1", occurredAt: "2026-09-01T00:00:00.000Z" })] }));
+      deps.listStaged = vi.fn().mockResolvedValue([event({ eventId: "already-staged", occurredAt: "2026-09-01T00:00:00.000Z" })]);
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      expect(deps.discoverSource).not.toHaveBeenCalled();
+      expect(deps.readPriorObservation).not.toHaveBeenCalled();
+    });
+
+    it("drops out-of-window prior events instead of staging them, and never seeds a checkpoint operation for them", async () => {
+      const deps = harness();
+      const outOfWindow = event({ eventId: "stale", occurredAt: "2020-01-01T00:00:00.000Z" });
+      deps.discoverSource = vi.fn().mockResolvedValue({ status: "found", source });
+      deps.readPriorObservation = vi.fn().mockResolvedValue(priorObservation({ dataThrough: "2026-09-04T12:00:00.000Z", events: [outOfWindow] }));
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      // Nothing to seed -- the empty checkpoint is untouched by a seed
+      // pre-write, and collect() runs with the job's original empty state.
+      expect(deps.checkpoint).toHaveBeenCalledTimes(1);
+      expect(deps.checkpoint).toHaveBeenCalledWith({ id: "job-1", leaseToken: "lease-1" }, EMPTY_CHECKPOINT, [], expect.any(Object), false);
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), []);
+    });
+
+    it("never lets a seeding failure (discovery/storage error) block the slice -- collection still proceeds from scratch", async () => {
+      const deps = harness();
+      deps.discoverSource = vi.fn().mockRejectedValue(new Error("storage unavailable"));
+      deps.collect = vi.fn().mockResolvedValue(sliceResult({ done: true, coverage: sampleCoverage }));
+
+      await runCollectionSlice(makeJob(), Date.now() + 60_000, deps);
+
+      expect(deps.collect).toHaveBeenCalledWith(expect.anything(), expect.anything(), EMPTY_CHECKPOINT, expect.anything(), []);
+      expect(deps.fail).not.toHaveBeenCalled();
+    });
   });
 });
 

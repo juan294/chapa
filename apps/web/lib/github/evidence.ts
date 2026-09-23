@@ -208,7 +208,16 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
           else reasons.add("not_accessible");
         }
       } else if (!r.stop) { const stop = makeStop(queryName, "protocol"); op.cursor = cursor; return { kind: "stop", stop }; }
-      if (r.stop) { op.cursor = cursor; return { kind: "stop", stop: r.stop }; }
+      if (r.stop) {
+        // A per-item fan-out fetch (this is never the profile/identity
+        // operation, which never reaches runPagedList) that lost access --
+        // e.g. a PR deleted after it merged, or a repo gone private -- must
+        // not block the receipt forever. Absorb it like a malformed node:
+        // one deduped diagnostic (already recorded inside request()), this
+        // operation done with whatever was collected, final coverage partial.
+        if (r.stop.stopKind === "not_accessible") { reasons.add("not_accessible"); op.done = true; op.cursor = null; return { kind: "done", totalCount: null }; }
+        op.cursor = cursor; return { kind: "stop", stop: r.stop };
+      }
       const page = object(connection.pageInfo);
       if (typeof page.hasNextPage !== "boolean") { const stop = makeStop(queryName, "protocol"); op.cursor = cursor; return { kind: "stop", stop }; }
       if (!page.hasNextPage) { op.done = true; op.cursor = null; return { kind: "done", totalCount }; }

@@ -150,7 +150,15 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
     let page = op.cursor ? Number(op.cursor) : 1;
     for (;;) {
       const r = await request(operation, path, { ...parameters, per_page: "100", page: String(page) });
-      if (r.stop) { op.cursor = String(page); return { kind: "stop", stop: r.stop }; }
+      if (r.stop) {
+        // A per-item fan-out fetch (never the profile/identity operation,
+        // which never reaches runPagedList) that lost access -- a project
+        // gone private, an MR deleted -- must not block the receipt forever.
+        // Absorb it like a malformed node: one already-deduped diagnostic,
+        // this operation done with whatever was collected, coverage partial.
+        if (r.stop.stopKind === "not_accessible") { reasons.add("not_accessible"); op.done = true; op.cursor = null; return { kind: "done" }; }
+        op.cursor = String(page); return { kind: "stop", stop: r.stop };
+      }
       if (!Array.isArray(r.data)) { const stop = makeStop(operation, "protocol"); op.cursor = String(page); return { kind: "stop", stop }; }
       let pageDegraded = false;
       for (const item of r.data) {
@@ -225,7 +233,19 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
     if (!meta || !inWindow(meta.mergedAt, "merge_requests")) { op.done = true; op.cursor = null; return "done"; }
     const path = `/projects/${meta.projectId}/merge_requests/${meta.iid}`;
     const detailsResponse = await request("merge_request", path);
-    if (detailsResponse.stop) { pendingStop = detailsResponse.stop; return "stop"; }
+    if (detailsResponse.stop) {
+      if (detailsResponse.stop.stopKind === "not_accessible") {
+        // The MR's details are gone (project went private, MR deleted after
+        // merge): absorb like a malformed response, not a terminal stop --
+        // the accepted_change event's core identity is already determined
+        // from the merge_requests list; only its file measurements are lost.
+        reasons.add("not_accessible");
+        op.done = true; op.cursor = null;
+        emitMergedEvent(meta, { paths: [], additions: 0, deletions: 0, nodeCount: 0, full: false }, false);
+        return "done";
+      }
+      pendingStop = detailsResponse.stop; return "stop";
+    }
     const details = row(detailsResponse.data);
     const mrDetails: Record<string, GitlabMrDetails> = (state.mrDetails as Record<string, GitlabMrDetails> | undefined) ?? {};
     state.mrDetails = mrDetails;
@@ -234,6 +254,36 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
     op.done = true; op.cursor = null;
     ensureOp(`diffs:${key}`);
     return "done";
+  }
+
+  /** Builds and stages the merge's accepted_change event. Shared by `runDiffs`
+   * (which computes `full` from real cross-checks) and `runDetails`'s
+   * not_accessible absorption branch (which forces `full: false` since no
+   * details/diffs are reachable at all).
+   */
+  function emitMergedEvent(meta: GitlabMrMeta, acc: GitlabDiffAcc, full: boolean): void {
+    const base = mrKey(meta.projectId, meta.iid);
+    if (!full) reasons.add("partial_files");
+    let leadTimeHours: Observation<number> = unknown("partial", "source_error");
+    try {
+      const hours = (scoringInstant(String(meta.mergedAt)).getTime() - scoringInstant(String(meta.createdAt)).getTime()) / 3_600_000;
+      if (hours >= 0) leadTimeHours = observed(hours, "complete", "source_observed");
+    } catch { /* Missing/invalid dates remain unknown. */ }
+    addEvent({
+      schemaVersion: "v7", provider: "gitlab", host: "gitlab.com", subjectId: subjectId()!, actorId: subjectId()!,
+      repositoryId: meta.projectId, eventId: `${base}:merged`, kind: "accepted_change", occurredAt: scoringInstant(String(meta.mergedAt)).toISOString(),
+      dataThrough: window.referenceTime, canonicalProjectId: projectKey(meta.projectId), workItemId: base, artifactRevision: meta.sha ?? base,
+      artifactReferenceIds: [base], attribution: "individual", provenance: "source_observed", coverage: "complete",
+      categories: [],
+      measurements: {
+        changedFiles: full ? observed(acc.paths, "complete", "source_observed") : unknown("partial", "partial_files"),
+        additions: full ? observed(acc.additions, "complete", "source_observed") : unknown("partial", "partial_files"),
+        deletions: full ? observed(acc.deletions, "complete", "source_observed") : unknown("partial", "partial_files"),
+        leadTimeHours, hasDescription: meta.description !== null && meta.description !== undefined ? observed(meta.description.trim().length > 0, "complete", "source_observed") : unknown("partial", "source_error"),
+        hasIssueLink: unknown("unavailable", "not_supported"), usesFeatureBranch: unknown("unavailable", "not_supported"),
+      },
+      acceptance: observed({ method: "merged_change", acceptedAt: scoringInstant(String(meta.mergedAt)).toISOString(), acceptedResultId: base }, "complete", "source_observed"),
+    });
   }
 
   async function runDiffs(op: MutableGitlabOperation): Promise<"done" | "stop"> {
@@ -257,29 +307,8 @@ export const collectGitlabSlice: CollectSlice = async (input, credential, checkp
       acc.nodeCount++;
     });
     if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
-    const base = mrKey(meta.projectId, meta.iid);
     const full = acc.full && details.id === Number(meta.globalId) && meta.sha !== null && details.sha === meta.sha && details.changesCount !== null && details.changesCount === acc.nodeCount;
-    if (!full) reasons.add("partial_files");
-    let leadTimeHours: Observation<number> = unknown("partial", "source_error");
-    try {
-      const hours = (scoringInstant(String(meta.mergedAt)).getTime() - scoringInstant(String(meta.createdAt)).getTime()) / 3_600_000;
-      if (hours >= 0) leadTimeHours = observed(hours, "complete", "source_observed");
-    } catch { /* Missing/invalid dates remain unknown. */ }
-    addEvent({
-      schemaVersion: "v7", provider: "gitlab", host: "gitlab.com", subjectId: subjectId()!, actorId: subjectId()!,
-      repositoryId: meta.projectId, eventId: `${base}:merged`, kind: "accepted_change", occurredAt: scoringInstant(String(meta.mergedAt)).toISOString(),
-      dataThrough: window.referenceTime, canonicalProjectId: projectKey(meta.projectId), workItemId: base, artifactRevision: meta.sha ?? base,
-      artifactReferenceIds: [base], attribution: "individual", provenance: "source_observed", coverage: "complete",
-      categories: [],
-      measurements: {
-        changedFiles: full ? observed(acc.paths, "complete", "source_observed") : unknown("partial", "partial_files"),
-        additions: full ? observed(acc.additions, "complete", "source_observed") : unknown("partial", "partial_files"),
-        deletions: full ? observed(acc.deletions, "complete", "source_observed") : unknown("partial", "partial_files"),
-        leadTimeHours, hasDescription: meta.description !== null && meta.description !== undefined ? observed(meta.description.trim().length > 0, "complete", "source_observed") : unknown("partial", "source_error"),
-        hasIssueLink: unknown("unavailable", "not_supported"), usesFeatureBranch: unknown("unavailable", "not_supported"),
-      },
-      acceptance: observed({ method: "merged_change", acceptedAt: scoringInstant(String(meta.mergedAt)).toISOString(), acceptedResultId: base }, "complete", "source_observed"),
-    });
+    emitMergedEvent(meta, acc, full);
     op.done = true; op.cursor = null;
     return "done";
   }

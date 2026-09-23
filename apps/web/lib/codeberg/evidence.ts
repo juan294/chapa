@@ -120,7 +120,15 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
     let page = op.cursor ? Number(op.cursor) : 1;
     for (;;) {
       const r = await request(operation, path, { ...parameters, page: String(page), limit: "50" });
-      if (r.stop) { op.cursor = String(page); return { kind: "stop", stop: r.stop }; }
+      if (r.stop) {
+        // A per-item fan-out fetch (never the profile/identity operation,
+        // which never reaches runPagedList) that lost access -- a repo gone
+        // private, a PR deleted -- must not block the receipt forever.
+        // Absorb it like a malformed node: one already-deduped diagnostic,
+        // this operation done with whatever was collected, coverage partial.
+        if (r.stop.stopKind === "not_accessible") { reasons.add("not_accessible"); op.done = true; op.cursor = null; return { kind: "done" }; }
+        op.cursor = String(page); return { kind: "stop", stop: r.stop };
+      }
       if (!Array.isArray(r.data)) { const stop = makeStop(operation, "protocol"); op.cursor = String(page); return { kind: "stop", stop }; }
       let pageDegraded = false;
       for (const value of r.data) {
@@ -224,7 +232,18 @@ export const collectCodebergSlice: CollectSlice = async (input, credential, chec
     const path = repoPath(meta.repositoryId);
     if (!path) { op.done = true; op.cursor = null; return "done"; }
     const r = await request("refs", `${path}/git/refs/pull/${meta.prId}/head`);
-    if (r.stop) { pendingStop = r.stop; return "stop"; }
+    if (r.stop) {
+      if (r.stop.stopKind === "not_accessible") {
+        // The PR's ref is gone (repo went private, PR deleted after merge):
+        // absorb like any other lost-access fan-out item. Files remain
+        // independently attempted -- refsVerified simply stays unset (false).
+        reasons.add("not_accessible");
+        op.done = true; op.cursor = null;
+        ensureOp(`files:${key}`);
+        return "done";
+      }
+      pendingStop = r.stop; return "stop";
+    }
     const refs = Array.isArray(r.data) ? r.data : [];
     const archived = refs.find((ref) => row(ref).ref === `refs/pull/${meta.prId}/head`);
     const archivedSha = hash(row(row(archived).object).sha);

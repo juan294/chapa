@@ -113,6 +113,45 @@ describe("collectBitbucketSlice", () => {
     expect(result.coverage?.reasonCodes).not.toContain("partial_files");
   });
 
+  it("never stores an absolute (host-carrying) URL as a checkpoint cursor", async () => {
+    setupFetch();
+    let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
+    let staged: NormalizedEngineeringEvent[] = [];
+    for (let slices = 0; slices < 500; slices++) {
+      const result = await collectBitbucketSlice(ownedInput(), credential, checkpoint, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, staged);
+      for (const op of result.checkpoint.operations) {
+        if (op.cursor === null) continue;
+        expect(op.cursor).not.toContain("https://");
+        expect(op.cursor).not.toContain("http://");
+      }
+      staged = [...staged, ...result.events];
+      checkpoint = result.checkpoint;
+      if (result.done) break;
+    }
+  });
+
+  it("absorbs a not_accessible fan-out item (a repo that went private mid-collection) as a soft reason: the job completes with partial coverage and the other repo's data is still collected", async () => {
+    setupFetch({ repos: [REPO_A, REPO_B] });
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown) => {
+      const url = new URL(String(input));
+      const path = url.pathname.replace(/^\/2\.0/, "");
+      if (path.includes(encodeURIComponent(REPO_A)) && (path.endsWith("/commits") || path.endsWith("/pullrequests"))) {
+        return new Response(JSON.stringify({ type: "error", error: { message: "repository access lost" } }), { status: 403 });
+      }
+      if (path === "/user") return new Response(JSON.stringify(PROFILE), { status: 200 });
+      if (path === "/user/workspaces") return new Response(JSON.stringify({ values: [{ workspace: { uuid: WORKSPACE } }], next: null }), { status: 200 });
+      if (path === `/repositories/${encodeURIComponent(WORKSPACE)}`) return new Response(JSON.stringify({ values: [REPO_A, REPO_B].map((uuid) => ({ uuid, full_name: `juan/${uuid}` })), next: null }), { status: 200 });
+      if (path.endsWith("/commits")) return new Response(JSON.stringify({ values: [{ hash: "abcdef1234567890abcdef1234567890abcdef12", date: "2026-01-01T00:00:00.000Z", author: { user: { uuid: PROFILE.uuid } } }], next: null }), { status: 200 });
+      if (path.endsWith("/pullrequests")) return new Response(JSON.stringify({ values: [] }), { status: 200 });
+      throw new Error(`Unexpected request: ${path}`);
+    }));
+    const result = await runToCompletion(ownedInput(), 200);
+    expect(result.coverage?.status).toBe("partial");
+    expect(result.coverage?.reasonCodes).toContain("not_accessible");
+    expect(result.events.filter((e) => e.kind === "authored_commit").every((e) => e.repositoryId === REPO_B)).toBe(true);
+    expect(result.events.some((e) => e.repositoryId === REPO_B)).toBe(true);
+  });
+
   it("supports the juan294 single-repo explicit shape without enumerating workspaces", async () => {
     const { fetcher } = setupFetch({ repos: [REPO_A] });
     const result = await runToCompletion(explicitInput(REPO_A), 50);

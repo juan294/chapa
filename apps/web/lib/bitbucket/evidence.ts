@@ -128,12 +128,22 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
    * (the raw next URL) across slices.
    */
   async function runPagedList(op: MutableBitbucketOperation, operation: string, initialUrl: string, onNode: (node: Row) => void): Promise<BitbucketListOutcome> {
-    let url = op.cursor ?? initialUrl;
     const initial = new URL(initialUrl);
+    // The checkpoint is pure data with no URLs that carry a host (plan.ts) --
+    // store only path+query and rebuild against the fixed API origin on resume.
+    const toRelative = (absolute: string): string => { const u = new URL(absolute); return `${u.pathname}${u.search}`; };
+    let url = op.cursor ? new URL(op.cursor, initial.origin).toString() : initialUrl;
     for (;;) {
       const r = await request(operation, url);
-      if (r.stop) { op.cursor = url; return { kind: "stop", stop: r.stop }; }
-      if (!Array.isArray(r.data.values)) { const stop = makeStop(operation, "protocol"); op.cursor = url; return { kind: "stop", stop }; }
+      if (r.stop) {
+        // A per-item fan-out fetch that lost access (a repo gone private, a
+        // PR deleted after merge) must not block the receipt forever. Absorb
+        // it like a malformed node: this operation done with whatever was
+        // collected, one already-deduped diagnostic, final coverage partial.
+        if (r.stop.stopKind === "not_accessible") { reasons.add("not_accessible"); op.done = true; op.cursor = null; return { kind: "done" }; }
+        op.cursor = toRelative(url); return { kind: "stop", stop: r.stop };
+      }
+      if (!Array.isArray(r.data.values)) { const stop = makeStop(operation, "protocol"); op.cursor = toRelative(url); return { kind: "stop", stop }; }
       let pageDegraded = false;
       for (const value of r.data.values) {
         if (value === null || typeof value !== "object" || Array.isArray(value)) { reasons.add(diag.record(operation, "protocol")); pageDegraded = true; }
@@ -153,7 +163,7 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
         const next = new URL(String(r.data.next));
         if (next.origin !== initial.origin || next.pathname !== initial.pathname || next.username || next.password || next.hash) throw new Error("Invalid cursor");
         url = next.toString();
-      } catch { const stop = makeStop(operation, "protocol"); op.cursor = url; return { kind: "stop", stop }; }
+      } catch { const stop = makeStop(operation, "protocol"); op.cursor = toRelative(url); return { kind: "stop", stop }; }
     }
   }
 
@@ -170,7 +180,7 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
 
   async function runWorkspaces(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
     const url = new URL(`${API}/user/workspaces`); url.searchParams.set("pagelen", "100");
-    const outcome = await runPagedList(op, "workspaces", op.cursor ?? url.toString(), (permission) => {
+    const outcome = await runPagedList(op, "workspaces", url.toString(), (permission) => {
       const workspaceId = uuid(row(permission.workspace).uuid);
       if (!workspaceId) { reasons.add("attribution_unknown"); return; }
       ensureOp(`workspace-repos:${workspaceId}`);
@@ -182,7 +192,7 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
   async function runWorkspaceRepos(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
     const workspaceId = op.key.slice("workspace-repos:".length);
     const url = new URL(`${API}/repositories/${encodeURIComponent(workspaceId)}`); url.searchParams.set("pagelen", "100");
-    const outcome = await runPagedList(op, "repositories", op.cursor ?? url.toString(), (repo) => {
+    const outcome = await runPagedList(op, "repositories", url.toString(), (repo) => {
       const repositoryId = uuid(repo.uuid);
       if (!repositoryId) { reasons.add("attribution_unknown"); return; }
       registerRepo(repositoryId);
@@ -193,7 +203,7 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
 
   async function runCommits(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
     const repositoryId = op.key.slice("commits:".length);
-    const outcome = await runPagedList(op, "commits", op.cursor ?? commitsPath(repositoryId, window.startInclusive), (commit) => {
+    const outcome = await runPagedList(op, "commits", commitsPath(repositoryId, window.startInclusive), (commit) => {
       if (!isSubject(commit.author)) return;
       const sha = hash(commit.hash); const date = instant(commit.date, "commits");
       if (!sha) { reasons.add(diag.record("commits", "protocol")); return; }
@@ -215,7 +225,7 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     const url = new URL(`${API}/repositories/%7B%7D/${encodeURIComponent(repositoryId)}/pullrequests`);
     url.searchParams.set("pagelen", "100");
     for (const state_ of ["OPEN", "MERGED", "DECLINED", "SUPERSEDED"]) url.searchParams.append("state", state_);
-    const outcome = await runPagedList(op, "pullrequests", op.cursor ?? url.toString(), (pr) => {
+    const outcome = await runPagedList(op, "pullrequests", url.toString(), (pr) => {
       const prId = numericId(pr.id); if (!prId) { reasons.add(diag.record("pullrequests", "protocol")); return; }
       const key = `${projectKey(repositoryId)}:pr:${prId}`;
       prMeta[key] = {
@@ -245,7 +255,7 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     const acc = activityAcc[key] ?? (activityAcc[key] = { dates: [], invalidMergeDate: false });
     const url = new URL(`${API}/repositories/%7B%7D/${encodeURIComponent(meta.repositoryId)}/pullrequests/${meta.prId}/activity`);
     url.searchParams.set("pagelen", "100");
-    const outcome = await runPagedList(op, "activity", op.cursor ?? url.toString(), (entry) => {
+    const outcome = await runPagedList(op, "activity", url.toString(), (entry) => {
       const update = row(entry.update);
       if (update.state === "MERGED") { const date = instant(update.date, "activity"); if (date) acc.dates.push(date); else acc.invalidMergeDate = true; }
       for (const kind of ["approval", "changes_requested", "comment"] as const) {
@@ -298,7 +308,18 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     if (!meta) { op.done = true; op.cursor = null; return "done"; }
     const redirectUrl = `${API}/repositories/%7B%7D/${encodeURIComponent(meta.repositoryId)}/pullrequests/${meta.prId}/diffstat`;
     const redirect = await request("diffstat", redirectUrl, { inspectRedirect: true });
-    if (redirect.stop) { pendingStop = redirect.stop; return "stop"; }
+    if (redirect.stop) {
+      if (redirect.stop.stopKind === "not_accessible") {
+        // The PR's diffstat is gone (repo went private, PR deleted after
+        // merge): absorb like a malformed redirect, not a terminal stop --
+        // the accepted_change event itself is already fully determined.
+        reasons.add("not_accessible");
+        op.done = true; op.cursor = null;
+        emitAcceptedChange(key, meta, { paths: [], additions: 0, deletions: 0, full: false });
+        return "done";
+      }
+      pendingStop = redirect.stop; return "stop";
+    }
     op.done = true; op.cursor = null;
     const diffUrls: Record<string, string> = (state.diffUrl as Record<string, string> | undefined) ?? {};
     state.diffUrl = diffUrls;
@@ -332,7 +353,7 @@ export const collectBitbucketSlice: CollectSlice = async (input, credential, che
     const diffAcc: Record<string, BitbucketDiffAcc> = (state.diffAcc as Record<string, BitbucketDiffAcc> | undefined) ?? {};
     state.diffAcc = diffAcc;
     const acc = diffAcc[key] ?? (diffAcc[key] = { paths: [], additions: 0, deletions: 0, full: true });
-    const outcome = await runPagedList(op, "diff", op.cursor ?? initialUrl, (value) => {
+    const outcome = await runPagedList(op, "diff", initialUrl, (value) => {
       const oldPath = text(row(value.old).path); const newPath = text(row(value.new).path);
       if (oldPath && !acc.paths.includes(oldPath)) acc.paths.push(oldPath);
       if (newPath && !acc.paths.includes(newPath)) acc.paths.push(newPath);

@@ -317,4 +317,23 @@ describe("collectGitHubSlice -- ported business-logic parity (soft reasons, comp
     expect(result.coverage.eventKinds.accepted_change).toBe("partial");
     expect(result.coverage.reasonCodes).toContain("acceptance_time_unknown");
   });
+  it("absorbs a not_accessible fan-out item (a PR whose files became inaccessible, e.g. deleted after merge) as a soft reason: the slice completes, coverage is partial with not_accessible, and the other item is still collected", async () => {
+    mockApi({
+      V7MergedChanges: () => ({ search: { ...page([pr("PR1"), pr("PR2")]), issueCount: 2 } }),
+      V7Files: ({ id }) => id === "PR1" ? new Response("gone", { status: 403 }) : { node: { files: page([{ path: "README.md" }]) } },
+    });
+    const result = await runToCompletion();
+    expect(result.coverage.status).toBe("partial");
+    expect(result.coverage.reasonCodes).toContain("not_accessible");
+    const pr1 = result.events.find((e) => e.eventId === "PR1");
+    const pr2 = result.events.find((e) => e.eventId === "PR2");
+    expect(pr1?.measurements.changedFiles.status).toBe("unknown");
+    expect(pr2?.measurements.changedFiles).toMatchObject({ status: "observed", value: ["README.md"] });
+  });
+  it("only the identity (profile) operation can produce a terminal not_accessible stop", async () => {
+    mockApi({ V7Profile: () => new Response("unauthorized", { status: 403 }) });
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    expect(result.done).toBe(false);
+    expect(result.stop).toMatchObject({ provider: "github", operation: "profile", stopKind: "not_accessible" });
+  });
 });

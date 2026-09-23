@@ -89,11 +89,11 @@ describe("collectGitlabSlice -- ported diagnostic matrix (hard stops)", () => {
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "gitlab", operation: "diffs", stopKind: "http", httpStatus: 500 });
   });
-  it("classifies an unavailable (403) notes endpoint as a not_accessible stop -- a lost-access job failure now recovers via reconnect, not a silently downgraded permanent partial (see the report)", async () => {
+  it("absorbs an unavailable (403) notes endpoint as a soft not_accessible reason: the job completes with partial coverage rather than blocking forever, and review stays a real per-item outcome rather than a terminal job failure", async () => {
     api((url) => url.pathname.endsWith("/notes") ? json({}, 403) : undefined);
-    const result = await collectGitlabSlice(explicitInput(["10"]), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
-    expect(result.done).toBe(false);
-    expect(result.stop).toMatchObject({ provider: "gitlab", operation: "notes", stopKind: "not_accessible", httpStatus: 403 });
+    const result = await runToCompletion(explicitInput(["10"]));
+    expect(result.coverage.status).toBe("partial");
+    expect(result.coverage.reasonCodes).toContain("not_accessible");
   });
   it("retains preceding pages and resumes from the failed page instead of restarting", async () => {
     api((url) => {
@@ -201,14 +201,16 @@ describe("collectGitlabSlice -- ported business-logic parity (soft reasons, comp
     const result = await runToCompletion();
     expect(result.events.find((e) => e.kind === "accepted_change")?.measurements.changedFiles.status).toBe("unknown");
   });
-  it("classifies an unavailable (403) emails endpoint as a not_accessible stop rather than a silent attribution downgrade", async () => {
+  it("absorbs an unavailable (403) emails endpoint as a soft not_accessible reason rather than blocking the job", async () => {
     api((url) => {
       if (url.pathname === "/api/v4/user") return json({ id: 7, username: "alice" });
       if (url.pathname === "/api/v4/user/emails") return json({}, 403);
+      if (url.pathname.endsWith("/repository/commits")) return json([]);
     });
-    const result = await collectGitlabSlice(explicitInput(["10"]), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
-    expect(result.done).toBe(false);
-    expect(result.stop).toMatchObject({ provider: "gitlab", operation: "emails", stopKind: "not_accessible", httpStatus: 403 });
+    const result = await runToCompletion(explicitInput(["10"]));
+    expect(result.coverage.status).toBe("partial");
+    expect(result.coverage.reasonCodes).toContain("not_accessible");
+    expect(result.events.some((e) => e.kind === "authored_commit")).toBe(false);
   });
   it("keeps acceptance time unknown when an old-authored commit may first land inside the window", async () => {
     api((url) => {
@@ -228,5 +230,28 @@ describe("collectGitlabSlice -- ported business-logic parity (soft reasons, comp
     const revision = (result: { events: readonly NormalizedEngineeringEvent[] }) => result.events.find((e) => e.kind === "review")?.artifactRevision;
     expect(revision(first)).toBeDefined();
     expect(revision(first)).toBe(revision(second));
+  });
+  it("absorbs a not_accessible fan-out item (one MR's details became inaccessible, e.g. the project went private) as a soft reason: the slice completes, coverage is partial with not_accessible, and the other MR is still collected", async () => {
+    api((url) => {
+      if (url.pathname === "/api/v4/merge_requests") return json([mr(1), mr(2)]);
+      if (url.pathname === "/api/v4/projects/10/merge_requests") return json([]);
+      if (url.pathname.endsWith("/merge_requests/1")) return json({}, 403);
+      if (url.pathname.endsWith("/1/notes") || url.pathname.endsWith("/2/notes")) return json([]);
+    });
+    const result = await runToCompletion();
+    expect(result.coverage.status).toBe("partial");
+    expect(result.coverage.reasonCodes).toContain("not_accessible");
+    const accepted = result.events.filter((e) => e.kind === "accepted_change");
+    expect(accepted).toHaveLength(2);
+    const mr1 = accepted.find((e) => e.eventId.includes(":mr:1:"));
+    const mr2 = accepted.find((e) => e.eventId.includes(":mr:2:"));
+    expect(mr1?.measurements.changedFiles.status).toBe("unknown");
+    expect(mr2?.measurements.changedFiles).toMatchObject({ status: "observed", value: ["docs/a.md"] });
+  });
+  it("only the identity (profile / /user) operation can produce a terminal not_accessible stop", async () => {
+    api((url) => url.pathname === "/api/v4/user" ? json({}, 403) : undefined);
+    const result = await collectGitlabSlice(ownedInput(), credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, []);
+    expect(result.done).toBe(false);
+    expect(result.stop).toMatchObject({ provider: "gitlab", operation: "profile", stopKind: "not_accessible" });
   });
 });
