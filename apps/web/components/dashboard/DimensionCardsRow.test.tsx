@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
-import type { TrendSummary } from "@/lib/history/trend";
-import type { SnapshotDiff } from "@/lib/history/diff";
+import type { StatsData } from "@chapa/shared";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 import { DimensionCardsRow } from "./DimensionCardsRow";
 
 // ---------------------------------------------------------------------------
@@ -14,12 +13,6 @@ vi.mock("./DimensionCard", () => ({
     <div
       data-testid={`dimension-card-${props.dimension}`}
       data-score={props.score}
-      data-delta={props.delta ?? "none"}
-      data-trend-avg-delta={
-        props.trend && typeof props.trend === "object" && "avgDelta" in (props.trend as Record<string, unknown>)
-          ? (props.trend as Record<string, unknown>).avgDelta
-          : "none"
-      }
       data-animation-delay={props.animationDelay}
       className={typeof props.className === "string" ? props.className : ""}
     >
@@ -33,17 +26,6 @@ afterEach(cleanup);
 // ---------------------------------------------------------------------------
 // Mock data
 // ---------------------------------------------------------------------------
-
-const mockDimensions: DimensionScores = {
-  delivery: 85,
-  quality: 72,
-  consistency: 91,
-  breadth: 68,
-};
-
-const mockImpact = {
-  dimensions: mockDimensions,
-} as ImpactV6Result;
 
 const mockStats: StatsData = {
   handle: "testuser",
@@ -65,64 +47,59 @@ const mockStats: StatsData = {
   fetchedAt: "2026-02-28T00:00:00Z",
 };
 
-const mockTrend: TrendSummary = {
-  direction: "improving",
-  avgDelta: 2.5,
-  compositeValues: [{ date: "2026-02-21", value: 80 }],
+const scoringNoCraft = makeScoring({
   dimensions: {
-    delivery: { avgDelta: 3, values: [{ date: "2026-02-21", value: 82 }] },
-    quality: { avgDelta: -1, values: [{ date: "2026-02-21", value: 73 }] },
-    consistency: { avgDelta: 1, values: [{ date: "2026-02-21", value: 90 }] },
-    breadth: { avgDelta: 2, values: [{ date: "2026-02-21", value: 66 }] },
+    delivery: { kind: "point", value: 85, display: 85 },
+    quality: { kind: "point", value: 72, display: 72 },
+    consistency: { kind: "point", value: 91, display: 91 },
+    breadth: { kind: "point", value: 68, display: 68 },
   },
-};
+});
 
-const mockDiff: SnapshotDiff = {
-  direction: "improving",
-  daysBetween: 7,
-  compositeScore: 3,
-  adjustedComposite: 2,
-  confidence: 1,
-  dimensions: { delivery: 5, quality: -2, consistency: 3, breadth: 4 },
-  stats: {
-    commitsTotal: 20,
-    prsMergedCount: 5,
-    prsMergedWeight: 5,
-    reviewsSubmittedCount: 3,
-    issuesClosedCount: 2,
-    reposContributed: 1,
-    activeDays: 7,
-    linesAdded: 500,
-    linesDeleted: 200,
-    totalStars: 2,
-    totalForks: 1,
-    totalWatchers: 3,
-    topRepoShare: -0.05,
+const scoringWithCraft = makeScoring({
+  dimensions: scoringNoCraft.dimensions,
+  reportCraft: {
+    status: "scored",
+    unlocked: true,
+    report: {
+      reportRef: "00000000-0000-4000-8000-000000000099",
+      supersedesReportRef: null,
+      inputs: {
+        policyVersion: "v7.2",
+        classifierRevision: "cc-outcomes-v7.2",
+        window: { referenceTime: "2026-09-08T10:00:00.000Z", referenceDate: "2026-09-08", startInclusive: "2025-09-09T00:00:00.000Z", endExclusive: "2026-09-09T00:00:00.000Z", calendarDays: 365 },
+        reportPeriod: { startInclusive: "2026-09-01T00:00:00.000Z", endExclusive: "2026-09-08T00:00:00.000Z" },
+        totalSessions: 10,
+        outcomes: { fully_achieved: 4, mostly_achieved: 2, partially_achieved: 0, not_achieved: 0 },
+        unknownSessions: 0,
+        unclassifiedSessions: 0,
+      },
+      result: {
+        status: "scored",
+        unlocked: true,
+        provenance: "report_derived",
+        assessment: "model_estimate",
+        reportPeriod: { startInclusive: "2026-09-01T00:00:00.000Z", endExclusive: "2026-09-08T00:00:00.000Z" },
+        point: { kind: "point", exact: 45, displayValue: 45, displayLabel: "45" },
+        trace: { outcomeCredits: { fully_achieved: 1, mostly_achieved: 0.7, partially_achieved: 0.3, not_achieved: 0 }, creditedSessions: 5.4, recognizedSessions: 6, totalSessions: 10, unknownSessions: 0, unclassifiedSessions: 0, recognizedCoverage: 0.6, exact: 45 },
+      },
+    },
   },
-  archetype: null,
-  tier: null,
-  profileType: null,
-  penaltyChanges: null,
-};
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+} as never);
 
 describe("DimensionCardsRow", () => {
-  // 1. Renders 4 DimensionCards (one per dimension)
-  it("renders 4 DimensionCards, one per dimension", () => {
-    render(<DimensionCardsRow impact={mockImpact} stats={mockStats} />);
+  it("renders 4 DimensionCards, one per dimension, when Craft is not unlocked", () => {
+    render(<DimensionCardsRow scoring={scoringNoCraft} stats={mockStats} />);
 
     expect(screen.getByTestId("dimension-card-delivery")).toBeTruthy();
     expect(screen.getByTestId("dimension-card-quality")).toBeTruthy();
     expect(screen.getByTestId("dimension-card-consistency")).toBeTruthy();
     expect(screen.getByTestId("dimension-card-breadth")).toBeTruthy();
+    expect(screen.queryByTestId("dimension-card-craft")).toBeNull();
   });
 
-  // 2. Passes correct dimension data to each card
   it("passes correct score to each DimensionCard", () => {
-    render(<DimensionCardsRow impact={mockImpact} stats={mockStats} />);
+    render(<DimensionCardsRow scoring={scoringNoCraft} stats={mockStats} />);
 
     expect(screen.getByTestId("dimension-card-delivery").getAttribute("data-score")).toBe("85");
     expect(screen.getByTestId("dimension-card-quality").getAttribute("data-score")).toBe("72");
@@ -130,65 +107,17 @@ describe("DimensionCardsRow", () => {
     expect(screen.getByTestId("dimension-card-breadth").getAttribute("data-score")).toBe("68");
   });
 
-  // 3. Passes trend/diff data when available
-  it("passes trend and diff data to each DimensionCard when provided", () => {
-    render(
-      <DimensionCardsRow
-        impact={mockImpact}
-        stats={mockStats}
-        trend={mockTrend}
-        diff={mockDiff}
-      />,
-    );
-
-    // Check trend data is forwarded (avgDelta per dimension)
-    expect(screen.getByTestId("dimension-card-delivery").getAttribute("data-trend-avg-delta")).toBe("3");
-    expect(screen.getByTestId("dimension-card-quality").getAttribute("data-trend-avg-delta")).toBe("-1");
-    expect(screen.getByTestId("dimension-card-consistency").getAttribute("data-trend-avg-delta")).toBe("1");
-    expect(screen.getByTestId("dimension-card-breadth").getAttribute("data-trend-avg-delta")).toBe("2");
-
-    // Check diff data is forwarded (delta per dimension)
-    expect(screen.getByTestId("dimension-card-delivery").getAttribute("data-delta")).toBe("5");
-    expect(screen.getByTestId("dimension-card-quality").getAttribute("data-delta")).toBe("-2");
-    expect(screen.getByTestId("dimension-card-consistency").getAttribute("data-delta")).toBe("3");
-    expect(screen.getByTestId("dimension-card-breadth").getAttribute("data-delta")).toBe("4");
-  });
-
-  // 4. Handles null trend/diff gracefully
-  it("handles null trend and diff gracefully", () => {
-    render(
-      <DimensionCardsRow
-        impact={mockImpact}
-        stats={mockStats}
-        trend={null}
-        diff={null}
-      />,
-    );
-
-    // All 4 cards render
-    expect(screen.getByTestId("dimension-card-delivery")).toBeTruthy();
-    expect(screen.getByTestId("dimension-card-quality")).toBeTruthy();
-    expect(screen.getByTestId("dimension-card-consistency")).toBeTruthy();
-    expect(screen.getByTestId("dimension-card-breadth")).toBeTruthy();
-
-    // Delta and trend fall back to "none"
-    expect(screen.getByTestId("dimension-card-delivery").getAttribute("data-delta")).toBe("none");
-    expect(screen.getByTestId("dimension-card-delivery").getAttribute("data-trend-avg-delta")).toBe("none");
-  });
-
-  // 5. Renders section header "Performance Dimensions"
   it('renders section header "Performance Dimensions"', () => {
-    render(<DimensionCardsRow impact={mockImpact} stats={mockStats} />);
+    render(<DimensionCardsRow scoring={scoringNoCraft} stats={mockStats} />);
 
     const header = screen.getByText("Performance Dimensions");
     expect(header).toBeTruthy();
     expect(header.tagName).toBe("H3");
   });
 
-  // 6. Has responsive grid classes
-  it("has responsive grid classes on the grid container", () => {
+  it("has responsive 4-column grid classes when Craft is not unlocked", () => {
     const { container } = render(
-      <DimensionCardsRow impact={mockImpact} stats={mockStats} />,
+      <DimensionCardsRow scoring={scoringNoCraft} stats={mockStats} />,
     );
 
     const grid = container.querySelector(".grid");
@@ -199,9 +128,8 @@ describe("DimensionCardsRow", () => {
     expect(grid!.classList.contains("gap-3")).toBe(true);
   });
 
-  // 7. Passes staggered animationDelay to each card
   it("passes staggered animationDelay to each card (400, 500, 600, 700)", () => {
-    render(<DimensionCardsRow impact={mockImpact} stats={mockStats} />);
+    render(<DimensionCardsRow scoring={scoringNoCraft} stats={mockStats} />);
 
     expect(screen.getByTestId("dimension-card-delivery").getAttribute("data-animation-delay")).toBe("400");
     expect(screen.getByTestId("dimension-card-quality").getAttribute("data-animation-delay")).toBe("500");
@@ -209,117 +137,28 @@ describe("DimensionCardsRow", () => {
     expect(screen.getByTestId("dimension-card-breadth").getAttribute("data-animation-delay")).toBe("700");
   });
 
-  // 8. Applies opacity to non-active cards when activeDimension is set
-  it("applies opacity-70 to non-active cards when activeDimension is set", () => {
-    render(
-      <DimensionCardsRow
-        impact={mockImpact}
-        stats={mockStats}
-        activeDimension="delivery"
-      />,
-    );
-
-    // Active card: no opacity class
-    const deliveryCard = screen.getByTestId("dimension-card-delivery");
-    expect(deliveryCard.className).not.toContain("opacity-70");
-
-    // Non-active cards: have opacity-70
-    const qualityCard = screen.getByTestId("dimension-card-quality");
-    expect(qualityCard.className).toContain("opacity-70");
-
-    const consistencyCard = screen.getByTestId("dimension-card-consistency");
-    expect(consistencyCard.className).toContain("opacity-70");
-
-    const breadthCard = screen.getByTestId("dimension-card-breadth");
-    expect(breadthCard.className).toContain("opacity-70");
-  });
-
-  // 9. No opacity classes when activeDimension is null
-  it("does not apply opacity classes when activeDimension is null", () => {
-    render(
-      <DimensionCardsRow
-        impact={mockImpact}
-        stats={mockStats}
-        activeDimension={null}
-      />,
-    );
-
-    expect(screen.getByTestId("dimension-card-delivery").className).not.toContain("opacity-70");
-    expect(screen.getByTestId("dimension-card-quality").className).not.toContain("opacity-70");
-    expect(screen.getByTestId("dimension-card-consistency").className).not.toContain("opacity-70");
-    expect(screen.getByTestId("dimension-card-breadth").className).not.toContain("opacity-70");
-  });
-
-  // 10. Applies custom className to section wrapper
   it("applies custom className to the section wrapper", () => {
     const { container } = render(
-      <DimensionCardsRow
-        impact={mockImpact}
-        stats={mockStats}
-        className="mt-8"
-      />,
+      <DimensionCardsRow scoring={scoringNoCraft} stats={mockStats} className="mt-8" />,
     );
 
     const section = container.firstElementChild as HTMLElement;
     expect(section.classList.contains("mt-8")).toBe(true);
   });
 
-  // 11. Handles undefined trend/diff (not passed at all)
-  it("handles undefined trend and diff (omitted props)", () => {
-    render(<DimensionCardsRow impact={mockImpact} stats={mockStats} />);
-
-    // All 4 cards render with delta="none"
-    expect(screen.getByTestId("dimension-card-delivery").getAttribute("data-delta")).toBe("none");
-    expect(screen.getByTestId("dimension-card-quality").getAttribute("data-delta")).toBe("none");
-    expect(screen.getByTestId("dimension-card-consistency").getAttribute("data-delta")).toBe("none");
-    expect(screen.getByTestId("dimension-card-breadth").getAttribute("data-delta")).toBe("none");
-  });
-
-  // 12. Renders only 4 cards when craft is absent
-  it("renders 4 cards when craft dimension is absent", () => {
-    const impactWithoutCraft = {
-      ...mockImpact,
-      dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68 },
-    } as ImpactV6Result;
-
-    render(<DimensionCardsRow impact={impactWithoutCraft} stats={mockStats} />);
-
-    expect(screen.getByTestId("dimension-card-delivery")).toBeTruthy();
-    expect(screen.getByTestId("dimension-card-quality")).toBeTruthy();
-    expect(screen.getByTestId("dimension-card-consistency")).toBeTruthy();
-    expect(screen.getByTestId("dimension-card-breadth")).toBeTruthy();
-    expect(screen.queryByTestId("dimension-card-craft")).toBeNull();
-  });
-
-  // 13. Renders 5 cards when craft is present
-  it("renders 5 cards when craft dimension is present", () => {
-    const impactWithCraft = {
-      ...mockImpact,
-      dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68, craft: 45 },
-    } as ImpactV6Result;
-
-    render(<DimensionCardsRow impact={impactWithCraft} stats={mockStats} />);
+  it("renders 5 cards and a 5-column grid when Craft is unlocked", () => {
+    const { container } = render(
+      <DimensionCardsRow scoring={scoringWithCraft} stats={mockStats} />,
+    );
 
     expect(screen.getByTestId("dimension-card-delivery")).toBeTruthy();
     expect(screen.getByTestId("dimension-card-quality")).toBeTruthy();
     expect(screen.getByTestId("dimension-card-consistency")).toBeTruthy();
     expect(screen.getByTestId("dimension-card-breadth")).toBeTruthy();
     expect(screen.getByTestId("dimension-card-craft")).toBeTruthy();
-  });
-
-  // 14. Uses responsive 5-column grid when craft is present
-  it("uses 5-column grid when craft is present", () => {
-    const impactWithCraft = {
-      ...mockImpact,
-      dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68, craft: 45 },
-    } as ImpactV6Result;
-
-    const { container } = render(
-      <DimensionCardsRow impact={impactWithCraft} stats={mockStats} />,
-    );
+    expect(screen.getByTestId("dimension-card-craft").getAttribute("data-score")).toBe("45");
 
     const grid = container.querySelector(".grid");
-    expect(grid).toBeTruthy();
     expect(grid!.classList.contains("grid-cols-2")).toBe(true);
     expect(grid!.classList.contains("sm:grid-cols-3")).toBe(true);
     expect(grid!.classList.contains("lg:grid-cols-5")).toBe(true);

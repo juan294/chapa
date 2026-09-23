@@ -5,12 +5,9 @@ import { ReceiptExplanationPanel } from "@/components/dashboard/ReceiptExplanati
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
 import { useState } from "react";
-import type { ClientImpactV6Result, CraftResult, Platform, StatsData } from "@chapa/shared";
-import type { TrendSummary } from "@/lib/history/trend";
-import type { ClientSnapshotDiff } from "@/lib/history/diff";
+import type { Platform, StatsData } from "@chapa/shared";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
-import { ScoreExplanationPanel } from "@/components/dashboard/ScoreExplanationPanel";
 import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
@@ -121,12 +118,6 @@ function EmptyImpactState({ handle }: { handle: string }) {
 interface SharePageOwnerContentProps {
   handle: string;
   stats: StatsData | null;
-  // #1067 — redacted PublicImpactV6Result for a non-owner visitor, full
-  // ImpactV6Result for the owner (see SharePageOwnerContentLazy).
-  impact: ClientImpactV6Result | null;
-  craftResult?: CraftResult | null;
-  trend?: TrendSummary | null;
-  diff?: ClientSnapshotDiff | null;
   // #1165 (FE-H2) — server-resolved display gate, threaded down from
   // `/u/[handle]`'s dynamic (non-ISR) render so this doesn't need to
   // re-derive ownership over a network round trip to `/api/auth/session`.
@@ -142,11 +133,12 @@ interface SharePageOwnerContentProps {
   // equivalent using the same formula.
   embedMarkdown?: string;
   embedHtml?: string;
-  /** #1311 — the issued v7 receipt's own arithmetic, resolved server-side.
-   *  Present only for a subject with a receipt; its presence is what switches
-   *  this surface off the v6 explanation. */
+  /** #1311/#1335 — the issued receipt's own arithmetic, resolved server-side.
+   *  Present only for a subject with a receipt; absent when a v7.2 subject's
+   *  receipt explanation could not be built (see the fallback message below). */
   receiptExplanation?: ReceiptExplanation | null;
-  scoring?: ScoreViewModel | null;
+  /** #1335 — v7.2 is the one scoring policy this surface renders. */
+  scoring: ScoreViewModel;
   /** #1331 — see SharePageOwnerContentLazy. */
   staleFallback?: { observedAt: string } | null;
   /** #1332 — owner-only; see SharePageOwnerContentLazy. Always `[]` when the
@@ -157,10 +149,6 @@ interface SharePageOwnerContentProps {
 export function SharePageOwnerContent({
   handle,
   stats,
-  impact,
-  craftResult = null,
-  trend = null,
-  diff = null,
   isOwner: isOwnerProp,
   embedMarkdown: embedMarkdownProp,
   embedHtml: embedHtmlProp,
@@ -253,17 +241,13 @@ export function SharePageOwnerContent({
       </h2>
 
       {/* Impact Dashboard */}
-      {impact && stats ? (
+      {stats ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
           <ImpactDashboard
             isOwner={isOwner}
-            impact={impact}
             scoring={scoring}
             receiptExplanation={receiptExplanation}
             stats={stats}
-            craftResult={craftResult}
-            trend={trend}
-            diff={diff}
             activityUnavailable={!!staleFallback}
           />
         </section>
@@ -271,26 +255,16 @@ export function SharePageOwnerContent({
         <EmptyImpactState handle={handle} />
       )}
 
-      {/* #1311 — a v7 subject is explained by its receipt. The v6 panel
-          explains confidence penalties, an adjusted score and a recency
-          multiplier, none of which produced the number on the badge above,
-          so showing it here would explain arithmetic that never ran. */}
+      {/* #1311/#1335 — v7.2 is the one scoring policy; a subject is always
+          explained by its receipt now. The explanation is absent only when
+          the receipt explanation itself could not be built. */}
       {receiptExplanation ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
           <ReceiptExplanationPanel explanation={receiptExplanation} />
         </section>
-      ) : scoring?.policyVersion === "v7.2" ? (
+      ) : (
         <p className="mb-12 text-sm text-text-secondary">{t("observedScoring.explanationUnavailable") as string}</p>
-      ) : impact && stats ? (
-        <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
-          <ScoreExplanationPanel
-            impact={impact}
-            stats={stats}
-            craftResult={craftResult}
-            isOwner={isOwner}
-          />
-        </section>
-      ) : null}
+      )}
 
       {/* Embed Snippets */}
       <section className="space-y-6 animate-fade-in-up motion-reduce:animate-none [animation-delay:500ms]">

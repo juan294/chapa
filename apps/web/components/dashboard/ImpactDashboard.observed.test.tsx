@@ -13,7 +13,7 @@ afterEach(cleanup);
 it.each([57, 0] as const)("shows the exact receipt core46 and fifth Craft%s instead of contradictory legacy scores", async craft => {
   const f = await scoringConsistencyFixture({ craft });
   const explanation = explainObservedReceipt({ receipt: f.envelope, trend: null }, Date.parse(f.envelope.receipt.window.referenceTime));
-  render(<ImpactDashboard impact={f.impact} stats={f.stats} scoring={f.model} receiptExplanation={explanation} />);
+  render(<ImpactDashboard stats={f.stats} scoring={f.model} receiptExplanation={explanation} />);
   expect(screen.getByText("46")).toBeDefined();
   expect(screen.queryByText("Builder")).toBeNull();
   expect(screen.queryByText("83")).toBeNull();
@@ -30,17 +30,17 @@ it.each([57, 0] as const)("shows the exact receipt core46 and fifth Craft%s inst
 // stored-badge fallback must hide it here exactly like the v6 branch.
 it("hides the activity heatmap for a v7.2 model when activityUnavailable is set", async () => {
   const f = await scoringConsistencyFixture({ craft: "none" });
-  render(<ImpactDashboard impact={f.impact} stats={f.stats} scoring={f.model} activityUnavailable />);
+  render(<ImpactDashboard stats={f.stats} scoring={f.model} activityUnavailable />);
   expect(screen.queryByText("Descriptive activity")).toBeNull();
   expect(screen.getByText("Descriptive source counts")).toBeDefined();
 });
 
 it("keeps no report at four cards and expired Craft unlocked without a fabricated zero", async () => {
   const absent = await scoringConsistencyFixture({ craft: "none" });
-  const view = render(<ImpactDashboard impact={absent.impact} stats={absent.stats} scoring={absent.model} />);
+  const view = render(<ImpactDashboard stats={absent.stats} scoring={absent.model} />);
   expect(screen.getAllByRole("article")).toHaveLength(4);
   const expired = await scoringConsistencyFixture({ craft: "expired" });
-  view.rerender(<ImpactDashboard impact={expired.impact} stats={expired.stats} scoring={expired.model} />);
+  view.rerender(<ImpactDashboard stats={expired.stats} scoring={expired.model} />);
   expect(screen.getAllByRole("article")).toHaveLength(5);
   const card = screen.getByRole("article", { name: /Craft/ });
   expect(within(card).queryByRole("progressbar")).toBeNull();
@@ -50,7 +50,7 @@ it("keeps no report at four cards and expired Craft unlocked without a fabricate
 
 it("offers report recovery only to the owner for absent and insufficient reports", async () => {
   const f = await scoringConsistencyFixture({ craft: "none" });
-  const view = render(<ImpactDashboard impact={f.impact} stats={f.stats} scoring={f.model} isOwner />);
+  const view = render(<ImpactDashboard stats={f.stats} scoring={f.model} isOwner />);
   expect(screen.getByText("No insights report")).toBeDefined();
   expect(screen.getByRole("link", { name: "Upload insights" }).getAttribute("href")).toBe("/settings");
   const scored = await scoringConsistencyFixture({ craft: 57 });
@@ -60,11 +60,11 @@ it("offers report recovery only to the owner for absent and insufficient reports
   if (calculation.status !== "valid" || calculation.result.status !== "insufficient_report_data") throw new Error("Expected insufficient report");
   const model = { ...f.model, reportCraft: { status: "insufficient_report_data" as const, unlocked: false as const,
     report: { inputs: calculation.inputs, result: calculation.result } } };
-  view.rerender(<ImpactDashboard impact={f.impact} stats={f.stats} scoring={model} isOwner />);
+  view.rerender(<ImpactDashboard stats={f.stats} scoring={model} isOwner />);
   expect(screen.getAllByRole("article")).toHaveLength(4);
   expect(screen.getByText("Insufficient report data")).toBeDefined();
   expect(screen.getByRole("link", { name: "Update insights" }).getAttribute("href")).toBe("/settings");
-  view.rerender(<ImpactDashboard impact={f.impact} stats={f.stats} scoring={model} isOwner={false} />);
+  view.rerender(<ImpactDashboard stats={f.stats} scoring={model} isOwner={false} />);
   expect(screen.getByText("Insufficient report data")).toBeDefined();
   expect(screen.queryByRole("link", { name: /insights/i })).toBeNull();
 });
