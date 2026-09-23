@@ -583,6 +583,13 @@ describe("UserMenu — trimmed to navigation (#1238)", () => {
     }
   });
 
+  // #1332 review — a UserMenu-owned reconnect indicator was tried and reverted:
+  // #1238 deliberately removed per-page connection status fetches from this
+  // menu (Settings is the one place that owns them), and reintroducing even a
+  // read-only usePlatformConnections() call here would add up to 3 status
+  // requests to every authenticated page load. The reconnect prompt now lives
+  // on /settings (full detail) and the owner's own /u/[handle] share page
+  // (a small notice, computed server-side with no extra client request).
   it("never fetches platform connection status", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     render(<UserMenu {...baseProps} />);

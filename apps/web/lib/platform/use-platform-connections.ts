@@ -25,6 +25,10 @@ export type PlatformId = "bitbucket" | "codeberg" | "gitlab";
 export interface PlatformStatus {
   linked: boolean;
   remoteLogin: string | null;
+  /** True when the connection's refresh grant needs the owner to reconnect
+   * through the normal OAuth flow (#1332): a definitive revoke, or an
+   * ambiguous refresh claim that has exhausted its one takeover retry. */
+  needsReconnect: boolean;
 }
 
 interface PlatformStatusEntry {
@@ -115,7 +119,7 @@ export function usePlatformConnections(): PlatformConnections {
             .then((r) => r.json())
             .then((data) => {
               const status = data.enabled
-                ? { linked: data.linked, remoteLogin: data.remoteLogin }
+                ? { linked: data.linked, remoteLogin: data.remoteLogin, needsReconnect: data.needsReconnect === true }
                 : null;
               platformStatusStore.set({
                 ...platformStatusStore.getSnapshot(),
@@ -153,7 +157,7 @@ export function usePlatformConnections(): PlatformConnections {
           [platform]: {
             fetched: true,
             pending: false,
-            status: { linked: false, remoteLogin: null },
+            status: { linked: false, remoteLogin: null, needsReconnect: false },
           },
         });
         return true;

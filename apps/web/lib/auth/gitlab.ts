@@ -165,17 +165,23 @@ export async function exchangeGitlabCode(
 /**
  * Refresh an expired access token.
  *
- * Returns a discriminated result distinguishing permanent revocation
- * (HTTP 400 + `invalid_grant`) from transient failures (network, timeout, 5xx).
- * Callers should only unlink the platform on `reason: "revoked"`.
+ * Returns a discriminated result distinguishing definite outcomes (a
+ * provider HTTP response was received — permanent revocation via 400 +
+ * `invalid_grant`, or another definitive error/no-token response) from a
+ * truly ambiguous one (no response was ever observed: network error, abort,
+ * timeout). Only the `fetch()` call itself is treated as ambiguous on
+ * failure — once a response exists, the outcome is always definitive, even
+ * if its body could not be parsed (#1332). Callers should only unlink the
+ * platform on `outcome: "definitive", reason: "revoked"`.
  */
 export async function refreshGitlabToken(
   refreshToken: string,
   clientId: string,
   clientSecret: string,
 ): Promise<TokenRefreshResult<GitlabTokenResponse>> {
+  let res: Response;
   try {
-    const res = await fetch(GL_TOKEN_URL, {
+    res = await fetch(GL_TOKEN_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -188,18 +194,22 @@ export async function refreshGitlabToken(
       }).toString(),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
+  } catch {
+    return { ok: false, outcome: "ambiguous" };
+  }
 
-    if (!res.ok) {
-      return { ok: false, reason: await classifyOAuthError(res) };
-    }
+  if (!res.ok) {
+    return { ok: false, outcome: "definitive", reason: await classifyOAuthError(res) };
+  }
 
+  try {
     const data = await res.json();
     if (!data.access_token) {
-      return { ok: false, reason: "transient" };
+      return { ok: false, outcome: "definitive", reason: "transient" };
     }
     return { ok: true, tokens: data as GitlabTokenResponse };
   } catch {
-    return { ok: false, reason: "transient" };
+    return { ok: false, outcome: "definitive", reason: "transient" };
   }
 }
 

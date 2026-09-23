@@ -29,6 +29,7 @@ const {
   mockResolveBadgeConfigSnapshot,
   mockReadStoredBadgeProfile,
   mockCaptureServerEvent,
+  mockDbGetLinkedPlatforms,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -55,6 +56,7 @@ const {
   // badge route uses rather than a duplicate.
   mockReadStoredBadgeProfile: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
+  mockDbGetLinkedPlatforms: vi.fn(),
 }));
 
 vi.mock("@/lib/render/badge-config", async (importOriginal) => {
@@ -118,6 +120,11 @@ vi.mock("@/lib/profile/stored-badge-profile", async (importOriginal) => {
 
 vi.mock("@/lib/validation", () => ({
   isValidHandle: (...args: unknown[]) => mockIsValidHandle(...args),
+}));
+
+// #1332 — dbGetLinkedPlatforms backs the owner-only reconnect notice.
+vi.mock("@/lib/db/user-platforms", () => ({
+  dbGetLinkedPlatforms: (...args: unknown[]) => mockDbGetLinkedPlatforms(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
@@ -394,6 +401,7 @@ describe("SharePage /u/[handle]", () => {
     // No session by default — most tests exercise the visitor path. Tests
     // that need owner behavior override this per-test.
     mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+    mockDbGetLinkedPlatforms.mockResolvedValue([]);
     mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
@@ -1312,6 +1320,33 @@ describe("SharePage /u/[handle]", () => {
 
       const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
       expect(ownerEl!.props.isOwner).toBe(false);
+    });
+
+    // #1332 — dbGetLinkedPlatforms is a real Supabase read; must never run
+    // for a non-owner viewer, and must only ever forward platforms whose
+    // refresh grant actually needs reconnecting.
+    it("threads a filtered reconnectNeeded to SharePageOwnerContentLazy for the owner", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+      mockDbGetLinkedPlatforms.mockResolvedValue([
+        { platform: "bitbucket", remoteLogin: "bb-user", connectedAt: "2026-02-20T12:00:00Z", needsReconnect: true },
+        { platform: "gitlab", remoteLogin: "gl-user", connectedAt: "2026-02-20T12:00:00Z", needsReconnect: false },
+      ]);
+
+      const result = await renderPage("testuser");
+
+      expect(mockDbGetLinkedPlatforms).toHaveBeenCalledWith("testuser");
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      expect(ownerEl!.props.reconnectNeeded).toEqual(["bitbucket"]);
+    });
+
+    it("never calls dbGetLinkedPlatforms and passes an empty reconnectNeeded for a visitor", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      const result = await renderPage("testuser");
+
+      expect(mockDbGetLinkedPlatforms).not.toHaveBeenCalled();
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      expect(ownerEl!.props.reconnectNeeded).toEqual([]);
     });
   });
 

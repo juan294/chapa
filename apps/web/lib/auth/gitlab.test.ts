@@ -229,20 +229,20 @@ describe("refreshGitlabToken", () => {
     );
 
     const result = await refreshGitlabToken("revoked", "cid", "csecret");
-    expect(result).toEqual({ ok: false, reason: "revoked" });
+    expect(result).toEqual({ ok: false, outcome: "definitive", reason: "revoked" });
   });
 
-  it("returns transient on network error", async () => {
+  it("returns ambiguous on network error (no response was ever observed)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new Error("network error")),
     );
 
     const result = await refreshGitlabToken("refresh", "cid", "csecret");
-    expect(result).toEqual({ ok: false, reason: "transient" });
+    expect(result).toEqual({ ok: false, outcome: "ambiguous" });
   });
 
-  it("returns transient on 500 server error", async () => {
+  it("returns definitive transient on 500 server error", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -252,17 +252,30 @@ describe("refreshGitlabToken", () => {
     );
 
     const result = await refreshGitlabToken("refresh", "cid", "csecret");
-    expect(result).toEqual({ ok: false, reason: "transient" });
+    expect(result).toEqual({ ok: false, outcome: "definitive", reason: "transient" });
   });
 
-  it("returns transient on timeout (AbortError)", async () => {
+  it("returns ambiguous on timeout (AbortError — no response was ever observed)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
     );
 
     const result = await refreshGitlabToken("refresh", "cid", "csecret");
-    expect(result).toEqual({ ok: false, reason: "transient" });
+    expect(result).toEqual({ ok: false, outcome: "ambiguous" });
+  });
+
+  it("returns definitive transient on an ok response with no access_token", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ token_type: "bearer" }),
+      }),
+    );
+
+    const result = await refreshGitlabToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, outcome: "definitive", reason: "transient" });
   });
 });
 

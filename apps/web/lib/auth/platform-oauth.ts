@@ -491,6 +491,11 @@ export function createStatusHandler(config: PlatformOAuthConfig) {
       linked: !!match,
       remoteLogin: match?.remoteLogin ?? null,
       connectedAt: match?.connectedAt ?? null,
+      // #1332 — a durable refresh grant can end up dead (definitive revoke)
+      // or permanently un-refreshable (an exhausted takeover) with no other
+      // owner-visible signal. Never exposes attempt ids or token material —
+      // just the boolean the UI needs to prompt a reconnect.
+      needsReconnect: match?.needsReconnect ?? false,
     });
   };
 }

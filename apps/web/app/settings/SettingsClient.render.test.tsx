@@ -138,6 +138,29 @@ describe("SettingsClient", () => {
     expect(screen.queryByTestId("settings-connection-gitlab")).toBeNull();
   });
 
+  // #1332 — a connection whose refresh grant needs reconnecting must prompt
+  // the owner to fix it, not silently keep failing forever.
+  it("shows a reconnect prompt and CTA for a connection that needs reconnecting", () => {
+    mocks.connections.mockReturnValue([
+      connection("bitbucket", { status: { linked: true, remoteLogin: "octo-bb", needsReconnect: true } }),
+    ]);
+    renderSettings();
+
+    const row = screen.getByTestId("settings-connection-bitbucket");
+    expect(screen.getByTestId("settings-connection-bitbucket-needs-reconnect")).toBeTruthy();
+    const reconnectLink = within(row).getByRole("link", { name: "Reconnect Bitbucket account" });
+    expect(reconnectLink.getAttribute("href")).toBe("/api/auth/bitbucket/connect?returnTo=/settings");
+    // Unlink must still be available — reconnecting is not the only way out.
+    expect(within(row).getByRole("button", { name: "Unlink Bitbucket account" })).toBeTruthy();
+  });
+
+  it("shows no reconnect prompt for a normally connected platform", () => {
+    renderSettings();
+    const row = screen.getByTestId("settings-connection-bitbucket");
+    expect(within(row).queryByRole("link", { name: "Reconnect Bitbucket account" })).toBeNull();
+    expect(screen.queryByTestId("settings-connection-bitbucket-needs-reconnect")).toBeNull();
+  });
+
   it("says so when no platform is available at all", () => {
     mocks.connections.mockReturnValue([
       connection("bitbucket", { enabled: false }),

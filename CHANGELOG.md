@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.3] - 2026-09-23
+
+### Fixed
+
+- **A linked source no longer stays stuck after a failed token refresh.**
+  Before, any failure after a refresh claim kept the claim forever, and the
+  owner was never told. Now a claim is released at once when no request was
+  sent or the provider gave a definite answer. A revoked grant marks the
+  connection as needing a reconnect. A request with no answer keeps the
+  barrier, and one retry is allowed after 360 seconds, when the first request
+  can no longer be running. If that retry also has no answer, the connection
+  needs a reconnect (#1332).
+- **Owners are told when a connection needs a reconnect.** Settings shows a
+  "Reconnect" button for the connection, and the owner's profile page shows a
+  notice with the same link. Visitors never see it.
+
+### Changed
+
+- Migration `053_platform_token_refresh_claim_recovery.sql` adds
+  `platform_token_refresh_attempts.takeover_used`,
+  `user_platforms.needs_reconnect` and two service-role-only functions to
+  release and take over a claim. See
+  `docs/decisions/2026-09-23-refresh-claim-recovery.md`.
+- Plans now need a "Stuck states and recovery" section and a "Consumer sweep"
+  section (`.claude/commands/plan.md`).
+
 ## [3.0.2] - 2026-09-23
 
 ### Fixed
@@ -1710,7 +1736,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.2...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.3...HEAD
+[3.0.3]: https://github.com/juan294/chapa/compare/v3.0.2...v3.0.3
 [3.0.2]: https://github.com/juan294/chapa/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/juan294/chapa/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/juan294/chapa/compare/v2.29.5...v3.0.0
