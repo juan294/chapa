@@ -10,10 +10,6 @@ vi.mock("@/lib/github/client", () => ({
   getStats: vi.fn(),
 }));
 
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: vi.fn(),
-}));
-
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: vi.fn(),
 }));
@@ -24,6 +20,14 @@ vi.mock("@/lib/auth/github-session-token", () => ({
 
 vi.mock("@/lib/platform/source-diagnostics", () => ({
   findUnusableSourceLinks: vi.fn(),
+}));
+
+// #1335 phase 5 — the route no longer reads the retired scoring-render-
+// selection flag; it always enqueues collection. Mocked here (rather than
+// left to the real Supabase-backed implementation) so this unit suite stays
+// isolated and fast, per the Test Conventions module-level mocking rule.
+vi.mock("@/lib/profile/post-write-score", () => ({
+  enqueueAndReportScoringStatus: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/analytics/server-errors", async (importOriginal) => {
@@ -52,20 +56,20 @@ vi.mock("next/server", async (importOriginal) => {
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
 import { rateLimit } from "@/lib/cache/redis";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
 import { captureServerError } from "@/lib/analytics/server-errors";
-import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
+import type { StatsData } from "@chapa/shared";
 
 const mockRequireSession = vi.mocked(requireSession);
 const mockGetStats = vi.mocked(getStats);
-const mockComputeImpact = vi.mocked(computeImpactV6);
 const mockRateLimit = vi.mocked(rateLimit);
 const mockGetSessionGitHubToken = vi.mocked(getSessionGitHubToken);
 const mockFindUnusableSourceLinks = vi.mocked(findUnusableSourceLinks);
 const mockCaptureServerError = vi.mocked(captureServerError);
+const mockEnqueueAndReportScoringStatus = vi.mocked(enqueueAndReportScoringStatus);
 
 function makeRequest(cookie?: string): NextRequest {
   const req = new NextRequest("http://localhost:3001/api/generate", {
@@ -88,6 +92,7 @@ describe("POST /api/generate", () => {
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockGetSessionGitHubToken.mockResolvedValue("ghp_test");
     mockFindUnusableSourceLinks.mockResolvedValue([]);
+    mockEnqueueAndReportScoringStatus.mockResolvedValue(null);
   });
 
   it("returns 401 when no session cookie is present", async () => {
@@ -127,9 +132,7 @@ describe("POST /api/generate", () => {
   it("returns 200 with success when stats are generated", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     const fakeStats = { handle: "juan294", commitsTotal: 100 } as unknown as StatsData;
-    const fakeImpact = { archetype: "Builder", adjustedComposite: 72 } as unknown as ImpactV6Result;
     mockGetStats.mockResolvedValue(fakeStats);
-    mockComputeImpact.mockReturnValue(fakeImpact);
 
     const res = await POST(makeRequest("chapa_session=abc"));
     expect(res.status).toBe(200);
@@ -141,7 +144,6 @@ describe("POST /api/generate", () => {
   it("calls getStats with the stored GitHub token", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
-    mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
 
     await POST(makeRequest("chapa_session=abc"));
 
@@ -198,24 +200,23 @@ describe("POST /api/generate", () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     const fakeStats = { handle: "juan294", commitsTotal: 7 } as unknown as StatsData;
     mockGetStats.mockResolvedValueOnce(null).mockResolvedValueOnce(fakeStats);
-    mockComputeImpact.mockReturnValue({ archetype: "Emerging" } as unknown as ImpactV6Result);
 
     const res = await POST(makeRequest("chapa_session=abc"));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true, handle: "juan294", policyVersion: "v6" });
+    // No scoringStatus (mocked null above): the response carries only
+    // success + handle — there is no v6 policyVersion fallback any more.
+    await expect(res.json()).resolves.toEqual({ success: true, handle: "juan294" });
     expect(mockGetStats).toHaveBeenCalledTimes(2);
     expect(mockGetStats).toHaveBeenNthCalledWith(1, "juan294", "ghp_test");
     // Exactly one argument: an explicit `undefined` token would be a
     // different call shape and is not what getStats' scope classifier expects.
     expect(mockGetStats.mock.calls[1]).toEqual(["juan294"]);
-    expect(mockComputeImpact).toHaveBeenCalledWith(fakeStats);
   });
 
   it("does not fall back when the session-token fetch succeeds", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
-    mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
 
     await POST(makeRequest("chapa_session=abc"));
 
@@ -229,6 +230,21 @@ describe("POST /api/generate", () => {
     await expect(POST(makeRequest("chapa_session=abc"))).rejects.toThrow("unexpected boom");
   });
 
+  it("enqueues collection for the signup reason and reports the returned scoring status", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
+    mockEnqueueAndReportScoringStatus.mockResolvedValue({ kind: "collecting", percent: 0, sources: [], hasPriorReceipt: false });
+
+    const res = await POST(makeRequest("chapa_session=abc"));
+
+    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith("juan294", "signup", expect.objectContaining({ enabled: true, machinePolicy: "v7.2" }));
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      handle: "juan294",
+      scoringStatus: { kind: "collecting", percent: 0, sources: [], hasPriorReceipt: false },
+    });
+  });
+
   // LE-5-1 — the share page materializes tokenless (as the server
   // GITHUB_TOKEN), and the stats cache row is bound to the credential that
   // fetched it (lib/platform/source-context.ts hashes the token into
@@ -240,7 +256,6 @@ describe("POST /api/generate", () => {
       mockRequireSession.mockReturnValue({ session: SESSION });
       const fakeStats = { handle: "juan294", commitsTotal: 100 } as unknown as StatsData;
       mockGetStats.mockResolvedValue(fakeStats);
-      mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
 
       const res = await POST(makeRequest("chapa_session=abc"));
 
@@ -269,7 +284,6 @@ describe("POST /api/generate", () => {
     it("captures a warm failure instead of letting the after() callback reject", async () => {
       mockRequireSession.mockReturnValue({ session: SESSION });
       mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
-      mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
 
       const res = await POST(makeRequest("chapa_session=abc"));
       expect(res.status).toBe(200);
@@ -299,7 +313,6 @@ describe("POST /api/generate", () => {
       mockRequireSession.mockReturnValue({ session: SESSION });
       const fakeStats = { handle: "juan294", commitsTotal: 7 } as unknown as StatsData;
       mockGetStats.mockResolvedValueOnce(null).mockResolvedValueOnce(fakeStats);
-      mockComputeImpact.mockReturnValue({ archetype: "Emerging" } as unknown as ImpactV6Result);
 
       const res = await POST(makeRequest("chapa_session=abc"));
 
@@ -309,6 +322,3 @@ describe("POST /api/generate", () => {
     });
   });
 });
-
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));
-vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceipt: vi.fn(async () => "skipped") }));

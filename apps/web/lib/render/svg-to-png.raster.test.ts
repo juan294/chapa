@@ -3,7 +3,8 @@ import { describe, it, expect } from "vitest";
 import { renderAsync, type ResvgRenderOptions } from "@resvg/resvg-js";
 import { getResvgFontOptions } from "./svg-to-png";
 import { renderBadgeSvg } from "./BadgeSvg";
-import { DEMO_IMPACT, DEMO_STATS } from "./demoData";
+import { DEMO_STATS } from "./demoData";
+import { DEMO_SCORING } from "./__fixtures__/demo-scoring";
 
 /**
  * #1275 — real-resvg regression tests.
@@ -86,7 +87,8 @@ describe("svgToPng fonts — glyphs actually rasterize (#1275)", () => {
 });
 
 describe("OG badge — the score number is visible in the rasterized badge (#1275)", () => {
-  const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+  const svg = renderBadgeSvg(DEMO_STATS, {
+    scoring: DEMO_SCORING,
     demoMode: true,
     disableAnimation: true,
   });
@@ -119,7 +121,7 @@ describe("OG badge — the score number is visible in the rasterized badge (#127
 
 describe("Ice Terminal complete raster at embed sizes", () => {
   it("keeps the maximum score glyphs inside the opaque ring interior", async () => {
-    const svg = renderBadgeSvg(DEMO_STATS, { ...DEMO_IMPACT, adjustedComposite: 100 }, { disableAnimation: true });
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring: { ...DEMO_SCORING, composite: { kind: "point", value: 100, display: 100 } }, disableAnimation: true });
     const painted = await renderAsync(svg, { font: getResvgFontOptions() });
     const missing = await renderAsync(svg, { font: NO_FONTS });
     const paintedPixels = painted.pixels;
@@ -140,7 +142,7 @@ describe("Ice Terminal complete raster at embed sizes", () => {
 
   for (const width of [1200, 600]) {
     it(`paints name and score glyphs at ${width}px with a real missing-font negative control`, async () => {
-      const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, { demoMode: true, disableAnimation: true });
+      const svg = renderBadgeSvg(DEMO_STATS, { scoring: DEMO_SCORING, demoMode: true, disableAnimation: true });
       const withFonts = await renderAsync(svg, { fitTo: { mode: "width", value: width }, font: getResvgFontOptions() });
       const withoutFonts = await renderAsync(svg, { fitTo: { mode: "width", value: width }, font: NO_FONTS });
       // resvg's native pixels getter copies the buffer. Read it once per image,

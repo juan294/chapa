@@ -2,7 +2,7 @@ import { createScoringWindow, type ObservationPeriod, type DimensionScores } fro
 import { CORE_DIMENSION_KEYS, type ScoreViewModel, type ScoreIdentityView, type ScoreValue } from "./score-view-model";
 
 /** Public values are copied from the selected model; no scoring or second rounding. */
-export function publicScoreProjection(model: ScoreViewModel, legacyCraft?: number) {
+export function publicScoreProjection(model: ScoreViewModel) {
   const dimensions: Partial<DimensionScores> = {};
   const exactDimensions: Partial<DimensionScores> = {};
   for (const key of CORE_DIMENSION_KEYS) {
@@ -13,8 +13,6 @@ export function publicScoreProjection(model: ScoreViewModel, legacyCraft?: numbe
   if (craft?.status === "scored") {
     dimensions.craft = craft.report.result.point.displayValue;
     exactDimensions.craft = craft.report.result.point.exact;
-  } else if (model.policyVersion === "v6" && legacyCraft !== undefined && Number.isFinite(legacyCraft)) {
-    dimensions.craft = legacyCraft; exactDimensions.craft = legacyCraft;
   }
   return { policyVersion: model.policyVersion, identity: model.identity, window: model.window,
     displayScore: model.composite.kind === "point" ? model.composite.display : null,
@@ -29,14 +27,14 @@ type ComparisonProjection = Pick<PublicScoreProjection, "policyVersion" | "windo
 export function comparePublicScores<A extends ComparisonProjection, B extends ComparisonProjection>(current: A, other: B) {
   const reason = current.policyVersion !== other.policyVersion ? "policy_mismatch"
     : current.freshness !== "current" || other.freshness !== "current" ? "unavailable"
-    : current.policyVersion !== "v6" && (!current.window || !other.window
+    : !current.window || !other.window
       || current.window.referenceDate !== other.window.referenceDate
       || current.window.startInclusive !== other.window.startInclusive
-      || current.window.endExclusive !== other.window.endExclusive) ? "period_mismatch"
+      || current.window.endExclusive !== other.window.endExclusive ? "period_mismatch"
     : current.exactScore === null || other.exactScore === null ? "non_point" : null;
   const currentCraft = current.craftPeriod;
   const otherCraft = other.craftPeriod;
-  const craftReason = current.policyVersion === "v6" ? null : !currentCraft || !otherCraft ? "unavailable"
+  const craftReason = !currentCraft || !otherCraft ? "unavailable"
     : currentCraft.startInclusive !== otherCraft.startInclusive || currentCraft.endExclusive !== otherCraft.endExclusive ? "period_mismatch" : null;
   const craftComparison = reason || craftReason ? { status: "not_comparable" as const, reason: reason ?? craftReason }
     : { status: "comparable" as const, reason: null };
@@ -69,7 +67,7 @@ export function readPublicComparison(value: unknown): (ComparisonProjection & {
   const model = value.scoring;
   if (model.illustrative === true) return null;
   const policyVersion = model.policyVersion;
-  if (policyVersion !== "v6" && policyVersion !== "v7" && policyVersion !== "v7.2") return null;
+  if (policyVersion !== "v7" && policyVersion !== "v7.2") return null;
   const point = (value: unknown) => {
     if (!record(value)) return null;
     if (value.kind === "point" && magnitude(value.value) && magnitude(value.display)) return { kind: "point" as const, value: value.value, display: value.display };
@@ -110,8 +108,6 @@ export function readPublicComparison(value: unknown): (ComparisonProjection & {
     if (!isoTime(period.startInclusive) || !isoTime(period.endExclusive) || period.startInclusive >= period.endExclusive || !magnitude(result.exact) || !magnitude(result.displayValue)) return null;
     craftPeriod = { startInclusive: period.startInclusive, endExclusive: period.endExclusive };
     dimensions.craft = result.displayValue; exactDimensions.craft = result.exact;
-  } else if (policyVersion === "v6" && record(value.dimensions) && magnitude(value.dimensions.craft)) {
-    dimensions.craft = value.dimensions.craft; exactDimensions.craft = value.dimensions.craft;
   }
   const freshness = model.freshness ?? "current";
   if (freshness !== "current" && freshness !== "stale" && freshness !== "unavailable") return null;

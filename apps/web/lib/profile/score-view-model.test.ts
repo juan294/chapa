@@ -4,24 +4,9 @@ import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
 import {
   CORE_DIMENSION_KEYS,
   CRAFT_CRITERION_KEYS,
-  legacyViewModel,
   receiptViewModel,
   sameScoredRevision,
 } from "./score-view-model";
-import type { ImpactV6Result } from "@chapa/shared";
-
-const legacy: ImpactV6Result = {
-  handle: "Alice",
-  profileType: "collaborative",
-  dimensions: { delivery: 61.4, quality: 72, consistency: 55.5, breadth: 40 },
-  archetype: "Builder",
-  compositeScore: 57.2,
-  confidence: 90,
-  confidencePenalties: [],
-  adjustedComposite: 57.2,
-  tier: "Solid",
-  computedAt: "2026-09-01T12:00:00.000Z",
-};
 
 describe("shared score view model", () => {
   it("copies the receipt's own displayed integers rather than re-rounding", async () => {
@@ -81,41 +66,6 @@ describe("shared score view model", () => {
     expect(receiptViewModel("alice", snapshot).craft).toEqual({ status: "not_observed" });
   });
 
-  it("projects a v6 aggregate into the same shape, labelled and limited as legacy", () => {
-    const model = legacyViewModel(legacy);
-
-    expect(model.policyVersion).toBe("v6");
-    expect(model.identity).toBeNull();
-    expect(model.window).toBeNull();
-    expect(model.craft).toBeNull();
-    expect(model.coverage).toEqual([]);
-    expect(model.limitations).toEqual(["legacy_aggregate"]);
-    expect(model.dimensions.delivery).toEqual({ kind: "point", value: 61.4, display: 61 });
-    expect(model.composite).toEqual({ kind: "point", value: 57.2, display: 57 });
-    expect(model.tier).toBe("Solid");
-    expect(model.archetype).toBe("Builder");
-    expect(Object.keys(model.dimensions)).toEqual([...CORE_DIMENSION_KEYS]);
-  });
-
-  // badge-source-outage-resilience (2026-09-22) — the legacy v6 projection
-  // accepts an explicit freshness so materialize-profile.ts can carry
-  // `readStats`'s current/stale distinction onto the model every consumer
-  // renders, without ever touching a committed v7/v7.2 receipt's own
-  // freshness authority (`observedReceiptViewModel` derives that separately).
-  it("carries an explicit current/stale freshness onto the legacy model, and omits it by default", () => {
-    expect(legacyViewModel(legacy).freshness).toBeUndefined();
-    expect(legacyViewModel(legacy, { freshness: "current" }).freshness).toBe("current");
-    expect(legacyViewModel(legacy, { freshness: "stale" }).freshness).toBe("stale");
-    // Every other field is unaffected by the freshness label.
-    const { freshness: _freshness, ...withoutFreshness } = legacyViewModel(legacy, { freshness: "stale" });
-    expect(withoutFreshness).toEqual(legacyViewModel(legacy));
-  });
-
-  it("keeps the visitor-redacted v6 shape renderable without confidence data", () => {
-    const { confidence: _confidence, confidencePenalties: _penalties, ...visitor } = legacy;
-    expect(legacyViewModel(visitor)).toEqual(legacyViewModel(legacy));
-  });
-
   it("identifies the same issued revision, and separates a corrected one", async () => {
     const first = await receiptFixtureV7("2026-09-01", 4);
     const corrected = await receiptFixtureV7("2026-09-01", 5, first.receipt);
@@ -124,8 +74,6 @@ describe("shared score view model", () => {
     expect(sameScoredRevision(model, receiptViewModel("alice", buildReceiptSnapshotV7(first, null)))).toBe(true);
     expect(sameScoredRevision(model, receiptViewModel("bob", buildReceiptSnapshotV7(first, null)))).toBe(false);
     expect(sameScoredRevision(model, receiptViewModel("alice", buildReceiptSnapshotV7(corrected, null)))).toBe(false);
-    expect(sameScoredRevision(model, legacyViewModel(legacy))).toBe(false);
-    expect(sameScoredRevision(legacyViewModel(legacy), legacyViewModel(legacy))).toBe(true);
   });
 
   it("exposes every Craft criterion key when a portfolio is observed", () => {

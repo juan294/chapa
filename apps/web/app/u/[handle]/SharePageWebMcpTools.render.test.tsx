@@ -1,23 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
-import type { ClientImpactV6Result } from "@chapa/shared";
-import {
-  legacyViewModel,
-  type ScoreViewModel,
-} from "@/lib/profile/score-view-model";
-import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
-import {
-  WEBMCP_EMPTY_INPUT_SCHEMA,
-  WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
-} from "@/lib/webmcp/shared-tools";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { DEMO_STATS } from "@/lib/render/demoData";
+import { DEMO_SCORING } from "@/lib/render/__fixtures__/demo-scoring";
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
+import { WEBMCP_EMPTY_INPUT_SCHEMA } from "@/lib/webmcp/shared-tools";
 import type { WebMcpTool } from "@/lib/webmcp/use-model-context-tools";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 
 const mocks = vi.hoisted(() => ({
   useModelContextTools: vi.fn(),
   useClientFeatureFlags: vi.fn(),
-  createExplainDimensionTool: vi.fn(),
 }));
 
 vi.mock("@/lib/webmcp/use-model-context-tools", async (importOriginal) => {
@@ -35,51 +29,13 @@ vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
   useClientFeatureFlags: () => mocks.useClientFeatureFlags(),
 }));
 
-vi.mock("@/lib/webmcp/shared-tools", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/webmcp/shared-tools")>();
-  return {
-    ...actual,
-    createExplainDimensionTool: (
-      ...args: Parameters<typeof actual.createExplainDimensionTool>
-    ) => {
-      mocks.createExplainDimensionTool(...args);
-      return actual.createExplainDimensionTool(...args);
-    },
-  };
-});
-
-vi.mock("@/lib/i18n", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
-
-const impact: ClientImpactV6Result = {
-  handle: DEMO_IMPACT.handle,
-  profileType: DEMO_IMPACT.profileType,
-  dimensions: DEMO_IMPACT.dimensions,
-  archetype: DEMO_IMPACT.archetype,
-  compositeScore: DEMO_IMPACT.compositeScore,
-  adjustedComposite: DEMO_IMPACT.adjustedComposite,
-  tier: DEMO_IMPACT.tier,
-  computedAt: DEMO_IMPACT.computedAt,
-};
 const verification = { hash: "abc12345", date: "2026-08-27" };
 
-// The v6 aggregate the page passes as `impact` is the fresh number today, but
-// the badge draws the resolved score model (#1001/#1311). These two fixtures
-// make them disagree so a test can tell which one a tool publishes.
-const drawnScore = DEMO_IMPACT.adjustedComposite + 1;
-const smoothedImpact: ClientImpactV6Result = {
-  ...impact,
-  adjustedComposite: DEMO_IMPACT.adjustedComposite,
-  tier: "Solid",
-};
-const pointScoring: ScoreViewModel = {
-  ...legacyViewModel(impact),
-  composite: { kind: "point", value: drawnScore, display: drawnScore },
-  tier: "High",
-};
+// #1335 phase 5 ("delete v6") — the page no longer has a legacy
+// `ImpactV6Result` to pass; `scoring` (a v7/v7.2 receipt view model) is the
+// only source every tool reads.
 const rangeScoring: ScoreViewModel = {
-  ...legacyViewModel(impact),
+  ...DEMO_SCORING,
   policyVersion: "v7",
   composite: {
     kind: "range",
@@ -99,13 +55,11 @@ function renderHost(
   render(
     <SharePageWebMcpTools
       handle="developer"
-      impact={impact}
-      scoring={legacyViewModel(impact)}
+      scoring={DEMO_SCORING}
       stats={DEMO_STATS}
       verification={verification}
       trend={null}
       diff={null}
-      craftResult={null}
       embedMarkdown="![Chapa Badge of developer](https://chapa.thecreativetoken.com/u/developer/badge.svg)"
       embedHtml={'<img src="https://chapa.thecreativetoken.com/u/developer/badge.svg" alt="Chapa Badge of developer" width="600" height="315" />'}
       {...overrides}
@@ -158,7 +112,7 @@ afterEach(() => {
 });
 
 describe("SharePageWebMcpTools", () => {
-  it("registers exactly six read-only tools behind the WebMCP flag", () => {
+  it("registers exactly five read-only tools behind the WebMCP flag", () => {
     const { tools, enabled, getTool } = renderHost();
 
     expect(enabled).toBe(true);
@@ -166,7 +120,6 @@ describe("SharePageWebMcpTools", () => {
       "get_impact_profile",
       "get_impact_history",
       "verify_badge",
-      "explain_dimension",
       "compare_profiles",
       "get_embed_snippet",
     ]);
@@ -181,28 +134,9 @@ describe("SharePageWebMcpTools", () => {
     });
     expect(getTool("get_embed_snippet")).toMatchObject({
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
-      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
     });
     expect(getTool("compare_profiles").description).toBe(
       "Compare this impact profile with another existing public Chapa profile, identified by GitHub handle.",
-    );
-    expect(mocks.createExplainDimensionTool).toHaveBeenCalledOnce();
-  });
-
-  it("registers explain_dimension with the untrusted annotation set on the share page", () => {
-    const { getTool } = renderHost();
-
-    // Share-page data (dimension sub-metrics) is currently all numeric, but the
-    // share page shows untrusted (owner-controlled) profile data throughout, so
-    // annotation choice must not be inferred per-field — it follows the page.
-    expect(getTool("explain_dimension").annotations).toEqual({
-      readOnlyHint: true,
-      untrustedContentHint: true,
-    });
-    expect(mocks.createExplainDimensionTool).toHaveBeenCalledWith(
-      expect.objectContaining({
-        annotations: { readOnlyHint: true, untrustedContentHint: true },
-      }),
     );
   });
 
@@ -215,7 +149,7 @@ describe("SharePageWebMcpTools", () => {
     expect(mocks.useModelContextTools).toHaveBeenCalledWith([], false);
   });
 
-  it("returns the redacted on-page profile and freshness without fetching", async () => {
+  it("returns the on-page profile and freshness without fetching", async () => {
     const trend = { direction: "improving", avgDelta: 2 } as never;
     const diff = { adjustedComposite: 3 } as never;
     const { getTool } = renderHost({ trend, diff });
@@ -225,10 +159,8 @@ describe("SharePageWebMcpTools", () => {
 
     expect(result).toMatchObject({
       handle: "developer",
-      legacy: { impact: {
-        adjustedComposite: DEMO_IMPACT.adjustedComposite,
-        dimensions: DEMO_IMPACT.dimensions,
-      } },
+      policyVersion: "v7.2",
+      displayScore: DEMO_SCORING.composite.kind === "point" ? DEMO_SCORING.composite.display : null,
       stats: {
         commitsTotal: DEMO_STATS.commitsTotal,
         prsMergedCount: DEMO_STATS.prsMergedCount,
@@ -239,10 +171,9 @@ describe("SharePageWebMcpTools", () => {
       freshness: {
         source: "current page render",
         statsFetchedAt: DEMO_STATS.fetchedAt,
-        impactComputedAt: DEMO_IMPACT.computedAt,
       },
     });
-    expect(result.legacy.impact).not.toHaveProperty("confidence");
+    expect(result).not.toHaveProperty("legacy");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -339,53 +270,6 @@ describe("SharePageWebMcpTools", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("compares the page profile with a public profile using numeric deltas", async () => {
-    respondWith({
-      handle: "other-user",
-      dimensions: {
-        delivery: 90,
-        quality: 70,
-        consistency: 85,
-        breadth: 60,
-        craft: 80,
-      },
-      adjustedComposite: 70,
-      displayScore: 79,
-      tier: "High",
-      displayTier: "High",
-      scoring: legacyViewModel({ ...impact, dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60, craft: 80 }, adjustedComposite: 79, tier: "High" }),
-    });
-    const { getTool } = renderHost();
-
-    const { output, signal } = await execute(getTool("compare_profiles"), {
-      other_handle: "other-user",
-    });
-    const result = JSON.parse(output);
-
-    expect(result).toMatchObject({
-      current: {
-        handle: "developer",
-        score: DEMO_IMPACT.adjustedComposite,
-        dimensions: DEMO_IMPACT.dimensions,
-      },
-      other: {
-        handle: "other-user",
-        score: 79,
-      },
-      differences: {
-        score: 79 - DEMO_IMPACT.adjustedComposite,
-        dimensions: {
-          delivery: 90 - DEMO_IMPACT.dimensions.delivery,
-          quality: 70 - DEMO_IMPACT.dimensions.quality,
-          consistency: 85 - DEMO_IMPACT.dimensions.consistency,
-          breadth: 60 - DEMO_IMPACT.dimensions.breadth,
-          craft: 80 - DEMO_IMPACT.dimensions.craft!,
-        },
-      },
-    });
-    expect(fetch).toHaveBeenCalledWith("/api/profile/other-user", { signal });
-  });
-
   it("explains that a missing comparison profile requires owner sign-in", async () => {
     respondWith({ error: "request failed" }, 404);
     const { getTool } = renderHost();
@@ -412,144 +296,20 @@ describe("SharePageWebMcpTools", () => {
     });
   });
 
-  describe("headline is the number the badge draws (LE-7-1 twin)", () => {
-    it("get_impact_profile publishes the drawn score beside the smoothed aggregate", async () => {
-      const { getTool } = renderHost({ impact: smoothedImpact, scoring: pointScoring });
+  it("get_impact_profile reports a v7 evidence range as null with its interval", async () => {
+    const { getTool } = renderHost({ scoring: rangeScoring });
 
-      const { output } = await execute(getTool("get_impact_profile"));
-      const result = JSON.parse(output);
+    const { output } = await execute(getTool("get_impact_profile"));
+    const result = JSON.parse(output);
 
-      expect(result.displayScore).toBe(drawnScore);
-      expect(result.displayTier).toBe("High");
-      expect(result.scoring).toMatchObject({
-        policyVersion: "v6",
-        composite: { kind: "point", display: drawnScore },
-      });
-      // The v6 aggregate stays for compatibility but is never the headline.
-      expect(result.legacy.impact.adjustedComposite).toBe(DEMO_IMPACT.adjustedComposite);
-      expect(result.note).toMatch(/badge draws/);
-      expect(result.scoring).not.toHaveProperty("confidence");
-      expect(fetch).not.toHaveBeenCalled();
-    });
-
-    it("get_impact_profile reports a v7 evidence range as null with its interval", async () => {
-      const { getTool } = renderHost({ impact: smoothedImpact, scoring: rangeScoring });
-
-      const { output } = await execute(getTool("get_impact_profile"));
-      const result = JSON.parse(output);
-
-      expect(result.displayScore).toBeNull();
-      expect(result.displayTier).toBeNull();
-      expect(result.scoring.composite).toEqual({
-        kind: "range",
-        lower: 61,
-        upper: 74,
-        displayLower: 61,
-        displayUpper: 74,
-      });
-    });
-
-    it("compare_profiles scores the current side from the drawn headline, never the smoothed aggregate", async () => {
-      respondWith({
-        handle: "other-user",
-        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
-        adjustedComposite: 70,
-        displayScore: 79,
-        tier: "Solid",
-        displayTier: "High",
-        scoring: { ...legacyViewModel(impact), composite: { kind: "point", value: 79, display: 79 }, tier: "High" },
-      });
-      const { getTool } = renderHost({ impact: smoothedImpact, scoring: pointScoring });
-
-      const { output } = await execute(getTool("compare_profiles"), {
-        other_handle: "other-user",
-      });
-      const result = JSON.parse(output);
-
-      expect(result.current).toMatchObject({
-        handle: "developer",
-        score: drawnScore,
-        tier: "High",
-      });
-      expect(result.other).toMatchObject({
-        handle: "other-user",
-        score: 79,
-        tier: "High",
-      });
-      expect(result.differences.score).toBe(79 - drawnScore);
-      expect(result.note).toMatch(/badge draws/);
-    });
-
-    it("compare_profiles reports a current-side evidence range as null with its interval", async () => {
-      respondWith({
-        handle: "other-user",
-        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
-        adjustedComposite: 70,
-        displayScore: 79,
-        displayTier: "High",
-      });
-      const { getTool } = renderHost({ impact: smoothedImpact, scoring: rangeScoring });
-
-      const { output } = await execute(getTool("compare_profiles"), {
-        other_handle: "other-user",
-      });
-      const result = JSON.parse(output);
-
-      expect(result.current.score).toBeNull();
-      expect(result.current.tier).toBeNull();
-      expect(result.current.scoring.composite).toMatchObject({
-        kind: "range",
-        displayLower: 61,
-        displayUpper: 74,
-      });
-      expect(result.differences).toBeNull();
-    });
-
-    it("compare_profiles never falls back to the other side's smoothed composite", async () => {
-      respondWith({
-        handle: "other-user",
-        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
-        adjustedComposite: 70,
-        tier: "Solid",
-        displayScore: null,
-        displayTier: "High",
-        scoring: { ...rangeScoring, tier: "High",
-          composite: { kind: "range", lower: 66, upper: 72, displayLower: 66, displayUpper: 72 },
-        },
-      });
-      const { getTool } = renderHost({ impact: smoothedImpact, scoring: pointScoring });
-
-      const { output } = await execute(getTool("compare_profiles"), {
-        other_handle: "other-user",
-      });
-      const result = JSON.parse(output);
-
-      expect(result.other.score).toBeNull();
-      expect(result.other.tier).toBe("High");
-      expect(result.other.scoring.composite).toMatchObject({
-        displayLower: 66,
-        displayUpper: 72,
-      });
-      expect(result.differences).toBeNull();
-      expect(result.status).toBe("not_comparable");
-    });
-
-    it("compare_profiles treats a payload with no headline fields at all as score null, not as unreadable", async () => {
-      respondWith({
-        handle: "other-user",
-        dimensions: { delivery: 90, quality: 70, consistency: 85, breadth: 60 },
-        adjustedComposite: 70,
-        tier: "Solid",
-      });
-      const { getTool } = renderHost();
-
-      const { output } = await execute(getTool("compare_profiles"), {
-        other_handle: "other-user",
-      });
-      const result = JSON.parse(output);
-
-      expect(result.other).toMatchObject({ score: null, tier: null, scoring: null });
-      expect(result.differences).toBeNull();
+    expect(result.displayScore).toBeNull();
+    expect(result.displayTier).toBeNull();
+    expect(result.scoring.composite).toEqual({
+      kind: "range",
+      lower: 61,
+      upper: 74,
+      displayLower: 61,
+      displayUpper: 74,
     });
   });
 
@@ -569,13 +329,12 @@ describe("SharePageWebMcpTools", () => {
   });
 });
 
-import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 it("exposes current dimensions and refuses a mixed-policy browser comparison", async () => {
   const f = await scoringConsistencyFixture({ craft: 0 });
-  const host = renderHost({ impact: f.impact, stats: f.stats, scoring: f.model });
+  const host = renderHost({ stats: f.stats, scoring: f.model });
   const profile = JSON.parse((await execute(host.getTool("get_impact_profile"))).output);
   expect(profile).toMatchObject({ policyVersion: "v7.2", displayScore: 46, dimensions: { craft: 0 }, archetype: null });
-  respondWith({ handle: "other", policyVersion: "v6", dimensions: impact.dimensions, displayScore: 80, displayTier: "High", scoring: legacyViewModel(impact) });
+  respondWith({ handle: "other", policyVersion: "v7", dimensions: { delivery: 61, quality: 72, consistency: 55, breadth: 40 }, displayScore: 80, displayTier: "High", scoring: rangeScoring });
   const comparison = JSON.parse((await execute(host.getTool("compare_profiles"), { other_handle: "other" })).output);
   expect(comparison).toMatchObject({ status: "not_comparable", reason: "policy_mismatch", differences: null });
 });
@@ -588,7 +347,7 @@ it.each([200, 410])("preserves top-level receipt verification and revocation at 
 
 it("rejects malformed comparison values without echoing unallowlisted fields", async () => {
   const f = await scoringConsistencyFixture({ craft: 57 });
-  const host = renderHost({ impact: f.impact, scoring: f.model });
+  const host = renderHost({ scoring: f.model });
   respondWith({ scoring: { ...f.model, composite: { kind: "point", value: "46", display: "46" }, privateToken: "secret-value" } });
   const output = (await execute(host.getTool("compare_profiles"), { other_handle: "other" })).output;
   expect(JSON.parse(output)).toMatchObject({ status: "not_comparable", reason: "unavailable", differences: null });
@@ -596,7 +355,7 @@ it("rejects malformed comparison values without echoing unallowlisted fields", a
 });
 it.each(["illustrative", "retracted"])("refuses %s profiles as current comparison evidence", async kind => {
   const f = await scoringConsistencyFixture({ craft: 57 });
-  const host = renderHost({ impact: f.impact, scoring: f.model });
+  const host = renderHost({ scoring: f.model });
   respondWith({ scoring: kind === "illustrative" ? { ...f.model, illustrative: true, identity: null } : { ...f.model, identity: { ...f.model.identity, action: "retract" } } });
   const result = JSON.parse((await execute(host.getTool("compare_profiles"), { other_handle: "other" })).output);
   expect(result).toMatchObject({ status: "not_comparable", reason: "unavailable", differences: null });

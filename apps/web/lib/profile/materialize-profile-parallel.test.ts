@@ -1,8 +1,8 @@
 /**
- * #800 — materializeProfile must run readStats concurrently with the
- * craft / snapshot / dirty cache lookups. The cache lookups only need
- * the handle, so blocking them behind readStats adds an extra RTT to
- * every share-page / badge.svg cache miss.
+ * #800 — materializeProfile must run readStats concurrently with the craft
+ * cache lookup and the receipt read. #1335 phase 5 ("delete v6") dropped the
+ * snapshot/dirty-marker cache lookups this suite used to also verify
+ * concurrency for — there is no EMA/snapshot machinery left to read.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { materializeProfile } from "./materialize-profile";
@@ -11,8 +11,7 @@ import { makeFullStats } from "../test-helpers/fixtures";
 
 const mockReadStats = vi.fn();
 const mockGetCachedCraftScore = vi.fn();
-const mockGetCachedLatestSnapshot = vi.fn();
-const mockIsStatsDirty = vi.fn();
+const mockReadRenderableReceipt = vi.fn();
 
 vi.mock("@/lib/github/client", () => ({
   readStats: (...args: unknown[]) => mockReadStats(...args),
@@ -20,20 +19,18 @@ vi.mock("@/lib/github/client", () => ({
 vi.mock("@/lib/cache/craft-cache", () => ({
   getCachedCraftScore: (...args: unknown[]) => mockGetCachedCraftScore(...args),
 }));
-vi.mock("@/lib/cache/snapshot-cache", () => ({
-  getCachedLatestSnapshot: (...args: unknown[]) =>
-    mockGetCachedLatestSnapshot(...args),
-}));
-vi.mock("@/lib/cache/dirty-stats", () => ({
-  isStatsDirty: (...args: unknown[]) => mockIsStatsDirty(...args),
+vi.mock("./score-model", () => ({
+  readRenderableReceipt: (...args: unknown[]) => mockReadRenderableReceipt(...args),
+  scoreModelFrom: vi.fn(() => undefined),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockReadRenderableReceipt.mockResolvedValue(null);
 });
 
 describe("materializeProfile parallelism (#800)", () => {
-  it("starts the cache lookups before readStats resolves", async () => {
+  it("starts the craft cache lookup and the receipt read before readStats resolves", async () => {
     const callOrder: string[] = [];
 
     let resolveStats: (v: unknown) => void = () => {};
@@ -52,52 +49,49 @@ describe("materializeProfile parallelism (#800)", () => {
       callOrder.push("craft:end");
       return null;
     });
-    mockGetCachedLatestSnapshot.mockImplementation(async () => {
-      callOrder.push("snapshot:start");
+    mockReadRenderableReceipt.mockImplementation(async () => {
+      callOrder.push("receipt:start");
       await new Promise((r) => setTimeout(r, 0));
-      callOrder.push("snapshot:end");
+      callOrder.push("receipt:end");
       return null;
-    });
-    mockIsStatsDirty.mockImplementation(async () => {
-      callOrder.push("dirty:start");
-      await new Promise((r) => setTimeout(r, 0));
-      callOrder.push("dirty:end");
-      return false;
     });
 
     const promise = materializeProfile("octocat");
     // Yield once so all synchronously-started promises can record their start.
     await new Promise((r) => setTimeout(r, 0));
 
-    // The cache lookups must have started before readStats resolved.
+    // The craft cache lookup and the receipt read must have started before
+    // readStats resolved.
     expect(callOrder).toContain("craft:start");
-    expect(callOrder).toContain("snapshot:start");
-    expect(callOrder).toContain("dirty:start");
+    expect(callOrder).toContain("receipt:start");
     expect(callOrder).not.toContain("readStats:end");
 
     resolveStats({ status: "current", stats: makeFullStats(), capturedAt: new Date().toISOString() });
     await promise;
   });
 
-  it("returns null when readStats fails, even if cache lookups succeed", async () => {
+  it("returns null when readStats fails, even if the craft cache lookup succeeds", async () => {
     mockReadStats.mockResolvedValue({ status: "unavailable" });
     mockGetCachedCraftScore.mockResolvedValue(null);
-    mockGetCachedLatestSnapshot.mockResolvedValue(null);
-    mockIsStatsDirty.mockResolvedValue(false);
 
     const result = await materializeProfile("nope");
     expect(result).toBeNull();
   });
 
-  it("survives cache lookup rejections (fail open to defaults)", async () => {
+  it("survives a craft cache lookup rejection (fails open to null)", async () => {
     mockReadStats.mockResolvedValue({ status: "current", stats: makeFullStats(), capturedAt: new Date().toISOString() });
     mockGetCachedCraftScore.mockRejectedValue(new Error("redis"));
-    mockGetCachedLatestSnapshot.mockRejectedValue(new Error("redis"));
-    mockIsStatsDirty.mockRejectedValue(new Error("redis"));
 
     const result = expectFound(await materializeProfile("octocat"));
     expect(result.craftResult).toBeNull();
-    expect(result.latestSnapshot).toBeNull();
-    expect(result.inputsChanged).toBe(false);
+  });
+
+  it("survives a receipt read rejection (fails open to no scoring model)", async () => {
+    mockReadStats.mockResolvedValue({ status: "current", stats: makeFullStats(), capturedAt: new Date().toISOString() });
+    mockGetCachedCraftScore.mockResolvedValue(null);
+    mockReadRenderableReceipt.mockRejectedValue(new Error("db down"));
+
+    const result = expectFound(await materializeProfile("octocat"));
+    expect(result.scoring).toBeUndefined();
   });
 });

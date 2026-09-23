@@ -23,24 +23,14 @@ vi.mock("@/lib/cache/redis", () => ({
 // Import after mocks are set up
 import { notifyFirstBadge } from "./notifications";
 import { _resetClient } from "./resend";
-import type { ImpactV6Result } from "@chapa/shared";
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// #1335 phase 5 ("delete v6") — `notifyFirstBadge` no longer takes a legacy
+// `ImpactV6Result`; the receipt-only plain-text body (previously this
+// function's v7.2 branch) is the only body there is now. Every test below
+// supplies a real sealed v7.2 receipt view model via the shared fixture.
 // ---------------------------------------------------------------------------
-
-const sampleImpact: ImpactV6Result = {
-  handle: "TestUser",
-  profileType: "solo",
-  dimensions: { delivery: 80, quality: 60, consistency: 70, breadth: 50 },
-  archetype: "Builder",
-  compositeScore: 72,
-  confidence: 85,
-  confidencePenalties: [],
-  adjustedComposite: 61,
-  tier: "High",
-  computedAt: "2026-01-15T10:00:00Z",
-};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -63,8 +53,9 @@ beforeEach(() => {
 describe("environment guards", () => {
   it("skips when VERCEL_ENV is not production", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
+    const f = await scoringConsistencyFixture({ craft: 0 });
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", f.model);
 
     expect(mockCacheGet).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
@@ -72,8 +63,9 @@ describe("environment guards", () => {
 
   it("skips when VERCEL_ENV is unset", async () => {
     vi.stubEnv("VERCEL_ENV", "");
+    const f = await scoringConsistencyFixture({ craft: 0 });
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", f.model);
 
     expect(mockCacheGet).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
@@ -87,15 +79,18 @@ describe("environment guards", () => {
 describe("deduplication", () => {
   it("skips when Redis marker exists", async () => {
     mockCacheGet.mockResolvedValueOnce(true);
+    const f = await scoringConsistencyFixture({ craft: 0 });
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", f.model);
 
     expect(mockCacheGet).toHaveBeenCalledWith("badge:notified:testuser");
     expect(mockSend).not.toHaveBeenCalled();
   });
 
   it("sends email and sets marker when marker is absent", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
+    const f = await scoringConsistencyFixture({ craft: 0 });
+
+    await notifyFirstBadge("testuser", f.model);
 
     expect(mockSend).toHaveBeenCalledOnce();
     expect(mockCacheSet).toHaveBeenCalledWith(
@@ -106,7 +101,9 @@ describe("deduplication", () => {
   });
 
   it("lowercases handle for the Redis key", async () => {
-    await notifyFirstBadge("TestUser", sampleImpact);
+    const f = await scoringConsistencyFixture({ craft: 0 });
+
+    await notifyFirstBadge("TestUser", f.model);
 
     expect(mockCacheGet).toHaveBeenCalledWith("badge:notified:testuser");
     expect(mockCacheSet).toHaveBeenCalledWith(
@@ -121,70 +118,46 @@ describe("deduplication", () => {
 // Email content
 // ---------------------------------------------------------------------------
 
-describe("email content", () => {
-  it("includes handle, archetype, and tier in subject", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
+describe("current receipt notification content", () => {
+  it("uses the current canonical headline, dimensions and Craft instead of legacy traps", async () => {
+    const fixture = await scoringConsistencyFixture({ craft: 0, boundary: true });
 
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.subject).toContain("testuser");
-    expect(call.subject).toContain("Builder");
-    expect(call.subject).toContain("High");
+    await notifyFirstBadge("alice", fixture.model);
+
+    const payload = mockSend.mock.calls[0]![0];
+    expect(payload.subject).toContain("alice");
+    expect(payload.text).toContain("Policy: v7.2");
+    expect(payload.text).toContain("Score: 69.99");
+    expect(payload.text).toContain("Craft: 0");
+    expect(payload.text).toContain(fixture.model.identity!.revisionId);
+    expect(payload.text).not.toMatch(/Confidence:|Adjusted:|Builder|Craft: 83/);
   });
 
-  it("includes score, confidence, and share URL in body", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
+  it("includes the share and badge URLs", async () => {
+    const fixture = await scoringConsistencyFixture({ craft: 0 });
 
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.html).toContain("61"); // adjustedComposite
-    expect(call.html).toContain("85"); // confidence
-    expect(call.html).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser",
-    );
-    expect(call.text).toContain("61");
-    expect(call.text).toContain("85");
-    expect(call.text).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser",
-    );
+    await notifyFirstBadge("alice", fixture.model);
+
+    const payload = mockSend.mock.calls[0]![0];
+    expect(payload.text).toContain("https://chapa.thecreativetoken.com/u/alice");
+    expect(payload.text).toContain("https://chapa.thecreativetoken.com/u/alice/badge.svg");
+    expect(payload.html).toContain("Score:");
   });
 
-  it("includes dimension scores in body", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
+  it("suppresses a notification with unavailable current authority", async () => {
+    const fixture = await scoringConsistencyFixture();
 
-    const call = mockSend.mock.calls[0]![0];
-    // HTML should contain all four dimension values
-    expect(call.html).toContain("80"); // delivery
-    expect(call.html).toContain("60"); // quality
-    expect(call.html).toContain("70"); // consistency
-    expect(call.html).toContain("50"); // breadth
-    // Plain text too
-    expect(call.text).toContain("Delivery:");
-    expect(call.text).toContain("80");
-    expect(call.text).toContain("Quality:");
-    expect(call.text).toContain("60");
-    expect(call.text).toContain("Consistency:");
-    expect(call.text).toContain("70");
-    expect(call.text).toContain("Breadth:");
-    expect(call.text).toContain("50");
+    await notifyFirstBadge("alice", { ...fixture.model, freshness: "unavailable" });
+
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it("includes badge SVG link in body", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
+  it("suppresses a notification for an illustrative/demo model", async () => {
+    const fixture = await scoringConsistencyFixture();
 
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.html).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser/badge.svg",
-    );
-    expect(call.text).toContain(
-      "https://chapa.thecreativetoken.com/u/testuser/badge.svg",
-    );
-  });
+    await notifyFirstBadge("alice", { ...fixture.model, illustrative: true });
 
-  it("includes Chapa branding in HTML", async () => {
-    await notifyFirstBadge("testuser", sampleImpact);
-
-    const call = mockSend.mock.calls[0]![0];
-    expect(call.html).toContain("#1BD093"); // brand purple
-    expect(call.html).toContain("CHAPA");
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });
 
@@ -196,9 +169,10 @@ describe("graceful degradation", () => {
   it("does not throw when Resend is unavailable", async () => {
     _resetClient();
     vi.stubEnv("RESEND_API_KEY", "");
+    const f = await scoringConsistencyFixture({ craft: 0 });
 
     await expect(
-      notifyFirstBadge("testuser", sampleImpact),
+      notifyFirstBadge("testuser", f.model),
     ).resolves.toBeUndefined();
     expect(mockSend).not.toHaveBeenCalled();
   });
@@ -208,9 +182,10 @@ describe("graceful degradation", () => {
       data: null,
       error: { message: "Rate limited" },
     });
+    const f = await scoringConsistencyFixture({ craft: 0 });
 
     await expect(
-      notifyFirstBadge("testuser", sampleImpact),
+      notifyFirstBadge("testuser", f.model),
     ).resolves.toBeUndefined();
   });
 
@@ -219,29 +194,10 @@ describe("graceful degradation", () => {
       data: null,
       error: { message: "Rate limited" },
     });
+    const f = await scoringConsistencyFixture({ craft: 0 });
 
-    await notifyFirstBadge("testuser", sampleImpact);
+    await notifyFirstBadge("testuser", f.model);
 
     expect(mockCacheSet).not.toHaveBeenCalled();
-  });
-});
-
-describe("current receipt notification content", () => {
-  it("uses the current canonical headline, dimensions and Craft instead of legacy traps", async () => {
-    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
-    const fixture = await scoringConsistencyFixture({ craft: 0, boundary: true });
-    await notifyFirstBadge("alice", fixture.impact, fixture.model);
-    const payload = mockSend.mock.calls[0]![0];
-    expect(payload.text).toContain("Policy: v7.2");
-    expect(payload.text).toContain("Score: 69.99");
-    expect(payload.text).toContain("Craft: 0");
-    expect(payload.text).toContain(fixture.model.identity!.revisionId);
-    expect(payload.text).not.toMatch(/Confidence:|Adjusted:|Builder|Craft: 83/);
-  });
-  it("suppresses a notification with unavailable current authority", async () => {
-    const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
-    const fixture = await scoringConsistencyFixture();
-    await notifyFirstBadge("alice", fixture.impact, { ...fixture.model, freshness: "unavailable" });
-    expect(mockSend).not.toHaveBeenCalled();
   });
 });

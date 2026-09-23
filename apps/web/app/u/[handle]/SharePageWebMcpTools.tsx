@@ -2,14 +2,11 @@
 
 import { useMemo } from "react";
 import {
-  type ClientImpactV6Result,
-  type CraftResult,
   type StatsData,
 } from "@chapa/shared";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import type { TrendSummary } from "@/lib/history/trend";
-import { useTranslation } from "@/lib/i18n";
 import { publicScoreProjection, comparePublicScores, readPublicComparison } from "@/lib/profile/public-score-projection";
 import { type ScoreViewModel } from "@/lib/profile/score-view-model";
 import { isValidHandle } from "@/lib/validation";
@@ -18,7 +15,6 @@ import {
   publicStats,
 } from "@/lib/webmcp/catalog";
 import {
-  createExplainDimensionTool,
   isWebMcpRecord,
   WEBMCP_EMPTY_INPUT_SCHEMA,
   WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
@@ -36,20 +32,16 @@ interface PublicVerification {
 
 interface SharePageWebMcpToolsProps {
   handle: string;
-  impact: ClientImpactV6Result;
   /**
-   * The resolved score model the badge on this page draws from. `impact` is
-   * the v6 aggregate and today carries the same number, but under the v7
-   * receipt the badge draws this projection, so it is the only source a tool
-   * may publish as the score (#1001/#1311, LE-7-1). It is a public projection:
-   * nothing owner-only (confidence, penalties) lives on it.
+   * The resolved score model the badge on this page draws from (#1001/#1311,
+   * LE-7-1, #1335 phase 5). It is a public projection: nothing owner-only
+   * (confidence, penalties) lives on it.
    */
   scoring: ScoreViewModel;
   stats: StatsData;
   verification: PublicVerification | null;
   trend: TrendSummary | null;
   diff: ClientSnapshotDiff | null;
-  craftResult?: CraftResult | null;
   embedMarkdown: string;
   embedHtml: string;
 }
@@ -68,43 +60,38 @@ async function readJson(response: Response): Promise<Record<string, unknown> | n
 
 export function SharePageWebMcpTools({
   handle,
-  impact,
   scoring,
   stats,
   verification,
   trend,
   diff,
-  craftResult = null,
   embedMarkdown,
   embedHtml,
 }: SharePageWebMcpToolsProps) {
   const { webmcpEnabled } = useClientFeatureFlags();
-  const { t } = useTranslation();
 
   const tools = useMemo<WebMcpTool[]>(() => {
     if (!webmcpEnabled) return [];
 
-    const projection = publicScoreProjection(scoring, impact.dimensions.craft);
+    const projection = publicScoreProjection(scoring);
 
     const getImpactProfile: WebMcpTool = {
       name: "get_impact_profile",
       description:
-        "Return the public impact profile shown in the current page render. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range); legacy carries the aggregate snapshot.",
+        "Return the public impact profile shown in the current page render. displayScore and displayTier are the headline the badge draws (displayScore is null for an evidence range).",
       inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
       annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
       execute: () => JSON.stringify({
         handle,
         ...projection,
-        legacy: { impact },
         displayTier: projection.tier,
         stats: publicStats(stats),
         verification,
-        trend: scoring.policyVersion === "v7.2" ? null : trend,
-        diff: scoring.policyVersion === "v7.2" ? null : diff,
+        trend,
+        diff,
         freshness: {
           source: "current page render",
           statsFetchedAt: stats.fetchedAt,
-          impactComputedAt: impact.computedAt,
         },
         note: HEADLINE_NOTE,
       }),
@@ -173,15 +160,6 @@ export function SharePageWebMcpTools({
       },
     };
 
-    const explainDimension = createExplainDimensionTool({
-      impact,
-      scoring,
-      stats,
-      craftResult,
-      t,
-      annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
-    });
-
     const compareProfiles: WebMcpTool = {
       name: "compare_profiles",
       description:
@@ -246,20 +224,16 @@ export function SharePageWebMcpTools({
       getImpactProfile,
       getImpactHistory,
       verifyBadge,
-      explainDimension,
       compareProfiles,
       getEmbedSnippet,
     ];
   }, [
-    craftResult,
     diff,
     embedHtml,
     embedMarkdown,
     handle,
-    impact,
     scoring,
     stats,
-    t,
     trend,
     verification,
     webmcpEnabled,
