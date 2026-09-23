@@ -3,6 +3,7 @@ import { toDateString } from "@/lib/utils/date";
 import { listCollectionJobsForDate } from "@/lib/db/collection-queue";
 import { dbIsScoringSubject } from "@/lib/db/scoring-subjects";
 import { dbReadObservedReceipt } from "@/lib/db/score-receipts-observed";
+import { captureServerError } from "@/lib/analytics/server-errors";
 import { deriveScoringStatus, type ReceiptSummary } from "./status";
 import type { ScoringStatus } from "./scoring-status";
 
@@ -16,9 +17,8 @@ import type { ScoringStatus } from "./scoring-status";
  * Part B's badge/OG/share routes import this exact name and path.
  */
 export async function readScoringStatus(handle: string): Promise<ScoringStatus | null> {
+  const owner = handle.toLowerCase();
   try {
-    const owner = handle.toLowerCase();
-
     const registration = await dbIsScoringSubject(owner);
     if (registration === "unavailable") return null;
     if (registration === "unregistered") return { kind: "unregistered" };
@@ -40,7 +40,17 @@ export async function readScoringStatus(handle: string): Promise<ScoringStatus |
       : null;
 
     return deriveScoringStatus(jobs, receipt, true);
-  } catch {
+  } catch (error) {
+    // An authority-read failure must stay observable, not silently become
+    // `null` with no trace -- the same "durable write/read failure must be
+    // observable" rule as everywhere else in this codebase. Only the handle
+    // and route are attached; captureServerError's own sanitize() still
+    // redacts anything token-shaped inside the wrapped message.
+    await captureServerError({
+      route: "lib/collection/read-scoring-status",
+      statusCode: 500,
+      error: new Error(`readScoringStatus failed for ${owner}: ${error instanceof Error ? error.message : String(error)}`),
+    });
     return null;
   }
 }

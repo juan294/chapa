@@ -1,5 +1,7 @@
 import { postWriteScore } from "@/lib/profile/post-write-score";
 import { enqueueCollection, scheduleCollectionAdvance } from "@/lib/collection/enqueue";
+import { maybeIssue } from "@/lib/collection/fan-in";
+import { listCollectionJobsForDate } from "@/lib/db/collection-queue";
 import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -9,6 +11,7 @@ import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUserHandlePage } from "@/lib/db/users";
 import { isValidHandle } from "@/lib/validation";
+import { toDateString } from "@/lib/utils/date";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -170,16 +173,30 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
-            // #1335 phase 4 — enqueues an `admin`-reason collection so a
-            // subject with no job yet (or a failed one) gets one; issuance
-            // itself happens only from fan-in once every connected source is
-            // complete. Unlike /api/refresh's `refresh` reason, `admin` is
-            // idempotent against an already-queued/running/complete job for
-            // today — bulk-recalculate is a batch operation over many
-            // handles at once, and forcing a full re-collection for every one
-            // of them would be a very different (and far more expensive)
-            // operation than "recompute the score from what's already known".
-            if (scoringSelection.enabled) await enqueueCollection(handle, "admin");
+            // #1335 phase 4 — bulk-recalculate exists to make published
+            // numbers current after a scoring-code fix, which needs no new
+            // evidence: when every one of today's jobs is already complete,
+            // call fan-in's issuance directly (it recomputes the receipt
+            // fresh from already-stored observations and republishes if the
+            // result differs — no collection required). Only a subject with
+            // no job yet, or one still in progress, gets an `admin`-reason
+            // enqueue instead; `admin` is idempotent against an
+            // already-queued/running/complete job for today, since forcing a
+            // full re-collection for every handle in a batch would be a very
+            // different (and far more expensive) operation than "recompute
+            // the score from what's already known". Either path records its
+            // outcome through the same scoring_issuance_attempts table.
+            if (scoringSelection.enabled) {
+              const today = toDateString(new Date());
+              const referenceTime = new Date().toISOString();
+              const jobs = await listCollectionJobsForDate(handle, today);
+              const allComplete = jobs.length > 0 && jobs.every((job) => job.state === "complete");
+              if (allComplete) {
+                await maybeIssue(handle, today, referenceTime);
+              } else {
+                await enqueueCollection(handle, "admin");
+              }
+            }
             publications.push({ handle, result: await postWriteScore(handle, scoringSelection) });
             await invalidateProfileReadModels(handle, {
               stats: true,

@@ -5,6 +5,10 @@ import { dbRecordScoringIssuanceAttempt } from "@/lib/db/scoring-issuance";
 import { captureServerError, captureOperationalAlert } from "@/lib/analytics/server-errors";
 import { scheduleServerEvent } from "@/lib/analytics/schedule-server-event";
 import { cacheSetNxStatus } from "@/lib/cache/redis";
+import { readRenderableReceipt, type RenderableReceipt } from "@/lib/profile/score-model";
+import { observedReceiptViewModel } from "@/lib/profile/score-view-model";
+import { scoringObservation, compareScoringObservations, type ScoringObservation } from "@/lib/history/scoring-observations";
+import { notifyObservedScoreChange } from "@/lib/email/score-bump";
 
 /**
  * Issuance fan-in (#1335 phase 4). A receipt is issued exactly when every
@@ -22,6 +26,12 @@ export interface FanInDeps {
   readonly scheduleEvent: typeof scheduleServerEvent;
   readonly captureError: typeof captureServerError;
   readonly alertFailure: (owner: string, referenceDate: string, reason: string) => Promise<void>;
+  /** Reads the owner's current receipt, read once before issuing (the
+   * pre-issuance baseline) and once after a fresh `issued` outcome (#1335
+   * phase 5.7: `notifyObservedScoreChange` is kept, re-homed here from the
+   * old synchronous warm-cache issuance it used to sit beside). */
+  readonly readReceipt: (owner: string) => Promise<RenderableReceipt>;
+  readonly notifyScoreChange: typeof notifyObservedScoreChange;
 }
 
 /** Dedupe key mirrors the warm-cache ceiling alert's pattern (#1162 / BE-L5):
@@ -45,7 +55,16 @@ export const productionFanInDeps: FanInDeps = {
   scheduleEvent: scheduleServerEvent,
   captureError: captureServerError,
   alertFailure: alertScoringCollectionFailed,
+  readReceipt: readRenderableReceipt,
+  notifyScoreChange: notifyObservedScoreChange,
 };
+
+/** `scoringObservation` needs a `ScoreViewModel`; a receipt read that came
+ * back null or unavailable has nothing to observe. */
+function observationFrom(owner: string, receipt: RenderableReceipt): ScoringObservation | null {
+  if (!receipt || "unavailable" in receipt) return null;
+  return scoringObservation(observedReceiptViewModel(owner, receipt));
+}
 
 /**
  * Issues a receipt for `owner`/`referenceDate` if, and only if, every job
@@ -60,6 +79,14 @@ export async function maybeIssue(
 ): Promise<void> {
   const jobs = await deps.listJobsForDate(owner, referenceDate);
   if (jobs.length === 0 || jobs.some((job) => job.state !== "complete")) return;
+
+  // The pre-issuance baseline: read before, not after, calling deps.issue --
+  // issuance is what's about to change this, so the "previous" side of the
+  // comparison has to be captured first. A read failure here (thrown or a
+  // reported `unavailable`) just means no notification is possible; it must
+  // never block or fail issuance itself.
+  const before = await deps.readReceipt(owner).catch((): RenderableReceipt => null);
+  const previousObserved = observationFrom(owner, before);
 
   const outcome = await deps.issue(owner, { referenceTime });
   await deps.recordAttempt(owner, referenceDate, outcome);
@@ -77,6 +104,22 @@ export async function maybeIssue(
       error: new Error(`Issuance failed for ${owner} (${referenceDate}): ${outcome.reason}`),
     });
     await deps.alertFailure(owner, referenceDate, outcome.reason);
+    return;
+  }
+
+  // Only a genuine new revision is worth comparing and notifying about --
+  // "unchanged" means nothing moved, and there is no earlier state to
+  // compare against on a subject's first-ever issuance.
+  if (outcome.status !== "issued" || !previousObserved) return;
+
+  try {
+    const after = await deps.readReceipt(owner);
+    const currentObserved = observationFrom(owner, after);
+    if (!currentObserved) return;
+    await deps.notifyScoreChange(owner, compareScoringObservations(previousObserved, currentObserved));
+  } catch {
+    // Never let the notification side-channel fail fan-in itself -- the
+    // receipt is already durably issued at this point.
   }
 }
 

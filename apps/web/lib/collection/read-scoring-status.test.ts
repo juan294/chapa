@@ -1,14 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { mockDbIsScoringSubject, mockListCollectionJobsForDate, mockDbReadObservedReceipt } = vi.hoisted(() => ({
+const { mockDbIsScoringSubject, mockListCollectionJobsForDate, mockDbReadObservedReceipt, mockCaptureServerError } = vi.hoisted(() => ({
   mockDbIsScoringSubject: vi.fn(),
   mockListCollectionJobsForDate: vi.fn(),
   mockDbReadObservedReceipt: vi.fn(),
+  mockCaptureServerError: vi.fn(),
 }));
 
 vi.mock("@/lib/db/scoring-subjects", () => ({ dbIsScoringSubject: mockDbIsScoringSubject }));
 vi.mock("@/lib/db/collection-queue", () => ({ listCollectionJobsForDate: mockListCollectionJobsForDate }));
 vi.mock("@/lib/db/score-receipts-observed", () => ({ dbReadObservedReceipt: mockDbReadObservedReceipt }));
+vi.mock("@/lib/analytics/server-errors", () => ({ captureServerError: mockCaptureServerError }));
 
 import { readScoringStatus } from "./read-scoring-status";
 
@@ -16,6 +18,7 @@ beforeEach(() => {
   mockDbIsScoringSubject.mockReset();
   mockListCollectionJobsForDate.mockReset().mockResolvedValue([]);
   mockDbReadObservedReceipt.mockReset().mockResolvedValue({ status: "missing" });
+  mockCaptureServerError.mockReset().mockResolvedValue(undefined);
 });
 
 describe("readScoringStatus", () => {
@@ -80,8 +83,22 @@ describe("readScoringStatus", () => {
     expect(mockDbReadObservedReceipt).toHaveBeenCalledWith("octocat");
   });
 
-  it("returns null rather than throwing when an unexpected error escapes", async () => {
+  it("captures the error and returns null, rather than failing silently, when an unexpected error escapes", async () => {
     mockDbIsScoringSubject.mockRejectedValue(new Error("boom"));
     expect(await readScoringStatus("octocat")).toBeNull();
+    expect(mockCaptureServerError).toHaveBeenCalledOnce();
+    const [captured] = mockCaptureServerError.mock.calls[0]!;
+    expect(captured.route).toBe("lib/collection/read-scoring-status");
+    expect(captured.error).toBeInstanceOf(Error);
+    expect((captured.error as Error).message).toContain("boom");
+  });
+
+  it("captures the handle (lowercased) alongside the route, with no other structured context", async () => {
+    mockDbIsScoringSubject.mockRejectedValue(new Error("db unavailable"));
+    await readScoringStatus("OctoCat");
+    const [captured] = mockCaptureServerError.mock.calls[0]!;
+    expect(captured.route).toBe("lib/collection/read-scoring-status");
+    expect((captured.error as Error).message).toContain("octocat");
+    expect(Object.keys(captured).sort()).toEqual(["error", "route", "statusCode"]);
   });
 });
