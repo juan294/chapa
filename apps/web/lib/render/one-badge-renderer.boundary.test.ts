@@ -16,16 +16,20 @@ const NOT_SOURCE = /(\.test\.|\.spec\.|__fixtures__|\/test-helpers\/)/;
  * displaying a badge is not drawing one, so only a real `<svg>` root counts. */
 const BADGE_SVG_ROOT = /<svg[^>]*viewBox="0 0 (?:1200 630|\$\{W\} \$\{H\})"/;
 /**
- * Three other files use the badge's canvas without drawing a badge: the "cannot
- * render your badge right now" placeholder, the site-level social card, and the
- * share page's leader-line overlay, which only borrows the coordinate space.
- * They are allowed because none of them renders a score, so none can drift from
- * the real artifact — the assertion below holds them to that.
+ * Four other files use the badge's canvas without drawing a badge: the "cannot
+ * render your badge right now" placeholder, the site-level social card, the
+ * share page's leader-line overlay (borrows only the coordinate space), and
+ * (#1335 phase 4) the scoring-status placeholder — collecting/action_needed/
+ * unregistered — which draws an identity header and a state sentence, never
+ * a score, heatmap or radar. They are allowed because none of them renders a
+ * score, so none can drift from the real artifact — the assertion below
+ * holds them to that.
  */
 const SCORELESS_CANVASES = [
   "apps/web/app/og-image/route.ts",
   "apps/web/app/u/[handle]/badge.svg/route.ts",
   "apps/web/components/BadgeOverlay.tsx",
+  "apps/web/lib/render/badge-state.ts",
 ];
 /** Anything that turns a score into badge artwork. */
 const DRAWS_A_SCORE = /renderRadarChart|renderHeatmapSvg|getTierColor|getArchetypeColor|buildHeatmapCells/;

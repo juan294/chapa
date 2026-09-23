@@ -47,6 +47,9 @@ import {
   type ServerTimingEntry,
 } from "@/lib/monitoring/latency-slo";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { readScoringStatus } from "@/lib/collection/read-scoring-status";
+import { badgeStatusState, buildBadgeStatusStrings, renderBadgeStatusSvg, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 export const maxDuration = 35;
 
@@ -492,6 +495,60 @@ export async function GET(
   // overhead (#882 — rate limit moved to cache-MISS branch only).
   const readOnly = request.nextUrl.searchParams.get(READ_ONLY_SMOKE_PARAM) === "1";
   const scoringSelection = await readScoringRenderSelection();
+
+  // #1335 phase 4 — under the current v7.2 selection, a handle with no ready
+  // receipt renders its scoring STATE (collecting/action_needed/unregistered)
+  // instead of falling through to a legacy v6 render or an empty materialize.
+  // Gated to v7.2 only: an explicit v6 selection (phase 5 deletes that branch
+  // entirely) keeps its existing behavior untouched. A null status — the
+  // authority read failed, or this is a v6 selection — takes neither branch
+  // below and the route continues exactly as it did before this phase: no new
+  // cache-header behavior is invented for a failed status read.
+  let scoringStatus: ScoringStatus | null = null;
+  if (scoringSelection.machinePolicy === "v7.2") {
+    try {
+      scoringStatus = await readScoringStatus(handle);
+    } catch (err) {
+      scoringStatus = null;
+      fireAndForget(() => captureServerError({
+        route: `/u/${handle}/badge.svg`,
+        statusCode: 500,
+        error: err,
+      }));
+    }
+  }
+  const badgeState = scoringStatus ? badgeStatusState(scoringStatus) : null;
+  if (badgeState && scoringStatus) {
+    try {
+      const t = getServerT(locale);
+      const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+      const svg = renderBadgeStatusSvg(badgeState, {
+        handle,
+        percent: scoringStatus.kind === "collecting" ? scoringStatus.percent : undefined,
+        config: configSnapshot.config,
+        disableAnimation: true,
+        strings: buildBadgeStatusStrings((key) => t(key) as string, scoringStatus as NonReadyScoringStatus, interpolate),
+      });
+      // Every non-ready state is sent no-store (phase-4 plan, "Surfaces"):
+      // there is nothing to cache yet, and the state can change on the next
+      // collection tick.
+      return badgeSvgResponse(svg, {
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "private, no-store, max-age=0",
+        "Vercel-CDN-Cache-Control": "no-store",
+      }, startedAt, []);
+    } catch (err) {
+      fireAndForget(() => captureServerError({
+        route: `/u/${handle}/badge.svg`,
+        statusCode: 500,
+        error: err,
+      }));
+      // Fall through to the normal pipeline below rather than 500ing on a
+      // legal handle — a rendering hiccup on the status placeholder is not
+      // a reason to fail the whole request.
+    }
+  }
+
   const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
   // #1181 — locale is part of the shared SVG cache key so an es- and
   // en-rendered badge for the same handle/day never collide. Doubles cache

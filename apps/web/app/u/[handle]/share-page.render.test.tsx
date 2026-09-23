@@ -3,8 +3,21 @@ vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
   readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
 }));
+// #1335 phase 4 — defaults to `ready` so pre-existing tests (all v6 by
+// default anyway, which never calls this at all) keep their behavior.
+const { mockReadScoringStatus, mockSharePageScoringStatusComponent } = vi.hoisted(() => ({
+  mockReadScoringStatus: vi.fn(),
+  mockSharePageScoringStatusComponent: vi.fn(() => null),
+}));
+vi.mock("@/lib/collection/read-scoring-status", () => ({
+  readScoringStatus: (...args: unknown[]) => mockReadScoringStatus(...args),
+}));
+vi.mock("./SharePageScoringStatus", () => ({
+  SharePageScoringStatus: mockSharePageScoringStatusComponent,
+}));
 beforeEach(() => {
   mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
+  mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-05-03", updating: false });
 });
 /**
  * Phase 4d — Share page i18n: interpolate helper, sharePage namespace,
@@ -733,6 +746,66 @@ describe("Phase 4d — Share page i18n", () => {
       // names the profile and carries the headline score.
       expect(SOURCE).toContain("SharePageHeader");
       expect(SOURCE).not.toContain("SharePageH2");
+    });
+  });
+
+  // #1335 phase 4 — status gating, mirroring badge.svg/og-image's own tests.
+  describe("scoring status placeholder", () => {
+    beforeEach(() => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
+    });
+
+    it("renders SharePageScoringStatus (not the normal pipeline) when collecting with no prior receipt", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 42, sources: [], hasPriorReceipt: false });
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+      const result = await SharePageContent({ handle: "testuser" });
+
+      const found = findElementByType(result, mockSharePageScoringStatusComponent);
+      expect(found).not.toBeNull();
+      expect(found?.props).toMatchObject({
+        handle: "testuser",
+        badgeState: "collecting",
+        isOwner: true,
+        status: { kind: "collecting", percent: 42, sources: [], hasPriorReceipt: false },
+      });
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    });
+
+    it("computes isOwner=false for a visitor", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "unregistered" });
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+      const result = await SharePageContent({ handle: "testuser" });
+      const found = findElementByType(result, mockSharePageScoringStatusComponent);
+      expect(found?.props).toMatchObject({ isOwner: false, badgeState: "unregistered" });
+    });
+
+    it("falls back to the normal pipeline when collecting WITH a prior receipt", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 90, sources: [], hasPriorReceipt: true });
+      const result = await SharePageContent({ handle: "testuser" });
+      expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("never gates on status under an explicit v6 selection", async () => {
+      mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
+      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 1, sources: [], hasPriorReceipt: false });
+      await SharePageContent({ handle: "testuser" });
+      expect(mockReadScoringStatus).not.toHaveBeenCalled();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("falls through to the normal pipeline when the status read fails", async () => {
+      mockReadScoringStatus.mockRejectedValue(new Error("boom"));
+      const result = await SharePageContent({ handle: "testuser" });
+      expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+    });
+
+    it("renders normally (no gating) when the receipt is ready", async () => {
+      mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-05-03", updating: false });
+      const result = await SharePageContent({ handle: "testuser" });
+      expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
     });
   });
 });
