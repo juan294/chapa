@@ -4,7 +4,7 @@ import {
   type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
 import {
-  classifyFetchFailure, createDiagnosticRecorder, isRateLimitedResponse, retryAfterSeconds, type SourceDiagnostic,
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 
 /**
@@ -84,16 +84,15 @@ export async function fetchCodebergEvidence(
     const operation = operationFor(path);
     // A collector's own budget or deadline is honest incompleteness, never a
     // provider-reported or structural failure: classify before attempting.
-    if (requestCount >= maxRequests) return { data: null, error: diag.record(operation, "budget"), headers: new Headers() };
-    if (signal.aborted) return { data: null, error: diag.record(operation, "deadline"), headers: new Headers() };
+    const stop = budgetOrDeadlineStop(requestCount, maxRequests, signal);
+    if (stop) return { data: null, error: diag.record(operation, stop), headers: new Headers() };
     requestCount++;
     try {
       const url = new URL(`${API}${path}`); for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
       const response = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token.trim()}`, Accept: "application/json" }, signal, redirect: "error" });
       if (!response.ok) {
-        if (isRateLimitedResponse(response.status, response.headers)) return { data: null, error: diag.record(operation, "rate_limited", response.status, retryAfterSeconds(response.headers)), headers: response.headers };
-        if ([401, 403, 404].includes(response.status)) return { data: null, error: diag.record(operation, "not_accessible", response.status), headers: response.headers };
-        return { data: null, error: diag.record(operation, "http", response.status), headers: response.headers };
+        const stopKind = classifyHttpStatus(response.status, response.headers, [401, 403, 404]);
+        return { data: null, error: diag.record(operation, stopKind, response.status, stopKind === "rate_limited" ? retryAfterSeconds(response.headers) : null), headers: response.headers };
       }
       return { data: await response.json() as unknown, error: null, headers: response.headers };
     } catch (error) {
@@ -151,11 +150,15 @@ export async function fetchCodebergEvidence(
   if (explicit) {
     for (const repoId of declaredIds) {
       const response = await request(`/repositories/${repoId}`);
-      let structuralReason: EvidenceReasonCode | null = null;
-      if (response.error) reasons.add(response.error);
+      // Every branch that leaves the repository unresolved sets reason -- it
+      // either fails via request() (response.error) or fails the id match
+      // below (diag.record), never neither.
+      let reason: EvidenceReasonCode | undefined;
+      if (response.error) reason = response.error;
       else if (id(row(response.data).id) === repoId) addRepo(response.data);
-      else { structuralReason = diag.record("repository", "protocol"); reasons.add(structuralReason); }
-      progress.push({ path: `/repositories/${repoId}`, parameters: {}, nextPage: repositories.has(repoId) ? null : 1, collectedNodes: repositories.has(repoId) ? 1 : 0, complete: repositories.has(repoId), reasonCodes: repositories.has(repoId) ? [] : [response.error ?? structuralReason ?? "source_error"] });
+      else reason = diag.record("repository", "protocol");
+      if (reason) reasons.add(reason);
+      progress.push({ path: `/repositories/${repoId}`, parameters: {}, nextPage: repositories.has(repoId) ? null : 1, collectedNodes: repositories.has(repoId) ? 1 : 0, complete: repositories.has(repoId), reasonCodes: repositories.has(repoId) ? [] : [reason!] });
     }
   } else {
     for (const path of [`/users/${encodeURIComponent(username)}/repos`, "/user/repos"]) for (const repo of (await collect(path)).nodes) addRepo(repo);

@@ -5,17 +5,13 @@ import { fetchCodebergEvidence } from "@/lib/codeberg/evidence";
 import { fetchBitbucketEvidence } from "@/lib/bitbucket/evidence";
 import { appendSourceObservation, discoverStoredSource, readSourceObservation } from "@/lib/db/source-context";
 import {
-  classifyFetchFailure, isRateLimitedResponse, retryAfterSeconds, type SourceDiagnostic,
+  classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds,
 } from "@/lib/platform/evidence-diagnostics";
-import { createSourceCoordinator, type SourceCollectorResult } from "./source-coordinator";
+import { createSourceCoordinator, type SourceCollectionOutcome, type SourceCollectorResult } from "./source-coordinator";
 import type { SourceContextInput } from "./source-context";
 import { readSourceAuthorization } from "./source-authorization";
 import { refreshSourceLink } from "./source-refresh";
 
-export interface SourceCollectionOutcome {
-  readonly result: SourceCollectorResult | null;
-  readonly diagnostics: readonly SourceDiagnostic[];
-}
 const clean = (result: SourceCollectorResult | null): SourceCollectionOutcome => ({ result, diagnostics: [] });
 
 export async function collectSource(input: SourceContextInput, token: string | undefined): Promise<SourceCollectionOutcome> {
@@ -28,6 +24,7 @@ export async function collectSource(input: SourceContextInput, token: string | u
     return { result: evidence, diagnostics: evidence?.diagnostics ?? [] };
   }
   if (!token) return clean(null);
+  const diag = createDiagnosticRecorder(provider);
   // Canonical identity must come from the same credential, never the login.
   const urls = { gitlab: "https://gitlab.com/api/v4/user", codeberg: "https://codeberg.org/api/v1/user", bitbucket: "https://api.bitbucket.org/2.0/user" };
   const signal = AbortSignal.timeout(8_000);
@@ -35,13 +32,13 @@ export async function collectSource(input: SourceContextInput, token: string | u
   try {
     response = await fetch(urls[provider], { headers: { Authorization: `Bearer ${token}` }, signal, redirect: "error" });
   } catch (error) {
-    return { result: null, diagnostics: [{ provider, operation: "preflight_user", stopKind: classifyFetchFailure(error, signal), httpStatus: null, retryAfterSeconds: null }] };
+    diag.record("preflight_user", classifyFetchFailure(error, signal));
+    return { result: null, diagnostics: diag.diagnostics };
   }
   if (!response.ok) {
-    const stopKind = isRateLimitedResponse(response.status, response.headers)
-      ? "rate_limited" as const
-      : response.status === 401 || response.status === 403 ? "not_accessible" as const : "http" as const;
-    return { result: null, diagnostics: [{ provider, operation: "preflight_user", stopKind, httpStatus: response.status, retryAfterSeconds: retryAfterSeconds(response.headers) }] };
+    const stopKind = classifyHttpStatus(response.status, response.headers, [401, 403]);
+    diag.record("preflight_user", stopKind, response.status, stopKind === "rate_limited" ? retryAfterSeconds(response.headers) : null);
+    return { result: null, diagnostics: diag.diagnostics };
   }
   const user = await response.json() as Record<string, unknown>;
   if (provider === "bitbucket") {

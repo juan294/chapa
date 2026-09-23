@@ -70,6 +70,16 @@ export function reasonFor(stopKind: StopKind): EvidenceReasonCode {
   }
 }
 
+/** A collector's own budget or deadline, checked before attempting a
+ * request. Budget takes priority when both apply: an already-exhausted
+ * budget is reported as such even if the deadline has also passed.
+ */
+export function budgetOrDeadlineStop(requestCount: number, maxRequests: number, signal: AbortSignal): "budget" | "deadline" | null {
+  if (requestCount >= maxRequests) return "budget";
+  if (signal.aborted) return "deadline";
+  return null;
+}
+
 /** True for HTTP 429, or a GitHub-style 403 with an exhausted rate-limit
  * header. Generic across providers: a provider that never sets these headers
  * simply never matches, and falls through to its ordinary status handling.
@@ -79,10 +89,36 @@ export function isRateLimitedResponse(status: number, headers: Headers | undefin
   return status === 403 && headers?.get("x-ratelimit-remaining") === "0";
 }
 
-/** True for a GraphQL `errors` array reporting a `RATE_LIMITED` error type. */
+/** Classifies a non-ok HTTP response: rate-limited first (it can otherwise
+ * overlap with a provider's own not-accessible status, e.g. GitHub's 403),
+ * then a provider-specific not-accessible status, then any other status.
+ */
+export function classifyHttpStatus(status: number, headers: Headers | undefined | null, notAccessibleStatuses: readonly number[]): "rate_limited" | "not_accessible" | "http" {
+  if (isRateLimitedResponse(status, headers)) return "rate_limited";
+  if (notAccessibleStatuses.includes(status)) return "not_accessible";
+  return "http";
+}
+
+/** A GraphQL error entry shape wide enough to cover every provider observed
+ * here (github/queries.ts:14-30 documents the same three fields for the
+ * legacy v6 client; defined again here rather than imported because that
+ * module is v6 code phase 5 deletes).
+ */
+interface GraphqlErrorShape {
+  readonly type?: string;
+  readonly code?: string;
+  readonly extensions?: { readonly type?: string };
+}
+function isRateLimitedGraphqlErrorEntry(entry: GraphqlErrorShape): boolean {
+  return entry.type === "RATE_LIMITED" || entry.code === "RATE_LIMITED" || entry.extensions?.type === "RATE_LIMITED";
+}
+/** True for a GraphQL `errors` array reporting a `RATE_LIMITED` error, in
+ * any of the shapes providers use: a top-level `type`, a top-level `code`,
+ * or `extensions.type`.
+ */
 export function isGraphqlRateLimited(errors: unknown): boolean {
   return Array.isArray(errors) && errors.some((entry) => (
-    entry !== null && typeof entry === "object" && !Array.isArray(entry) && (entry as Record<string, unknown>).type === "RATE_LIMITED"
+    entry !== null && typeof entry === "object" && !Array.isArray(entry) && isRateLimitedGraphqlErrorEntry(entry as GraphqlErrorShape)
   ));
 }
 
@@ -104,13 +140,22 @@ export function retryAfterSeconds(headers: Headers | undefined | null): number |
 /** A per-collection-run recorder: pushes a diagnostic and returns the mapped
  * reason code in one call, so a collector's `request()` can write
  * `error: diagnostics.record(operation, stopKind)` at every stop site.
+ * Keeps at most one diagnostic per (operation, stopKind) pair -- a page loop
+ * that hits the same stop on every row would otherwise push up to one
+ * diagnostic (and one PostHog event) per row. `record()` still returns the
+ * mapped reason code on every call, whether or not it added a diagnostic.
  */
 export function createDiagnosticRecorder(provider: SourceProvider) {
   const diagnostics: SourceDiagnostic[] = [];
+  const seen = new Set<string>();
   return {
     diagnostics,
     record(operation: string, stopKind: StopKind, httpStatus: number | null = null, retryAfter: number | null = null): EvidenceReasonCode {
-      diagnostics.push({ provider, operation, stopKind, httpStatus, retryAfterSeconds: retryAfter });
+      const key = `${operation}:${stopKind}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        diagnostics.push({ provider, operation, stopKind, httpStatus, retryAfterSeconds: retryAfter });
+      }
       return reasonFor(stopKind);
     },
   };

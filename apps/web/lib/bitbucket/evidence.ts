@@ -4,7 +4,7 @@ import {
   type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
 import {
-  classifyFetchFailure, createDiagnosticRecorder, isRateLimitedResponse, retryAfterSeconds, type SourceDiagnostic,
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 
 /**
@@ -90,16 +90,15 @@ export async function fetchBitbucketEvidence(
     const operation = operationFor(url);
     // A collector's own budget or deadline is honest incompleteness, never a
     // provider-reported or structural failure: classify before attempting.
-    if (requestCount >= maxRequests) return { data: {}, error: diag.record(operation, "budget") };
-    if (signal.aborted) return { data: {}, error: diag.record(operation, "deadline") };
+    const stop = budgetOrDeadlineStop(requestCount, maxRequests, signal);
+    if (stop) return { data: {}, error: diag.record(operation, stop) };
     requestCount++;
     try {
       const response = await fetch(url, { headers: { Authorization: `Bearer ${token.trim()}`, Accept: "application/json" }, signal, redirect: inspectRedirect ? "manual" : "error" });
       if (inspectRedirect && response.status === 302) return { data: {}, error: null, location: response.headers.get("location") };
       if (!response.ok) {
-        if (isRateLimitedResponse(response.status, response.headers)) return { data: {}, error: diag.record(operation, "rate_limited", response.status, retryAfterSeconds(response.headers)) };
-        if ([401, 403, 404].includes(response.status)) return { data: {}, error: diag.record(operation, "not_accessible", response.status) };
-        return { data: {}, error: diag.record(operation, "http", response.status) };
+        const stopKind = classifyHttpStatus(response.status, response.headers, [401, 403, 404]);
+        return { data: {}, error: diag.record(operation, stopKind, response.status, stopKind === "rate_limited" ? retryAfterSeconds(response.headers) : null) };
       }
       const data = row(await response.json());
       if (data.type === "error" || data.error) return { data, error: diag.record(operation, "protocol", response.status) };
@@ -274,8 +273,11 @@ export async function fetchBitbucketEvidence(
       const redirectUrl = `${API}${path}/pullrequests/${prId}/diffstat`;
       const redirect = await request(redirectUrl, true);
       let diffUrl: string | null = null;
-      let structuralReason: EvidenceReasonCode | null = null;
-      if (redirect.error) reasons.add(redirect.error);
+      // Every branch that leaves diffUrl null sets reason -- a diffstat
+      // request either fails via request() (redirect.error) or fails the
+      // local redirect validation below (diag.record), never neither.
+      let reason: EvidenceReasonCode | undefined = redirect.error ?? undefined;
+      if (reason) reasons.add(reason);
       else {
         try {
           const target = new URL("location" in redirect && typeof redirect.location === "string" ? redirect.location : "");
@@ -286,10 +288,10 @@ export async function fetchBitbucketEvidence(
             !/^[a-f\d]{7,64}(?:\.\.[a-f\d]{7,64})?$/i.test(decoded.slice(prefix.length)) ||
             [...target.searchParams.keys()].some((key) => !["topic", "pagelen"].includes(key))) throw new Error("Invalid diff comparison");
           target.searchParams.set("pagelen", "100"); diffUrl = target.toString();
-        } catch { structuralReason = diag.record("diffstat", "protocol"); reasons.add(structuralReason); }
+        } catch { reason = diag.record("diffstat", "protocol"); reasons.add(reason); }
       }
       progress.push({ initialUrl: redirectUrl, nextUrl: diffUrl ? null : redirectUrl, collectedNodes: 0, complete: diffUrl !== null,
-        reasonCodes: diffUrl ? [] : [redirect.error ?? structuralReason ?? "source_error"] });
+        reasonCodes: diffUrl ? [] : [reason!] });
       if (diffUrl) {
         const diffs = await collect(diffUrl);
         const paths = new Set<string>(); let additions = 0; let deletions = 0; let full = diffs.complete;

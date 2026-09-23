@@ -4,7 +4,7 @@ import {
   type NormalizedEngineeringEvent, type Observation, type ScoringWindow, type SourceCoverage,
 } from "@chapa/shared";
 import {
-  classifyFetchFailure, createDiagnosticRecorder, isRateLimitedResponse, retryAfterSeconds, type SourceDiagnostic,
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 
 /**
@@ -106,17 +106,16 @@ export async function fetchGitlabEvidence(
     const operation = operationFor(path);
     // A collector's own budget or deadline is honest incompleteness, never a
     // provider-reported or structural failure: classify before attempting.
-    if (requestCount >= maxRequests) return { data: null, headers: new Headers(), error: diag.record(operation, "budget") };
-    if (signal.aborted) return { data: null, headers: new Headers(), error: diag.record(operation, "deadline") };
+    const stop = budgetOrDeadlineStop(requestCount, maxRequests, signal);
+    if (stop) return { data: null, headers: new Headers(), error: diag.record(operation, stop) };
     requestCount++;
     try {
       const url = new URL(`https://gitlab.com/api/v4${path}`);
       for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
       const response = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token.trim()}` }, signal, redirect: "error" });
       if (!response.ok) {
-        if (isRateLimitedResponse(response.status, response.headers)) return { data: null, headers: response.headers, error: diag.record(operation, "rate_limited", response.status, retryAfterSeconds(response.headers)) };
-        if ([401, 403, 404].includes(response.status)) return { data: null, headers: response.headers, error: diag.record(operation, "not_accessible", response.status) };
-        return { data: null, headers: response.headers, error: diag.record(operation, "http", response.status) };
+        const stopKind = classifyHttpStatus(response.status, response.headers, [401, 403, 404]);
+        return { data: null, headers: response.headers, error: diag.record(operation, stopKind, response.status, stopKind === "rate_limited" ? retryAfterSeconds(response.headers) : null) };
       }
       return { data: await response.json() as unknown, headers: response.headers, error: null };
     } catch (error) {

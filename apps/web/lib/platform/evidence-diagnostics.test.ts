@@ -4,8 +4,8 @@ const mocks = vi.hoisted(() => ({ scheduleServerEvent: vi.fn() }));
 vi.mock("@/lib/analytics/schedule-server-event", () => ({ scheduleServerEvent: mocks.scheduleServerEvent }));
 
 import {
-  classifyFetchFailure, createDiagnosticRecorder, emitSourceDiagnostics, isGraphqlRateLimited,
-  isRateLimitedResponse, reasonFor, retryAfterSeconds, type SourceDiagnostic,
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, emitSourceDiagnostics,
+  isGraphqlRateLimited, isRateLimitedResponse, reasonFor, retryAfterSeconds, type SourceDiagnostic,
 } from "./evidence-diagnostics";
 
 describe("classifyFetchFailure", () => {
@@ -40,6 +40,43 @@ describe("reasonFor", () => {
   });
 });
 
+describe("budgetOrDeadlineStop", () => {
+  it("returns budget once the request budget is exhausted", () => {
+    const controller = new AbortController();
+    expect(budgetOrDeadlineStop(5, 5, controller.signal)).toBe("budget");
+    expect(budgetOrDeadlineStop(6, 5, controller.signal)).toBe("budget");
+  });
+  it("returns deadline once the signal has aborted, budget permitting", () => {
+    const controller = new AbortController();
+    controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
+    expect(budgetOrDeadlineStop(1, 5, controller.signal)).toBe("deadline");
+  });
+  it("prefers budget over deadline when both apply", () => {
+    const controller = new AbortController();
+    controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
+    expect(budgetOrDeadlineStop(5, 5, controller.signal)).toBe("budget");
+  });
+  it("returns null when neither the budget nor the deadline has been reached", () => {
+    const controller = new AbortController();
+    expect(budgetOrDeadlineStop(1, 5, controller.signal)).toBeNull();
+  });
+});
+
+describe("classifyHttpStatus", () => {
+  it("classifies 429 as rate_limited regardless of the not-accessible list", () => {
+    expect(classifyHttpStatus(429, new Headers(), [401, 403, 404])).toBe("rate_limited");
+  });
+  it("classifies a rate-limited 403 as rate_limited before checking not-accessible", () => {
+    expect(classifyHttpStatus(403, new Headers({ "x-ratelimit-remaining": "0" }), [401, 403, 404])).toBe("rate_limited");
+  });
+  it("classifies a listed status as not_accessible", () => {
+    expect(classifyHttpStatus(404, new Headers(), [401, 403, 404])).toBe("not_accessible");
+  });
+  it("classifies any other status as http", () => {
+    expect(classifyHttpStatus(500, new Headers(), [401, 403, 404])).toBe("http");
+  });
+});
+
 describe("isRateLimitedResponse", () => {
   it("is true for HTTP 429 regardless of headers", () => {
     expect(isRateLimitedResponse(429, new Headers())).toBe(true);
@@ -57,11 +94,19 @@ describe("isRateLimitedResponse", () => {
 });
 
 describe("isGraphqlRateLimited", () => {
-  it("is true when an errors entry reports RATE_LIMITED", () => {
+  it("is true when an errors entry reports RATE_LIMITED via type", () => {
     expect(isGraphqlRateLimited([{ type: "RATE_LIMITED" }])).toBe(true);
+  });
+  it("is true when an errors entry reports RATE_LIMITED via extensions.type", () => {
+    expect(isGraphqlRateLimited([{ extensions: { type: "RATE_LIMITED" } }])).toBe(true);
+  });
+  it("is true when an errors entry reports RATE_LIMITED via code", () => {
+    expect(isGraphqlRateLimited([{ code: "RATE_LIMITED" }])).toBe(true);
   });
   it("is false for other GraphQL error types or non-arrays", () => {
     expect(isGraphqlRateLimited([{ type: "NOT_FOUND" }])).toBe(false);
+    expect(isGraphqlRateLimited([{ extensions: { type: "NOT_FOUND" } }])).toBe(false);
+    expect(isGraphqlRateLimited([{ code: "NOT_FOUND" }])).toBe(false);
     expect(isGraphqlRateLimited(null)).toBe(false);
   });
 });
@@ -97,6 +142,24 @@ describe("createDiagnosticRecorder", () => {
     expect(recorder.diagnostics).toEqual([
       { provider: "bitbucket", operation: "pullrequests", stopKind: "rate_limited", httpStatus: 429, retryAfterSeconds: 30 },
     ]);
+  });
+  it("keeps at most one diagnostic per (operation, stopKind), even across many calls", () => {
+    const recorder = createDiagnosticRecorder("bitbucket");
+    for (let i = 0; i < 100; i++) {
+      const reason = recorder.record("commits", "protocol");
+      expect(reason).toBe("source_error");
+    }
+    expect(recorder.diagnostics).toEqual([
+      { provider: "bitbucket", operation: "commits", stopKind: "protocol", httpStatus: null, retryAfterSeconds: null },
+    ]);
+  });
+  it("keeps a separate diagnostic per distinct (operation, stopKind) pair", () => {
+    const recorder = createDiagnosticRecorder("gitlab");
+    recorder.record("commits", "protocol");
+    recorder.record("commits", "http", 500);
+    recorder.record("notes", "protocol");
+    recorder.record("commits", "protocol"); // duplicate, should not add a fourth entry
+    expect(recorder.diagnostics).toHaveLength(3);
   });
 });
 

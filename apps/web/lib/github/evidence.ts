@@ -5,8 +5,8 @@ import {
 } from "@chapa/shared";
 import { getGithubToken } from "@/lib/env";
 import {
-  classifyFetchFailure, createDiagnosticRecorder, isGraphqlRateLimited, isRateLimitedResponse,
-  retryAfterSeconds, type SourceDiagnostic,
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder,
+  isGraphqlRateLimited, retryAfterSeconds, type SourceDiagnostic,
 } from "@/lib/platform/evidence-diagnostics";
 import { GITHUB_EVIDENCE_QUERIES as queries } from "./evidence-queries";
 
@@ -80,8 +80,8 @@ export async function fetchGitHubEvidence(
   async function request(operation: keyof typeof queries, variables: Record<string, unknown>) {
     // A collector's own budget or deadline is honest incompleteness, never a
     // provider-reported or structural failure: classify before attempting.
-    if (requestCount >= maxRequests) return { data: {}, error: diag.record(operation, "budget") };
-    if (signal.aborted) return { data: {}, error: diag.record(operation, "deadline") };
+    const stop = budgetOrDeadlineStop(requestCount, maxRequests, signal);
+    if (stop) return { data: {}, error: diag.record(operation, stop) };
     requestCount++;
     try {
       const response = await fetch("https://api.github.com/graphql", {
@@ -89,9 +89,8 @@ export async function fetchGitHubEvidence(
         body: JSON.stringify({ query: queries[operation], variables }),
       });
       if (!response.ok) {
-        if (isRateLimitedResponse(response.status, response.headers)) return { data: {}, error: diag.record(operation, "rate_limited", response.status, retryAfterSeconds(response.headers)) };
-        if (response.status === 401 || response.status === 403) return { data: {}, error: diag.record(operation, "not_accessible", response.status) };
-        return { data: {}, error: diag.record(operation, "http", response.status) };
+        const stopKind = classifyHttpStatus(response.status, response.headers, [401, 403]);
+        return { data: {}, error: diag.record(operation, stopKind, response.status, stopKind === "rate_limited" ? retryAfterSeconds(response.headers) : null) };
       }
       const payload = object(await response.json());
       if (Array.isArray(payload.errors) && payload.errors.length > 0) {
