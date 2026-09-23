@@ -11,7 +11,7 @@ const input = { owner: "ALICE", provider: "github" as const, window, scope: { di
 const source = { provider: "github" as const, host: "github.com", subjectId: "canonical" };
 const value = { id: "11111111-1111-4111-8111-111111111111", window, coverage: { source, window, dataThrough: window.referenceTime, status: "complete", discovery: "explicit_repositories", repositoryIds: [], repositoryDiscoveryComplete: true, eventKinds: { accepted_change: "complete" }, reasonCodes: [], unknownPeriods: [] }, events: [] } as StoredSourceObservation;
 function harness() {
- const deps = { authorize: vi.fn<SourceCoordinatorDependencies["authorize"]>().mockResolvedValue({ status: "authorized", consentVersion: "v1", link: null }), discover: vi.fn<SourceCoordinatorDependencies["discover"]>().mockResolvedValue({ status: "missing" }), read: vi.fn<SourceCoordinatorDependencies["read"]>().mockResolvedValue(null), append: vi.fn<SourceCoordinatorDependencies["append"]>().mockImplementation(async (_ctx, data) => data as StoredSourceObservation), collect: vi.fn<SourceCoordinatorDependencies["collect"]>().mockResolvedValue({ result: value, diagnostics: [] }), refreshLink: vi.fn<SourceCoordinatorDependencies["refreshLink"]>().mockImplementation(async a => a) };
+ const deps = { authorize: vi.fn<SourceCoordinatorDependencies["authorize"]>().mockResolvedValue({ status: "authorized", subjectVersion: "v1", link: null }), discover: vi.fn<SourceCoordinatorDependencies["discover"]>().mockResolvedValue({ status: "missing" }), read: vi.fn<SourceCoordinatorDependencies["read"]>().mockResolvedValue(null), append: vi.fn<SourceCoordinatorDependencies["append"]>().mockImplementation(async (_ctx, data) => data as StoredSourceObservation), collect: vi.fn<SourceCoordinatorDependencies["collect"]>().mockResolvedValue({ result: value, diagnostics: [] }), refreshLink: vi.fn<SourceCoordinatorDependencies["refreshLink"]>().mockImplementation(async a => a) };
  return { deps, select: createSourceCoordinator(deps) };
 }
 describe("source selection", () => {
@@ -36,7 +36,7 @@ describe("source selection", () => {
   const upper = "{ABCDEFAB-3333-3333-3333-333333333333}";
   const repositoryId = upper.toLowerCase();
   const bitbucket = { provider: "bitbucket" as const, host: "bitbucket.org", subjectId: "canonical-account" };
-  deps.authorize.mockResolvedValue({ status: "authorized", consentVersion: "v1", link: {
+  deps.authorize.mockResolvedValue({ status: "authorized", subjectVersion: "v1", link: {
    id: "11111111-1111-4111-8111-111111111111", updatedAt: "2026-09-05T12:00:00.000001Z", handle: "alice", platform: "bitbucket", remoteLogin: "display-label",
    tokens: { accessToken: "bound-token", refreshToken: null, expiresAt: null },
   } });

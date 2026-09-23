@@ -13,6 +13,7 @@ import { consumeOauthState } from "@/lib/auth/oauth-state";
 import { rateLimitStrict } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
+import { dbEnsureScoringSubject } from "@/lib/db/scoring-subjects";
 import { addContact } from "@/lib/email/audience";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { getRequestId } from "@/lib/log";
@@ -170,6 +171,11 @@ export const GET = withErrorCapture("/api/auth/callback", async (request: NextRe
         avatarUrl: user.avatar_url ?? null,
       });
       if (!registered) throw new Error("GitHub user registration failed");
+      // Same authenticated-signup boundary as the `users` row above (#1239):
+      // a scoring subject is registered here, and only here, never on a
+      // public badge/share-page read (#1335 phase 2).
+      const subjectRegistered = await dbEnsureScoringSubject(user.login);
+      if (!subjectRegistered) throw new Error("Scoring subject registration failed");
     } catch (error) {
       await captureServerError({
         route: "/api/auth/callback",

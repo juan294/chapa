@@ -25,7 +25,7 @@ export interface ObservedReceiptMaterializationOptions extends ReceiptMaterializ
    * Absence/errors are unavailable, never inferred no_report consent. */
   readonly readCraft?: (owner: string, window: ScoringWindow) => Promise<PublicObservedCraft>;
 }
-type FailureReason = "no_receipt" | "not_consented" | "storage_error" | "source_error" | "craft_error";
+type FailureReason = "no_receipt" | "storage_error" | "source_error" | "craft_error";
 export type ObservedReceiptMaterialization =
   | { readonly status: "issued"; readonly snapshot: ObservedReceiptSnapshot; readonly publication: "inserted" | "duplicate"; readonly isCurrent: boolean; readonly freshness: "current" | "stale" }
   | { readonly status: "stored"; readonly snapshot: ObservedReceiptSnapshot; readonly freshness: "current" | "stale"; readonly reason?: FailureReason }
@@ -153,7 +153,6 @@ export async function materializeObservedScoreReceipt(owner: string, options: Ob
         : { status: "issued", snapshot: snapshot(published), publication: published.status, isCurrent: published.isCurrent, freshness };
     }
     const ledgerSnapshot = await dbReadEngineeringEvidence(handle, handle, window);
-    if (!ledgerSnapshot.publicConsent) return { status: "unavailable", reason: "not_consented" };
     const ledger = projectEngineeringLedger(ledgerSnapshot, window);
     const collected = await collectSources(handle, window, { ...options, readOnly: options.reportUpdate && previous.status === "found" ? true : options.readOnly });
     const sources = collected.sources.map(source => {

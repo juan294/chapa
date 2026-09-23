@@ -101,7 +101,7 @@ export function createSourceCoordinator(deps: SourceCoordinatorDependencies) {
         return { status: "observed", observation };
       };
       // Read-only must never join work which can refresh, collect or append.
-      const key = `${binding.selectionId}:${initial.consentVersion}:${request.readOnly ? "read" : "write"}:${request.refresh ? "refresh" : "cached"}`;
+      const key = `${binding.selectionId}:${initial.subjectVersion}:${request.readOnly ? "read" : "write"}:${request.refresh ? "refresh" : "cached"}`;
       let work = inflight.get(key);
       if (!work) {
         work = run(); inflight.set(key, work);

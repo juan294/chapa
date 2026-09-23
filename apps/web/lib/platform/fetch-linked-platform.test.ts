@@ -10,7 +10,7 @@ vi.mock("./source-authorization", async importOriginal => ({
 }));
 vi.mock("./source-refresh", () => ({ refreshSourceLink: vi.fn() }));
 vi.mock("@/lib/cache/redis", () => ({ cacheMGet: vi.fn(), cacheSet: vi.fn() }));
-const linked: Extract<SourceAuthorization, { status: "authorized" }> = { status: "authorized", consentVersion: "legacy-unpublished",
+const linked: Extract<SourceAuthorization, { status: "authorized" }> = { status: "authorized", subjectVersion: "legacy-unpublished",
   link: { id: "11111111-1111-4111-8111-111111111111", updatedAt: "2026-09-05T12:00:00.000001Z", handle: "alice", platform: "gitlab", remoteLogin: "linked-alice",
     tokens: { accessToken: "current-token", refreshToken: "refresh-token", expiresAt: null } } };
 function config(): FetchLinkedPlatformConfig {

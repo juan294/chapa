@@ -78,8 +78,8 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
   if (body && typeof body === "object" && "schemaVersion" in body && body.schemaVersion === "v7.2") {
     const selection = negotiatedSelection ?? await readScoringRenderSelection();
     if (!selection.enabled) return NextResponse.json({ error: "policy_changed", persisted: false }, { status: 409 });
-    if (Array.isArray(body) || Object.keys(body).some(key => !["schemaVersion", "report", "publicationAcknowledged", "supersedesReportId"].includes(key))
-      || !("report" in body) || ("publicationAcknowledged" in body && typeof body.publicationAcknowledged !== "boolean")
+    if (Array.isArray(body) || Object.keys(body).some(key => !["schemaVersion", "report", "supersedesReportId"].includes(key))
+      || !("report" in body)
       || ("supersedesReportId" in body && (typeof body.supersedesReportId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.supersedesReportId)))) {
       return NextResponse.json({ error: "Invalid insights data", persisted: false }, { status: 400 });
     }
@@ -89,10 +89,8 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     catch { return NextResponse.json({ error: "Invalid insights data", persisted: false }, { status: 400 }); }
     const handle = auth.handle.toLowerCase();
     const stored = await dbStoreReportCraft(handle, handle, prepared, {
-      publicationAcknowledged: "publicationAcknowledged" in body && body.publicationAcknowledged === true,
       ...("supersedesReportId" in body ? { supersedesReportId: body.supersedesReportId as string } : {}),
     });
-    if (stored.status === "consent_required") return NextResponse.json({ error: "publication_acknowledgment_required", persisted: false }, { status: 409 });
     if (stored.status === "correction_required") return NextResponse.json({ error: "same_period_requires_explicit_correction", persisted: false, supersedesReportId: stored.supersedesReportId }, { status: 409 });
     if (stored.status !== "stored") return NextResponse.json({ error: "Insights storage unavailable", persisted: false }, { status: 503 });
     const pending = { success: true, persisted: true, schemaVersion: "v7.2", uploadId: stored.reportId, reportSelection: stored.selection, publication: "pending", refreshed: false, scoring: null, craft: null };

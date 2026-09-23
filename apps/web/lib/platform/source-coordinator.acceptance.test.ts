@@ -23,7 +23,7 @@ function deferred<T>() {
 }
 function harness() {
   const deps = {
-    authorize: vi.fn<SourceCoordinatorDependencies["authorize"]>().mockResolvedValue({ status: "authorized", consentVersion: "consent1", link: null }),
+    authorize: vi.fn<SourceCoordinatorDependencies["authorize"]>().mockResolvedValue({ status: "authorized", subjectVersion: "consent1", link: null }),
     discover: vi.fn<SourceCoordinatorDependencies["discover"]>().mockResolvedValue({ status: "missing" }),
     read: vi.fn<SourceCoordinatorDependencies["read"]>().mockResolvedValue(null),
     append: vi.fn<SourceCoordinatorDependencies["append"]>().mockImplementation(async (_context, value) => structuredClone(value) as StoredSourceObservation),
@@ -80,7 +80,7 @@ describe("independent source-coordinator acceptance", () => {
     const input = request();
     const pending = select(input);
     (input.scope.repositoryIds as string[])[0] = "mutated-after-call";
-    gate.resolve({ status: "authorized", consentVersion: "consent1", link: null });
+    gate.resolve({ status: "authorized", subjectVersion: "consent1", link: null });
     const first = await pending;
     expect(deps.collect.mock.calls[0]![0].scope.repositoryIds).toEqual(["known"]);
     expect(first.status).toBe("observed");

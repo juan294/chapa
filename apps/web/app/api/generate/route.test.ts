@@ -311,4 +311,4 @@ describe("POST /api/generate", () => {
 });
 
 vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));
-vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceiptIfConsented: vi.fn(async () => "skipped") }));
+vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceipt: vi.fn(async () => "skipped") }));

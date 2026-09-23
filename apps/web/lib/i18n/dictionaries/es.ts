@@ -436,7 +436,7 @@ export const es: Translations = {
     "compare": "Comparar un recibo",
     "compareBody": "Envía el objeto envelope completo del recibo como JSON mediante POST a la URL de verificación que aparece abajo. La comparación abarca todos los campos canónicos, incluida Artesanía; no inspecciona una imagen.",
     "replayBody": "El campo envelope de la respuesta contiene todos los datos públicos de cálculo y el desglose aritmético. Guarda ese campo para reproducir el cálculo de forma independiente y sin conexión.",
-    "retention": "Disponible mientras se mantenga el consentimiento de publicación. Retirarlo elimina el acceso público; las copias descargadas antes no se pueden recuperar."
+    "retention": "Disponible mientras el sujeto permanezca registrado. Eliminar la cuenta por completo elimina el acceso público; las copias descargadas antes no se pueden recuperar."
 },
   verifyDetail: {
     verifiedTitle: "Registro de verificación antiguo",
@@ -492,14 +492,6 @@ export const es: Translations = {
     evidenceCraftDescription: 'Un portafolio Craft recoge la práctica de ingeniería: cómo planteaste un problema, cómo lo verificaste, el criterio detrás de usar o no usar una herramienta y el resultado aceptado. No hace falta ninguna herramienta de IA ni ningún informe importado: decidir no delegar demuestra criterio igual que delegar.',
     evidenceCraftEmpty: 'Todavía no has enviado episodios Craft.',
     evidenceCraftPresent: 'Episodios Craft enviados.',
-    consentTitle: 'Publica tu recibo de evidencia',
-    consentDescription: 'Chapa calcula tu puntuación en cualquier caso. El consentimiento decide si esa puntuación se publica como un recibo v7 emitido — un registro público e inmutable que cualquiera puede reproducir sin conexión para comprobar la aritmética — o si sigue siendo un agregado heredado v6 en tu insignia.',
-    consentConsequence: 'Publicar es público y permanente en un sentido: retirarlo después revoca el acceso al recibo y borra los registros privados que lo respaldan, pero las copias que otras personas ya hayan descargado no se pueden recuperar. El recibo nunca contiene nombres de repositorios, rutas privadas, contenidos de informes ni identidades de evaluadores.',
-    consentStateOn: 'Tu recibo de evidencia está publicado.',
-    consentStateOff: 'Tu recibo de evidencia no está publicado. Tu insignia muestra un agregado heredado v6.',
-    consentGrant: 'Publicar mi recibo',
-    consentWithdraw: 'Retirar la publicación',
-    consentError: 'No se pudo actualizar el consentimiento de publicación. Inténtalo de nuevo más tarde.',
   },
   observedScoring: {
     "uploadInsights": "Subir insights",
@@ -570,9 +562,6 @@ export const es: Translations = {
     insightsImported: 'Insights importados',
     insightsReportCraftResult: "Craft: {score}/100",
     insightsReportCraftDetail: "Craft se calcula a partir del informe y por separado de tu puntuación principal.",
-    insightsPublicationTitle: "Publicar tu puntuación y recibo",
-    insightsPublicationBody: "Tus puntuaciones numéricas derivadas y el recibo reproducible serán públicos. Tu informe original seguirá siendo privado.",
-    insightsPublicationConfirm: "Publicar y desbloquear Craft",
     insightsReplacementTitle: "Reemplazar el informe de este periodo",
     insightsReplacementBody: "Esto corrige explícitamente el informe existente del mismo periodo. El nuevo cálculo puede aumentar o reducir Craft.",
     insightsReplacementConfirm: "Reemplazar informe",
@@ -1107,7 +1096,7 @@ export const es: Translations = {
       ],
       "sectionCraft": "Craft a partir de un informe de insights",
       "craftBody": [
-            "Importa un informe de Claude Code /insights y, si hace falta, acepta la publicación numérica en esa misma acción. Craft se deriva del informe y es una estimación del modelo; reproducir su cálculo no verifica el informe de forma independiente.",
+            "Importa un informe de Claude Code /insights; las puntuaciones numéricas resultantes se publican automáticamente. Craft se deriva del informe y es una estimación del modelo; reproducir su cálculo no verifica el informe de forma independiente.",
             "Los créditos son: fully achieved = 1, mostly achieved = 0.7, partially achieved = 0.3 y not achieved o failed = 0. Todas las sesiones permanecen en el denominador, incluidas las de resultado desconocido o sin clasificar."
       ],
       "craftFormula": "Craft = 100 × (fully + 0.7 × mostly + 0.3 × partially) / totalSessions",
@@ -1156,7 +1145,7 @@ export const es: Translations = {
       "sectionReceipts": "Recibos, reproducción y límites",
       "receiptsBody": [
             "El recibo público inmutable registra las versiones de política y algoritmo, recuentos exactos, puntuaciones puntuales, límites originales, periodo del informe, cobertura y pasos del cálculo. Reproducirlo comprueba la coherencia numérica y la integridad; no verifica la verdad de las fuentes. Los recibos históricos conservan sus reglas originales.",
-            "La publicación requiere consentimiento. El texto del informe y las etiquetas desconocidas siguen siendo privados; los archivos originales caducan a los 30 días, mientras que el resumen numérico mínimo se conserva hasta la retirada del consentimiento o la eliminación. Las referencias públicas de informes son identificadores opacos.",
+            "La publicación es automática para todo sujeto registrado; no requiere activarla. El texto del informe y las etiquetas desconocidas siguen siendo privados; los archivos originales caducan a los 30 días, mientras que el resumen numérico mínimo se conserva hasta que se elimina la cuenta. Las referencias públicas de informes son identificadores opacos.",
             "Las correcciones conservan su relación con las versiones anteriores. La tendencia opcional se identifica por separado y usa una retención diaria de 0.85; nunca sustituye al núcleo bruto ni a su nivel."
       ],
       "sectionExcludes": "Qué no aporta crédito por sí solo",
@@ -1289,12 +1278,12 @@ export const es: Translations = {
         ['Élite', '85 o más', 'Amplitud y profundidad excepcionales de contribución registrada'],
       ],
       sectionReceipts: 'Recibos que puedes reproducir',
-      receiptsIntro1Prefix: 'Una vez que lo has activado, cada revisión puntuada emite un ',
+      receiptsIntro1Prefix: 'Cada revisión puntuada emite un ',
       receiptsIntro1Highlight: 'recibo público inmutable',
       receiptsIntro1Suffix: ' que lleva todos los agregados, cotas de cobertura y resultados de rúbrica necesarios para reproducir la aritmética sin conexión. Puedes comprobar el número tú misma en lugar de confiar en él.',
       receiptsBody2: 'Un recibo excluye rutas privadas, nombres de repositorios, contenidos de informes, tokens e identidades de evaluadores; los resultados públicos por criterio exponen solo un estado estructurado, una categoría, un recuento y un código de motivo seguro. La reproducción valida la aritmética sobre los agregados emitidos: no establece la veracidad de los datos de la plataforma subyacente, y emitir un recibo no afirma que esos datos sean exactos.',
       receiptsBody3: 'Las correcciones crean una revisión inmutable nueva en lugar de editar una antigua. Los recibos existentes conservan su aritmética histórica y pueden mostrar un estado de sustituido o retirado sin filtrar el motivo privado del cambio.',
-      receiptsConsentNote: 'Publicar un recibo es opcional y se activa desde tus ajustes. Hasta que lo actives, tu insignia muestra un agregado heredado v6, etiquetado como tal. Retirarlo revoca el acceso público y borra los registros privados que lo respaldan, pero las copias que otras personas ya hayan descargado no se pueden recuperar, y por eso la pantalla de consentimiento lo dice antes de que aceptes.',
+      receiptsConsentNote: 'Publicar un recibo es automático para todo sujeto registrado — no requiere activarlo. Eliminar tu cuenta revoca el acceso público y borra los registros privados que lo respaldan, pero las copias que otras personas ya hayan descargado no se pueden recuperar.',
       sectionExcludes: 'Qué no puntúa nada, en ninguna parte',
       excludesIntro: 'No son olvidos. Cada uno de estos se consideró y se le dio peso cero:',
       excludeFollowers: 'Seguidores, estrellas, forks y watchers',

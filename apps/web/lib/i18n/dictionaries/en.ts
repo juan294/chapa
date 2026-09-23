@@ -442,7 +442,7 @@ export const en: Translations = {
     "compare": "Compare a receipt",
     "compareBody": "Submit the complete receipt envelope as JSON with POST to the verification URL below. A match compares all canonical receipt fields, including Craft; it does not inspect an image.",
     "replayBody": "The envelope field in the response contains all public calculation inputs and the arithmetic trace. Save that field for independent offline replay.",
-    "retention": "Available while publication consent remains in effect. Withdrawal removes public access; previously downloaded copies cannot be recalled."
+    "retention": "Available for as long as the subject stays registered. Full account deletion removes public access; previously downloaded copies cannot be recalled."
 },
   verifyDetail: {
     verifiedTitle: 'Legacy verification record',
@@ -498,14 +498,6 @@ export const en: Translations = {
     evidenceCraftDescription: 'A Craft portfolio records engineering practice: how you framed a problem, how you verified it, the judgment behind using or not using a tool, and the accepted outcome. No AI tool and no imported report is required — choosing not to delegate demonstrates judgment the same way delegating does.',
     evidenceCraftEmpty: 'No Craft episodes submitted yet.',
     evidenceCraftPresent: 'Craft episodes submitted.',
-    consentTitle: 'Publish your evidence receipt',
-    consentDescription: 'Chapa scores your activity either way. Consent decides whether that score is published as an issued v7 receipt — an immutable, public record that anyone can replay offline to check the arithmetic — or stays a legacy v6 aggregate on your badge.',
-    consentConsequence: 'Publishing is public and permanent in one respect: withdrawing later revokes access to the receipt and deletes the private records behind it, but copies already downloaded by others cannot be recalled. The receipt never contains repository names, private paths, report contents or evaluator identities.',
-    consentStateOn: 'Your evidence receipt is published.',
-    consentStateOff: 'Your evidence receipt is not published. Your badge shows a legacy v6 aggregate.',
-    consentGrant: 'Publish my receipt',
-    consentWithdraw: 'Withdraw publication',
-    consentError: 'Could not update publication consent. Try again later.',
   },
   observedScoring: {
     "uploadInsights": "Upload insights",
@@ -576,9 +568,6 @@ export const en: Translations = {
     insightsImported: 'Insights uploaded',
     insightsReportCraftResult: "Craft: {score}/100",
     insightsReportCraftDetail: "Report-derived Craft is calculated separately from your core score.",
-    insightsPublicationTitle: "Publish your score and receipt",
-    insightsPublicationBody: "Your derived numerical scores and reproducible receipt will be public. Your raw report stays private.",
-    insightsPublicationConfirm: "Publish and unlock Craft",
     insightsReplacementTitle: "Replace the report for this period",
     insightsReplacementBody: "This explicitly corrects the existing report for the same period. The new calculation may raise or lower Craft.",
     insightsReplacementConfirm: "Replace report",
@@ -1118,7 +1107,7 @@ export const en: Translations = {
       ],
       "sectionCraft": "Craft from one insights report",
       "craftBody": [
-            "Import a Claude Code /insights report and acknowledge public numerical publication in the same import action if needed. Craft is report-derived and model-estimated; a reproducible calculation does not independently verify the report.",
+            "Import a Claude Code /insights report; the resulting numerical scores publish automatically. Craft is report-derived and model-estimated; a reproducible calculation does not independently verify the report.",
             "Outcome credits are fully achieved = 1, mostly achieved = 0.7, partially achieved = 0.3, and not achieved or failed = 0. Every session stays in the denominator, including unknown and unclassified outcomes."
       ],
       "craftFormula": "Craft = 100 × (fully + 0.7 × mostly + 0.3 × partially) / totalSessions",
@@ -1167,7 +1156,7 @@ export const en: Translations = {
       "sectionReceipts": "Receipts, replay and limitations",
       "receiptsBody": [
             "The immutable public receipt records its policy and algorithm versions, exact counts, point values, original bounds, report period, coverage and calculation trace. Replaying it checks numerical reproducibility and integrity; it does not verify real-world source truth. Historical receipts keep their original rules.",
-            "Receipt publication is opt-in. Raw report text and unknown labels stay private; raw artifacts expire after 30 days, while the minimal numerical replay summary remains until withdrawal or deletion. Public report references are opaque identifiers.",
+            "Receipt publication happens automatically for every registered subject; there is no opt-in. Raw report text and unknown labels stay private; raw artifacts expire after 30 days, while the minimal numerical replay summary remains until account deletion. Public report references are opaque identifiers.",
             "Corrections preserve lineage. The optional trend is a separately labelled value with 0.85 daily retention; it never replaces the raw core or its tier."
       ],
       "sectionExcludes": "What earns no credit by itself",
@@ -1300,12 +1289,12 @@ export const en: Translations = {
         ['Elite', '85 and above', 'Exceptional breadth and depth of recorded contribution'],
       ],
       sectionReceipts: 'Receipts you can replay',
-      receiptsIntro1Prefix: 'Once you have opted in, every scored revision issues an ',
+      receiptsIntro1Prefix: 'Every scored revision issues an ',
       receiptsIntro1Highlight: 'immutable public receipt',
       receiptsIntro1Suffix: ' carrying every aggregate, coverage bound and rubric result needed to replay the arithmetic offline. You can check the number yourself instead of trusting it.',
       receiptsBody2: 'A receipt excludes private paths, repository names, report contents, tokens and evaluator identities; public criterion results expose a structured status, category, count and safe reason code only. Replay validates the arithmetic over the issued aggregates — it does not establish the truth of the underlying platform data, and issuance is not a claim that the platform data is accurate.',
       receiptsBody3: 'Corrections create a new immutable revision rather than editing an old one. Existing receipts keep their historical arithmetic and can show a superseded or retracted status without leaking the private reason for the change.',
-      receiptsConsentNote: 'Publishing a receipt is opt-in, from your settings. Until you opt in, your badge shows a legacy v6 aggregate, labelled as such. Withdrawing revokes public access and deletes the private records behind it, but copies other people already downloaded cannot be recalled — which is why the consent screen says so before you agree.',
+      receiptsConsentNote: 'Publishing a receipt is automatic for every registered subject — there is no opt-in. Deleting your account revokes public access and deletes the private records behind it, but copies other people already downloaded cannot be recalled.',
       sectionExcludes: 'What earns nothing, anywhere',
       excludesIntro: 'These are not oversights. Each one was considered and given zero weight:',
       excludeFollowers: 'Followers, stars, forks and watchers',

@@ -10,7 +10,7 @@ import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { captureServerError, captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
-import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
+import { issueScoreReceipt } from "@/lib/profile/issue-receipt";
 
 /**
  * POST /api/generate
@@ -111,11 +111,11 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
   // Compute impact (also warms any downstream caches)
   computeImpactV6(stats);
 
-  // #1311 — first badge generation is where a consented subject acquires their
+  // #1311 — first badge generation is where a registered subject acquires their
   // first v7 receipt, so the badge they are about to see is the issued revision
   // rather than a legacy aggregate that a later refresh would silently replace.
   const scoringSelection = await readScoringRenderSelection();
-  const issuance = await issueScoreReceiptIfConsented(handle, { token, scoringSelection });
+  const issuance = await issueScoreReceipt(handle, { token, scoringSelection });
 
   // LE-5-1 — the stats cache row is bound to the credential that fetched it
   // (source-context hashes the token into accessContextId), and the share

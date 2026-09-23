@@ -32,13 +32,6 @@ it("rejects a current-policy upload after rollback before private persistence", 
   expect(await response.json()).toMatchObject({ error: "policy_changed", persisted: false });
   expect(mocks.store).not.toHaveBeenCalled();
 });
-it("requires inline acknowledgment before storing or publishing", async () => {
-  mocks.store.mockResolvedValue({ status: "consent_required", persisted: false });
-  const response = await POST(request());
-  expect(response.status).toBe(409);
-  expect(await response.json()).toMatchObject({ error: "publication_acknowledgment_required", persisted: false });
-  expect(mocks.materialize).not.toHaveBeenCalled();
-});
 it("separates persistence from failed publication and makes an identical retry repair verification and purge", async () => {
   const snapshot = { receipt: await observedReceiptFixture(), trend: null };
   mocks.materialize.mockResolvedValue({ status: "stored", snapshot, freshness: "current" });

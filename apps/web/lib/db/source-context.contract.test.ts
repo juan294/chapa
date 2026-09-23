@@ -20,7 +20,7 @@ async function cleanup() {
  expect((await db().from("user_platforms").delete().eq("handle", owner)).error).toBeNull();
  expect((await db().from("scoring_v7_subjects").delete().eq("owner_handle", owner)).error).toBeNull();
 }
-beforeEach(async () => { await cleanup(); expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: window.referenceTime })).error).toBeNull(); });
+beforeEach(async () => { await cleanup(); expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull(); });
 afterEach(cleanup);
 describe("source context RPC draft contracts (requires reviewed migration045)", () => {
  it("denies browser roles all source and token mutation RPCs", () => {

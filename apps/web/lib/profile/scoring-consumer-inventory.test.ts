@@ -25,7 +25,7 @@ const INVENTORY = "docs/scoring-consumer-inventory.md";
  * this pattern the moment its JSON-LD switched from `adjustedComposite` to the
  * shared model, while still very much publishing a score. */
 const SCORED_SYMBOLS =
-  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|ScoreViewModel|explainReceipt|simulateCoreScore|adjustedComposite|compositeScore|resolveScoreModel|scoreModelFrom|readRenderableReceipt|issueScoreReceiptIfConsented|describeScoreForMetadata|PublicObservedScoringReceipt|ObservedReceiptSnapshot|observedReceiptViewModel|materializeObservedScoreReceipt|publicScoreProjection|comparePublicScores|simulateObservedScore|scoringObservation|dbReadObservedReceipt|resolvePostWriteScore|readObservedScoringHistory)\b/;
+  /\b(ImpactV6Result|PublicImpactV6Result|ClientImpactV6Result|materializeProfile|materializeImpactState|materializeDisplayProfile|materializeOrchestratedProfile|materializeScoreReceiptV7|readScoreReceiptV7|receiptViewModel|legacyViewModel|renderableScore|ScoreViewModel|explainReceipt|simulateCoreScore|adjustedComposite|compositeScore|resolveScoreModel|scoreModelFrom|readRenderableReceipt|issueScoreReceipt|describeScoreForMetadata|PublicObservedScoringReceipt|ObservedReceiptSnapshot|observedReceiptViewModel|materializeObservedScoreReceipt|publicScoreProjection|comparePublicScores|simulateObservedScore|scoringObservation|dbReadObservedReceipt|resolvePostWriteScore|readObservedScoringHistory)\b/;
 const SCAN_ROOTS = ["apps/web/app", "apps/web/components", "apps/web/lib", "scripts"];
 const NOT_A_CONSUMER = /(\.test\.|\.spec\.|__fixtures__|\/test-helpers\/|\/__mocks__\/)/;
 
@@ -93,6 +93,23 @@ function existsInRepo(path: string): boolean {
     return false;
   }
 }
+
+/**
+ * Publication consent is retired (#1335 phase 2): every registered subject is
+ * collected and published without an opt-in. This fails if consent comes
+ * back — accidentally reintroduced by a revert, a merge, or a new caller
+ * copying an old pattern — the same way `sourceFiles`/`SCORED_SYMBOLS` above
+ * catch a scored consumer going unregistered.
+ */
+describe("retired publication consent", () => {
+  const RETIRED_CONSENT = /\b(publicConsent|public_evidence_consent|PublicationConsent|publicationAcknowledged)\b/;
+  const allSourceFiles = () => sourceFiles(join(repoRoot, "apps/web"));
+
+  it("appears nowhere under apps/web", () => {
+    const hits = allSourceFiles().filter(path => RETIRED_CONSENT.test(readFileSync(join(repoRoot, path), "utf8")));
+    expect(hits).toEqual([]);
+  });
+});
 
 /** Membership does not establish correctness: run real outward projections
  * against sealed evidence and conflicting legacy fields in the same assertion. */

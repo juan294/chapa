@@ -12,7 +12,7 @@ afterAll(async () => {
   await cleanupUser(owner); await cleanupUser(reviewer);
 });
 describe("POST /api/evidence complete local workflow", () => {
-  it("supports owner no-report claims, reviewer verdicts, amendments/retractions, consent and withdrawal", async () => {
+  it("supports owner no-report claims, reviewer verdicts, amendments/retractions, and retires consent/withdrawal", async () => {
     await seedUser(owner); await seedUser(reviewer);
     const body = { action: "claim", owner, channel: "core", previousRevisionId: null, category: "performance_accessibility", artifactRevision: "sha-1",
       occurredAt: "2026-08-01T00:00:00Z", claim: "Reduced measured response time", baseline: { kind: "measured", value: "100ms" }, observedResult: "80ms",
@@ -38,16 +38,16 @@ describe("POST /api/evidence complete local workflow", () => {
     expect(corrected.status).toBe(200);
     expect((await write(owner, { action: "retract", owner, revisionId: bodyAsRecord(corrected).revisionId, rationale: "Measurement superseded" })).status).toBe(200);
     expect((await write(owner, { ...body, channel: "craft", previousRevisionId: null })).status).toBe(200);
-    expect((await write(owner, { action: "consent", owner, enabled: true, publicationAcknowledged: true })).status).toBe(200);
     const privateRead = await invokeJson(GET, { method: "GET", path: `/api/evidence?owner=${owner}`, bearer: makeCliBearer(reviewer) });
     expect(privateRead.status).toBe(200);
     expect((await write(owner, { action: "grant", owner, reviewer, enabled: false })).status).toBe(200);
     expect((await invokeJson(GET, { method: "GET", path: `/api/evidence?owner=${owner}`, bearer: makeCliBearer(reviewer) })).status).toBe(403);
-    const withdrawal = await write(owner, { action: "withdraw", owner, publicationAcknowledged: true });
-    expect(withdrawal.status).toBe(202);
-    expect(bodyAsRecord(withdrawal)).toMatchObject({ withdrawn: true, success: false, cleanup: { complete: false, status: "pending" } });
-    for (const table of ["scoring_v7_evidence", "scoring_v7_assessments", "scoring_v7_evidence_references", "scoring_v7_raw_artifacts"]) {
-      expect((await getServiceClient().from(table).select("owner_handle").eq("owner_handle", owner)).data).toEqual([]);
-    }
+    // Publication consent is retired (#1335 phase 2): the ledger no longer
+    // recognizes "consent" at all, and "withdraw" is a recognized shape only
+    // so the route can answer with a specific, honest error.
+    expect((await write(owner, { action: "consent", owner, enabled: true, publicationAcknowledged: true })).status).toBe(400);
+    const withdrawal = await write(owner, { action: "withdraw", owner });
+    expect(withdrawal.status).toBe(400);
+    expect(bodyAsRecord(withdrawal)).toEqual({ error: "retired_action" });
   });
 });
