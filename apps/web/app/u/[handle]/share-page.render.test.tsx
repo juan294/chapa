@@ -284,6 +284,14 @@ const FAKE_MATERIALIZED = {
     profileType: "collaborative",
   },
   snapshot: { date: "2026-05-03", adjustedComposite: 65, tier: "Solid" },
+  // #1331 — configCacheable now requires exactly freshness === "current"
+  // (was `!== "unavailable"`, which `undefined` also satisfied).
+  scoring: {
+    policyVersion: "v6",
+    freshness: "current",
+    tier: "Solid",
+    composite: { kind: "point", value: 65, display: 65 },
+  },
 };
 
 beforeEach(() => {

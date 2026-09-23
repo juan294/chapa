@@ -175,6 +175,25 @@ describe("ImpactDashboard", () => {
     expect(screen.getByTestId("stats-grid")).toBeTruthy();
   });
 
+  // #1331 — a durable stored-badge fallback never has real per-day data
+  // (`stats.heatmapData` is always `[]`), so the heatmap must be hidden
+  // rather than drawn as a fabricated "no activity" grid. StatsGrid still
+  // renders — its counts (activeDays, commits, etc.) are real durable values.
+  it("hides the activity heatmap but keeps other sections when activityUnavailable is set", () => {
+    render(
+      <ImpactDashboard
+        impact={mockImpact}
+        stats={mockStats}
+        activityUnavailable
+      />,
+    );
+
+    expect(screen.queryByTestId("activity-heatmap")).toBeNull();
+    expect(screen.getByTestId("dimension-cards-row")).toBeTruthy();
+    expect(screen.getByTestId("coaching-insights")).toBeTruthy();
+    expect(screen.getByTestId("stats-grid")).toBeTruthy();
+  });
+
   // ----------------------------------------------------------------
   // 2. Passes trend/diff data to child components when provided as props
   // ----------------------------------------------------------------

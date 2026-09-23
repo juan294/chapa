@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-09-23
+
+### Fixed
+
+- **The share page shows the stored profile when live sources are
+  unavailable.** In v3.0.1 the badge rendered the stored score, but the share
+  page breakdown still said "Impact data could not be loaded". The share page
+  now shows the stored score, tier, archetype and dimensions with a notice that
+  names the stored date. It hides the activity heatmap instead of drawing an
+  empty one, and it mints no verification record, writes no snapshot and writes
+  no badge cache from stored data (#1331).
+- **The share page never caches a stale badge render.** Its badge cache write
+  now requires current data, the same rule the badge route uses.
+
 ## [3.0.1] - 2026-09-22
 
 ### Fixed
@@ -1696,7 +1710,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v3.0.2...HEAD
+[3.0.2]: https://github.com/juan294/chapa/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/juan294/chapa/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/juan294/chapa/compare/v2.29.5...v3.0.0
 [2.24.1]: https://github.com/juan294/chapa/compare/v2.24.0...v2.24.1

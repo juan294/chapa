@@ -63,6 +63,11 @@ interface Props {
   embedHtml?: string;
   receiptExplanation?: ReceiptExplanation | null;
   scoring?: ScoreViewModel | null;
+  /** #1331 — set when `stats`/`impact` are a durable stored-badge projection
+   *  (live materialization was unavailable), never a real-time fetch. Drives
+   *  the breakdown's stale notice and hides the activity heatmap, which would
+   *  otherwise draw an empty (falsely "no activity") grid. */
+  staleFallback?: { observedAt: string } | null;
 }
 
 export function SharePageOwnerContentLazy(props: Props) {

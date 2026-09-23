@@ -5,6 +5,7 @@ import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { readPublicObservedScore } from "./post-write-score";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import { legacyViewModel, type ScoreViewModel } from "./score-view-model";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 /**
  * The durable, non-activity counts a stored badge can truthfully draw — the
@@ -192,4 +193,18 @@ export function storedBadgeRenderInputs(
     },
     impact: stored.legacyImpact,
   };
+}
+
+/**
+ * The stored-badge fallback's activity disclosure, date-interpolated from
+ * `stored.observedAt`. Shared by every stored-fallback renderer (the badge
+ * route's SVG and the share page's inline SVG + breakdown notice) so they
+ * never independently reformat the same fact — `t` is the caller's own
+ * already-resolved translator (`getServerT(locale)` on the server), and the
+ * dictionary key is `badge.activityUnavailable`.
+ */
+export function storedBadgeActivityUnavailable(t: (key: string) => string, observedAt: string): string {
+  return interpolate(t("badge.activityUnavailable"), {
+    date: observedAt.slice(0, 10),
+  });
 }

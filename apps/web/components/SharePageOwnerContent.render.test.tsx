@@ -39,7 +39,12 @@ vi.mock("@/components/ImpactBreakdown", () => ({
 }));
 
 vi.mock("@/components/dashboard/ImpactDashboard", () => ({
-  ImpactDashboard: () => <div data-testid="impact-dashboard" />,
+  ImpactDashboard: (props: { activityUnavailable?: boolean }) => (
+    <div
+      data-testid="impact-dashboard"
+      data-activity-unavailable={String(!!props.activityUnavailable)}
+    />
+  ),
 }));
 
 vi.mock("@/components/CopyButton", () => ({
@@ -533,6 +538,47 @@ describe("SharePageOwnerContent — render", () => {
     // English: shareOwner.embedBadge = 'Embed this badge'
     expect(screen.getByText("Embed this badge")).toBeTruthy();
     expect(screen.queryByTestId("data-sources")).toBeNull();
+  });
+
+  // #1331 — a durable stored-badge fallback: the breakdown must visibly
+  // disclose the stored date and that live sources are unavailable, and must
+  // never let ImpactDashboard draw the activity heatmap from a fabricated
+  // (empty) heatmapData.
+  it("shows a stale notice naming the stored date and hides the activity heatmap when staleFallback is set", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={MOCK_IMPACT}
+        staleFallback={{ observedAt: "2026-04-16T00:00:00.000Z" }}
+      />,
+    );
+
+    // English: shareOwner.staleDataNotice interpolated with the stored date.
+    expect(screen.getByRole("status")).toBeTruthy();
+    expect(screen.getByText(/2026-04-16/)).toBeTruthy();
+    expect(
+      screen.getByTestId("impact-dashboard").getAttribute("data-activity-unavailable"),
+    ).toBe("true");
+  });
+
+  it("shows no stale notice and passes activityUnavailable=false when staleFallback is absent", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={MOCK_IMPACT}
+      />,
+    );
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(
+      screen.getByTestId("impact-dashboard").getAttribute("data-activity-unavailable"),
+    ).toBe("false");
   });
 });
 

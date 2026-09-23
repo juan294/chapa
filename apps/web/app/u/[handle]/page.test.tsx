@@ -27,6 +27,8 @@ const {
   mockCaptureServerError,
   mockCacheGet,
   mockResolveBadgeConfigSnapshot,
+  mockReadStoredBadgeProfile,
+  mockCaptureServerEvent,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -46,6 +48,13 @@ const {
   mockCaptureServerError: vi.fn(),
   mockCacheGet: vi.fn(),
   mockResolveBadgeConfigSnapshot: vi.fn(),
+  // #1331 — readStoredBadgeProfile is the only export of
+  // lib/profile/stored-badge-profile mocked out; storedBadgeRenderInputs and
+  // storedBadgeActivityUnavailable stay real (pure projections) via
+  // importOriginal below, so tests exercise the same projection logic the
+  // badge route uses rather than a duplicate.
+  mockReadStoredBadgeProfile: vi.fn(),
+  mockCaptureServerEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/render/badge-config", async (importOriginal) => {
@@ -92,7 +101,20 @@ vi.mock("@/lib/feature-flags", () => ({
 // failure via captureServerError, mirroring the badge route's #1013 pattern.
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
+  captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
 }));
+
+// #1331 — only readStoredBadgeProfile (the durable-store read) is mocked;
+// storedBadgeRenderInputs/storedBadgeActivityUnavailable stay the real, pure
+// projections so a test failure here reflects page.tsx wiring, not a
+// hand-rolled duplicate of the projection logic.
+vi.mock("@/lib/profile/stored-badge-profile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/profile/stored-badge-profile")>();
+  return {
+    ...actual,
+    readStoredBadgeProfile: (...args: unknown[]) => mockReadStoredBadgeProfile(...args),
+  };
+});
 
 vi.mock("@/lib/validation", () => ({
   isValidHandle: (...args: unknown[]) => mockIsValidHandle(...args),
@@ -264,6 +286,79 @@ const FAKE_MATERIALIZED = {
     profileType: "collaborative",
   },
   snapshot: { date: "2026-04-17", adjustedComposite: 65, tier: "Solid" },
+  // #1331 — a real materialized profile always carries a scoring view model;
+  // `freshness: "current"` is what configCacheable now requires (previously
+  // `!== "unavailable"`, which undefined also satisfied — this fixture used
+  // to omit `scoring` entirely and still passed the pre-#1331 gate).
+  scoring: {
+    policyVersion: "v6",
+    freshness: "current",
+    tier: "Solid",
+    archetype: "Builder",
+    identity: null,
+    composite: { kind: "point", value: 65, display: 65 },
+  },
+};
+
+// #1331 — a durable stored-badge fallback: what
+// `readStoredBadgeProfile` returns when live materialization is null but a
+// committed legacy snapshot exists. `context` deliberately omits
+// heatmap/avatar/displayName (never persisted in a MetricsSnapshot) —
+// storedBadgeRenderInputs (the real, unmocked projection) turns this into
+// the same shape the badge route renders from.
+const FAKE_STORED_PROFILE = {
+  kind: "stored" as const,
+  handle: "testuser",
+  policyVersion: "v6" as const,
+  observedAt: "2026-04-16T00:00:00.000Z",
+  scoring: {
+    policyVersion: "v6" as const,
+    handle: "testuser",
+    identity: null,
+    window: null,
+    dimensions: {
+      delivery: { kind: "point" as const, value: 70, display: 70 },
+      quality: { kind: "point" as const, value: 60, display: 60 },
+      consistency: { kind: "point" as const, value: 65, display: 65 },
+      breadth: { kind: "point" as const, value: 55, display: 55 },
+    },
+    composite: { kind: "point" as const, value: 62, display: 62 },
+    tier: "Solid" as const,
+    archetype: "Builder" as const,
+    craft: null,
+    coverage: [],
+    exclusions: [],
+    limitations: ["legacy_aggregate"] as const,
+    freshness: "stale" as const,
+  },
+  legacyImpact: {
+    handle: "testuser",
+    profileType: "collaborative" as const,
+    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+    archetype: "Builder" as const,
+    compositeScore: 62,
+    confidence: 80,
+    confidencePenalties: [],
+    adjustedComposite: 62,
+    tier: "Solid" as const,
+    computedAt: "2026-04-16T00:00:00.000Z",
+  },
+  context: {
+    commitsTotal: 42,
+    prsMergedCount: 10,
+    prsMergedWeight: 12,
+    reviewsSubmittedCount: 5,
+    issuesClosedCount: 2,
+    reposContributed: 3,
+    activeDays: 40,
+    linesAdded: 100,
+    linesDeleted: 50,
+    totalStars: 5,
+    totalForks: 1,
+    totalWatchers: 1,
+    topRepoShare: 0.2,
+    maxCommitsIn10Min: 2,
+  },
 };
 
 async function renderPage(handle = "testuser") {
@@ -292,6 +387,10 @@ describe("SharePage /u/[handle]", () => {
     mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
     mockHeaders.mockResolvedValue({ get: () => null });
     mockCaptureServerError.mockResolvedValue(undefined);
+    mockCaptureServerEvent.mockResolvedValue(undefined);
+    // #1331 — no durable stored profile by default; tests that exercise the
+    // fallback override this per-test.
+    mockReadStoredBadgeProfile.mockResolvedValue(null);
     // No session by default — most tests exercise the visitor path. Tests
     // that need owner behavior override this per-test.
     mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
@@ -812,6 +911,150 @@ describe("SharePage /u/[handle]", () => {
 
     expect(mockAfter).not.toHaveBeenCalled();
     expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+  });
+
+  // badge-source-outage-resilience (2026-09-22) / #1331 — when live
+  // materialization is null (not the GitHub not-found sentinel, covered
+  // separately below) but a durable stored profile exists, the share page
+  // renders it instead of the generic empty state: the same degraded
+  // disclosure the badge route's own `!materialized` branch draws, and never
+  // the normal SVG cache, verification, or profile side effects.
+  describe("stored-badge fallback (#1331)", () => {
+    beforeEach(() => {
+      mockMaterializePublicProfile.mockResolvedValue(null);
+      mockReadStoredBadgeProfile.mockResolvedValue(FAKE_STORED_PROFILE);
+    });
+
+    it("reads the stored profile bound to the same scoring selection", async () => {
+      await renderPage();
+
+      expect(mockReadStoredBadgeProfile).toHaveBeenCalledWith(
+        "testuser",
+        expect.objectContaining({ machinePolicy: "v6" }),
+      );
+    });
+
+    it("renders the inline SVG from the stored score/dimensions with the badge route's degraded disclosure", async () => {
+      await renderPage();
+
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        expect.objectContaining({ handle: "testuser", commitsTotal: 42, heatmapData: [] }),
+        FAKE_STORED_PROFILE.legacyImpact,
+        expect.objectContaining({
+          scoring: FAKE_STORED_PROFILE.scoring,
+          degraded: {
+            reason: "live_sources_unavailable",
+            observedAt: FAKE_STORED_PROFILE.observedAt,
+            activityAvailable: false,
+          },
+          strings: expect.objectContaining({
+            activityUnavailable: expect.stringContaining("2026-04-16"),
+          }),
+        }),
+      );
+    });
+
+    it("passes the stored date and scoring model to SharePageOwnerContentLazy as staleFallback", async () => {
+      const result = await renderPage();
+
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      expect(ownerEl!.props.staleFallback).toEqual({ observedAt: FAKE_STORED_PROFILE.observedAt });
+      expect(ownerEl!.props.scoring).toEqual(FAKE_STORED_PROFILE.scoring);
+    });
+
+    it("redacts confidence from the stored legacy impact for a visitor, same as a live profile (#1067/#1122)", async () => {
+      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
+
+      const result = await renderPage();
+
+      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_STORED_PROFILE.legacyImpact);
+      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
+      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
+      expect("confidence" in impactProp).toBe(false);
+      expect("confidencePenalties" in impactProp).toBe(false);
+    });
+
+    it("never calls resolveBadgeVerification, runs no after() side effects, and writes no normal SVG cache", async () => {
+      await renderPage();
+
+      // resolveBadgeVerification's own v6 branch delegates to
+      // getPublicProfileVerification (mocked as mockGetPublicProfileVerification);
+      // it is never invoked at all here because resolveBadgeVerification stays
+      // gated on `materialized`, which is null for a stored fallback.
+      expect(mockGetPublicProfileVerification).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
+
+    it("reports the bounded stored-fallback telemetry event (policy + date only)", async () => {
+      await renderPage();
+
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith("badge_stored_fallback", {
+        policyVersion: "v6",
+        observedDate: "2026-04-16",
+      });
+    });
+
+    it("behaves consistently with the badge route in read-only smoke mode: still renders the stored fallback with no side effects", async () => {
+      await SharePageContent({ handle: "testuser", readOnly: true });
+
+      expect(mockReadStoredBadgeProfile).toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+      expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
+    });
+
+    it("keeps today's empty state when materialization is null and no stored profile exists (cold handle)", async () => {
+      mockReadStoredBadgeProfile.mockResolvedValue(null);
+
+      await renderPage();
+
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+    });
+
+    it("keeps the 404 behavior for an unknown GitHub handle and never consults the stored fallback", async () => {
+      mockMaterializePublicProfile.mockResolvedValue(githubUserNotFound("ghost"));
+
+      await expect(renderPage("ghost")).rejects.toThrow("NOT_FOUND");
+
+      expect(mockReadStoredBadgeProfile).not.toHaveBeenCalled();
+    });
+  });
+
+  // badge-source-outage-resilience (2026-09-22) / #1331 — the normal SVG
+  // cache is only ever written for a `"current"` read, mirroring the badge
+  // route's own `freshnessCacheable` gate. A `"stale"` exact-bound aggregate
+  // (or any freshness other than `"current"`) must never publish into the
+  // shared cache the badge route and future share-page visits both read.
+  describe("cache eligibility requires freshness === 'current' (#1331)", () => {
+    it("writes the normal SVG cache for a current live render", async () => {
+      await renderPage();
+
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockWriteBadgeSvgCache).toHaveBeenCalled();
+    });
+
+    it("does not write the normal SVG cache when scoring freshness is 'stale'", async () => {
+      mockMaterializePublicProfile.mockResolvedValue({
+        ...FAKE_MATERIALIZED,
+        scoring: { ...FAKE_MATERIALIZED.scoring, freshness: "stale" },
+      });
+
+      await renderPage();
+
+      // materialized is non-null here, so after() still fires (durable side
+      // effects still run for an exact-bound stale aggregate) but the cache
+      // write itself must be skipped.
+      expect(mockAfter).toHaveBeenCalledTimes(1);
+      const callback = mockAfter.mock.calls[0][0];
+      await callback();
+
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
   });
 
   it("tolerates avatar fetch failure for inline rendering", async () => {

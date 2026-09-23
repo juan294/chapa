@@ -35,9 +35,15 @@ import {
   redactImpactForVisitor,
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
+import {
+  readStoredBadgeProfile,
+  storedBadgeRenderInputs,
+  storedBadgeActivityUnavailable,
+  type StoredBadgeProfile,
+} from "@/lib/profile/stored-badge-profile";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { isGitHubUserNotFound } from "@/lib/github/not-found";
-import { captureServerError } from "@/lib/analytics/server-errors";
+import { captureServerError, captureServerEvent } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { isWebmcpEnabled } from "@/lib/feature-flags";
@@ -193,6 +199,11 @@ export async function SharePageContent({
   locale?: Locale;
 }) {
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
+  // Hoisted above every other statement (a pure, sync dictionary lookup with
+  // no data dependency) so the stored-fallback render branch below — which
+  // needs a translator for its degraded disclosure — and the pre-existing
+  // uses further down share one instance instead of resolving it twice.
+  const t = getServerT(locale);
 
   // #1067 — resolve the requester's session server-side (the route is
   // dynamic per #1066) so owner-only confidence data can be redacted below
@@ -249,14 +260,35 @@ export async function SharePageContent({
   if (isGitHubUserNotFound(materialization)) notFound();
   const materialized = materialization;
   const isOwner = session?.login === handle;
-  const stats = materialized?.stats ?? null;
+
+  // badge-source-outage-resilience (2026-09-22) / #1331 — live materialization
+  // failed (a linked-source refresh outage, a GitHub rejection, etc.), but a
+  // durable last committed receipt/snapshot may still exist. Mirrors the
+  // badge route's own `!materialized` branch exactly (`stored-badge-profile.ts`):
+  // a stored fallback is a distinct, non-`MaterializedProfile` projection, so
+  // it can never reach `resolveBadgeVerification`, `runPublicProfileSideEffects`,
+  // snapshot persistence, or the normal SVG cache write below — all three stay
+  // gated on `materialized` alone, unchanged, and `materialized` stays null here.
+  const stored: StoredBadgeProfile | null = materialized
+    ? null
+    : await readStoredBadgeProfile(handle, scoringSelection);
+  const storedInputs = stored ? storedBadgeRenderInputs(stored) : null;
+
+  const stats = materialized?.stats ?? storedInputs?.stats ?? null;
   // `impact` stays the FULL, unredacted result — it feeds renderBadgeSvg and
   // personJsonLd below (and, via `materialized` itself, the snapshot/HMAC
   // record in the deferred work further down). Only the copy handed to the
   // client component tree is redacted, via `impactForClient` near the
-  // bottom of this function.
-  const impact = materialized?.displayImpact ?? null;
+  // bottom of this function. For a stored fallback this is the durable
+  // snapshot's legacy projection — still full, never pre-redacted, so the
+  // SAME redaction step below governs both sources identically.
+  const impact = materialized?.displayImpact ?? storedInputs?.impact ?? null;
   const craftResult = materialized?.craftResult ?? null;
+  // The one scoring authority both a live and a stored render draw from —
+  // v7.2 receipt authority when present, never mixed with a v6 aggregate
+  // (`stored.scoring`/`materialized.scoring` are each already one or the
+  // other, never both).
+  const scoringModel = materialized?.scoring ?? stored?.scoring ?? null;
   const verification = materialized
     ? await resolveBadgeVerification(materialized)
     : null;
@@ -271,7 +303,7 @@ export async function SharePageContent({
   let configRevision: number | null = null;
   let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
 
-  if (!cachedSvg && stats && impact) {
+  if (!cachedSvg && stats && impact && materialized) {
     // Cache miss — render inline. Avatar fetch is best-effort with a tight
     // 250ms deadline (#800) so a slow external image server can't block
     // TTFB. The /u/[handle]/badge.svg route uses a longer bounded deadline on
@@ -287,12 +319,16 @@ export async function SharePageContent({
       avatarCachePolicy = getBadgeAvatarCachePolicy(avatarOutcome);
     }
     const configSnapshot = await resolveBadgeConfigSnapshot(handle);
-    configCacheable = configSnapshot.cacheable && materialized?.scoring?.freshness !== "unavailable";
+    // badge-source-outage-resilience (2026-09-22) — requiring exactly
+    // `"current"` (not merely `!== "unavailable"`) keeps a `"stale"`
+    // exact-bound aggregate render out of the normal SVG cache, mirroring
+    // the badge route's own `freshnessCacheable` gate (#1331).
+    configCacheable = configSnapshot.cacheable && materialized.scoring?.freshness === "current";
     configRevision = configSnapshot.revision;
     inlineSvg = renderBadgeSvg(stats, impact, {
       // `impact` is non-null here only because `materialized` was; the optional
       // read keeps the compiler honest and falls back to the same legacy model.
-      scoring: materialized?.scoring,
+      scoring: materialized.scoring,
       avatarDataUri,
       // #1191 — this render writes to the same cache slot the badge route
       // reads, so it must use the same config.
@@ -301,9 +337,40 @@ export async function SharePageContent({
       verificationDate: verification?.date,
       // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
       // so content and key are always for the same locale.
-      strings: badgeLocale.stringsFor(materialized?.scoring?.tier ?? impact.tier),
+      strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? impact.tier),
     });
     renderedFresh = true;
+  } else if (!cachedSvg && stats && impact && stored) {
+    // badge-source-outage-resilience (2026-09-22) / #1331 — the stored
+    // fallback's own render: the same degraded disclosure the badge route's
+    // `!materialized` branch draws (`stored-badge-profile.ts`'s
+    // `storedBadgeRenderInputs`/`storedBadgeActivityUnavailable`), never
+    // eligible for the normal SVG cache — `renderedFresh` stays false, and
+    // the deferred cache-write/side-effect block below stays gated on
+    // `materialized`, which is null here, so it never runs for this branch.
+    const configSnapshot = await resolveBadgeConfigSnapshot(handle);
+    inlineSvg = renderBadgeSvg(stats, impact, {
+      scoring: stored.scoring,
+      config: configSnapshot.config,
+      degraded: {
+        reason: "live_sources_unavailable",
+        observedAt: stored.observedAt,
+        activityAvailable: false,
+      },
+      strings: {
+        ...badgeLocale.stringsFor(stored.scoring.tier ?? null),
+        activityUnavailable: storedBadgeActivityUnavailable((key) => t(key) as string, stored.observedAt),
+      },
+    });
+
+    // Bounded telemetry: fallback kind + date only, same event the badge
+    // route emits for the same fallback.
+    fireAndForget(() =>
+      captureServerEvent("badge_stored_fallback", {
+        policyVersion: stored.policyVersion,
+        observedDate: stored.observedAt.slice(0, 10),
+      }),
+    );
   }
 
   // Deferred work: verification storage, tracking, snapshots, and an eligible
@@ -376,7 +443,6 @@ export async function SharePageContent({
   // handle-bearing clipboard content — this used to be an independent,
   // hardcoded-English, non-handle-bearing literal. The alt text form
   // matches the HTML embed's own (`${badgeAltOf} ${handle}`).
-  const t = getServerT(locale);
   // #1167 (UX-B1) — real routes (/about, /about/scoring, /verify) for the
   // server Navbar's center nav, NOT the landing page's `landing.navLinks`
   // hash anchors (`#features`, etc.), which are meaningless off that page.
@@ -388,7 +454,7 @@ export async function SharePageContent({
 
   const displayLabel = stats?.displayName ?? handle;
 
-  const scoreDescription = describeScoreForMetadata(materialized?.scoring ?? null);
+  const scoreDescription = describeScoreForMetadata(scoringModel);
 
   // #1311 — a v7 subject's breakdown is the receipt's own arithmetic. Resolved
   // here rather than in the client tree: `explainReceipt` reads the sealed
@@ -542,7 +608,8 @@ export async function SharePageContent({
           embedMarkdown={embedMarkdown}
           embedHtml={embedHtml}
           receiptExplanation={receiptExplanation}
-          scoring={materialized?.scoring ?? null}
+          scoring={scoringModel}
+          staleFallback={stored ? { observedAt: stored.observedAt } : null}
         />
       </div>
 
