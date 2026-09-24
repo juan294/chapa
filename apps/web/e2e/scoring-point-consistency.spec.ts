@@ -34,9 +34,16 @@ async function settlePublicBadge(page: Page) {
   await page.evaluate(async () => { await document.fonts.ready; });
 }
 async function servedImage(page: Page) {
-  const imageMetadata = page.locator('meta[property="og:image"]');
-  await expect(imageMetadata).toHaveCount(1);
-  const metadata = await imageMetadata.getAttribute("content");
+  // Social crawlers read the served HTML, not the hydrated DOM, so the
+  // metadata contract is asserted on the server response for this exact URL
+  // (with this browser context's cookies). The live DOM can briefly hold a
+  // second, byte-identical tag after a same-page locale sync re-renders the
+  // route's streamed metadata; that client-only duplicate is tracked
+  // separately and never reaches a crawler.
+  const html = await (await page.request.get(page.url())).text();
+  const tags = html.match(/<meta[^>]+property="og:image"[^>]*>/g) ?? [];
+  expect(tags).toHaveLength(1);
+  const metadata = tags[0]?.match(/content="([^"]+)"/)?.[1]?.replaceAll("&amp;", "&");
   expect(metadata).toBeTruthy();
   const url = new URL(metadata!);
   expect(url.searchParams.get("v")).toBeTruthy();

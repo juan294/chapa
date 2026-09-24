@@ -41,7 +41,11 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
 
 test('language changes preserve relevant search and hash in both directions', async ({ page }) => {
   await page.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
-  await page.goto('/?lang=en&source=redesign#features', { waitUntil: 'networkidle' });
+  // No `networkidle`: under full parallel load the shared server never goes
+  // quiet for 500ms. The language control being visible and enabled is the
+  // real readiness gate for the clicks below.
+  await page.goto('/?lang=en&source=redesign#features');
+  await expect(page.getByRole('button', { name: 'EN', exact: true })).toBeEnabled();
   for (const [current, next, option] of [['EN', 'es', 'Español'], ['ES', 'en', 'English']] as const) {
     await page.getByRole('button', { name: current, exact: true }).click();
     await page.getByRole('option', { name: option, exact: true }).click();
