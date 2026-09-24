@@ -40,17 +40,10 @@ const MOCK_ADMIN_RESULT = {
       registeredAt: "2025-06-01T00:00:00Z",
       lastSnapshotDate: "2025-06-01",
       fetchedAt: "2025-06-01T12:00:00Z",
-      commitsTotal: 100,
-      prsMergedCount: 20,
-      reviewsSubmittedCount: 15,
-      activeDays: 180,
-      reposContributed: 8,
-      totalStars: 50,
       archetype: "Builder",
       tier: "Solid",
       adjustedComposite: 65,
       rawScore: 60,
-      confidence: 85,
     },
   ],
   total: 1,
@@ -243,13 +236,6 @@ describe("GET /api/admin/users", () => {
     expect(user).toHaveProperty("registeredAt");
     expect(user).toHaveProperty("lastSnapshotDate");
     expect(user).toHaveProperty("fetchedAt");
-    expect(user).toHaveProperty("commitsTotal");
-    expect(user).toHaveProperty("prsMergedCount");
-    expect(user).toHaveProperty("reviewsSubmittedCount");
-    expect(user).toHaveProperty("activeDays");
-    expect(user).toHaveProperty("reposContributed");
-    expect(user).toHaveProperty("totalStars");
-    expect(user).toHaveProperty("confidence");
     expect(user).toHaveProperty("archetype");
     expect(user).toHaveProperty("tier");
     expect(user).toHaveProperty("adjustedComposite");
@@ -286,9 +272,7 @@ describe("GET /api/admin/users", () => {
 
   it("accepts all valid sort fields", async () => {
     const validFields = [
-      "handle", "adjustedComposite", "rawScore", "confidence",
-      "commitsTotal", "prsMergedCount", "reviewsSubmittedCount",
-      "activeDays", "totalStars", "tier", "archetype",
+      "handle", "adjustedComposite", "rawScore", "tier", "archetype",
       "registeredAt", "lastSnapshotDate",
     ];
 

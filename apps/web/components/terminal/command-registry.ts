@@ -93,13 +93,6 @@ const SORT_FIELD_ALIASES: Record<string, string> = {
   archetype: "archetype",
   tier: "tier",
   score: "adjustedComposite",
-  confidence: "confidence",
-  conf: "confidence",
-  commits: "commitsTotal",
-  prs: "prsMergedCount",
-  reviews: "reviewsSubmittedCount",
-  days: "activeDays",
-  stars: "totalStars",
   updated: "lastSnapshotDate",
   registered: "registeredAt",
 };

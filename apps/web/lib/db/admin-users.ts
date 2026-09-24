@@ -45,12 +45,6 @@ export type AdminSortField =
   | "handle"
   | "adjustedComposite"
   | "rawScore"
-  | "confidence"
-  | "commitsTotal"
-  | "prsMergedCount"
-  | "reviewsSubmittedCount"
-  | "activeDays"
-  | "totalStars"
   | "tier"
   | "archetype"
   | "registeredAt"
@@ -76,21 +70,10 @@ export interface AdminUserEntry {
   registeredAt: string;
   lastSnapshotDate: string | null;
   fetchedAt: string | null;
-  /** Raw activity counts are no longer sourced from this view (#1335 —
-   * their only source, `metrics_snapshots`, is retired). Always null;
-   * kept as fields so existing admin UI columns keep typechecking. */
-  commitsTotal: number | null;
-  prsMergedCount: number | null;
-  reviewsSubmittedCount: number | null;
-  activeDays: number | null;
-  reposContributed: number | null;
-  totalStars: number | null;
   archetype: string | null;
   tier: string | null;
   adjustedComposite: number | null;
   rawScore: number | null;
-  /** Legacy v6 confidence no longer exists; always null. */
-  confidence: number | null;
 }
 
 export interface AdminUserResult {
@@ -105,11 +88,8 @@ export interface AdminUserResult {
 // Sort field → DB column mapping
 // ---------------------------------------------------------------------------
 
-/** Sort columns on the current receipt projection. Fields with no v7.2
- * source (commitsTotal, prsMergedCount, reviewsSubmittedCount, activeDays,
- * totalStars, confidence) fall back to `current_display_score` rather than
- * a column this module no longer reads for display. */
-const SORT_COLUMN_MAP: Partial<Record<AdminSortField, string>> = {
+/** Sort columns on the current receipt projection. */
+const SORT_COLUMN_MAP: Record<AdminSortField, string> = {
   handle: "handle",
   adjustedComposite: "current_display_score",
   rawScore: "current_display_score",
@@ -120,7 +100,7 @@ const SORT_COLUMN_MAP: Partial<Record<AdminSortField, string>> = {
 };
 
 function mapSortField(field: AdminSortField): string {
-  return SORT_COLUMN_MAP[field] ?? "current_display_score";
+  return SORT_COLUMN_MAP[field];
 }
 
 // ---------------------------------------------------------------------------
@@ -137,17 +117,10 @@ function rowToAdminUser(row: AdminUserRow): AdminUserEntry {
     registeredAt: row.registered_at,
     lastSnapshotDate: hasReceipt ? row.current_snapshot_date ?? null : null,
     fetchedAt: hasReceipt ? row.current_fetched_at ?? null : null,
-    commitsTotal: null,
-    prsMergedCount: null,
-    reviewsSubmittedCount: null,
-    activeDays: null,
-    reposContributed: null,
-    totalStars: null,
     archetype: hasReceipt ? row.current_archetype ?? null : null,
     tier: hasReceipt ? row.current_tier ?? null : null,
     adjustedComposite: hasReceipt ? row.current_display_score ?? null : null,
     rawScore: hasReceipt ? row.current_display_score ?? null : null,
-    confidence: null,
     ...(hasReceipt && {
       policyVersion: "v7.2" as const,
       exactScore: row.current_exact_score ?? null,

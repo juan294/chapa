@@ -12,17 +12,10 @@ export interface AdminUser {
   registeredAt: string;
   lastSnapshotDate: string | null;
   fetchedAt: string | null;
-  commitsTotal: number | null;
-  prsMergedCount: number | null;
-  reviewsSubmittedCount: number | null;
-  activeDays: number | null;
-  reposContributed: number | null;
-  totalStars: number | null;
   archetype: string | null;
   tier: string | null;
   adjustedComposite: number | null;
   rawScore: number | null;
-  confidence: number | null;
 }
 
 export interface PaginatedResponse {
@@ -39,12 +32,6 @@ export type SortField =
   | "tier"
   | "adjustedComposite"
   | "rawScore"
-  | "confidence"
-  | "commitsTotal"
-  | "prsMergedCount"
-  | "reviewsSubmittedCount"
-  | "activeDays"
-  | "totalStars"
   | "registeredAt"
   | "lastSnapshotDate";
 

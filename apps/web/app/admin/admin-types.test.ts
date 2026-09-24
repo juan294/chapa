@@ -21,17 +21,10 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     registeredAt: "2025-06-01T00:00:00Z",
     lastSnapshotDate: null,
     fetchedAt: null,
-    commitsTotal: null,
-    prsMergedCount: null,
-    reviewsSubmittedCount: null,
-    activeDays: null,
-    reposContributed: null,
-    totalStars: null,
     archetype: null,
     tier: null,
     adjustedComposite: null,
     rawScore: null,
-    confidence: null,
     ...overrides,
   };
 }
