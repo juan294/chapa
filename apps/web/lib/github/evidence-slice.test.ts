@@ -90,13 +90,19 @@ describe("collectGitHubSlice", () => {
       })) } };
     };
     const filesHandler: Handler = ({ id }) => ({ node: { files: page([{ path: `file-${id as string}.md` }]) } });
-    const commitsHandler: Handler = ({ id }) => ({ node: { isEmpty: false, defaultBranchRef: { target: { history: page([
+    const commitsSince: unknown[] = [];
+    const commitsHandler: Handler = ({ id, since }) => { commitsSince.push(since); return { node: { isEmpty: false, defaultBranchRef: { target: { history: page([
       { id: `${id as string}-C1`, oid: `${id as string}-C1`, author: { user: actor }, authoredDate: "2026-01-01T00:00:00.000Z", additions: 1, deletions: 0 },
       { id: `${id as string}-C2`, oid: `${id as string}-C2`, author: { user: actor }, authoredDate: "2026-01-02T00:00:00.000Z", additions: 1, deletions: 0 },
-    ]) } } } });
+    ]) } } } }; };
     mockApi({ V7MergedChanges: mergedHandler, V7Files: filesHandler, V7Commits: commitsHandler });
 
     const result = await runToCompletion(5);
+    // History is bounded by committed date with a 30-day margin before the
+    // window, so authored-date filtering (inWindow) still sees every commit.
+    expect(commitsSince.length).toBeGreaterThan(0);
+    const expectedSince = new Date(Date.parse(`${window.startInclusive.slice(0, 10)}T00:00:00.000Z`) - 30 * 86_400_000).toISOString();
+    expect(new Set(commitsSince)).toEqual(new Set([expectedSince]));
     expect(result.slices).toBeGreaterThan(1);
     expect(result.events.filter((e) => e.kind === "accepted_change")).toHaveLength(1800);
     expect(result.events.filter((e) => e.kind === "authored_commit")).toHaveLength(REPO_COUNT * 2);
