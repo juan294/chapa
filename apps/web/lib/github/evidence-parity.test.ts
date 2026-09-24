@@ -141,6 +141,20 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
     expect(result.done).toBe(false);
     expect(result.stop).toMatchObject({ provider: "github", operation: "merged", stopKind: "rate_limited", httpStatus: 403 });
   });
+  it("classifies GitHub's real GraphQL rate-limit body (HTTP 200, type RATE_LIMIT) as rate_limited with the header reset time", async () => {
+    // Captured from api.github.com on 2026-09-24: a 200 whose errors entry
+    // says RATE_LIMIT / graphql_rate_limit, not RATE_LIMITED. Seven jobs
+    // failed as "graphql" on this shape when the shared allowance ran out.
+    const resetEpoch = Math.floor(Date.now() / 1000) + 600;
+    mockApi({ V7MergedChanges: () => new Response(JSON.stringify({ errors: [{ type: "RATE_LIMIT", code: "graphql_rate_limit", message: "API rate limit already exceeded for user ID 1." }] }), {
+      status: 200, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(resetEpoch) },
+    }) });
+    const result = await collectGitHubSlice(input, credential, EMPTY_CHECKPOINT, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
+    expect(result.done).toBe(false);
+    expect(result.stop).toMatchObject({ provider: "github", operation: "merged", stopKind: "rate_limited" });
+    expect(result.stop?.retryAfterSeconds).toBeGreaterThan(590);
+    expect(result.stop?.retryAfterSeconds).toBeLessThanOrEqual(601);
+  });
   it("classifies an unparseable accepted-change date as a parse stop, still source_error-equivalent", async () => {
     mockApi({ V7MergedChanges: () => ({ search: { ...page([pr("PR1", { mergedAt: "" })]), issueCount: 1 } }) });
     const result = await runToCompletion();
