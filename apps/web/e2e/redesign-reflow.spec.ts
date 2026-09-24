@@ -10,7 +10,14 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await page.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
     for (const width of [768, 320]) {
       await page.setViewportSize({ width, height: 1000 });
-      await page.goto(`/?lang=${locale}`, { waitUntil: 'networkidle' });
+      // `networkidle` requires 500ms of total silence on the network; under
+      // full parallel load the shared dev/prod server keeps every page's
+      // chunks/API calls trickling in past that window, so this timed out
+      // well before the 30s test budget instead of ever finding quiet.
+      // The default 'load' wait plus the web-first assertions below (which
+      // already retry until the client tree actually hydrates) is the real
+      // readiness signal this test needs.
+      await page.goto(`/?lang=${locale}`);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
       await expect(page.locator('[data-theme-mode]')).toHaveAttribute('data-theme-mode', theme);
       await expect(page.locator('h1')).toBeVisible();
