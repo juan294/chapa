@@ -20,6 +20,11 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
       await page.goto(`/?lang=${locale}`);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
       await expect(page.locator('[data-theme-mode]')).toHaveAttribute('data-theme-mode', theme);
+      // A reload with the locale cookie already set can briefly leave the
+      // stale server-rendered subtree beside the hydrated one (#1329 class):
+      // two identical h1s for a few hundred ms. Wait for the single hydrated
+      // heading before any strict locator acts on it.
+      await expect(page.locator('h1')).toHaveCount(1);
       await expect(page.locator('h1')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       const input = page.locator('#terminal-command-input');
