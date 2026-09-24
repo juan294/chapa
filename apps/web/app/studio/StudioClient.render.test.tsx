@@ -1903,8 +1903,24 @@ describe("StudioClient render", () => {
       fireEvent.keyDown(input, { key: "Enter" });
       await screen.findByText("Configuration saved");
 
-      const event = dispatchBeforeUnload();
-      expect(event.defaultPrevented).toBe(false);
+      // This assertion must wait on its OWN condition (same class of bug as
+      // #1253 above). `handleSave` runs as `void handleSave()` — its state
+      // updates (setPersistedConfig, setSaveState, setLines) all land in the
+      // same batch once the mocked fetch/json promises resolve, but that
+      // batch's passive effects — including useUnsavedNavigation's listener
+      // re-registration for the new `hasUnsavedChanges` — are not guaranteed
+      // to have flushed by the exact moment `findByText` above observes the
+      // "Configuration saved" DOM mutation and resolves. Under full-suite
+      // load the two can settle out of order, so the very next beforeunload
+      // dispatch can still hit the stale, not-yet-removed listener from the
+      // dirty state and intermittently fail (reproduced once during this
+      // fix's own commit, under full-suite load). Waiting on the dispatch's
+      // own result, rather than sampling it once right after an unrelated
+      // text assertion, gives React's effect flush the same room every
+      // other waitFor in this file already gets.
+      await waitFor(() => {
+        expect(dispatchBeforeUnload().defaultPrevented).toBe(false);
+      });
     });
 
     it("never warns in demo mode, even while dirty — demo never persists by design", async () => {
