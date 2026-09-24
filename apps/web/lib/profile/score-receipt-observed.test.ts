@@ -12,7 +12,7 @@ import { materializeObservedScoreReceipt, type ObservedReceiptMaterializationOpt
 import { ledgerFixture } from "@/lib/evidence/test-fixtures";
 
 const referenceTime = "2026-09-08T10:00:00.000Z";
-const ledger = { ownerId: "alice", publicConsent: true, claims: [], assessments: [], references: [] };
+const ledger = { ownerId: "alice", claims: [], assessments: [], references: [] };
 const readCraft = vi.fn<(owner: string, window: ScoringWindow) => Promise<PublicObservedCraft>>(async () => ({ status: "no_report", unlocked: false, report: null }));
 let saved: { envelope: HashedObservedScoreReceipt; semanticDigest: string; coreSemanticDigest: string | null } | null;
 beforeEach(() => {
@@ -28,7 +28,7 @@ beforeEach(() => {
   });
 });
 describe("observed receipt materialization", () => {
-  it("publishes a consented truthful zero only with authoritative no_report and one fixed context", async () => {
+  it("publishes a truthful zero only with authoritative no_report and one fixed context", async () => {
     expect((await materializeObservedScoreReceipt("Alice", { referenceTime, readCraft })).status).toBe("issued");
     expect(saved!.envelope.receipt.core.composite.displayValue).toBe(0);
     expect(saved!.envelope.receipt.window.referenceTime).toBe(referenceTime);
@@ -64,13 +64,30 @@ describe("observed receipt materialization", () => {
     expect(await materializeObservedScoreReceipt("alice", { referenceTime, readCraft })).toMatchObject({ status: "stored", snapshot: { receipt: previous }, freshness: "stale", reason: "source_error" });
     expect(dbPublishObservedReceipt).toHaveBeenCalledTimes(1);
   });
-  it("never guesses missing Craft authority or ignores explicit consent withdrawal", async () => {
+  it("never regresses an established non-trivial core to empty evidence -- refuses instead of silently publishing zero", async () => {
+    vi.mocked(dbReadEngineeringEvidence).mockResolvedValueOnce(ledgerFixture());
+    await materializeObservedScoreReceipt("alice", { referenceTime, readCraft });
+    const established = saved!.envelope;
+    expect(established.receipt.core.composite.exact).toBeGreaterThan(0);
+    // A later report whose period extends past the established window (so the
+    // Craft-only short-circuit's exact-window match fails) falls through to a
+    // full recompute. The read-only source coordinator (#1335 phase 3) and an
+    // empty ledger both report cleanly -- no source is "unavailable" -- but
+    // nothing was actually collected. That must never overwrite an established,
+    // non-trivial receipt with a zero built from missing evidence.
+    const result = await materializeObservedScoreReceipt("alice", {
+      referenceTime: "2026-09-09T10:00:00.000Z",
+      reportUpdate: { endExclusive: "2026-09-09T09:00:00.000Z" },
+      readCraft,
+    });
+    expect(result).toMatchObject({ status: "stored", snapshot: { receipt: established }, freshness: "stale", reason: "empty_evidence" });
+    expect(saved!.envelope).toEqual(established);
+  });
+  it("never guesses missing Craft authority", async () => {
     expect(await materializeObservedScoreReceipt("alice", { referenceTime })).toMatchObject({ status: "unavailable", reason: "craft_error" });
-    vi.mocked(dbReadEngineeringEvidence).mockResolvedValue({ ...ledger, publicConsent: false });
-    expect(await materializeObservedScoreReceipt("alice", { referenceTime, readCraft })).toEqual({ status: "unavailable", reason: "not_consented" });
     expect(dbPublishObservedReceipt).not.toHaveBeenCalled();
   });
-  it("read-only resolves durable state without consent writes, collection or Craft reads", async () => {
+  it("read-only resolves durable state without new writes, collection or Craft reads", async () => {
     await materializeObservedScoreReceipt("alice", { referenceTime, readCraft });
     vi.clearAllMocks();
     expect((await materializeObservedScoreReceipt("alice", { readOnly: true })).status).toBe("stored");
@@ -98,7 +115,7 @@ describe("observed receipt materialization", () => {
     const second = { ...original, assessment: { ...original.assessment, assessmentId: "second", revisionId: "second:1", evaluator: { ...original.assessment.evaluator, id: "second-reviewer" } } };
     for (const assessments of [[original, correction], [original, second]]) {
       saved = null;
-      vi.mocked(dbReadEngineeringEvidence).mockResolvedValue({ ...base, publicConsent: true, assessments });
+      vi.mocked(dbReadEngineeringEvidence).mockResolvedValue({ ...base, assessments });
       expect((await materializeObservedScoreReceipt("owner", { referenceTime, readCraft })).status).toBe("issued");
       expect(saved!.envelope.receipt.criteria).toHaveLength(1);
       expect(saved!.envelope.receipt.criteria[0]).toMatchObject({ criterion: "verification", status: "accepted", qualifyingCount: 1 });
@@ -108,7 +125,7 @@ describe("observed receipt materialization", () => {
   it("latest retraction never revives an earlier accepted public criterion", async () => {
     const base = ledgerFixture(), original = base.assessments[0]!;
     const retraction = { ...original, assessment: { ...original.assessment, revisionId: "assessment-rev:2", supersedesRevisionId: original.assessment.revisionId, revision: 2, action: "retract" as const, status: "retracted" as const } };
-    vi.mocked(dbReadEngineeringEvidence).mockResolvedValue({ ...base, publicConsent: true, assessments: [original, retraction] });
+    vi.mocked(dbReadEngineeringEvidence).mockResolvedValue({ ...base, assessments: [original, retraction] });
     expect((await materializeObservedScoreReceipt("owner", { referenceTime, readCraft })).status).toBe("issued");
     expect(saved!.envelope.receipt.criteria).toEqual([]);
     expect(saved!.envelope.receipt.inputs.counts.quality.verification.lower).toBe(0);
@@ -146,10 +163,10 @@ it("reprojects retained normalized evidence with honest old dataThrough on UTC r
     coverage: { source: { provider: "github" as const, host: "github.com", subjectId: "alice" }, window: oldWindow,
       dataThrough: referenceTime, status: "complete" as const, discovery: "owned_and_contributed" as const,
       repositoryIds: [], repositoryDiscoveryComplete: true, eventKinds: {}, reasonCodes: [], unknownPeriods: [] }, events: [] };
-  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "observed", observation } : { status: "unlinked" });
+  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "observed", observation, inProgress: false } : { status: "unlinked" });
   await materializeObservedScoreReceipt("alice", { referenceTime, readCraft });
   const original = saved!.envelope;
-  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "stale", observation } : { status: "unlinked" });
+  vi.mocked(selectSourceEvidence).mockImplementation(async input => input.provider === "github" ? { status: "stale", observation, inProgress: false } : { status: "unlinked" });
   const result = await materializeObservedScoreReceipt("alice", { referenceTime: "2026-09-09T12:00:00.000Z", reportUpdate: { endExclusive: "2026-09-09T11:00:00.000Z" }, readCraft });
   expect(result.status).toBe("issued");
   expect(saved!.envelope.receipt.receiptId).not.toBe(original.receipt.receiptId);

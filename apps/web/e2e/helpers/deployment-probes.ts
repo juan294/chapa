@@ -45,8 +45,12 @@ export async function assertCoreDependencies(
 export function assertRenderableBadgeBody(body: string): void {
   expect(body).toContain("<svg");
   expect(body).toContain("</svg>");
-  expect(body).not.toContain('data-chapa-state="fallback"');
-  expect(body).toContain('data-chapa-state="rendered"');
+  // #1335: a subject without a drawable receipt renders a real v7.2 product
+  // state (a badge, a scoring-in-progress card, an action-needed card, or
+  // "not on Chapa yet"). The generic load-error `fallback` and the
+  // `unavailable` authority failure are the no-data artifacts this rejects.
+  const state = body.match(/data-chapa-state="([a-z_]+)"/)?.[1];
+  expect(["rendered", "collecting", "action_needed", "unregistered"]).toContain(state);
 }
 
 export async function assertBadgeSvg(
@@ -117,11 +121,13 @@ export async function assertRollbackReadiness(
 }
 
 /**
- * #1190 — the share page's badge + embed snippet, plus its verification
- * link, must resolve end to end: the inline badge SVG's verification strip
- * links to /verify/{hash}. This legacy octocat fixture must resolve to the
- * explicitly labelled legacy record, with matching API identity; current
- * receipt authenticity is exercised by the scoring-point fixture suite.
+ * #1190/#1335 — the share page's badge + embed snippet, plus its
+ * verification link, must resolve end to end: the inline badge SVG's
+ * verification strip links to /verify/{token}. The octocat fixture publishes
+ * a real v7.2 receipt (`issueObservedVerification`), so this probe resolves
+ * that same current, signature-authenticated receipt through the public API
+ * and the rendered verify page — the retired v6 "legacy record" path no
+ * longer exists to probe.
  */
 /**
  * Keep the response body when an assertion on it fails, so a transient
@@ -163,18 +169,33 @@ export async function assertShareVerification(
 
   const apiResponse = await request.get(`/api/verify/${hash}`, { maxRedirects: 0 });
   expect(apiResponse.status()).toBe(200);
-  expect(await apiResponse.json()).toMatchObject({
-    version: "v6", status: "legacy_record", arithmetic: "replay_unavailable", hash,
-    data: { handle: "octocat" },
+  const apiBody = await apiResponse.json();
+  expect(apiBody).toMatchObject({
+    version: "v7", status: "current", signatureAuthenticated: true,
   });
+  // #1335 phase 5 retired the verify page's owner-identity display entirely
+  // ("There is nothing left to embed at render time" — VerifyPageWebMcpTools):
+  // ReceiptCard shows the receipt itself (policy/revision, score, verified
+  // state), never the owner handle. Assert against that real rendered
+  // content, cross-checked against the API's own receipt so this stays a
+  // specific proof, not a loosened one.
+  const receipt = apiBody.envelope.receipt;
+  const composite = receipt.core.composite;
+  const expectedScore = composite.kind === "point" ? String(composite.displayValue) : `${composite.displayLower}–${composite.displayUpper}`;
   const verifyResponse = await request.get(`/verify/${hash}?lang=en`, { maxRedirects: 0 });
   expect(verifyResponse.status()).toBe(200);
   const verifyBody = await verifyResponse.text();
   // #1279 — rendered state, not document substrings: the page also ships
   // its translation dictionary, which names every state it can render.
   await withBodyAttachment("verify-page.html", verifyBody, () => {
-    expect(hasRenderedText(verifyBody, "Legacy verification record"), "verify page did not render the explicit legacy record state").toBe(true);
-    expect(hasRenderedText(verifyBody, "octocat"), "verify page did not render the linked profile identity").toBe(true);
+    expect(hasRenderedText(verifyBody, "Signature authenticated"), "verify page did not render the authenticated signature state").toBe(true);
+    expect(hasRenderedText(verifyBody, "Current revision"), "verify page did not render the current-revision status").toBe(true);
+    // The rendered `/api/verify/<token>` path is this exact receipt's own
+    // policy prefix ("v7.") plus revision id and content-authenticating
+    // signature — the closest the page comes to a linked identity, since it
+    // never names an owner.
+    expect(hasRenderedText(verifyBody, `/api/verify/${hash}`), "verify page did not render this receipt's own revision/content-hash token").toBe(true);
+    expect(hasRenderedText(verifyBody, expectedScore), "verify page did not render the receipt's core score").toBe(true);
     expect(hasRenderedText(verifyBody, "Invalid hash"), "verify page rendered the invalid-hash callout").toBe(false);
     expect(hasRenderedText(verifyBody, "Not found"), "verify page rendered the not-found callout").toBe(false);
   });

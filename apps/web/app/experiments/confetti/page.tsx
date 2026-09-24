@@ -18,7 +18,7 @@ type Palette = ConfettiPalette;
 function MockBadgeCard() {
   return (
     <div className="rounded-2xl border border-warm-stroke bg-warm-card p-6 w-full max-w-sm mx-auto">
-      <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
+      <BadgeContent stats={MOCK_STATS} scoring={MOCK_IMPACT} />
     </div>
   );
 }

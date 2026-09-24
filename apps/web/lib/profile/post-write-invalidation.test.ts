@@ -5,14 +5,10 @@ const {
   mockCacheDel,
   mockBuildCraftKey,
   mockInvalidateBadgeSvgCacheForHandle,
-  mockBuildSnapshotKey,
-  mockInvalidateHistoryCache,
 } = vi.hoisted(() => ({
   mockCacheDel: vi.fn(),
   mockBuildCraftKey: vi.fn(),
   mockInvalidateBadgeSvgCacheForHandle: vi.fn(),
-  mockBuildSnapshotKey: vi.fn(),
-  mockInvalidateHistoryCache: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -28,14 +24,6 @@ vi.mock("@/lib/render/badge-svg-cache", () => ({
     mockInvalidateBadgeSvgCacheForHandle(...args),
 }));
 
-vi.mock("@/lib/cache/snapshot-cache", () => ({
-  buildSnapshotKey: (...args: unknown[]) => mockBuildSnapshotKey(...args),
-}));
-
-vi.mock("@/lib/history/history", () => ({
-  invalidateHistoryCache: (...args: unknown[]) => mockInvalidateHistoryCache(...args),
-}));
-
 describe("invalidateProfileReadModels", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,8 +33,6 @@ describe("invalidateProfileReadModels", () => {
       redis: true,
       edge: "purged",
     });
-    mockBuildSnapshotKey.mockImplementation((handle: string) => `snapshot:${handle}`);
-    mockInvalidateHistoryCache.mockResolvedValue(undefined);
   });
 
   it("invalidates enabled read models in a defined order", async () => {
@@ -59,16 +45,11 @@ describe("invalidateProfileReadModels", () => {
       steps.push(`badge:${handle}`);
       return { redis: true, edge: "purged" };
     });
-    mockInvalidateHistoryCache.mockImplementation(async (handle: string) => {
-      steps.push(`history:${handle}`);
-    });
 
     await invalidateProfileReadModels("MixedCase", {
       stats: true,
       craft: true,
       badgeSvg: true,
-      snapshot: true,
-      history: true,
     });
 
     // #1191 hotfix (v2.29.2) — the badgeSvg step now delegates to the shared
@@ -78,8 +59,6 @@ describe("invalidateProfileReadModels", () => {
       "stats:v3:mixedcase",
       "craft:mixedcase",
       "badge:mixedcase",
-      "snapshot:mixedcase",
-      "history:mixedcase",
     ]);
   });
 
@@ -89,8 +68,6 @@ describe("invalidateProfileReadModels", () => {
     expect(mockCacheDel).not.toHaveBeenCalled();
     expect(mockBuildCraftKey).not.toHaveBeenCalled();
     expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
-    expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
-    expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
   });
 
   it("only invalidates the stats read model when stats=true", async () => {
@@ -100,8 +77,6 @@ describe("invalidateProfileReadModels", () => {
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v3:solo");
     expect(mockBuildCraftKey).not.toHaveBeenCalled();
     expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
-    expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
-    expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
   });
 
   it("calls invalidateBadgeSvgCacheForHandle(handle, today) once when badgeSvg=true", async () => {
@@ -120,27 +95,6 @@ describe("invalidateProfileReadModels", () => {
     expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
   });
 
-  it("only invalidates the snapshot read model when snapshot=true", async () => {
-    await invalidateProfileReadModels("Solo", { snapshot: true });
-
-    expect(mockBuildSnapshotKey).toHaveBeenCalledWith("solo");
-    expect(mockCacheDel).toHaveBeenCalledTimes(1);
-    expect(mockCacheDel).toHaveBeenCalledWith("snapshot:solo");
-    expect(mockBuildCraftKey).not.toHaveBeenCalled();
-    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
-    expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
-  });
-
-  it("only invalidates the history read model when history=true", async () => {
-    await invalidateProfileReadModels("Solo", { history: true });
-
-    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("solo");
-    expect(mockCacheDel).not.toHaveBeenCalled();
-    expect(mockBuildCraftKey).not.toHaveBeenCalled();
-    expect(mockInvalidateBadgeSvgCacheForHandle).not.toHaveBeenCalled();
-    expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
-  });
-
   it("continues invalidating later read models when one step throws", async () => {
     mockCacheDel
       .mockRejectedValueOnce(new Error("stats down"))
@@ -150,25 +104,23 @@ describe("invalidateProfileReadModels", () => {
       invalidateProfileReadModels("TestUser", {
         stats: true,
         craft: true,
-        history: true,
       }),
     ).resolves.toBeUndefined();
 
     expect(mockCacheDel).toHaveBeenNthCalledWith(1, "stats:v3:testuser");
     expect(mockCacheDel).toHaveBeenNthCalledWith(2, "craft:testuser");
-    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("testuser");
   });
 
-  it("continues invalidating later read models when the badge invalidation throws", async () => {
+  it("continues invalidating other read models when the badge invalidation throws", async () => {
     mockInvalidateBadgeSvgCacheForHandle.mockRejectedValueOnce(new Error("edge down"));
 
     await expect(
       invalidateProfileReadModels("TestUser", {
         badgeSvg: true,
-        history: true,
+        craft: true,
       }),
     ).resolves.toBeUndefined();
 
-    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("testuser");
+    expect(mockBuildCraftKey).toHaveBeenCalledWith("testuser");
   });
 });

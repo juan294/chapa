@@ -5,7 +5,6 @@ import { assertLocalSqlTarget } from "@/test/contract/local-sql";
 const owner = "contract-observed-upload";
 const capturedAt = "2026-09-08T12:00:00.000Z";
 const controlled = vi.hoisted(() => ({ source: vi.fn(async (input: unknown) => { void input; return { status: "unlinked" }; }), invalidate: vi.fn(async () => ({ redis: true, edge: "skipped" })) }));
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: async () => ({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T12:00:00.000Z") }) }));
 vi.mock("@/lib/platform/source-collectors", () => ({ selectSourceEvidence: controlled.source }));
 vi.mock("@/lib/auth/resolve-request-auth", () => ({ resolveRequestAuth: async () => ({ handle: "contract-observed-upload" }) }));
 vi.mock("@/lib/render/badge-svg-cache", () => ({ invalidateBadgeSvgCacheForHandle: controlled.invalidate, isBadgeCacheRefreshed: (r: { redis: boolean; edge: string }) => r.redis && r.edge !== "failed" }));
@@ -17,7 +16,7 @@ const db = () => getServiceClient();
 const cleanup = async () => { assertLocalSqlTarget(); expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); };
 beforeEach(async () => {
   await cleanup(); vi.clearAllMocks();
-  expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: capturedAt })).error).toBeNull();
+  expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
 });
 afterEach(async () => { vi.restoreAllMocks(); await cleanup(); });
 const report = (zero = false) => ({ schemaVersion: "v7.2", tool: "claude-code", reportPeriod: { start: "2026-09-01", end: "2026-09-07" }, totalSessions: 10,

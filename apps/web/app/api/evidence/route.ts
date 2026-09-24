@@ -1,4 +1,3 @@
-import { withdrawReceiptPublicationV7 } from "@/lib/verification/cleanup";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { type NextRequest, NextResponse } from "next/server";
 import { createScoringWindow } from "@chapa/shared";
@@ -9,7 +8,6 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { MAX_EVIDENCE_BYTES, parseLedgerCommand } from "@/lib/evidence/validation";
 import { dbReadEngineeringArtifact, dbReadEngineeringEvidence, dbWriteEngineeringEvidence, LedgerStorageError } from "@/lib/db/engineering-evidence";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 
 const headers = { "Cache-Control": "private, no-store" };
 function json(body: unknown, status = 200) { return NextResponse.json(body, { status, headers }); }
@@ -54,34 +52,18 @@ async function postEvidence(request: NextRequest) {
     if (raw === null) return json({ error: "Evidence payload too large" }, 413);
     command = parseLedgerCommand(JSON.parse(raw), referenceTime);
   } catch { return json({ error: "Invalid evidence command" }, 400); }
+  // Publication consent is retired (#1335 phase 2): every registered subject
+  // is collected and published without an opt-in, so there is nothing left
+  // to withdraw. `withdraw` stays a recognized shape only so this answers
+  // with a specific, honest error instead of a generic parse failure.
+  if (command.action === "withdraw") return json({ error: "retired_action" }, 400);
   if (command.action !== "assessment") {
     const denied = assertHandleOwnership(auth, command.owner);
     if (denied) return denied;
   }
   try {
-    const withdrawing = command.action === "withdraw" || (command.action === "consent" && !command.enabled);
-    const result = withdrawing
-      ? await withdrawReceiptPublicationV7(command.owner, auth.handle, true)
-      : await dbWriteEngineeringEvidence(auth.handle, command, referenceTime);
-    await invalidateProfileReadModels(command.owner, { stats: true, craft: true, snapshot: true, history: true, badgeSvg: true });
-
-    // #1311 — granting consent is what makes a receipt issuable, so issue one
-    // now. Without this the settings page reported publication as on while the
-    // badge kept showing a legacy v6 aggregate until the next refresh or the
-    // next hourly warm pass, which is up to an hour of the product
-    // contradicting itself about the thing the user just turned on.
-    // Awaited: the response reports the outcome of the opt-in.
-    if (command.action === "consent" && command.enabled) {
-      await issueScoreReceiptIfConsented(command.owner);
-    }
-    // Revocation is already committed. Empty retries cannot re-identify erased
-    // owner/revision links, so they await the recurring content-free sweep.
-    if (withdrawing && result.success === false) {
-      const cleanup = result.cleanup as { status?: string };
-      return cleanup.status === "pending"
-        ? json({ ...result, message: "Publication withdrawn; receipt cache cleanup remains unconfirmed pending the background sweep." }, 202)
-        : json({ ...result, error: "Publication withdrawn; cache cleanup failed. Background sweeps will retry known revoked and retired cache entries." }, 503);
-    }
+    const result = await dbWriteEngineeringEvidence(auth.handle, command, referenceTime);
+    await invalidateProfileReadModels(command.owner, { stats: true, craft: true, badgeSvg: true });
     return json(result);
   } catch (error) { return failure(error); }
 }

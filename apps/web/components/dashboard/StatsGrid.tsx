@@ -2,73 +2,61 @@
 
 import type { StatsData } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
-import type { ClientSnapshotDiff } from "@/lib/history/diff";
 import { InfoTooltip } from "@/components/InfoTooltip";
-import { DeltaIndicator } from "./DeltaIndicator";
 import { useTranslation } from "@/lib/i18n";
 
 interface StatItem {
   key: "stars" | "forks" | "watchers" | "activeDays" | "commits" | "prsMerged" | "reviews" | "repos";
   tooltipId: string;
   value: number;
-  delta: number | undefined;
 }
 
 interface StatsGridProps {
   stats: StatsData;
-  diff: ClientSnapshotDiff | null;
 }
 
-export function StatsGrid({ stats, diff }: StatsGridProps) {
+export function StatsGrid({ stats }: StatsGridProps) {
   const { t } = useTranslation();
   const items: StatItem[] = [
     {
       key: "stars",
       tooltipId: "stat-stars",
       value: stats.totalStars,
-      delta: diff?.stats.totalStars,
     },
     {
       key: "forks",
       tooltipId: "stat-forks",
       value: stats.totalForks,
-      delta: diff?.stats.totalForks,
     },
     {
       key: "watchers",
       tooltipId: "stat-watchers",
       value: stats.totalWatchers,
-      delta: diff?.stats.totalWatchers,
     },
     {
       key: "activeDays",
       tooltipId: "stat-active-days",
       value: stats.activeDays,
-      delta: diff?.stats.activeDays,
     },
     {
       key: "commits",
       tooltipId: "stat-commits",
       value: stats.commitsTotal,
-      delta: diff?.stats.commitsTotal,
     },
     {
       key: "prsMerged",
       tooltipId: "stat-prs-merged",
       value: stats.prsMergedCount,
-      delta: diff?.stats.prsMergedCount,
     },
     {
       key: "reviews",
       tooltipId: "stat-reviews",
       value: stats.reviewsSubmittedCount,
-      delta: diff?.stats.reviewsSubmittedCount,
     },
     {
       key: "repos",
       tooltipId: "stat-repos",
       value: stats.reposContributed,
-      delta: diff?.stats.reposContributed,
     },
   ];
 
@@ -81,8 +69,6 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {items.map((item, i) => {
           const label = t(`dashboard.stats.${item.key}.label`) as string;
-          const showDelta =
-            item.delta !== undefined && item.delta !== 0;
 
           return (
             <div
@@ -108,15 +94,6 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
                   id={item.tooltipId}
                 />
               </div>
-
-              {showDelta && (
-                <div className="mt-1">
-                  <DeltaIndicator
-                    delta={item.delta!}
-                    size="sm"
-                  />
-                </div>
-              )}
             </div>
           );
         })}

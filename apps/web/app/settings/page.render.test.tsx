@@ -31,6 +31,9 @@ vi.mock("./EvidenceWorkflow", () => ({
     <div data-testid="evidence-workflow" data-handle={handle} />
   ),
 }));
+vi.mock("./ScoringStatusPanel", () => ({
+  ScoringStatusPanel: () => <div data-testid="scoring-status-panel" />,
+}));
 vi.mock("./SettingsClient", () => ({
   SettingsClient: ({
     login,
@@ -121,6 +124,14 @@ describe("SettingsPage", () => {
   it("is force-dynamic — it reads the session from headers", async () => {
     const mod = await import("./page");
     expect(mod.dynamic).toBe("force-dynamic");
+  });
+
+  // #1335 — v7.2 is the one scoring policy, so the owner's scoring status
+  // panel always renders.
+  it("shows the scoring status panel", async () => {
+    const { default: SettingsPage } = await import("./page");
+    render(await SettingsPage());
+    expect(screen.getByTestId("scoring-status-panel")).toBeDefined();
   });
 
   // An account page has nothing to offer a crawler and everything to leak.

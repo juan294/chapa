@@ -1,168 +1,116 @@
-import { describe, it, expect } from "vitest";
-import { isSignificantChange } from "./significant-change";
-import type { SnapshotDiff } from "./diff";
+import { describe, expect, it } from "vitest";
+import type { ScoringComparison, ScoringObservation } from "./scoring-observations";
+import { isSignificantScoringChange } from "./significant-change";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+/**
+ * #1335 phase 5 — the v6 `isSignificantChange` (SnapshotDiff-based) this file
+ * used to test is retired along with `metrics_snapshots`. `scoring-observations
+ * .test.ts` already covers the `score_bump` reason and the two `not_comparable`
+ * short-circuits (different policy / different window) for
+ * `isSignificantScoringChange`; this file covers the reasons and multi-reason
+ * behavior that were not exercised anywhere: `tier_change`, `archetype_change`,
+ * more than one reason firing at once, and the exact-composite boundary.
+ */
 
-function makeDiff(overrides: Partial<SnapshotDiff> = {}): SnapshotDiff {
+const BASE_OBSERVATION: ScoringObservation = {
+  policyVersion: "v7.2",
+  identity: null,
+  window: null,
+  composite: { exact: 0, display: 0 },
+  dimensions: {
+    delivery: { exact: 50, display: 50 },
+    quality: { exact: 50, display: 50 },
+    consistency: { exact: 50, display: 50 },
+    breadth: { exact: 50, display: 50 },
+  },
+  tier: "Solid",
+  archetype: "Builder",
+  craft: null,
+};
+
+function comparable(overrides: {
+  previous?: Partial<ScoringObservation>;
+  current?: Partial<ScoringObservation>;
+  compositeExact?: number;
+}): ScoringComparison {
+  const previous = { ...BASE_OBSERVATION, ...overrides.previous };
+  const current = { ...BASE_OBSERVATION, ...overrides.current };
   return {
-    direction: "stable",
-    daysBetween: 1,
-    compositeScore: 0,
-    adjustedComposite: 0,
-    confidence: 0,
-    dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 },
-    stats: {
-      commitsTotal: 0,
-      prsMergedCount: 0,
-      prsMergedWeight: 0,
-      reviewsSubmittedCount: 0,
-      issuesClosedCount: 0,
-      reposContributed: 0,
-      activeDays: 0,
-      linesAdded: 0,
-      linesDeleted: 0,
-      totalStars: 0,
-      totalForks: 0,
-      totalWatchers: 0,
-      topRepoShare: 0,
+    previous,
+    current,
+    status: "comparable",
+    composite: { exact: overrides.compositeExact ?? 0, display: overrides.compositeExact ?? 0 },
+    dimensions: {
+      delivery: { exact: 0, display: 0 },
+      quality: { exact: 0, display: 0 },
+      consistency: { exact: 0, display: 0 },
+      breadth: { exact: 0, display: 0 },
     },
-    archetype: null,
-    tier: null,
-    profileType: null,
-    penaltyChanges: null,
-    ...overrides,
+    craft: null,
+    craftLimitation: "not_scored",
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+describe("isSignificantScoringChange", () => {
+  it("reports a tier change alone", () => {
+    const result = isSignificantScoringChange(
+      comparable({ current: { tier: "High" } }),
+    );
+    expect(result).toMatchObject({ significant: true, reason: "tier_change", allReasons: ["tier_change"] });
+  });
 
-describe("isSignificantChange", () => {
-  describe("insignificant changes", () => {
-    it("returns insignificant for no change", () => {
-      const result = isSignificantChange(makeDiff());
-      expect(result.significant).toBe(false);
+  it("reports an archetype change alone", () => {
+    const result = isSignificantScoringChange(
+      comparable({ current: { archetype: "Quality Champion" } }),
+    );
+    expect(result).toMatchObject({ significant: true, reason: "archetype_change", allReasons: ["archetype_change"] });
+  });
+
+  it("treats exactly the threshold composite increase as a score bump, and just under it as insignificant", () => {
+    expect(isSignificantScoringChange(comparable({ compositeExact: 10 }))).toMatchObject({
+      significant: true, reason: "score_bump", allReasons: ["score_bump"],
     });
+    expect(isSignificantScoringChange(comparable({ compositeExact: 9.999 }))).toEqual({ significant: false });
+  });
 
-    it("returns insignificant for small score increase (<10)", () => {
-      const result = isSignificantChange(makeDiff({ adjustedComposite: 9.9 }));
-      expect(result.significant).toBe(false);
-    });
+  it("does not treat a composite decrease as significant on its own", () => {
+    expect(isSignificantScoringChange(comparable({ compositeExact: -20 }))).toEqual({ significant: false });
+  });
 
-    it("returns insignificant for score decrease", () => {
-      const result = isSignificantChange(makeDiff({ adjustedComposite: -10 }));
-      expect(result.significant).toBe(false);
-    });
-
-    it("returns insignificant for zero delta", () => {
-      const result = isSignificantChange(makeDiff({ adjustedComposite: 0 }));
-      expect(result.significant).toBe(false);
+  it("collects every reason that fires and orders allReasons tier/archetype/score_bump, reporting the first as reason", () => {
+    const result = isSignificantScoringChange(
+      comparable({
+        current: { tier: "High", archetype: "Quality Champion" },
+        compositeExact: 25,
+      }),
+    );
+    expect(result).toMatchObject({
+      significant: true,
+      reason: "tier_change",
+      allReasons: ["tier_change", "archetype_change", "score_bump"],
     });
   });
 
-  describe("tier change", () => {
-    it("detects tier change as significant", () => {
-      const result = isSignificantChange(
-        makeDiff({ tier: { from: "Solid", to: "High" } }),
-      );
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.reason).toBe("tier_change");
-        expect(result.allReasons).toContain("tier_change");
-      }
-    });
-
-    it("detects tier downgrade as significant", () => {
-      const result = isSignificantChange(
-        makeDiff({ tier: { from: "High", to: "Solid" } }),
-      );
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.reason).toBe("tier_change");
-      }
-    });
+  it("reports insignificant when nothing changed", () => {
+    expect(isSignificantScoringChange(comparable({}))).toEqual({ significant: false });
   });
 
-  describe("archetype change", () => {
-    it("detects archetype change as significant", () => {
-      const result = isSignificantChange(
-        makeDiff({ archetype: { from: "Balanced", to: "Builder" } }),
-      );
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.reason).toBe("archetype_change");
-        expect(result.allReasons).toContain("archetype_change");
-      }
+  it("is never significant for a not_comparable result, even with a tier/archetype difference between the two observations", () => {
+    const previous = { ...BASE_OBSERVATION, tier: "Solid" as const };
+    const current = { ...BASE_OBSERVATION, tier: "High" as const, policyVersion: "v7" as const };
+    const result = isSignificantScoringChange({
+      previous,
+      current,
+      status: "not_comparable",
+      reason: "policy_mismatch",
     });
+    expect(result).toEqual({ significant: false });
   });
 
-  describe("score bump", () => {
-    it("detects score bump exactly at threshold", () => {
-      const result = isSignificantChange(makeDiff({ adjustedComposite: 10 }));
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.reason).toBe("score_bump");
-      }
-    });
-
-    it("detects large score bump", () => {
-      const result = isSignificantChange(makeDiff({ adjustedComposite: 15 }));
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.reason).toBe("score_bump");
-      }
-    });
-  });
-
-  describe("priority ordering", () => {
-    it("tier_change takes priority over archetype_change and score_bump", () => {
-      const result = isSignificantChange(
-        makeDiff({
-          tier: { from: "Solid", to: "High" },
-          archetype: { from: "Balanced", to: "Builder" },
-          adjustedComposite: 10,
-        }),
-      );
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.reason).toBe("tier_change");
-        expect(result.allReasons).toEqual([
-          "tier_change",
-          "archetype_change",
-          "score_bump",
-        ]);
-      }
-    });
-
-    it("archetype_change takes priority over score_bump", () => {
-      const result = isSignificantChange(
-        makeDiff({
-          archetype: { from: "Quality Champion", to: "Polymath" },
-          adjustedComposite: 12,
-        }),
-      );
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.reason).toBe("archetype_change");
-        expect(result.allReasons).toEqual(["archetype_change", "score_bump"]);
-      }
-    });
-
-    it("includes all reasons that fired", () => {
-      const result = isSignificantChange(
-        makeDiff({
-          tier: { from: "Emerging", to: "Solid" },
-          adjustedComposite: 11,
-        }),
-      );
-      expect(result.significant).toBe(true);
-      if (result.significant) {
-        expect(result.allReasons).toEqual(["tier_change", "score_bump"]);
-      }
-    });
+  it("is never significant when the current observation is not v7.2, even inside a comparable window", () => {
+    const result = isSignificantScoringChange(
+      comparable({ current: { policyVersion: "v7" as ScoringObservation["policyVersion"], tier: "High" } }),
+    );
+    expect(result).toEqual({ significant: false });
   });
 });

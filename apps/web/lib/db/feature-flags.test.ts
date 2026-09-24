@@ -22,26 +22,7 @@ import {
   dbGetFeatureFlags,
   dbGetFeatureFlag,
   dbUpdateFeatureFlag,
-  dbReadScoringFlagDirect,
 } from "./feature-flags";
-
-describe("direct scoring flag authority", () => {
-  it("ignores a deliberately stale shared ff:key cache", async () => {
-    mockCacheGet.mockResolvedValue(makeRow("scoring_v7_rendering", false));
-    mockSelectSingle({ enabled: true });
-    expect(await dbReadScoringFlagDirect()).toBe(true);
-    expect(mockCacheGet).not.toHaveBeenCalled();
-    expect(mockCacheSet).not.toHaveBeenCalled();
-  });
-  it("distinguishes absent configuration from storage failure", async () => {
-    mockSelectSingle(null);
-    expect(await dbReadScoringFlagDirect()).toBeNull();
-    mockSelectSingle(null, new Error("unavailable"));
-    await expect(dbReadScoringFlagDirect()).rejects.toThrow();
-    mockSelectSingle({ enabled: "false" });
-    await expect(dbReadScoringFlagDirect()).rejects.toThrow();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Helpers

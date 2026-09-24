@@ -10,9 +10,7 @@ import {
 } from "react";
 import type {
   BadgeConfig,
-  CraftResult,
   StatsData,
-  ImpactV6Result,
 } from "@chapa/shared";
 import { useUnsavedNavigation } from "@/hooks/useUnsavedNavigation";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
@@ -53,10 +51,9 @@ import { getStudioCommandConfig } from "./studio-command-config";
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: StatsData;
-  impact: ImpactV6Result;
-  /** The model the public badge draws; forwarded to the preview (#1311). */
-  scoring?: ScoreViewModel;
-  craftResult?: CraftResult | null;
+  /** The one v7.2 model the public badge draws; forwarded to the preview
+   *  (#1311/#1335). */
+  scoring: ScoreViewModel;
   handle?: string;
   verification?: PreviewVerification | null;
   /**
@@ -198,9 +195,7 @@ function useReducedMotion(): boolean {
 export function StudioClient({
   initialConfig,
   stats,
-  impact,
   scoring,
-  craftResult = null,
   handle = "",
   verification = null,
   avatarDataUri,
@@ -262,6 +257,25 @@ export function StudioClient({
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
   const saveInFlightRef = useRef(false);
+
+  // #1329 — a stale, pre-hydration copy of this SSR-rendered subtree can
+  // briefly linger in the live DOM alongside the freshly committed client
+  // copy during `/studio`'s hydration handoff (`force-dynamic` +
+  // `loading.tsx`; see `e2e/smoke.spec.ts`'s documented `#main-content`
+  // precedent for the same class of transient dual-tree window). That stale
+  // copy is discarded without ever hydrating, so it never runs a mount
+  // effect. `hydrated` therefore only ever becomes true on the one real,
+  // committed tree — an anchor other code (tests, WebMCP tools) can scope
+  // through to find the current tree unambiguously, instead of guessing
+  // with a positional `.first()`/`.last()` locator.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    // This is the intended, one-shot "mounted" flip -- the effect body IS
+    // the signal (a committed mount), not a subscription to an external
+    // store, so there is nothing else for it to synchronize with.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     configRef.current = config;
@@ -558,10 +572,7 @@ export function StudioClient({
   const studioWebMcpTools = useStudioWebMcpTools({
     config,
     enabled: webmcpEnabled,
-    stats,
-    impact,
     scoring,
-    craftResult,
     handle,
     saveStatus: saveState.status,
     runCommand: handleSubmit,
@@ -660,6 +671,7 @@ export function StudioClient({
     // rather than collapsing. Narrow viewports keep the flowing layout.
     <div
       data-testid="studio-root"
+      data-studio-hydrated={hydrated ? "true" : "false"}
       className="flex min-h-[calc(100dvh-69px)] flex-col lg:h-[calc(100dvh-69px)]"
     >
       <h1 className="sr-only">{t("studio.title") as string}</h1>
@@ -761,7 +773,6 @@ export function StudioClient({
                 key={previewKey}
                 config={config}
                 stats={stats}
-                impact={impact}
                 scoring={scoring}
                 verification={verification}
                 avatarDataUri={avatarDataUri}

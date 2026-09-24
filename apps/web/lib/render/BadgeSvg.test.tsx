@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { renderBadgeSvg } from "./BadgeSvg";
-import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 import { WARM_AMBER } from "./theme";
 import {
   makeStats as _makeStats,
-  makeImpact,
+  makeScoring,
 } from "../test-helpers/fixtures";
-import { legacyViewModel } from "@/lib/profile/score-view-model";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 
 // ---------------------------------------------------------------------------
 // Local wrapper — badge tests need a populated heatmap to test animations
@@ -38,18 +38,18 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
 
 describe("renderBadgeSvg", () => {
   it("returns a string starting with <svg", () => {
-    const svg = renderBadgeSvg(makeStats(), makeImpact());
+    const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
     expect(svg.trimStart().startsWith("<svg")).toBe(true);
   });
 
   it("returns valid SVG (no unclosed tags)", () => {
-    const svg = renderBadgeSvg(makeStats(), makeImpact());
+    const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
     expect(svg.trimStart().startsWith("<svg")).toBe(true);
     expect(svg.trimEnd().endsWith("</svg>")).toBe(true);
   });
 
   it("sets viewBox to 1200x630", () => {
-    const svg = renderBadgeSvg(makeStats(), makeImpact());
+    const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
     expect(svg).toContain('viewBox="0 0 1200 630"');
   });
 
@@ -61,7 +61,7 @@ describe("renderBadgeSvg", () => {
     it("contains the escaped handle with @ prefix", () => {
       const svg = renderBadgeSvg(
         makeStats({ handle: "user<xss>" }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("@user&lt;xss&gt;");
       expect(svg).not.toContain("user<xss>");
@@ -70,7 +70,7 @@ describe("renderBadgeSvg", () => {
     it("shows displayName instead of handle when available", () => {
       const svg = renderBadgeSvg(
         makeStats({ displayName: "Juan García" }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("Juan Garc");
       expect(svg).not.toContain("@testuser");
@@ -79,20 +79,21 @@ describe("renderBadgeSvg", () => {
     it("falls back to @handle when displayName is not set", () => {
       const svg = renderBadgeSvg(
         makeStats({ displayName: undefined }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("@testuser");
     });
 
     it("labels metrics as public when no verification seal exists", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("Public metrics");
       expect(svg).not.toContain("Verified metrics");
       expect(svg).not.toContain("M12 1L3 5v6");
     });
 
     it("labels metrics as verified only when a verification seal exists", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
       });
@@ -102,28 +103,28 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains 'Chapa_' logo text with underscore cursor", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("Chapa");
       expect(svg).toMatch(/Chapa.*_/);
       expect(svg).not.toMatch(/Chapa<tspan[^>]*>\.<\/tspan>/);
     });
 
     it("Chapa_ logo font-size is at least 22 for readability", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       const match = svg.match(/font-size="(\d+)"[^>]*>Chapa/);
       expect(match).not.toBeNull();
       expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(22);
     });
 
     it("Chapa_ logo opacity is at least 0.65 for readability", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       const match = svg.match(/opacity="([0-9.]+)"[^>]*>Chapa/);
       expect(match).not.toBeNull();
       expect(parseFloat(match![1]!)).toBeGreaterThanOrEqual(0.65);
     });
 
     it("contains a circular avatar with clip-path", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("<circle");
       expect(svg).toContain("clipPath");
     });
@@ -132,8 +133,7 @@ describe("renderBadgeSvg", () => {
       const dataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: "https://avatars.githubusercontent.com/u/123" }),
-        makeImpact(),
-        { avatarDataUri: dataUri },
+        { scoring: makeScoring(), avatarDataUri: dataUri },
       );
       expect(svg).toContain("<image");
       expect(svg).toContain(dataUri);
@@ -143,7 +143,7 @@ describe("renderBadgeSvg", () => {
     it("falls back to Chapa shield icon when no avatarDataUri and no avatarUrl", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: undefined }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("<circle");
       // Shield outline path
@@ -157,7 +157,7 @@ describe("renderBadgeSvg", () => {
     it("falls back to Chapa shield icon when avatarUrl exists but avatarDataUri is not provided", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: "https://avatars.githubusercontent.com/u/123" }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       // Shield outline path (not Octocat)
       expect(svg).toContain("M14 0.875L25.375 5.25");
@@ -172,7 +172,8 @@ describe("renderBadgeSvg", () => {
 
   describe("verified icon", () => {
     it("contains a shield/checkmark icon in non-demo mode", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
       });
@@ -180,12 +181,13 @@ describe("renderBadgeSvg", () => {
     });
 
     it("does NOT contain the word 'Verified' as text", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).not.toContain(">Verified<");
     });
 
     it("verified icon has low opacity", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
       });
@@ -193,7 +195,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("shield icon appears just before 'Verified metrics' text in SVG", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
       });
@@ -207,7 +210,7 @@ describe("renderBadgeSvg", () => {
     });
 
     it("hides shield icon in demo mode (no duplicate shields)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), { demoMode: true });
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring(), demoMode: true });
       // The verified shield path should NOT appear (avatar already has a shield)
       expect(svg).not.toContain("M12 1L3 5v6");
       expect(svg).toContain("Simulated metrics");
@@ -220,13 +223,13 @@ describe("renderBadgeSvg", () => {
 
   describe("body layout", () => {
     it("does NOT contain section labels (ACTIVITY, DEVELOPER PROFILE)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).not.toContain(">ACTIVITY<");
       expect(svg).not.toContain(">DEVELOPER PROFILE<");
     });
 
     it("does NOT contain dimension cards (BUILDING, GUARDING, etc.)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).not.toContain(">BUILDING<");
       expect(svg).not.toContain(">GUARDING<");
       expect(svg).not.toContain(">CONSISTENCY<");
@@ -234,7 +237,7 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains the archetype label above the heatmap", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring({ archetype: "Builder" }) });
       expect(svg).toContain("Builder");
       // Archetype pill should appear before the heatmap rects in SVG order
       const archetypeIdx = svg.indexOf("Builder");
@@ -243,20 +246,20 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains a code-brackets icon in the archetype pill (not a star)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring({ archetype: "Builder" }) });
       // Code brackets icon rendered as SVG <path> near the archetype text
       const builderIdx = svg.indexOf(">Builder<");
       expect(builderIdx).toBeGreaterThan(-1);
       const pillArea = svg.slice(Math.max(0, builderIdx - 400), builderIdx);
       expect(pillArea).toContain("<path");
       // ★ should NOT appear before the archetype name in the pill
-      expect(pillArea).not.toContain("\u2605");
+      expect(pillArea).not.toContain("★");
     });
 
     it("shows repos, watch, fork, star as labeled pills with counts and dot separators", () => {
       const svg = renderBadgeSvg(
         makeStats({ reposContributed: 7, totalWatchers: 80, totalForks: 25, totalStars: 142 }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("80");
       expect(svg).toContain("25");
@@ -267,7 +270,7 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("Fork");
       expect(svg).toContain("Star");
       // Dot separators between pills (at least 4: archetype·repos·watch·fork·star)
-      const dots = svg.match(/\u00B7/g);
+      const dots = svg.match(/·/g);
       expect(dots).not.toBeNull();
       expect(dots!.length).toBeGreaterThanOrEqual(4);
     });
@@ -275,7 +278,7 @@ describe("renderBadgeSvg", () => {
     it("repos pill appears before watch pill in SVG order", () => {
       const svg = renderBadgeSvg(
         makeStats({ reposContributed: 5 }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       const reposIdx = svg.indexOf("Repos");
       const watchIdx = svg.indexOf("Watch");
@@ -287,7 +290,7 @@ describe("renderBadgeSvg", () => {
     it("shows reposContributed count in repos pill", () => {
       const svg = renderBadgeSvg(
         makeStats({ reposContributed: 12 }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("12 Repos");
     });
@@ -295,7 +298,7 @@ describe("renderBadgeSvg", () => {
     it("formats large counts with compact notation", () => {
       const svg = renderBadgeSvg(
         makeStats({ totalWatchers: 1005, totalForks: 31800, totalStars: 188000 }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("1k");
       expect(svg).toContain("31.8k");
@@ -307,13 +310,13 @@ describe("renderBadgeSvg", () => {
       const oldStats = makeStats();
       delete (oldStats as unknown as Record<string, unknown>).totalWatchers;
       delete (oldStats as unknown as Record<string, unknown>).totalForks;
-      const svg = renderBadgeSvg(oldStats, makeImpact());
+      const svg = renderBadgeSvg(oldStats, { scoring: makeScoring() });
       // Should render "0" instead of "undefined"
       expect(svg).not.toContain("undefined");
     });
 
     it("metric pills have individual rect backgrounds", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       // At least 5 pill rects: 1 archetype + 4 metrics (Repos, Watch, Fork, Star)
       const pillRects = svg.match(/rx="3"/g);
       expect(pillRects).not.toBeNull();
@@ -321,13 +324,13 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains a radar chart with polygon", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("fill-opacity");
       expect(svg).toContain("<polygon");
     });
 
     it("radar chart shows dimension labels", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain(">Delivery<");
       expect(svg).toContain(">Quality<");
       expect(svg).toContain(">Consistency<");
@@ -343,13 +346,13 @@ describe("renderBadgeSvg", () => {
     it("contains the composite score as text", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ adjustedComposite: 58 }),
+        { scoring: makeScoring({ composite: 58 }) },
       );
       expect(svg).toContain(">58<");
     });
 
     it("hero score font-size is 52px (fits inside ring)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       const match = svg.match(/font-size="(\d+)"[^>]*>58</);
       expect(match).not.toBeNull();
       expect(parseInt(match![1]!, 10)).toBe(52);
@@ -358,25 +361,25 @@ describe("renderBadgeSvg", () => {
     it("always shows tier label below the score ring", () => {
       const svgWithDifferentTier = renderBadgeSvg(
         makeStats(),
-        makeImpact({ archetype: "Builder", tier: "Elite" }),
+        { scoring: makeScoring({ archetype: "Builder", tier: "Elite" }) },
       );
       expect(svgWithDifferentTier).toContain(">Elite<");
 
       // Tier label is always shown, even when tier === archetype
       const svgSameTier = renderBadgeSvg(
         makeStats(),
-        makeImpact({ archetype: "Emerging", tier: "Emerging" }),
+        { scoring: makeScoring({ archetype: "Emerging", tier: "Emerging" }) },
       );
       expect(svgSameTier).toMatch(/>Emerging<\/text>/);
     });
 
     it("does NOT contain a separate confidence text", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ confidence: 85 }));
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).not.toContain("% Confidence");
     });
 
     it("contains a score ring track circle", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       // Background track: circle with dim accent stroke, no fill. Built from
       // accentTint so the palette conversion in #1225 could not leave this
       // assertion pinned to a colour the badge no longer uses.
@@ -389,14 +392,14 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains a score ring arc with stroke-dasharray", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("stroke-dasharray");
     });
 
     it("score ring arc offset is proportional to score", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ adjustedComposite: 50 }),
+        { scoring: makeScoring({ composite: 50 }) },
       );
       // circumference = 2π × 46 ≈ 289.03, offset = 289.03 × (1 - 50/100) ≈ 144.51
       const match = svg.match(/stroke-dashoffset="([0-9.]+)"/);
@@ -406,12 +409,12 @@ describe("renderBadgeSvg", () => {
     });
 
     it("score ring arc has stroke-linecap round", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain('stroke-linecap="round"');
     });
 
     it("score ring arc has a draw-in animation from 0 to score", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       // Should contain a ring-draw keyframe animation
       expect(svg).toContain("@keyframes ring-draw");
       // The arc circle should reference the animation
@@ -419,7 +422,7 @@ describe("renderBadgeSvg", () => {
     });
 
     it("ring-draw animation starts from full circumference (empty ring)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       // circumference ≈ 289.03 — animation should start from this value
       expect(svg).toMatch(/ring-draw[\s\S]*stroke-dashoffset:\s*289/);
     });
@@ -431,14 +434,15 @@ describe("renderBadgeSvg", () => {
 
   describe("footer", () => {
     it("includes branding text by default", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("Forged from ");
       expect(svg).toContain("purpose");
       expect(svg).toContain("curiosity");
     });
 
     it("omits branding when includeBranding is false", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         includeBranding: false,
       });
       expect(svg).not.toContain("Forged from ");
@@ -446,12 +450,12 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains the domain name in footer", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("chapa.thecreativetoken.com");
     });
 
     it("footer text is at least 17px for readability", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:<tspan[^>]*>Forged from |chapa\.thecreativetoken\.com)/g);
       expect(brandingFontSizes).not.toBeNull();
       for (const match of brandingFontSizes!) {
@@ -461,7 +465,7 @@ describe("renderBadgeSvg", () => {
     });
 
     it("footer domain text opacity is at least 0.75 for readability", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       const opacityMatches = [...svg.matchAll(/opacity="([0-9.]+)"[^>]*>chapa\.thecreativetoken\.com/g)];
       expect(opacityMatches.length).toBeGreaterThanOrEqual(1);
       for (const match of opacityMatches) {
@@ -470,19 +474,19 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains a divider line above footer", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("<line");
     });
 
     it("shows only GitHub logo when no linkedPlatforms", () => {
-      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: undefined }), makeImpact());
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: undefined }), { scoring: makeScoring() });
       expect(svg).toContain("M12 0C5.37");    // GitHub logo
       expect(svg).not.toContain("M.778 1.211"); // No Bitbucket
       expect(svg).not.toContain("M11.955.49");  // No Codeberg
     });
 
     it("shows GitHub + Bitbucket logos when bitbucket is linked", () => {
-      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: ["bitbucket"] }), makeImpact());
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: ["bitbucket"] }), { scoring: makeScoring() });
       expect(svg).toContain("M12 0C5.37");    // GitHub
       expect(svg).toContain("M.778 1.211");   // Bitbucket
       expect(svg).not.toContain("M11.955.49"); // No Codeberg
@@ -491,7 +495,7 @@ describe("renderBadgeSvg", () => {
     it("shows all 3 platform logos when both linked", () => {
       const svg = renderBadgeSvg(
         makeStats({ linkedPlatforms: ["bitbucket", "codeberg"] }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("M12 0C5.37");   // GitHub
       expect(svg).toContain("M.778 1.211");  // Bitbucket
@@ -499,14 +503,15 @@ describe("renderBadgeSvg", () => {
     });
 
     it("shows GitHub + GitLab logos when gitlab is linked", () => {
-      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: ["gitlab"] }), makeImpact());
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: ["gitlab"] }), { scoring: makeScoring() });
       expect(svg).toContain("M12 0C5.37");   // GitHub
       expect(svg).toContain("m23.6004");     // GitLab
       expect(svg).not.toContain("M.778 1.211"); // No Bitbucket
     });
 
     it("shows all 4 platform logos in demo mode regardless of linkedPlatforms", () => {
-      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: undefined }), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: undefined }), {
+        scoring: makeScoring(),
         demoMode: true,
       });
       expect(svg).toContain("M12 0C5.37");   // GitHub
@@ -522,14 +527,14 @@ describe("renderBadgeSvg", () => {
 
   describe("font size parity", () => {
     it("subtitle font-size is at least 19 to display at ~14px", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       const match = svg.match(/font-size="(\d+)"[^>]*>Public metrics/);
       expect(match).not.toBeNull();
       expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(19);
     });
 
     it("archetype pill text font-size is at least 17", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring({ archetype: "Builder" }) });
       const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*>Builder</);
       expect(match).not.toBeNull();
       expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(17);
@@ -542,20 +547,21 @@ describe("renderBadgeSvg", () => {
 
   describe("animations", () => {
     it("includes heatmap fade-in animations", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("<animate");
       expect(svg).toContain('attributeName="opacity"');
     });
 
     it("includes pulse animation on composite score area", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("pulse-glow");
     });
 
     // #760 — badges embedded via <img> don't run SMIL <animate>, so heatmap
     // cells can render permanently invisible. disableAnimation renders static cells.
     it("renders static heatmap cells when disableAnimation is true", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         disableAnimation: true,
       });
       // No SMIL animate on the heatmap cells, and cells are fully opaque
@@ -572,12 +578,12 @@ describe("renderBadgeSvg", () => {
 
   describe("typography", () => {
     it("uses JetBrains Mono for headings/score", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("JetBrains Mono");
     });
 
     it("uses Plus Jakarta Sans for body text", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("Plus Jakarta Sans");
     });
   });
@@ -590,7 +596,7 @@ describe("renderBadgeSvg", () => {
     it("renders pentagon radar with Craft label when craft dimension is present", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ dimensions: { delivery: 72, quality: 55, consistency: 68, breadth: 48, craft: 60 } }),
+        { scoring: makeScoring({ craftDisplay: 60 }) },
       );
       expect(svg).toContain(">Craft<");
       expect(svg).toContain(">Delivery<");
@@ -600,7 +606,7 @@ describe("renderBadgeSvg", () => {
     });
 
     it("renders diamond radar without Craft label when craft dimension is absent", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).not.toContain(">Craft<");
       expect(svg).toContain(">Delivery<");
       expect(svg).toContain(">Quality<");
@@ -609,14 +615,14 @@ describe("renderBadgeSvg", () => {
     });
 
     it("does not contain AI Craft pill in output (removed in v3)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).not.toContain("AI Craft");
     });
 
     it("does not contain AI Craft pill even when craft dimension is present", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ dimensions: { delivery: 72, quality: 55, consistency: 68, breadth: 48, craft: 60 } }),
+        { scoring: makeScoring({ craftDisplay: 60 }) },
       );
       expect(svg).not.toContain("AI Craft");
     });
@@ -624,7 +630,7 @@ describe("renderBadgeSvg", () => {
     it("badge dimensions remain 1200x630 with pentagon radar", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ dimensions: { delivery: 72, quality: 55, consistency: 68, breadth: 48, craft: 60 } }),
+        { scoring: makeScoring({ craftDisplay: 60 }) },
       );
       expect(svg).toContain('viewBox="0 0 1200 630"');
     });
@@ -638,7 +644,7 @@ describe("renderBadgeSvg", () => {
     it("shows each archetype type correctly", () => {
       const archetypes = ["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"] as const;
       for (const archetype of archetypes) {
-        const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype }));
+        const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring({ archetype }) });
         expect(svg).toContain(archetype);
       }
     });
@@ -650,25 +656,26 @@ describe("renderBadgeSvg", () => {
 
   describe("SVG XSS prevention", () => {
     it("escapes special XML characters in archetype", () => {
-      const maliciousImpact = makeImpact({
-        archetype: 'Builder<script>alert("xss")</script>' as unknown as ImpactV6Result["archetype"],
+      const maliciousScoring = makeScoring({
+        archetype: 'Builder<script>alert("xss")</script>' as unknown as ScoreViewModel["archetype"],
       });
-      const svg = renderBadgeSvg(makeStats(), maliciousImpact);
+      const svg = renderBadgeSvg(makeStats(), { scoring: maliciousScoring });
       expect(svg).not.toContain('<script>');
       expect(svg).toContain('&lt;script&gt;');
     });
 
     it("escapes special XML characters in tier", () => {
-      const maliciousImpact = makeImpact({
-        tier: 'Elite"onload="alert(1)' as unknown as ImpactV6Result["tier"],
+      const maliciousScoring = makeScoring({
+        tier: 'Elite"onload="alert(1)' as unknown as ScoreViewModel["tier"],
       });
-      const svg = renderBadgeSvg(makeStats(), maliciousImpact);
+      const svg = renderBadgeSvg(makeStats(), { scoring: maliciousScoring });
       expect(svg).not.toContain('"onload=');
       expect(svg).toContain('&quot;onload=');
     });
 
     it("escapes special XML characters in avatarDataUri", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         avatarDataUri: 'data:image/png;base64,abc"onload="alert(1)',
       });
       expect(svg).not.toContain('"onload="alert(1)"');
@@ -682,7 +689,7 @@ describe("renderBadgeSvg", () => {
 
   describe("badge branding integration", () => {
     it("new user, no photo: Chapa shield avatar + GitHub-only footer", () => {
-      const svg = renderBadgeSvg(makeStats({ avatarUrl: undefined }), makeImpact());
+      const svg = renderBadgeSvg(makeStats({ avatarUrl: undefined }), { scoring: makeScoring() });
       // Avatar: Chapa shield (not Octocat)
       expect(svg).toContain("M14 0.875L25.375 5.25");
       expect(svg).not.toContain("M14 0C6.27");
@@ -695,7 +702,7 @@ describe("renderBadgeSvg", () => {
 
     it("user with photo: embedded image avatar + GitHub-only footer", () => {
       const dataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), { avatarDataUri: dataUri });
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring(), avatarDataUri: dataUri });
       // Avatar: embedded image
       expect(svg).toContain("<image");
       expect(svg).toContain(dataUri);
@@ -708,7 +715,7 @@ describe("renderBadgeSvg", () => {
     it("user + Bitbucket: Chapa shield + GitHub + Bitbucket footer logos", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: undefined, linkedPlatforms: ["bitbucket"] }),
-        makeImpact(),
+        { scoring: makeScoring() },
       );
       expect(svg).toContain("M14 0.875L25.375 5.25"); // Shield avatar
       expect(svg).toContain("M12 0C5.37");    // GitHub logo
@@ -720,8 +727,7 @@ describe("renderBadgeSvg", () => {
       const dataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
       const svg = renderBadgeSvg(
         makeStats({ linkedPlatforms: ["bitbucket", "codeberg"] }),
-        makeImpact(),
-        { avatarDataUri: dataUri },
+        { scoring: makeScoring(), avatarDataUri: dataUri },
       );
       expect(svg).toContain("<image");        // Photo avatar
       expect(svg).toContain("M12 0C5.37");   // GitHub
@@ -732,8 +738,7 @@ describe("renderBadgeSvg", () => {
     it("demo badge: Chapa shield + all 3 logos regardless of linkedPlatforms", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: undefined, linkedPlatforms: undefined }),
-        makeImpact(),
-        { demoMode: true },
+        { scoring: makeScoring(), demoMode: true },
       );
       expect(svg).toContain("M14 0.875L25.375 5.25"); // Shield
       expect(svg).toContain("Simulated metrics");
@@ -745,8 +750,7 @@ describe("renderBadgeSvg", () => {
     it("branding disabled: Chapa shield avatar + no footer at all", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: undefined }),
-        makeImpact(),
-        { includeBranding: false },
+        { scoring: makeScoring(), includeBranding: false },
       );
       expect(svg).toContain("M14 0.875L25.375 5.25"); // Shield still shown
       expect(svg).not.toContain("Forged from ");
@@ -760,7 +764,7 @@ describe("renderBadgeSvg", () => {
 
   describe("prefers-reduced-motion guard", () => {
     it("contains a prefers-reduced-motion media block disabling the infinite pulse-glow", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)/);
       // The media block must target the pulse-glow animation and turn it off.
       const mediaMatch = svg.match(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\}\s*\}/);
@@ -769,7 +773,7 @@ describe("renderBadgeSvg", () => {
     });
 
     it("does not disable the finite ring-draw reveal in the reduced-motion block", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       const mediaMatch = svg.match(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\}\s*\}/);
       expect(mediaMatch).not.toBeNull();
       expect(mediaMatch![0]).not.toContain("ring-draw");
@@ -779,7 +783,7 @@ describe("renderBadgeSvg", () => {
     });
 
     it("still includes the pulse-glow keyframe and applies it to the score (unchanged when motion is not reduced)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain("@keyframes pulse-glow");
       expect(svg).toMatch(/pulse-glow 3s ease-in-out infinite/);
     });
@@ -793,7 +797,8 @@ describe("renderBadgeSvg", () => {
 
   describe("accessible name (role/title/desc)", () => {
     it("adds role=img, <title>, and <desc> when disableAnimation is true (route-served variant)", () => {
-      const svg = renderBadgeSvg(makeStats({ handle: "octocat" }), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats({ handle: "octocat" }), {
+        scoring: makeScoring(),
         disableAnimation: true,
       });
       expect(svg).toContain('role="img"');
@@ -807,7 +812,7 @@ describe("renderBadgeSvg", () => {
       // aria-labelledby / BadgeOverlay tooltip convention — a native <title>
       // tooltip here would collide with it, and role=img here would be
       // redundant with the wrapping role=img div.
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).not.toContain('role="img"');
       expect(svg).not.toContain("<title>");
       expect(svg).not.toContain("<desc>");
@@ -816,8 +821,7 @@ describe("renderBadgeSvg", () => {
     it("escapes user-controlled text in the accessible name (XSS)", () => {
       const svg = renderBadgeSvg(
         makeStats({ handle: "user<script>alert(1)</script>" }),
-        makeImpact(),
-        { disableAnimation: true },
+        { scoring: makeScoring(), disableAnimation: true },
       );
       expect(svg).not.toContain("<script>");
       expect(svg).toContain("&lt;script&gt;");
@@ -826,8 +830,7 @@ describe("renderBadgeSvg", () => {
     it("<title> content mentions the score and archetype", () => {
       const svg = renderBadgeSvg(
         makeStats({ handle: "octocat" }),
-        makeImpact({ adjustedComposite: 74, archetype: "Builder", tier: "High" }),
-        { disableAnimation: true },
+        { scoring: makeScoring({ composite: 74, archetype: "Builder", tier: "High" }), disableAnimation: true },
       );
       const titleMatch = svg.match(/<title>([\s\S]*?)<\/title>/);
       expect(titleMatch).not.toBeNull();
@@ -842,7 +845,8 @@ describe("renderBadgeSvg", () => {
 
   describe("verified signal uses a single coral color, not purple + coral", () => {
     it("renders the verified shield in coral (#E05A47), not the purple brand accent", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
       });
@@ -867,7 +871,8 @@ describe("renderBadgeSvg", () => {
 
   describe("locale-aware strings (#1181)", () => {
     it("defaults to English metrics/tier/radar/verification text when no strings option is given", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "High" }), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring({ tier: "High" }),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
       });
@@ -880,7 +885,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("uses translated metrics label (public) when strings option is provided", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         strings: { metricsPublic: "Métricas públicas" },
       });
       expect(svg).toContain("Métricas públicas");
@@ -888,7 +894,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("uses translated metrics label (verified) when strings option is provided", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
         strings: { metricsVerified: "Métricas verificadas" },
@@ -898,7 +905,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("uses translated metrics label (simulated/demo) when strings option is provided", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         demoMode: true,
         strings: { metricsSimulated: "Métricas simuladas" },
       });
@@ -909,8 +917,7 @@ describe("renderBadgeSvg", () => {
     it("uses a translated tier label when provided, without altering the raw archetype", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ archetype: "Builder", tier: "Solid" }),
-        { strings: { tierLabel: "Sólido" } },
+        { scoring: makeScoring({ archetype: "Builder", tier: "Solid" }), strings: { tierLabel: "Sólido" } },
       );
       expect(svg).toContain(">Sólido<");
       expect(svg).not.toContain(">Solid<");
@@ -919,7 +926,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("uses translated radar dimension labels when provided", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         strings: {
           radarLabels: {
             delivery: "Entrega",
@@ -940,15 +948,15 @@ describe("renderBadgeSvg", () => {
     it("uses translated radar empty-state text when provided", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 } }),
-        { strings: { radarNoData: "aún sin datos" } },
+        { scoring: makeScoring({ dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 } }), strings: { radarNoData: "aún sin datos" } },
       );
       expect(svg).toContain(">aún sin datos<");
       expect(svg).not.toContain(">no data yet<");
     });
 
     it("uses a translated verified strip label when provided", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         verificationHash: "abc12345",
         verificationDate: "2026-08-10",
         strings: { verifiedLabel: "VERIFICADO" },
@@ -957,7 +965,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("uses a translated sample disclosure when provided (demo mode)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         demoMode: true,
         strings: { sampleDisclosure: "MUESTRA · NO ES UNA CHAPA REAL · SOLO PARA ILUSTRACIÓN" },
       });
@@ -965,7 +974,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("still escapes the translated tier label (XSS boundary preserved)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         strings: { tierLabel: '"onload="alert(1)' },
       });
       expect(svg).not.toContain('"onload=');
@@ -982,14 +992,14 @@ describe("renderBadgeSvg", () => {
 
   describe("machine-readable state (data-chapa-*)", () => {
     it("always marks a normal render as rendered/current", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring() });
       expect(svg).toContain('data-chapa-state="rendered"');
       expect(svg).toContain('data-chapa-freshness="current"');
     });
 
     it("marks a phase-1 stale-aggregate live render as stale (heatmap unaffected)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
-        scoring: legacyViewModel(makeImpact(), { freshness: "stale" }),
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring({ freshness: "stale" }),
       });
       expect(svg).toContain('data-chapa-state="rendered"');
       expect(svg).toContain('data-chapa-freshness="stale"');
@@ -998,7 +1008,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("marks a degraded stored-badge render as stale", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         degraded: {
           reason: "live_sources_unavailable",
           observedAt: "2026-09-18T00:00:00.000Z",
@@ -1023,7 +1034,8 @@ describe("renderBadgeSvg", () => {
     }
 
     it("omits heatmap cells and shows the last-successful-snapshot disclosure instead", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         disableAnimation: true,
         degraded: {
           reason: "live_sources_unavailable",
@@ -1046,8 +1058,8 @@ describe("renderBadgeSvg", () => {
             count: 0,
           })),
         }),
-        makeImpact(),
         {
+          scoring: makeScoring(),
           disableAnimation: true,
           degraded: {
             reason: "live_sources_unavailable",
@@ -1061,7 +1073,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("includes the disclosure in the accessible <desc> (route-served variant)", () => {
-      const svg = renderBadgeSvg(makeStats({ handle: "octocat" }), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats({ handle: "octocat" }), {
+        scoring: makeScoring(),
         disableAnimation: true,
         degraded: {
           reason: "live_sources_unavailable",
@@ -1075,7 +1088,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("uses a translated activityUnavailable string when provided", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         disableAnimation: true,
         degraded: {
           reason: "live_sources_unavailable",
@@ -1090,13 +1104,14 @@ describe("renderBadgeSvg", () => {
     });
 
     it("a non-degraded render still shows real heatmap cells", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), { disableAnimation: true });
+      const svg = renderBadgeSvg(makeStats(), { scoring: makeScoring(), disableAnimation: true });
       const block = activityBlock(svg);
       expect(block).toContain("<rect");
     });
 
     it("escapes a custom activityUnavailable string (XSS boundary)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+      const svg = renderBadgeSvg(makeStats(), {
+        scoring: makeScoring(),
         disableAnimation: true,
         degraded: {
           reason: "live_sources_unavailable",

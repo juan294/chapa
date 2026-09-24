@@ -32,7 +32,7 @@ const referenceTime = "2026-09-05T12:00:00.000Z";
 const options = { referenceTime };
 const fetchers = { bitbucket: fetchBitbucketIfLinked, codeberg: fetchCodebergIfLinked, gitlab: fetchGitlabIfLinked };
 function authorization(platform: "bitbucket" | "codeberg" | "gitlab"): Extract<SourceAuthorization, { status: "authorized" }> {
-  return { status: "authorized", consentVersion: "legacy-unpublished", link: {
+  return { status: "authorized", subjectVersion: "legacy-unpublished", link: {
     id: "11111111-1111-4111-8111-111111111111", updatedAt: "2026-09-05T12:00:00.000001Z", handle: "alice", platform,
     remoteLogin: `remote-${platform}`, tokens: { accessToken: `${platform}-token`, refreshToken: null, expiresAt: null },
   } };

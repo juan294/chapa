@@ -1,8 +1,4 @@
-import { getVerificationRecord, getReceiptVerificationV7 } from "@/lib/verification/store";
-import {
-  toPublicVerificationRecord,
-  type VerificationRecord,
-} from "@/lib/verification/types";
+import { getReceiptVerificationV7 } from "@/lib/verification/store";
 import { SiteFooter } from "@/components/SiteFooter";
 import { StatusCallout } from "@/components/StatusCallout";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
@@ -16,7 +12,6 @@ import {
 import { DynamicRouteShell } from "@/components/DynamicRouteShell";
 import type { NavLinkItem } from "@/components/NavbarShell";
 import { isWebmcpEnabled } from "@/lib/feature-flags";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { VerifyPageWebMcpTools } from "./VerifyPageWebMcpTools";
 import { VERIFICATION_CODE_PATTERN, parseVerificationTokenV7 } from "@/lib/verification/constants";
@@ -87,16 +82,16 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
       <VerifyLocaleBoundary locale={locale} navLinks={innerNavLinks} queryLang={lang} t={t}>
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
           <ReceiptCard token={hash} result={result} t={t} />
-          {webmcpEnabled && result && result !== "unavailable" && <VerifyPageWebMcpTools hash={hash} version="v7" />}
+          {webmcpEnabled && result && result !== "unavailable" && <VerifyPageWebMcpTools hash={hash} isV7={true} />}
         </main>
       </VerifyLocaleBoundary>
     );
   }
 
-  const [record, webmcpEnabled] = await Promise.all([
-    getVerificationRecord(hash),
-    isWebmcpEnabled(),
-  ]);
+  // #1335 phase 5 — every well-formed non-v7 hash reaching here matched
+  // VERIFICATION_CODE_PATTERN above, so it is a retired v6 verification
+  // code, not a lookup miss. `verification_records` no longer exists.
+  const webmcpEnabled = await isWebmcpEnabled();
 
   return (
     <VerifyLocaleBoundary
@@ -106,19 +101,8 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
       t={t}
     >
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
-        {record ? (
-          <>
-            {webmcpEnabled && (
-              <VerifyPageWebMcpTools
-                hash={hash}
-                record={toPublicVerificationRecord(record)}
-              />
-            )}
-            <VerifiedCard hash={hash} record={record} t={t} />
-          </>
-        ) : (
-          <NotFoundCard hash={hash} t={t} />
-        )}
+        {webmcpEnabled && <VerifyPageWebMcpTools hash={hash} isV7={false} />}
+        <RetiredV6Card hash={hash} t={t} />
       </main>
     </VerifyLocaleBoundary>
   );
@@ -159,143 +143,15 @@ function VerifyLocaleBoundary({
 
 type TFunc = (key: string) => string | string[] | string[][] | Translations | Translations[];
 
-function VerifiedCard({
-  hash,
-  record,
-  t,
-}: {
-  hash: string;
-  record: VerificationRecord;
-  t: TFunc;
-}) {
-  return (
-    <StatusCallout
-      variant="verification"
-      title={t('verifyDetail.verifiedTitle') as string}
-      titleAs="h1"
-      description={t('verifyDetail.verifiedDescription') as string}
-    >
-      {/* Hash display */}
-      <div className="mb-6 rounded-[3px] border border-stroke bg-bg px-4 py-3">
-        <p className="text-xs text-text-secondary">{t('verifyDetail.verificationCode') as string}</p>
-        <p className="break-all font-heading text-lg tracking-widest text-complement-text">
-          {hash}
-        </p>
-      </div>
-
-      {/* Profile info */}
-      <div className="mb-6 space-y-3">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{t('verifyDetail.developer') as string}</span>
-          <Link
-            href={`/u/${record.handle}`}
-            className="font-heading text-sm text-complement-text hover:text-complement-text-hover"
-          >
-            @{record.handle}
-          </Link>
-        </div>
-        {record.displayName && (
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-text-secondary">{t('verifyDetail.name') as string}</span>
-            <span className="text-sm text-text-primary">
-              {record.displayName}
-            </span>
-          </div>
-        )}
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{t('verifyDetail.impactScore') as string}</span>
-          <span className="font-heading text-sm font-bold text-text-primary">
-            {record.adjustedComposite}
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{t('verifyDetail.tier') as string}</span>
-          <span className="text-sm text-text-primary">{record.tier}</span>
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{t('verifyDetail.archetype') as string}</span>
-          <span className="text-sm text-text-primary">{record.archetype}</span>
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{t('verifyDetail.profile') as string}</span>
-          <span className="text-sm capitalize text-text-primary">
-            {record.profileType}
-          </span>
-        </div>
-      </div>
-
-      {/* Dimensions */}
-      <div className="mb-6">
-        <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
-          {t('verifyDetail.dimensions') as string}
-        </h2>
-        <div className="grid grid-cols-2 gap-2">
-          {(
-            Object.entries(record.dimensions) as [string, number][]
-          ).map(([key, value]) => (
-            <div
-              key={key}
-              className="rounded-[3px] border border-stroke bg-bg px-3 py-2"
-            >
-              <p className="text-xs capitalize text-text-secondary">{key}</p>
-              <p className="font-heading text-sm font-bold text-text-primary">
-                {Math.round(value)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Key metrics */}
-      <div className="mb-6">
-        <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
-          {t('verifyDetail.keyMetrics') as string}
-        </h2>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-[3px] border border-stroke bg-bg px-3 py-2 text-center">
-            <p className="font-heading text-sm font-bold text-text-primary">
-              {record.commitsTotal}
-            </p>
-            <p className="text-xs text-text-secondary">{t('verifyDetail.commits') as string}</p>
-          </div>
-          <div className="rounded-[3px] border border-stroke bg-bg px-3 py-2 text-center">
-            <p className="font-heading text-sm font-bold text-text-primary">
-              {record.prsMergedCount}
-            </p>
-            <p className="text-xs text-text-secondary">{t('verifyDetail.prsMerged') as string}</p>
-          </div>
-          <div className="rounded-[3px] border border-stroke bg-bg px-3 py-2 text-center">
-            <p className="font-heading text-sm font-bold text-text-primary">
-              {record.reviewsSubmittedCount}
-            </p>
-            <p className="text-xs text-text-secondary">{t('verifyDetail.reviews') as string}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-stroke pt-4">
-        <p className="text-xs text-text-secondary">
-          {t('verifyDetail.generatedOn') as string} {record.generatedAt}
-        </p>
-        <Link
-          href={`/u/${record.handle}/badge.svg`}
-          className="text-xs text-complement-text hover:text-complement-text-hover"
-        >
-          {t('verifyDetail.viewBadge') as string}
-        </Link>
-      </div>
-    </StatusCallout>
-  );
-}
-
-function NotFoundCard({ hash, t }: { hash: string; t: TFunc }) {
+/** #1335 phase 5 — a well-formed pre-v7 hash is terminal, not a lookup miss:
+ * `verification_records` no longer exists, so there is nothing left to find. */
+function RetiredV6Card({ hash, t }: { hash: string; t: TFunc }) {
   return (
     <StatusCallout
       variant="warning"
-      title={t('verifyDetail.notFoundTitle') as string}
+      title={t('verifyDetail.retiredTitle') as string}
       titleAs="h1"
-      description={t('verifyDetail.notFoundDescription') as string}
+      description={t('verifyDetail.retiredDescription') as string}
     >
       <div className="rounded-[3px] border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">{t('verifyDetail.hashLabel') as string}</p>
@@ -303,9 +159,6 @@ function NotFoundCard({ hash, t }: { hash: string; t: TFunc }) {
           {hash}
         </p>
       </div>
-      <p className="mt-4 text-sm text-text-secondary">
-        {t('verifyDetail.notFoundExplanation') as string}
-      </p>
     </StatusCallout>
   );
 }

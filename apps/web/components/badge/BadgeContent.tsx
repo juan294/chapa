@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { useTranslation } from "@/lib/i18n";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import { InlineBadgeSvg } from "./InlineBadgeSvg";
 
 export interface BadgeContentProps {
   stats: StatsData;
-  impact: ImpactV6Result;
+  /** #1335 — v7.2 is the one scoring policy this wrapper draws. */
+  scoring: ScoreViewModel;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -35,7 +37,7 @@ export interface BadgeContentProps {
  */
 export function BadgeContent({
   stats,
-  impact,
+  scoring,
   className = "",
   style,
 }: BadgeContentProps) {
@@ -43,10 +45,11 @@ export function BadgeContent({
 
   const svg = useMemo(
     () =>
-      renderBadgeSvg(stats, impact, {
-        strings: buildBadgeI18nStrings(t, impact.tier),
+      renderBadgeSvg(stats, {
+        scoring,
+        strings: buildBadgeI18nStrings(t, scoring.tier),
       }),
-    [stats, impact, t],
+    [stats, scoring, t],
   );
 
   return (

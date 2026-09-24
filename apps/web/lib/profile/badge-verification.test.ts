@@ -2,13 +2,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("./score-receipt-v7", () => ({ readScoreReceiptV7: vi.fn() }));
 vi.mock("./score-receipt-observed", () => ({ readObservedScoreReceipt: vi.fn() }));
-vi.mock("./public-profile", () => ({ getPublicProfileVerification: vi.fn() }));
 vi.mock("@/lib/verification/receipt-token", () => ({ deriveReceiptVerificationTokenV7: vi.fn() }));
 vi.mock("@/lib/verification/store", () => ({ getReceiptVerificationV7: vi.fn() }));
 
 import { readScoreReceiptV7 } from "./score-receipt-v7";
 import { readObservedScoreReceipt } from "./score-receipt-observed";
-import { getPublicProfileVerification } from "./public-profile";
 import { deriveReceiptVerificationTokenV7 } from "@/lib/verification/receipt-token";
 import { getReceiptVerificationV7 } from "@/lib/verification/store";
 import { resolveBadgeVerification } from "./badge-verification";
@@ -20,15 +18,14 @@ const snapshot = {
     contentHash: { value: "hash-a" },
   },
 };
-const profile = (policyVersion: "v6" | "v7" | "v7.2") => ({
-  stats: { handle: "alice" }, displayImpact: {}, statsComplete: true,
+const profile = (policyVersion: "v7" | "v7.2") => ({
+  stats: { handle: "alice" },
   scoring: { policyVersion, identity },
 }) as unknown as Parameters<typeof resolveBadgeVerification>[0];
 
 beforeEach(() => {
   vi.mocked(readObservedScoreReceipt).mockReset();
   vi.mocked(readScoreReceiptV7).mockReset().mockResolvedValue(snapshot as never);
-  vi.mocked(getPublicProfileVerification).mockReset();
   vi.mocked(deriveReceiptVerificationTokenV7).mockReset().mockResolvedValue("v7.revision-a.sig");
   vi.mocked(getReceiptVerificationV7).mockReset().mockResolvedValue({
     version: "v7", status: "current", revisionId: "revision-a", issuanceRecorded: true,
@@ -46,12 +43,12 @@ describe("resolveBadgeVerification", () => {
     expect(await resolveBadgeVerification(profile("v7.2"))).toEqual({ hash: "v7.revision-a.sig", date: "2026-09-01" });
     expect(readObservedScoreReceipt).toHaveBeenCalledWith("alice", "revision-a");
     expect(readScoreReceiptV7).not.toHaveBeenCalled();
-    expect(getPublicProfileVerification).not.toHaveBeenCalled();
   });
-  it("attests a v6 badge with the v6 HMAC record", async () => {
-    vi.mocked(getPublicProfileVerification).mockReturnValue({ hash: "abc123", date: "2026-09-01" });
-    expect(await resolveBadgeVerification(profile("v6"))).toEqual({ hash: "abc123", date: "2026-09-01" });
+
+  it("returns null when there is no receipt to attest (no scoring model)", async () => {
+    expect(await resolveBadgeVerification({ stats: { handle: "alice" }, scoring: undefined } as unknown as Parameters<typeof resolveBadgeVerification>[0])).toBeNull();
     expect(readScoreReceiptV7).not.toHaveBeenCalled();
+    expect(readObservedScoreReceipt).not.toHaveBeenCalled();
   });
 
   it("reads materialized A exactly even when latest B exists", async () => {
@@ -60,7 +57,6 @@ describe("resolveBadgeVerification", () => {
     } as never);
     expect(await resolveBadgeVerification(profile("v7"))).toEqual({ hash: "v7.revision-a.sig", date: "2026-09-01" });
     expect(readScoreReceiptV7).toHaveBeenCalledWith("alice", "revision-a");
-    expect(getPublicProfileVerification).not.toHaveBeenCalled();
   });
 
   it("permits recorded superseded A to verify the badge that still displays A", async () => {

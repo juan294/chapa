@@ -21,7 +21,7 @@ test.describe("Badge endpoint — /u/:handle/badge.svg", () => {
     expect(body).toMatch(/^<svg /);
   });
 
-  test("successful response includes public cache headers", async ({
+  test("cache headers match the badge's scoring state", async ({
     request,
   }) => {
     const response = await request.get(smokeBadgePath);
@@ -35,9 +35,19 @@ test.describe("Badge endpoint — /u/:handle/badge.svg", () => {
     // response leaves the edge — not observable here against the local
     // webServer, and deliberately not asserted in E2E; see phase 1 of the
     // hotfix plan).
+    // #1335: only a drawable receipt is publicly cacheable. A subject with no
+    // receipt yet (collecting, action needed, or never signed up, which is
+    // what `octocat` is outside the seeded fixture stack) is served no-store,
+    // so it can never outlive its own state change.
     const cacheControl = response.headers()["cache-control"] ?? "";
-    expect(cacheControl).toContain("public");
-    expect(cacheControl).toContain("max-age");
+    const state = (await response.text()).match(/data-chapa-state="([a-z_]+)"/)?.[1];
+    if (state === "rendered") {
+      expect(cacheControl).toContain("public");
+      expect(cacheControl).toContain("max-age");
+    } else {
+      expect(["collecting", "action_needed", "unregistered"]).toContain(state);
+      expect(cacheControl).toContain("no-store");
+    }
   });
 
   test("syntactically invalid handle returns 400 with SVG body", async ({

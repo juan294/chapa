@@ -2,7 +2,7 @@
 
 Chapa exposes 19 browser-native WebMCP page/tool registrations across 18 distinct names; `explain_dimension` is shared by Studio and public profiles. They let an agent work on the same page state that a person can see. Studio mutations use the existing command system. Landing, public profile, and verification tools are read-only.
 
-Public tools that can return GitHub-controlled names or fetched public content also set `untrustedContentHint: true`. Verification records are projected to their public shape and never expose the internal confidence value.
+Public tools that can return GitHub-controlled names or fetched public content also set `untrustedContentHint: true`. Verification results are projected to their public shape and never expose confidence data, which no longer exists in the current scoring model.
 
 Runtime status was verified against production on 2026-09-01. Flagged Google Chrome 151 passed native registration, discovery, and execution for the preview-only `chapa_hello` gate, then the production preflight found all 19 registrations across 18 distinct names on the four live surfaces. Release v2.29.0 added the nine-tool remote MCP endpoint and static discovery declarations. The ChatGPT in-app browser remains untested. This is not evidence of a ChatGPT compatibility failure.
 
@@ -43,9 +43,9 @@ These tools orient and navigate only. They fetch no data and do not wrap the pub
 | `preview_badge` | `EMPTY` | yes | Returns the current configuration, public badge SVG URL, and save status. |
 | `reset_badge_config` | `EMPTY` | no | Runs the visible `/reset` command and returns terminal output plus the reset configuration snapshot. |
 | `save_badge_config` | `EMPTY` | no | Opens an on-page save proposal. It never calls the save API itself. Only a human click on the confirmation control can continue. |
-| `simulate_score` | `SIMULATION` or current count scenario | yes | Current `v7.2` uses fixed receipt inputs/window and four 25% core weights. `{ "counts": { "deliveryUnits": { "lower": 12, "upper": 12 } } }` overrides public evidence counts; omitted counts stay fixed. Direct dimension overrides are explicitly hypothetical and make no attainment claim. Craft overrides never change core. Results include `hypothetical`, policy, baseline revision, inputs, exact/display values and scope. Legacy `v6` retains recency/confidence behavior. It never publishes a receipt. |
-| `suggest_improvements` | `EMPTY` | yes | Current scoring describes evidence to document without proficiency labels or promised score gains. Legacy scoring retains its existing insight engine. |
-| `explain_dimension` | `DIMENSION` | yes | Returns selected current points and public observed traces; Craft reports outcome credits, period and coverage without legacy proficiency. The legacy branch retains its existing explanation. |
+| `simulate_score` | `SIMULATION` or current count scenario | yes | `v7.2` (the only policy) uses fixed receipt inputs/window and four 25% core weights. `{ "counts": { "deliveryUnits": { "lower": 12, "upper": 12 } } }` overrides public evidence counts; omitted counts stay fixed. Direct dimension overrides are explicitly hypothetical and make no attainment claim. Craft overrides never change core. Results include `hypothetical`, policy, baseline revision, inputs, exact/display values and scope. It never publishes a receipt. |
+| `suggest_improvements` | `EMPTY` | yes | Describes evidence to document without proficiency labels or promised score gains. |
+| `explain_dimension` | `DIMENSION` | yes | Returns selected current points and public observed traces; Craft reports outcome credits, period and coverage. |
 
 ### Public profile: `/u/[handle]`
 
@@ -53,9 +53,9 @@ These tools receive the same server-computed public data as the rendered page. V
 
 | Tool | Input | `readOnlyHint` | Behavior |
 | --- | --- | --- | --- |
-| `get_impact_profile` | `EMPTY` | yes | Returns canonical `displayScore`, separate `exactScore`, selected dimensions and `exactDimensions`, machine policy, receipt identity, observation window, nullable archetype and explicit report Craft. Valid Craft zero is retained; absent/expired Craft has no numeric value. `legacy.impact` contains compatibility aggregates. Public stats and receipt verification remain separate. It makes no request. |
+| `get_impact_profile` | `EMPTY` | yes | Returns canonical `displayScore`, separate `exactScore`, selected dimensions and `exactDimensions`, machine policy, receipt identity, observation window, nullable archetype and explicit report Craft. Valid Craft zero is retained; absent/expired Craft has no numeric value. When there is no drawable current receipt yet, returns `scoringStatus` instead (collecting, action needed, unregistered, or ready-and-updating). Public stats and receipt verification remain separate. It makes no request. |
 | `get_impact_history` | `EMPTY` | yes | Fetches `/api/history/[handle]?include=snapshots,trend` with the tool cancellation signal. It returns friendly messages for missing or rate-limited data. |
-| `verify_badge` | `EMPTY` | yes | Fetches the verification API and preserves its top-level versioned envelope, revision, issuance authentication and arithmetic status. HTTP 410 remains revoked, not a generic failure or an authentication claim. Legacy responses retain the public record projection. |
+| `verify_badge` | `EMPTY` | yes | Fetches the verification API and preserves its top-level versioned envelope, revision, issuance authentication and arithmetic status. HTTP 410 remains revoked, not a generic failure or an authentication claim; a well-formed pre-v7 hash answers HTTP 410 `retired_v6_code`, since `verification_records` no longer exists. |
 | `explain_dimension` | `DIMENSION` | yes | Uses the same shared explanation tool as Studio. It operates on the current public page data. |
 | `compare_profiles` | `COMPARE` | yes | Compares canonical selected values only when machine policy and core observation period agree. Mixed policies, periods, unavailable profiles and non-point evidence return `not_comparable` with `differences: null`. Each side retains exact/display values and receipt context. Different Craft report periods leave core comparable but set `craftComparison` to `not_comparable` and omit Craft deltas. Unknown HTTP fields are never echoed as a scoring model. |
 | `get_embed_snippet` | `EMPTY` | yes | Returns the page's canonical Markdown and HTML embed snippets for the live badge. |
@@ -67,7 +67,7 @@ These tools are present only when the page found a verification record.
 | Tool | Input | `readOnlyHint` | Behavior |
 | --- | --- | --- | --- |
 | `get_verification_record` | `EMPTY` | yes | Serializes the hash and the verification record already displayed on the page. It makes no request. |
-| `explain_verification` | `EMPTY` | yes | Explains the HMAC-SHA256 process, what the record proves, what it does not prove, record expiry, and whether the displayed code is current or legacy format. |
+| `explain_verification` | `EMPTY` | yes | Explains the receipt-token verification process, what the record proves, what it does not prove, and record expiry. A well-formed pre-v7 hash is a retired v6 code (HTTP 410), not a lookup. |
 
 ## Remote MCP endpoint
 

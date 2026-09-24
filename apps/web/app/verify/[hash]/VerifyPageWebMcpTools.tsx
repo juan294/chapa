@@ -3,10 +3,6 @@
 import { useMemo } from "react";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import {
-  toPublicVerificationRecord,
-  type PublicVerificationRecord,
-} from "@/lib/verification/types";
-import {
   VERIFICATION_EXPLANATION,
   RECEIPT_VERIFICATION_EXPLANATION,
   verificationCodeFormat,
@@ -21,32 +17,28 @@ import {
   type WebMcpTool,
 } from "@/lib/webmcp/use-model-context-tools";
 
-type VerifyPageWebMcpToolsProps = { hash: string } & (
-  | { version: "v7"; record?: never }
-  | { version?: "v6"; record: PublicVerificationRecord }
-);
-
-export function VerifyPageWebMcpTools({
-  hash,
-  record,
-  version = "v6",
-}: VerifyPageWebMcpToolsProps) {
+/**
+ * #1335 phase 5 — `verification_records` and the legacy static-record mode
+ * are retired. Every hash (a v7 receipt token, or a well-formed legacy code
+ * that now answers 410 `retired_v6_code`) is resolved the same way: a live
+ * `GET /api/verify/<hash>` call. There is nothing left to embed at render
+ * time, so this component takes only the hash and whether it parses as a
+ * v7 token (which only changes which explanation is returned).
+ */
+export function VerifyPageWebMcpTools({ hash, isV7 }: { hash: string; isV7: boolean }) {
   const { webmcpEnabled } = useClientFeatureFlags();
   const tools = useMemo<WebMcpTool[]>(() => {
     if (!webmcpEnabled) return [];
-    const publicRecord = record ? toPublicVerificationRecord(record) : null;
-
     const codeFormat = verificationCodeFormat(hash);
 
     return [
       {
         name: "get_verification_record",
         description:
-          "Return the verification hash and record displayed on this page.",
+          "Return the verification result displayed on this page.",
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
         execute: async (_input, context) => {
-          if (version !== "v7") return JSON.stringify({ version: "v6", hash, record: publicRecord });
           try {
             const response = await fetch(`/api/verify/${hash}`, { cache: "no-store", signal: context.signal });
             if (response.ok || response.status === 410) return JSON.stringify(await response.json());
@@ -61,12 +53,12 @@ export function VerifyPageWebMcpTools({
         inputSchema: WEBMCP_EMPTY_INPUT_SCHEMA,
         annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
         execute: () => JSON.stringify({
-          ...(version === "v7" ? RECEIPT_VERIFICATION_EXPLANATION : VERIFICATION_EXPLANATION),
+          ...(isV7 ? RECEIPT_VERIFICATION_EXPLANATION : VERIFICATION_EXPLANATION),
           codeFormat,
         }),
       },
     ];
-  }, [hash, record, version, webmcpEnabled]);
+  }, [hash, isV7, webmcpEnabled]);
 
   useModelContextTools(tools, webmcpEnabled);
   return null;

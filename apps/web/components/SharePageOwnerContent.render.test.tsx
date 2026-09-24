@@ -2,7 +2,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { SharePageOwnerContent } from "./SharePageOwnerContent";
-import type { ImpactV6Result, StatsData } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 import type { SessionUser } from "@/hooks/useSession";
 
 interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
@@ -75,21 +76,6 @@ const MOCK_STATS = {
   heatmapData: [],
 } as unknown as StatsData;
 
-const MOCK_IMPACT = {
-  handle: "testuser",
-  delivery: 75,
-  quality: 80,
-  consistency: 70,
-  breadth: 65,
-  archetype: "builder",
-  compositeScore: 72,
-  adjustedComposite: 70,
-  confidence: 85,
-  confidenceReasons: [],
-  tier: "Solid",
-  dimensions: [],
-} as unknown as ImpactV6Result;
-
 beforeEach(() => {
   mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
 });
@@ -112,7 +98,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -134,7 +120,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -157,7 +143,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -175,7 +161,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -196,7 +182,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -219,7 +205,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -247,7 +233,7 @@ describe("SharePageOwnerContent — render", () => {
         <SharePageOwnerContent
           handle="testuser"
           stats={MOCK_STATS}
-          impact={MOCK_IMPACT}
+          scoring={makeScoring()}
         />,
       );
 
@@ -269,7 +255,7 @@ describe("SharePageOwnerContent — render", () => {
         <SharePageOwnerContent
           handle="testuser"
           stats={MOCK_STATS}
-          impact={MOCK_IMPACT}
+          scoring={makeScoring()}
           embedMarkdown={canonicalMarkdown}
         />,
       );
@@ -286,7 +272,7 @@ describe("SharePageOwnerContent — render", () => {
         <SharePageOwnerContent
           handle="testuser"
           stats={MOCK_STATS}
-          impact={MOCK_IMPACT}
+          scoring={makeScoring()}
           embedHtml={canonicalHtml}
         />,
       );
@@ -311,7 +297,7 @@ describe("SharePageOwnerContent — render", () => {
         <SharePageOwnerContent
           handle="testuser"
           stats={MOCK_STATS}
-          impact={MOCK_IMPACT}
+          scoring={makeScoring()}
           isOwner={true}
         />,
       );
@@ -335,7 +321,7 @@ describe("SharePageOwnerContent — render", () => {
         <SharePageOwnerContent
           handle="testuser"
           stats={MOCK_STATS}
-          impact={MOCK_IMPACT}
+          scoring={makeScoring()}
           isOwner={false}
         />,
       );
@@ -352,7 +338,7 @@ describe("SharePageOwnerContent — render", () => {
         <SharePageOwnerContent
           handle="testuser"
           stats={MOCK_STATS}
-          impact={MOCK_IMPACT}
+          scoring={makeScoring()}
           isOwner={true}
         />,
       );
@@ -371,8 +357,8 @@ describe("SharePageOwnerContent — render", () => {
     render(
       <SharePageOwnerContent
         handle="testuser"
-        stats={MOCK_STATS}
-        impact={null}
+        stats={null}
+        scoring={makeScoring()}
       />,
     );
 
@@ -392,8 +378,8 @@ describe("SharePageOwnerContent — render", () => {
     render(
       <SharePageOwnerContent
         handle="testuser"
-        stats={MOCK_STATS}
-        impact={null}
+        stats={null}
+        scoring={makeScoring()}
       />,
     );
 
@@ -413,8 +399,8 @@ describe("SharePageOwnerContent — render", () => {
     render(
       <SharePageOwnerContent
         handle="testuser"
-        stats={MOCK_STATS}
-        impact={null}
+        stats={null}
+        scoring={makeScoring()}
       />,
     );
 
@@ -452,8 +438,8 @@ describe("SharePageOwnerContent — render", () => {
     render(
       <SharePageOwnerContent
         handle="testuser"
-        stats={MOCK_STATS}
-        impact={null}
+        stats={null}
+        scoring={makeScoring()}
       />,
     );
 
@@ -476,8 +462,8 @@ describe("SharePageOwnerContent — render", () => {
     render(
       <SharePageOwnerContent
         handle="testuser"
-        stats={MOCK_STATS}
-        impact={null}
+        stats={null}
+        scoring={makeScoring()}
       />,
     );
 
@@ -501,8 +487,8 @@ describe("SharePageOwnerContent — render", () => {
     render(
       <SharePageOwnerContent
         handle="testuser"
-        stats={MOCK_STATS}
-        impact={null}
+        stats={null}
+        scoring={makeScoring()}
       />,
     );
 
@@ -531,7 +517,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={null}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -551,7 +537,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
         staleFallback={{ observedAt: "2026-04-16T00:00:00.000Z" }}
       />,
     );
@@ -571,7 +557,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
       />,
     );
 
@@ -591,7 +577,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
         isOwner={true}
         reconnectNeeded={["bitbucket", "gitlab"]}
       />,
@@ -612,7 +598,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
         isOwner={true}
       />,
     );
@@ -630,7 +616,7 @@ describe("SharePageOwnerContent — render", () => {
       <SharePageOwnerContent
         handle="testuser"
         stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
+        scoring={makeScoring()}
         isOwner={false}
         reconnectNeeded={["bitbucket"]}
       />,
@@ -643,7 +629,7 @@ describe("SharePageOwnerContent — render", () => {
 it("never falls back to legacy arithmetic when the current receipt explanation is unavailable", async () => {
   const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
   const fixture = await scoringConsistencyFixture({ craft: 57 });
-  render(<SharePageOwnerContent handle="alice" stats={fixture.stats} impact={fixture.impact} scoring={fixture.model} isOwner receiptExplanation={null} />);
+  render(<SharePageOwnerContent handle="alice" stats={fixture.stats} scoring={fixture.model} isOwner receiptExplanation={null} />);
   expect(screen.queryByText("How is my score calculated?")).toBeNull();
   expect(screen.queryByText(/confidence adjustment/i)).toBeNull();
 });

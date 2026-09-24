@@ -58,7 +58,7 @@ The strict receipt schema rejects all unrecognized fields at every depth and acc
 
 No Craft payload (`null`), no eligible portfolio (`not_observed`) and an assessed portfolio with measured zero (`observed` with zero) remain distinct. None changes the four-dimension core.
 
-Public aggregate receipt retention ends on owner withdrawal/deletion. S14 removes public access/private backing data and retains only a content-free revocation tombstone. Independently downloaded copies cannot be recalled; publication consent must explain that consequence.
+Public aggregate receipt retention ends on owner withdrawal/deletion. S14 removes public access/private backing data and retains only a content-free revocation tombstone. Independently downloaded copies cannot be recalled; the withdrawal/deletion flow must explain that consequence.
 
 ## Historical limits and verification
 

@@ -1,10 +1,12 @@
-import { createScoringWindow, sealObservedScoreReceipt, type CoreCountInputs, type ImpactV6Result, type PublicObservedCraft } from "@chapa/shared";
+import { createScoringWindow, sealObservedScoreReceipt, type CoreCountInputs, type PublicObservedCraft } from "@chapa/shared";
 import { observedReceiptFixture } from "@/lib/history/__fixtures__/receipts-observed";
 import { calculateReportCraftInputs } from "@/lib/insights/report-craft";
-import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
+import { DEMO_STATS } from "@/lib/render/demoData";
 import { observedReceiptViewModel } from "../score-view-model";
 
-/** Synthetic, replayable current receipt beside deliberately contradictory legacy fields. */
+/** Synthetic, replayable current receipt (#1335 phase 5 — no more legacy v6
+ * fields alongside it; every consumer now reads the v7.2 receipt view model
+ * or raw `StatsData`). */
 export async function scoringConsistencyFixture(options: { craft?: "none" | 57 | 0 | "expired"; boundary?: boolean } = {}) {
   const referenceTime = "2026-09-08T10:00:00.000Z";
   const window = createScoringWindow(referenceTime);
@@ -29,7 +31,6 @@ export async function scoringConsistencyFixture(options: { craft?: "none" | 57 |
     receiptId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", revisionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" });
   const envelope = await sealObservedScoreReceipt({ ...base.receipt, coverage: [{ sourceRef: "source-1", provider: "github", status: "partial", dataThrough: referenceTime, discovery: "owned_and_contributed", accessibleRepositoryCount: 4, repositoryDiscoveryComplete: false, reasonCodes: ["discovery_incomplete"], unknownPeriods: [] }] });
   const model = observedReceiptViewModel("alice", { receipt: envelope, trend: null }, Date.parse(referenceTime));
-  const impact: ImpactV6Result = { ...DEMO_IMPACT, handle: "alice", dimensions: { delivery: 88, quality: 72, consistency: 80, breadth: 65, craft: 83 }, archetype: "Builder", compositeScore: 80, adjustedComposite: 80, tier: "High", computedAt: referenceTime };
   const stats = { ...DEMO_STATS, handle: "alice", displayName: "Alice Example", fetchedAt: referenceTime };
-  return { impact, stats, model, envelope };
+  return { stats, model, envelope };
 }

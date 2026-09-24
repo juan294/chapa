@@ -9,7 +9,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 describe("observed badge presentation", () => {
   it.each(["none", 57, 0, "expired"] as const)("renders the receipt's %s Craft state without legacy traps", async craft => {
     const fixture = await scoringConsistencyFixture({ craft });
-    const svg = renderBadgeSvg(fixture.stats, fixture.impact, { scoring: fixture.model, disableAnimation: true });
+    const svg = renderBadgeSvg(fixture.stats, { scoring: fixture.model, disableAnimation: true });
     expect(svg).toMatch(/data-element="score"[^>]*>46<\/text>/);
     expect(svg).not.toContain("Builder");
     expect(svg).not.toContain("Craft practice portfolio");
@@ -29,26 +29,26 @@ describe("observed badge presentation", () => {
   it("localizes trace-derived Craft evidence and unavailable state in Spanish", async () => {
     const fixture = await scoringConsistencyFixture({ craft: 57 });
     const strings = buildBadgeI18nStrings(key => resolveTranslation(key, es), fixture.model.tier);
-    const svg = renderBadgeSvg(fixture.stats, fixture.impact, { scoring: fixture.model, strings, disableAnimation: true });
+    const svg = renderBadgeSvg(fixture.stats, { scoring: fixture.model, strings, disableAnimation: true });
     expect(svg).toContain("Craft: 57/100 a partir de 5.7 sesiones");
     expect(svg).toContain("Resultados clasificados: 8/10");
     expect(svg).toContain("fin exclusivo");
     expect(svg).not.toContain("Observed core score");
     const expired = await scoringConsistencyFixture({ craft: "expired" });
-    const expiredSvg = renderBadgeSvg(expired.stats, expired.impact, { scoring: expired.model, strings, disableAnimation: true });
+    const expiredSvg = renderBadgeSvg(expired.stats, { scoring: expired.model, strings, disableAnimation: true });
     expect(expiredSvg).toContain("Actualiza insights");
     expect(expiredSvg).not.toContain("Craft: 57/100");
   });
 
   it("identifies illustrative scoring models in the accessible description", async () => {
     const fixture = await scoringConsistencyFixture({ craft: 57 });
-    const svg = renderBadgeSvg(fixture.stats, fixture.impact, { scoring: { ...fixture.model, illustrative: true }, disableAnimation: true });
+    const svg = renderBadgeSvg(fixture.stats, { scoring: { ...fixture.model, illustrative: true }, disableAnimation: true });
     expect(svg).toContain("Illustrative scoring example.");
   });
 
   it("preserves the canonical boundary decimal and its below-boundary tier", async () => {
     const fixture = await scoringConsistencyFixture({ craft: 57, boundary: true });
-    const svg = renderBadgeSvg(fixture.stats, fixture.impact, { scoring: fixture.model });
+    const svg = renderBadgeSvg(fixture.stats, { scoring: fixture.model });
     expect(svg).toMatch(/data-element="score"[^>]*>69\.99<\/text>/);
     expect(svg).toMatch(/data-element="tier"[^>]*>Solid<\/text>/);
   });

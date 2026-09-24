@@ -3,15 +3,14 @@ import { buildReceiptSnapshotV7 } from "@/lib/history/snapshot";
 import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
 import {
   CORE_DIMENSION_KEYS,
-  legacyViewModel,
   receiptViewModel,
   renderableScore,
   sameScoredRevision,
   type ScoreViewModel,
 } from "@/lib/profile/score-view-model";
-import type { ImpactV6Result } from "@chapa/shared";
 import { renderBadgeSvg } from "./BadgeSvg";
 import { DEMO_STATS } from "./demoData";
+import { DEMO_SCORING } from "./__fixtures__/demo-scoring";
 import { buildBadgeI18nStrings } from "./badge-i18n-strings";
 
 /**
@@ -62,22 +61,6 @@ describe("one revision, one set of rendered numbers", () => {
     if (delivery.kind === "range") expect(rendered.dimensions.delivery).toBe(delivery.displayLower);
   });
 
-  it("still renders a legacy v6 aggregate, with no range and no receipt identity", () => {
-    const legacy: ImpactV6Result = {
-      handle: "alice", profileType: "collaborative",
-      dimensions: { delivery: 70, quality: 60, consistency: 50, breadth: 40 },
-      archetype: "Builder", compositeScore: 55, confidence: 90, confidencePenalties: [],
-      adjustedComposite: 55, tier: "Solid", computedAt: "2026-09-01T12:00:00.000Z",
-    };
-    const rendered = renderableScore(legacyViewModel(legacy));
-
-    expect(rendered).toEqual({
-      dimensions: { delivery: 70, quality: 60, consistency: 50, breadth: 40 },
-      composite: 55, tier: "Solid", archetype: "Builder", rangeKeys: [],
-    });
-    expect(legacyViewModel(legacy).identity).toBeNull();
-  });
-
   it("separates two revisions of the same receipt", async () => {
     const first = await receiptFixtureV7("2026-09-01", 4);
     const corrected = await receiptFixtureV7("2026-09-01", 9, first.receipt);
@@ -95,36 +78,12 @@ describe("one revision, one set of rendered numbers", () => {
 /**
  * The cutover regression. The badge is the artifact people embed, so it is the
  * surface where a wrong policy version does the most damage: a v7 range drawn
- * as a v6 point publishes a claim the evidence does not support, and a v6
- * aggregate drawn as v7 explains legacy arithmetic that never ran.
+ * as a point publishes a claim the evidence does not support (#1335 phase 5 —
+ * "delete v6": every drawn magnitude now comes from the supplied `scoring`
+ * model; there is no legacy aggregate to accidentally fall back to).
  */
 describe("badge SVG renders the resolved policy version", () => {
   const stats = DEMO_STATS;
-  /** The badge still takes a v6 impact; with a v7 model supplied every drawn
-   *  magnitude comes from the model, so these values must never surface. */
-  const unusedLegacy: ImpactV6Result = {
-    handle: "alice", profileType: "collaborative",
-    dimensions: { delivery: 1, quality: 2, consistency: 3, breadth: 4 },
-    archetype: "Emerging", compositeScore: 3, confidence: 50, confidencePenalties: [],
-    adjustedComposite: 3, tier: "Emerging", computedAt: "2026-09-01T12:00:00.000Z",
-  };
-
-  it("draws a v6 aggregate unchanged, with its Craft axis intact", () => {
-    const impact: ImpactV6Result = {
-      handle: "alice", profileType: "collaborative",
-      dimensions: { delivery: 61, quality: 72, consistency: 55, breadth: 40, craft: 66 },
-      archetype: "Builder", compositeScore: 57, confidence: 90, confidencePenalties: [],
-      adjustedComposite: 57, tier: "Solid", computedAt: "2026-09-01T12:00:00.000Z",
-    };
-
-    const svg = renderBadgeSvg(stats, impact);
-
-    expect(svg).toContain(">57<");
-    expect(svg).toContain("Solid");
-    expect(svg).toContain("Builder");
-    // Five axes: Craft is a core dimension under v6 semantics.
-    expect(svg).toContain("Craft");
-  });
 
   it("prints a v7 evidence range as an interval, and refuses to guess an archetype", async () => {
     const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 9, undefined, true), null);
@@ -133,10 +92,10 @@ describe("badge SVG renders the resolved policy version", () => {
     // Any non-point dimension forbids a definitive archetype.
     expect(model.archetype).toBeNull();
 
-    const svg = renderBadgeSvg(stats, unusedLegacy, { scoring: model });
+    const svg = renderBadgeSvg(stats, { scoring: model });
 
     const composite = model.composite as { displayLower: number; displayUpper: number };
-    expect(svg).toContain(`${composite.displayLower}\u2013${composite.displayUpper}`);
+    expect(svg).toContain(`${composite.displayLower}–${composite.displayUpper}`);
     expect(svg).toContain("insufficient evidence");
     // Craft is never a core axis under v7, so the radar stays a diamond.
     expect(svg).not.toContain("Craft");
@@ -146,7 +105,7 @@ describe("badge SVG renders the resolved policy version", () => {
     const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 9, undefined, true), null);
     const straddling = { ...receiptViewModel("alice", snapshot), tier: null };
 
-    const svg = renderBadgeSvg(stats, unusedLegacy, { scoring: straddling });
+    const svg = renderBadgeSvg(stats, { scoring: straddling });
 
     expect(svg).toContain("evidence range");
     for (const tier of ["Emerging", "Solid", "High", "Elite"]) expect(svg).not.toContain(`>${tier}<`);
@@ -192,19 +151,15 @@ describe("the drawn label comes from the drawn model", () => {
  * by `describeScoringEvidence`, so the tier inside it stays canonical. A
  * translated word there would read as "Alto tier" mid-sentence, and — the
  * reason this is a regression rather than a preference — it would change the
- * `<desc>` of every existing v6 static badge rendered in a non-default locale.
+ * `<desc>` of every existing static badge rendered in a non-default locale.
  */
 describe("the accessible description stays locale-independent", () => {
   const spanish = (key: string) => (key === "tiers.high" ? "Alto" : key === "tiers.solid" ? "Sólido" : key);
-  const v6: ImpactV6Result = {
-    handle: "alice", profileType: "collaborative",
-    dimensions: { delivery: 61, quality: 72, consistency: 55, breadth: 40 },
-    archetype: "Builder", compositeScore: 57, confidence: 90, confidencePenalties: [],
-    adjustedComposite: 57, tier: "Solid", computedAt: "2026-09-01T12:00:00.000Z",
-  };
+  const solidModel: ScoreViewModel = { ...DEMO_SCORING, tier: "Solid" };
 
   it("keeps the canonical tier in <desc> while the drawn label is translated", () => {
-    const svg = renderBadgeSvg(DEMO_STATS, v6, {
+    const svg = renderBadgeSvg(DEMO_STATS, {
+      scoring: solidModel,
       disableAnimation: true,
       strings: buildBadgeI18nStrings(spanish, "Solid"),
     });
@@ -220,7 +175,7 @@ describe("the accessible description stays locale-independent", () => {
     const snapshot = buildReceiptSnapshotV7(await receiptFixtureV7("2026-09-01", 9, undefined, true), null);
     const model = { ...receiptViewModel("alice", snapshot), tier: null };
 
-    const svg = renderBadgeSvg(DEMO_STATS, v6, { scoring: model, disableAnimation: true });
+    const svg = renderBadgeSvg(DEMO_STATS, { scoring: model, disableAnimation: true });
 
     expect(svg).toContain("unassigned tier");
   });
@@ -236,12 +191,6 @@ describe("the accessible description stays locale-independent", () => {
  * the headline inside the ring for every width a score can take.
  */
 describe("the headline fits inside the score ring", () => {
-  const legacyStub: ImpactV6Result = {
-    handle: "alice", profileType: "collaborative",
-    dimensions: { delivery: 1, quality: 2, consistency: 3, breadth: 4 },
-    archetype: "Emerging", compositeScore: 3, confidence: 50, confidencePenalties: [],
-    adjustedComposite: 3, tier: "Emerging", computedAt: "2026-09-01T12:00:00.000Z",
-  };
   const RING_CLEAR_WIDTH = 88;   // r=46, 4px stroke
   const MONO_ADVANCE = 0.6;      // JetBrains Mono advances 0.6em per glyph
 
@@ -269,7 +218,7 @@ describe("the headline fits inside the score ring", () => {
       coverage: [], exclusions: [], limitations: [],
     } as unknown as ScoreViewModel;
 
-    const { text, size } = headline(renderBadgeSvg(DEMO_STATS, legacyStub, { scoring: model }));
+    const { text, size } = headline(renderBadgeSvg(DEMO_STATS, { scoring: model }));
 
     expect(text.length * size * MONO_ADVANCE).toBeLessThanOrEqual(RING_CLEAR_WIDTH);
   });

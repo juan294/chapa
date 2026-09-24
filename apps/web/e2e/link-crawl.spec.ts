@@ -134,6 +134,9 @@ async function visit(page: Page, origin: string, path: string, from: string, dep
   // measure the page the user ends up on.
   const measure = () => page.evaluate(({ fixtureHandles, currentOrigin }) => {
     const root = document.documentElement;
+    // Mid-navigation the old document can be swapped out before the new one
+    // has a root element; report it so the retry below waits for the load.
+    if (!root) throw new Error("navigation in progress: no document element yet");
     const anchors = [...document.querySelectorAll("a[href]")] as HTMLAnchorElement[];
     const hrefs = anchors.map((a) => a.getAttribute("href") ?? "");
     const images = [...document.querySelectorAll("img")] as HTMLImageElement[];

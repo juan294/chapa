@@ -15,10 +15,10 @@ Chapa is a free, open web application that generates live, embeddable SVG badges
 Chapa reports an **observed engineering activity and practices index** over a
 declared evidence scope. It does not certify ability, causal business impact,
 architecture, reliability or security. "Complete" means complete for the
-connected, consented sources and the reference window named in the receipt —
+connected, authorized sources and the reference window named in the receipt —
 never all work a person has done.
 
-Read policyVersion on every response: v6 remains the rollout-off policy. The archived v7.1 algorithm (machine policy v7) retains its original evidence-completion range arithmetic and immutable receipts. Current v7.2 receipts use the point policy below. A missing current receipt is explicitly labelled legacy; an unavailable authoritative read is not replaced by a fabricated current score.
+Read policyVersion on every response: v7.2 is the one current policy. The archived v7.1 algorithm (machine policy v7) retains its original evidence-completion range arithmetic and immutable receipts. A subject with no current receipt yet reports an explicit scoring status (collecting, action needed, unregistered) instead; an unavailable authoritative read is not replaced by a fabricated current score.
 
 ### The window
 
@@ -150,7 +150,7 @@ Demo mode at \`/studio?demo=1\` needs no login and uses fixed local data. Tools 
 - \`save_badge_config\` (human-gated): Opens an on-page save proposal but never calls the save API itself.
 - \`simulate_score\` (read-only): Replays supplied count scenarios under the current receipt policy and window without saving data. Direct dimension overrides are explicitly hypothetical, use the four core weights, and cannot add Craft to the core.
 - \`suggest_improvements\` (read-only): Returns grounded improvement suggestions from the current impact profile.
-- \`explain_dimension\` (read-only): Returns the selected receipt point and its recorded calculation; legacy submetrics are not presented as current arithmetic.
+- \`explain_dimension\` (read-only): Returns the selected receipt point and its recorded calculation.
 
 ### Public profile: \`/u/{handle}\`
 
@@ -175,7 +175,7 @@ Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless St
 ### Public (no auth required)
 - \`GET /u/{handle}/badge.svg\` — Embeddable badge image. Returns SVG with policy-aware Cache-Control headers, bounded to at most five minutes and the current UTC date; unavailable or changing authority responses are not cached.
 - \`GET /u/{handle}\` — Share page with badge, breakdown, and embed snippets.
-- \`GET /api/profile/{handle}\` — JSON: policyVersion, receipt identity and window, canonical displayScore, exactScore, dimensions, tier, nullable archetype and separate Craft. Current compositeScore and adjustedComposite aliases agree with displayScore; they do not expose a competing EMA headline. Historical v6 fields, when supplied, are explicitly nested under legacy. Report-derived Craft is read from the published receipt, not a pending upload.
+- \`GET /api/profile/{handle}\` — JSON: policyVersion, receipt identity and window, canonical displayScore, exactScore, dimensions, tier, nullable archetype and separate Craft, or a \`scoringStatus\` when there is no drawable current receipt yet. compositeScore and adjustedComposite aliases agree with displayScore; they do not expose a competing EMA headline. Report-derived Craft is read from the published receipt, not a pending upload.
 - \`GET /api/history/{handle}\` — JSON: policy-qualified immutable observations and durable trend anchors. EMA is a separate trend value, never the badge score. Policy changes or incompatible windows do not produce a comparable score delta.
 - \`GET /about/scoring\` — Scoring methodology page.
 - \`GET /archetypes/{type}\` — Archetype guide (builder, guardian, marathoner, polymath, artificer, balanced, emerging).

@@ -15,6 +15,13 @@ import { test, expect } from "@playwright/test";
  */
 
 const HANDLE = "juan294";
+// #1335 — every signed-up subject is scored, and `bootstrapRedesignFixtures`
+// seeds `octocat` with a real, current v7.2 receipt whenever the disposable
+// redesign/qualification fixture stack is active. `HANDLE` above is
+// deliberately never registered in any environment, so it proves the
+// opposite (unregistered) contract instead.
+const REGISTERED_FIXTURE_HANDLE = "octocat";
+const hasRegisteredFixtures = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
 
 // ────────────────────────────────────────────────────────────────
 // 1. Badge SVG endpoint
@@ -65,18 +72,39 @@ test.describe("Integration — Badge SVG endpoint (/u/:handle/badge.svg)", () =>
     }
   });
 
-  test("response includes public caching headers", async ({ request }) => {
+  test("response includes public caching headers for a registered handle with a current receipt", async ({ request }) => {
+    // A generic/unregistered handle is correctly non-cacheable under #1335
+    // (see the unregistered-handle test below) — public caching only ever
+    // applies to a registered subject's current receipt, so that is what
+    // this assertion must target instead of an arbitrary handle.
+    test.skip(!hasRegisteredFixtures, "requires the disposable redesign fixture stack's registered octocat receipt");
+    const response = await request.get(`/u/${REGISTERED_FIXTURE_HANDLE}/badge.svg`);
+    expect(response.ok()).toBe(true);
+    // #1191 hotfix (v2.29.2) — the client-facing Cache-Control is now a
+    // short, explicit max-age; the long-lived s-maxage/stale-while-revalidate
+    // policy lives in Vercel-CDN-Cache-Control, which Vercel strips before
+    // the response leaves the edge and is not observable against the local
+    // webServer (see phase 1 of the hotfix plan). CLAUDE.md bounds badge/OG
+    // response freshness to <=300 seconds.
+    const cacheControl = response.headers()["cache-control"] ?? "";
+    expect(cacheControl).toContain("public");
+    const maxAge = Number(cacheControl.match(/max-age=(\d+)/)?.[1]);
+    expect(maxAge, `expected an explicit positive max-age, got Cache-Control: ${cacheControl}`).toBeGreaterThan(0);
+    expect(maxAge).toBeLessThanOrEqual(300);
+  });
+
+  test("response is private/no-store with an unregistered-state marker for an unregistered handle", async ({ request }) => {
     const response = await request.get(`/u/${HANDLE}/badge.svg`);
 
     if (response.ok()) {
-      // #1191 hotfix (v2.29.2) — the client-facing Cache-Control is now a
-      // short, explicit max-age; the long-lived s-maxage/stale-while-revalidate
-      // policy lives in Vercel-CDN-Cache-Control, which Vercel strips before
-      // the response leaves the edge and is not observable against the local
-      // webServer (see phase 1 of the hotfix plan).
+      // #1335 — an unregistered handle's badge is a real, legal "not on
+      // Chapa yet" 200 response, deliberately never publicly cacheable
+      // (see badge.svg/route.ts's badgeCacheHeaders and
+      // lib/render/badge-state.ts's `unregistered` state).
       const cacheControl = response.headers()["cache-control"] ?? "";
-      expect(cacheControl).toContain("public");
-      expect(cacheControl).toContain("max-age");
+      expect(cacheControl).toContain("no-store");
+      const body = await response.text();
+      expect(body).toContain('data-chapa-state="unregistered"');
     }
   });
 

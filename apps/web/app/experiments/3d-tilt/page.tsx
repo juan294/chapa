@@ -33,7 +33,7 @@ function BadgeCard({ glare, tilt }: BadgeCardProps) {
       )}
 
       <div className="relative z-[1]">
-        <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
+        <BadgeContent stats={MOCK_STATS} scoring={MOCK_IMPACT} />
       </div>
     </>
   );

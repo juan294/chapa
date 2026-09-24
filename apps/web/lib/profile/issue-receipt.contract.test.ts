@@ -4,13 +4,12 @@ import { receiptFixtureV7 } from "@/lib/history/__fixtures__/receipts-v7";
 import { observedReceiptFixture } from "@/lib/history/__fixtures__/receipts-observed";
 import { dbPublishObservedReceipt } from "@/lib/db/score-receipts-observed";
 import { dbPublishReceiptV7, dbReadReceiptV7 } from "@/lib/db/snapshots";
-import { issueScoreReceiptIfConsented } from "./issue-receipt";
+import { issueScoreReceipt } from "./issue-receipt";
 import { issueReceiptVerificationV7, getReceiptVerificationV7 } from "@/lib/verification/store";
 import { resolveBadgeVerification } from "./badge-verification";
 import { receiptViewModel } from "./score-view-model";
 import * as env from "@/lib/env";
 
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: async () => ({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() }) }));
 vi.mock("@/lib/cache/snapshot-cache", () => ({ getCachedReceiptSnapshotV7: async () => null }));
 // The test starts at a real partial write: receipt committed, verification absent.
 // Collection is excluded so retries exercise durable identity and issuance only.
@@ -18,7 +17,7 @@ vi.mock("./score-receipt-observed", async importOriginal => {
   const actual = await importOriginal<typeof import("./score-receipt-observed")>();
   return { ...actual, materializeObservedScoreReceipt: async (owner: string) => {
     const stored = await actual.readObservedScoreReceipt(owner);
-    return stored.status === "found" ? { status: "stored", snapshot: { receipt: stored.envelope, trend: stored.trend }, freshness: "current" } : { status: "unavailable", reason: "not_consented" };
+    return stored.status === "found" ? { status: "stored", snapshot: { receipt: stored.envelope, trend: stored.trend }, freshness: "current" } : { status: "unavailable", reason: "no_receipt" };
   } };
 });
 const owner = "contract-receipt-repair";
@@ -26,7 +25,7 @@ const db = () => getServiceClient();
 const cleanup = async () => { expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); };
 beforeEach(async () => {
   await cleanup();
-  expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-01T00:00:00Z" })).error).toBeNull();
+  expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
 });
 afterEach(async () => { vi.restoreAllMocks(); await cleanup(); });
 
@@ -48,9 +47,9 @@ describe("receipt verification repair against durable local state", () => {
     const envelope = await observedReceiptFixture();
     await dbPublishObservedReceipt(owner, owner, envelope, "b".repeat(64));
     vi.spyOn(env, "getChapaVerificationSecret").mockReturnValueOnce(undefined);
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("failed");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "failed", reason: "storage_error" });
     expect((await db().from("scoring_v7_verification").select("receipt_id").eq("receipt_id", envelope.receipt.revisionId)).data).toEqual([]);
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("skipped");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "unchanged" });
     expect((await db().from("scoring_v7_verification").select("receipt_id").eq("receipt_id", envelope.receipt.revisionId)).data).toHaveLength(1);
     expect((await db().from("scoring_v7_receipts").select("id").eq("owner_handle", owner)).data).toEqual([{ id: envelope.receipt.revisionId }]);
   });

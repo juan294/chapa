@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, cleanup } from "@testing-library/react";
 
 vi.mock("@/components/badge/BadgeContent", () => ({
   BadgeContent: () => <div data-testid="badge-content">badge</div>,
 }));
+
+afterEach(cleanup);
 
 describe("glassmorphism experiment page", () => {
   it("renders without throwing", async () => {

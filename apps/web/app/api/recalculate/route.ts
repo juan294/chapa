@@ -1,5 +1,4 @@
-import { postWriteScore } from "@/lib/profile/post-write-score";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
@@ -8,18 +7,19 @@ import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
-import {
-  materializeOrchestratedProfile,
-  persistOrchestratedSnapshot,
-} from "@/lib/profile/orchestrated-profile";
+import { materializeOrchestratedProfile } from "@/lib/profile/orchestrated-profile";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
+
 /**
- * POST /api/recalculate — Force-recalculate impact score.
+ * POST /api/recalculate — Force-recalculate a subject's score.
  *
- * Fetches stats (cached or fresh), reads the stored craft score, computes
- * fresh impact, replaces today's snapshot, and returns the new score.
+ * Fetches fresh stats, (re-)enqueues v7.2 collection for the same reason,
+ * and reports the resulting scoring status (#1335 phase 5 — the v6
+ * immediate snapshot-replace-and-return path is retired along with
+ * `metrics_snapshots`; issuance itself only happens from fan-in, once
+ * every connected source is complete).
  *
  * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
  * Rate limited: 20 requests/handle/hour.
@@ -56,9 +56,7 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     );
   }
 
-  const scoringSelection = await readScoringRenderSelection();
   const materialized = await materializeOrchestratedProfile(handle, {
-    scoringSelection,
     token: auth.token,
   });
 
@@ -69,10 +67,6 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     );
   }
 
-  // #1076 — persistOrchestratedSnapshot's #1003 gate would refuse to persist
-  // stats that look incomplete/poisoned anyway; check it here so the
-  // intentional skip (422) is distinguishable from a genuine write failure
-  // (500) up front, rather than inferring the reason from a bare `!persisted`.
   if (!materialized.statsComplete) {
     return NextResponse.json(
       {
@@ -83,30 +77,15 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
     );
   }
 
-  const persisted = await persistOrchestratedSnapshot(handle, materialized, {
-    mode: "replace",
-  });
-  if (!persisted) {
-    return NextResponse.json(
-      { error: "Could not save recalculated profile. Try again later." },
-      { status: 500 },
-    );
-  }
+  await invalidateProfileReadModels(handle, { badgeSvg: true });
 
-  await invalidateProfileReadModels(handle, {
-    badgeSvg: true,
-    snapshot: true,
-    history: true,
-  });
+  // #1335 phase 4/5 — recalculate exists to make a subject's published
+  // numbers current after a scoring change, so it (re-)enqueues collection
+  // for the same reason a snapshot used to be rewritten here. Issuance
+  // itself happens only from fan-in, once every connected source is
+  // complete.
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "refresh");
 
-  // #1311 — recalculate exists to make a subject's published numbers current
-  // after a scoring change, so a consented subject's receipt is re-issued here
-  // for the same reason the snapshot was rewritten above.
-  const issuance = await issueScoreReceiptIfConsented(handle, { token: auth.token, scoringSelection });
-
-  const publishedScore = await postWriteScore(handle, scoringSelection, issuance);
-
-  // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
   if (craftResult) {
     fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
@@ -114,23 +93,9 @@ export const POST = withErrorCapture("/api/recalculate", async (request: NextReq
 
   revalidatePath(`/u/${handle}`);
 
-  if (publishedScore.status !== "legacy") return NextResponse.json({
-    success: true,
-    ...(publishedScore.status === "current" ? { ...publishedScore.projection, publication: publishedScore.publication } : { policyVersion: "v7.2", displayScore: null, exactScore: null, compositeScore: null, adjustedComposite: null, scoring: null, publication: "pending" }),
-    legacy: { impact: materialized.displayImpact },
-  }, { headers: { "Cache-Control": "no-store" } });
+  if (scoringStatus === null) {
+    return NextResponse.json({ error: "Scoring status is temporarily unavailable" }, { status: 503, headers: NO_STORE_HEADERS });
+  }
 
-  return NextResponse.json({
-    success: true,
-    adjustedComposite: materialized.displayImpact.adjustedComposite,
-    displayAdjustedComposite: materialized.displayImpact.adjustedComposite,
-    rawAdjustedComposite: materialized.rawImpact.adjustedComposite,
-    compositeScore: materialized.displayImpact.compositeScore,
-    dimensions: materialized.displayImpact.dimensions,
-    archetype: materialized.displayImpact.archetype,
-    tier: materialized.displayImpact.tier,
-    profileType: materialized.displayImpact.profileType,
-    craftScore: materialized.craftResult?.craftScore ?? null,
-    craftTier: materialized.craftResult?.tier ?? null,
-  });
+  return NextResponse.json({ success: true, scoringStatus }, { headers: NO_STORE_HEADERS });
 });

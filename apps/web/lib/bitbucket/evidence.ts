@@ -1,8 +1,16 @@
 import {
-  createScoringWindow, isWithinScoringWindow, observed, scoringInstant, unknown,
-  type CoverageStatus, type EvidenceReasonCode, type EventMeasurements, type NormalizedEngineeringEvent,
-  type Observation, type ScoringWindow, type SourceCoverage,
+  engineeringEventKey, isWithinScoringWindow, observed, scoringInstant, unknown,
+  type EvidenceReasonCode, type NormalizedEngineeringEvent,
+  type Observation, type SourceCoverage,
 } from "@chapa/shared";
+import type { CollectSlice } from "@/lib/collection/plan";
+import {
+  assembleSliceCoverage, buildSliceCheckpoint, emptySliceMeasurements, ensureSliceOperation, makeSliceStopFactory, newSliceEvents,
+  validateSliceWindow, type MutableSliceOperation,
+} from "@/lib/collection/slice-helpers";
+import {
+  budgetOrDeadlineStop, classifyFetchFailure, classifyHttpStatus, createDiagnosticRecorder, retryAfterSeconds, type SourceDiagnostic,
+} from "@/lib/platform/evidence-diagnostics";
 
 /**
  * v7 only. Primary semantics: developer.atlassian.com/cloud/bitbucket/rest/
@@ -18,290 +26,412 @@ const uuid = (value: unknown): string | null => typeof value === "string" && /^\
 const hash = (value: unknown): string | null => typeof value === "string" && /^[\da-f]{7,64}$/i.test(value) ? value.toLowerCase() : null;
 const numericId = (value: unknown): string | null => typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? String(value) : null;
 const nonnegative = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-const emptyMeasurements = (): EventMeasurements => ({
-  changedFiles: unknown("unavailable", "not_supported"), additions: unknown("unavailable", "not_supported"),
-  deletions: unknown("unavailable", "not_supported"), leadTimeHours: unknown("unavailable", "not_supported"),
-  hasDescription: unknown("unavailable", "not_supported"), hasIssueLink: unknown("unavailable", "not_supported"), usesFeatureBranch: unknown("unavailable", "not_supported"),
-});
+const emptyMeasurements = emptySliceMeasurements;
 const API = "https://api.bitbucket.org/2.0";
-export interface BitbucketEvidenceOptions {
-  /** Stable UUIDs, not names. Omit to enumerate current visible workspaces/repos. */
-  readonly repositories?: readonly { readonly workspaceId: string; readonly repositoryId: string }[];
-  /** Stable repository UUIDs resolved with an empty-workspace lookup.
-   * Mutually exclusive with pre-resolved workspace/repository pairs. */
-  readonly repositoryIds?: readonly string[];
-  readonly maxRequests?: number;
-  readonly timeoutMs?: number;
+// ---------------------------------------------------------------------------
+// collectBitbucketSlice (#1335 phase 3) -- checkpointed, resumable slice API,
+// and the only Bitbucket collector implementation (the prior single-run
+// `fetchBitbucketEvidence` and its `collectSource` caller were removed once
+// the durable queue worker became the sole production collection path).
+// Every repository-scoped request uses Bitbucket's `{}` empty-workspace UUID
+// form, so no workspace tracking is needed once a repository UUID is known.
+// ---------------------------------------------------------------------------
+
+interface BitbucketPrMeta {
+  readonly repositoryId: string;
+  readonly prId: string;
+  authorIsSubject: boolean;
+  merged: boolean;
+  createdAt?: string | null;
+  description?: string | null;
+  mergeCommitHash?: string | null;
 }
-/** Private: provider URLs can identify private repositories and must not be published. */
-export interface BitbucketEvidenceProgress {
-  readonly initialUrl: string;
-  readonly nextUrl: string | null;
-  readonly collectedNodes: number;
-  readonly complete: boolean;
-  readonly reasonCodes: readonly EvidenceReasonCode[];
+type MutableBitbucketOperation = MutableSliceOperation;
+interface BitbucketListOutcome { readonly kind: "done" | "stop"; readonly stop?: SourceDiagnostic }
+
+/** Bounds an otherwise-unbounded commit history to the scoring window via
+ * Bitbucket Query Language (`q=date>=...`), per #1335 phase 3.
+ */
+function commitsPath(repositoryId: string, sinceIso: string): string {
+  const url = new URL(`${API}/repositories/%7B%7D/${encodeURIComponent(repositoryId)}/commits`);
+  url.searchParams.set("pagelen", "100");
+  url.searchParams.set("q", `date>=${sinceIso}`);
+  return url.toString();
 }
-export interface BitbucketEvidenceResult {
-  readonly profile: { readonly uuid: string | null; readonly accountId: string | null; readonly displayName: string | null };
-  readonly events: readonly NormalizedEngineeringEvent[];
-  readonly coverage: SourceCoverage;
-  readonly progress: readonly BitbucketEvidenceProgress[];
-  readonly requestCount: number;
-}
-export async function fetchBitbucketEvidence(
-  stableAccountId: string, token: string, inputWindow: ScoringWindow, options: BitbucketEvidenceOptions = {},
-): Promise<BitbucketEvidenceResult> {
-  if (!stableAccountId.trim() || !token.trim()) throw new RangeError("Invalid Bitbucket subject or credential");
-  const window = createScoringWindow(inputWindow.referenceTime);
-  if (window.startInclusive !== inputWindow.startInclusive || window.endExclusive !== inputWindow.endExclusive || window.referenceDate !== inputWindow.referenceDate || inputWindow.calendarDays !== 365) throw new RangeError("Inconsistent scoring window");
-  const maxRequests = options.maxRequests ?? 100; const timeoutMs = options.timeoutMs ?? 30_000;
-  if (!Number.isInteger(maxRequests) || maxRequests < 1 || maxRequests > 500 || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120_000) throw new RangeError("Invalid Bitbucket evidence budget");
-  if (options.repositories && (options.repositories.length > 500 || options.repositories.some((r) => !uuid(r.repositoryId) || !uuid(r.workspaceId)))) throw new RangeError("Invalid Bitbucket repository UUIDs");
-  if (options.repositories !== undefined && options.repositoryIds !== undefined) throw new RangeError("Ambiguous Bitbucket repository scope");
-  if (options.repositoryIds && (options.repositoryIds.length > 500 || options.repositoryIds.some(id => !uuid(id)))) throw new RangeError("Invalid Bitbucket repository UUIDs");
-  const signal = AbortSignal.timeout(timeoutMs);
-  const reasons = new Set<EvidenceReasonCode>();
-  const progress: BitbucketEvidenceProgress[] = [];
+
+export const collectBitbucketSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
+  const window = validateSliceWindow(input);
+  if (!credential.token || !credential.token.trim()) throw new RangeError("Bitbucket collection requires a credential");
+  const token = credential.token.trim();
+  const explicit = input.scope.discovery === "explicit_repositories";
+  const signal = AbortSignal.timeout(Math.max(0, budget.deadlineAt - Date.now()));
+  const diag = createDiagnosticRecorder("bitbucket");
   let requestCount = 0;
-  async function request(url: string, inspectRedirect = false): Promise<{ data: Row; error: EvidenceReasonCode | null; location?: string | null }> {
-    if (requestCount >= maxRequests || signal.aborted) return { data: {}, error: "pagination_incomplete" as const };
+
+  const operations: MutableBitbucketOperation[] = checkpoint.operations.map((op) => ({ key: op.key, cursor: op.cursor, done: op.done }));
+  const repositoryIds = new Set(checkpoint.discovered.repositoryIds);
+  const state: Record<string, unknown> = { ...(checkpoint.state ?? {}) };
+  const prMeta: Record<string, BitbucketPrMeta> = { ...((state.pr as Record<string, BitbucketPrMeta> | undefined) ?? {}) };
+  state.pr = prMeta;
+  const reasons = new Set<EvidenceReasonCode>((state.reasons as EvidenceReasonCode[] | undefined) ?? []);
+  const newEvents = new Map<string, NormalizedEngineeringEvent>();
+
+  function subjectId(): string | undefined { return state.subjectId as string | undefined; }
+  const makeStop = makeSliceStopFactory(diag, "bitbucket");
+  function ensureOp(key: string): void { ensureSliceOperation(operations, key); }
+  function registerRepo(repositoryId: string): void {
+    if (repositoryIds.has(repositoryId)) return;
+    repositoryIds.add(repositoryId);
+    ensureOp(`commits:${repositoryId}`);
+    ensureOp(`pullrequests:${repositoryId}`);
+  }
+  function addEvent(event: NormalizedEngineeringEvent): void { newEvents.set(engineeringEventKey(event), event); }
+  const projectKey = (repositoryId: string) => `bitbucket.org:repository:${repositoryId}`;
+  function instant(value: unknown, operation: string): string | null {
+    if (!text(value)) { reasons.add(diag.record(operation, "parse")); return null; }
+    try { return scoringInstant(String(value)).toISOString(); } catch { reasons.add(diag.record(operation, "parse")); return null; }
+  }
+  function isSubject(value: unknown): boolean {
+    const actor = row(row(value).user ?? value); const actorUuid = uuid(actor.uuid); const actorAccount = text(actor.account_id);
+    if (!actorUuid && !actorAccount) { reasons.add("attribution_unknown"); return false; }
+    const profileUuid = state.profileUuid as string | null | undefined; const accountId = state.accountId as string | null | undefined;
+    if (actorUuid && profileUuid) return actorUuid === profileUuid;
+    return actorAccount !== null && accountId !== undefined && actorAccount === accountId;
+  }
+
+  async function request(operation: string, url: string, opts: { readonly inspectRedirect?: boolean } = {}): Promise<{ data: Row; stop: SourceDiagnostic | null; location?: string | null }> {
+    const budgetStop = budgetOrDeadlineStop(requestCount, budget.maxRequests, signal);
+    if (budgetStop) return { data: {}, stop: makeStop(operation, budgetStop) };
     requestCount++;
     try {
-      const response = await fetch(url, { headers: { Authorization: `Bearer ${token.trim()}`, Accept: "application/json" }, signal, redirect: inspectRedirect ? "manual" : "error" });
-      if (inspectRedirect && response.status === 302) return { data: {}, error: null, location: response.headers.get("location") };
-      if (!response.ok) return { data: {}, error: [401, 403, 404].includes(response.status) ? "not_accessible" as const : "source_error" as const };
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal, redirect: opts.inspectRedirect ? "manual" : "error" });
+      if (opts.inspectRedirect && response.status === 302) return { data: {}, stop: null, location: response.headers.get("location") };
+      if (!response.ok) {
+        const stopKind = classifyHttpStatus(response.status, response.headers, [401, 403, 404]);
+        return { data: {}, stop: makeStop(operation, stopKind, response.status, stopKind === "rate_limited" ? retryAfterSeconds(response.headers) : null) };
+      }
       const data = row(await response.json());
-      return { data, error: data.type === "error" || data.error ? "source_error" as const : null };
-    } catch { return { data: {}, error: "source_error" as const }; }
+      if (data.type === "error" || data.error) return { data, stop: makeStop(operation, "protocol", response.status) };
+      return { data, stop: null };
+    } catch (error) {
+      return { data: {}, stop: makeStop(operation, classifyFetchFailure(error, signal)) };
+    }
   }
-  const makeUrl = (path: string, parameters: readonly (readonly [string, string])[] = []) => {
-    const url = new URL(`${API}${path}`); url.searchParams.set("pagelen", "100");
-    for (const [key, value] of parameters) url.searchParams.append(key, value);
-    return url.toString();
-  };
-  async function collect(initialUrl: string) {
-    const nodes: Row[] = []; const errors = new Set<EvidenceReasonCode>(); const seen = new Set<string>();
+
+  /** Drains one Bitbucket `next`-linked page collection until exhausted or a
+   * budget/deadline/protocol stop interrupts it, resuming from `op.cursor`
+   * (the raw next URL) across slices.
+   */
+  async function runPagedList(op: MutableBitbucketOperation, operation: string, initialUrl: string, onNode: (node: Row) => void): Promise<BitbucketListOutcome> {
     const initial = new URL(initialUrl);
-    let nextUrl: string | null = initialUrl; let complete = false;
+    // The checkpoint is pure data with no URLs that carry a host (plan.ts) --
+    // store only path+query and rebuild against the fixed API origin on resume.
+    const toRelative = (absolute: string): string => { const u = new URL(absolute); return `${u.pathname}${u.search}`; };
+    let url = op.cursor ? new URL(op.cursor, initial.origin).toString() : initialUrl;
     for (;;) {
-      seen.add(nextUrl!);
-      const response = await request(nextUrl!);
-      if (response.error) { errors.add(response.error); break; }
-      if (!Array.isArray(response.data.values)) { errors.add("source_error"); break; }
-      for (const value of response.data.values) {
-        if (value === null || typeof value !== "object" || Array.isArray(value)) errors.add("source_error");
-        else nodes.push(row(value));
+      const r = await request(operation, url);
+      if (r.stop) {
+        // A per-item fan-out fetch that lost access (a repo gone private, a
+        // PR deleted after merge) must not block the receipt forever. Absorb
+        // it like a malformed node: this operation done with whatever was
+        // collected, one already-deduped diagnostic, final coverage partial.
+        if (r.stop.stopKind === "not_accessible") { reasons.add("not_accessible"); op.done = true; op.cursor = null; return { kind: "done" }; }
+        op.cursor = toRelative(url); return { kind: "stop", stop: r.stop };
       }
-      if (response.data.truncated === true || response.data.is_truncated === true || response.data.overflow === true) errors.add("pagination_incomplete");
-      if (errors.size > 0) break; // Replay this incoming page, retaining valid nodes.
-      if (response.data.next !== undefined && response.data.next !== null && response.data.next !== "") {
-        try {
-          const next = new URL(String(response.data.next));
-          if (next.origin !== initial.origin || next.pathname !== initial.pathname || next.username || next.password || next.hash || seen.has(next.toString())) throw new Error("Invalid cursor");
-          for (const key of new Set(initial.searchParams.keys())) {
-            if (key !== "pagelen" && JSON.stringify(next.searchParams.getAll(key)) !== JSON.stringify(initial.searchParams.getAll(key))) throw new Error("Changed query scope");
-          }
-          nextUrl = next.toString();
-        } catch { errors.add("source_error"); break; }
-        continue;
+      if (!Array.isArray(r.data.values)) { const stop = makeStop(operation, "protocol"); op.cursor = toRelative(url); return { kind: "stop", stop }; }
+      let pageDegraded = false;
+      for (const value of r.data.values) {
+        if (value === null || typeof value !== "object" || Array.isArray(value)) { reasons.add(diag.record(operation, "protocol")); pageDegraded = true; }
+        else onNode(row(value));
       }
-      if (response.data.size !== undefined && (!nonnegative(response.data.size) || response.data.size !== nodes.length)) { errors.add("pagination_incomplete"); break; }
-      complete = true; nextUrl = null; break;
+      if (r.data.truncated === true || r.data.is_truncated === true || r.data.overflow === true) { reasons.add("pagination_incomplete"); pageDegraded = true; }
+      // A malformed node or a provider-reported truncation is not retryable:
+      // this page's outgoing cursor cannot certify the missing portion was
+      // read, so this operation permanently accepts partial completeness
+      // here rather than following a cursor whose provenance it cannot trust.
+      if (pageDegraded) { op.done = true; op.cursor = null; return { kind: "done" }; }
+      if (r.data.next === undefined || r.data.next === null || r.data.next === "") {
+        if (r.data.size !== undefined && (!nonnegative(r.data.size))) reasons.add("pagination_incomplete");
+        op.done = true; op.cursor = null; return { kind: "done" };
+      }
+      try {
+        const next = new URL(String(r.data.next));
+        if (next.origin !== initial.origin || next.pathname !== initial.pathname || next.username || next.password || next.hash) throw new Error("Invalid cursor");
+        url = next.toString();
+      } catch { const stop = makeStop(operation, "protocol"); op.cursor = toRelative(url); return { kind: "stop", stop }; }
     }
-    for (const reason of errors) reasons.add(reason);
-    progress.push({ initialUrl, nextUrl, collectedNodes: nodes.length, complete, reasonCodes: [...errors] });
-    return { nodes, complete };
   }
-  const profileResponse = await request(`${API}/user`); const profile = row(profileResponse.data);
-  const profileUuid = uuid(profile.uuid); const accountId = text(profile.account_id);
-  if (profileResponse.error) reasons.add(profileResponse.error);
-  else if ((accountId === null || stableAccountId !== accountId) && (profileUuid === null || uuid(stableAccountId) !== profileUuid)) throw new Error("Bitbucket credential subject does not match requested subject");
-  if (!profileUuid && !accountId) reasons.add("attribution_unknown");
-  const subjectId = profileUuid ?? accountId ?? stableAccountId;
-  function isSubject(value: unknown) {
-    const actor = row(value); const actorUuid = uuid(actor.uuid); const actorAccount = text(actor.account_id);
-    if (!actorUuid && !actorAccount) { reasons.add("attribution_unknown"); return false; }
-    if (actorUuid && profileUuid) return actorUuid === profileUuid && (!actorAccount || !accountId || actorAccount === accountId);
-    return actorAccount !== null && accountId !== null && actorAccount === accountId;
+
+  async function runProfile(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const r = await request("profile", `${API}/user`);
+    if (r.stop) { pendingStop = r.stop; return "stop"; }
+    const profileUuid = uuid(r.data.uuid); const accountId = text(r.data.account_id);
+    if (!profileUuid && !accountId) { reasons.add("attribution_unknown"); }
+    state.profileUuid = profileUuid; state.accountId = accountId; state.subjectId = profileUuid ?? accountId ?? input.owner;
+    state.displayName = text(r.data.display_name);
+    op.done = true; op.cursor = null;
+    return "done";
   }
-  const repositories = new Map<string, { workspaceId: string; repositoryId: string; fullName?: string }>();
-  function addRepo(value: unknown, workspaceId: string) {
-    const repo = row(value); const repositoryId = uuid(repo.uuid);
-    if (!repositoryId) { reasons.add("attribution_unknown"); return; }
-    repositories.set(repositoryId, { workspaceId, repositoryId, ...(text(repo.full_name) ? { fullName: String(repo.full_name) } : {}) });
-  }
-  const explicit = options.repositories !== undefined || options.repositoryIds !== undefined;
-  let repositoryDiscoveryComplete = explicit;
-  if (options.repositoryIds !== undefined) {
-    // https://developer.atlassian.com/cloud/bitbucket/rest/intro/#repository-object-and-uuid
-    // Resolve only declared repositories, within the same bounded HTTP budget.
-    for (const repositoryId of new Set(options.repositoryIds.map(id => uuid(id)!))) {
-      const initialUrl = `${API}/repositories/%7B%7D/${encodeURIComponent(repositoryId)}`;
-      const metadata = await request(initialUrl);
-      const repo = row(metadata.data); const workspaceId = uuid(row(repo.workspace).uuid);
-      const reason = metadata.error ?? (uuid(repo.uuid) !== repositoryId || !workspaceId ? "source_error" : null);
-      progress.push({ initialUrl, nextUrl: reason ? initialUrl : null, collectedNodes: reason ? 0 : 1,
-        complete: reason === null, reasonCodes: reason ? [reason] : [] });
-      if (reason) { reasons.add(reason); repositoryDiscoveryComplete = false; continue; }
-      addRepo(repo, workspaceId!);
-    }
-  } else if (options.repositories !== undefined) for (const repo of options.repositories) repositories.set(uuid(repo.repositoryId)!, { workspaceId: uuid(repo.workspaceId)!, repositoryId: uuid(repo.repositoryId)! });
-  else {
-    const workspaces = await collect(makeUrl("/user/workspaces"));
-    for (const permission of workspaces.nodes) {
+
+  async function runWorkspaces(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const url = new URL(`${API}/user/workspaces`); url.searchParams.set("pagelen", "100");
+    const outcome = await runPagedList(op, "workspaces", url.toString(), (permission) => {
       const workspaceId = uuid(row(permission.workspace).uuid);
-      if (!workspaceId) { reasons.add("attribution_unknown"); continue; }
-      for (const repo of (await collect(makeUrl(`/repositories/${encodeURIComponent(workspaceId)}`))).nodes) addRepo(repo, workspaceId);
-    }
+      if (!workspaceId) { reasons.add("attribution_unknown"); return; }
+      ensureOp(`workspace-repos:${workspaceId}`);
+    });
+    if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+    return "done";
   }
-  function instant(value: unknown): string | null {
-    if (!text(value)) { reasons.add("source_error"); return null; }
-    try { return scoringInstant(String(value)).toISOString(); } catch { reasons.add("source_error"); return null; }
+
+  async function runWorkspaceRepos(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const workspaceId = op.key.slice("workspace-repos:".length);
+    const url = new URL(`${API}/repositories/${encodeURIComponent(workspaceId)}`); url.searchParams.set("pagelen", "100");
+    const outcome = await runPagedList(op, "repositories", url.toString(), (repo) => {
+      const repositoryId = uuid(repo.uuid);
+      if (!repositoryId) { reasons.add("attribution_unknown"); return; }
+      registerRepo(repositoryId);
+    });
+    if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+    return "done";
   }
-  const events = new Map<string, NormalizedEngineeringEvent>();
-  const projectKey = (repo: string) => `bitbucket.org:repository:${repo}`;
-  function event(repositoryId: string, eventId: string, kind: NormalizedEngineeringEvent["kind"], occurredAt: string, workItemId: string, revision: string): NormalizedEngineeringEvent | null {
-    if (!isWithinScoringWindow(occurredAt, window)) return null;
-    return {
-      schemaVersion: "v7", provider: "bitbucket", host: "bitbucket.org", subjectId, actorId: subjectId, repositoryId, eventId, kind, occurredAt,
-      dataThrough: window.referenceTime, canonicalProjectId: projectKey(repositoryId), workItemId, artifactRevision: revision,
-      artifactReferenceIds: [eventId], attribution: "individual", provenance: "source_observed", coverage: "complete",
-      categories: [], measurements: emptyMeasurements(), acceptance: unknown("unavailable", "not_assessed"),
-    };
-  }
-  for (const { repositoryId, workspaceId, fullName: discoveredName } of repositories.values()) {
-    const path = `/repositories/${encodeURIComponent(workspaceId)}/${encodeURIComponent(repositoryId)}`;
-    let fullName = discoveredName;
-    if (!fullName) {
-      const metadata = await request(`${API}${path}`); const repo = row(metadata.data);
-      if (metadata.error) reasons.add(metadata.error);
-      else if (uuid(repo.uuid) === repositoryId && uuid(row(repo.workspace).uuid) === workspaceId) fullName = text(repo.full_name) ?? undefined;
-      else reasons.add("source_error");
-    }
-    // Bitbucket exposes actual commit objects across all refs. date is its
-    // provider commit timestamp, never a first-default-branch reachability time.
-    for (const commit of (await collect(makeUrl(`${path}/commits`))).nodes) {
-      if (!isSubject(row(commit.author).user)) continue;
-      const sha = hash(commit.hash); const date = instant(commit.date);
-      if (!sha || !date) { reasons.add("source_error"); continue; }
+
+  async function runCommits(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const repositoryId = op.key.slice("commits:".length);
+    const outcome = await runPagedList(op, "commits", commitsPath(repositoryId, window.startInclusive), (commit) => {
+      if (!isSubject(commit.author)) return;
+      const sha = hash(commit.hash); const date = instant(commit.date, "commits");
+      if (!sha) { reasons.add(diag.record("commits", "protocol")); return; }
+      if (!date || !isWithinScoringWindow(date, window)) return;
       const key = `${projectKey(repositoryId)}:commit:${sha}`;
-      const base = event(repositoryId, key, "authored_commit", date, key, sha);
-      if (base) events.set(key, { ...base, acceptance: unknown("unavailable", "acceptance_time_unknown") });
-    }
-    const prs = await collect(makeUrl(`${path}/pullrequests`, [
-      ["state", "OPEN"], ["state", "MERGED"], ["state", "DECLINED"], ["state", "SUPERSEDED"],
-    ]));
-    for (const pr of prs.nodes) {
-      const prId = numericId(pr.id); if (!prId) { reasons.add("source_error"); continue; }
-      const key = `${projectKey(repositoryId)}:pr:${prId}`;
-      const activity = await collect(makeUrl(`${path}/pullrequests/${prId}/activity`));
-      const mergeUpdates: { update: Row; date: string }[] = [];
-      let invalidMergeDate = false;
-      for (const entry of activity.nodes) {
-        const update = row(entry.update);
-        if (update.state === "MERGED") {
-          const date = instant(update.date); if (date) mergeUpdates.push({ update, date }); else invalidMergeDate = true;
-        }
-        for (const kind of ["approval", "changes_requested", "comment"] as const) {
-          if (!entry[kind]) continue;
-          const detail = row(entry[kind]);
-          if (!isSubject(detail.user)) continue;
-          if (detail.deleted === true) { reasons.add("not_accessible"); continue; }
-          const date = instant(kind === "comment" ? detail.created_on : detail.date); if (!date) continue;
-          const identity = kind === "comment" ? numericId(detail.id) : `${subjectId}:${date}`;
-          if (!identity) { reasons.add("source_error"); continue; }
-          const eventId = `${key}:${kind}:${identity}`;
-          const base = event(repositoryId, eventId, "review", date, key, kind === "comment" ? `${identity}:${instant(detail.updated_on ?? detail.created_on) ?? date}` : eventId);
-          if (base) events.set(eventId, base); // Rubric assessment is separate, including empty approvals.
-        }
-      }
-      if (!isSubject(pr.author) || pr.state !== "MERGED") continue;
-      // Updates repeat current state even for title edits. Only the earliest
-      // MERGED update in an exhausted history can supply the merge timestamp.
-      if (!activity.complete || invalidMergeDate || mergeUpdates.length === 0) { reasons.add("acceptance_time_unknown"); continue; }
-      mergeUpdates.sort((a, b) => a.date.localeCompare(b.date));
-      const first = mergeUpdates[0];
-      if (!first) continue;
-      const sourceHash = hash(row(row(first.update.source).commit).hash);
-      const base = event(repositoryId, `${key}:merged`, "accepted_change", first.date, key, sourceHash ?? hash(row(pr.merge_commit).hash) ?? key);
-      if (!base) continue;
-      let measurements = emptyMeasurements();
-      // The PR endpoint chooses the authoritative comparison; reconstructing a
-      // destination from a post-merge snapshot can wrongly produce an empty diff.
-      // Inspect its 302 without automatically forwarding any credential.
-      const redirectUrl = `${API}${path}/pullrequests/${prId}/diffstat`;
-      const redirect = await request(redirectUrl, true);
-      let diffUrl: string | null = null;
-      if (redirect.error) reasons.add(redirect.error);
-      else {
-        try {
-          const target = new URL("location" in redirect && typeof redirect.location === "string" ? redirect.location : "");
-          const decoded = decodeURIComponent(target.pathname);
-          const allowedPrefixes = [`/2.0${decodeURIComponent(path)}/diffstat/`, ...(fullName && /^[^/]+\/[^/]+$/.test(fullName) ? [`/2.0/repositories/${fullName}/diffstat/`] : [])];
-          const prefix = allowedPrefixes.find((p) => decoded.startsWith(p));
-          if (target.origin !== "https://api.bitbucket.org" || target.username || target.password || target.hash || !prefix ||
-            !/^[a-f\d]{7,64}(?:\.\.[a-f\d]{7,64})?$/i.test(decoded.slice(prefix.length)) ||
-            [...target.searchParams.keys()].some((key) => !["topic", "pagelen"].includes(key))) throw new Error("Invalid diff comparison");
-          target.searchParams.set("pagelen", "100"); diffUrl = target.toString();
-        } catch { reasons.add("source_error"); }
-      }
-      progress.push({ initialUrl: redirectUrl, nextUrl: diffUrl ? null : redirectUrl, collectedNodes: 0, complete: diffUrl !== null,
-        reasonCodes: diffUrl ? [] : [redirect.error ?? "source_error"] });
-      if (diffUrl) {
-        const diffs = await collect(diffUrl);
-        const paths = new Set<string>(); let additions = 0; let deletions = 0; let full = diffs.complete;
-        const seenPaths = new Set<string>();
-        for (const diff of diffs.nodes) {
-          const oldPath = text(row(diff.old).path); const newPath = text(row(diff.new).path);
-          const validPaths = diff.status === "added" ? newPath !== null : diff.status === "removed" ? oldPath !== null : ["modified", "renamed"].includes(String(diff.status)) && oldPath !== null && newPath !== null;
-          const pair = JSON.stringify([oldPath, newPath]);
-          if (!validPaths || seenPaths.has(pair) || !nonnegative(diff.lines_added) || !nonnegative(diff.lines_removed) || diff.truncated === true || diff.overflow === true || diff.too_large === true) full = false;
-          seenPaths.add(pair);
-          for (const p of [oldPath, newPath]) if (p) paths.add(p);
-          if (nonnegative(diff.lines_added)) additions += diff.lines_added;
-          if (nonnegative(diff.lines_removed)) deletions += diff.lines_removed;
-        }
-        if (!Number.isSafeInteger(additions) || !Number.isSafeInteger(deletions)) full = false;
-        if (!full) reasons.add("partial_files");
-        measurements = { ...measurements,
-          changedFiles: full ? observed([...paths], "complete", "source_observed") : unknown("partial", "partial_files"),
-          additions: full ? observed(additions, "complete", "source_observed") : unknown("partial", "partial_files"),
-          deletions: full ? observed(deletions, "complete", "source_observed") : unknown("partial", "partial_files"),
-        };
-      } else reasons.add("partial_files");
-      let leadTimeHours: Observation<number> = unknown("partial", "source_error");
-      const createdAt = instant(pr.created_on);
-      if (createdAt) {
-        const hours = (scoringInstant(first.date).getTime() - scoringInstant(createdAt).getTime()) / 3_600_000;
-        if (hours >= 0) leadTimeHours = observed(hours, "complete", "source_observed");
-      }
-      events.set(base.eventId, { ...base,
-        artifactReferenceIds: [...base.artifactReferenceIds, key, ...(hash(row(pr.merge_commit).hash) ? [`${projectKey(repositoryId)}:commit:${hash(row(pr.merge_commit).hash)}`] : [])],
-        measurements: { ...measurements, leadTimeHours,
-          hasDescription: typeof first.update.description === "string" ? observed(first.update.description.trim().length > 0, "complete", "source_observed") : unknown("partial", "source_error"),
-        },
-        acceptance: observed({ method: "merged_change", acceptedAt: base.occurredAt, acceptedResultId: key }, "complete", "source_observed"),
+      addEvent({
+        schemaVersion: "v7", provider: "bitbucket", host: "bitbucket.org", subjectId: subjectId()!, actorId: subjectId()!, repositoryId,
+        eventId: key, kind: "authored_commit", occurredAt: date, dataThrough: window.referenceTime, canonicalProjectId: projectKey(repositoryId),
+        workItemId: key, artifactRevision: sha, artifactReferenceIds: [key], attribution: "individual", provenance: "source_observed", coverage: "complete",
+        categories: [], measurements: emptyMeasurements(), acceptance: unknown("unavailable", "acceptance_time_unknown"),
       });
+    });
+    if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+    return "done";
+  }
+
+  async function runPullRequests(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const repositoryId = op.key.slice("pullrequests:".length);
+    const url = new URL(`${API}/repositories/%7B%7D/${encodeURIComponent(repositoryId)}/pullrequests`);
+    url.searchParams.set("pagelen", "100");
+    for (const state_ of ["OPEN", "MERGED", "DECLINED", "SUPERSEDED"]) url.searchParams.append("state", state_);
+    const outcome = await runPagedList(op, "pullrequests", url.toString(), (pr) => {
+      const prId = numericId(pr.id); if (!prId) { reasons.add(diag.record("pullrequests", "protocol")); return; }
+      const key = `${projectKey(repositoryId)}:pr:${prId}`;
+      prMeta[key] = {
+        repositoryId, prId, authorIsSubject: isSubject(pr.author), merged: pr.state === "MERGED",
+        createdAt: text(pr.created_on), description: typeof pr.description === "string" ? pr.description : null,
+        mergeCommitHash: hash(row(pr.merge_commit).hash),
+      };
+      ensureOp(`activity:${key}`);
+    });
+    if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+    return "done";
+  }
+
+  interface BitbucketMergeInfo { readonly mergedAt: string }
+  interface BitbucketDiffAcc { paths: string[]; additions: number; deletions: number; full: boolean }
+
+  interface BitbucketActivityAcc { dates: string[]; invalidMergeDate: boolean }
+
+  async function runActivity(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const key = op.key.slice("activity:".length);
+    const meta = prMeta[key];
+    if (!meta) { reasons.add("not_accessible"); op.done = true; op.cursor = null; return "done"; }
+    // Persisted across slices: a MERGED update found on an earlier page of a
+    // multi-slice pagination must not be forgotten once this op resumes.
+    const activityAcc: Record<string, BitbucketActivityAcc> = (state.activityAcc as Record<string, BitbucketActivityAcc> | undefined) ?? {};
+    state.activityAcc = activityAcc;
+    const acc = activityAcc[key] ?? (activityAcc[key] = { dates: [], invalidMergeDate: false });
+    const url = new URL(`${API}/repositories/%7B%7D/${encodeURIComponent(meta.repositoryId)}/pullrequests/${meta.prId}/activity`);
+    url.searchParams.set("pagelen", "100");
+    const outcome = await runPagedList(op, "activity", url.toString(), (entry) => {
+      const update = row(entry.update);
+      if (update.state === "MERGED") { const date = instant(update.date, "activity"); if (date) acc.dates.push(date); else acc.invalidMergeDate = true; }
+      for (const kind of ["approval", "changes_requested", "comment"] as const) {
+        if (!entry[kind]) continue;
+        const detail = row(entry[kind]);
+        if (!isSubject(detail)) continue;
+        if (detail.deleted === true) { reasons.add(diag.record("activity", "not_accessible")); continue; }
+        const date = instant(kind === "comment" ? detail.created_on : detail.date, "activity"); if (!date || !isWithinScoringWindow(date, window)) continue;
+        const identity = kind === "comment" ? numericId(detail.id) : `${subjectId()}:${date}`;
+        if (!identity) { reasons.add(diag.record("activity", "protocol")); continue; }
+        const eventId = `${key}:${kind}:${identity}`;
+        addEvent({
+          schemaVersion: "v7", provider: "bitbucket", host: "bitbucket.org", subjectId: subjectId()!, actorId: subjectId()!, repositoryId: meta.repositoryId,
+          eventId, kind: "review", occurredAt: date, dataThrough: window.referenceTime, canonicalProjectId: projectKey(meta.repositoryId),
+          workItemId: key, artifactRevision: kind === "comment" ? `${identity}:${date}` : eventId, artifactReferenceIds: [eventId],
+          attribution: "individual", provenance: "source_observed", coverage: "complete", categories: [], measurements: emptyMeasurements(),
+          acceptance: unknown("unavailable", "not_assessed"),
+        });
+      }
+    });
+    if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+    // A single malformed MERGED update anywhere in the history makes the
+    // whole timestamp untrustworthy -- never fall back to a different, valid
+    // update instead (matches the single-run adapter's `invalidMergeDate`).
+    if (!meta.authorIsSubject || !meta.merged || acc.invalidMergeDate || acc.dates.length === 0) {
+      if (meta.merged && meta.authorIsSubject) reasons.add("acceptance_time_unknown");
+      delete activityAcc[key];
+      return "done";
     }
+    const mergedAt = [...acc.dates].sort((a, b) => a.localeCompare(b))[0]!;
+    delete activityAcc[key];
+    if (!isWithinScoringWindow(mergedAt, window)) return "done";
+    const mergeInfo: Record<string, BitbucketMergeInfo> = (state.mergeInfo as Record<string, BitbucketMergeInfo> | undefined) ?? {};
+    mergeInfo[key] = { mergedAt }; state.mergeInfo = mergeInfo;
+    ensureOp(`diffstat:${key}`);
+    return "done";
   }
-  // Direct-commit first reachability is unsupported even with no authored-date
-  // observations. Removed issues and unseen/deleted history remain unknown.
-  reasons.add("acceptance_time_unknown"); reasons.add("not_supported"); reasons.add("discovery_incomplete");
-  function statusFor(suffix: string): CoverageStatus {
-    const entries = progress.filter((p) => new URL(p.initialUrl).pathname.endsWith(suffix));
-    return entries.length > 0 && entries.every((p) => !p.complete && p.collectedNodes === 0 && p.reasonCodes.includes("not_accessible")) ? "unavailable" : "partial";
+
+  /** GET-only: resolves the diffstat redirect's authoritative comparison URL,
+   * then hands off to the persisted `diff:<key>` operation. Splitting the
+   * redirect resolution from the (potentially multi-page) diff collection
+   * means a budget that cannot finish both in one slice keeps the redirect's
+   * result instead of re-resolving it every retry -- the same fix as GitLab's
+   * details:/diffs: split, applied here to close the analogous bug where a
+   * tight budget reported `partial_files` even though the data was available.
+   */
+  async function runDiffstat(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const key = op.key.slice("diffstat:".length);
+    const meta = prMeta[key];
+    if (!meta) { op.done = true; op.cursor = null; return "done"; }
+    const redirectUrl = `${API}/repositories/%7B%7D/${encodeURIComponent(meta.repositoryId)}/pullrequests/${meta.prId}/diffstat`;
+    const redirect = await request("diffstat", redirectUrl, { inspectRedirect: true });
+    if (redirect.stop) {
+      if (redirect.stop.stopKind === "not_accessible") {
+        // The PR's diffstat is gone (repo went private, PR deleted after
+        // merge): absorb like a malformed redirect, not a terminal stop --
+        // the accepted_change event itself is already fully determined.
+        reasons.add("not_accessible");
+        op.done = true; op.cursor = null;
+        emitAcceptedChange(key, meta, { paths: [], additions: 0, deletions: 0, full: false });
+        return "done";
+      }
+      pendingStop = redirect.stop; return "stop";
+    }
+    op.done = true; op.cursor = null;
+    const diffUrls: Record<string, string> = (state.diffUrl as Record<string, string> | undefined) ?? {};
+    state.diffUrl = diffUrls;
+    try {
+      if (typeof redirect.location !== "string") throw new Error("Missing diff redirect");
+      const target = new URL(redirect.location);
+      // Never forward credentials via an embedded userinfo, and require an
+      // immutable hash..hash (or single-hash) comparison under a real
+      // repositories path -- rejects a foreign host, a mutable ref like
+      // `main..develop`, and a fragment-smuggled redirect.
+      if (target.origin !== "https://api.bitbucket.org" || target.username || target.password || target.hash) throw new Error("Invalid diff redirect");
+      if (!/^\/2\.0\/repositories\/[^/]+\/[^/]+\/diffstat\/[a-f\d]{7,64}(?:\.\.[a-f\d]{7,64})?$/i.test(target.pathname)) throw new Error("Invalid diff redirect");
+      target.searchParams.set("pagelen", "100");
+      diffUrls[key] = target.toString();
+      ensureOp(`diff:${key}`);
+    } catch {
+      // A malformed/unsafe redirect is structural, not retryable: proceed to
+      // the event with unknown file measurements rather than looping forever.
+      reasons.add("partial_files");
+      emitAcceptedChange(key, meta, { paths: [], additions: 0, deletions: 0, full: false });
+    }
+    return "done";
   }
+
+  async function runDiff(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    const key = op.key.slice("diff:".length);
+    const meta = prMeta[key];
+    const diffUrls = (state.diffUrl as Record<string, string> | undefined) ?? {};
+    const initialUrl = diffUrls[key];
+    if (!meta || !initialUrl) { op.done = true; op.cursor = null; return "done"; }
+    const diffAcc: Record<string, BitbucketDiffAcc> = (state.diffAcc as Record<string, BitbucketDiffAcc> | undefined) ?? {};
+    state.diffAcc = diffAcc;
+    const acc = diffAcc[key] ?? (diffAcc[key] = { paths: [], additions: 0, deletions: 0, full: true });
+    const outcome = await runPagedList(op, "diff", initialUrl, (value) => {
+      const oldPath = text(row(value.old).path); const newPath = text(row(value.new).path);
+      if (oldPath && !acc.paths.includes(oldPath)) acc.paths.push(oldPath);
+      if (newPath && !acc.paths.includes(newPath)) acc.paths.push(newPath);
+      if (nonnegative(value.lines_added)) acc.additions += value.lines_added; else acc.full = false;
+      if (nonnegative(value.lines_removed)) acc.deletions += value.lines_removed; else acc.full = false;
+      if (value.truncated === true || value.overflow === true || value.too_large === true) acc.full = false;
+    });
+    if (outcome.kind === "stop") { pendingStop = outcome.stop!; return "stop"; }
+    emitAcceptedChange(key, meta, acc);
+    return "done";
+  }
+
+  function emitAcceptedChange(key: string, meta: BitbucketPrMeta, diff: BitbucketDiffAcc): void {
+    const mergeInfo = (state.mergeInfo as Record<string, BitbucketMergeInfo> | undefined)?.[key];
+    if (!mergeInfo) { reasons.add("not_accessible"); return; }
+    const mergedAt = mergeInfo.mergedAt;
+    if (!diff.full) reasons.add("partial_files");
+    let leadTimeHours: Observation<number> = unknown("partial", "source_error");
+    const createdAt = meta.createdAt ? instant(meta.createdAt, "pullrequests") : null;
+    if (createdAt) {
+      const hours = (scoringInstant(mergedAt).getTime() - scoringInstant(createdAt).getTime()) / 3_600_000;
+      if (hours >= 0) leadTimeHours = observed(hours, "complete", "source_observed");
+    }
+    addEvent({
+      schemaVersion: "v7", provider: "bitbucket", host: "bitbucket.org", subjectId: subjectId()!, actorId: subjectId()!, repositoryId: meta.repositoryId,
+      eventId: `${key}:merged`, kind: "accepted_change", occurredAt: mergedAt, dataThrough: window.referenceTime, canonicalProjectId: projectKey(meta.repositoryId),
+      workItemId: key, artifactRevision: key,
+      artifactReferenceIds: [`${key}:merged`, ...(meta.mergeCommitHash ? [`${projectKey(meta.repositoryId)}:commit:${meta.mergeCommitHash}`] : [])],
+      attribution: "individual", provenance: "source_observed", coverage: "complete",
+      categories: [],
+      measurements: {
+        ...emptyMeasurements(), leadTimeHours,
+        changedFiles: diff.full ? observed(diff.paths, "complete", "source_observed") : unknown("partial", "partial_files"),
+        additions: diff.full ? observed(diff.additions, "complete", "source_observed") : unknown("partial", "partial_files"),
+        deletions: diff.full ? observed(diff.deletions, "complete", "source_observed") : unknown("partial", "partial_files"),
+        hasDescription: meta.description !== null && meta.description !== undefined ? observed(meta.description.trim().length > 0, "complete", "source_observed") : unknown("partial", "source_error"),
+      },
+      acceptance: observed({ method: "merged_change", acceptedAt: mergedAt, acceptedResultId: `${key}:merged` }, "complete", "source_observed"),
+    });
+  }
+
+  let pendingStop: SourceDiagnostic | null = null;
+
+  async function processOperation(op: MutableBitbucketOperation): Promise<"done" | "stop"> {
+    if (op.key === "profile") return runProfile(op);
+    if (op.key === "workspaces") return runWorkspaces(op);
+    if (op.key.startsWith("workspace-repos:")) return runWorkspaceRepos(op);
+    if (op.key.startsWith("commits:")) return runCommits(op);
+    if (op.key.startsWith("pullrequests:")) return runPullRequests(op);
+    if (op.key.startsWith("activity:")) return runActivity(op);
+    if (op.key.startsWith("diffstat:")) return runDiffstat(op);
+    if (op.key.startsWith("diff:")) return runDiff(op);
+    op.done = true; return "done";
+  }
+
+  if (!operations.some((op) => op.key === "profile")) {
+    operations.unshift({ key: "profile", cursor: null, done: false });
+    if (explicit) for (const id of input.scope.repositoryIds) registerRepo(id);
+    else operations.push({ key: "workspaces", cursor: null, done: false });
+  }
+
+  for (const op of operations) {
+    if (op.done) continue;
+    const outcome = await processOperation(op);
+    if (outcome === "stop") break;
+  }
+
+  function buildCheckpoint() { return buildSliceCheckpoint(operations, repositoryIds, state, reasons); }
+  function newEventsForCaller(): NormalizedEngineeringEvent[] { return newSliceEvents(newEvents, stagedKeys); }
+
+  if (pendingStop) return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: false, coverage: null, stop: pendingStop, requests: requestCount };
+
+  if (!explicit) reasons.add("discovery_incomplete");
+  reasons.add("acceptance_time_unknown"); reasons.add("not_supported");
+  const commitsComplete = operations.filter((op) => op.key.startsWith("commits:")).every((op) => op.done);
+  const activityComplete = operations.filter((op) => op.key.startsWith("activity:")).every((op) => op.done);
   const eventKinds: SourceCoverage["eventKinds"] = {
-    accepted_change: "partial", authored_commit: statusFor("/commits"), review: statusFor("/activity"),
+    accepted_change: "partial", authored_commit: explicit && commitsComplete ? "complete" : "partial",
+    review: explicit && activityComplete ? "complete" : "partial",
     issue_work: "unavailable", practice_evidence: "unavailable", documentation_design: "unavailable", maintenance: "unavailable",
   };
-  return {
-    profile: { uuid: profileUuid, accountId, displayName: text(profile.display_name) },
-    events: [...events.values()], progress, requestCount,
-    coverage: { source: { provider: "bitbucket", host: "bitbucket.org", subjectId }, window,
-      dataThrough: profileResponse.error ? null : window.referenceTime, status: "partial",
-      discovery: explicit ? "explicit_repositories" : "owned_and_contributed", repositoryIds: [...repositories.keys()].sort(), repositoryDiscoveryComplete,
-      eventKinds, reasonCodes: [...reasons].sort(), unknownPeriods: [{ startInclusive: window.startInclusive, endExclusive: window.endExclusive }],
-    },
-  };
-}
+  const coverage = assembleSliceCoverage({
+    provider: "bitbucket", host: "bitbucket.org", subjectId: subjectId()!, window, explicit, repositoryIds, eventKinds, reasons,
+  });
+  return { events: newEventsForCaller(), checkpoint: buildCheckpoint(), done: true, coverage, stop: null, requests: requestCount };
+};

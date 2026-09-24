@@ -1,23 +1,53 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { scoringConsistencyFixture } from "./__fixtures__/scoring-consistency";
-const receipt = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/db/score-receipts-observed", () => ({ dbReadObservedReceipt: receipt }));
-import { postWriteScore } from "./post-write-score";
-const selection = { enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") };
-beforeEach(() => vi.clearAllMocks());
-describe("final write response score authority", () => {
-  it("reads the final published revision after issuance and copies canonical display precision", async () => {
-    const fixture = await scoringConsistencyFixture({ boundary: true, craft: 0 });
-    receipt.mockResolvedValue({ status: "found", envelope: fixture.envelope, trend: null, semanticDigest: "private", coreSemanticDigest: null, isCurrent: true });
-    const result = await postWriteScore("alice", selection, "issued");
-    expect(result).toMatchObject({ status: "current", publication: "published", projection: { policyVersion: "v7.2", displayScore: 69.99, compositeScore: 69.99, adjustedComposite: 69.99, identity: { revisionId: fixture.envelope.receipt.revisionId } } });
-    expect(JSON.stringify(result)).not.toContain("private");
+
+const mockReadScoringStatus = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/collection/read-scoring-status", () => ({ readScoringStatus: mockReadScoringStatus }));
+
+const mockEnqueueCollection = vi.hoisted(() => vi.fn());
+const mockScheduleCollectionAdvance = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/collection/enqueue", () => ({
+  enqueueCollection: mockEnqueueCollection,
+  scheduleCollectionAdvance: mockScheduleCollectionAdvance,
+}));
+
+import { postWriteScore, enqueueAndReportScoringStatus } from "./post-write-score";
+
+beforeEach(() => {
+  mockReadScoringStatus.mockReset();
+  mockEnqueueCollection.mockReset().mockResolvedValue([]);
+  mockScheduleCollectionAdvance.mockReset();
+});
+
+describe("postWriteScore (#1335 phase 5: v7.2 is the one rendered policy)", () => {
+  it("returns the owner's current ScoringStatus once collection has issued a receipt", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-09-08", updating: false });
+    expect(await postWriteScore("alice")).toEqual({ kind: "ready", receiptDate: "2026-09-08", updating: false });
+    expect(mockReadScoringStatus).toHaveBeenCalledWith("alice");
   });
-  it("marks publication failure pending even if an earlier valid receipt remains", async () => {
-    const fixture = await scoringConsistencyFixture({ craft: 57 });
-    receipt.mockResolvedValue({ status: "found", envelope: fixture.envelope, trend: null, isCurrent: true });
-    expect(await postWriteScore("alice", selection, "failed")).toMatchObject({ status: "current", publication: "pending", projection: { displayScore: 46, freshness: "stale" } });
-    receipt.mockResolvedValue({ status: "unavailable" });
-    expect(await postWriteScore("alice", selection, "failed")).toEqual({ status: "unavailable", publication: "pending" });
+
+  it("passes through a collecting status while the write's enqueued job is still in flight", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 40, sources: [], hasPriorReceipt: false });
+    expect(await postWriteScore("alice")).toMatchObject({ kind: "collecting", percent: 40 });
+  });
+
+  it("passes through null when the status authority read itself fails", async () => {
+    mockReadScoringStatus.mockResolvedValue(null);
+    expect(await postWriteScore("alice")).toBeNull();
+  });
+});
+
+describe("enqueueAndReportScoringStatus (#1335 phase 4/5: the enqueue-then-report shape shared by refresh/recalculate/generate)", () => {
+  it("enqueues for the given reason, schedules a background slice, and reports the resulting ScoringStatus", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 40, sources: [], hasPriorReceipt: false });
+    const result = await enqueueAndReportScoringStatus("alice", "refresh");
+    expect(mockEnqueueCollection).toHaveBeenCalledWith("alice", "refresh");
+    expect(mockScheduleCollectionAdvance).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ kind: "collecting", percent: 40 });
+  });
+
+  it("passes the reason through unchanged (e.g. generate's signup vs refresh's refresh)", async () => {
+    mockReadScoringStatus.mockResolvedValue({ kind: "unregistered" });
+    await enqueueAndReportScoringStatus("alice", "signup");
+    expect(mockEnqueueCollection).toHaveBeenCalledWith("alice", "signup");
   });
 });

@@ -3,8 +3,6 @@ import { createScoringWindow } from "@chapa/shared";
 import { materializeObservedScoreReceipt, type ObservedReceiptMaterializationOptions } from "./score-receipt-observed";
 import { dbReadReportCraft, dbPublishObservedReceiptWithReport } from "@/lib/db/report-craft";
 import { issueReceiptVerificationV7 } from "@/lib/verification/store";
-import { captureServerError } from "@/lib/analytics/server-errors";
-import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 /** The Craft reader and publication fence share one selected report generation. */
 export async function materializeCurrentObservedReceipt(handle: string, options: ObservedReceiptMaterializationOptions = {}) {
@@ -31,35 +29,66 @@ export async function materializeCurrentObservedReceipt(handle: string, options:
   });
 }
 
-/**
- * Issue an observed v7.2 receipt for a subject who has consented to publication.
- *
- * Called from the authenticated write paths — refresh, recalculate, generate —
- * and the warm-cache cron, never from a public read. Issuing on a public badge
- * hit would publish a durable artifact for whoever happened to be embedded,
- * which is the same mistake #1239 fixed for the `users` table.
- *
- * `not_consented` is the normal answer for the overwhelming majority of
- * subjects and is deliberately silent: consent is opt-in, and a subject who has
- * not opted in keeps their labelled v6 aggregate rather than acquiring a
- * published evidence receipt as a side effect of pressing Refresh. Only a
- * genuine storage failure is captured, because that one is a durable write that
- * failed and must stay observable.
- */
-export async function issueScoreReceiptIfConsented(
-  handle: string,
-  options: { token?: string; referenceTime?: string; scoringSelection?: ScoringRenderSelection } = {},
-): Promise<"issued" | "skipped" | "failed"> {
-  // Gated with the render half. Issuing while nothing renders a receipt would
-  // mint durable public artifacts no surface shows — and the warm-cache cron
-  // would mint a fresh `revision: 1` every hour, with no revision chain.
-  const selection = options.scoringSelection ?? await readScoringRenderSelection();
-  if (!selection.enabled) return "skipped";
+/** A recorded preserve/storage reason narrows to these four (#1335 phase 4;
+ * `empty_evidence` added phase 5) -- `no_receipt` is not a failure of
+ * issuance itself (there is nothing to preserve or publish), so it is folded
+ * into `storage_error` below rather than exposed as a fifth reason nothing
+ * else needs to handle. */
+export type ReceiptFailureReason = "storage_error" | "source_error" | "craft_error" | "empty_evidence";
 
+/**
+ * Every fan-in issuance outcome, with no silent skip (#1335 phase 4): a
+ * `preserve` outcome from `materializeCurrentObservedReceipt` -- previously
+ * absorbed into a bare `"skipped"` and the root cause of the 2026-09-23
+ * production incident this plan exists to fix -- is now an explicit,
+ * recorded `failed{reason}`.
+ */
+export type ReceiptIssuanceOutcome =
+  | { readonly status: "issued" }
+  | { readonly status: "unchanged" }
+  | { readonly status: "failed"; readonly reason: ReceiptFailureReason };
+
+/**
+ * Issue an observed v7.2 receipt for a registered subject.
+ *
+ * Called only by fan-in (`lib/collection/fan-in.ts`), once every one of an
+ * owner's connected sources for the day is complete (#1335 phase 4) — never
+ * from a public read, and never synchronously from a write route. Issuing on
+ * a public badge hit would publish a durable artifact for whoever happened to
+ * be embedded, which is the same mistake #1239 fixed for the `users` table.
+ *
+ * Publication consent is retired (#1335 phase 2): a registered subject needs
+ * no opt-in to be published. `unchanged` means the receipt is already
+ * current — never an unconsenting subject, since that state no longer
+ * exists. Every other non-`issued` outcome is an explicit `failed{reason}`,
+ * because a durable write that fails but reports success is always a bug.
+ *
+ * #1335 phase 5 — the render-half gate (the retired DB-backed render-selector
+ * selector) is gone: there is one policy now, and it always renders, so
+ * issuing was never inert to begin with.
+ *
+ * A `failed` outcome is deliberately *not* captured here: the sole caller
+ * (`lib/collection/fan-in.ts`) captures every `failed` outcome exactly once,
+ * regardless of reason. Capturing here too used to double-report every
+ * `storage_error` -- one capture point, at the caller, is enough.
+ */
+export async function issueScoreReceipt(
+  handle: string,
+  options: { token?: string; referenceTime?: string } = {},
+): Promise<ReceiptIssuanceOutcome> {
   try {
     const result = await materializeCurrentObservedReceipt(handle, { token: options.token, referenceTime: options.referenceTime ?? new Date().toISOString() });
     if (result.status === "issued" || result.status === "stored") {
-      if (result.freshness !== "current") return "failed";
+      if (result.status === "stored" && result.reason) {
+        // A preserve outcome: an error occurred, but a prior current receipt
+        // was retained rather than clobbered. Still a recorded, observable
+        // failure — never silently absorbed as "nothing to do". (Its
+        // `freshness` is always "stale" here, which is why this check comes
+        // before the freshness check below — checking freshness first would
+        // mask the specific reason behind a generic storage_error.)
+        return { status: "failed", reason: result.reason === "no_receipt" ? "storage_error" : result.reason };
+      }
+      if (result.freshness !== "current") return { status: "failed", reason: "storage_error" };
       // The receipt and the link that resolves it are one act. Issuing the
       // receipt without recording its verification would put a derived token
       // on the badge that `/verify` answers "not found" to.
@@ -68,23 +97,14 @@ export async function issueScoreReceiptIfConsented(
         // re-verifies what it is given, and the inner payload does not carry the
         // hash that verification binds to.
         await issueReceiptVerificationV7(handle, handle, result.snapshot.receipt);
-      } catch (error) {
-        void captureServerError({ route: "issue-score-receipt-observed", statusCode: 500, error });
-        return "failed";
+      } catch {
+        return { status: "failed", reason: "storage_error" };
       }
-      return result.status === "issued" ? "issued" : "skipped";
+      return result.status === "issued" ? { status: "issued" } : { status: "unchanged" };
     }
-    if (result.status === "unavailable" && result.reason === "storage_error") {
-      void captureServerError({
-        route: "issue-score-receipt-observed",
-        statusCode: 500,
-        error: new Error(`Observed receipt storage failed for handle: ${handle}`),
-      });
-      return "failed";
-    }
-    return "skipped";
-  } catch (error) {
-    void captureServerError({ route: "issue-score-receipt-observed", statusCode: 500, error });
-    return "failed";
+    // result.status === "unavailable".
+    return { status: "failed", reason: result.reason === "no_receipt" ? "storage_error" : result.reason };
+  } catch {
+    return { status: "failed", reason: "storage_error" };
   }
 }

@@ -3,15 +3,18 @@ import { deriveReceiptVerificationTokenV7 } from "@/lib/verification/receipt-tok
 import { readScoreReceiptV7 } from "./score-receipt-v7";
 import { readObservedScoreReceipt } from "./score-receipt-observed";
 import { getReceiptVerificationV7 } from "@/lib/verification/store";
-import { getPublicProfileVerification, type PublicVerificationCode } from "./public-profile";
+import type { PublicVerificationCode } from "./public-profile";
 import type { MaterializedProfile } from "./materialize-profile";
 
-type VerifiableProfile = Pick<MaterializedProfile, "stats" | "displayImpact" | "statsComplete"> & {
-  scoring?: Omit<NonNullable<MaterializedProfile["scoring"]>, "policyVersion"> & { policyVersion: "v6" | "v7" | "v7.2" };
-};
+type VerifiableProfile = Pick<MaterializedProfile, "stats" | "scoring">;
 
 /**
- * The attestation that belongs on the badge being rendered.
+ * The attestation that belongs on the badge being rendered (#1335 phase 5 —
+ * "delete v6"). Every scored badge now draws either the archived `"v7"`
+ * machine engine or the current `"v7.2"` observed policy — there is no v6
+ * HMAC branch left. `null` means either there is nothing to draw (no
+ * receipt), or the receipt's own recorded issuance could not be resolved,
+ * revoked or retracted.
  *
  * One accessor rather than a policy check at each render site: the badge, the
  * OG image, the share page and the warm-cache pre-render must agree about
@@ -21,25 +24,19 @@ type VerifiableProfile = Pick<MaterializedProfile, "stats" | "displayImpact" | "
 export async function resolveBadgeVerification(
   materialized: VerifiableProfile,
 ): Promise<PublicVerificationCode | null> {
-  if (!materialized.scoring || materialized.scoring.policyVersion === "v6") {
-    return getPublicProfileVerification({
-      ...materialized,
-      scoring: materialized.scoring ? { ...materialized.scoring, policyVersion: "v6" } : undefined,
-    });
-  }
-  const identity = materialized.scoring.identity;
+  const identity = materialized.scoring?.identity;
   if (!identity) return null;
   try {
     // A later refresh may already have published B. This badge still displays
     // A, so only A's immutable recorded issuance can attest it.
-    const current = materialized.scoring.policyVersion === "v7.2"
+    const current = materialized.scoring!.policyVersion === "v7.2"
       ? await readObservedScoreReceipt(materialized.stats.handle, identity.revisionId) : null;
     const snapshot = current
       ? current.status === "found" ? { receipt: current.envelope } : null
       : await readScoreReceiptV7(materialized.stats.handle, identity.revisionId);
     if (!snapshot) return null;
     const receipt = snapshot.receipt.receipt;
-    if (receipt.policyVersion !== materialized.scoring.policyVersion
+    if (receipt.policyVersion !== materialized.scoring!.policyVersion
       || receipt.receiptId !== identity.receiptId
       || receipt.revisionId !== identity.revisionId
       || receipt.revision !== identity.revision

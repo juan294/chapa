@@ -1,67 +1,81 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { makeSnapshot } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
-// Mocks — getTrendData is a thin server-side wrapper over getSnapshots +
-// computeTrend + compareSnapshots. Mock the history data layer so tests are
-// deterministic and don't hit Redis/Supabase.
+// Mocks — getTrendData is a thin server-side wrapper over
+// readObservedScoringHistory (#1335 phase 5). Mock the history data layer so
+// tests are deterministic and don't hit Redis/Supabase.
 // ---------------------------------------------------------------------------
 
-const mockGetSnapshots = vi.fn();
+const mockReadObservedScoringHistory = vi.fn();
 
-vi.mock("./history", () => ({
-  getSnapshots: (...args: unknown[]) => mockGetSnapshots(...args),
+vi.mock("./observed-history", () => ({
+  readObservedScoringHistory: (...args: unknown[]) => mockReadObservedScoringHistory(...args),
 }));
 
 import { getTrendData } from "./get-trend-data";
+
+const observation = (overrides: Record<string, unknown> = {}) => ({
+  policyVersion: "v7.2" as const,
+  identity: { revisionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+  window: { referenceDate: "2026-09-01", startInclusive: "2025-09-02", endExclusive: "2026-09-02" },
+  composite: { exact: 50, display: 50 },
+  dimensions: {},
+  tier: "Solid",
+  archetype: "Builder",
+  craft: null,
+  ...overrides,
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("getTrendData", () => {
-  it("returns null trend/diff when fewer than 2 snapshots exist", async () => {
-    mockGetSnapshots.mockResolvedValue([makeSnapshot()]);
+  it("returns null history when the subject was never scored", async () => {
+    mockReadObservedScoringHistory.mockResolvedValue({ status: "missing" });
 
     const result = await getTrendData("testuser");
 
-    expect(result).toEqual({ trend: null, diff: null });
+    expect(result).toEqual({ history: null });
   });
 
-  it("returns null trend/diff when there are no snapshots (new/unavailable history)", async () => {
-    mockGetSnapshots.mockResolvedValue([]);
+  it("returns null history when the store is unavailable", async () => {
+    mockReadObservedScoringHistory.mockResolvedValue({ status: "unavailable" });
 
     const result = await getTrendData("testuser");
 
-    expect(result).toEqual({ trend: null, diff: null });
+    expect(result).toEqual({ history: null });
   });
 
-  it("computes trend and diff from the two most recent snapshots when available", async () => {
-    const older = makeSnapshot({
-      date: "2025-06-01",
-      adjustedComposite: 50,
-      compositeScore: 55,
+  it("returns null history when fewer than 2 observations exist", async () => {
+    mockReadObservedScoringHistory.mockResolvedValue({
+      status: "found",
+      history: { observations: [observation()], trend: [], comparisons: [] },
     });
-    const newer = makeSnapshot({
-      date: "2025-06-08",
-      adjustedComposite: 60,
-      compositeScore: 65,
-    });
-    mockGetSnapshots.mockResolvedValue([older, newer]);
 
     const result = await getTrendData("testuser");
 
-    expect(result.trend).not.toBeNull();
-    expect(result.trend?.compositeValues.length).toBe(2);
-    expect(result.diff).not.toBeNull();
-    expect(result.diff?.adjustedComposite).toBe(10);
+    expect(result).toEqual({ history: null });
   });
 
-  it("degrades gracefully — returns null trend/diff when the underlying history store throws", async () => {
-    mockGetSnapshots.mockRejectedValue(new Error("supabase down"));
+  it("returns the history when at least 2 observations exist", async () => {
+    const history = {
+      observations: [observation({ composite: { exact: 50, display: 50 } }), observation({ composite: { exact: 60, display: 60 } })],
+      trend: [],
+      comparisons: [{ status: "comparable", composite: { exact: 10, display: 10 } }],
+    };
+    mockReadObservedScoringHistory.mockResolvedValue({ status: "found", history });
 
     const result = await getTrendData("testuser");
 
-    expect(result).toEqual({ trend: null, diff: null });
+    expect(result).toEqual({ history });
+  });
+
+  it("degrades gracefully — returns null history when the underlying history store throws", async () => {
+    mockReadObservedScoringHistory.mockRejectedValue(new Error("supabase down"));
+
+    const result = await getTrendData("testuser");
+
+    expect(result).toEqual({ history: null });
   });
 });

@@ -139,8 +139,6 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
   await invalidateProfileReadModels(targetHandle, {
     stats: true,
     badgeSvg: true,
-    snapshot: true,
-    history: true,
   });
 
   // 7. Mark stats dirty (#826) so today's snapshot lock yields to the new
@@ -177,7 +175,7 @@ async function uploadV2(body: { targetHandle?: string }, auth: { handle: string 
   } catch {
     await captureServerError({ route: "/api/supplemental", statusCode: 200, error: new Error("Supplemental evidence committed; cache rebuild deferred") });
   }
-  await invalidateProfileReadModels(owner, { stats: true, badgeSvg: true, snapshot: true, history: true });
+  await invalidateProfileReadModels(owner, { stats: true, badgeSvg: true });
   await markStatsDirty(owner);
   return NextResponse.json({ success: true, persisted: true, schemaVersion: "supplemental-v2", uploadId: stored.uploadId,
     uploadedAt: stored.uploadedAt, cacheRefreshed, eligibility: "dated_self_reported", coverage: "partial" });

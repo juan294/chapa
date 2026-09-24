@@ -10,7 +10,6 @@ const requiredEnvPresent = Boolean(
     process.env.NEXTAUTH_SECRET,
 );
 
-const today = new Date().toISOString().slice(0, 10);
 const pendingStorageKey = "chapa:e2e:pending-studio-config";
 
 type Shape = {
@@ -130,12 +129,16 @@ test.describe("full impact journey", () => {
         expect(share).not.toBeNull();
         expect(share!.status()).toBeLessThan(500);
         await expect(page.locator("body")).toContainText(shape.handle);
-        // LE-8-2 — the fixture handle has no GitHub account, so the honest
-        // share page is the not-found state (streamed, so still HTTP 200),
-        // for the owner exactly as for a visitor. A handle GitHub knows
-        // renders the profile with its embed snippets instead.
+        // #1335 phase 5 — with v6 deleted, this fixture handle (never
+        // registered as a scoring subject) never reaches a GitHub fetch or
+        // materialize at all: the share page's status gate answers
+        // "unregistered" before any of that runs, and shows the owner's
+        // scoring-status panel ("You haven't started scoring yet.") rather
+        // than the old not-found state a stats-fetch failure used to
+        // produce. This is what LE-8-2's honest-render invariant looks like
+        // now that the badge/share pipeline is v7.2-only.
         await expect(page.locator("body")).toContainText(
-          /Page not found|Página no encontrada|Markdown|HTML/,
+          /Not on Chapa yet|Aún no está en Chapa|haven.t started scoring yet|no has empezado a puntuar/,
         );
 
         await context.setOffline(true);
@@ -163,17 +166,6 @@ test.describe("full impact journey", () => {
       }
 
       for (const shape of shapes) {
-        const snapshot = await readSnapshot(db, shape.handle);
-        expect(snapshot).not.toBeNull();
-        expect(Number.isFinite(Number(snapshot!.commits_total))).toBe(true);
-        expect(Number.isFinite(Number(snapshot!.prs_merged_count))).toBe(true);
-        expect(Number.isFinite(Number(snapshot!.reviews_submitted))).toBe(true);
-        if (shape.kind === "non-craft") {
-          expect(snapshot!.craft).toBeNull();
-        } else {
-          expect(Number(snapshot!.craft)).toBeGreaterThan(0);
-        }
-
         const config = await readStudioConfig(db, shape.handle);
         expect(config).toMatchObject({ ...savedConfig, background: "particles" });
 
@@ -226,13 +218,6 @@ test.describe("full impact journey", () => {
           residueEvidence: evidenceReference,
         },
       ];
-      const snapshotFixtures = [
-        {
-          id: `${evidenceRunId}-${projectName}-snapshot`,
-          cleanupStatus,
-          residueEvidence: evidenceReference,
-        },
-      ];
       await writeFile(
         evidencePath,
         `${JSON.stringify(
@@ -255,20 +240,6 @@ test.describe("full impact journey", () => {
                   cleanup: [evidenceReference],
                 },
                 fixtures: studioFixtures,
-              },
-              {
-                scenarioId: "profile.snapshot-integrity",
-                environment: "local-contract",
-                status: journeyPassed ? "passed" : "failed",
-                startedAt,
-                finishedAt: new Date().toISOString(),
-                runner: "playwright",
-                evidence: {
-                  http: [evidenceReference],
-                  datastore: [evidenceReference],
-                  cleanup: [evidenceReference],
-                },
-                fixtures: snapshotFixtures,
               },
             ],
             cleanup: {
@@ -334,7 +305,7 @@ function serviceClient(): SupabaseClient {
 async function resetShapes(db: SupabaseClient, shapes: Shape[]): Promise<void> {
   const handles = shapes.map((shape) => shape.handle);
   const errors: string[] = [];
-  for (const table of ["user_platforms", "studio_configs", "metrics_snapshots", "users"]) {
+  for (const table of ["user_platforms", "studio_configs", "users"]) {
     const { error } = await db.from(table).delete().in("handle", handles);
     if (error) errors.push(`${table}: ${error.message}`);
   }
@@ -347,7 +318,7 @@ async function countShapeResidue(
 ): Promise<number> {
   const handles = shapes.map((shape) => shape.handle);
   let remainingCount = 0;
-  for (const table of ["user_platforms", "studio_configs", "metrics_snapshots", "users"]) {
+  for (const table of ["user_platforms", "studio_configs", "users"]) {
     const { count, error } = await db
       .from(table)
       .select("*", { count: "exact", head: true })
@@ -364,11 +335,6 @@ async function seedShapes(db: SupabaseClient, shapes: Shape[]): Promise<void> {
       .from("users")
       .upsert({ handle: shape.handle }, { onConflict: "handle" });
     expect(userError).toBeNull();
-
-    const { error: snapshotError } = await db
-      .from("metrics_snapshots")
-      .upsert(snapshotRow(shape), { onConflict: "handle,date" });
-    expect(snapshotError).toBeNull();
 
     if (shape.platform) {
       const { error: platformError } = await db.from("user_platforms").upsert(
@@ -443,55 +409,6 @@ async function featureFlagsMatch(
 ): Promise<boolean> {
   const actual = await readFeatureFlags(db);
   return JSON.stringify(actual) === JSON.stringify(expected);
-}
-
-function snapshotRow(shape: Shape): Record<string, unknown> {
-  return {
-    handle: shape.handle,
-    date: today,
-    commits_total: 124,
-    prs_merged_count: 18,
-    prs_merged_weight: 21,
-    reviews_submitted: 33,
-    issues_closed: 7,
-    repos_contributed: 9,
-    active_days: 44,
-    lines_added: 9800,
-    lines_deleted: 2100,
-    total_stars: 135,
-    total_forks: 22,
-    total_watchers: 41,
-    top_repo_share: 0.38,
-    max_commits_in_10min: 3,
-    micro_commit_ratio: 0.08,
-    docs_only_pr_ratio: 0.16,
-    building: 74,
-    guarding: 69,
-    consistency: 71,
-    breadth: 67,
-    craft: shape.craft,
-    archetype: shape.craft == null ? "Builder" : "Artificer",
-    profile_type: shape.platform ? "collaborative" : "solo",
-    composite_score: 72,
-    adjusted_composite: 70,
-    confidence: 86,
-    tier: "High",
-    confidence_penalties: [{ flag: "fixture", penalty: 0 }],
-  };
-}
-
-async function readSnapshot(
-  db: SupabaseClient,
-  handle: string,
-): Promise<Record<string, unknown> | null> {
-  const { data, error } = await db
-    .from("metrics_snapshots")
-    .select("*")
-    .eq("handle", handle)
-    .eq("date", today)
-    .maybeSingle();
-  expect(error).toBeNull();
-  return data;
 }
 
 async function readStudioConfig(

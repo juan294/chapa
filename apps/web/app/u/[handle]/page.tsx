@@ -1,4 +1,3 @@
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { resolveBadgeVerification } from "@/lib/profile/badge-verification";
 import { Suspense } from "react";
 import { after } from "next/server";
@@ -32,7 +31,6 @@ import Link from "next/link";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
   materializePublicProfile,
-  redactImpactForVisitor,
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
 import {
@@ -48,8 +46,6 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { isWebmcpEnabled } from "@/lib/feature-flags";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { getTrendData } from "@/lib/history/get-trend-data";
-import { redactSnapshotDiffForVisitor } from "@/lib/history/diff";
 import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
 import { DynamicRouteShell } from "@/components/DynamicRouteShell";
@@ -65,6 +61,10 @@ import { explainReceipt, explainObservedReceipt } from "@/lib/dashboard/receipt-
 import { SharePageLocaleContent } from "./SharePageLocaleContent";
 import { SharePageWebMcpTools } from "./SharePageWebMcpTools";
 import { dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
+import { readScoringStatus, hasDrawableCurrentReceipt } from "@/lib/collection/read-scoring-status";
+import { badgeStatusState, needsUnavailablePlaceholder, type NonReadyScoringStatus } from "@/lib/render/badge-state";
+import { SharePageScoringStatus } from "./SharePageScoringStatus";
+import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -99,12 +99,11 @@ export async function generateMetadata({
   // The date and durable Studio revision make each rendered configuration a
   // distinct CDN URL. This prevents an in-flight pre-save response from
   // refilling the URL advertised after that save.
-  const scoringSelection = await readScoringRenderSelection();
-  const today = toDateString(new Date(scoringSelection.capturedAt));
+  const today = toDateString(new Date());
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
-  const ogVersion = configSnapshot.cacheable && scoringSelection.cacheable
-    ? buildOgImageCacheVersion(today, configSnapshot.revision, scoringSelection.machinePolicy)
-    : `${buildOgImageCacheVersion(today, null, scoringSelection.machinePolicy)}-uncached`;
+  const ogVersion = configSnapshot.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision)
+    : `${buildOgImageCacheVersion(today, null)}-uncached`;
   const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${ogVersion}&lang=${locale}`;
   return {
     title: `@${interpolate(t("sharePage.metadataTitle") as string, { handle })}`,
@@ -213,16 +212,13 @@ export async function SharePageContent({
   // only hides the UI — the data would already be in a visitor's
   // view-source via the RSC payload.
   //
-  // #1034 — trend/diff history is fetched alongside profile materialization
-  // (rather than in a client `useEffect` post-hydration) so the dashboard
-  // renders with this data on first paint instead of a client fetch waterfall.
-  // getTrendData() already degrades gracefully (returns nulls) on any
-  // history-store failure; the `.catch()` here is a belt-and-suspenders
-  // guard so a future regression in that contract still can't fail the
-  // whole share page render — a 500 here would be a bug (CLAUDE.md).
+  // #1335 phase 5 — trend/diff history display was retired along with
+  // `metrics_snapshots` (CLAUDE.md's non-goals: "No long-term history
+  // charts"); `SharePageOwnerContent`/`SharePageWebMcpTools` no longer take
+  // trend/diff props, so this page no longer fetches `getTrendData` at all.
   //
-  // Session and flag resolution have no data dependency on the profile or
-  // trend fetches, so all four run concurrently.
+  // Session and flag resolution have no data dependency on the profile
+  // fetch, so all three run concurrently.
   //
   // #1180 (PE-L1) — the shared SVG cache read (#720 below) depends on
   // nothing in this wave: only `handle` and today's date, both known here
@@ -233,8 +229,50 @@ export async function SharePageContent({
   // below — computing the date once and reusing it (rather than recomputing
   // `toDateString(new Date())` again after the wave) avoids a UTC-midnight
   // race where a request could read one day's key and write another.
-  const scoringSelection = await readScoringRenderSelection();
-  const today = toDateString(new Date(scoringSelection.capturedAt));
+  // #1335 phase 5 — there is one policy now (`SCORING_POLICY`); `capturedAt`
+  // is captured once per render so every cache-header/key computation below
+  // agrees.
+  const capturedAt = Date.now();
+
+  // #1335 phase 4/5 — a handle with no ready receipt renders its scoring
+  // state instead of the normal materialize/breakdown pipeline: there is
+  // nothing to fetch or explain yet. Resolving the session here (rather than
+  // inside the Promise.all wave below) costs one extra sequential await only
+  // on this early-return path — session resolution is a local cookie/JWT
+  // check, not network I/O — and is what lets this branch decide `isOwner`
+  // before doing any of the heavier work below. A null status (a failed
+  // authority read) takes neither branch below and this function continues
+  // exactly as it did before phase 4.
+  //
+  // #1335 phase 4 perf fix — skip `readScoringStatus` (3 DB reads) whenever
+  // `hasDrawableCurrentReceipt` (the same single receipt read
+  // `materializePublicProfile` below already does) finds a drawable current
+  // receipt. See badge.svg's own comment for the full rationale.
+  let scoringStatus: ScoringStatus | null = null;
+  if (!(await hasDrawableCurrentReceipt(handle))) {
+    try {
+      scoringStatus = await readScoringStatus(handle);
+    } catch (err) {
+      scoringStatus = null;
+      fireAndForget(() => captureServerError({ route: `/u/${handle}`, statusCode: 500, error: err }));
+    }
+  }
+  const badgeState = scoringStatus ? badgeStatusState(scoringStatus) : null;
+  if (badgeState && scoringStatus) {
+    const session = await headers().then((h) => getOptionalServerSessionFromHeaders(h));
+    const isOwner = session?.login === handle;
+    return (
+      <SharePageScoringStatus
+        handle={handle}
+        locale={locale}
+        status={scoringStatus as NonReadyScoringStatus}
+        badgeState={badgeState}
+        isOwner={isOwner}
+      />
+    );
+  }
+
+  const today = toDateString(new Date(capturedAt));
   // #1181 (UX-H3 follow-up) — the cache key and the rendered content below
   // MUST come from the same resolved locale, never independent defaults.
   // `resolveBadgeLocale` (not `buildBadgeSvgCacheKey` directly) is the only
@@ -244,14 +282,13 @@ export async function SharePageContent({
   // this fixed — content defaulted to English while the key defaulted to
   // DEFAULT_LOCALE/Spanish, so the majority Spanish-locale traffic was
   // served an English badge).
-  const badgeLocale = resolveBadgeLocale(locale, scoringSelection.machinePolicy);
+  const badgeLocale = resolveBadgeLocale(locale);
   const svgCacheKey = badgeLocale.cacheKey(handle, today);
-  const [session, materialization, trendData, webmcpEnabled, cachedSvg] = await Promise.all([
+  const [session, materialization, webmcpEnabled, cachedSvg] = await Promise.all([
     headers().then((h) => getOptionalServerSessionFromHeaders(h)),
-    materializePublicProfile(handle, { readOnly, scoringSelection }),
-    getTrendData(handle).catch(() => ({ trend: null, diff: null })),
+    materializePublicProfile(handle, { readOnly }),
     isWebmcpEnabled(),
-    scoringSelection.cacheable ? readBadgeSvgCache(svgCacheKey) : Promise.resolve(null),
+    readBadgeSvgCache(svgCacheKey),
   ]);
   // LE-8-2 — GitHub answered that nobody owns this handle. Not the empty
   // "try later" state, which is reserved for `null` (an outage or a rate
@@ -261,6 +298,28 @@ export async function SharePageContent({
   if (isGitHubUserNotFound(materialization)) notFound();
   const materialized = materialization;
   const isOwner = session?.login === handle;
+
+  // #1335 phase 4 fix — `scoringStatus === null` means the `readScoringStatus`
+  // authority read itself failed under v7.2 (not "no receipt found"; that is
+  // its own real `ScoringStatus`, handled above). "Failed authority reads are
+  // unavailable": this must never silently fall through to whatever the
+  // normal materialize pipeline above already produced when THAT also has no
+  // v7.2 receipt to draw. A handle WITH a drawable receipt (found
+  // independently by that same materialize call) still renders it normally
+  // below — reuses the exact same status-placeholder component as
+  // `collecting`/`action_needed`/`unregistered` rather than inventing a
+  // second one.
+  if (materialized && needsUnavailablePlaceholder(scoringStatus, materialized.scoring?.policyVersion)) {
+    return (
+      <SharePageScoringStatus
+        handle={handle}
+        locale={locale}
+        status={null}
+        badgeState="unavailable"
+        isOwner={isOwner}
+      />
+    );
+  }
 
   // #1332 — owner-only, cheap (single indexed SELECT on `user_platforms` by
   // handle, no token decryption): a linked source whose refresh grant needs
@@ -286,19 +345,10 @@ export async function SharePageContent({
   // gated on `materialized` alone, unchanged, and `materialized` stays null here.
   const stored: StoredBadgeProfile | null = materialized
     ? null
-    : await readStoredBadgeProfile(handle, scoringSelection);
+    : await readStoredBadgeProfile(handle);
   const storedInputs = stored ? storedBadgeRenderInputs(stored) : null;
 
   const stats = materialized?.stats ?? storedInputs?.stats ?? null;
-  // `impact` stays the FULL, unredacted result — it feeds renderBadgeSvg and
-  // personJsonLd below (and, via `materialized` itself, the snapshot/HMAC
-  // record in the deferred work further down). Only the copy handed to the
-  // client component tree is redacted, via `impactForClient` near the
-  // bottom of this function. For a stored fallback this is the durable
-  // snapshot's legacy projection — still full, never pre-redacted, so the
-  // SAME redaction step below governs both sources identically.
-  const impact = materialized?.displayImpact ?? storedInputs?.impact ?? null;
-  const craftResult = materialized?.craftResult ?? null;
   // The one scoring authority both a live and a stored render draw from —
   // v7.2 receipt authority when present, never mixed with a v6 aggregate
   // (`stored.scoring`/`materialized.scoring` are each already one or the
@@ -318,7 +368,7 @@ export async function SharePageContent({
   let configRevision: number | null = null;
   let avatarCachePolicy: ReturnType<typeof getBadgeAvatarCachePolicy> = "skip";
 
-  if (!cachedSvg && stats && impact && materialized) {
+  if (!cachedSvg && stats && materialized?.scoring) {
     // Cache miss — render inline. Avatar fetch is best-effort with a tight
     // 250ms deadline (#800) so a slow external image server can't block
     // TTFB. The /u/[handle]/badge.svg route uses a longer bounded deadline on
@@ -340,10 +390,11 @@ export async function SharePageContent({
     // the badge route's own `freshnessCacheable` gate (#1331).
     configCacheable = configSnapshot.cacheable && materialized.scoring?.freshness === "current";
     configRevision = configSnapshot.revision;
-    inlineSvg = renderBadgeSvg(stats, impact, {
-      // `impact` is non-null here only because `materialized` was; the optional
-      // read keeps the compiler honest and falls back to the same legacy model.
-      scoring: materialized.scoring,
+    // #1335 phase 5 — `materialized.scoring` is guaranteed non-null by the
+    // gate above (a drawable receipt already passed
+    // `needsUnavailablePlaceholder`), even though its type stays optional.
+    inlineSvg = renderBadgeSvg(stats, {
+      scoring: materialized.scoring!,
       avatarDataUri,
       // #1191 — this render writes to the same cache slot the badge route
       // reads, so it must use the same config.
@@ -352,10 +403,10 @@ export async function SharePageContent({
       verificationDate: verification?.date,
       // #1181 — same `badgeLocale` bundle that produced `svgCacheKey` above,
       // so content and key are always for the same locale.
-      strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? impact.tier),
+      strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? null),
     });
     renderedFresh = true;
-  } else if (!cachedSvg && stats && impact && stored) {
+  } else if (!cachedSvg && stats && storedInputs && stored) {
     // badge-source-outage-resilience (2026-09-22) / #1331 — the stored
     // fallback's own render: the same degraded disclosure the badge route's
     // `!materialized` branch draws (`stored-badge-profile.ts`'s
@@ -364,13 +415,14 @@ export async function SharePageContent({
     // the deferred cache-write/side-effect block below stays gated on
     // `materialized`, which is null here, so it never runs for this branch.
     const configSnapshot = await resolveBadgeConfigSnapshot(handle);
-    inlineSvg = renderBadgeSvg(stats, impact, {
+    inlineSvg = renderBadgeSvg(stats, {
       scoring: stored.scoring,
       config: configSnapshot.config,
       degraded: {
         reason: "live_sources_unavailable",
         observedAt: stored.observedAt,
         activityAvailable: false,
+        countsAvailable: storedInputs.countsAvailable,
       },
       strings: {
         ...badgeLocale.stringsFor(stored.scoring.tier ?? null),
@@ -382,7 +434,7 @@ export async function SharePageContent({
     // route emits for the same fallback.
     fireAndForget(() =>
       captureServerEvent("badge_stored_fallback", {
-        policyVersion: stored.policyVersion,
+        policyVersion: stored.scoring.policyVersion,
         observedDate: stored.observedAt.slice(0, 10),
       }),
     );
@@ -400,18 +452,14 @@ export async function SharePageContent({
   // It still gets a write, just a short-TTL one, so it doesn't shadow a
   // later good render for the full 24h+jitter a normal write would use.
   //
-  // #1091 — the snapshot persist is a durable Supabase write with nothing
-  // in the rendered HTML depending on its result, so (mirroring the badge
-  // route's #1013 fix) it runs inside after() alongside the deferred cache
-  // work, instead of blocking TTFB. A genuine failure from the deferred chain
-  // is escalated via captureServerError rather than swallowed —
-  // persistProfileSnapshot already does this internally for its own "failed"
-  // write outcome; this outer catch covers any other error.
+  // #1091 — the cache write and side effects have nothing in the rendered
+  // HTML depending on their result, so (mirroring the badge route's #1013
+  // fix) they run inside after() instead of blocking TTFB. A genuine
+  // failure is escalated via captureServerError rather than swallowed.
   //
-  // LE-6-1 — `verification` is the code rendered into the inline SVG above
-  // (or minted for this visit when the cached SVG was served), and
-  // `runPublicProfileSideEffects` records it on every visit rather than only
-  // on the first of the day, so the strip's link always resolves.
+  // #1335 phase 5 — snapshot persistence and the v6 HMAC verification
+  // record are gone; `runPublicProfileSideEffects` now only tracks the
+  // badge-generated event and refreshes the owner's display name/avatar.
   if (materialized && inlineSvg && !readOnly) {
     const cacheEligible =
       renderedFresh && configCacheable && !!verification && avatarCachePolicy !== "skip";
@@ -428,10 +476,10 @@ export async function SharePageContent({
           svgCacheKey,
           svgToCache,
           handle,
-          { ttlSeconds: svgCacheTtlSeconds, scoringSelection, configRevision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null },
+          { ttlSeconds: svgCacheTtlSeconds, configRevision, receiptIdentity: materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null },
         );
       }
-      return runPublicProfileSideEffects(handle, materialized, { verification })
+      return runPublicProfileSideEffects(handle, materialized)
         .catch((err) => {
           fireAndForget(() =>
             captureServerError({
@@ -475,11 +523,11 @@ export async function SharePageContent({
   // here rather than in the client tree: `explainReceipt` reads the sealed
   // receipt, and the projection it returns is what crosses the boundary.
   const identity = materialized?.scoring?.identity;
-  const receiptExplanation = identity && materialized?.scoring.policyVersion === "v7.2"
+  const receiptExplanation = identity && materialized?.scoring?.policyVersion === "v7.2"
     ? await readObservedScoreReceipt(handle, identity.revisionId).then(stored =>
         stored.status === "found" && stored.envelope.receipt.revisionId === identity.revisionId && stored.envelope.contentHash.value === identity.contentHash
-          ? explainObservedReceipt({ receipt: stored.envelope, trend: stored.trend }, scoringSelection.capturedAt) : null)
-    : identity && materialized?.scoring.policyVersion === "v7"
+          ? explainObservedReceipt({ receipt: stored.envelope, trend: stored.trend }, capturedAt) : null)
+    : identity && materialized?.scoring?.policyVersion === "v7"
       ? await readScoreReceiptV7(handle, identity.revisionId).then(snapshot =>
           snapshot && snapshot.receipt.receipt.revisionId === identity.revisionId && snapshot.receipt.contentHash.value === identity.contentHash ? explainReceipt(snapshot) : null)
       : null;
@@ -509,17 +557,6 @@ export async function SharePageContent({
 
   const badgeLabelId = `share-badge-label-${handle}`;
 
-  // #1067 — this is the ONE place `impact` crosses into a "use client"
-  // component tree. A projection, not a mutation: `impact` (and, more
-  // importantly, `materialized.displayImpact` it's aliased from) must stay
-  // fully intact above for the badge render, JSON-LD, and the deferred
-  // snapshot/HMAC verification-record work in `after()`.
-  const impactForClient = impact && !isOwner ? redactImpactForVisitor(impact) : impact;
-  const diffForClient =
-    trendData.diff && !isOwner
-      ? redactSnapshotDiffForVisitor(trendData.diff)
-      : trendData.diff;
-
   return (
     <>
       <SharePageShortcuts
@@ -527,16 +564,12 @@ export async function SharePageContent({
         handle={handle}
         isOwner={isOwner}
       />
-      {webmcpEnabled && stats && impactForClient && materialized && (
+      {webmcpEnabled && stats && materialized?.scoring && (
         <SharePageWebMcpTools
           handle={handle}
-          impact={impactForClient}
           scoring={materialized.scoring}
           stats={stats}
           verification={verification}
-          trend={trendData.trend}
-          diff={diffForClient}
-          craftResult={craftResult}
           embedMarkdown={embedMarkdown}
           embedHtml={embedHtml}
         />
@@ -609,24 +642,29 @@ export async function SharePageContent({
           />
         </div>
 
-        {/* ── Owner/Visitor Content (isOwner resolved server-side above; see
-             the redaction boundary comment near impactForClient — this prop
-             stays a DISPLAY gate only) ── */}
-        <SharePageOwnerContentLazy
-          handle={handle}
-          stats={stats}
-          impact={impactForClient}
-          craftResult={craftResult}
-          trend={trendData.trend}
-          diff={diffForClient}
-          isOwner={isOwner}
-          embedMarkdown={embedMarkdown}
-          embedHtml={embedHtml}
-          receiptExplanation={receiptExplanation}
-          scoring={scoringModel}
-          staleFallback={stored ? { observedAt: stored.observedAt } : null}
-          reconnectNeeded={reconnectNeeded}
-        />
+        {/* ── Owner/Visitor Content (isOwner resolved server-side above) ──
+             #1335 phase 5 — "delete v6": `SharePageOwnerContent`'s Impact
+             Dashboard section now draws solely from `scoring`/
+             `receiptExplanation`; there is no `impact`/`craftResult`/
+             `trend`/`diff` prop left to pass. `scoring` is a required
+             `ScoreViewModel`: `scoringModel` is genuinely null only for a
+             receipt-authority desync neither earlier placeholder branch
+             caught (a status with `hasPriorReceipt: true` whose prior
+             receipt is not itself drawable) — render nothing below the
+             toolbar rather than pass a non-existent model. */}
+        {scoringModel && (
+          <SharePageOwnerContentLazy
+            handle={handle}
+            stats={stats}
+            isOwner={isOwner}
+            embedMarkdown={embedMarkdown}
+            embedHtml={embedHtml}
+            receiptExplanation={receiptExplanation}
+            scoring={scoringModel}
+            staleFallback={stored ? { observedAt: stored.observedAt } : null}
+            reconnectNeeded={reconnectNeeded}
+          />
+        )}
       </div>
 
       {/* pb-16 spacer (#1167 / UX-B1) — CommandBarHint (rendered by the

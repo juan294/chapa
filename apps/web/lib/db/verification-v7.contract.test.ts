@@ -8,7 +8,7 @@ const db = () => getServiceClient();
 describe("v7 durable issuance (real local database)", () => {
   beforeEach(async () => {
     expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull();
-    expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-01T12:00:00.000Z" })).error).toBeNull();
+    expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
   });
   afterEach(async () => { expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); });
   async function published() {
@@ -58,7 +58,7 @@ describe("v7 durable issuance (real local database)", () => {
     expect(withdrawn.error).toBeNull();
     expect(withdrawn.data).toEqual([args.p_revision]);
     // Either issuance committed before withdrawal or correctly rejected after it.
-    if (issued.error) expect(issued.error.message).toContain("Current consent required");
+    if (issued.error) expect(issued.error.message).toContain("Registered subject required");
     expect((await db().rpc("scoring_v7_read_verification", { p_revision: args.p_revision, p_signature: args.p_signature })).data).toEqual({ status: "revoked" });
     expect((await db().from("scoring_v7_verification").select("signature").eq("receipt_id", args.p_revision)).data).toEqual([]);
   });

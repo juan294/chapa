@@ -1,10 +1,9 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({ read: vi.fn(), limit: vi.fn() }));
-vi.mock("@/lib/verification/store", () => ({ getReceiptVerificationV7: mocks.read, getVerificationRecord: vi.fn() }));
+vi.mock("@/lib/verification/store", () => ({ getReceiptVerificationV7: mocks.read }));
 vi.mock("@/lib/cache/redis", () => ({ rateLimit: mocks.limit }));
 vi.mock("@/lib/http/client-ip", () => ({ getClientIp: () => "test" }));
-vi.mock("@/lib/env", () => ({ getBaseUrl: () => "https://example.test" }));
 import { GET, POST } from "./route";
 const token = `v7.11111111-1111-4111-8111-111111111111.${"0".repeat(64)}`;
 const ctx = (hash = token) => ({ params: Promise.resolve({ hash }) });

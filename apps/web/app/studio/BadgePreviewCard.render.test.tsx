@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { resolveTranslation } from "@/lib/i18n/resolve";
 import { __getFallbackDictionary } from "@/lib/i18n/fallback-dictionary";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 import { BadgePreviewCard } from "./BadgePreviewCard";
 
 afterEach(cleanup);
@@ -25,18 +26,21 @@ const stats = {
   linkedPlatforms: ["github"],
 } as unknown as StatsData;
 
-const impact = {
-  // The renderer projects this through the shared score view model, which
-  // identifies the subject — a fixture that casts the field away is lying
-  // about a value `ImpactV6Result` requires.
+// #1335 — the renderer projects this through the shared score view model,
+// which identifies the subject; a v7.2 ScoreViewModel fixture instead of
+// the retired ImpactV6Result shape.
+const scoring = makeScoring({
   handle: "testuser",
-  dimensions: { delivery: 72, quality: 64, consistency: 81, breadth: 58 },
-  archetype: "builder",
-  compositeScore: 65,
-  adjustedComposite: 65,
+  dimensions: {
+    delivery: { kind: "point", value: 72, display: 72 },
+    quality: { kind: "point", value: 64, display: 64 },
+    consistency: { kind: "point", value: 81, display: 81 },
+    breadth: { kind: "point", value: 58, display: 58 },
+  },
+  archetype: "Builder",
+  composite: { kind: "point", value: 65, display: 65 },
   tier: "Solid",
-  confidence: 90,
-} as unknown as ImpactV6Result;
+});
 
 /**
  * #1191 step 6 — the whole point of the one-artifact work. Studio used to
@@ -64,9 +68,10 @@ describe("BadgePreviewCard renders the real badge artifact (#1191)", () => {
    */
   function expectedSvg(config: BadgeConfig) {
     const host = document.createElement("div");
-    host.innerHTML = renderBadgeSvg(stats, impact, {
+    host.innerHTML = renderBadgeSvg(stats, {
+      scoring,
       config,
-      strings: buildBadgeI18nStrings(t, impact.tier),
+      strings: buildBadgeI18nStrings(t, scoring.tier),
     });
     return host.innerHTML;
   }
@@ -76,7 +81,7 @@ describe("BadgePreviewCard renders the real badge artifact (#1191)", () => {
       <BadgePreviewCard
         config={DEFAULT_BADGE_CONFIG}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
       />,
     );
     const preview = screen.getByTestId("badge-preview");
@@ -92,7 +97,7 @@ describe("BadgePreviewCard renders the real badge artifact (#1191)", () => {
     ["tierTreatment", { tierTreatment: "enhanced" }],
   ])("stays byte-identical to the badge when %s changes", (_name, patch) => {
     const config = { ...DEFAULT_BADGE_CONFIG, ...patch } as BadgeConfig;
-    render(<BadgePreviewCard config={config} stats={stats} impact={impact} />);
+    render(<BadgePreviewCard config={config} stats={stats} scoring={scoring} />);
     expect(screen.getByTestId("badge-preview").innerHTML).toBe(
       expectedSvg(config),
     );
@@ -103,7 +108,7 @@ describe("BadgePreviewCard renders the real badge artifact (#1191)", () => {
       <BadgePreviewCard
         config={DEFAULT_BADGE_CONFIG}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
       />,
     );
     const before = screen.getByTestId("badge-preview").innerHTML;
@@ -111,7 +116,7 @@ describe("BadgePreviewCard renders the real badge artifact (#1191)", () => {
       <BadgePreviewCard
         config={{ ...DEFAULT_BADGE_CONFIG, background: "aurora" }}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
       />,
     );
     expect(screen.getByTestId("badge-preview").innerHTML).not.toBe(before);
@@ -122,7 +127,7 @@ describe("BadgePreviewCard renders the real badge artifact (#1191)", () => {
       <BadgePreviewCard
         config={DEFAULT_BADGE_CONFIG}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
       />,
     );
     const preview = screen.getByTestId("badge-preview");
@@ -143,7 +148,7 @@ describe("BadgePreviewCard renders the real badge artifact (#1191)", () => {
           cardStyle: "frost",
         }}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
       />,
     );
     const preview = screen.getByTestId("badge-preview");
@@ -165,7 +170,7 @@ describe("BadgePreviewCard verification and identity", () => {
       <BadgePreviewCard
         config={DEFAULT_BADGE_CONFIG}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
         verification={verification}
       />,
     );
@@ -181,7 +186,7 @@ describe("BadgePreviewCard verification and identity", () => {
       <BadgePreviewCard
         config={DEFAULT_BADGE_CONFIG}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
         verification={{ hash: "abc123def456", date: "2026-08-30" }}
       />,
     );
@@ -194,7 +199,7 @@ describe("BadgePreviewCard verification and identity", () => {
       <BadgePreviewCard
         config={DEFAULT_BADGE_CONFIG}
         stats={stats}
-        impact={impact}
+        scoring={scoring}
         avatarDataUri={avatarDataUri}
       />,
     );
@@ -209,7 +214,7 @@ describe("Studio observed receipt consistency", () => {
   it.each(["none", 57, 0, "expired"] as const)("preserves core46 and the optional Craft %s state", async (craft) => {
     const { scoringConsistencyFixture } = await import("@/lib/profile/__fixtures__/scoring-consistency");
     const fixture = await scoringConsistencyFixture({ craft });
-    render(<BadgePreviewCard config={DEFAULT_BADGE_CONFIG} stats={fixture.stats} impact={fixture.impact} scoring={fixture.model} />);
+    render(<BadgePreviewCard config={DEFAULT_BADGE_CONFIG} stats={fixture.stats} scoring={fixture.model} />);
     const preview = screen.getByTestId("badge-preview");
     expect(preview.querySelector('[data-element="score"]')?.textContent).toBe("46");
     expect(preview.querySelector('[data-element="archetype"]')?.textContent).not.toContain("Builder");

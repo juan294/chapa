@@ -46,14 +46,14 @@ const ENTRANCE_DEADLINE_MS = 1000;
 
 describe("StatsGrid — caption contrast is measured on the settled card (LE-8-3)", () => {
   it("captions use the text-secondary token, which clears 4.5:1 on bg-card in both themes", () => {
-    render(<StatsGrid stats={STATS} diff={null} />);
+    render(<StatsGrid stats={STATS} />);
     const caption = screen.getByText("Reviews");
     expect(caption.className).toContain("text-text-secondary");
     expect(caption.closest(".bg-card")).not.toBeNull();
   });
 
   it("every card finishes its entrance inside the dimension cards' window", () => {
-    const { container } = render(<StatsGrid stats={STATS} diff={null} />);
+    const { container } = render(<StatsGrid stats={STATS} />);
     const cards = Array.from(container.querySelectorAll<HTMLElement>(".animate-fade-in-up"));
     expect(cards).toHaveLength(8);
     for (const card of cards) {

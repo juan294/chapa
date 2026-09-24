@@ -174,7 +174,7 @@ create or replace view "public"."admin_users_observed" as  SELECT a.handle,
             ELSE NULL::text
         END AS current_content_hash
    FROM (((public.admin_users a
-     LEFT JOIN public.scoring_v7_subjects s ON (((s.owner_handle = a.handle) AND s.public_evidence_consent)))
+     LEFT JOIN public.scoring_v7_subjects s ON ((s.owner_handle = a.handle)))
      LEFT JOIN public.scoring_observed_current c ON ((c.owner_handle = s.owner_handle)))
      LEFT JOIN public.scoring_v7_receipts r ON (((r.id = c.receipt_id) AND (r.owner_handle = a.handle) AND (r.policy_version = 'v7.2'::text) AND ((r.public_receipt ->> 'action'::text) <> 'retract'::text))));`;
 

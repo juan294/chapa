@@ -1,5 +1,6 @@
-import type { StatsData, ImpactV6Result, HeatmapDay } from "@chapa/shared";
+import type { StatsData, HeatmapDay } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
+import { STUDIO_OBSERVED_DEMO } from "./observed-demo-data";
 
 /* ── Heatmap data (13 weeks × 7 days = 91 entries) ────────────────────────
    Levels: 0 = none, 1 = low, 2 = medium, 3 = high, 4 = intense
@@ -70,21 +71,10 @@ export const DEMO_STATS: StatsData = {
   linkedPlatformLogins: { bitbucket: "developer", codeberg: "developer", gitlab: "developer" },
 };
 
-export const DEMO_IMPACT: ImpactV6Result = {
-  handle: "developer",
-  profileType: "collaborative",
-  dimensions: {
-    delivery: 88,
-    quality: 72,
-    consistency: 80,
-    breadth: 65,
-    craft: 72,
-  },
-  archetype: "Builder",
-  compositeScore: 76,
-  confidence: 87,
-  confidencePenalties: [],
-  adjustedComposite: 82,
-  tier: "High",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/**
+ * #1335 phase 5 — v6 is retired, so the Studio/badge sample is the same
+ * illustrative v7.2 view model the badge itself would render for a "current"
+ * receipt: 82 / High / Balanced (CLAUDE.md). Kept under the historical name
+ * so its many consumers don't all need a rename for a value swap.
+ */
+export const DEMO_IMPACT = STUDIO_OBSERVED_DEMO;

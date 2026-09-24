@@ -1,37 +1,42 @@
 import { describe, it, expect } from "vitest";
+import { renderableScore } from "@/lib/profile/score-view-model";
 import {
   BUILDER_STATS,
-  BUILDER_IMPACT,
+  BUILDER_SCORING,
   GUARDIAN_STATS,
-  GUARDIAN_IMPACT,
+  GUARDIAN_SCORING,
   MARATHONER_STATS,
-  MARATHONER_IMPACT,
+  MARATHONER_SCORING,
   POLYMATH_STATS,
-  POLYMATH_IMPACT,
+  POLYMATH_SCORING,
   BALANCED_STATS,
-  BALANCED_IMPACT,
+  BALANCED_SCORING,
   EMERGING_STATS,
-  EMERGING_IMPACT,
+  EMERGING_SCORING,
   ARTIFICER_STATS,
-  ARTIFICER_IMPACT,
+  ARTIFICER_SCORING,
 } from "./archetypeDemoData";
+
+// #1335 phase 5 — v6 is retired. Each archetype's `*_SCORING` constant is a
+// real v7.2 ScoreViewModel produced by the production `calculateObservedCoreV7`
+// arithmetic from tuned evidence counts, not a hand-picked display score.
 
 describe("archetypeDemoData", () => {
   describe("data integrity", () => {
     const archetypes = [
-      { name: "Builder", stats: BUILDER_STATS, impact: BUILDER_IMPACT },
-      { name: "Guardian", stats: GUARDIAN_STATS, impact: GUARDIAN_IMPACT },
-      { name: "Marathoner", stats: MARATHONER_STATS, impact: MARATHONER_IMPACT },
-      { name: "Polymath", stats: POLYMATH_STATS, impact: POLYMATH_IMPACT },
-      { name: "Balanced", stats: BALANCED_STATS, impact: BALANCED_IMPACT },
-      { name: "Emerging", stats: EMERGING_STATS, impact: EMERGING_IMPACT },
-      { name: "Artificer", stats: ARTIFICER_STATS, impact: ARTIFICER_IMPACT },
+      { name: "Builder", stats: BUILDER_STATS, scoring: BUILDER_SCORING },
+      { name: "Guardian", stats: GUARDIAN_STATS, scoring: GUARDIAN_SCORING },
+      { name: "Marathoner", stats: MARATHONER_STATS, scoring: MARATHONER_SCORING },
+      { name: "Polymath", stats: POLYMATH_STATS, scoring: POLYMATH_SCORING },
+      { name: "Balanced", stats: BALANCED_STATS, scoring: BALANCED_SCORING },
+      { name: "Emerging", stats: EMERGING_STATS, scoring: EMERGING_SCORING },
+      { name: "Artificer", stats: ARTIFICER_STATS, scoring: ARTIFICER_SCORING },
     ];
 
-    for (const { name, stats, impact } of archetypes) {
+    for (const { name, stats, scoring } of archetypes) {
       describe(name, () => {
-        it("has matching handle in stats and impact", () => {
-          expect(stats.handle).toBe(impact.handle);
+        it("has matching handle in stats and scoring", () => {
+          expect(stats.handle).toBe(scoring.handle);
         });
 
         it("has heatmap data", () => {
@@ -47,19 +52,21 @@ describe("archetypeDemoData", () => {
         });
 
         it("has core dimensions between 0 and 100", () => {
-          const dims = impact.dimensions;
+          const drawn = renderableScore(scoring);
           for (const key of ["delivery", "quality", "consistency", "breadth"] as const) {
-            expect(dims[key]).toBeGreaterThanOrEqual(0);
-            expect(dims[key]).toBeLessThanOrEqual(100);
-          }
-          if (dims.craft !== undefined) {
-            expect(dims.craft).toBeGreaterThanOrEqual(0);
-            expect(dims.craft).toBeLessThanOrEqual(100);
+            expect(drawn.dimensions[key]).toBeGreaterThanOrEqual(0);
+            expect(drawn.dimensions[key]).toBeLessThanOrEqual(100);
           }
         });
 
-        it("has valid tier", () => {
-          expect(["Emerging", "Solid", "High", "Elite"]).toContain(impact.tier);
+        it("has a valid tier", () => {
+          expect(["Emerging", "Solid", "High", "Elite"]).toContain(scoring.tier);
+        });
+
+        it("is explicitly illustrative, with no publication identity", () => {
+          expect(scoring.illustrative).toBe(true);
+          expect(scoring.identity).toBeNull();
+          expect(scoring.policyVersion).toBe("v7.2");
         });
       });
     }
@@ -122,50 +129,58 @@ describe("archetypeDemoData", () => {
 
   describe("archetype-specific characteristics", () => {
     it("Builder has the highest delivery dimension", () => {
-      expect(BUILDER_IMPACT.archetype).toBe("Builder");
-      expect(BUILDER_IMPACT.dimensions.delivery).toBeGreaterThan(BUILDER_IMPACT.dimensions.quality);
-      expect(BUILDER_IMPACT.dimensions.delivery).toBeGreaterThan(BUILDER_IMPACT.dimensions.consistency);
-      expect(BUILDER_IMPACT.dimensions.delivery).toBeGreaterThan(BUILDER_IMPACT.dimensions.breadth);
+      const drawn = renderableScore(BUILDER_SCORING);
+      expect(drawn.archetype).toBe("Builder");
+      expect(drawn.dimensions.delivery).toBeGreaterThan(drawn.dimensions.quality);
+      expect(drawn.dimensions.delivery).toBeGreaterThan(drawn.dimensions.consistency);
+      expect(drawn.dimensions.delivery).toBeGreaterThan(drawn.dimensions.breadth);
     });
 
     it("Guardian (Quality Champion) has the highest quality dimension", () => {
-      expect(GUARDIAN_IMPACT.archetype).toBe("Quality Champion");
-      expect(GUARDIAN_IMPACT.dimensions.quality).toBeGreaterThan(GUARDIAN_IMPACT.dimensions.delivery);
+      const drawn = renderableScore(GUARDIAN_SCORING);
+      expect(drawn.archetype).toBe("Quality Champion");
+      expect(drawn.dimensions.quality).toBeGreaterThan(drawn.dimensions.delivery);
     });
 
     it("Marathoner has the highest consistency dimension", () => {
-      expect(MARATHONER_IMPACT.archetype).toBe("Marathoner");
-      expect(MARATHONER_IMPACT.dimensions.consistency).toBeGreaterThan(MARATHONER_IMPACT.dimensions.delivery);
+      const drawn = renderableScore(MARATHONER_SCORING);
+      expect(drawn.archetype).toBe("Marathoner");
+      expect(drawn.dimensions.consistency).toBeGreaterThan(drawn.dimensions.delivery);
     });
 
     it("Polymath has the highest breadth dimension", () => {
-      expect(POLYMATH_IMPACT.archetype).toBe("Polymath");
-      expect(POLYMATH_IMPACT.dimensions.breadth).toBeGreaterThan(POLYMATH_IMPACT.dimensions.delivery);
+      const drawn = renderableScore(POLYMATH_SCORING);
+      expect(drawn.archetype).toBe("Polymath");
+      expect(drawn.dimensions.breadth).toBeGreaterThan(drawn.dimensions.delivery);
     });
 
     it("Balanced has all dimensions within 10 points of each other", () => {
-      const dims = BALANCED_IMPACT.dimensions;
-      const values = [dims.delivery, dims.quality, dims.consistency, dims.breadth];
+      const drawn = renderableScore(BALANCED_SCORING);
+      const values = [drawn.dimensions.delivery, drawn.dimensions.quality, drawn.dimensions.consistency, drawn.dimensions.breadth];
       const max = Math.max(...values);
       const min = Math.min(...values);
       expect(max - min).toBeLessThanOrEqual(10);
+      expect(drawn.archetype).toBe("Balanced");
     });
 
     it("Emerging has all dimensions below 30", () => {
-      const dims = EMERGING_IMPACT.dimensions;
+      const drawn = renderableScore(EMERGING_SCORING);
       for (const key of ["delivery", "quality", "consistency", "breadth"] as const) {
-        expect(dims[key]).toBeLessThan(30);
+        expect(drawn.dimensions[key]).toBeLessThan(30);
       }
+      expect(drawn.archetype).toBe("Emerging");
     });
 
-    it("Emerging has solo profile type", () => {
-      expect(EMERGING_IMPACT.profileType).toBe("solo");
-    });
-
-    it("Artificer has craft as the highest dimension", () => {
-      expect(ARTIFICER_IMPACT.archetype).toBe("Artificer");
-      expect(ARTIFICER_IMPACT.dimensions.craft).toBeGreaterThan(ARTIFICER_IMPACT.dimensions.delivery);
-      expect(ARTIFICER_IMPACT.dimensions.craft).toBeGreaterThan(ARTIFICER_IMPACT.dimensions.quality);
+    it("Artificer has a Balanced-shaped core but a scored report Craft channel the others lack", () => {
+      const drawn = renderableScore(ARTIFICER_SCORING);
+      // coreArchetypeV7 never returns "Artificer" (see archetypeDemoData.ts
+      // module doc) — the persona reads through Craft, not the core shape.
+      expect(drawn.archetype).toBe("Balanced");
+      expect(ARTIFICER_SCORING.reportCraft?.status).toBe("scored");
+      expect(BUILDER_SCORING.reportCraft?.status).toBe("no_report");
+      if (ARTIFICER_SCORING.reportCraft?.status === "scored") {
+        expect(ARTIFICER_SCORING.reportCraft.report.result.point.displayValue).toBeGreaterThan(90);
+      }
     });
   });
 });

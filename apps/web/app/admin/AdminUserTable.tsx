@@ -108,49 +108,6 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
         )}
       </td>
 
-      {/* Confidence */}
-      <td className="hidden md:table-cell px-3 py-2.5">
-        {user.confidence != null ? (
-          <div className="flex items-center gap-1.5">
-            <div
-              className="h-1 w-10 rounded-full bg-stroke overflow-hidden"
-              role="progressbar"
-              aria-valuenow={user.confidence}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Legacy confidence score"
-            >
-              <div
-                className="h-full rounded-full bg-amber-text"
-                style={{ width: `${user.confidence}%` }}
-              />
-            </div>
-            <span className="font-heading text-xs text-text-secondary tabular-nums">
-              {user.confidence}
-            </span>
-          </div>
-        ) : (
-          <span className="text-xs text-text-secondary">&mdash;</span>
-        )}
-      </td>
-
-      {/* Stats columns */}
-      <td className="hidden lg:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-        {user.commitsTotal != null ? user.commitsTotal.toLocaleString() : "\u2014"}
-      </td>
-      <td className="hidden lg:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-        {user.prsMergedCount ?? "\u2014"}
-      </td>
-      <td className="hidden xl:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-        {user.reviewsSubmittedCount ?? "\u2014"}
-      </td>
-      <td className="hidden xl:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-        {user.activeDays ?? "\u2014"}
-      </td>
-      <td className="hidden xl:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-        {user.totalStars != null ? user.totalStars.toLocaleString() : "\u2014"}
-      </td>
-
       {/* Updated */}
       <td className="hidden md:table-cell px-3 py-2.5 text-xs text-text-secondary">
         {user.fetchedAt ? formatDate(user.fetchedAt) : "\u2014"}
@@ -211,12 +168,6 @@ export function AdminUserTable({
             <AdminSortableHeader field="tier" label="Tier" sortField={sortField} sortDir={sortDir} onSort={onSort} />
             <AdminSortableHeader field="adjustedComposite" label="Score" sortField={sortField} sortDir={sortDir} onSort={onSort} />
             <AdminSortableHeader field="rawScore" label="Exact / legacy raw" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
-            <AdminSortableHeader field="confidence" label="Legacy confidence" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
-            <AdminSortableHeader field="commitsTotal" label="Commits" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
-            <AdminSortableHeader field="prsMergedCount" label="PRs" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
-            <AdminSortableHeader field="reviewsSubmittedCount" label="Reviews" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
-            <AdminSortableHeader field="activeDays" label="Days" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
-            <AdminSortableHeader field="totalStars" label="Stars" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
             <AdminSortableHeader field="lastSnapshotDate" label="Updated" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
             {/* Keep the absolute sr-only label inside the table's scroll area. */}
             <AdminHeaderCell className="relative w-10">
@@ -228,7 +179,7 @@ export function AdminUserTable({
           {users.length === 0 ? (
             <tr>
               <td
-                colSpan={13}
+                colSpan={7}
                 className="px-3 py-12 text-center text-sm text-text-secondary"
               >
                 {search ? "No users match your search." : "No users found."}

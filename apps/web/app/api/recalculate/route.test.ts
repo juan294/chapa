@@ -1,4 +1,3 @@
-import { issueScoreReceiptIfConsented } from "@/lib/profile/issue-receipt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "./route";
@@ -11,7 +10,7 @@ const {
   mockInvalidateProfileReadModels,
   mockRevalidatePath,
   mockMaterializeOrchestratedProfile,
-  mockPersistOrchestratedSnapshot,
+  mockEnqueueAndReportScoringStatus,
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
@@ -20,7 +19,7 @@ const {
   mockInvalidateProfileReadModels: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
-  mockPersistOrchestratedSnapshot: vi.fn(),
+  mockEnqueueAndReportScoringStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -49,18 +48,13 @@ vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
-// The route issues a v7 receipt behind `scoring_v7_rendering`. Mocking the
-// flag module keeps this route test off the DB-backed flag machinery (and its
-// `unstable_cache`) and states the gate's position explicitly instead.
-vi.mock("@/lib/feature-flags", () => ({
-  isScoringV7RenderingEnabled: () => Promise.resolve(false),
-}));
-
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: (...args: unknown[]) =>
     mockMaterializeOrchestratedProfile(...args),
-  persistOrchestratedSnapshot: (...args: unknown[]) =>
-    mockPersistOrchestratedSnapshot(...args),
+}));
+
+vi.mock("@/lib/profile/post-write-score", () => ({
+  enqueueAndReportScoringStatus: (...args: unknown[]) => mockEnqueueAndReportScoringStatus(...args),
 }));
 
 const AUTH = { handle: "TestUser", token: "cli-token" };
@@ -68,41 +62,10 @@ const AUTH = { handle: "TestUser", token: "cli-token" };
 const FAKE_MATERIALIZED = {
   stats: { handle: "testuser" },
   craftResult: { craftScore: 69, tier: "Expert" },
-  rawImpact: {
-    adjustedComposite: 61,
-    compositeScore: 65,
-    dimensions: {
-      delivery: 75,
-      quality: 40,
-      consistency: 60,
-      breadth: 55,
-    },
-    archetype: "Builder",
-    tier: "Solid",
-    profileType: "solo",
-    confidence: 85,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  displayImpact: {
-    adjustedComposite: 58,
-    compositeScore: 65,
-    dimensions: {
-      delivery: 75,
-      quality: 40,
-      consistency: 60,
-      breadth: 55,
-    },
-    archetype: "Builder",
-    tier: "Solid",
-    profileType: "solo",
-    confidence: 85,
-    confidencePenalties: [],
-    computedAt: "2026-04-17T12:00:00.000Z",
-  },
-  snapshot: { date: "2026-04-17", adjustedComposite: 58, tier: "Solid" },
   statsComplete: true,
 };
+
+const SCORING_STATUS = { kind: "collecting" as const, percent: 40, sources: [], hasPriorReceipt: false };
 
 function makeRequest(): NextRequest {
   return new NextRequest(
@@ -120,8 +83,8 @@ describe("POST /api/recalculate", () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     mockRevalidatePath.mockImplementation(() => undefined);
-    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockUpdateCraftCache.mockResolvedValue(undefined);
+    mockEnqueueAndReportScoringStatus.mockResolvedValue(SCORING_STATUS);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -138,44 +101,20 @@ describe("POST /api/recalculate", () => {
     expect(resp.status).toBe(429);
   });
 
-  it("materializes the public profile, persists a replace snapshot, and returns raw plus display scores", async () => {
+  it("materializes fresh stats, enqueues collection, and reports the resulting scoring status", async () => {
     const resp = await POST(makeRequest());
     const body = await resp.json();
 
     expect(resp.status).toBe(200);
-    expect(issueScoreReceiptIfConsented).toHaveBeenCalledWith("testuser", expect.objectContaining({ scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 } }));
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "cli-token",
-      scoringSelection: { enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 },
     });
-    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", { badgeSvg: true });
+    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(
       "testuser",
-      FAKE_MATERIALIZED,
-      { mode: "replace" },
+      "refresh",
     );
-    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
-      badgeSvg: true,
-      history: true,
-      snapshot: true,
-    });
-    expect(body.success).toBe(true);
-    expect(body.adjustedComposite).toBe(58);
-    expect(body.displayAdjustedComposite).toBe(58);
-    expect(body.rawAdjustedComposite).toBe(61);
-    expect(body.craftScore).toBe(69);
-    expect(body.craftTier).toBe("Expert");
-  });
-
-  it("persists before invalidating history-backed read models", async () => {
-    await POST(makeRequest());
-
-    const persistOrder = mockPersistOrchestratedSnapshot.mock.invocationCallOrder[0];
-    const invalidateOrder =
-      mockInvalidateProfileReadModels.mock.invocationCallOrder[0];
-
-    expect(persistOrder).toBeDefined();
-    expect(invalidateOrder).toBeDefined();
-    expect(persistOrder!).toBeLessThan(invalidateOrder!);
+    expect(body).toEqual({ success: true, scoringStatus: SCORING_STATUS });
   });
 
   it("updates craft cache when materialized profile carries craft data", async () => {
@@ -228,24 +167,21 @@ describe("POST /api/recalculate", () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith("/u/testuser");
   });
 
-  it("returns 500 when the recalculated snapshot cannot be persisted", async () => {
-    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
+  it("returns 503 when the scoring status authority read itself fails", async () => {
+    mockEnqueueAndReportScoringStatus.mockResolvedValue(null);
 
     const resp = await POST(makeRequest());
 
-    expect(resp.status).toBe(500);
-    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
-    expect(mockRevalidatePath).not.toHaveBeenCalled();
+    expect(resp.status).toBe(503);
   });
 
   // ---------------------------------------------------------------------------
-  // #1076 — the route checks materialized.statsComplete up front (the #1003
-  // persist-boundary gate) so an intentional skip is distinguishable from a
-  // genuine write failure, not a bare 500, and persistOrchestratedSnapshot is
-  // never even called.
+  // #1076 — the route checks materialized.statsComplete up front so an
+  // intentional skip is distinguishable from a genuine failure, and no
+  // collection is enqueued for incomplete stats.
   // ---------------------------------------------------------------------------
 
-  it("#1076: returns 422 with reason stats_incomplete without attempting to persist", async () => {
+  it("#1076: returns 422 with reason stats_incomplete without enqueueing collection", async () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue({
       ...FAKE_MATERIALIZED,
       statsComplete: false,
@@ -256,7 +192,7 @@ describe("POST /api/recalculate", () => {
 
     expect(resp.status).toBe(422);
     expect(body.reason).toBe("stats_incomplete");
-    expect(mockPersistOrchestratedSnapshot).not.toHaveBeenCalled();
+    expect(mockEnqueueAndReportScoringStatus).not.toHaveBeenCalled();
     expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
@@ -305,6 +241,3 @@ describe("POST /api/recalculate", () => {
     expect(mockResolveRequestAuth).not.toHaveBeenCalled();
   });
 });
-
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 })) }));
-vi.mock("@/lib/profile/issue-receipt", () => ({ issueScoreReceiptIfConsented: vi.fn(async () => "skipped") }));

@@ -10,9 +10,21 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
     await page.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
     for (const width of [768, 320]) {
       await page.setViewportSize({ width, height: 1000 });
-      await page.goto(`/?lang=${locale}`, { waitUntil: 'networkidle' });
+      // `networkidle` requires 500ms of total silence on the network; under
+      // full parallel load the shared dev/prod server keeps every page's
+      // chunks/API calls trickling in past that window, so this timed out
+      // well before the 30s test budget instead of ever finding quiet.
+      // The default 'load' wait plus the web-first assertions below (which
+      // already retry until the client tree actually hydrates) is the real
+      // readiness signal this test needs.
+      await page.goto(`/?lang=${locale}`);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
       await expect(page.locator('[data-theme-mode]')).toHaveAttribute('data-theme-mode', theme);
+      // A reload with the locale cookie already set can briefly leave the
+      // stale server-rendered subtree beside the hydrated one (#1329 class):
+      // two identical h1s for a few hundred ms. Wait for the single hydrated
+      // heading before any strict locator acts on it.
+      await expect(page.locator('h1')).toHaveCount(1);
       await expect(page.locator('h1')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       const input = page.locator('#terminal-command-input');
@@ -41,7 +53,11 @@ for (const locale of ['en', 'es']) for (const theme of ['light', 'dark'] as cons
 
 test('language changes preserve relevant search and hash in both directions', async ({ page }) => {
   await page.route('**/*', route => ['127.0.0.1', 'localhost'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
-  await page.goto('/?lang=en&source=redesign#features', { waitUntil: 'networkidle' });
+  // No `networkidle`: under full parallel load the shared server never goes
+  // quiet for 500ms. The language control being visible and enabled is the
+  // real readiness gate for the clicks below.
+  await page.goto('/?lang=en&source=redesign#features');
+  await expect(page.getByRole('button', { name: 'EN', exact: true })).toBeEnabled();
   for (const [current, next, option] of [['EN', 'es', 'Español'], ['ES', 'en', 'English']] as const) {
     await page.getByRole('button', { name: current, exact: true }).click();
     await page.getByRole('option', { name: option, exact: true }).click();

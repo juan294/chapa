@@ -38,7 +38,7 @@ async function publish(envelope: HashedScoreReceipt) {
 }
 beforeEach(async () => {
   expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull();
-  expect((await db().from("scoring_v7_subjects").insert({ owner_handle: owner, public_evidence_consent: true, consent_recorded_at: "2026-09-01T12:00:00.000Z" })).error).toBeNull();
+  expect((await db().rpc("scoring_v7_ensure_subject", { p_owner: owner })).error).toBeNull();
 });
 afterEach(async () => { expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); });
 

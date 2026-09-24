@@ -1,19 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getServiceClient } from "@/test/contract/invoke";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { getReceiptVerificationV7 } from "@/lib/verification/store";
 import { readRenderableReceipt } from "./score-model";
 import { resolveBadgeVerification } from "./badge-verification";
-import { issueScoreReceiptIfConsented } from "./issue-receipt";
+import { issueScoreReceipt } from "./issue-receipt";
 import { observedReceiptViewModel } from "./score-view-model";
 
 /**
- * The v7 path with `scoring_v7_rendering` ON, against real persistence (#1320).
- *
- * The suite default is off, because off is what ships today. This file turns it
- * on for its own scope so the behaviour the flag exists to enable is exercised
- * where the manifest, the cache and the durable table can actually disagree
- * with each other.
+ * The v7.2 issuance path against real persistence (#1320, updated #1335
+ * phase 5 — "delete v6": the `scoring_v7_rendering` selector this suite used
+ * to turn on is retired; there is one policy now and issuance always runs).
+ * This file exercises the behaviour where the manifest, the cache and the
+ * durable table can actually disagree with each other.
  *
  * That distinction is not theoretical. An optimization to `readScoreReceiptV7`
  * assumed a null from the cached path proved no receipt existed; the unit test
@@ -33,20 +31,13 @@ vi.mock("@/lib/profile/post-write-invalidation", () => ({
   invalidateProfileReadModels: vi.fn(async () => undefined),
 }));
 
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn() }));
 const owner = "contract-v7-flag-on";
 const db = () => getServiceClient();
-const consent = async () =>
-  db().from("scoring_v7_subjects").insert({
-    owner_handle: owner,
-    public_evidence_consent: true,
-    consent_recorded_at: "2026-09-01T00:00:00Z",
-  });
+const register = async () => db().rpc("scoring_v7_ensure_subject", { p_owner: owner });
 
 beforeEach(async () => {
-  vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-08T12:00:00.000Z") });
   expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull();
-  expect((await consent()).error).toBeNull();
+  expect((await register()).error).toBeNull();
 });
 afterEach(async () => { expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); });
 
@@ -55,7 +46,7 @@ describe("the v7 path with rendering enabled", () => {
     // The helper is the production entry point, and it is what binds the two:
     // a receipt whose /verify link answers "not found" is a badge carrying an
     // attestation nobody can resolve.
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("issued");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "issued" });
 
     const snapshot = await readRenderableReceipt(owner);
     if (!snapshot || "unavailable" in snapshot) throw new Error("Expected observed receipt");
@@ -65,8 +56,6 @@ describe("the v7 path with rendering enabled", () => {
     // so this also proves the derivation and the issued record agree.
     const verification = await resolveBadgeVerification({
       stats: { handle: owner },
-      displayImpact: {},
-      statsComplete: true,
       scoring: observedReceiptViewModel(owner, snapshot!),
     } as never);
     expect(verification?.hash).toMatch(/^v7\./);
@@ -77,12 +66,12 @@ describe("the v7 path with rendering enabled", () => {
   });
 
   it("issues nothing on a second pass over identical evidence", async () => {
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("issued");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "issued" });
     const first = await readRenderableReceipt(owner);
 
     // What the hourly warm-cache cron does. Without the skip this published a
     // correction every hour, each with its own verification token.
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("skipped");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "unchanged" });
 
     const second = await readRenderableReceipt(owner);
     if (!first || "unavailable" in first || !second || "unavailable" in second) throw new Error("Expected observed receipts");
@@ -92,11 +81,11 @@ describe("the v7 path with rendering enabled", () => {
   });
 
   it("stops attesting once publication is withdrawn", async () => {
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("issued");
+    expect(await issueScoreReceipt(owner)).toEqual({ status: "issued" });
     const snapshot = await readRenderableReceipt(owner);
     if (!snapshot || "unavailable" in snapshot) throw new Error("Expected observed receipt");
     const verification = await resolveBadgeVerification({
-      stats: { handle: owner }, displayImpact: {}, statsComplete: true,
+      stats: { handle: owner },
       scoring: observedReceiptViewModel(owner, snapshot!),
     } as never);
     expect(verification).not.toBeNull();
@@ -108,13 +97,4 @@ describe("the v7 path with rendering enabled", () => {
     expect(after === null || after.status === "revoked").toBe(true);
   });
 
-  it("reads and issues nothing at all while the flag is off", async () => {
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("issued");
-    vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T12:00:00.000Z") });
-
-    // The gate is what keeps this branch inert in an environment whose schema
-    // does not have these tables at all.
-    expect(await readRenderableReceipt(owner)).toBeNull();
-    expect(await issueScoreReceiptIfConsented(owner)).toBe("skipped");
-  });
 });

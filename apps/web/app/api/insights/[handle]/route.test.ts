@@ -1,5 +1,3 @@
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: vi.fn().mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00Z") }) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -7,12 +5,13 @@ import { NextRequest } from "next/server";
 // Mocks — hoisted before any imports that depend on them
 // ---------------------------------------------------------------------------
 
-const { mockRateLimit, mockDbGet, mockGetClientIp, mockIsValidHandle } =
+const { mockRateLimit, mockGetClientIp, mockIsValidHandle, mockReadPublicObservedScore, mockReadScoringStatus } =
   vi.hoisted(() => ({
     mockRateLimit: vi.fn(),
-    mockDbGet: vi.fn(),
     mockGetClientIp: vi.fn(),
     mockIsValidHandle: vi.fn(),
+    mockReadPublicObservedScore: vi.fn(),
+    mockReadScoringStatus: vi.fn(),
   }));
 
 vi.mock("@/lib/validation", () => ({
@@ -23,12 +22,16 @@ vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
 }));
 
-vi.mock("@/lib/db/tool-insights", () => ({
-  dbGetToolInsights: mockDbGet,
-}));
-
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
+}));
+
+vi.mock("@/lib/profile/post-write-score", () => ({
+  readPublicObservedScore: mockReadPublicObservedScore,
+}));
+
+vi.mock("@/lib/collection/read-scoring-status", () => ({
+  readScoringStatus: mockReadScoringStatus,
 }));
 
 // ---------------------------------------------------------------------------
@@ -51,22 +54,13 @@ function makeParams(handle: string) {
   return { params: Promise.resolve({ handle }) };
 }
 
-const STORED_CRAFT = {
-  tool: "claude-code" as const,
-  dimensions: { proficiency: 60, effectiveness: 70, sophistication: 50 },
-  craftScore: 60,
-  tier: "Expert" as const,
-  reportPeriod: { start: "2026-02-20", end: "2026-03-07" },
-  computedAt: "2026-03-07T12:00:00.000Z",
+const MOCK_PROJECTION = {
+  policyVersion: "v7.2" as const,
+  identity: { revisionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+  craft: { status: "scored" as const, report: { result: { point: { exact: 60, displayValue: 60 } } } },
 };
 
-const LATEST_UPLOADED_CRAFT = {
-  ...STORED_CRAFT,
-  tool: "cursor" as const,
-  craftScore: 67,
-  tier: "Master" as const,
-  computedAt: "2026-03-08T12:00:00.000Z",
-};
+const MOCK_SCORING_STATUS = { kind: "unregistered" as const };
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -74,11 +68,11 @@ const LATEST_UPLOADED_CRAFT = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(readScoringRenderSelection).mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.parse("2026-09-08T10:00:00.000Z") });
   mockIsValidHandle.mockReturnValue(true);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
-  mockDbGet.mockResolvedValue(null);
   mockGetClientIp.mockReturnValue("127.0.0.1");
+  mockReadPublicObservedScore.mockResolvedValue({ status: "current", projection: MOCK_PROJECTION });
+  mockReadScoringStatus.mockResolvedValue(MOCK_SCORING_STATUS);
 });
 
 // ---------------------------------------------------------------------------
@@ -86,44 +80,46 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("GET /api/insights/:handle", () => {
-  // --- Success cases ---
-
-  it("returns 200 with craft score for existing data", async () => {
-    mockDbGet.mockResolvedValue(STORED_CRAFT);
-
+  it("returns 200 with the receipt's craft outcome for a current subject", async () => {
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
 
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.craftScore).toEqual(STORED_CRAFT);
+    expect(body).toEqual({
+      handle: "juan294",
+      policyVersion: MOCK_PROJECTION.policyVersion,
+      identity: MOCK_PROJECTION.identity,
+      craft: MOCK_PROJECTION.craft,
+    });
+    expect(mockReadScoringStatus).not.toHaveBeenCalled();
   });
 
-  it("returns the latest uploaded craft result selected by the DB layer", async () => {
-    mockDbGet.mockResolvedValue(LATEST_UPLOADED_CRAFT);
-
-    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
-
-    expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.craftScore).toEqual(LATEST_UPLOADED_CRAFT);
-  });
-
-  it("returns 200 with null craftScore when no data exists", async () => {
-    mockDbGet.mockResolvedValue(null);
+  it("returns 200 with scoringStatus when there is no drawable current receipt", async () => {
+    mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
 
     const resp = await GET(makeRequest("newuser"), makeParams("newuser"));
 
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.craftScore).toBeNull();
+    expect(body).toEqual({ handle: "newuser", scoringStatus: MOCK_SCORING_STATUS });
   });
 
-  it("calls dbGetToolInsights with the lowercase handle", async () => {
-    await GET(makeRequest("TestUser"), makeParams("TestUser"));
+  it("returns 503 when the current-receipt authority is unavailable", async () => {
+    mockReadPublicObservedScore.mockResolvedValue({ status: "unavailable" });
 
-    // The route passes the handle directly; dbGetToolInsights lowercases internally
-    expect(mockDbGet).toHaveBeenCalledTimes(1);
-    expect(mockDbGet).toHaveBeenCalledWith("TestUser");
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(resp.status).toBe(503);
+    expect(mockReadScoringStatus).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when the scoring status authority read itself fails", async () => {
+    mockReadPublicObservedScore.mockResolvedValue({ status: "missing" });
+    mockReadScoringStatus.mockResolvedValue(null);
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(resp.status).toBe(503);
   });
 
   // --- Validation ---
@@ -138,32 +134,18 @@ describe("GET /api/insights/:handle", () => {
     expect(body.error).toContain("Invalid handle");
   });
 
-  it("returns 400 for invalid handle (special characters)", async () => {
-    mockIsValidHandle.mockReturnValue(false);
-
-    const resp = await GET(makeRequest("user@name"), makeParams("user@name"));
-
-    expect(resp.status).toBe(400);
-    const body = await resp.json();
-    expect(body.error).toContain("Invalid handle");
-  });
-
-  it("does not call dbGetToolInsights when handle is invalid", async () => {
+  it("does not read scoring for an invalid handle", async () => {
     mockIsValidHandle.mockReturnValue(false);
 
     await GET(makeRequest("-bad"), makeParams("-bad"));
 
-    expect(mockDbGet).not.toHaveBeenCalled();
+    expect(mockReadPublicObservedScore).not.toHaveBeenCalled();
   });
 
   // --- Rate limiting ---
 
   it("returns 429 when IP rate limited", async () => {
-    mockRateLimit.mockResolvedValue({
-      allowed: false,
-      current: 61,
-      limit: 60,
-    });
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
 
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
 
@@ -173,27 +155,19 @@ describe("GET /api/insights/:handle", () => {
   });
 
   it("returns Retry-After header on 429", async () => {
-    mockRateLimit.mockResolvedValue({
-      allowed: false,
-      current: 61,
-      limit: 60,
-    });
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
 
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
 
     expect(resp.headers.get("Retry-After")).toBe("60");
   });
 
-  it("does not call dbGetToolInsights when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({
-      allowed: false,
-      current: 61,
-      limit: 60,
-    });
+  it("does not read scoring when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
 
     await GET(makeRequest("juan294"), makeParams("juan294"));
 
-    expect(mockDbGet).not.toHaveBeenCalled();
+    expect(mockReadPublicObservedScore).not.toHaveBeenCalled();
   });
 
   it("passes correct rate limit key based on client IP", async () => {
@@ -208,28 +182,12 @@ describe("GET /api/insights/:handle", () => {
     );
   });
 
-  // --- Edge cases ---
-
-  it("returns null craftScore when dbGetToolInsights returns null (Supabase unavailable)", async () => {
-    // dbGetToolInsights returns null when Supabase is unavailable — graceful degradation
-    mockDbGet.mockResolvedValue(null);
-
-    const resp = await GET(makeRequest("testuser"), makeParams("testuser"));
-
-    expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.craftScore).toBeNull();
-  });
+  // --- Misc ---
 
   it("is a public endpoint — no auth required", async () => {
-    // The route has NO auth checks; any request with a valid handle should succeed
-    mockDbGet.mockResolvedValue(STORED_CRAFT);
-
     const resp = await GET(makeRequest("anyone"), makeParams("anyone"));
 
     expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.craftScore).toBeDefined();
   });
 
   it("returns JSON content type", async () => {
@@ -238,19 +196,10 @@ describe("GET /api/insights/:handle", () => {
     expect(resp.headers.get("content-type")).toContain("application/json");
   });
 
-  it("response identifies its legacy policy alongside craftScore", async () => {
-    mockDbGet.mockResolvedValue(STORED_CRAFT);
-
-    const resp = await GET(makeRequest("testuser"), makeParams("testuser"));
-
-    const body = await resp.json();
-    expect(Object.keys(body)).toEqual(["policyVersion", "craftScore"]);
-  });
-
   // --- Error handling ---
 
-  it("re-throws when dbGetToolInsights throws (handled by withErrorCapture)", async () => {
-    mockDbGet.mockRejectedValue(new Error("DB connection lost"));
+  it("re-throws when readPublicObservedScore throws (handled by withErrorCapture)", async () => {
+    mockReadPublicObservedScore.mockRejectedValue(new Error("DB connection lost"));
 
     await expect(GET(makeRequest("juan294"), makeParams("juan294"))).rejects.toThrow("DB connection lost");
   });

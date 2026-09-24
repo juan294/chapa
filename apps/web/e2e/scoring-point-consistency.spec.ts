@@ -2,7 +2,8 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { createHash } from "node:crypto";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { setRedesignSession, redesignFixtureClient } from "./helpers/redesign-fixtures";
-import { assertScoringFixtureEnvironment, scoringReportHtml } from "./helpers/scoring-point-fixtures";
+import { assertScoringFixtureEnvironment, scoringReportHtml, enqueueGithubJob, seedFailedGithubJob } from "./helpers/scoring-point-fixtures";
+import { studioRoot, studioControl, studioBadgePreview } from "./helpers/studio";
 
 const admitted = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
 if (process.env.RELEASE_VERIFICATION_MODE === "local-candidate" && !admitted) throw new Error("Local scoring qualification requires disposable fixtures");
@@ -33,9 +34,16 @@ async function settlePublicBadge(page: Page) {
   await page.evaluate(async () => { await document.fonts.ready; });
 }
 async function servedImage(page: Page) {
-  const imageMetadata = page.locator('meta[property="og:image"]');
-  await expect(imageMetadata).toHaveCount(1);
-  const metadata = await imageMetadata.getAttribute("content");
+  // Social crawlers read the served HTML, not the hydrated DOM, so the
+  // metadata contract is asserted on the server response for this exact URL
+  // (with this browser context's cookies). The live DOM can briefly hold a
+  // second, byte-identical tag after a same-page locale sync re-renders the
+  // route's streamed metadata; that client-only duplicate is tracked
+  // separately and never reaches a crawler.
+  const html = await (await page.request.get(page.url())).text();
+  const tags = html.match(/<meta[^>]+property="og:image"[^>]*>/g) ?? [];
+  expect(tags).toHaveLength(1);
+  const metadata = tags[0]?.match(/content="([^"]+)"/)?.[1]?.replaceAll("&amp;", "&");
   expect(metadata).toBeTruthy();
   const url = new URL(metadata!);
   expect(url.searchParams.get("v")).toBeTruthy();
@@ -133,10 +141,11 @@ async function upload(page: Page, point: 57 | 0, referenceTime: string) {
   return body;
 }
 
-test("real report57 then explicit correction0 preserves one core across surfaces, saves and rollback", async ({ page, context, baseURL }, testInfo) => {
+test("real report57 then explicit correction0 preserves one core across surfaces, saves and stays published", async ({ page, context, baseURL }, testInfo) => {
   // This is the longest browser contract: it publishes twice, saves and
-  // restores Studio state, verifies two locales, rolls the flag back and
-  // withdraws the receipt. Leave headroom when the full suite is concurrent.
+  // restores Studio state, verifies two locales and confirms the retired
+  // publication-withdrawal action leaves the receipt published.
+  // Leave headroom when the full suite is concurrent.
   test.setTimeout(240_000);
   assertScoringFixtureEnvironment(process.env);
   const owner = `chapa-score-${testInfo.project.name}`;
@@ -183,8 +192,8 @@ test("real report57 then explicit correction0 preserves one core across surfaces
   expect(configBefore.error).toBeNull();
   try {
     await page.goto("/studio?lang=en");
-    await expect(page.getByTestId("badge-preview").locator('[data-element="score"]')).toHaveText("46");
-    await expect(page.getByTestId("badge-preview").locator('[data-axis="craft"]')).toHaveAttribute("data-value", "0");
+    await expect(studioBadgePreview(page).locator('[data-element="score"]')).toHaveText("46");
+    await expect(studioBadgePreview(page).locator('[data-axis="craft"]')).toHaveAttribute("data-value", "0");
     const input = page.locator("#terminal-command-input");
     await input.fill("/set palette jade"); await input.press("Enter");
     const saved = page.waitForResponse(r => r.url().includes("/api/studio/config") && r.request().method() === "PUT");
@@ -193,7 +202,7 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     await expect(page.getByTestId("agent-save-confirm")).toBeVisible();
     expect((await db.from("studio_configs").select("config").eq("handle", owner).single()).data!.config).toEqual(configBefore.data!.config);
     await page.getByTestId("agent-save-confirm").click(); expect((await saved).status()).toBe(200);
-    await expect(page.locator('[data-save-state="saved"]')).toBeVisible();
+    await expect(studioRoot(page).locator('[data-save-state="saved"]')).toBeVisible();
     await page.getByTestId("studio-zoom-half").click();
     const config = await db.from("studio_configs").select("config").eq("handle", owner).single();
     expect(config.data!.config).toEqual({ ...DEFAULT_BADGE_CONFIG, colorPalette: "jade" });
@@ -206,30 +215,15 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     const input = page.locator("#terminal-command-input");
     await input.fill(`/set palette ${configBefore.data!.config.colorPalette}`); await input.press("Enter");
     const restored = page.waitForResponse(r => r.url().includes("/api/studio/config") && r.request().method() === "PUT");
-    await page.locator('[data-testid="studio-save"]:visible').last().click(); expect((await restored).status()).toBe(200);
+    await studioControl(page, "studio-save").click(); expect((await restored).status()).toBe(200);
     await currentSurface(page, owner, 0, initial);
     expect((await servedImage(page)).digest).toBe(imageBeforePalette.digest);
   }
 
-  const verificationBeforeRollback = await verifyIdentity(page, zero);
-  try {
-    expect((await db.from("feature_flags").update({ enabled: false }).eq("key", "scoring_v7_rendering")).error).toBeNull();
-    await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 8_000 }).toBe("v6");
-    const legacy = await api(page, owner);
-    for (const locale of ["en", "es"]) {
-      const off = await page.request.get(`/u/${owner}/badge.svg?lang=${locale}`);
-      expect(off.status()).toBe(200);
-      const svg = await off.text();
-      expect(svg).toContain(`>${legacy.displayScore}</text>`);
-      expect(svg).not.toContain('data-axis="craft" data-value="0"');
-      await page.goto(`/u/${owner}?lang=${locale}`);
-      const image = await servedImage(page);
-      await testInfo.attach(`rollback-${locale}.png`, { body: image.bytes, contentType: "image/png" });
-    }
-    expect((await page.request.get(`/api${verificationBeforeRollback}`)).status()).toBe(200);
-
-  } finally { expect((await db.from("feature_flags").update({ enabled: true }).eq("key", "scoring_v7_rendering")).error).toBeNull(); }
-  await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 8_000 }).toBe("v7.2");
+  // #1335 phase 5 — the `scoring_v7_rendering` selector this used to flip to
+  // roll back to a v6 render is retired; v7.2 is the one rendered policy
+  // unconditionally now, so there is no rollback path left to exercise here.
+  expect((await api(page, owner)).policyVersion).toBe("v7.2");
   expect((await api(page, owner)).identity.revisionId).toBe(zero.identity.revisionId);
   for (const locale of ["en", "es"]) {
     const svg = await page.request.get(`/u/${owner}/badge.svg?lang=${locale}`);
@@ -242,13 +236,20 @@ test("real report57 then explicit correction0 preserves one core across surfaces
   await page.goto(`/u/${owner}?lang=en`);
   const tokenLink = await page.locator(`a[href*="${tokenPath}"]`).first().getAttribute("href");
   expect(tokenLink).toBeTruthy();
-  await page.goto("/settings?lang=en");
-  const withdrawal = page.waitForResponse(r => r.url().endsWith("/api/evidence") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Withdraw publication", exact: true }).click();
-  expect((await withdrawal).status()).toBe(200);
-  expect((await page.request.get(`/api${new URL(tokenLink!, baseURL).pathname}`)).status()).toBe(410);
+  // Publication consent, and the "Withdraw publication" action that used to
+  // depend on it, are retired (#1335 phase 2 -- see the `withdraw` branch in
+  // apps/web/app/api/evidence/route.ts): every registered subject publishes
+  // with no opt-in, so there is no UI action left to withdraw it. `withdraw`
+  // stays a recognized command shape only so it answers a specific
+  // retired_action error instead of a generic parse failure; the receipt
+  // this test built stays published and its verify link stays resolvable.
+  const retiredWithdraw = await page.request.post("/api/evidence", { data: { action: "withdraw", owner } });
+  expect(retiredWithdraw.status()).toBe(400);
+  expect((await retiredWithdraw.json()).error).toBe("retired_action");
+  expect((await page.request.get(`/api${new URL(tokenLink!, baseURL).pathname}`)).status()).toBe(200);
   const remaining = await db.from("scoring_v7_receipts").select("id").eq("owner_handle", owner);
-  expect(remaining.error).toBeNull(); expect(remaining.data).toEqual([]);
+  expect(remaining.error).toBeNull();
+  expect(remaining.data!.length).toBeGreaterThan(0);
 });
 
 test("expired Craft retains five labels and boundary69.99 fits EN/ES narrow themes", async ({ page, context, baseURL }, testInfo) => {
@@ -278,4 +279,130 @@ test("expired Craft retains five labels and boundary69.99 fits EN/ES narrow them
     expect(boundary).toMatchObject({ displayScore: 69.99, tier: "Solid" });
     await page.screenshot({ path: testInfo.outputPath(`boundary-${locale}-${theme}.png`), fullPage: true });
   }
+});
+
+// #1335 phase 4.8 — the durable collection queue end to end: a registered
+// owner with a queued job renders "collecting", driving the REAL
+// `/api/cron/collect-evidence` worker against a fetch-interception fixture
+// (never real GitHub) takes it to a "ready" v7.2 score, and every surface
+// agrees on that exact score. Distinct from every other test in this file,
+// which seeds a receipt directly and never touches the collection queue.
+test("registered owner with a queued job shows collecting, then ready with an identical score everywhere", async ({ page, context, baseURL, request }, testInfo) => {
+  test.setTimeout(120_000);
+  assertScoringFixtureEnvironment(process.env);
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) throw new Error("CRON_SECRET required to drive the local collection worker");
+  const owner = `chapa-collectq-${testInfo.project.name}`;
+  const db = redesignFixtureClient();
+  const referenceTime = new Date().toISOString();
+  await installTools(page);
+  await setRedesignSession(context, baseURL!, owner);
+
+  // (a) A queued job with no receipt yet renders "collecting" -- no score,
+  // no-store, never the legacy v6 fallback.
+  await enqueueGithubJob(db, owner, referenceTime);
+  const collectingBadge = await page.request.get(`/u/${owner}/badge.svg?lang=en`);
+  expect(collectingBadge.status()).toBe(200);
+  const collectingSvg = await collectingBadge.text();
+  expect(collectingSvg).toContain('data-chapa-state="collecting"');
+  expect(collectingSvg).not.toMatch(/data-element="score"/);
+  expect(collectingBadge.headers()["cache-control"]).toContain("no-store");
+  // The session is authenticated AS `owner` (needed for the Retry action
+  // later), so the share page renders the OWNER'S panel here, not a
+  // visitor's one-sentence summary -- SharePageScoringStatus.render.test.tsx
+  // covers the visitor branch directly.
+  await page.goto(`/u/${owner}?lang=en`);
+  await expect(page.locator('svg[data-chapa-state="collecting"]').first()).toBeVisible();
+  // .first(): the responsive layout keeps both a mobile and a desktop copy
+  // of the owner's ScoringStatusPanel heading in the DOM (CSS-hidden, not
+  // removed), so this resolves to 2 elements on the mobile project without it.
+  await expect(page.getByText("Scoring status").first()).toBeVisible();
+
+  // (b) Drive the real worker -- provider HTTP is replayed from the local
+  // fixture server (redesign-upstream.mjs), never real GitHub -- until the
+  // job completes. A zero-activity account (no repos/PRs/reviews) completes
+  // in a single slice (lib/github/evidence.ts never queues per-item
+  // operations with nothing to fan out over).
+  let completed = false;
+  for (let attempt = 0; attempt < 5 && !completed; attempt++) {
+    const tick = await request.get("/api/cron/collect-evidence", { headers: { Authorization: `Bearer ${cronSecret}` } });
+    expect(tick.status()).toBe(200);
+    const job = await db.from("scoring_collection_jobs").select("state").eq("owner_handle", owner).eq("provider", "github").single();
+    expect(job.error).toBeNull();
+    completed = job.data!.state === "complete";
+  }
+  expect(completed).toBe(true);
+
+  // The owner then shows ready with an identical v7.2 score everywhere.
+  await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 15_000 }).toBe("v7.2");
+  const profile = await api(page, owner);
+  expect(profile.archetype).toBeNull(); // Zero activity earns no archetype.
+
+  const badge = await page.request.get(`/u/${owner}/badge.svg?lang=en`);
+  expect(badge.status()).toBe(200);
+  const badgeSvg = await badge.text();
+  expect(badgeSvg).not.toContain("data-chapa-state=\"collecting\"");
+  expect(badgeSvg).not.toContain("data-chapa-state=\"unavailable\"");
+  expect(badgeSvg).toMatch(new RegExp(`data-element="score"[^>]*>${profile.displayScore}</text>`));
+
+  // #1335 phase 4.8 — this is the first navigation to /u/:handle to reach
+  // page.tsx's normal Promise.all([session, materialization, trendData,
+  // webmcpEnabled, cachedSvg]) branch for this owner (the earlier "collecting"
+  // visit above returns early through the status-placeholder branch, which
+  // never calls isWebmcpEnabled()). The App Router streams app/u/[handle]/
+  // loading.tsx's Suspense fallback ("Building the badge") first, then
+  // replaces it once this Promise.all settles -- give that settle its own
+  // generous poll rather than re-navigating (a fresh navigation just
+  // restarts the same stream and can race the fallback again).
+  await page.goto(`/u/${owner}?lang=en`);
+  await expect(page.locator('svg[data-badge-design] [data-element="score"]').first()).toHaveText(String(profile.displayScore), { timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __scoringTools: Map<string, unknown> }).__scoringTools.has("get_impact_profile")), { timeout: 15_000 }).toBe(true);
+  const tool = await page.evaluate(async () => JSON.parse(String(await (window as unknown as { __scoringTools: Map<string, { execute(input: unknown): unknown }> }).__scoringTools.get("get_impact_profile")!.execute({}))));
+  expect(tool).toMatchObject({ policyVersion: "v7.2", displayScore: profile.displayScore, identity: profile.identity });
+
+  const history = await page.request.get(`/api/history/${owner}?include=snapshots`);
+  expect(history.status()).toBe(200);
+  const historyBody = await history.json();
+  expect(historyBody.policyVersion).toBe("v7.2");
+  expect(historyBody.snapshots).toHaveLength(1);
+  expect(historyBody.snapshots[0].composite).toMatchObject({ exact: profile.exactScore, display: profile.displayScore });
+
+  await verifyIdentity(page, profile);
+});
+
+// #1335 phase 4.8 — a terminally-failed job (seeded directly -- the actual
+// failure paths are exercised by lib/collection/worker.test.ts's unit suite,
+// not this browser spec) shows the owner a reason and a working Retry action.
+test("a failed collection job shows the reason and a Retry action to the owner", async ({ page, context, baseURL }, testInfo) => {
+  assertScoringFixtureEnvironment(process.env);
+  const owner = `chapa-collectq-failed-${testInfo.project.name}`;
+  const db = redesignFixtureClient();
+  const referenceTime = new Date().toISOString();
+  await setRedesignSession(context, baseURL!, owner);
+  await seedFailedGithubJob(db, owner, referenceTime, { provider: "github", operation: "profile", stopKind: "http", httpStatus: 500, retryAfterSeconds: null });
+
+  const badge = await page.request.get(`/u/${owner}/badge.svg?lang=en`);
+  expect(badge.status()).toBe(200);
+  const svg = await badge.text();
+  expect(svg).toContain('data-chapa-state="action_needed"');
+  expect(svg).toContain("Scoring paused: action needed");
+  expect(badge.headers()["cache-control"]).toContain("no-store");
+
+  await page.goto("/settings?lang=en");
+  await expect(page.getByText("Scoring paused: action needed")).toBeVisible();
+  await expect(page.getByText("We were alerted; you can retry.")).toBeVisible();
+  const retryButton = page.getByRole("button", { name: "Retry", exact: true });
+  await expect(retryButton).toBeVisible();
+  const retried = page.waitForResponse((r) => r.url().endsWith("/api/scoring/status") && r.request().method() === "POST");
+  await retryButton.click();
+  expect((await retried).status()).toBe(200);
+  // POST /api/scoring/status re-enqueues (state -> "queued") and then calls
+  // scheduleCollectionAdvance() to run a bounded slice in the background
+  // immediately, rather than waiting for the next cron tick. Against this
+  // zero-activity fixture that background slice can complete before this
+  // poll's first read, racing straight through "queued" to "complete" --
+  // the retry succeeded either way, so assert only that it left "failed".
+  await expect
+    .poll(async () => (await db.from("scoring_collection_jobs").select("state").eq("owner_handle", owner).eq("provider", "github").single()).data?.state)
+    .not.toBe("failed");
 });

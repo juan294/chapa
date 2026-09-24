@@ -1,22 +1,15 @@
-import { type NextRequest, NextResponse, after } from "next/server";
+import { SCORING_POLICY } from "@chapa/shared";
+import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimitStrict } from "@/lib/cache/redis";
 import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import { isInsightsEnabled } from "@/lib/feature-flags";
-import {
-  isValidInsightsUpload,
-  MAX_INSIGHTS_BYTES,
-} from "@/lib/insights/validation";
+import { MAX_INSIGHTS_BYTES } from "@/lib/insights/validation";
 import { dbStoreCraftReportV7 } from "@/lib/db/craft-v7";
 import { parseInsightsReportV7 } from "@/lib/insights/report-v7";
-import { computeCraftScore } from "@/lib/insights/scoring";
-import { dbUpsertToolInsights } from "@/lib/db/tool-insights";
-import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
-import type { InsightsUpload } from "@chapa/shared";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { log } from "@/lib/log";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { prepareReportCraftImport } from "@/lib/insights/report-craft-import";
 import { dbStoreReportCraft } from "@/lib/db/report-craft";
 import { materializeCurrentObservedReceipt } from "@/lib/profile/issue-receipt";
@@ -25,9 +18,15 @@ import { issueReceiptVerificationV7 } from "@/lib/verification/store";
 import { invalidateBadgeSvgCacheForHandle, isBadgeCacheRefreshed } from "@/lib/render/badge-svg-cache";
 
 /**
- * POST /api/insights — Upload an insights report and compute craft score.
+ * POST /api/insights — Upload an insights report and compute Craft.
  * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
- * Rate limited: 10 req/IP/hour (before auth) + 10 req/handle/24h (after auth).
+ * Rate limited: 10 req/IP/hour (before auth).
+ *
+ * #1335 phase 5 — the v6 legacy InsightsUpload/computeCraftScore/
+ * dbUpsertToolInsights path is retired: nothing reads its output anymore
+ * (`/api/insights/:handle` and `/api/profile/:handle` read Craft from the
+ * current v7.2 receipt only). The archived v7 schemaVersion branch below
+ * (immutable, pre-v7.2) is unaffected.
  *
  * BE-H2 (#860): IP rate-limit runs BEFORE resolveRequestAuth to prevent
  * unauthenticated callers from triggering outbound GitHub calls.
@@ -69,17 +68,17 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // #1335 phase 5 — the retired DB-backed render-selector flag is gone; v7.2 is
+  // the only rendered policy, so a caller negotiating any other policy is
+  // rejected before writing.
   const expectedPolicy = request.headers.get("X-Chapa-Scoring-Policy");
-  const negotiatedSelection = expectedPolicy ? await readScoringRenderSelection() : null;
-  if (negotiatedSelection && expectedPolicy !== negotiatedSelection.machinePolicy) {
+  if (expectedPolicy && expectedPolicy !== SCORING_POLICY) {
     return NextResponse.json({ error: "policy_changed", persisted: false }, { status: 409 });
   }
 
   if (body && typeof body === "object" && "schemaVersion" in body && body.schemaVersion === "v7.2") {
-    const selection = negotiatedSelection ?? await readScoringRenderSelection();
-    if (!selection.enabled) return NextResponse.json({ error: "policy_changed", persisted: false }, { status: 409 });
-    if (Array.isArray(body) || Object.keys(body).some(key => !["schemaVersion", "report", "publicationAcknowledged", "supersedesReportId"].includes(key))
-      || !("report" in body) || ("publicationAcknowledged" in body && typeof body.publicationAcknowledged !== "boolean")
+    if (Array.isArray(body) || Object.keys(body).some(key => !["schemaVersion", "report", "supersedesReportId"].includes(key))
+      || !("report" in body)
       || ("supersedesReportId" in body && (typeof body.supersedesReportId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.supersedesReportId)))) {
       return NextResponse.json({ error: "Invalid insights data", persisted: false }, { status: 400 });
     }
@@ -89,10 +88,8 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     catch { return NextResponse.json({ error: "Invalid insights data", persisted: false }, { status: 400 }); }
     const handle = auth.handle.toLowerCase();
     const stored = await dbStoreReportCraft(handle, handle, prepared, {
-      publicationAcknowledged: "publicationAcknowledged" in body && body.publicationAcknowledged === true,
       ...("supersedesReportId" in body ? { supersedesReportId: body.supersedesReportId as string } : {}),
     });
-    if (stored.status === "consent_required") return NextResponse.json({ error: "publication_acknowledgment_required", persisted: false }, { status: 409 });
     if (stored.status === "correction_required") return NextResponse.json({ error: "same_period_requires_explicit_correction", persisted: false, supersedesReportId: stored.supersedesReportId }, { status: 409 });
     if (stored.status !== "stored") return NextResponse.json({ error: "Insights storage unavailable", persisted: false }, { status: 503 });
     const pending = { success: true, persisted: true, schemaVersion: "v7.2", uploadId: stored.reportId, reportSelection: stored.selection, publication: "pending", refreshed: false, scoring: null, craft: null };
@@ -114,7 +111,8 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     }
   }
 
-  // Explicit v7 branch; v6 archives/clients retain their historical contract until S15 cutover.
+  // Archived v7 schemaVersion branch (pre-v7.2, immutable format) — unaffected
+  // by the v6 retirement above.
   if (body && typeof body === "object" && "schemaVersion" in body) {
     const referenceTime = new Date().toISOString();
     let report;
@@ -133,62 +131,5 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     }
   }
 
-  // Validate InsightsUpload shape
-  const validation = isValidInsightsUpload(body);
-  if (!validation.valid) {
-    log("warn", "[insights] Validation failed", { route: "/api/insights", reason: validation.reason });
-    return NextResponse.json({ error: "Invalid insights data" }, { status: 400 });
-  }
-
-  // Rate limit: 10 uploads per handle per 24h
-  const rl = await rateLimitStrict(
-    `ratelimit:insights:${auth.handle.toLowerCase()}`,
-    10,
-    86400,
-  );
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many uploads. Please try again later." },
-      { status: 429, headers: { "Retry-After": "86400" } },
-    );
-  }
-
-  const data = body as InsightsUpload;
-  const scores = computeCraftScore(data);
-
-  // Store in database (synchronous — response needs the stored result)
-  const stored = await dbUpsertToolInsights(auth.handle, data, scores);
-  const persisted = stored != null;
-
-  if (!persisted) {
-    log("error", "[insights] durable persist returned null", {
-      route: "/api/insights",
-      handle: auth.handle,
-    });
-    void captureServerError({
-      route: "/api/insights",
-      statusCode: 200,
-      error: new Error("Tool insights durable persist returned null"),
-    });
-  }
-
-  // Defer cache invalidation until after the durable write completes.
-  after(async () => {
-    const handle = auth.handle.toLowerCase();
-    await invalidateProfileReadModels(handle, {
-      stats: true,
-      craft: true,
-      badgeSvg: true,
-      snapshot: true,
-      history: true,
-    });
-    revalidatePath(`/u/${handle}`);
-  });
-
-  return NextResponse.json({
-    success: true,
-    persisted,
-    policyVersion: "v6",
-    craftScore: stored ?? scores,
-  });
+  return NextResponse.json({ error: "Invalid insights data" }, { status: 400 });
 });

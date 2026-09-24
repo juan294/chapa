@@ -21,7 +21,7 @@ vi.mock("@/lib/auth/bitbucket", () => ({ isTokenExpired: () => true, refreshBitb
 vi.mock("@/lib/auth/codeberg", () => ({ refreshCodebergToken: vi.fn() }));
 vi.mock("@/lib/auth/gitlab", () => ({ refreshGitlabToken: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getGitlabClientId: () => "client", getGitlabClientSecret: () => "secret" }));
-const initial: Extract<SourceAuthorization, { status: "authorized" }> = { status: "authorized", consentVersion: "v1", link: { id: "11111111-1111-4111-8111-111111111111", updatedAt: "2026-09-05T12:00:00.000001Z", handle: "alice", platform: "gitlab", remoteLogin: "alice-lab", tokens: { accessToken: "old", refreshToken: "refresh", expiresAt: new Date("2026-09-01") } } };
+const initial: Extract<SourceAuthorization, { status: "authorized" }> = { status: "authorized", subjectVersion: "v1", link: { id: "11111111-1111-4111-8111-111111111111", updatedAt: "2026-09-05T12:00:00.000001Z", handle: "alice", platform: "gitlab", remoteLogin: "alice-lab", tokens: { accessToken: "old", refreshToken: "refresh", expiresAt: new Date("2026-09-01") } } };
 const input = { owner: "alice", provider: "gitlab" as const };
 beforeEach(() => {
   vi.resetAllMocks();

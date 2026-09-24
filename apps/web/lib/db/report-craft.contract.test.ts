@@ -9,7 +9,7 @@ const owner = "contract-report-craft";
 const db = () => getServiceClient();
 const capture = "2026-09-08T12:00:00.000Z";
 const dto = (outcomes = [{ label: "Fully Achieved", count: 4 }, { label: "Mostly Achieved", count: 2 }, { label: "Partially Achieved", count: 1 }, { label: "Failed", count: 1 }, { label: "private label", count: 1 }], end = "2026-09-08") => ({ schemaVersion: "v7.2", tool: "claude-code", reportPeriod: { start: "2026-09-01", end }, totalSessions: 10, outcomes });
-const save = async (value = dto(), ack = true, supersedesReportId?: string, capturedAt = capture) => dbStoreReportCraft(owner, owner, await prepareReportCraftImport(value, capturedAt), { publicationAcknowledged: ack, supersedesReportId });
+const save = async (value = dto(), supersedesReportId?: string, capturedAt = capture) => dbStoreReportCraft(owner, owner, await prepareReportCraftImport(value, capturedAt), { supersedesReportId });
 async function cleanup() { assertLocalSqlTarget(); expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull(); }
 beforeEach(cleanup); afterEach(cleanup);
 describe("report Craft durable publication admission", () => {
@@ -18,9 +18,9 @@ describe("report Craft durable publication admission", () => {
     expect(grants).toBe("f|f|t|f|f|t");
   });
   it("fences an earlier no-report read when first insufficient evidence is admitted", async () => {
-    await db().rpc("scoring_v7_ledger_write", { p_owner: owner, p_actor: owner, p_action: "consent", p_data: { publicationAcknowledged: true, enabled: true } });
+    await db().rpc("scoring_v7_ensure_subject", { p_owner: owner });
     const before = await dbReadReportCraft(owner, createScoringWindow(capture));
-    if (before.status !== "found") throw new Error("Expected consent");
+    if (before.status !== "found") throw new Error("Expected registered subject");
     const envelope = await observedReceiptFixture({ referenceTime: capture, craft: before.craft });
     await save(dto([{ label: "Unknown", count: 10 }]));
     expect(await dbPublishObservedReceiptWithReport(owner, owner, envelope, "a".repeat(64), before.selectedReportId, before.generation)).toEqual({ status: "failed" });
@@ -40,10 +40,10 @@ describe("report Craft durable publication admission", () => {
     expect(await dbPublishObservedReceiptWithReport(owner, owner, valid, "a".repeat(64), null, read.generation)).toMatchObject({ status: "inserted", isCurrent: true });
   });
   it("orders competing reports by effective observation cutoff, not the declared start", async () => {
-    const first = await save(dto(), true, undefined, "2026-09-08T10:00:00.000Z");
+    const first = await save(dto(), undefined, "2026-09-08T10:00:00.000Z");
     if (first.status !== "stored") throw new Error("Expected first report");
     const slow = { ...dto([{ label: "Failed", count: 10 }]), reportPeriod: { start: "2026-09-02", end: "2026-09-08" } };
-    expect(await save(slow, true, undefined, "2026-09-08T09:00:00.000Z")).toMatchObject({ status: "stored", selection: "older", selectedReportId: first.reportId });
+    expect(await save(slow, undefined, "2026-09-08T09:00:00.000Z")).toMatchObject({ status: "stored", selection: "older", selectedReportId: first.reportId });
     expect(await dbReadReportCraft(owner, createScoringWindow(capture))).toMatchObject({ craft: { report: { result: { point: { exact: 57 } } } } });
   });
   it("selects a retained eligible shorter report when the longer current report straddles next day's window", async () => {
@@ -55,8 +55,7 @@ describe("report Craft durable publication admission", () => {
     // An older in-flight context cannot rewind the selected identity.
     expect(await dbReadReportCraft(owner, createScoringWindow(capture))).toMatchObject({ status: "found", selectedReportId: short.reportId, generation: 3 });
   });
-  it("requires first inline acknowledgment, reuses consent and persists numeric57 with opaque identity", async () => {
-    expect(await save(dto(), false)).toMatchObject({ status: "consent_required", persisted: false });
+  it("persists numeric57 with opaque identity, needing no acknowledgment", async () => {
     const saved = await save();
     expect(saved).toMatchObject({ status: "stored", persisted: true, consented: true, selection: "selected", generation: 1 });
     const read = await dbReadReportCraft(owner, createScoringWindow(capture));
@@ -64,14 +63,14 @@ describe("report Craft durable publication admission", () => {
     if (read.status !== "found") throw new Error("Expected stored report");
     expect(JSON.stringify(read.craft)).not.toContain("private label");
     expect(read.selectedReportId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(await save(dto(), false)).toMatchObject({ status: "stored", generation: 1, selection: "unchanged" });
+    expect(await save(dto())).toMatchObject({ status: "stored", generation: 1, selection: "unchanged" });
   });
   it("deduplicates concurrent uploads and retains first capture through later and next-day retries", async () => {
     const outcomes = await Promise.all([save(), save()]);
     expect(outcomes.every(row => row.status === "stored")).toBe(true);
     if (outcomes[0]?.status !== "stored") throw new Error("Expected persisted report");
     const first = outcomes[0];
-    expect(await save(dto(), false, undefined, "2026-09-09T12:00:00.000Z")).toMatchObject({ status: "stored", reportId: first.reportId, generation: 1 });
+    expect(await save(dto(), undefined, "2026-09-09T12:00:00.000Z")).toMatchObject({ status: "stored", reportId: first.reportId, generation: 1 });
     const read = await dbReadReportCraft(owner, createScoringWindow("2026-09-09T12:00:00.000Z"));
     expect(read).toMatchObject({ craft: { report: { inputs: { reportPeriod: { endExclusive: capture } } } } });
     expect((await db().from("report_craft_reports").select("id").eq("owner_handle", owner)).data).toHaveLength(1);
@@ -81,14 +80,14 @@ describe("report Craft durable publication admission", () => {
     if (first.status !== "stored") throw new Error("Expected persisted report");
     const zero = dto([{ label: "Failed", count: 10 }]);
     expect(await save(zero)).toMatchObject({ status: "correction_required", persisted: false, supersedesReportId: first.reportId });
-    expect(await save(zero, true, first.reportId)).toMatchObject({ status: "stored", selection: "selected", generation: 2 });
+    expect(await save(zero, first.reportId)).toMatchObject({ status: "stored", selection: "selected", generation: 2 });
     expect(await dbReadReportCraft(owner, createScoringWindow(capture))).toMatchObject({ craft: { status: "scored", report: { result: { point: { exact: 0 } }, supersedesReportRef: first.reportId } } });
   });
   it("keeps valid57 selected after newer insufficient or older valid imports", async () => {
     const first = await save();
     if (first.status !== "stored") throw new Error("Expected persisted report");
     const insufficient = dto([{ label: "Unknown", count: 10 }]);
-    expect(await save(insufficient, true, first.reportId)).toMatchObject({ status: "stored", selection: "insufficient", selectedReportId: first.reportId, generation: 1 });
+    expect(await save(insufficient, first.reportId)).toMatchObject({ status: "stored", selection: "insufficient", selectedReportId: first.reportId, generation: 1 });
     expect(await save(dto([{ label: "Failed", count: 10 }], "2026-09-07"))).toMatchObject({ status: "stored", selection: "older", selectedReportId: first.reportId });
     expect(await dbReadReportCraft(owner, createScoringWindow(capture))).toMatchObject({ craft: { report: { result: { point: { exact: 57 } } } } });
   });
@@ -105,7 +104,7 @@ describe("report Craft durable publication admission", () => {
     const before = await dbReadReportCraft(owner, createScoringWindow(capture));
     if (before.status !== "found") throw new Error("Expected report");
     const envelope = await observedReceiptFixture({ referenceTime: capture, craft: before.craft });
-    const next = await save(dto([{ label: "Failed", count: 10 }]), true, before.selectedReportId!);
+    const next = await save(dto([{ label: "Failed", count: 10 }]), before.selectedReportId!);
     expect(next.status).toBe("stored");
     expect(await dbPublishObservedReceiptWithReport(owner, owner, envelope, "a".repeat(64), before.selectedReportId, before.generation)).toEqual({ status: "failed" });
     expect((await db().from("scoring_v7_receipts").select("id").eq("owner_handle", owner)).data).toEqual([]);
@@ -132,6 +131,6 @@ describe("report Craft durable publication admission", () => {
     if (result.status !== "failed") expect(canonicalJson(result.envelope)).toBe(canonicalJson(envelope));
     await cleanup();
     expect((await db().from("report_craft_reports").select("id").eq("owner_handle", owner)).data).toEqual([]);
-    expect(await dbReadReportCraft(owner, createScoringWindow(capture))).toEqual({ status: "not_consented" });
+    expect(await dbReadReportCraft(owner, createScoringWindow(capture))).toEqual({ status: "not_registered" });
   });
 });

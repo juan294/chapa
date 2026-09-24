@@ -74,6 +74,16 @@ export const SUPABASE_TABLES: ReadonlyArray<{ table: string; column: string; del
     { table: "report_craft_reports", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "report_craft_selection", column: "owner_handle", deletion: "scoring_v7_rpc" },
     { table: "scoring_observed_current", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    // scoring_collection_jobs.owner_handle REFERENCES scoring_v7_subjects
+    // ON DELETE CASCADE (migration 055, #1335 phase 3); staged events cascade
+    // again from the job row. Enumerated for discovery only -- the withdrawal
+    // RPC's cascade already removes both, same as every other row above.
+    { table: "scoring_collection_jobs", column: "owner_handle", deletion: "scoring_v7_rpc" },
+    // scoring_issuance_attempts.owner_handle REFERENCES scoring_v7_subjects
+    // ON DELETE CASCADE (migration 056, #1335 phase 4). Enumerated for
+    // discovery only -- the withdrawal RPC's cascade already removes it, same
+    // as every other row above.
+    { table: "scoring_issuance_attempts", column: "owner_handle", deletion: "scoring_v7_rpc" },
   ];
 
 export interface Args {
@@ -183,6 +193,21 @@ async function scanAllKeys(cfg: Config, pattern: string): Promise<string[]> {
 // Supabase PostgREST
 // ---------------------------------------------------------------------------
 
+/**
+ * #1335 — `metrics_snapshots` and `verification_records` are dropped by a
+ * held contract migration (057) not yet applied to production. PostgREST
+ * answers a query against a table/relation it cannot find with 404
+ * (`PGRST205`); every other failure mode this script needs to keep failing
+ * loudly on (auth, permission, malformed query) uses a different status
+ * (401/403/400/406). A HEAD response (used by `supaCount`) carries no body to
+ * confirm the error code against, so the status alone is the signal. Once
+ * migration 057 lands, this lets the same table list keep working without
+ * another edit here.
+ */
+function isMissingTableStatus(status: number): boolean {
+  return status === 404;
+}
+
 async function supaCount(
   cfg: Config,
   table: string,
@@ -201,6 +226,7 @@ async function supaCount(
     },
   );
   if (!res.ok) {
+    if (isMissingTableStatus(res.status)) return 0;
     throw new Error(`count ${table}: ${res.status}`);
   }
   const range = res.headers.get("content-range"); // "*/<total>"
@@ -225,6 +251,7 @@ async function supaDelete(
     },
   );
   if (!res.ok) {
+    if (isMissingTableStatus(res.status)) return 0;
     throw new Error(`delete ${table}: ${res.status}`);
   }
   const text = await res.text();

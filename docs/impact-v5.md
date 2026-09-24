@@ -1,4 +1,4 @@
-> **Superseded by v6:** Impact v5 recalibrations remain in effect. v6 adds the 5th "Craft" dimension on top of v5. See `docs/impact-v6.md` for the current spec.
+> **Superseded by v6, which is itself retired (2026-09-23):** Impact v5 recalibrations remained in effect through v6. v6 added the 5th "Craft" dimension on top of v5. See `docs/impact-v6.md` for that (now historical) spec, and `docs/impact-v7.md` for the current one.
 
 # Impact V5 Scoring Specification
 

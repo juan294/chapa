@@ -7,10 +7,12 @@ import { canonicalJson, canonicalSha256, createScoringWindow, DEFAULT_BADGE_CONF
 import { observedReceiptFixture } from "../../lib/history/__fixtures__/receipts-observed";
 import { calculateReportCraftInputs } from "../../lib/insights/report-craft";
 import { observedSemanticIdentity } from "../../lib/profile/receipt-semantic-identity";
-import { DEMO_IMPACT } from "../../lib/render/demoData";
 import { buildStatsCacheEnvelope, statsCacheBindingBytes } from "../../lib/cache/stats-cache-envelope";
 import { buildRedesignGitHubFixture } from "./redesign-github";
 import { localCandidateTarget } from "./local-candidate";
+import { GITHUB_EVIDENCE_QUERIES } from "../../lib/github/evidence-queries";
+import { withRateLimit } from "../../lib/github/evidence-rate-limit";
+import type { SourceDiagnostic } from "../../lib/platform/evidence-diagnostics";
 
 /** Mirrors `FRESH_SECONDS` in `lib/cache/stats-cache.ts` (that module cannot
  * be imported here — see `stats-cache-envelope.ts`'s header). Kept as a
@@ -45,8 +47,7 @@ export async function buildScoringPointSeeds(referenceTime: string) {
     const counts: CoreCountInputs | undefined = handle.endsWith("boundary") ? { deliveryUnits: fixed(14), quality: { rationale: fixed(1), verification: fixed(1), review_or_correction: fixed(1), outcome_followup: fixed(1) }, activeIsoWeeks: fixed(35), eligibleProjects: fixed(4), eligibleCategories: fixed(4) } : undefined;
     const envelope = await observedReceiptFixture({ referenceTime: window.referenceTime, craft, counts });
     const stats = buildRedesignGitHubFixture(handle, referenceTime).stats;
-    const legacyImpact = { ...DEMO_IMPACT, handle, adjustedComposite: 80, compositeScore: 80, archetype: "Builder" as const, dimensions: { delivery: 100, quality: 74, consistency: 67, breadth: 71, craft: 83 }, computedAt: referenceTime };
-    return { handle, envelope, stats, legacyImpact };
+    return { handle, envelope, stats };
   }));
 }
 /** The existing fixture session uses the same local-only token as the server.
@@ -96,12 +97,11 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
     const cache: Record<string, string> = {};
     const owners: Record<string, { revisionId: string; receiptId: string; contentHash: string; verificationToken: string }> = {};
     for (const seed of seeds) {
-      const { handle, envelope, stats, legacyImpact } = seed; const receipt = envelope.receipt;
+      const { handle, envelope, stats } = seed; const receipt = envelope.receipt;
       await check(db.from("users").insert({ handle, display_name: handle }));
       await check(db.from("studio_configs").insert({ handle, config: DEFAULT_BADGE_CONFIG }));
       await check(db.from("tool_insights").insert({ handle, tool: "claude-code", report_start: receipt.window.referenceDate, report_end: receipt.window.referenceDate, raw_data: { sentinel: "SCORING_PRIVATE_SENTINEL" }, proficiency: 83, effectiveness: 83, sophistication: 83, craft_score: 83, craft_tier: "Expert" }));
-      await check(db.from("metrics_snapshots").insert({ handle, date: receipt.window.referenceDate, captured_at: options.referenceTime, commits_total: stats.commitsTotal, prs_merged_count: stats.prsMergedCount, prs_merged_weight: stats.prsMergedWeight, reviews_submitted: stats.reviewsSubmittedCount, issues_closed: stats.issuesClosedCount, repos_contributed: stats.reposContributed, active_days: stats.activeDays, lines_added: stats.linesAdded, lines_deleted: stats.linesDeleted, total_stars: stats.totalStars, total_forks: stats.totalForks, total_watchers: stats.totalWatchers, top_repo_share: stats.topRepoShare, building: 100, guarding: 74, consistency: 67, breadth: 71, archetype: "Builder", profile_type: legacyImpact.profileType, composite_score: 80, adjusted_composite: 80, confidence: 90, tier: "High", craft: 83 }));
-      await check(db.rpc("scoring_v7_ledger_write", { p_owner: handle, p_actor: handle, p_action: "consent", p_data: { enabled: true, publicationAcknowledged: true } }));
+      await check(db.rpc("scoring_v7_ensure_subject", { p_owner: handle }));
       const coreDigest = await canonicalSha256({ fixture: "scoring-point-v1", counts: receipt.inputs.counts });
       await check(db.rpc("scoring_observed_publish_receipt", { p_owner: handle, p_actor: handle, p_receipt: receipt, p_canonical: canonicalJson(receipt), p_semantic_digest: await observedSemanticIdentity(coreDigest, receipt.craft), p_core_semantic_digest: coreDigest }));
       const signature = createHmac("sha256", signing).update(canonicalJson(receipt)).digest("hex");
@@ -112,4 +112,112 @@ export async function bootstrapScoringPointFixtures(db: SupabaseClient, options:
     }
     return { cache, publicManifest: { referenceTime: options.referenceTime, owners }, cleanup };
   } catch (error) { try { await cleanup(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], "Scoring bootstrap and cleanup failed"); } throw error; }
+}
+
+/**
+ * Step 4.8 (#1335) — drives the REAL collection queue
+ * (`scoring_collection_*` RPCs, `lib/collection/worker.ts`,
+ * `/api/cron/collect-evidence`), never a direct receipt seed. Distinct
+ * handles from `SCORING_POINT_HANDLES` above, which bypasses collection
+ * entirely by writing a receipt straight into the DB.
+ */
+export const COLLECTION_QUEUE_HANDLES = ["chapa-collectq-chromium", "chapa-collectq-mobile", "chapa-collectq-failed-chromium", "chapa-collectq-failed-mobile"] as const;
+
+/**
+ * Canned zero-activity responses for the 5 GitHub v7.2 collection GraphQL
+ * operations (`lib/github/evidence.ts`) that run for an account with no
+ * repositories, merged PRs or review contributions — that engine never
+ * queues `files`/`reviews`/`commits`/`issues`/`closures` operations in that
+ * case, so no fixture is needed for those. Keyed by the exact query text the
+ * engine actually sends: `withRateLimit(GITHUB_EVIDENCE_QUERIES.<op>)`, not
+ * the bare query — every request that engine makes injects a `rateLimit`
+ * selection first (see `withRateLimit`'s own header comment). Both pieces are
+ * imported, never duplicated as literals, so a future change to either the
+ * query text or that injection changes this fixture's keys with it: a drift
+ * is a visible "Unexpected redesign upstream" failure in
+ * `redesign-upstream.mjs`, not a silent mismatch.
+ */
+export function githubZeroActivityResponses(): Record<string, unknown> {
+  const emptyPage = { hasNextPage: false, endCursor: null };
+  return {
+    [withRateLimit(GITHUB_EVIDENCE_QUERIES.profile)]: { data: { user: { id: "collectq-fixture-user-id", login: "collectq-fixture-user", name: null, avatarUrl: null } } },
+    [withRateLimit(GITHUB_EVIDENCE_QUERIES.repositories)]: { data: { user: { repositories: { pageInfo: emptyPage, totalCount: 0, nodes: [] } } } },
+    [withRateLimit(GITHUB_EVIDENCE_QUERIES.contributed)]: { data: { user: { repositoriesContributedTo: { pageInfo: emptyPage, totalCount: 0, nodes: [] } } } },
+    [withRateLimit(GITHUB_EVIDENCE_QUERIES.merged)]: { data: { search: { issueCount: 0, pageInfo: emptyPage, nodes: [] } } },
+    [withRateLimit(GITHUB_EVIDENCE_QUERIES.reviewDiscovery)]: { data: { user: { contributionsCollection: { restrictedContributionsCount: 0, pullRequestReviewContributions: { pageInfo: emptyPage, totalCount: 0, nodes: [] } } } } },
+  };
+}
+
+/**
+ * Registers each `COLLECTION_QUEUE_HANDLES` owner as a scoring subject —
+ * nothing more for the v7.2 receipt itself. No job, no receipt: the spec
+ * enqueues jobs (`enqueueGithubJob`/`seedFailedGithubJob`) and, for the
+ * `ready` scenario, drives `/api/cron/collect-evidence` to actually run the
+ * collector.
+ *
+ * It DOES seed `stats:v3:<handle>` (Redis, via `fixtureStatsCacheEntry`) and
+ * a `github[handle]` CONTRIBUTION_QUERY fallback (same shapes
+ * `bootstrapScoringPointFixtures` and `bootstrapRedesignFixtures` seed for
+ * their own handles), because `materializeProfile` calls `loadDisplayInputs`
+ * -> `getStats()` unconditionally, even under v7.2 selection — the share
+ * page and badge still need GitHub-derived `stats` (and the legacy
+ * `displayImpact` computed from them) for the avatar, heatmap, star counts
+ * and the WebMCP `get_impact_profile` tool's mount condition, independent of
+ * the v7.2 receipt driving the score. A pre-seeded fresh cache entry (proven
+ * by `bootstrapScoringPointFixtures`'s own handles) avoids a
+ * `getStats()` cache-miss live-fetch race that otherwise left `displayImpact`
+ * null on the first post-collection page render; `github[handle]` stays as a
+ * fallback for any caller that misses the cache. The caller merges the
+ * returned `github`/`cache` maps into the shared `REDESIGN_FIXTURE_FILE`
+ * upstream fixture and Redis respectively (the fixture file already carries
+ * the one shared `contributionQuery` value from `bootstrapRedesignFixtures`).
+ */
+export async function bootstrapCollectionQueueFixtures(db: SupabaseClient, options: { referenceTime: string }) {
+  const secret = process.env.NEXTAUTH_SECRET, token = process.env.GITHUB_TOKEN;
+  if (!secret || token !== "redesign-local-fixture") throw new Error("Explicit local fixture secrets/token required");
+  const check = async <T extends { error: unknown }>(operation: PromiseLike<T>): Promise<T> => { const result = await operation; if (result.error) throw result.error; return result; };
+  const existing = await check(db.from("users").select("handle").in("handle", [...COLLECTION_QUEUE_HANDLES]));
+  if (existing.data?.length) throw new Error("Refusing to overwrite collection queue fixture owners");
+  const github: Record<string, unknown> = {};
+  const cache: Record<string, string> = {};
+  for (const handle of COLLECTION_QUEUE_HANDLES) {
+    await check(db.from("users").insert({ handle, display_name: handle }));
+    await check(db.rpc("scoring_v7_ensure_subject", { p_owner: handle }));
+    const fixture = buildRedesignGitHubFixture(handle, options.referenceTime);
+    github[handle] = fixture.response;
+    const referenceDate = options.referenceTime.slice(0, 10);
+    cache[`stats:v3:${handle}`] = fixtureStatsCacheEntry(handle, referenceDate, secret, token, fixture.stats, new Date(options.referenceTime));
+  }
+  const cleanup = async () => {
+    const errors: unknown[] = [];
+    for (const owner of COLLECTION_QUEUE_HANDLES) await check(db.rpc("scoring_v7_withdraw", { p_owner: owner })).catch(error => errors.push(error));
+    for (const table of ["verification_records", "studio_configs", "tool_insights", "metrics_snapshots", "users"]) await check(db.from(table).delete().in("handle", [...COLLECTION_QUEUE_HANDLES])).catch(error => errors.push(error));
+    for (const table of ["scoring_v7_subjects", "scoring_v7_sources", "scoring_v7_evidence", "scoring_v7_raw_artifacts", "scoring_v7_receipts", "scoring_observed_current", "scoring_collection_jobs", "scoring_issuance_attempts", "report_craft_reports", "report_craft_selection"]) {
+      const residue = await check(db.from(table).select("owner_handle").in("owner_handle", [...COLLECTION_QUEUE_HANDLES])).catch(error => { errors.push(error); return null; });
+      if (residue?.data?.length) errors.push(new Error(`Collection queue fixture residue in ${table}`));
+    }
+    if (errors.length) throw new AggregateError(errors, "Collection queue fixture cleanup failed");
+  };
+  return { github, cache, cleanup };
+}
+
+/** Enqueues a `github` collection job for `owner` — a plain, direct RPC call
+ * mirroring exactly what the OAuth callback/refresh/warm-cache enqueue sites
+ * do in production, so the job this creates is indistinguishable from a real
+ * one to every downstream reader (`readScoringStatus`, the worker, fan-in). */
+export async function enqueueGithubJob(db: SupabaseClient, owner: string, referenceTime: string): Promise<{ id: string }> {
+  const result = await db.rpc("scoring_collection_enqueue", { p_owner: owner, p_provider: "github", p_reason: "signup", p_reference_time: referenceTime });
+  if (result.error) throw result.error;
+  return result.data as { id: string };
+}
+
+/** Seeds a terminally-`failed` job directly (never via a real collector run)
+ * for the "owner action needed, with a reason and Retry" scenario — the
+ * cheapest correct way to reach that state, since the actual failure paths
+ * (rate limit exhaustion, a structural GitHub error) are exercised by
+ * `lib/collection/worker.test.ts`'s unit suite, not this browser spec. */
+export async function seedFailedGithubJob(db: SupabaseClient, owner: string, referenceTime: string, stop: SourceDiagnostic): Promise<void> {
+  const enqueued = await enqueueGithubJob(db, owner, referenceTime);
+  const result = await db.from("scoring_collection_jobs").update({ state: "failed", last_stop: stop, lease_token: null, lease_expires_at: null }).eq("id", enqueued.id);
+  if (result.error) throw result.error;
 }

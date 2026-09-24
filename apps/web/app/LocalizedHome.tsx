@@ -1,8 +1,6 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { DEMO_STATS } from "@/lib/render/demoData";
-import { LANDING_OBSERVED_DEMO } from "@/lib/render/observed-demo-data";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { LANDING_IMPACT } from "@/lib/render/landing-demo-data";
 import { LandingContent } from "./LandingContent";
 import { DEFAULT_LOCALE, LangSync, LanguageProvider } from "@/lib/i18n";
@@ -17,7 +15,7 @@ import { LandingWebMcpTools } from "@/components/LandingWebMcpTools";
 import { getLeaderboard } from "@/lib/profile/leaderboard";
 
 // The literal en/es route wrappers declare force-dynamic: the sample and
-// standings must share one live scoring selection after a cutover.
+// standings must share one live scoring policy after a cutover.
 // #1065 (FE-H1) — the root layout no longer sets a blanket canonical, so
 // every page (including this one) must declare its own. `/` is the one
 // place a root-relative canonical is actually correct.
@@ -42,22 +40,21 @@ export default async function Home({ params }: HomeProps) {
   const { locale } = await params;
   if (!isSupportedLocale(locale)) notFound();
   const t = getServerT(locale);
-  const selection = await readScoringRenderSelection();
-  const demoScoring = selection.enabled ? LANDING_OBSERVED_DEMO : undefined;
   const options = {
-    scoring: demoScoring,
+    scoring: LANDING_IMPACT,
     includeBranding: true,
     demoMode: true,
-    strings: buildBadgeI18nStrings(t, demoScoring ? demoScoring.tier : LANDING_IMPACT.tier),
+    strings: buildBadgeI18nStrings(t, LANDING_IMPACT.tier),
   };
-  const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, LANDING_IMPACT, options);
-  const readmeBadgeSvg = renderBadgeSvg(DEMO_STATS, LANDING_IMPACT, {
+  const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, options);
+  const readmeBadgeSvg = renderBadgeSvg(DEMO_STATS, {
     ...options,
     disableAnimation: true,
   });
-  // A failed authority read produces no standings; no previous-policy rows
-  // are substituted for unavailable current receipts.
-  const topScored = await getLeaderboard(3, selection);
+  // #1335 phase 5 — v7.2 is the one scoring policy; the selector this used to
+  // branch on is retired. A failed authority read produces no standings; no
+  // previous-policy rows are substituted for unavailable current receipts.
+  const topScored = await getLeaderboard(3);
   return (
     <>
       <DocumentLocaleMarker locale={locale} />
@@ -78,7 +75,7 @@ export default async function Home({ params }: HomeProps) {
       >
         <LangSync />
         <LandingWebMcpTools />
-        <LandingContent demoBadgeSvg={demoBadgeSvg} readmeBadgeSvg={readmeBadgeSvg} demoImpact={LANDING_IMPACT} demoScoring={demoScoring} topScored={topScored} t={t} />
+        <LandingContent demoBadgeSvg={demoBadgeSvg} readmeBadgeSvg={readmeBadgeSvg} demoScoring={LANDING_IMPACT} topScored={topScored} t={t} />
       </LanguageProvider>
     </>
   );

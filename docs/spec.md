@@ -1,5 +1,11 @@
 # Chapa Product Spec
 
+> **Historical planning document.** Written for an earlier Impact v6-era
+> design (6 visual categories, confidence scoring) and not maintained since.
+> The current spec is `docs/impact-v7.md`; current goals and routes are in
+> `CLAUDE.md`. Kept for its original product-story framing, not as a source
+> of current behavior.
+
 ## User story
 As a developer, I want a **beautiful, embeddable badge** that shows my multi-dimensional Impact v6 Profile and updates automatically, so I can share it on my portfolio, README, or social media.
 

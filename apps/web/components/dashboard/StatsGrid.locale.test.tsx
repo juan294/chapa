@@ -18,10 +18,6 @@ vi.mock("@/components/InfoTooltip", () => ({
   ),
 }));
 
-vi.mock("./DeltaIndicator", () => ({
-  DeltaIndicator: () => null,
-}));
-
 import { StatsGrid } from "./StatsGrid";
 
 afterEach(cleanup);
@@ -48,7 +44,7 @@ const stats: StatsData = {
 
 describe("StatsGrid locale", () => {
   it("renders Spanish labels and tooltip content in the live dashboard grid", () => {
-    render(<StatsGrid stats={stats} diff={null} />);
+    render(<StatsGrid stats={stats} />);
 
     expect(screen.getByText("Días activos")).toBeDefined();
     expect(screen.getByText("PRs fusionadas")).toBeDefined();

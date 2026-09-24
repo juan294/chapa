@@ -21,7 +21,6 @@ interface SettingsClientProps {
   login: string;
   name: string | null;
   avatarUrl: string | null;
-  scoringPolicy?: "v6" | "v7.2";
 }
 
 const PLATFORM_META: Record<
@@ -110,12 +109,12 @@ function Section({
   );
 }
 
-export function SettingsClient({ login, name, avatarUrl, scoringPolicy = "v6" }: SettingsClientProps) {
+export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { insightsEnabled } = useClientFeatureFlags();
   const { connections, unlink } = usePlatformConnections();
-  const insights = useInsightsImport(login, scoringPolicy);
+  const insights = useInsightsImport(login);
   const [pendingUnlink, setPendingUnlink] = useState<PlatformId | null>(null);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
@@ -327,28 +326,22 @@ export function SettingsClient({ login, name, avatarUrl, scoringPolicy = "v6" }:
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              disabled={insights.cooldownActive || insights.processing}
-              title={insights.cooldownTooltip}
+              disabled={insights.processing}
               className="min-h-[44px] rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("userMenu.importInsights") as string}
             </button>
-            {insights.cooldownTooltip && (
-              <p className="mt-3 text-xs text-text-secondary">
-                {insights.cooldownTooltip}
-              </p>
-            )}
             {insights.pendingConfirmation && (
               <div className="mt-4 border-t border-stroke pt-4" role="group" aria-labelledby="insights-confirm-title">
                 <h3 id="insights-confirm-title" className="font-heading text-sm text-balance text-text-primary">
-                  {t(insights.pendingConfirmation === "retry" ? "userMenu.insightsPublicationPending" : insights.pendingConfirmation === "publication" ? "userMenu.insightsPublicationTitle" : "userMenu.insightsReplacementTitle") as string}
+                  {t(insights.pendingConfirmation === "retry" ? "userMenu.insightsPublicationPending" : "userMenu.insightsReplacementTitle") as string}
                 </h3>
                 <p className="mt-2 text-sm text-pretty leading-relaxed text-text-secondary">
-                  {t(insights.pendingConfirmation === "retry" ? "userMenu.insightsRetryDetail" : insights.pendingConfirmation === "publication" ? "userMenu.insightsPublicationBody" : "userMenu.insightsReplacementBody") as string}
+                  {t(insights.pendingConfirmation === "retry" ? "userMenu.insightsRetryDetail" : "userMenu.insightsReplacementBody") as string}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <button type="button" disabled={insights.processing} onClick={() => void insights.confirmImport()} className="min-h-11 rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text hover:bg-action-hover disabled:opacity-50">
-                    {t(insights.pendingConfirmation === "retry" ? "userMenu.insightsRetryConfirm" : insights.pendingConfirmation === "publication" ? "userMenu.insightsPublicationConfirm" : "userMenu.insightsReplacementConfirm") as string}
+                    {t(insights.pendingConfirmation === "retry" ? "userMenu.insightsRetryConfirm" : "userMenu.insightsReplacementConfirm") as string}
                   </button>
                   <button type="button" disabled={insights.processing} onClick={insights.cancelImport} className="min-h-11 rounded-[3px] border border-stroke-strong px-4 py-2 text-sm text-text-primary disabled:opacity-50">
                     {t("userMenu.cancelBtn") as string}

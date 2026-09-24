@@ -23,6 +23,5 @@ describe("journey release evidence lifecycle", () => {
   it("keeps actual handles synthetic and evidence fixtures scoped to the full run id", () => {
     expect(source).toContain("chapa-e2e-${runId}");
     expect(source).toContain("${evidenceRunId}-${projectName}-studio");
-    expect(source).toContain("${evidenceRunId}-${projectName}-snapshot");
   });
 });

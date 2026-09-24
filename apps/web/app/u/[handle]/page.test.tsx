@@ -1,26 +1,14 @@
-const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
-vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
-  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
-}));
-beforeEach(() => {
-  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
-});
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockMaterializePublicProfile,
-  mockGetPublicProfileVerification,
+  mockResolveBadgeVerification,
   mockRunPublicProfileSideEffects,
-  mockPersistProfileSnapshot,
-  mockDeferProfileCacheWork,
-  mockRedactImpactForVisitor,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
   mockAfter,
   mockGetServerLocale,
-  mockGetTrendData,
   mockHeaders,
   mockGetOptionalServerSessionFromHeaders,
   mockWriteBadgeSvgCache,
@@ -32,17 +20,13 @@ const {
   mockDbGetLinkedPlatforms,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
+  mockResolveBadgeVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
-  mockPersistProfileSnapshot: vi.fn(),
-  mockDeferProfileCacheWork: vi.fn(),
-  mockRedactImpactForVisitor: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockAfter: vi.fn(),
   mockGetServerLocale: vi.fn(),
-  mockGetTrendData: vi.fn(),
   mockHeaders: vi.fn(),
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
@@ -70,16 +54,13 @@ vi.mock("@/lib/render/badge-config", async (importOriginal) => {
 
 vi.mock("@/lib/profile/public-profile", () => ({
   materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
-  persistProfileSnapshot: (...args: unknown[]) =>
-    mockPersistProfileSnapshot(...args),
-  deferProfileCacheWork: (...args: unknown[]) =>
-    mockDeferProfileCacheWork(...args),
-  redactImpactForVisitor: (...args: unknown[]) =>
-    mockRedactImpactForVisitor(...args),
+}));
+
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) =>
+    mockResolveBadgeVerification(...args),
 }));
 
 vi.mock("next/headers", () => ({
@@ -89,10 +70,6 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/auth/session", () => ({
   getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
     mockGetOptionalServerSessionFromHeaders(...args),
-}));
-
-vi.mock("@/lib/history/get-trend-data", () => ({
-  getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -265,6 +242,9 @@ function findElement(
 
 const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
 
+// #1335 phase 5 — v7.2 is the one scoring policy this surface renders; no
+// `rawImpact`/`displayImpact`/`snapshot` legacy fields left on
+// `MaterializedProfile`.
 const FAKE_MATERIALIZED = {
   stats: {
     handle: "testuser",
@@ -276,50 +256,49 @@ const FAKE_MATERIALIZED = {
     reviewsSubmittedCount: 5,
     heatmapData: [],
   },
-  rawImpact: {
-    adjustedComposite: 73,
-    tier: "High",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  displayImpact: {
-    adjustedComposite: 65,
-    tier: "Solid",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  snapshot: { date: "2026-04-17", adjustedComposite: 65, tier: "Solid" },
+  craftResult: null,
+  statsComplete: true,
+  statsFreshness: "current",
+  statsCapturedAt: "2026-04-17T00:00:00Z",
   // #1331 — a real materialized profile always carries a scoring view model;
   // `freshness: "current"` is what configCacheable now requires (previously
   // `!== "unavailable"`, which undefined also satisfied — this fixture used
   // to omit `scoring` entirely and still passed the pre-#1331 gate).
   scoring: {
-    policyVersion: "v6",
+    policyVersion: "v7.2",
+    handle: "testuser",
+    identity: null,
+    window: null,
     freshness: "current",
     tier: "Solid",
     archetype: "Builder",
-    identity: null,
     composite: { kind: "point", value: 65, display: 65 },
+    dimensions: {
+      delivery: { kind: "point", value: 70, display: 70 },
+      quality: { kind: "point", value: 60, display: 60 },
+      consistency: { kind: "point", value: 65, display: 65 },
+      breadth: { kind: "point", value: 55, display: 55 },
+    },
+    craft: null,
+    reportCraft: { status: "no_report", unlocked: false, report: null },
+    coverage: [],
+    exclusions: [],
+    limitations: [],
   },
 };
 
-// #1331 — a durable stored-badge fallback: what
+// #1331/#1335 phase 5 — a durable stored-badge fallback: what
 // `readStoredBadgeProfile` returns when live materialization is null but a
-// committed legacy snapshot exists. `context` deliberately omits
-// heatmap/avatar/displayName (never persisted in a MetricsSnapshot) —
-// storedBadgeRenderInputs (the real, unmocked projection) turns this into
-// the same shape the badge route renders from.
+// committed current v7.2 receipt exists. `stats` is `null` here (the
+// exact-bound stale envelope was itself unavailable) — storedBadgeRenderInputs
+// (the real, unmocked projection) then renders every count as unavailable,
+// never a fabricated zero.
 const FAKE_STORED_PROFILE = {
   kind: "stored" as const,
   handle: "testuser",
-  policyVersion: "v6" as const,
   observedAt: "2026-04-16T00:00:00.000Z",
   scoring: {
-    policyVersion: "v6" as const,
+    policyVersion: "v7.2" as const,
     handle: "testuser",
     identity: null,
     window: null,
@@ -333,38 +312,30 @@ const FAKE_STORED_PROFILE = {
     tier: "Solid" as const,
     archetype: "Builder" as const,
     craft: null,
+    reportCraft: { status: "no_report" as const, unlocked: false, report: null },
     coverage: [],
     exclusions: [],
-    limitations: ["legacy_aggregate"] as const,
+    limitations: [],
     freshness: "stale" as const,
   },
-  legacyImpact: {
+  stats: {
     handle: "testuser",
-    profileType: "collaborative" as const,
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    archetype: "Builder" as const,
-    compositeScore: 62,
-    confidence: 80,
-    confidencePenalties: [],
-    adjustedComposite: 62,
-    tier: "Solid" as const,
-    computedAt: "2026-04-16T00:00:00.000Z",
-  },
-  context: {
     commitsTotal: 42,
+    activeDays: 40,
     prsMergedCount: 10,
     prsMergedWeight: 12,
     reviewsSubmittedCount: 5,
     issuesClosedCount: 2,
-    reposContributed: 3,
-    activeDays: 40,
     linesAdded: 100,
     linesDeleted: 50,
+    reposContributed: 3,
+    topRepoShare: 0.2,
+    maxCommitsIn10Min: 2,
     totalStars: 5,
     totalForks: 1,
     totalWatchers: 1,
-    topRepoShare: 0.2,
-    maxCommitsIn10Min: 2,
+    heatmapData: [],
+    fetchedAt: "2026-04-16T00:00:00.000Z",
   },
 };
 
@@ -377,10 +348,8 @@ describe("SharePage /u/[handle]", () => {
     vi.clearAllMocks();
     mockIsValidHandle.mockReturnValue(true);
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-    mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+    mockResolveBadgeVerification.mockResolvedValue({ hash: "abc12345", date: "2026-04-17" });
     mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
-    mockPersistProfileSnapshot.mockResolvedValue(true);
-    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockWriteBadgeSvgCache.mockResolvedValue(true);
@@ -391,7 +360,6 @@ describe("SharePage /u/[handle]", () => {
       cacheable: true,
     });
     mockGetServerLocale.mockResolvedValue("en");
-    mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
     mockHeaders.mockResolvedValue({ get: () => null });
     mockCaptureServerError.mockResolvedValue(undefined);
     mockCaptureServerEvent.mockResolvedValue(undefined);
@@ -402,11 +370,6 @@ describe("SharePage /u/[handle]", () => {
     // that need owner behavior override this per-test.
     mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
     mockDbGetLinkedPlatforms.mockResolvedValue([]);
-    mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
-      return rest;
-    });
   });
 
   it("generates metadata with the daily OG cache buster", async () => {
@@ -422,7 +385,7 @@ describe("SharePage /u/[handle]", () => {
 
     expect(metadata.openGraph?.images).toEqual([
       {
-        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=ice-terminal-v2-v6-2026-04-17-r7&lang=es",
+        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=ice-terminal-v2-v7.2-2026-04-17-r7&lang=es",
         width: 1200,
         height: 630,
         alt: "Chapa de testuser",
@@ -592,72 +555,27 @@ describe("SharePage /u/[handle]", () => {
     });
   });
 
-  // #1067 (FE-M1) — confidence/confidencePenalties must never reach the
-  // client-serialized props for a non-owner request. Ownership is resolved
-  // server-side (via the session cookie), not client-side, so it can gate
-  // what data is SENT, not just what is displayed.
-  describe("owner-only confidence redaction (#1067)", () => {
-    it("resolves the session via headers() + getOptionalServerSessionFromHeaders", async () => {
-      const fakeHeaderStore = { get: () => null };
-      mockHeaders.mockResolvedValue(fakeHeaderStore);
+  // #1067's owner-only confidence redaction is retired along with
+  // `ImpactV6Result` (#1335 phase 5 — "delete v6"): `ScoreViewModel` carries
+  // no `confidence`/`confidencePenalties` field at all, so there is nothing
+  // left for `redactImpactForVisitor` to strip — the receipt explanation
+  // panel renders identically for an owner and a visitor (CLAUDE.md: "current
+  // v7.2 explains recorded evidence/coverage without confidence deductions").
 
-      await renderPage("testuser");
+  it("resolves the session via headers() + getOptionalServerSessionFromHeaders", async () => {
+    const fakeHeaderStore = { get: () => null };
+    mockHeaders.mockResolvedValue(fakeHeaderStore);
 
-      expect(mockGetOptionalServerSessionFromHeaders).toHaveBeenCalledWith(fakeHeaderStore);
-    });
+    await renderPage("testuser");
 
-    it("passes the redacted impact when there is no session (anonymous visitor)", async () => {
-      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
-
-      const result = await renderPage("testuser");
-
-      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_MATERIALIZED.displayImpact);
-      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
-      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
-      expect("confidence" in impactProp).toBe(false);
-      expect("confidencePenalties" in impactProp).toBe(false);
-    });
-
-    it("passes the redacted impact when a different user's session is present", async () => {
-      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "someone-else" });
-
-      const result = await renderPage("testuser");
-
-      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_MATERIALIZED.displayImpact);
-      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
-      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
-      expect("confidence" in impactProp).toBe(false);
-    });
-
-    it("passes the FULL impact (including confidence) when the session matches the handle", async () => {
-      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
-
-      const result = await renderPage("testuser");
-
-      expect(mockRedactImpactForVisitor).not.toHaveBeenCalled();
-      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
-      expect(ownerEl!.props.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
-    });
-
-    it("never redacts the impact used to render the inline badge SVG (server-only, not client-serialized)", async () => {
-      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
-
-      await renderPage("testuser");
-
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
-        expect.anything(),
-      );
-    });
+    expect(mockGetOptionalServerSessionFromHeaders).toHaveBeenCalledWith(fakeHeaderStore);
   });
 
-  it("renders the inline badge from displayImpact, not rawImpact", async () => {
+  it("renders the inline badge from the current scoring model", async () => {
     await renderPage();
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: false,
-      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     // #1181 — the call now always also carries a locale-resolved `strings`
     // bundle; see the "badge content and cache key never diverge by locale"
@@ -665,7 +583,6 @@ describe("SharePage /u/[handle]", () => {
     // the pre-existing avatar/verification contract.
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
@@ -681,19 +598,19 @@ describe("SharePage /u/[handle]", () => {
     const callback = mockAfter.mock.calls[0][0];
     await callback();
 
+    // #1335 phase 5 — snapshot persistence and the v6 HMAC verification
+    // record are gone; `runPublicProfileSideEffects` now takes only the
+    // handle and the materialized profile.
     expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
-      { verification: { hash: "abc12345", date: "2026-04-17" } },
     );
-    // The page no longer sequences the two halves itself.
-    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
-    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
-  // #1091 (PE-M6) — the durable side effects (snapshot persist, verification
-  // record) have nothing in the rendered HTML depending on their result. They
-  // must not hold TTFB open, mirroring the badge route's #1013 fix.
+  // #1091 (PE-M6) — the durable side effects (badge-generated telemetry,
+  // owner profile refresh) have nothing in the rendered HTML depending on
+  // their result. They must not hold TTFB open, mirroring the badge route's
+  // #1013 fix.
   describe("durable snapshot write deferred to after() (#1091)", () => {
     it("does not await the durable side effects on the render path — only after() invokes them", async () => {
       await renderPage();
@@ -709,12 +626,11 @@ describe("SharePage /u/[handle]", () => {
       expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
         "testuser",
         FAKE_MATERIALIZED,
-        { verification: { hash: "abc12345", date: "2026-04-17" } },
       );
     });
 
-    // LE-6-1 — the strip on the inline SVG and the record the deferred
-    // sequence stores come from the same minted code.
+    // LE-6-1 — the strip on the inline SVG is minted from the same
+    // `resolveBadgeVerification` read the cache write below gates on.
     it("hands the exact verification the inline SVG printed to the deferred sequence", async () => {
       await renderPage();
       const callback = mockAfter.mock.calls[0][0];
@@ -722,11 +638,9 @@ describe("SharePage /u/[handle]", () => {
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({ verificationHash: "abc12345", verificationDate: "2026-04-17" }),
       );
-      const [, , options] = mockRunPublicProfileSideEffects.mock.calls[0];
-      expect(options.verification).toEqual(mockGetPublicProfileVerification.mock.results[0].value);
+      expect(mockResolveBadgeVerification.mock.results[0].value).resolves.toEqual({ hash: "abc12345", date: "2026-04-17" });
     });
 
     it("escalates a deferred snapshot-write failure via captureServerError instead of swallowing it", async () => {
@@ -766,10 +680,12 @@ describe("SharePage /u/[handle]", () => {
       // Flush pending microtasks WITHOUT resolving materializePublicProfile.
       // If the cache read were still gated behind `await Promise.all([...])`
       // (the pre-fix ordering), it could not have been invoked yet because
-      // that Promise.all can't settle until materialize does.
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      // that Promise.all can't settle until materialize does. #1335 phase
+      // 4/5 added a sequential `hasDrawableCurrentReceipt` gate ahead of this
+      // wave (its own real, unmocked DB read fails fast in this test env but
+      // still costs a few extra microtask hops), so this flushes more ticks
+      // than the single Promise.all this test originally guarded.
+      for (let i = 0; i < 10; i++) await Promise.resolve();
 
       expect(mockCacheGet).toHaveBeenCalled();
       expect(mockMaterializePublicProfile).toHaveBeenCalled();
@@ -816,11 +732,10 @@ describe("SharePage /u/[handle]", () => {
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           strings: expect.objectContaining({
             metricsVerified: "Métricas verificadas",
-            tierLabel: "Sólido", // tiers.solid (displayImpact.tier === "Solid")
+            tierLabel: "Sólido", // tiers.solid (scoring.tier === "Solid")
             radarLabels: expect.objectContaining({ delivery: "Entrega" }),
           }),
         }),
@@ -834,7 +749,6 @@ describe("SharePage /u/[handle]", () => {
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           strings: expect.objectContaining({
             metricsVerified: "Verified metrics",
@@ -902,14 +816,11 @@ describe("SharePage /u/[handle]", () => {
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       readOnly: true,
-      scoringSelection: expect.objectContaining({ machinePolicy: "v6" }),
     });
     expect(mockRenderBadgeSvg).toHaveBeenCalled();
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
     expect(mockAfter).not.toHaveBeenCalled();
     expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
-    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
-    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
   it("does not register side effects when materialization returns null", async () => {
@@ -933,13 +844,10 @@ describe("SharePage /u/[handle]", () => {
       mockReadStoredBadgeProfile.mockResolvedValue(FAKE_STORED_PROFILE);
     });
 
-    it("reads the stored profile bound to the same scoring selection", async () => {
+    it("reads the durable stored profile for the handle", async () => {
       await renderPage();
 
-      expect(mockReadStoredBadgeProfile).toHaveBeenCalledWith(
-        "testuser",
-        expect.objectContaining({ machinePolicy: "v6" }),
-      );
+      expect(mockReadStoredBadgeProfile).toHaveBeenCalledWith("testuser");
     });
 
     it("renders the inline SVG from the stored score/dimensions with the badge route's degraded disclosure", async () => {
@@ -947,13 +855,13 @@ describe("SharePage /u/[handle]", () => {
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         expect.objectContaining({ handle: "testuser", commitsTotal: 42, heatmapData: [] }),
-        FAKE_STORED_PROFILE.legacyImpact,
         expect.objectContaining({
           scoring: FAKE_STORED_PROFILE.scoring,
           degraded: {
             reason: "live_sources_unavailable",
             observedAt: FAKE_STORED_PROFILE.observedAt,
             activityAvailable: false,
+            countsAvailable: true,
           },
           strings: expect.objectContaining({
             activityUnavailable: expect.stringContaining("2026-04-16"),
@@ -970,26 +878,12 @@ describe("SharePage /u/[handle]", () => {
       expect(ownerEl!.props.scoring).toEqual(FAKE_STORED_PROFILE.scoring);
     });
 
-    it("redacts confidence from the stored legacy impact for a visitor, same as a live profile (#1067/#1122)", async () => {
-      mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
-
-      const result = await renderPage();
-
-      expect(mockRedactImpactForVisitor).toHaveBeenCalledWith(FAKE_STORED_PROFILE.legacyImpact);
-      const ownerEl = findElement(result, (el) => el.type === SharePageOwnerContentLazy);
-      const impactProp = ownerEl!.props.impact as Record<string, unknown>;
-      expect("confidence" in impactProp).toBe(false);
-      expect("confidencePenalties" in impactProp).toBe(false);
-    });
-
     it("never calls resolveBadgeVerification, runs no after() side effects, and writes no normal SVG cache", async () => {
       await renderPage();
 
-      // resolveBadgeVerification's own v6 branch delegates to
-      // getPublicProfileVerification (mocked as mockGetPublicProfileVerification);
-      // it is never invoked at all here because resolveBadgeVerification stays
-      // gated on `materialized`, which is null for a stored fallback.
-      expect(mockGetPublicProfileVerification).not.toHaveBeenCalled();
+      // resolveBadgeVerification stays gated on `materialized`, which is
+      // null for a stored fallback — it is never invoked at all here.
+      expect(mockResolveBadgeVerification).not.toHaveBeenCalled();
       expect(mockAfter).not.toHaveBeenCalled();
       expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
       expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
@@ -999,7 +893,7 @@ describe("SharePage /u/[handle]", () => {
       await renderPage();
 
       expect(mockCaptureServerEvent).toHaveBeenCalledWith("badge_stored_fallback", {
-        policyVersion: "v6",
+        policyVersion: "v7.2",
         observedDate: "2026-04-16",
       });
     });
@@ -1072,7 +966,6 @@ describe("SharePage /u/[handle]", () => {
 
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
-      FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ avatarDataUri: undefined }),
     );
   });
@@ -1130,132 +1023,16 @@ describe("SharePage /u/[handle]", () => {
         expect.any(String),
         FAKE_SVG,
         "testuser",
-        expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }), configRevision: 7 }),
+        expect.objectContaining({ configRevision: 7 }),
       );
     });
   });
 
-  // ----------------------------------------------------------------
-  // #1034 — server-side trend/diff fetch (no client fetch waterfall)
-  // ----------------------------------------------------------------
-  describe("server-side trend data (#1034)", () => {
-    const FAKE_TREND = {
-      direction: "improving" as const,
-      avgDelta: 3,
-      compositeValues: [{ date: "2026-04-10", value: 55 }, { date: "2026-04-17", value: 65 }],
-      dimensions: {
-        delivery: { avgDelta: 2, values: [] },
-        quality: { avgDelta: 1, values: [] },
-        consistency: { avgDelta: 0, values: [] },
-        breadth: { avgDelta: -1, values: [] },
-      },
-    };
-
-    const FAKE_DIFF = {
-      direction: "improving" as const,
-      daysBetween: 7,
-      compositeScore: 8,
-      adjustedComposite: 10,
-      confidence: 0,
-      dimensions: { delivery: 5, quality: 2, consistency: 1, breadth: 0 },
-      stats: {
-        commitsTotal: 10,
-        prsMergedCount: 2,
-        prsMergedWeight: 2,
-        reviewsSubmittedCount: 1,
-        issuesClosedCount: 0,
-        reposContributed: 0,
-        activeDays: 3,
-        linesAdded: 100,
-        linesDeleted: 20,
-        totalStars: 0,
-        totalForks: 0,
-        totalWatchers: 0,
-        topRepoShare: 0,
-      },
-      archetype: null,
-      tier: null,
-      profileType: null,
-      penaltyChanges: null,
-    };
-
-    it("redacts confidence fields from anonymous trend diff props", async () => {
-      mockGetTrendData.mockResolvedValue({ trend: FAKE_TREND, diff: FAKE_DIFF });
-
-      const result = await renderPage();
-
-      expect(mockGetTrendData).toHaveBeenCalledWith("testuser");
-
-      const ownerEl = findElement(
-        result,
-        (el) => el.type === SharePageOwnerContentLazy,
-      );
-      expect(ownerEl).not.toBeNull();
-      expect(ownerEl!.props.trend).toEqual(FAKE_TREND);
-      expect(ownerEl!.props.diff).not.toHaveProperty("confidence");
-      expect(ownerEl!.props.diff).not.toHaveProperty("penaltyChanges");
-    });
-
-    it("preserves confidence fields in an owner's trend diff props", async () => {
-      mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
-      mockGetTrendData.mockResolvedValue({ trend: FAKE_TREND, diff: FAKE_DIFF });
-
-      const result = await renderPage();
-      const ownerEl = findElement(
-        result,
-        (el) => el.type === SharePageOwnerContentLazy,
-      );
-
-      expect(ownerEl!.props.diff).toEqual(FAKE_DIFF);
-    });
-
-    it("renders successfully with a graceful empty state when trend history is unavailable", async () => {
-      mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
-
-      const result = await renderPage();
-
-      const ownerEl = findElement(
-        result,
-        (el) => el.type === SharePageOwnerContentLazy,
-      );
-      expect(ownerEl).not.toBeNull();
-      expect(ownerEl!.props.trend).toBeNull();
-      expect(ownerEl!.props.diff).toBeNull();
-      // Impact/stats sections are still present — the page doesn't omit the
-      // dashboard just because history is missing.
-      expect(ownerEl!.props.stats).toEqual(FAKE_MATERIALIZED.stats);
-      // #1067 — the default test session is a visitor (no session), so the
-      // page redacts confidence/confidencePenalties before this crosses
-      // into the client component tree. See "owner-only confidence
-      // redaction (#1067)" below for dedicated coverage of that behavior.
-      expect(ownerEl!.props.impact).toEqual({
-        adjustedComposite: 65,
-        tier: "Solid",
-        archetype: "Builder",
-        dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-        profileType: "collaborative",
-      });
-    });
-
-    it("degrades gracefully (renders, does not throw) when getTrendData itself rejects", async () => {
-      // getTrendData is documented to fail-open internally and never reject,
-      // but this test guards the page-level integration in case that
-      // contract is ever violated in the future — the page must never 500
-      // just because history lookup failed (CLAUDE.md: "A 500 on legal user
-      // input is always a bug").
-      mockGetTrendData.mockRejectedValue(new Error("history store down"));
-
-      const result = await renderPage();
-
-      const ownerEl = findElement(
-        result,
-        (el) => el.type === SharePageOwnerContentLazy,
-      );
-      expect(ownerEl).not.toBeNull();
-      expect(ownerEl!.props.trend).toBeNull();
-      expect(ownerEl!.props.diff).toBeNull();
-    });
-  });
+  // #1034's server-side trend/diff fetch is retired along with
+  // `metrics_snapshots` (#1335 phase 5 — "delete v6"): `SharePageOwnerContent`
+  // draws solely from `scoring`/`receiptExplanation` now, and the page no
+  // longer fetches `getTrendData` at all (CLAUDE.md's non-goals: "No
+  // long-term history charts").
 
   // #1165 (FE-H2) — the route is dynamic (not ISR, see the page.test.ts
   // source-text assertions), so it must use the server Navbar variant and

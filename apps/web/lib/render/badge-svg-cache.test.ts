@@ -1,8 +1,3 @@
-const { cacheTestSelection } = vi.hoisted(() => ({ cacheTestSelection: { enabled: false, machinePolicy: "v6" as const, cacheable: true, capturedAt: 0 } }));
-vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
-  readScoringRenderSelection: async () => cacheTestSelection,
-}));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@/lib/i18n/types";
@@ -17,6 +12,15 @@ vi.mock("@/lib/cache/edge-cache", () => ({
   purgeEdgeCacheTag: vi.fn(),
   badgeEdgeCacheTag: (handle: string) => `badge-${handle.toLowerCase()}`,
   ogImageEdgeCacheTag: (handle: string) => `og-${handle.toLowerCase()}`,
+}));
+
+// #1335 phase 5 — `isScoringImageReceiptCurrent` (called by `writeBadgeSvgCache`
+// on every write) always consults the receipt manifest now; there is no more
+// v6 bypass that skipped it. Defaults to "missing" so a write with no
+// `receiptIdentity` (the common case in this file) is fenced as current.
+const mockDbObservedReceiptManifest = vi.fn();
+vi.mock("@/lib/db/score-receipts-observed", () => ({
+  dbObservedReceiptManifest: (...args: unknown[]) => mockDbObservedReceiptManifest(...args),
 }));
 
 import {
@@ -44,6 +48,7 @@ const purgeEdgeCacheTag = vi.mocked(edgeCache.purgeEdgeCacheTag);
 beforeEach(() => {
   vi.clearAllMocks();
   cacheDel.mockResolvedValue(true);
+  mockDbObservedReceiptManifest.mockResolvedValue({ status: "missing" });
 });
 
 describe("badge-svg-cache", () => {
@@ -61,7 +66,7 @@ describe("badge-svg-cache", () => {
       // Jade palette changed the rendered bytes, so every cached SVG must miss.
       expect(BADGE_RENDER_VARIANT).toBe("ice-terminal-v2");
       expect(key).toBe(
-        `badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:${DEFAULT_LOCALE}`,
+        `badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v7.2:2026-05-01:${DEFAULT_LOCALE}`,
       );
     });
 
@@ -75,7 +80,7 @@ describe("badge-svg-cache", () => {
       const es = buildBadgeSvgCacheKey("octocat", "2026-05-01", "es");
       const en = buildBadgeSvgCacheKey("octocat", "2026-05-01", "en");
       expect(es).not.toBe(en);
-      expect(en).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:en`);
+      expect(en).toBe(`badge:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v7.2:2026-05-01:en`);
     });
 
     it("lowercases the handle so case variants share a cache slot", () => {
@@ -86,7 +91,7 @@ describe("badge-svg-cache", () => {
 
     it("versions and locale-separates OG Redis slots with the renderer", () => {
       expect(buildOgImageCacheKey("Octocat", "2026-05-01", "es")).toBe(
-        "og-image:v5:octocat:ice-terminal-v2:v6:2026-05-01:es",
+        "og-image:v5:octocat:ice-terminal-v2:v7.2:2026-05-01:es",
       );
       expect(buildOgImageCacheKey("Octocat", "2026-05-01", "en")).not.toBe(
         buildOgImageCacheKey("Octocat", "2026-05-01", "es"),
@@ -94,20 +99,20 @@ describe("badge-svg-cache", () => {
     });
 
     it("versions OG image publication by date and Studio revision", () => {
-      expect(buildOgImageCacheVersion("2026-05-01", 42)).toBe("ice-terminal-v2-v6-2026-05-01-r42");
+      expect(buildOgImageCacheVersion("2026-05-01", 42)).toBe("ice-terminal-v2-v7.2-2026-05-01-r42");
       expect(buildOgImageCacheVersion("2026-05-01", null)).toBe(
-        "ice-terminal-v2-v6-2026-05-01-default",
+        "ice-terminal-v2-v7.2-2026-05-01-default",
       );
     });
 
     it("uses the same identity for the cross-instance render lock, including locale", () => {
       expect(buildBadgeSvgRenderLockKey("Octocat", "2026-05-01")).toBe(
-        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:${DEFAULT_LOCALE}`,
+        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v7.2:2026-05-01:${DEFAULT_LOCALE}`,
       );
       // Explicitly the non-default locale, so this stays a real assertion
       // whichever way DEFAULT_LOCALE points.
       expect(buildBadgeSvgRenderLockKey("Octocat", "2026-05-01", "es")).toBe(
-        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v6:2026-05-01:es`,
+        `badge-lock:${CACHE_VERSION}:octocat:${BADGE_RENDER_VARIANT}:v7.2:2026-05-01:es`,
       );
     });
   });
@@ -200,7 +205,7 @@ describe("badge-svg-cache", () => {
         "badge:v2:octocat:warm-amber:2026-05-01",
         "<svg>fresh</svg>",
         "octocat",
-        { scoringSelection: cacheTestSelection },
+        {},
       );
       const ttl = cacheSet.mock.calls[0]![2] as number;
       expect(ttl).toBeGreaterThanOrEqual(86400);
@@ -217,7 +222,7 @@ describe("badge-svg-cache", () => {
         "badge:v2:octocat:warm-amber:2026-05-01",
         "<svg>fresh</svg>",
         "octocat",
-        { scoringSelection: cacheTestSelection },
+        {},
       );
       const ttl = cacheSet.mock.calls[0]![2] as number;
       expect(ttl).toBeLessThanOrEqual(86400 + 7200);
@@ -226,7 +231,7 @@ describe("badge-svg-cache", () => {
     it("does not throw when Redis errors", async () => {
       cacheSet.mockRejectedValueOnce(new Error("redis down"));
       await expect(
-        writeBadgeSvgCache("k", "<svg/>", "testuser", { scoringSelection: cacheTestSelection }),
+        writeBadgeSvgCache("k", "<svg/>", "testuser", {}),
       ).resolves.not.toThrow();
     });
 
@@ -243,7 +248,7 @@ describe("badge-svg-cache", () => {
           "badge:v2:octocat:warm-amber:2026-05-01",
           "<svg>placeholder</svg>",
           "octocat",
-          { ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS, scoringSelection: cacheTestSelection },
+          { ttlSeconds: AVATAR_ABSENT_CACHE_TTL_SECONDS },
         );
 
         expect(cacheSet).toHaveBeenCalledWith(
@@ -264,7 +269,7 @@ describe("badge-svg-cache", () => {
           "badge:v2:octocat:warm-amber:2026-05-01",
           "<svg>fresh</svg>",
           "octocat",
-          { scoringSelection: cacheTestSelection },
+          {},
         );
         const ttl = cacheSet.mock.calls[0]![2] as number;
         expect(ttl).toBeGreaterThanOrEqual(86400);
@@ -298,8 +303,8 @@ describe("badge-svg-cache", () => {
     it("two different handles get different effective TTLs when written to cache (PE-S1)", async () => {
       cacheSet.mockResolvedValue(true);
 
-      await writeBadgeSvgCache("k1", "<svg/>", "alice", { scoringSelection: cacheTestSelection });
-      await writeBadgeSvgCache("k2", "<svg/>", "zz-different-hash-zz", { scoringSelection: cacheTestSelection });
+      await writeBadgeSvgCache("k1", "<svg/>", "alice", {});
+      await writeBadgeSvgCache("k2", "<svg/>", "zz-different-hash-zz", {});
 
       const ttl1 = cacheSet.mock.calls[0]![2] as number;
       const ttl2 = cacheSet.mock.calls[1]![2] as number;
@@ -325,7 +330,8 @@ describe("invalidateBadgeSvgCacheForHandle (#1191, #1266)", () => {
     await invalidateBadgeSvgCacheForHandle("Octocat", "2026-08-30");
 
     const deleted = cacheDel.mock.calls.map(([key]) => key);
-    expect(deleted).toHaveLength(SUPPORTED_LOCALES.length * 8);
+    // #1335 phase 5 — one policy now, not two: 2 days × (SVG + OG) per locale.
+    expect(deleted).toHaveLength(SUPPORTED_LOCALES.length * 4);
     for (const locale of SUPPORTED_LOCALES) {
       expect(deleted).toContain(
         buildBadgeSvgCacheKey("Octocat", "2026-08-30", locale),

@@ -2,13 +2,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 
 const mocks = vi.hoisted(() => ({
-  readScoringRenderSelection: vi.fn(),
   headers: vi.fn(),
   redirect: vi.fn(),
   isStudioEnabled: vi.fn(),
@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   getOptionalServerSessionFromHeaders: vi.fn(),
   getSessionGitHubToken: vi.fn(),
   materializeDisplayProfile: vi.fn(),
-  getPublicProfileVerification: vi.fn(),
+  resolveBadgeVerification: vi.fn(),
   loadStudioConfig: vi.fn(),
   getServerLocale: vi.fn(),
   getServerT: vi.fn(),
@@ -28,8 +28,6 @@ vi.mock("@/lib/render/avatar-outcome", () => ({
   resolveBadgeAvatar: mocks.resolveBadgeAvatar,
   getBadgeAvatarDataUri: mocks.getBadgeAvatarDataUri,
 }));
-
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: mocks.readScoringRenderSelection }));
 
 vi.mock("next/headers", () => ({
   headers: mocks.headers,
@@ -58,8 +56,8 @@ vi.mock("@/lib/profile/materialize-profile", () => ({
   materializeDisplayProfile: mocks.materializeDisplayProfile,
 }));
 
-vi.mock("@/lib/profile/public-profile", () => ({
-  getPublicProfileVerification: mocks.getPublicProfileVerification,
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: mocks.resolveBadgeVerification,
 }));
 
 vi.mock("@/lib/db/studio", () => ({
@@ -85,8 +83,6 @@ vi.mock("./StudioClient", () => ({
   StudioClient: ({
     handle,
     stats,
-    impact,
-    craftResult,
     scoring,
     initialConfig,
     verification,
@@ -95,9 +91,7 @@ vi.mock("./StudioClient", () => ({
   }: {
     handle: string;
     stats: StatsData;
-    impact: ImpactV6Result;
-    craftResult: CraftResult | null;
-    scoring?: ScoreViewModel;
+    scoring: ScoreViewModel;
     initialConfig: { theme?: string; background?: string };
     verification: { hash: string; date: string } | null;
     avatarDataUri?: string;
@@ -110,8 +104,6 @@ vi.mock("./StudioClient", () => ({
         data-handle={handle}
         data-commits={String(stats.commitsTotal)}
         data-scoring={JSON.stringify(scoring)}
-        data-impact-score={String(impact.adjustedComposite)}
-        data-craft-score={String(craftResult?.craftScore ?? "none")}
         data-config-theme={initialConfig.theme ?? "none"}
         data-config-background={initialConfig.background ?? "none"}
         data-verification={verification ? `${verification.hash}:${verification.date}` : "none"}
@@ -151,19 +143,9 @@ const stats = {
   fetchedAt: "2026-01-01T00:00:00.000Z",
 } satisfies StatsData;
 
-const craftResult = {
-  tool: "claude-code",
-  dimensions: { proficiency: 91, effectiveness: 72, sophistication: 83 },
-  craftScore: 82,
-  tier: "Expert",
-  reportPeriod: { start: "2026-08-01", end: "2026-08-27" },
-  computedAt: "2026-08-27T00:00:00.000Z",
-} satisfies CraftResult;
-
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
-  mocks.readScoringRenderSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: 1788868800000 });
   mocks.headers.mockResolvedValue(new Headers());
   mocks.redirect.mockImplementation((url: string) => {
     throw new Error(`redirect:${url}`);
@@ -174,11 +156,10 @@ beforeEach(() => {
   mocks.getSessionGitHubToken.mockResolvedValue("gho_token");
   mocks.materializeDisplayProfile.mockResolvedValue({
     stats,
-    craftResult,
-    displayImpact: { compositeScore: 80 },
+    scoring: makeScoring({ handle: "octocat" }),
     statsComplete: true,
   });
-  mocks.getPublicProfileVerification.mockReturnValue({
+  mocks.resolveBadgeVerification.mockResolvedValue({
     hash: "abc123",
     date: "2026-08-26",
   });
@@ -220,10 +201,12 @@ describe("StudioPage render", () => {
     expect(client.getAttribute("data-commits")).toBe(
       String(DEMO_STATS.commitsTotal),
     );
-    expect(client.getAttribute("data-impact-score")).toBe(
-      String(DEMO_IMPACT.adjustedComposite),
-    );
-    expect(client.getAttribute("data-craft-score")).toBe("none");
+    const demoModel = JSON.parse(client.getAttribute("data-scoring")!);
+    expect(DEMO_IMPACT.composite.kind).toBe("point");
+    expect(demoModel).toMatchObject({
+      policyVersion: "v7.2",
+      composite: { display: 82 },
+    });
     expect(client.getAttribute("data-config-background")).toBe("solid");
     expect(client.getAttribute("data-verification")).toBe("none");
     expect(mocks.isStudioEnabled).toHaveBeenCalledOnce();
@@ -233,18 +216,15 @@ describe("StudioPage render", () => {
     expect(mocks.getSessionGitHubToken).not.toHaveBeenCalled();
     expect(mocks.materializeDisplayProfile).not.toHaveBeenCalled();
     expect(mocks.loadStudioConfig).not.toHaveBeenCalled();
-    expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
+    expect(mocks.resolveBadgeVerification).not.toHaveBeenCalled();
   });
 
-  it("uses an explicitly illustrative current demo model only while observed rendering is selected", async () => {
+  it("uses an explicitly illustrative current demo model unconditionally (#1335 — v7.2 is the one policy)", async () => {
     mocks.isStudioDemoEnabled.mockResolvedValue(true);
     const { default: StudioPage } = await import("./page");
-    const view = render(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
+    render(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
     const model = JSON.parse(screen.getByTestId("studio-client").getAttribute("data-scoring")!);
     expect(model).toMatchObject({ policyVersion: "v7.2", illustrative: true, identity: null, composite: { kind: "point", display: 82 }, archetype: "Balanced" });
-    mocks.readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: 1788868800000 });
-    view.rerender(await StudioPage({ searchParams: Promise.resolve({ demo: "1" }) }));
-    expect(screen.getByTestId("studio-client").getAttribute("data-scoring")).toBeNull();
   });
 
   it("remounts Studio state when navigation crosses the demo boundary", async () => {
@@ -305,9 +285,9 @@ describe("StudioPage render", () => {
     await expect(StudioPage()).rejects.toThrow("redirect:/api/auth/login");
   });
 
-  it("forwards the exact observed model despite contradictory legacy scores", async () => {
+  it("forwards the exact observed model", async () => {
     const fixture = await scoringConsistencyFixture({ craft: 57 });
-    mocks.materializeDisplayProfile.mockResolvedValue({ stats: fixture.stats, displayImpact: fixture.impact, scoring: fixture.model, craftResult, statsComplete: true });
+    mocks.materializeDisplayProfile.mockResolvedValue({ stats: fixture.stats, scoring: fixture.model, statsComplete: true });
     const { default: StudioPage } = await import("./page");
     render(await StudioPage());
     const model = JSON.parse(screen.getByTestId("studio-client").getAttribute("data-scoring")!);
@@ -329,16 +309,14 @@ describe("StudioPage render", () => {
     const client = screen.getByTestId("studio-client");
     expect(client.getAttribute("data-handle")).toBe("octocat");
     expect(client.getAttribute("data-commits")).toBe("42");
-    expect(client.getAttribute("data-craft-score")).toBe("82");
     expect(client.getAttribute("data-config-theme")).toBe("saved-theme");
     expect(client.getAttribute("data-verification")).toBe(
       "abc123:2026-08-26",
     );
     expect(mocks.materializeDisplayProfile).toHaveBeenCalledWith("octocat", {
       token: "gho_token",
-      scoringSelection: expect.objectContaining({ machinePolicy: "v7.2" }),
     });
-    expect(mocks.getPublicProfileVerification).toHaveBeenCalledWith(
+    expect(mocks.resolveBadgeVerification).toHaveBeenCalledWith(
       expect.objectContaining({ stats }),
     );
     expect(mocks.loadStudioConfig).toHaveBeenCalledWith("octocat");
@@ -398,11 +376,9 @@ describe("StudioPage render", () => {
     expect(mocks.materializeDisplayProfile).toHaveBeenCalledTimes(2);
     expect(mocks.materializeDisplayProfile).toHaveBeenNthCalledWith(1, "octocat", {
       token: "gho_token",
-      scoringSelection: expect.objectContaining({ machinePolicy: "v7.2" }),
     });
-    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat", { scoringSelection: mocks.materializeDisplayProfile.mock.calls[0]?.[1].scoringSelection }]);
-    expect(mocks.readScoringRenderSelection).toHaveBeenCalledOnce();
-    expect(mocks.getPublicProfileVerification).not.toHaveBeenCalled();
+    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat", {}]);
+    expect(mocks.resolveBadgeVerification).not.toHaveBeenCalled();
   });
 
   // #1282/#1283 — a first-time owner has no baseline, so a session-token
@@ -414,8 +390,7 @@ describe("StudioPage render", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
         stats: fallbackStats,
-        craftResult,
-        displayImpact: { compositeScore: 80 },
+        scoring: makeScoring({ handle: "octocat" }),
         statsComplete: true,
       });
     const { default: StudioPage } = await import("./page");
@@ -426,8 +401,7 @@ describe("StudioPage render", () => {
     expect(client.getAttribute("data-handle")).toBe("octocat");
     expect(client.getAttribute("data-commits")).toBe("7");
     expect(mocks.materializeDisplayProfile).toHaveBeenCalledTimes(2);
-    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat", { scoringSelection: mocks.materializeDisplayProfile.mock.calls[0]?.[1].scoringSelection }]);
-    expect(mocks.readScoringRenderSelection).toHaveBeenCalledOnce();
+    expect(mocks.materializeDisplayProfile.mock.calls[1]).toEqual(["octocat", {}]);
   });
 
   it.each(["unavailable", "invalid"] as const)("blocks editing when persisted config is %s", async (status) => {

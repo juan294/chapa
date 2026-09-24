@@ -80,7 +80,7 @@ function HoloCard({ variant, intensity, speed, autoAnimate }: HoloCardProps) {
 
       {/* Card content */}
       <div className="relative z-[5] p-6 sm:p-8">
-        <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
+        <BadgeContent stats={MOCK_STATS} scoring={MOCK_IMPACT} />
       </div>
     </div>
   );

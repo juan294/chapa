@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
-import { en } from "@/lib/i18n/dictionaries/en";
-import { resolveTranslation } from "@/lib/i18n/resolve";
-import type { LanguageContextValue } from "@/lib/i18n";
+import { DEMO_IMPACT } from "@/lib/render/demoData";
 import { invalidInput } from "./use-model-context-tools";
 import {
   createExplainDimensionTool,
@@ -11,16 +8,10 @@ import {
   WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
 } from "./shared-tools";
 
-const t: LanguageContextValue["t"] = (key) =>
-  resolveTranslation(key, en) as ReturnType<LanguageContextValue["t"]>;
-
 describe("shared WebMCP tools", () => {
-  it("builds a read-only dimension tool from public-safe props", async () => {
+  it("builds a read-only dimension tool from public-safe props (#1335 — DEMO_IMPACT is a v7.2 ScoreViewModel)", async () => {
     const tool = createExplainDimensionTool({
-      impact: DEMO_IMPACT,
-      stats: DEMO_STATS,
-      craftResult: null,
-      t,
+      scoring: DEMO_IMPACT,
       annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
     });
 
@@ -42,19 +33,17 @@ describe("shared WebMCP tools", () => {
       ),
     );
     expect(result).toMatchObject({
+      policyVersion: "v7.2",
       dimension: "delivery",
-      score: DEMO_IMPACT.dimensions.delivery,
-      tip: expect.any(String),
-      formula: expect.any(String),
+      score: DEMO_IMPACT.dimensions.delivery.kind === "point" ? DEMO_IMPACT.dimensions.delivery.display : null,
+      weight: 0.25,
+      note: expect.any(String),
     });
-    expect(result.subMetrics).toHaveLength(3);
   });
 
   it("returns friendly validation text for an unknown dimension", async () => {
     const tool = createExplainDimensionTool({
-      impact: DEMO_IMPACT,
-      stats: DEMO_STATS,
-      t,
+      scoring: DEMO_IMPACT,
       annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
     });
 
@@ -70,9 +59,7 @@ describe("shared WebMCP tools", () => {
 
   it("passes through whichever annotations the caller provides, without a silent default", () => {
     const untrustedTool = createExplainDimensionTool({
-      impact: DEMO_IMPACT,
-      stats: DEMO_STATS,
-      t,
+      scoring: DEMO_IMPACT,
       annotations: WEBMCP_READ_ONLY_UNTRUSTED_ANNOTATIONS,
     });
     expect(untrustedTool.annotations).toEqual({
@@ -81,9 +68,7 @@ describe("shared WebMCP tools", () => {
     });
 
     const plainTool = createExplainDimensionTool({
-      impact: DEMO_IMPACT,
-      stats: DEMO_STATS,
-      t,
+      scoring: DEMO_IMPACT,
       annotations: WEBMCP_READ_ONLY_ANNOTATIONS,
     });
     expect(plainTool.annotations).toEqual({ readOnlyHint: true });

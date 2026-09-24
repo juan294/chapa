@@ -70,7 +70,7 @@ describe("ledger real transaction contracts", () => {
     const stored = await submit();
     expect((await db().rpc("scoring_v7_ledger_write", { p_owner: owner, p_actor: "stranger", p_action: "retract", p_data: { revisionId: stored.revisionId, rationale: "forged" } })).error?.code).toBe("42501");
   });
-  it("expires only raw bodies while keeping scored extracts and supports idempotent withdrawal", async () => {
+  it("expires only raw bodies while keeping scored extracts, and idempotent withdrawal clears everything", async () => {
     const stored = await submit(); await grant(); await dbWriteEngineeringEvidence(reviewer, review(stored), now());
     const refId = (stored.referenceIds as string[])[0]!;
     const instant = Date.now();
@@ -81,10 +81,15 @@ describe("ledger real transaction contracts", () => {
     const snapshot = await dbReadEngineeringEvidence(owner, owner, createScoringWindow(now()));
     expect(snapshot.references).toHaveLength(1);
     expect(deriveCoreEvidenceV7(projectEngineeringLedger(snapshot, createScoringWindow(now()))).observedCounts.deliveryUnits).toBe(1);
-    for (let i = 0; i < 2; i++) await dbWriteEngineeringEvidence(owner, { action: "withdraw", owner, publicationAcknowledged: true }, now());
+    // Withdrawal is not a ledger action any more (#1335 phase 2) — it is the
+    // same direct RPC scripts/delete-user.ts and the reviewer-grant cascade use.
+    for (let i = 0; i < 2; i++) expect((await db().rpc("scoring_v7_withdraw", { p_owner: owner })).error).toBeNull();
     for (const table of ["scoring_v7_evidence", "scoring_v7_assessments", "scoring_v7_evidence_references", "scoring_v7_raw_artifacts", "scoring_v7_reviewer_grants"]) {
       expect((await db().from(table).select("owner_handle").eq("owner_handle", owner)).data).toEqual([]);
     }
+  });
+  it("retires the ledger withdraw action itself", async () => {
+    await expect(dbWriteEngineeringEvidence(owner, { action: "withdraw", owner }, now())).rejects.toThrow();
   });
 });
 

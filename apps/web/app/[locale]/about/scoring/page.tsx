@@ -1,14 +1,13 @@
-import { cache } from "react";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { ScoringMethodologyContent } from "./ScoringMethodologyContent";
 import { getServerT } from "@/lib/i18n/server";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
 
-// Policy selection must stay live; an hour-long static page could describe
-// archived arithmetic beside a current observed profile.
+// #1335 — v7.2 is the one scoring policy; the selector this page used to
+// read is retired. `force-dynamic` is kept unchanged pending a separate
+// decision on whether this route can revert to static generation now that
+// its content no longer depends on a live per-request selection.
 export const dynamic = "force-dynamic";
-const selectedPolicy = cache(() => readScoringRenderSelection());
 
 export async function generateMetadata({
   params,
@@ -17,21 +16,13 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = getServerT(locale);
-  const selection = await selectedPolicy();
-  const observedTitle = t("about.scoringObserved.metadataTitle") as string;
-  const observedDescription = t("about.scoringObserved.metadataDescription") as string;
+  const title = t("about.scoringObserved.metadataTitle") as string;
+  const description = t("about.scoringObserved.metadataDescription") as string;
   return {
-    title: selection.enabled ? observedTitle : t('about.scoring.metadataTitle') as string,
-    description: selection.enabled ? observedDescription : t('about.scoring.metadataDescription') as string,
-    openGraph: {
-      title: selection.enabled ? observedTitle : t('about.scoring.ogTitle') as string,
-      description: selection.enabled ? observedDescription : t('about.scoring.ogDescription') as string,
-    },
-    twitter: {
-      card: "summary",
-      title: selection.enabled ? observedTitle : t('about.scoring.twitterTitle') as string,
-      description: selection.enabled ? observedDescription : t('about.scoring.twitterDescription') as string,
-    },
+    title,
+    description,
+    openGraph: { title, description },
+    twitter: { card: "summary", title, description },
     alternates: {
       canonical: "/about/scoring",
     },
@@ -45,6 +36,5 @@ export default async function ScoringMethodologyPage({
 }) {
   const { locale } = await params;
   const t = getServerT(locale);
-  const selection = await selectedPolicy();
-  return <ScoringMethodologyContent t={t} observed={selection.enabled} />;
+  return <ScoringMethodologyContent t={t} observed={true} />;
 }

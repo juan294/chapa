@@ -1,5 +1,80 @@
-import type { StatsData, ImpactV6Result, HeatmapDay } from "@chapa/shared";
+import { createScoringWindow, type CoreCountInputs, type StatsData, type HeatmapDay } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
+import { calculateObservedCoreV7 } from "@/lib/impact/observed-v7";
+import { calculateReportCraftInputs } from "@/lib/insights/report-craft";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+
+/**
+ * #1335 phase 5 — v6 is retired. Each archetype guide page (`/archetypes/*`)
+ * still needs a sample whose dimension shape visibly reads as that archetype,
+ * so these build real v7.2 `ScoreViewModel`s from tuned evidence counts
+ * through the production `calculateObservedCoreV7` arithmetic (same
+ * approach as `lib/render/observed-demo-data.ts`), rather than hand-picking
+ * a display score the way the old legacy aggregate constants did.
+ *
+ * `coreArchetypeV7` (lib/impact/v7.ts) derives the archetype purely from the
+ * four core dimensions and never returns "Artificer" — that persona is
+ * conveyed instead by the separate report-Craft channel: the Artificer
+ * sample below shares Balanced-shaped core dimensions but adds a
+ * near-maximal scored Craft report, so its badge draws the fifth (Craft)
+ * spoke the other six archetypes leave unscored.
+ */
+const ARCHETYPE_WINDOW = createScoringWindow("2026-09-08T10:00:00.000Z");
+
+function archetypeCounts(delivery: number, quality: number, weeks: number, projects: number, categories: number): CoreCountInputs {
+  const point = (value: number) => ({ lower: value, upper: value });
+  return {
+    deliveryUnits: point(delivery),
+    quality: {
+      rationale: point(quality),
+      verification: point(quality),
+      review_or_correction: point(quality),
+      outcome_followup: point(quality),
+    },
+    activeIsoWeeks: point(weeks),
+    eligibleProjects: point(projects),
+    eligibleCategories: point(categories),
+  };
+}
+
+/** Core-only sample: no report has been imported, so Craft renders as the
+ * labelled not-observed state rather than a fake numeric vertex. */
+function archetypeScoring(handle: string, delivery: number, quality: number, weeks: number, projects: number, categories: number): ScoreViewModel {
+  const calculation = calculateObservedCoreV7({ policyVersion: "v7.2", window: ARCHETYPE_WINDOW, counts: archetypeCounts(delivery, quality, weeks, projects, categories) });
+  const value = (source: { exact: number; displayValue: number }) => ({ kind: "point" as const, value: source.exact, display: source.displayValue });
+  return {
+    illustrative: true, observedInputs: calculation.inputs, policyVersion: "v7.2", handle, identity: null, window: null,
+    dimensions: {
+      delivery: value(calculation.core.dimensions.delivery),
+      quality: value(calculation.core.dimensions.quality),
+      consistency: value(calculation.core.dimensions.consistency),
+      breadth: value(calculation.core.dimensions.breadth),
+    },
+    composite: value(calculation.core.composite), tier: calculation.core.tier, archetype: calculation.core.archetype,
+    craft: null, reportCraft: { status: "no_report", unlocked: false, report: null },
+    coverage: [], exclusions: [], limitations: [],
+  };
+}
+
+/** Adds a scored report-Craft channel on top of a core sample — used only by
+ * the Artificer persona, whose defining trait is Craft mastery rather than a
+ * dominant core dimension. */
+function withReportCraft(base: ScoreViewModel, total: number, fully: number, mostly: number, failed: number): ScoreViewModel {
+  const craft = calculateReportCraftInputs({
+    policyVersion: "v7.2", classifierRevision: "cc-outcomes-v7.2", window: ARCHETYPE_WINDOW,
+    reportPeriod: { startInclusive: "2026-09-01T00:00:00.000Z", endExclusive: "2026-09-08T00:00:00.000Z" },
+    totalSessions: total, outcomes: { fully_achieved: fully, mostly_achieved: mostly, partially_achieved: 0, not_achieved: failed },
+    unknownSessions: 0, unclassifiedSessions: 0,
+  });
+  if (craft.status !== "valid" || craft.result.status !== "scored") throw new Error("Invalid illustrative archetype report");
+  return {
+    ...base,
+    reportCraft: {
+      status: "scored", unlocked: true,
+      report: { reportRef: "00000000-0000-4000-8000-00000000000a", supersedesReportRef: null, inputs: craft.inputs, result: craft.result },
+    },
+  };
+}
 
 const LEVEL_TO_COUNT: Record<number, number> = {
   0: 0,
@@ -64,24 +139,8 @@ export const BUILDER_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const BUILDER_IMPACT: ImpactV6Result = {
-  handle: "builder",
-  profileType: "collaborative",
-  dimensions: {
-    delivery: 92,
-    quality: 34,
-    consistency: 68,
-    breadth: 38,
-    craft: 55,
-  },
-  archetype: "Builder",
-  compositeScore: 72,
-  confidence: 91,
-  confidencePenalties: [],
-  adjustedComposite: 78,
-  tier: "High",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/* Builder: dominant delivery, evidence counts near the delivery cap. */
+export const BUILDER_SCORING = archetypeScoring("builder", 120, 1, 3, 1, 1);
 
 /* ── Quality Champion: steady review activity, fewer personal commits ── */
 const GUARDIAN_GRID: number[][] = [
@@ -121,24 +180,8 @@ export const GUARDIAN_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const GUARDIAN_IMPACT: ImpactV6Result = {
-  handle: "guardian",
-  profileType: "collaborative",
-  dimensions: {
-    delivery: 38,
-    quality: 90,
-    consistency: 62,
-    breadth: 30,
-    craft: 48,
-  },
-  archetype: "Quality Champion",
-  compositeScore: 68,
-  confidence: 88,
-  confidencePenalties: [],
-  adjustedComposite: 74,
-  tier: "High",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/* Guardian: dominant quality practices, evidence counts near the quality cap. */
+export const GUARDIAN_SCORING = archetypeScoring("guardian", 2, 12, 3, 1, 1);
 
 /* ── Marathoner: remarkably even daily contributions ─────────────────── */
 const MARATHONER_GRID: number[][] = [
@@ -178,24 +221,8 @@ export const MARATHONER_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const MARATHONER_IMPACT: ImpactV6Result = {
-  handle: "marathoner",
-  profileType: "collaborative",
-  dimensions: {
-    delivery: 52,
-    quality: 36,
-    consistency: 94,
-    breadth: 32,
-    craft: 42,
-  },
-  archetype: "Marathoner",
-  compositeScore: 65,
-  confidence: 93,
-  confidencePenalties: [],
-  adjustedComposite: 72,
-  tier: "High",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/* Marathoner: dominant consistency, active-week count near the consistency cap. */
+export const MARATHONER_SCORING = archetypeScoring("marathoner", 2, 1, 40, 1, 1);
 
 /* ── Polymath: spread across many repos, documentation contributor ───── */
 const POLYMATH_GRID: number[][] = [
@@ -235,24 +262,8 @@ export const POLYMATH_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const POLYMATH_IMPACT: ImpactV6Result = {
-  handle: "polymath",
-  profileType: "collaborative",
-  dimensions: {
-    delivery: 48,
-    quality: 40,
-    consistency: 50,
-    breadth: 88,
-    craft: 60,
-  },
-  archetype: "Polymath",
-  compositeScore: 70,
-  confidence: 86,
-  confidencePenalties: [],
-  adjustedComposite: 76,
-  tier: "High",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/* Polymath: dominant breadth, project and category counts at their caps. */
+export const POLYMATH_SCORING = archetypeScoring("polymath", 2, 1, 3, 4, 4);
 
 /* ── Balanced: all dimensions within 15pts, avg ≥ 60 ─────────────────── */
 const BALANCED_GRID: number[][] = [
@@ -292,24 +303,8 @@ export const BALANCED_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const BALANCED_IMPACT: ImpactV6Result = {
-  handle: "balanced",
-  profileType: "collaborative",
-  dimensions: {
-    delivery: 72,
-    quality: 68,
-    consistency: 74,
-    breadth: 66,
-    craft: 70,
-  },
-  archetype: "Balanced",
-  compositeScore: 70,
-  confidence: 90,
-  confidencePenalties: [],
-  adjustedComposite: 76,
-  tier: "High",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/* Balanced: all four dimensions close together, none near its cap. */
+export const BALANCED_SCORING = archetypeScoring("balanced", 30, 6, 16, 2, 2);
 
 /* ── Emerging: early-stage, low activity across all dimensions ───────── */
 const EMERGING_GRID: number[][] = [
@@ -349,24 +344,8 @@ export const EMERGING_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const EMERGING_IMPACT: ImpactV6Result = {
-  handle: "emerging",
-  profileType: "solo",
-  dimensions: {
-    delivery: 22,
-    quality: 8,
-    consistency: 18,
-    breadth: 15,
-    craft: 10,
-  },
-  archetype: "Emerging",
-  compositeScore: 16,
-  confidence: 55,
-  confidencePenalties: [],
-  adjustedComposite: 14,
-  tier: "Emerging",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/* Emerging: every count is low, so mean and max both stay below the archetype floor. */
+export const EMERGING_SCORING = archetypeScoring("emerging", 1, 0, 1, 0, 0);
 
 /* ── Artificer: craft (AI tool mastery) is the dominant dimension ───── */
 const ARTIFICER_GRID: number[][] = [
@@ -406,21 +385,6 @@ export const ARTIFICER_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const ARTIFICER_IMPACT: ImpactV6Result = {
-  handle: "artificer",
-  profileType: "collaborative",
-  dimensions: {
-    delivery: 58,
-    quality: 52,
-    consistency: 55,
-    breadth: 40,
-    craft: 92,
-  },
-  archetype: "Artificer",
-  compositeScore: 68,
-  confidence: 89,
-  confidencePenalties: [],
-  adjustedComposite: 74,
-  tier: "High",
-  computedAt: "2025-01-01T00:00:00Z",
-};
+/* Artificer: Balanced-shaped core plus a near-maximal scored Craft report —
+ * `coreArchetypeV7` never returns "Artificer" itself (see module doc above). */
+export const ARTIFICER_SCORING = withReportCraft(archetypeScoring("artificer", 30, 6, 16, 2, 2), 50, 48, 2, 0);

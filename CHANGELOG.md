@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-24
+
+Every signed-up user is now scored with Impact v7.2, collected reliably. Legacy
+v6 scoring is retired. See `docs/decisions/2026-09-23-universal-v72-no-consent.md`
+(#1335).
+
+### Changed
+
+- **Every signed-up user is scored with v7.2, with no opt-in.** The publication
+  consent step, its settings section and its API actions are removed. A
+  signed-up user is a handle with a GitHub connection. Any other handle's badge
+  says "Not on Chapa yet" and shows no number.
+- **Collection is durable and resumable.** Evidence is collected by a queue of
+  jobs that a new cron (`/api/cron/collect-evidence`, every 5 minutes) advances
+  in short, checkpointed slices. A job survives crashes and deadlines, waits
+  out rate limits, retries temporary errors (up to 8 attempts) and reuses the
+  previous day's evidence. Very active profiles now converge instead of
+  stopping at the old 30-second budget. GitHub search is split by month, so
+  profiles with more than 1,000 merged pull requests are collected in full.
+- **A receipt is issued when all of an owner's connected sources finish.** The
+  first score appears only after collection is complete. Until then, the
+  badge, social image and share page show "Scoring in progress" with progress,
+  or "Scoring paused: action needed" with the reason.
+- **Owners see and act on their scoring status.** `/settings` and the owner's
+  share page show each source's state, progress, resume time and reason, with
+  Retry and Reconnect actions. New endpoint: `GET/POST /api/scoring/status`.
+  Refresh and generate report the scoring status instead of reloading silently.
+- **Legacy v6 scoring is removed.** The `scoring_v7_rendering` selector, the v6
+  engine, snapshot history and v6 verification records are no longer used. The
+  landing standings, dashboard, Studio, emails, APIs and MCP tools read the
+  v7.2 receipt or the scoring status. The admin table drops the seven v6-only
+  columns.
+- Migrations `054_remove_publication_consent.sql`,
+  `055_scoring_collection_queue.sql` and `056_scoring_status_and_fan_in.sql`
+  must be applied before this release goes live. A contract migration that
+  drops the retired tables and columns follows in a later release.
+
+### Removed
+
+- **Retired v6 verification codes return HTTP 410** with an explanation, on
+  `/verify/<code>`, `/api/verify/<code>` and the `verify_badge` tool. Current
+  badges use v7.2 receipt codes.
+- The `consent` and `withdraw` evidence actions now answer `400 retired_action`.
+
+### Fixed
+
+- **A collector's own budget or deadline is no longer recorded as a source
+  error.** It is recorded as incomplete collection and continued. Every stop
+  now carries a structured diagnostic (provider, operation, HTTP status, stop
+  kind), without URLs or credentials.
+- **No silent failure.** Every issuance outcome is recorded, and a failed
+  collection or issuance raises an alert. `/api/health` reports a
+  `scoringQueue` block.
+- **One missing item no longer blocks a score.** A pull request, file list or
+  review that returns 401, 403 or 404 is recorded as partial coverage while the
+  rest is collected. Only a failed identity check asks the owner to reconnect.
+- **An empty collection never replaces an established score.** A recompute
+  with zero evidence keeps the last receipt, dated, and records the reason
+  `empty_evidence`.
+- **Studio's live controls are anchored to the hydrated tree**, so a brief
+  stale copy left over from server rendering is never read or acted on (#1329).
+
 ## [3.0.3] - 2026-09-23
 
 ### Fixed

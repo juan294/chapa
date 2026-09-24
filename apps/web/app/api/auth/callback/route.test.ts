@@ -14,10 +14,12 @@ const {
   mockClearStateCookie,
   mockRateLimit,
   mockDbUpsertUser,
+  mockDbEnsureScoringSubject,
   mockAddContact,
   mockCaptureServerError,
   mockStoreGitHubToken,
   mockAfter,
+  mockEnqueueCollection,
 } = vi.hoisted(() => ({
   mockExchangeCodeForToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
@@ -28,10 +30,12 @@ const {
   mockClearStateCookie: vi.fn(),
   mockRateLimit: vi.fn(),
   mockDbUpsertUser: vi.fn(),
+  mockDbEnsureScoringSubject: vi.fn(),
   mockAddContact: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockStoreGitHubToken: vi.fn(),
   mockAfter: vi.fn((cb: () => Promise<void>) => { void cb(); }),
+  mockEnqueueCollection: vi.fn(),
 }));
 
 vi.mock("next/server", async (importOriginal) => ({
@@ -64,6 +68,14 @@ vi.mock("@/lib/http/client-ip", () => ({
 
 vi.mock("@/lib/db/users", () => ({
   dbUpsertUser: mockDbUpsertUser,
+}));
+
+vi.mock("@/lib/db/scoring-subjects", () => ({
+  dbEnsureScoringSubject: mockDbEnsureScoringSubject,
+}));
+
+vi.mock("@/lib/collection/enqueue", () => ({
+  enqueueCollection: mockEnqueueCollection,
 }));
 
 vi.mock("@/lib/email/audience", () => ({
@@ -117,6 +129,8 @@ function allowRateLimit() {
   mockConsumeOauthState.mockResolvedValue(true);
   mockFetchGitHubUserEmail.mockResolvedValue(null);
   mockDbUpsertUser.mockResolvedValue(true);
+  mockDbEnsureScoringSubject.mockResolvedValue(true);
+  mockEnqueueCollection.mockResolvedValue([]);
   mockAddContact.mockResolvedValue(undefined);
   mockCaptureServerError.mockResolvedValue(undefined);
   mockStoreGitHubToken.mockResolvedValue(true);
@@ -986,6 +1000,100 @@ describe("GET /api/auth/callback — audience sync", () => {
     );
 
     // Should still redirect successfully despite dbUpsertUser failure
+    expect(res.status).toBe(307);
+    // Flush microtasks so .catch() runs
+    await new Promise((r) => setTimeout(r, 0));
+    // Error must be tracked — not silently swallowed
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error: expect.any(Error),
+      }),
+    );
+  });
+
+  it("registers a scoring subject for the signed-up handle after dbUpsertUser", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockDbEnsureScoringSubject).toHaveBeenCalledWith("octocat");
+    expect(mockDbUpsertUser.mock.invocationCallOrder[0]).toBeLessThan(mockDbEnsureScoringSubject.mock.invocationCallOrder[0]!);
+  });
+
+  it("enqueues a signup collection job for the signed-up handle after the subject is registered (#1335 phase 4)", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockEnqueueCollection).toHaveBeenCalledWith("octocat", "signup");
+    expect(mockDbEnsureScoringSubject.mock.invocationCallOrder[0]).toBeLessThan(mockEnqueueCollection.mock.invocationCallOrder[0]!);
+  });
+
+
+  it("never enqueues collection when subject registration itself failed", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+    mockDbEnsureScoringSubject.mockResolvedValue(false);
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockEnqueueCollection).not.toHaveBeenCalled();
+  });
+
+  it("swallows dbEnsureScoringSubject rejection and calls captureServerError (fire-and-forget)", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+    // dbEnsureScoringSubject rejects — should be captured, not silently discarded
+    mockDbEnsureScoringSubject.mockRejectedValue(new Error("subject registration down"));
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    // Should still redirect successfully despite dbEnsureScoringSubject failure
     expect(res.status).toBe(307);
     // Flush microtasks so .catch() runs
     await new Promise((r) => setTimeout(r, 0));

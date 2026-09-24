@@ -3,9 +3,7 @@
 import dynamic from "next/dynamic";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 import type { ReceiptExplanation } from "@/lib/dashboard/receipt-explanation";
-import type { ClientImpactV6Result, CraftResult, Platform, StatsData } from "@chapa/shared";
-import type { TrendSummary } from "@/lib/history/trend";
-import type { ClientSnapshotDiff } from "@/lib/history/diff";
+import type { Platform, StatsData } from "@chapa/shared";
 import { useTranslation } from "@/lib/i18n";
 
 /** Same visible fill as the route's `loading.tsx` breakdown skeleton. */
@@ -48,13 +46,6 @@ const SharePageOwnerContent = dynamic(
 interface Props {
   handle: string;
   stats: StatsData | null;
-  // #1067 — the server passes a redacted PublicImpactV6Result (no
-  // confidence/confidencePenalties keys) for non-owner visitors, and the
-  // full ImpactV6Result for the owner.
-  impact: ClientImpactV6Result | null;
-  craftResult?: CraftResult | null;
-  trend?: TrendSummary | null;
-  diff?: ClientSnapshotDiff | null;
   // #1165 (FE-H2/UX-M5) — mechanically threaded through to
   // SharePageOwnerContent; see that component for details. This wrapper has
   // no logic of its own beyond the next/dynamic lazy split.
@@ -62,7 +53,8 @@ interface Props {
   embedMarkdown?: string;
   embedHtml?: string;
   receiptExplanation?: ReceiptExplanation | null;
-  scoring?: ScoreViewModel | null;
+  /** #1335 — v7.2 is the one scoring policy this surface renders. */
+  scoring: ScoreViewModel;
   /** #1331 — set when `stats`/`impact` are a durable stored-badge projection
    *  (live materialization was unavailable), never a real-time fetch. Drives
    *  the breakdown's stale notice and hides the activity heatmap, which would

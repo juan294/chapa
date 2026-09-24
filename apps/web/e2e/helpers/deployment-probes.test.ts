@@ -39,4 +39,17 @@ describe("assertRenderableBadgeBody", () => {
     const body = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>';
     expect(() => assertRenderableBadgeBody(body)).toThrow();
   });
+
+  // #1335: a subject with no drawable receipt renders a real product state,
+  // not the error artifact. Right after a release no subject has a receipt
+  // yet, so the production probe must accept these states.
+  it.each(["unregistered", "collecting", "action_needed"])("accepts the %s scoring-state badge", (state) => {
+    const body = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" data-chapa-state="${state}"><text>octocat</text></svg>`;
+    expect(() => assertRenderableBadgeBody(body)).not.toThrow();
+  });
+
+  it("rejects the unavailable authority-failure badge", () => {
+    const body = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" data-chapa-state="unavailable"><text>x</text></svg>';
+    expect(() => assertRenderableBadgeBody(body)).toThrow();
+  });
 });

@@ -7,10 +7,11 @@ import { isGitHubUserNotFound, type GitHubUserNotFound } from "./not-found";
 import { assessRawFetchIntegrity } from "./stats-integrity";
 
 // v7 consumers receive dated evidence; fetchStats below remains the explicit v6 reader.
-/** @public Compatibility export for v7 evidence consumers. */
-export { fetchGitHubEvidence } from "./evidence";
-/** @public Compatibility types for v7 evidence consumers. */
-export type { GitHubEvidenceOptions, GitHubEvidenceResult } from "./evidence";
+/** @public Checkpointed, resumable collector slice API (#1335 phase 3) --
+ * the only GitHub collection implementation since the single-run
+ * `fetchGitHubEvidence` was removed with the durable queue worker's rollout.
+ */
+export { collectGitHubSlice, githubMergedSearchRanges } from "./evidence";
 
 // ---------------------------------------------------------------------------
 // fetchStats — main aggregation function

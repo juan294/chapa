@@ -1,8 +1,12 @@
 /**
  * Supabase data access — admin dashboard queries.
  *
- * Queries the `admin_users` view (users LEFT JOIN latest_snapshots)
- * with server-side pagination, sorting, and filtering.
+ * Queries the `admin_users_observed` view (#1335 phase 5 — the only
+ * remaining policy; the pre-release view still computes a v6 CASE fallback
+ * for subjects with no current receipt, but this module deliberately never
+ * reads those fallback columns, only the `current_*` receipt projection, so
+ * it is forward-compatible with the post-release contract migration that
+ * rebuilds this view from `users` directly with no fallback at all).
  * All operations fail-open (return empty results when DB is unavailable).
  */
 
@@ -10,16 +14,14 @@ import { getSupabase } from "./supabase";
 import { parseRows } from "./parse-row";
 
 // ---------------------------------------------------------------------------
-// Row type (matches admin_users view columns)
+// Row type (matches admin_users_observed view columns this module reads)
 // ---------------------------------------------------------------------------
 
 interface AdminUserRow {
-  current_policy_version?: "v6" | "v7.2";
   current_display_score?: number | null;
   current_exact_score?: number | null;
   current_tier?: string | null;
   current_archetype?: string | null;
-  current_confidence?: number | null;
   current_snapshot_date?: string | null;
   current_fetched_at?: string | null;
   current_revision_id?: string | null;
@@ -28,23 +30,6 @@ interface AdminUserRow {
   registered_at: string;
   display_name: string | null;
   avatar_url: string | null;
-  snapshot_date: string | null;
-  snapshot_captured_at: string | null;
-  commits_total: number | null;
-  prs_merged_count: number | null;
-  reviews_submitted: number | null;
-  repos_contributed: number | null;
-  active_days: number | null;
-  total_stars: number | null;
-  archetype: string | null;
-  tier: string | null;
-  adjusted_composite: number | null;
-  composite_score: number | null;
-  confidence: number | null;
-  building: number | null;
-  guarding: number | null;
-  consistency_score: number | null;
-  breadth: number | null;
 }
 
 const ADMIN_REQUIRED_KEYS: readonly (keyof AdminUserRow)[] = [
@@ -60,12 +45,6 @@ export type AdminSortField =
   | "handle"
   | "adjustedComposite"
   | "rawScore"
-  | "confidence"
-  | "commitsTotal"
-  | "prsMergedCount"
-  | "reviewsSubmittedCount"
-  | "activeDays"
-  | "totalStars"
   | "tier"
   | "archetype"
   | "registeredAt"
@@ -82,7 +61,7 @@ export interface AdminUserQuery {
 }
 
 export interface AdminUserEntry {
-  policyVersion?: "v6" | "v7.2";
+  policyVersion?: "v7.2";
   exactScore?: number | null;
   identity?: { revisionId: string; contentHash: string } | null;
   handle: string;
@@ -91,17 +70,10 @@ export interface AdminUserEntry {
   registeredAt: string;
   lastSnapshotDate: string | null;
   fetchedAt: string | null;
-  commitsTotal: number | null;
-  prsMergedCount: number | null;
-  reviewsSubmittedCount: number | null;
-  activeDays: number | null;
-  reposContributed: number | null;
-  totalStars: number | null;
   archetype: string | null;
   tier: string | null;
   adjustedComposite: number | null;
   rawScore: number | null;
-  confidence: number | null;
 }
 
 export interface AdminUserResult {
@@ -116,24 +88,19 @@ export interface AdminUserResult {
 // Sort field → DB column mapping
 // ---------------------------------------------------------------------------
 
+/** Sort columns on the current receipt projection. */
 const SORT_COLUMN_MAP: Record<AdminSortField, string> = {
   handle: "handle",
-  adjustedComposite: "adjusted_composite",
-  rawScore: "composite_score",
-  confidence: "confidence",
-  commitsTotal: "commits_total",
-  prsMergedCount: "prs_merged_count",
-  reviewsSubmittedCount: "reviews_submitted",
-  activeDays: "active_days",
-  totalStars: "total_stars",
-  tier: "tier",
-  archetype: "archetype",
+  adjustedComposite: "current_display_score",
+  rawScore: "current_display_score",
+  tier: "current_tier",
+  archetype: "current_archetype",
   registeredAt: "registered_at",
-  lastSnapshotDate: "snapshot_date",
+  lastSnapshotDate: "current_snapshot_date",
 };
 
 function mapSortField(field: AdminSortField): string {
-  return SORT_COLUMN_MAP[field] ?? "adjusted_composite";
+  return SORT_COLUMN_MAP[field];
 }
 
 // ---------------------------------------------------------------------------
@@ -141,35 +108,23 @@ function mapSortField(field: AdminSortField): string {
 // ---------------------------------------------------------------------------
 
 function rowToAdminUser(row: AdminUserRow): AdminUserEntry {
+  const hasReceipt = row.current_revision_id != null && row.current_content_hash != null;
+
   return {
     handle: row.handle,
     displayName: row.display_name,
     avatarUrl: row.avatar_url ?? `https://avatars.githubusercontent.com/${row.handle}`,
     registeredAt: row.registered_at,
-    lastSnapshotDate: row.snapshot_date,
-    fetchedAt: row.snapshot_captured_at,
-    commitsTotal: row.commits_total,
-    prsMergedCount: row.prs_merged_count,
-    reviewsSubmittedCount: row.reviews_submitted,
-    activeDays: row.active_days,
-    reposContributed: row.repos_contributed,
-    totalStars: row.total_stars,
-    archetype: row.archetype,
-    tier: row.tier,
-    adjustedComposite: row.adjusted_composite,
-    rawScore: row.composite_score,
-    confidence: row.confidence,
-    ...(row.current_policy_version && {
-      policyVersion: row.current_policy_version,
-      adjustedComposite: row.current_display_score ?? null,
-      rawScore: row.current_policy_version === "v7.2" ? row.current_display_score ?? null : row.composite_score,
+    lastSnapshotDate: hasReceipt ? row.current_snapshot_date ?? null : null,
+    fetchedAt: hasReceipt ? row.current_fetched_at ?? null : null,
+    archetype: hasReceipt ? row.current_archetype ?? null : null,
+    tier: hasReceipt ? row.current_tier ?? null : null,
+    adjustedComposite: hasReceipt ? row.current_display_score ?? null : null,
+    rawScore: hasReceipt ? row.current_display_score ?? null : null,
+    ...(hasReceipt && {
+      policyVersion: "v7.2" as const,
       exactScore: row.current_exact_score ?? null,
-      tier: row.current_tier ?? null,
-      archetype: row.current_archetype ?? null,
-      confidence: row.current_confidence ?? null,
-      lastSnapshotDate: row.current_snapshot_date ?? null,
-      fetchedAt: row.current_fetched_at ?? null,
-      identity: row.current_revision_id && row.current_content_hash ? { revisionId: row.current_revision_id, contentHash: row.current_content_hash } : null,
+      identity: { revisionId: row.current_revision_id!, contentHash: row.current_content_hash! },
     }),
   };
 }
@@ -211,13 +166,12 @@ const EMPTY_RESULT: AdminUserResult = {
 };
 
 /**
- * Get paginated admin user data from the `admin_users` view.
+ * Get paginated admin user data from the `admin_users_observed` view.
  * Supports sorting, search (ILIKE on handle/display_name), and
  * tier/archetype filtering. Returns empty result on error (fail-open).
  */
 export async function dbGetAdminUsers(
   query: AdminUserQuery,
-  options: { observed?: boolean } = {},
 ): Promise<AdminUserResult> {
   const db = getSupabase();
   if (!db) return EMPTY_RESULT;
@@ -229,7 +183,7 @@ export async function dbGetAdminUsers(
   const to = from + limit - 1;
 
   try {
-    let q = db.from(options.observed ? "admin_users_observed" : "admin_users").select("*", { count: "exact" });
+    let q = db.from("admin_users_observed").select("*", { count: "exact" });
 
     // Search filter: ILIKE on handle OR display_name. The term is run through
     // escapeIlike() first, which strips PostgREST filter-string delimiters
@@ -239,27 +193,16 @@ export async function dbGetAdminUsers(
       q = q.or(`handle.ilike.%${term}%,display_name.ilike.%${term}%`);
     }
 
-    // Tier filter
-    if (query.tier) {
-      q = q.eq(options.observed ? "current_tier" : "tier", query.tier);
-    }
+    if (query.tier) q = q.eq("current_tier", query.tier);
+    if (query.archetype) q = q.eq("current_archetype", query.archetype);
 
-    // Archetype filter
-    if (query.archetype) {
-      q = q.eq(options.observed ? "current_archetype" : "archetype", query.archetype);
-    }
-
-    // Sorting — nulls last for snapshot columns
-    const observedSort: Partial<Record<AdminSortField, string>> = { adjustedComposite: "current_display_score", rawScore: "current_display_score", confidence: "current_confidence", tier: "current_tier", archetype: "current_archetype", lastSnapshotDate: "current_snapshot_date" };
-    const sortCol = options.observed ? observedSort[query.sort] ?? mapSortField(query.sort) : mapSortField(query.sort);
+    const sortCol = mapSortField(query.sort);
     q = q.order(sortCol, {
       ascending: query.dir === "asc",
       nullsFirst: false,
     });
+    if (query.sort !== "handle") q = q.order("handle", { ascending: true });
 
-    if (options.observed && query.sort !== "handle") q = q.order("handle", { ascending: true });
-
-    // Pagination
     q = q.range(from, to);
 
     const { data, error, count } = await q;
@@ -269,7 +212,7 @@ export async function dbGetAdminUsers(
     const rows = parseRows<AdminUserRow>(
       data,
       ADMIN_REQUIRED_KEYS,
-      "admin_users",
+      "admin_users_observed",
     );
 
     return {

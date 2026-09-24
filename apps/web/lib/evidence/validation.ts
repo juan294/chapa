@@ -50,8 +50,11 @@ const assessmentCommand = z.strictObject({
 const command = z.discriminatedUnion("action", [claimCommand, assessmentCommand,
   z.strictObject({ action: z.literal("grant"), owner: handle, reviewer: handle, enabled: z.boolean() }),
   z.strictObject({ action: z.literal("retract"), owner: handle, revisionId: z.uuid(), rationale: text }),
-  z.strictObject({ action: z.literal("consent"), owner: handle, enabled: z.boolean(), publicationAcknowledged: z.literal(true) }),
-  z.strictObject({ action: z.literal("withdraw"), owner: handle, publicationAcknowledged: z.literal(true) }),
+  // `withdraw` is a retired action (publication is not opt-in, so there is
+  // nothing left to withdraw) — kept recognizable here only so the route can
+  // answer with a specific `retired_action` rather than a generic parse
+  // failure. `consent` is gone entirely: no caller can construct one anymore.
+  z.strictObject({ action: z.literal("withdraw"), owner: handle }),
 ]);
 export type LedgerCommand = z.infer<typeof command>;
 export type ClaimCommand = z.infer<typeof claimCommand>;

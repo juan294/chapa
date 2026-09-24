@@ -18,14 +18,14 @@ import { getCachedReceiptSnapshotV7 } from "@/lib/cache/snapshot-cache";
 import { materializeScoreReceiptV7, readScoreReceiptV7, RECEIPT_SOURCE_PROVIDERS } from "./score-receipt-v7";
 
 const referenceTime = "2026-09-01T12:00:00.000Z";
-const consentedLedger = {
-  ownerId: "alice", publicConsent: true, claims: [], assessments: [], references: [],
+const ledgerSnapshot = {
+  ownerId: "alice", claims: [], assessments: [], references: [],
 };
 
 
 const zero = { lower: 0, upper: 0 };
 const zeroCriterion = { input: zero, cap: 8, clamped: zero, normalized: zero, multiplier: 25, weighted: zero };
-/** The shape `dbReadCraftV7` returns for a consented subject with no eligible
+/** The shape `dbReadCraftV7` returns for a registered subject with no eligible
  * episodes: a real trace, an explicit not_observed result. */
 function emptyCraftPortfolio() {
   const window = createScoringWindow(referenceTime);
@@ -45,7 +45,7 @@ async function snapshot() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(dbReadEngineeringEvidence).mockResolvedValue(consentedLedger as never);
+  vi.mocked(dbReadEngineeringEvidence).mockResolvedValue(ledgerSnapshot as never);
   vi.mocked(selectSourceEvidence).mockResolvedValue({ status: "unlinked" } as never);
   vi.mocked(dbReadCraftV7).mockRejectedValue(new Error("no portfolio"));
   vi.mocked(dbPublishReceiptV7).mockImplementation(async () => ({ status: "inserted", snapshot: await snapshot() }) as never);
@@ -65,14 +65,6 @@ describe("v7 receipt materialization", () => {
     const [, , envelope] = vi.mocked(dbPublishReceiptV7).mock.calls[0]!;
     expect(envelope.receipt.window.referenceTime).toBe(referenceTime);
     expect(envelope.receipt.recordedAt).toBe(referenceTime);
-  });
-
-  it("publishes nothing without current public evidence consent", async () => {
-    vi.mocked(dbReadEngineeringEvidence).mockResolvedValue({ ...consentedLedger, publicConsent: false } as never);
-
-    expect(await materializeScoreReceiptV7("alice", { referenceTime })).toEqual({ status: "unavailable", reason: "not_consented" });
-    expect(selectSourceEvidence).not.toHaveBeenCalled();
-    expect(dbPublishReceiptV7).not.toHaveBeenCalled();
   });
 
   it("discloses an unconnected provider as an exclusion instead of dropping it", async () => {
@@ -238,7 +230,7 @@ describe("v7 receipt materialization", () => {
  *
  * Before this, every call minted `revision: 1` with no supersedes link and its
  * own verification token. Once the hourly warm-cache cron began calling this,
- * that was roughly 24 unrelated root receipts per consented subject per day,
+ * that was roughly 24 unrelated root receipts per registered subject per day,
  * each claiming to be the first.
  */
 describe("revision identity", () => {

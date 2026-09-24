@@ -1,18 +1,16 @@
 /** Disposable local data only. No app import or production authentication bypass. */
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import type { BrowserContext } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
-import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY, type StatsData } from '@chapa/shared';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { DEFAULT_BADGE_CONFIG, CONTRIBUTION_QUERY, REPOSITORY_STATS_QUERY, canonicalJson, canonicalSha256, createScoringWindow } from '@chapa/shared';
 import { buildRedesignGitHubFixture } from './redesign-github';
 import { makeFullStats } from '../../lib/test-helpers/fixtures';
 import { DEMO_STATS } from '../../lib/render/demoData';
-import { SCORING_POINT_HANDLES, fixtureStatsCacheEntry } from "./scoring-point-fixtures";
-import { computeImpactV6 } from '../../lib/impact/v6';
-import { buildPayload, computeHash } from '../../lib/verification/hmac-payload';
-import { VERIFICATION_RECORD_TTL_MS } from '../../lib/verification/constants';
-import { toDateString } from '../../lib/utils/date';
+import { SCORING_POINT_HANDLES, COLLECTION_QUEUE_HANDLES, fixtureStatsCacheEntry } from "./scoring-point-fixtures";
+import { observedReceiptFixture } from '../../lib/history/__fixtures__/receipts-observed';
+import { observedSemanticIdentity } from '../../lib/profile/receipt-semantic-identity';
 
 export const REDESIGN_OWNERS = ['en', 'es'].flatMap(locale => ['light', 'dark'].flatMap(theme => ['desktop', 'mobile'].map(device => `chapa-redesign-${locale}-${theme}-${device}`)));
 export const REDESIGN_HANDLES = ['octocat', 'juan294', 'chapa-redesign-owner', 'chapa-redesign-visitor', ...REDESIGN_OWNERS];
@@ -28,7 +26,7 @@ export function assertLocalFixtureTarget(url: string): void {
 
 export async function setRedesignSession(context: BrowserContext, baseURL: string, handle: string): Promise<void> {
   assertLocalFixtureTarget(baseURL);
-  if (!([...REDESIGN_HANDLES, ...SCORING_POINT_HANDLES] as readonly string[]).includes(handle)) throw new Error('Unknown redesign session');
+  if (!([...REDESIGN_HANDLES, ...SCORING_POINT_HANDLES, ...COLLECTION_QUEUE_HANDLES] as readonly string[]).includes(handle)) throw new Error('Unknown redesign session');
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error('Local session secret required');
   const iv = randomBytes(12);
@@ -39,27 +37,43 @@ export async function setRedesignSession(context: BrowserContext, baseURL: strin
 }
 
 /**
- * The exact `verification_records` row a live render of `handle` will
- * independently derive for `stats`, via the same pure
- * `computeImpactV6`/`buildPayload`/`computeHash` the production path uses
- * (`lib/profile/public-profile.ts#getPublicProfileVerification`,
- * `lib/verification/hmac.ts#generateVerificationCode`,
- * `lib/db/verification.ts#dbStoreVerification`'s column mapping) — never a
- * hand-picked hash or score set. See the call site in
- * `bootstrapRedesignFixtures` for why this must be pre-seeded at all.
+ * #1335 — seeds and publishes a real v7.2 observed receipt for `handle`,
+ * then issues its verification exactly the way `scoring_v7_issue_verification`
+ * does for the `scoring-point` fixture handles: `scoring_observed_publish_receipt`
+ * followed by `scoring_v7_issue_verification`, returning the same
+ * `v7.<revisionId>.<hexSignature>` token the share page's verification strip
+ * links to. Replaces the old hand-derived `computeImpactV6`/`buildPayload`/
+ * `computeHash` v6 `verification_records` row: current receipt authenticity
+ * (not a legacy hash) is what a live render of `handle` now independently
+ * derives.
  */
-export function buildDerivedVerificationRow(stats: StatsData, verificationSecret: string, now: Date = new Date()): Record<string, unknown> {
-  const impact = computeImpactV6(stats);
-  const verificationDate = toDateString(now);
-  const hash = computeHash(buildPayload(stats, impact, verificationDate), verificationSecret);
-  return {
-    hash, handle: stats.handle.toLowerCase(), display_name: stats.displayName ?? null,
-    adjusted_composite: impact.adjustedComposite, confidence: impact.confidence, tier: impact.tier, archetype: impact.archetype,
-    profile_type: impact.profileType, building: impact.dimensions.delivery, guarding: impact.dimensions.quality,
-    consistency: impact.dimensions.consistency, breadth: impact.dimensions.breadth,
-    commits_total: stats.commitsTotal, prs_merged_count: stats.prsMergedCount, reviews_submitted: stats.reviewsSubmittedCount,
-    generated_at: verificationDate, expires_at: new Date(now.getTime() + VERIFICATION_RECORD_TTL_MS).toISOString(),
+export async function issueObservedVerification(
+  db: SupabaseClient,
+  handle: string,
+  now: Date = new Date(),
+): Promise<string> {
+  const signing = process.env.CHAPA_VERIFICATION_SECRET;
+  if (!signing) throw new Error('Explicit local verification secret required to pre-seed the read-only smoke probe record');
+  const check = async <T extends { error: unknown }>(operation: PromiseLike<T>): Promise<T> => {
+    const result = await operation;
+    if (result.error) throw result.error;
+    return result;
   };
+  await check(db.rpc('scoring_v7_ensure_subject', { p_owner: handle }));
+  const window = createScoringWindow(now.toISOString());
+  const envelope = await observedReceiptFixture({ referenceTime: window.referenceTime, craft: { status: 'no_report', unlocked: false, report: null } });
+  const receipt = envelope.receipt;
+  const coreDigest = await canonicalSha256({ fixture: 'redesign-verification-v1', counts: receipt.inputs.counts });
+  await check(db.rpc('scoring_observed_publish_receipt', {
+    p_owner: handle, p_actor: handle, p_receipt: receipt, p_canonical: canonicalJson(receipt),
+    p_semantic_digest: await observedSemanticIdentity(coreDigest, receipt.craft), p_core_semantic_digest: coreDigest,
+  }));
+  const signature = createHmac('sha256', signing).update(canonicalJson(receipt)).digest('hex');
+  await check(db.rpc('scoring_v7_issue_verification', {
+    p_owner: handle, p_actor: handle, p_revision: receipt.revisionId, p_key_version: 'v7-1',
+    p_signature: signature, p_canonical: canonicalJson(receipt),
+  }));
+  return `v7.${receipt.revisionId}.${signature}`;
 }
 
 export function redesignFixtureClient() {
@@ -78,17 +92,53 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
     if (result.error) throw result.error;
     return result;
   };
+  // #1335 phase 5 — "Receipt binding mismatch" from
+  // scoring_v7_issue_verification was traced to leftover scoring_v7_receipts/
+  // scoring_v7_subjects rows from a PRIOR run of this same launcher: the
+  // cleanup() below now withdraws every receiptOwner, which removes the root
+  // cause. This retry is kept as cheap defense-in-depth against any other
+  // transient PostgREST error shaped like the same message, not as the fix.
+  const issueObservedVerificationRetrying = async (handle: string, now: Date): Promise<string> => {
+    const isBindingMismatch = (error: unknown): boolean => {
+      const message = error && typeof error === 'object' && 'message' in error ? String((error as { message: unknown }).message) : '';
+      return message.includes('Receipt binding mismatch');
+    };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await issueObservedVerification(db, handle, now);
+      } catch (error) {
+        if (attempt >= 2 || !isBindingMismatch(error)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+      }
+    }
+  };
   const existing = await check(db.from('users').select('handle').in('handle', [...REDESIGN_HANDLES]));
   if (existing.data?.length) throw new Error('Refusing to overwrite existing redesign users');
   const flags = await check(db.from('feature_flags').select('*').in('key', flagKeys));
+  // #1335 phase 5 — octocat and REDESIGN_OWNERS now publish a real v7.2
+  // receipt (issueObservedVerification*), same as the SCORING_POINT_HANDLES/
+  // COLLECTION_QUEUE_HANDLES fixtures already do. Without an explicit
+  // withdraw, scoring_v7_receipts/scoring_v7_subjects rows for these handles
+  // never get cleaned (unlike users/studio_configs/etc. above), so a LATER
+  // run's fresh publish for the SAME handle collides with the leftover row
+  // and fails deterministically with "Receipt binding mismatch" -- this was
+  // observed as a residue bug, not a transient flake, once octocat was no
+  // longer the only owner receiving a receipt.
+  const receiptOwners = ['octocat', ...REDESIGN_OWNERS];
   const cleanup = async () => {
     const errors: unknown[] = [];
+    for (const owner of receiptOwners) await check(db.rpc('scoring_v7_withdraw', { p_owner: owner })).catch(error => errors.push(error));
     const tables = ['verification_records', 'user_platforms', 'studio_configs', 'metrics_snapshots', 'users'];
     for (const table of tables) {
       await check(db.from(table).delete().in('handle', [...REDESIGN_HANDLES])).catch(error => errors.push(error));
     }
     await check(db.from('feature_flags').delete().in('key', flagKeys)).catch(error => errors.push(error));
     if (flags.data?.length) await check(db.from('feature_flags').upsert(flags.data, { onConflict: 'key' })).catch(error => errors.push(error));
+    for (const table of ['scoring_v7_subjects', 'scoring_v7_sources', 'scoring_v7_evidence', 'scoring_v7_raw_artifacts', 'scoring_v7_receipts', 'scoring_observed_current']) {
+      await check(db.from(table).select('owner_handle').in('owner_handle', receiptOwners))
+        .then(result => { if (result.data?.length) errors.push(new Error(`Redesign receipt residue in ${table}`)); })
+        .catch(error => errors.push(error));
+    }
     for (const table of tables) {
       await check(db.from(table).select('handle').in('handle', [...REDESIGN_HANDLES]))
         .then(result => { if (result.data?.length) errors.push(new Error(`Redesign residue in ${table}`)); })
@@ -108,7 +158,7 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
     ]));
     const cache: Record<string, string> = {};
     const github: Record<string, unknown> = {};
-    let octocatVerificationRow: Record<string, unknown> | null = null;
+    let octocatVerificationToken: string | null = null;
     for (const handle of REDESIGN_HANDLES) {
       const stats = makeFullStats({ ...DEMO_STATS, handle, displayName: handle, avatarUrl: '', linkedPlatforms: [], linkedPlatformLogins: {}, fetchedAt: new Date().toISOString() });
       const secret = process.env.NEXTAUTH_SECRET, token = process.env.GITHUB_TOKEN;
@@ -117,29 +167,36 @@ export async function bootstrapRedesignFixtures(upstreamFile: string) {
       cache[`stats:v3:${handle}`] = fixtureStatsCacheEntry(handle, referenceDate, secret, token, stats, new Date(stats.fetchedAt));
       cache[`stats:stale:v2:${handle}`] = JSON.stringify(stats);
       github[handle] = { data: { user: { login: handle, name: handle, avatarUrl: '', contributionsCollection: { contributionCalendar: { totalContributions: 0, weeks: [] }, pullRequestContributions: { totalCount: 0, nodes: [] }, pullRequestReviewContributions: { totalCount: 0 }, issueContributions: { totalCount: 0 } }, repositories: { totalCount: 0, nodes: [] } }, search: { issueCount: 0 } } };
-      // #1279/deployment-probes.ts `assertShareVerification` reads octocat's
-      // share page as a read-only smoke probe (`__chapa_smoke=1`), extracts
-      // the /verify/{hash} link the live render produced, then looks that
-      // exact hash up via /api/verify. `getPublicProfileVerification` derives
-      // that hash deterministically from (stats, impact, today's date), but
-      // `runPublicProfileSideEffects` only *persists* it when `readOnly` is
-      // false — a read-only probe never writes it. On a genuinely cold seed
-      // (no earlier non-read-only render of /u/octocat to mint it first),
-      // that made the lookup 404 regardless of the stats-cache fix above.
-      // Pre-seed the exact row a live render will independently derive, via
-      // the same pure `computeImpactV6`/`buildPayload`/`computeHash` the
-      // production path uses, rather than a hand-picked hash/scores.
+      // #1279/#1335 — deployment-probes.ts `assertShareVerification` reads
+      // octocat's share page as a read-only smoke probe (`__chapa_smoke=1`),
+      // extracts the /verify/{token} link the live render produced, then
+      // looks that exact token up via /api/verify. A v7.2 verification link
+      // needs a published receipt to exist first — `runPublicProfileSideEffects`
+      // only *persists* one when `readOnly` is false, and a read-only probe
+      // never writes it. On a genuinely cold seed (no earlier non-read-only
+      // render of /u/octocat to mint one first), that made the lookup 404
+      // regardless of the stats-cache fix above. Pre-seed and publish a real
+      // receipt via the same RPCs the scoring-point fixtures use, rather than
+      // a hand-picked hash/scores.
       if (handle === 'octocat') {
-        const verificationSecret = process.env.CHAPA_VERIFICATION_SECRET;
-        if (!verificationSecret) throw new Error('Explicit local verification secret required to pre-seed the read-only smoke probe record');
-        octocatVerificationRow = buildDerivedVerificationRow(stats, verificationSecret);
+        octocatVerificationToken = await issueObservedVerificationRetrying(handle, new Date(stats.fetchedAt));
+      }
+      // #1335 phase 5 — with v6 deleted there is no legacy stats-derived
+      // fallback score any more: a handle with no registered scoring
+      // subject/receipt renders the "unregistered" status placeholder (a
+      // real <svg>, but with no archetype/score to draw) instead of a
+      // computed badge. redesign-surfaces.spec.ts's Studio test asserts a
+      // real archetype-bearing badge preview for each of REDESIGN_OWNERS
+      // (owners viewing their OWN Studio), which a real production owner
+      // always has via the OAuth callback's subject registration — these
+      // synthetic fixture handles need the same v7.2 receipt octocat
+      // already gets, or Studio has nothing to draw.
+      if (REDESIGN_OWNERS.includes(handle)) {
+        await issueObservedVerificationRetrying(handle, new Date(stats.fetchedAt));
       }
     }
     for (const handle of SCORING_POINT_HANDLES) github[handle] = buildRedesignGitHubFixture(handle, new Date().toISOString()).response;
-    const today = new Date().toISOString();
-    await check(db.from('verification_records').insert({ hash: REDESIGN_VALID_HASH, handle: 'chapa-redesign-owner', display_name: 'Local redesign fixture', adjusted_composite: 70, confidence: 86, tier: 'High', archetype: 'Builder', profile_type: 'collaborative', building: 74, guarding: 69, consistency: 71, breadth: 67, commits_total: 124, prs_merged_count: 18, reviews_submitted: 33, generated_at: today.slice(0, 10), expires_at: new Date(Date.now() + 86400_000).toISOString() }));
-    if (!octocatVerificationRow) throw new Error('octocat verification row was not derived');
-    await check(db.from('verification_records').insert(octocatVerificationRow));
+    if (!octocatVerificationToken) throw new Error('octocat verification token was not derived');
     await writeFile(upstreamFile, JSON.stringify({ cache, github, journeyRunId: 'redesign', contributionQuery: CONTRIBUTION_QUERY, repositoryQuery: REPOSITORY_STATS_QUERY, avatarPng: (await readFile(resolve(__dirname, '../../public/logo-512.png'))).toString('base64') }));
     return { db, cleanup };
   } catch (error) {

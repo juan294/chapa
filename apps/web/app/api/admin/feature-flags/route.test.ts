@@ -1,6 +1,3 @@
-const { mockPurgeScoringImages, mockInvalidateScoringSelection } = vi.hoisted(() => ({ mockPurgeScoringImages: vi.fn(), mockInvalidateScoringSelection: vi.fn() }));
-vi.mock("@/lib/cache/edge-cache", () => ({ SCORING_IMAGES_EDGE_TAG: "scoring-images", purgeEdgeCacheTag: mockPurgeScoringImages }));
-vi.mock("@/lib/scoring-render-selection", () => ({ invalidateScoringRenderSelection: mockInvalidateScoringSelection }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -75,18 +72,6 @@ describe("PATCH /api/admin/feature-flags", () => {
       avatar_url: "",
     });
     mockDbUpdateFeatureFlag.mockResolvedValue(true);
-  });
-
-  it("reports persisted flag and failed global purge separately, and supports an idempotent retry", async () => {
-    mockPurgeScoringImages.mockResolvedValueOnce("failed").mockResolvedValueOnce("purged");
-    const first = await PATCH(makeRequest({ key: "scoring_v7_rendering", enabled: false }));
-    expect(first.status).toBe(200);
-    expect(await first.json()).toEqual({ success: true, persisted: true, edgePurge: "failed", imagesRefreshed: false });
-    const retry = await PATCH(makeRequest({ key: "scoring_v7_rendering", enabled: false }));
-    expect(await retry.json()).toEqual({ success: true, persisted: true, edgePurge: "purged", imagesRefreshed: true });
-    expect(mockInvalidateScoringSelection).toHaveBeenCalledTimes(2);
-    expect(mockPurgeScoringImages).toHaveBeenNthCalledWith(1, "scoring-images");
-    expect(mockPurgeScoringImages).toHaveBeenNthCalledWith(2, "scoring-images");
   });
 
   it("updates a feature flag", async () => {
