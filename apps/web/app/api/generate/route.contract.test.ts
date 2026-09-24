@@ -3,12 +3,10 @@ import { declareField, generatePayloads, runMatrix } from "@/test/contract/paylo
 import { bodyAsRecord, invokeJson } from "@/test/contract/invoke";
 
 const {
-  mockComputeImpactV6,
   mockGetSessionGitHubToken,
   mockGetStats,
   mockRequireSession,
 } = vi.hoisted(() => ({
-  mockComputeImpactV6: vi.fn(() => ({ archetype: "Builder" })),
   mockGetSessionGitHubToken: vi.fn(async () => "ghp_contract"),
   mockGetStats: vi.fn(async () => ({ handle: "octocat", commitsTotal: 12 })),
   mockRequireSession: vi.fn(() => ({
@@ -27,10 +25,6 @@ vi.mock("@/lib/auth/github-session-token", () => ({
 
 vi.mock("@/lib/github/client", () => ({
   getStats: mockGetStats,
-}));
-
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV6,
 }));
 
 import { POST } from "./route";
@@ -69,6 +63,5 @@ describe("POST /api/generate contract", () => {
     expect(response.status).toBe(200);
     expect(bodyAsRecord(response)).toMatchObject({ success: true, handle: "octocat" });
     expect(mockGetStats).toHaveBeenCalledWith("octocat", "ghp_contract");
-    expect(mockComputeImpactV6).toHaveBeenCalled();
   });
 });
