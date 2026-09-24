@@ -31,7 +31,6 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/lib/insights/use-insights-import.ts` | `apps/web/lib/insights/use-insights-import.test.tsx` |
 
 ### Creator Studio
 
@@ -56,8 +55,6 @@ score has far more surfaces than a badge does.
 | `apps/web/components/badge/BadgeContent.tsx` | `apps/web/lib/render/badge-view-model.test.tsx` |
 | `apps/web/lib/render/BadgeSvg.tsx` | `apps/web/lib/render/badge-observed.test.tsx` |
 | `apps/web/lib/render/archetypeDemoData.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
-| `apps/web/lib/render/demoData.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
-| `apps/web/lib/render/landing-demo-data.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
 | `apps/web/lib/render/observed-demo-data.ts` | `apps/web/lib/render/observed-demo-data.test.ts` |
 | `apps/web/lib/render/scoring-evidence-label.ts` | `apps/web/lib/render/scoring-evidence-label.test.ts` |
 
@@ -116,15 +113,10 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/components/dashboard/CoachingInsights.tsx` | `apps/web/lib/dashboard/generate-insights.test.ts` |
-| `apps/web/components/dashboard/DimensionCardsRow.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
+| `apps/web/components/dashboard/DimensionCardsRow.tsx` | `apps/web/components/dashboard/DimensionCardsRow.test.tsx` |
 | `apps/web/components/dashboard/ImpactDashboard.tsx` | `apps/web/components/dashboard/ImpactDashboard.observed.test.tsx` |
-| `apps/web/components/dashboard/ScoreBoldNumber.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/components/dashboard/ReceiptExplanationPanel.tsx` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
-| `apps/web/components/dashboard/ScoreExplanationPanel.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
-| `apps/web/lib/dashboard/generate-insights.ts` | `apps/web/lib/dashboard/generate-insights.test.ts` |
 | `apps/web/lib/dashboard/receipt-explanation.ts` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
-| `apps/web/lib/dashboard/score-explanation.ts` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 
 ### email
 
@@ -143,8 +135,6 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/app/experiments/number-counters/page.tsx` | `apps/web/lib/profile/score-view-model.test.ts` |
-| `apps/web/app/experiments/tier-visuals/_components/tier-data.ts` | `apps/web/app/experiments/tier-visuals/_components/tier-data.test.ts` |
 
 ### feature flags
 
@@ -182,8 +172,6 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `scripts/backfill-parsers.ts` | `scripts/backfill-parsers.test.ts` |
-| `scripts/recalculate-handles.ts` | `scripts/recalculate-handles.test.ts` |
 
 ### collection (#1335 phase 4)
 
@@ -230,7 +218,6 @@ score has far more surfaces than a badge does.
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/app/u/[handle]/page.tsx` | `apps/web/lib/render/badge-view-model.test.tsx` |
-| `apps/web/components/ImpactBreakdown.tsx` | `apps/web/lib/profile/score-view-model.test.ts` |
 | `apps/web/components/SharePageOwnerContent.tsx` | `apps/web/components/SharePageOwnerContent.render.test.tsx` |
 | `apps/web/components/SharePageOwnerContentLazy.tsx` | `apps/web/components/SharePageOwnerContentLazy.render.test.tsx` |
 
