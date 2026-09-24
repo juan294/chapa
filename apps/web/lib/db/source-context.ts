@@ -30,7 +30,7 @@ const coverageSchema = z.object({ source: sourceSchema, window: windowSchema, da
  discovery: z.enum(["owned_and_contributed", "contribution_search", "registered_ledger", "explicit_repositories", "legacy_upload"]), repositoryIds: z.array(text).max(10000), repositoryDiscoveryComplete: z.boolean(),
  eventKinds: z.partialRecord(kind, status), reasonCodes: z.array(reason).max(100), unknownPeriods: z.array(z.object({ startInclusive: instant, endExclusive: instant }).strict()).max(1000),
 }).strict();
-const valueSchema = z.object({ id: z.uuid(), window: windowSchema, coverage: coverageSchema, events: z.array(eventSchema).max(10000) }).strict();
+const valueSchema = z.object({ id: z.uuid(), window: windowSchema, coverage: coverageSchema, events: z.array(eventSchema).max(50000) }).strict();
 export type StoredSourceObservation = z.infer<typeof valueSchema>;
 export interface SourceStorageContext {
  readonly owner: string;

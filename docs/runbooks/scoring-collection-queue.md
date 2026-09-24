@@ -137,6 +137,15 @@ budget or timeout stop is never recorded as a genuine error), and a
 `waiting_rate_limit` job is not "stuck", it is working as designed until the
 provider's own reset time.
 
+## Event limit per source
+
+One source can hold at most 50,000 events (migration 057; it was 10,000). The
+limit is checked when events are staged, when a job finishes and when a source
+is read back. Above it, the job fails with operation `event_limit`. On
+2026-09-24 one GitHub source reached 11,124 authored commits in the window.
+Measured locally at 30,000 events of about 1.5 KB each: finish took 4.7 s and
+read-back took 3.6 s.
+
 ## Enqueueing by hand
 
 Prefer the app's own paths: owner refresh, admin bulk-recalculate, or the

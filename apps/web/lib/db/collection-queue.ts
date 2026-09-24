@@ -254,17 +254,26 @@ export async function finishCollectionJob(
  * slices (and this one, once its own checkpoint call has landed), so the
  * worker can pass `stagedKeys` to the next `CollectSlice` call per
  * `lib/collection/plan.ts`. A `CollectSlice` only ever dedupes against these
- * keys -- it never needs the staged rows' full JSONB bodies (up to 10,000
+ * keys -- it never needs the staged rows' full JSONB bodies (up to 50,000
  * per job), which `checkpoint()`/`finish()` read and write server-side --
  * so this reads the `event_key` column only, not `event`.
  */
 export async function listStagedEventKeys(jobId: string): Promise<ReadonlySet<string>> {
   const db = getSupabase();
   if (!db) throw new Error("listStagedEventKeys: Supabase client unavailable");
-  const { data, error } = await db.from("scoring_collection_staged_events").select("event_key").eq("job_id", jobId);
-  if (error) throw new Error(`listStagedEventKeys failed: ${error.message}`);
-  return new Set(z.array(z.object({ event_key: z.string() }).strict()).parse(data ?? []).map((row) => row.event_key));
+  // PostgREST returns at most `max_rows` (1,000) rows per request, so page
+  // explicitly: a truncated key set makes every later slice re-send events.
+  const keys = new Set<string>();
+  for (let from = 0; ; from += STAGED_KEYS_PAGE) {
+    const { data, error } = await db.from("scoring_collection_staged_events").select("event_key").eq("job_id", jobId)
+      .order("event_key").range(from, from + STAGED_KEYS_PAGE - 1);
+    if (error) throw new Error(`listStagedEventKeys failed: ${error.message}`);
+    const rows = z.array(z.object({ event_key: z.string() }).strict()).parse(data ?? []);
+    for (const row of rows) keys.add(row.event_key);
+    if (rows.length < STAGED_KEYS_PAGE) return keys;
+  }
 }
+const STAGED_KEYS_PAGE = 1_000;
 
 /** In-progress states: a job the owner or a visitor should see as "collection
  * running", as opposed to no job at all or a terminal `complete`/`failed`.
