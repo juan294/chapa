@@ -155,6 +155,35 @@ describe("collectGitHubSlice -- ported diagnostic matrix (hard stops)", () => {
     expect(result.stop?.retryAfterSeconds).toBeGreaterThan(590);
     expect(result.stop?.retryAfterSeconds).toBeLessThanOrEqual(601);
   });
+  // Captured from api.github.com on 2026-09-24 (nicholaivogel): GitHub could
+  // not count one very large commit's lines, returned the rest of the page,
+  // set that node to null and added a SERVICE_UNAVAILABLE error at its
+  // additions path. The job failed as "graphql" on every retry.
+  const unavailableLines = (index: number) => ({ type: "SERVICE_UNAVAILABLE", path: ["node", "defaultBranchRef", "target", "history", "nodes", index, "additions"], message: "The additions count for this commit is unavailable." });
+  it("keeps a commit whose line counts GitHub cannot compute, with unknown line measurements", async () => {
+    const counted = { id: "C1", oid: "sha1", author: { user: actor }, authoredDate: "2026-09-02T00:00:00Z", additions: 1, deletions: 0 };
+    const uncounted = { id: "C3", oid: "sha3", author: { user: actor }, authoredDate: "2026-09-03T00:00:00Z" };
+    mockApi({
+      V7Commits: () => new Response(JSON.stringify({ data: { node: { defaultBranchRef: { target: { history: page([counted, null]) } } } }, errors: [unavailableLines(1)] }), { status: 200 }),
+      V7CommitsWithoutLines: () => ({ node: { defaultBranchRef: { target: { history: page([{ id: "C1", oid: "sha1", author: { user: actor }, authoredDate: "2026-09-02T00:00:00Z" }, uncounted]) } } } }),
+    });
+    const result = await runToCompletion();
+    const commits = result.events.filter((e) => e.kind === "authored_commit");
+    expect(commits.map((e) => e.eventId).sort()).toEqual(["C1", "C3"]);
+    expect(commits.find((e) => e.eventId === "C1")!.measurements.additions).toMatchObject({ status: "observed", value: 1 });
+    expect(commits.find((e) => e.eventId === "C3")!.measurements.additions).toMatchObject({ status: "unknown" });
+  });
+  it("still stops as graphql when an error is not an unavailable line count", async () => {
+    mockApi({ V7Commits: () => new Response(JSON.stringify({ data: null, errors: [{ type: "SERVICE_UNAVAILABLE", path: ["node", "defaultBranchRef"], message: "Something else." }] }), { status: 200 }) });
+    let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
+    for (let i = 0; i < 100; i++) {
+      const result = await collectGitHubSlice(input, credential, checkpoint, { maxRequests: 200, deadlineAt: Date.now() + 60_000 }, new Set());
+      checkpoint = result.checkpoint;
+      if (result.stop?.stopKind === "graphql") { expect(result.stop.operation).toBe("commits"); return; }
+      if (result.done) throw new Error("expected a graphql stop");
+    }
+    throw new Error("no graphql stop");
+  });
   it("classifies an unparseable accepted-change date as a parse stop, still source_error-equivalent", async () => {
     mockApi({ V7MergedChanges: () => ({ search: { ...page([pr("PR1", { mergedAt: "" })]), issueCount: 1 } }) });
     const result = await runToCompletion();

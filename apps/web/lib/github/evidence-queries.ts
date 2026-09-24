@@ -9,6 +9,16 @@ const change = `id ${repository} author { ... on User { id } } merged mergedAt c
   headRefOid body headRefName baseRefName additions deletions changedFiles
   closingIssuesReferences(first: 1) { totalCount }`;
 
+function commitHistoryQuery(name: string, lineFields: string): string {
+  return `query ${name}($id: ID!, $subjectId: ID!, $since: GitTimestamp!, $after: String) {
+    node(id: $id) { ... on Repository { isEmpty defaultBranchRef { target { ... on Commit {
+      history(first: 50, after: $after, since: $since, author: {id: $subjectId}) {
+        ${pageInfo} nodes { id oid author { user { id } } authoredDate${lineFields ? ` ${lineFields}` : ""} }
+      }
+    } } } } }
+  }`;
+}
+
 export const GITHUB_EVIDENCE_QUERIES = {
   profile: `query V7Profile($login: String!) { user(login: $login) { id login name avatarUrl } }`,
   repositories: `query V7Repositories($login: String!, $after: String) {
@@ -45,13 +55,10 @@ export const GITHUB_EVIDENCE_QUERIES = {
   // it a margin before the window and still filters each node by authoredDate.
   // Unbounded history walked a repository's whole past and answered 502 on
   // large histories; smaller pages keep each request well inside GitHub's timeout.
-  commits: `query V7Commits($id: ID!, $subjectId: ID!, $since: GitTimestamp!, $after: String) {
-    node(id: $id) { ... on Repository { isEmpty defaultBranchRef { target { ... on Commit {
-      history(first: 50, after: $after, since: $since, author: {id: $subjectId}) {
-        ${pageInfo} nodes { id oid author { user { id } } authoredDate additions deletions }
-      }
-    } } } } }
-  }`,
+  commits: commitHistoryQuery("V7Commits", "additions deletions"),
+  // The same page without line counts. GitHub nulls a commit whose lines it
+  // cannot count; this variant recovers that commit with unknown lines.
+  commitsWithoutLines: commitHistoryQuery("V7CommitsWithoutLines", ""),
   issues: `query V7Issues($id: ID!, $since: DateTime!, $after: String) {
     node(id: $id) { ... on Repository {
       issues(first: 100, after: $after, filterBy: {since: $since}, orderBy: {field: UPDATED_AT, direction: DESC}) {
