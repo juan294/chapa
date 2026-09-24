@@ -41,24 +41,20 @@ describe("badgeStatusState", () => {
   });
 });
 
-describe("needsUnavailablePlaceholder (#1335 phase 4: shared badge.svg/og-image/share-page post-materialize gate)", () => {
+describe("needsUnavailablePlaceholder (#1335 phase 4/5: shared badge.svg/og-image/share-page post-materialize gate)", () => {
   const ready: ScoringStatus = { kind: "ready", receiptDate: "2026-09-23", updating: false };
 
-  it("is true only when v7.2 is selected, the status read failed (null), and the independent receipt lookup found no v7.2 receipt", () => {
-    expect(needsUnavailablePlaceholder({ machinePolicy: "v7.2" }, null, "v6")).toBe(true);
-    expect(needsUnavailablePlaceholder({ machinePolicy: "v7.2" }, null, undefined)).toBe(true);
-  });
-
-  it("is false under a v6 selection even with a null status", () => {
-    expect(needsUnavailablePlaceholder({ machinePolicy: "v6" }, null, undefined)).toBe(false);
+  it("is true when the status read failed (null) and the independent receipt lookup found no v7.2 receipt", () => {
+    expect(needsUnavailablePlaceholder(null, "v6")).toBe(true);
+    expect(needsUnavailablePlaceholder(null, undefined)).toBe(true);
   });
 
   it("is false when the status read actually succeeded (a real ScoringStatus, not a failed read)", () => {
-    expect(needsUnavailablePlaceholder({ machinePolicy: "v7.2" }, ready, undefined)).toBe(false);
+    expect(needsUnavailablePlaceholder(ready, undefined)).toBe(false);
   });
 
   it("is false when the independent receipt lookup found a v7.2 receipt despite the failed status read", () => {
-    expect(needsUnavailablePlaceholder({ machinePolicy: "v7.2" }, null, "v7.2")).toBe(false);
+    expect(needsUnavailablePlaceholder(null, "v7.2")).toBe(false);
   });
 });
 

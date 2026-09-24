@@ -1,7 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-const mocks = vi.hoisted(() => ({ selection: vi.fn(), store: vi.fn(), prepare: vi.fn(), materialize: vi.fn(), verify: vi.fn(), invalidate: vi.fn() }));
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: mocks.selection }));
+const mocks = vi.hoisted(() => ({ store: vi.fn(), prepare: vi.fn(), materialize: vi.fn(), verify: vi.fn(), invalidate: vi.fn() }));
 vi.mock("@/lib/db/report-craft", () => ({ dbStoreReportCraft: mocks.store }));
 vi.mock("@/lib/insights/report-craft-import", () => ({ prepareReportCraftImport: mocks.prepare }));
 vi.mock("@/lib/profile/issue-receipt", () => ({ materializeCurrentObservedReceipt: mocks.materialize }));
@@ -19,18 +18,10 @@ import { observedReceiptFixture } from "@/lib/history/__fixtures__/receipts-obse
 const request = () => new NextRequest("http://localhost/api/insights", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ schemaVersion: "v7.2", report: {} }) });
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.selection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-07T17:20:02.164Z") });
   mocks.prepare.mockResolvedValue({ calculation: { inputs: { reportPeriod: { endExclusive: "2026-09-07T12:00:00.000Z" } } } });
   mocks.store.mockResolvedValue({ status: "stored", persisted: true, reportId: "report", selection: "selected", consented: true });
   mocks.invalidate.mockResolvedValue({ refreshed: true });
   mocks.verify.mockResolvedValue("token");
-});
-it("rejects a current-policy upload after rollback before private persistence", async () => {
-  mocks.selection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-  const response = await POST(request());
-  expect(response.status).toBe(409);
-  expect(await response.json()).toMatchObject({ error: "policy_changed", persisted: false });
-  expect(mocks.store).not.toHaveBeenCalled();
 });
 it("separates persistence from failed publication and makes an identical retry repair verification and purge", async () => {
   const snapshot = { receipt: await observedReceiptFixture(), trend: null };
@@ -59,7 +50,6 @@ it("uses first server ingestion time even when cached policy lookup predates UTC
   vi.useFakeTimers({ toFake: ["Date"] });
   try {
     vi.setSystemTime(new Date("2026-09-08T00:00:02.000Z"));
-    mocks.selection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.parse("2026-09-07T23:59:59.000Z") });
     mocks.store.mockResolvedValue({ status: "consent_required", persisted: false });
     await POST(request());
     expect(mocks.prepare).toHaveBeenCalledWith({}, "2026-09-08T00:00:02.000Z");

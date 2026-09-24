@@ -1,123 +1,45 @@
 import "server-only";
-import type { StatsData, ImpactV6Result, DimensionScores } from "@chapa/shared";
-import type { MetricsSnapshot } from "@/lib/history/types";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
+import type { StatsData } from "@chapa/shared";
 import { readPublicObservedScore } from "./post-write-score";
-import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
-import { legacyViewModel, type ScoreViewModel } from "./score-view-model";
+import { readStats } from "@/lib/github/client";
+import type { ScoreViewModel } from "./score-view-model";
 import { interpolate } from "@/lib/i18n/interpolate";
 
 /**
- * The durable, non-activity counts a stored badge can truthfully draw — the
- * subset of `StatsData` a `MetricsSnapshot` actually records. Deliberately
- * excludes `heatmapData` (never persisted in the snapshot — a stored badge
- * never fabricates activity), `avatarUrl`/`displayName` (mutable display
- * fields the snapshot explicitly omits, see `packages/shared/src/types.ts`),
- * and `fetchedAt` (there is no live fetch behind this projection).
- */
-export type StoredBadgeStatsContext = Pick<
-  StatsData,
-  | "commitsTotal"
-  | "prsMergedCount"
-  | "prsMergedWeight"
-  | "reviewsSubmittedCount"
-  | "issuesClosedCount"
-  | "reposContributed"
-  | "activeDays"
-  | "linesAdded"
-  | "linesDeleted"
-  | "totalStars"
-  | "totalForks"
-  | "totalWatchers"
-  | "topRepoShare"
-  | "maxCommitsIn10Min"
->;
-
-/**
- * A badge-only durable projection: the last committed score plus the
- * non-activity counts the `MetricsSnapshot` recorded alongside it.
+ * A badge-only durable projection (#1335 phase 5, superseding the
+ * 2026-09-22 snapshot-backed design): the last committed v7.2 receipt plus
+ * the exact-bound stale `StatsData` envelope, when one is still available.
+ * It no longer depends on `metrics_snapshots` at all.
  *
  * Deliberately never a `MaterializedProfile` — it structurally omits
- * `stats`/`snapshot`/`statsComplete`/`statsFreshness`/`inputsChanged`/
- * `latestSnapshot`, so it cannot satisfy that type and cannot accidentally
- * reach `runPublicProfileSideEffects`, `persistProfileSnapshot`, or v6 HMAC
- * verification issuance — every one of which requires a real
- * `MaterializedProfile`. `kind: "stored"` is the discriminant a caller
- * checks before treating this as anything other than a read-only fallback.
+ * `statsFreshness`/`statsComplete`/`craftResult`, so it cannot accidentally
+ * reach `runPublicProfileSideEffects` or receipt issuance, either of which
+ * requires a real `MaterializedProfile`. `kind: "stored"` is the discriminant
+ * a caller checks before treating this as anything other than a read-only
+ * fallback.
  */
 export interface StoredBadgeProfile {
   readonly kind: "stored";
   readonly handle: string;
-  readonly policyVersion: "v6" | "v7.2";
-  /** When the underlying `MetricsSnapshot` was captured — never "now". */
+  /** The receipt's own recorded time — the disclosed "last known" date. */
   readonly observedAt: string;
   /**
-   * The sole scoring authority for this projection. Always carries
-   * `freshness: "stale"` (or the stricter `"unavailable"` the receipt model
-   * itself already reported) — a stored fallback never claims a current
-   * live read, regardless of what the underlying receipt window says.
+   * The sole scoring authority for this projection. Always forced to
+   * `stale` (or the stricter `"unavailable"` the receipt model itself
+   * already reported) — a stored fallback never claims a current live read,
+   * regardless of what the underlying receipt window says.
    */
   readonly scoring: ScoreViewModel;
   /**
-   * Structural companion for `renderBadgeSvg`'s legacy `impact` parameter.
-   * Always sourced from the same stored `MetricsSnapshot`; `scoring` — never
-   * this — is the number/tier/archetype authority a v7.2 stored badge draws
-   * (`renderBadgeSvg` only reads from `impact` on the v6 craft-radar branch).
+   * The exact-bound stale `StatsData` envelope, read cache-only (never a
+   * live GitHub fetch) via `readStats(handle, undefined, { readOnly: true })`
+   * — the same last-known-good binding recheck a live caller uses, without
+   * ever re-attempting the failed live fetch this fallback exists to
+   * replace. `null` when even a stale envelope is unavailable:
+   * {@link storedBadgeRenderInputs} then renders every count as unavailable,
+   * never as a fabricated zero.
    */
-  readonly legacyImpact: ImpactV6Result;
-  readonly context: StoredBadgeStatsContext;
-}
-
-/** Pure projection shared with `/api/profile/[handle]` so the two never
- * compute a stored snapshot's dimensions differently. */
-export function snapshotDimensions(snapshot: MetricsSnapshot): DimensionScores {
-  return {
-    delivery: snapshot.delivery,
-    quality: snapshot.quality,
-    consistency: snapshot.consistency,
-    breadth: snapshot.breadth,
-    ...(snapshot.craft != null && { craft: snapshot.craft }),
-  };
-}
-
-function snapshotStatsContext(snapshot: MetricsSnapshot): StoredBadgeStatsContext {
-  return {
-    commitsTotal: snapshot.commitsTotal,
-    prsMergedCount: snapshot.prsMergedCount,
-    prsMergedWeight: snapshot.prsMergedWeight,
-    reviewsSubmittedCount: snapshot.reviewsSubmittedCount,
-    issuesClosedCount: snapshot.issuesClosedCount,
-    reposContributed: snapshot.reposContributed,
-    activeDays: snapshot.activeDays,
-    linesAdded: snapshot.linesAdded,
-    linesDeleted: snapshot.linesDeleted,
-    totalStars: snapshot.totalStars,
-    totalForks: snapshot.totalForks,
-    totalWatchers: snapshot.totalWatchers,
-    topRepoShare: snapshot.topRepoShare,
-    maxCommitsIn10Min: snapshot.maxCommitsIn10Min,
-  };
-}
-
-/** Never calls `computeImpactV6` on reconstructed data — every field here is
- * copied verbatim from the durably stored snapshot. */
-function legacyImpactFromSnapshot(handle: string, snapshot: MetricsSnapshot): ImpactV6Result {
-  return {
-    handle: handle.toLowerCase(),
-    profileType: snapshot.profileType,
-    dimensions: snapshotDimensions(snapshot),
-    archetype: snapshot.archetype,
-    compositeScore: snapshot.compositeScore,
-    confidence: snapshot.confidence,
-    // `MetricsSnapshot.confidencePenalties` (`SnapshotPenalty[]`) deliberately
-    // drops the `reason` string to save bytes; it cannot be reconstructed
-    // truthfully, so this structural companion carries none rather than
-    // fabricating one. `renderBadgeSvg` never reads `impact.confidencePenalties`.
-    confidencePenalties: [],
-    adjustedComposite: snapshot.adjustedComposite,
-    tier: snapshot.tier,
-    computedAt: snapshot.capturedAt,
-  };
+  readonly stats: StatsData | null;
 }
 
 /** A stored fallback never claims a current live read: force `stale` unless
@@ -128,70 +50,71 @@ function withStaleFreshness(model: ScoreViewModel): ScoreViewModel {
 
 /**
  * Read the durable last-known-good badge projection for `handle`: the
- * committed current v7.2 receipt when one exists and is selected, else the
- * durable legacy `MetricsSnapshot`. Returns `null` when neither authority is
- * available, or when `selection` is not a known/cacheable policy — an
- * unknown policy authority is never a fallback opportunity.
+ * committed current v7.2 receipt is the sole scoring authority. Returns
+ * `null` only when there is nothing to draw at all — no current receipt. A
+ * receipt with no backing stats envelope still returns a profile —
+ * {@link storedBadgeRenderInputs} renders its counts as unavailable rather
+ * than refusing the fallback entirely.
  */
 export async function readStoredBadgeProfile(
   handle: string,
-  selection: ScoringRenderSelection,
 ): Promise<StoredBadgeProfile | null> {
-  if (!selection.cacheable) return null;
+  const observed = await readPublicObservedScore(handle);
+  if (observed.status !== "current") return null;
 
-  const [observed, snapshot] = await Promise.all([
-    readPublicObservedScore(handle, selection),
-    getCachedLatestSnapshot(handle),
-  ]);
-
-  if (!snapshot) return null;
-
-  const legacyImpact = legacyImpactFromSnapshot(handle, snapshot);
-  const context = snapshotStatsContext(snapshot);
-
-  if (observed.status === "current") {
-    return {
-      kind: "stored",
-      handle: handle.toLowerCase(),
-      policyVersion: "v7.2",
-      // The receipt is the scoring authority here, so the disclosed date is
-      // the receipt's own. The snapshot row is written by a separate path.
-      observedAt: observed.projection.scoring.identity?.recordedAt ?? snapshot.capturedAt,
-      scoring: withStaleFreshness(observed.projection.scoring),
-      legacyImpact,
-      context,
-    };
-  }
+  const statsRead = await readStats(handle, undefined, { readOnly: true });
+  const stats = statsRead.status === "current" || statsRead.status === "stale" ? statsRead.stats : null;
 
   return {
     kind: "stored",
     handle: handle.toLowerCase(),
-    policyVersion: "v6",
-    observedAt: snapshot.capturedAt,
-    scoring: withStaleFreshness(legacyViewModel(legacyImpact)),
-    legacyImpact,
-    context,
+    observedAt: observed.projection.scoring.identity?.recordedAt ?? new Date().toISOString(),
+    scoring: withStaleFreshness(observed.projection.scoring),
+    stats,
   };
 }
 
 /**
- * Build `renderBadgeSvg`'s positional `(stats, impact)` inputs from a stored
- * projection. `heatmapData` is always `[]` — never zero-filled per day —
- * because a stored render always pairs this with the `degraded` render
- * option, which replaces the heatmap with an explicit disclosure instead of
- * drawing an (empty, and therefore false) activity grid.
+ * Build `renderBadgeSvg`'s render inputs from a stored projection.
+ * `heatmapData` is always `[]` — never zero-filled per day — because a
+ * stored render always pairs this with the `degraded` render option, which
+ * replaces the heatmap with an explicit disclosure instead of drawing an
+ * (empty, and therefore false) activity grid.
+ *
+ * `countsAvailable: false` (no stats envelope backs this render at all)
+ * forces every repo/star/fork/watch pill to an explicit "unavailable" glyph
+ * instead of a fabricated zero — see `BadgeOptions.degraded.countsAvailable`.
  */
 export function storedBadgeRenderInputs(
   stored: StoredBadgeProfile,
-): { stats: StatsData; impact: ImpactV6Result } {
+): { stats: StatsData; countsAvailable: boolean } {
+  if (stored.stats) {
+    return {
+      stats: { ...stored.stats, heatmapData: [] },
+      countsAvailable: true,
+    };
+  }
   return {
     stats: {
       handle: stored.handle,
-      ...stored.context,
       heatmapData: [],
+      commitsTotal: 0,
+      activeDays: 0,
+      prsMergedCount: 0,
+      prsMergedWeight: 0,
+      reviewsSubmittedCount: 0,
+      issuesClosedCount: 0,
+      linesAdded: 0,
+      linesDeleted: 0,
+      reposContributed: 0,
+      topRepoShare: 0,
+      maxCommitsIn10Min: 0,
+      totalStars: 0,
+      totalForks: 0,
+      totalWatchers: 0,
       fetchedAt: stored.observedAt,
     },
-    impact: stored.legacyImpact,
+    countsAvailable: false,
   };
 }
 

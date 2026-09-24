@@ -10,19 +10,19 @@ vi.mock("@/lib/render/BadgeSvg", () => ({
 
 vi.mock("@/lib/render/archetypeDemoData", () => ({
   BUILDER_STATS: { handle: "builder" },
-  BUILDER_IMPACT: { compositeScore: 80 },
+  BUILDER_SCORING: { composite: { display: 80 } },
   GUARDIAN_STATS: { handle: "guardian" },
-  GUARDIAN_IMPACT: { compositeScore: 75 },
+  GUARDIAN_SCORING: { composite: { display: 75 } },
   MARATHONER_STATS: { handle: "marathoner" },
-  MARATHONER_IMPACT: { compositeScore: 70 },
+  MARATHONER_SCORING: { composite: { display: 70 } },
   POLYMATH_STATS: { handle: "polymath" },
-  POLYMATH_IMPACT: { compositeScore: 65 },
+  POLYMATH_SCORING: { composite: { display: 65 } },
   BALANCED_STATS: { handle: "balanced" },
-  BALANCED_IMPACT: { compositeScore: 60 },
+  BALANCED_SCORING: { composite: { display: 60 } },
   EMERGING_STATS: { handle: "emerging" },
-  EMERGING_IMPACT: { compositeScore: 30 },
+  EMERGING_SCORING: { composite: { display: 30 } },
   ARTIFICER_STATS: { handle: "artificer" },
-  ARTIFICER_IMPACT: { compositeScore: 72 },
+  ARTIFICER_SCORING: { composite: { display: 72 } },
 }));
 
 vi.mock("@/components/Navbar", () => ({

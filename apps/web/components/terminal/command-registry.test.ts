@@ -399,16 +399,6 @@ describe("createAdminCommands", () => {
     expect(result.lines[0]!.type).toBe("system");
   });
 
-  it("/sort conf resolves alias to confidence", () => {
-    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
-    const result = cmd.execute(["conf"]);
-    expect(result.action).toEqual({
-      type: "custom",
-      event: "chapa:admin-sort",
-      detail: { field: "confidence" },
-    });
-  });
-
   it("/sort name resolves alias to handle", () => {
     const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
     const result = cmd.execute(["name"]);
@@ -446,13 +436,13 @@ describe("createAdminCommands", () => {
     });
   });
 
-  it("/sort stars asc passes dir 'asc' in detail", () => {
+  it("/sort tier asc passes dir 'asc' in detail", () => {
     const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
-    const result = cmd.execute(["stars", "asc"]);
+    const result = cmd.execute(["tier", "asc"]);
     expect(result.action).toEqual({
       type: "custom",
       event: "chapa:admin-sort",
-      detail: { field: "totalStars", dir: "asc" },
+      detail: { field: "tier", dir: "asc" },
     });
   });
 

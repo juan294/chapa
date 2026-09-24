@@ -1,4 +1,3 @@
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import {
@@ -12,12 +11,6 @@ const VALID_SORT_FIELDS: AdminSortField[] = [
   "handle",
   "adjustedComposite",
   "rawScore",
-  "confidence",
-  "commitsTotal",
-  "prsMergedCount",
-  "reviewsSubmittedCount",
-  "activeDays",
-  "totalStars",
   "tier",
   "archetype",
   "registeredAt",
@@ -28,7 +21,8 @@ const VALID_SORT_FIELDS: AdminSortField[] = [
  * GET /api/admin/users
  *
  * Server-side paginated, sorted, and filtered admin user list.
- * Data comes from Supabase `admin_users` view (users + latest snapshot).
+ * Data comes from Supabase `admin_users_observed` view (#1335 — the only
+ * remaining policy, current-receipt projection only).
  */
 export const GET = withErrorCapture("/api/admin/users", async (request: NextRequest) => {
   // Pagination/sort/search each trigger a distinct request; the shared
@@ -62,11 +56,9 @@ export const GET = withErrorCapture("/api/admin/users", async (request: NextRequ
     );
   }
 
-  // Single Supabase call replaces: dbGetUsers + cacheMGet + computeImpactV6 + EMA
-  const selection = await readScoringRenderSelection();
-  if (!selection.cacheable) return NextResponse.json({ error: "Scoring policy is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  // Single Supabase call replaces: dbGetUsers + cacheMGet + per-row v6 scoring + EMA
   const result = await dbTimeoutOr504(
-    dbGetAdminUsers({ page, limit, sort, dir, search, tier, archetype }, { observed: selection.enabled }),
+    dbGetAdminUsers({ page, limit, sort, dir, search, tier, archetype }),
     "dbGetAdminUsers",
   );
   if (result instanceof NextResponse) return result;

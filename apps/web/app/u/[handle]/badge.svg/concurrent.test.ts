@@ -3,10 +3,8 @@ import { NextRequest } from "next/server";
 
 const {
   mockMaterializePublicProfile,
-  mockGetPublicProfileVerification,
+  mockResolveBadgeVerification,
   mockRunPublicProfileSideEffects,
-  mockPersistProfileSnapshot,
-  mockDeferProfileCacheWork,
   mockRenderBadgeSvg,
   mockGetAvatarBase64,
   mockGetOptionalRequestSession,
@@ -19,10 +17,8 @@ const {
   mockCacheDel,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
+  mockResolveBadgeVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
-  mockPersistProfileSnapshot: vi.fn(),
-  mockDeferProfileCacheWork: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockGetOptionalRequestSession: vi.fn(),
@@ -37,14 +33,12 @@ const {
 
 vi.mock("@/lib/profile/public-profile", () => ({
   materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
-  persistProfileSnapshot: (...args: unknown[]) =>
-    mockPersistProfileSnapshot(...args),
-  deferProfileCacheWork: (...args: unknown[]) =>
-    mockDeferProfileCacheWork(...args),
+}));
+
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) => mockResolveBadgeVerification(...args),
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -84,6 +78,14 @@ vi.mock("@/lib/render/escape", () => ({
   escapeXml: (s: string) => s,
 }));
 
+// #1335 phase 4 — `hasDrawableCurrentReceipt` defaults to `true` so these
+// concurrency tests skip the status-placeholder branch entirely and reach
+// the normal materialize/render path they exist to exercise.
+vi.mock("@/lib/collection/read-scoring-status", () => ({
+  readScoringStatus: vi.fn(),
+  hasDrawableCurrentReceipt: vi.fn(async () => true),
+}));
+
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
   return {
@@ -105,23 +107,31 @@ const FAKE_MATERIALIZED = {
     prsMergedCount: 10,
     reviewsSubmittedCount: 5,
   },
-  rawImpact: {
-    adjustedComposite: 73,
-    tier: "High",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
+  craftResult: null,
+  statsComplete: true,
+  statsFreshness: "current" as const,
+  statsCapturedAt: "2026-04-17T12:00:00.000Z",
+  scoring: {
+    policyVersion: "v7.2" as const,
+    handle: "testuser",
+    identity: { receiptId: "r1", revisionId: "rev1", revision: 1, recordedAt: "2026-04-17T00:00:00.000Z", action: "create" as const, supersedesRevisionId: null, contentHash: "hash1" },
+    window: null,
+    dimensions: {
+      delivery: { kind: "point" as const, value: 70, display: 70 },
+      quality: { kind: "point" as const, value: 60, display: 60 },
+      consistency: { kind: "point" as const, value: 65, display: 65 },
+      breadth: { kind: "point" as const, value: 55, display: 55 },
+    },
+    composite: { kind: "point" as const, value: 65, display: 65 },
+    tier: "Solid" as const,
+    archetype: "Builder" as const,
+    craft: null,
+    reportCraft: { status: "no_report" as const, unlocked: false, report: null },
+    freshness: "current" as const,
+    coverage: [],
+    exclusions: [],
+    limitations: [],
   },
-  displayImpact: {
-    adjustedComposite: 65,
-    tier: "Solid",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  snapshot: { date: "2026-04-17", adjustedComposite: 65, tier: "Solid" },
 };
 
 function makeRequest(
@@ -139,10 +149,8 @@ describe("GET /u/[handle]/badge.svg — cold-cache concurrency", () => {
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockGetOptionalRequestSession.mockReturnValue(null);
-    mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+    mockResolveBadgeVerification.mockResolvedValue({ hash: "abc12345", date: "2026-04-17" });
     mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
-    mockPersistProfileSnapshot.mockResolvedValue(true);
-    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockCaptureServerError.mockResolvedValue(undefined);
     mockCacheSetNx.mockResolvedValue(true);
@@ -206,7 +214,7 @@ describe("GET /u/[handle]/badge.svg — cold-cache concurrency", () => {
       },
     );
     mockRenderBadgeSvg.mockImplementation(
-      (_stats: unknown, _impact: unknown, opts: { avatarDataUri?: string }) =>
+      (_stats: unknown, opts: { avatarDataUri?: string }) =>
         opts.avatarDataUri ? FAKE_SVG : '<svg xmlns="http://www.w3.org/2000/svg">SMOKE</svg>',
     );
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");

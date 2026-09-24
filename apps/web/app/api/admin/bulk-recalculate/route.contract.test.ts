@@ -4,26 +4,21 @@ import { bodyAsRecord, invokeJson } from "@/test/contract/invoke";
 const {
   mockInvalidateProfileReadModels,
   mockMaterializeOrchestratedProfile,
-  mockPersistOrchestratedSnapshot,
 } = vi.hoisted(() => ({
   mockInvalidateProfileReadModels: vi.fn(async () => undefined),
   mockMaterializeOrchestratedProfile: vi.fn(async (handle: string) => ({
     craftResult: null,
-    // #1076: persistOrchestratedSnapshot now gates on statsComplete via the
-    // shared guardStatsComplete() — this fixture represents the happy path
-    // (complete stats), not the incomplete-stats case, so it must be true.
+    // #1335 phase 5 — there is no snapshot-replace step left; a materialize
+    // with complete stats always counts as recalculated. This fixture
+    // represents the happy path (complete stats), not the incomplete-stats
+    // case tested below.
     statsComplete: true,
-    displayImpact: { adjustedComposite: 70 },
-    rawImpact: { adjustedComposite: 72 },
-    snapshot: { date: "2026-07-03", adjustedComposite: 70, tier: "Solid" },
     stats: { handle },
   })),
-  mockPersistOrchestratedSnapshot: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: mockMaterializeOrchestratedProfile,
-  persistOrchestratedSnapshot: mockPersistOrchestratedSnapshot,
 }));
 
 vi.mock("@/lib/profile/post-write-invalidation", () => ({
@@ -59,20 +54,15 @@ describe("POST /api/admin/bulk-recalculate contract", () => {
       failed: 0,
       total: 1,
     });
-    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
-      token: undefined,
-      ignoreSnapshot: true,
-      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6" }),
-    });
-    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
-      "octocat",
-      expect.any(Object),
-      { mode: "replace" },
-    );
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat");
   });
 
-  it("records persistence failures without claiming recalculation success", async () => {
-    mockPersistOrchestratedSnapshot.mockResolvedValueOnce(false);
+  it("records incomplete-stats skips without claiming recalculation success", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValueOnce({
+      craftResult: null,
+      statsComplete: false,
+      stats: { handle: "octocat" },
+    });
 
     const response = await invokeJson(POST, {
       method: "POST",

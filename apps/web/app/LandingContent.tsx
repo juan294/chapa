@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { renderableScore, type ScoreViewModel } from "@/lib/profile/score-view-model";
-import type { ImpactV6Result } from "@chapa/shared";
 import type { LeaderboardPlace } from "@/lib/profile/leaderboard";
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { NavbarClient } from "@/components/NavbarClient";
@@ -15,21 +14,33 @@ import { GitHubIcon, BitbucketIcon, CodebergIcon, GitlabIcon } from "@/component
 import { tArray, tObject } from "@/lib/i18n/typed-accessors";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { SITE_TOOL_MAP } from "@/lib/webmcp/site-tool-map";
-import { BUILDER_IMPACT, GUARDIAN_IMPACT, MARATHONER_IMPACT, POLYMATH_IMPACT, ARTIFICER_IMPACT, BALANCED_IMPACT, EMERGING_IMPACT } from "@/lib/render/archetypeDemoData";
+import { BUILDER_SCORING, GUARDIAN_SCORING, MARATHONER_SCORING, POLYMATH_SCORING, ARTIFICER_SCORING, BALANCED_SCORING, EMERGING_SCORING } from "@/lib/render/archetypeDemoData";
 import { LandingUrlEffects } from "./LandingUrlEffects";
 import { LandingTerminal } from "./LandingTerminal";
 
 type TFunction = (key: string) => unknown;
 const DIMENSIONS = ["delivery", "quality", "consistency", "breadth", "craft"] as const;
 const EXAMPLES = [
-  { id: "builder", glyph: "↗", impact: BUILDER_IMPACT },
-  { id: "guardian", glyph: "[✓]", impact: GUARDIAN_IMPACT },
-  { id: "marathoner", glyph: "∞", impact: MARATHONER_IMPACT },
-  { id: "polymath", glyph: "✳", impact: POLYMATH_IMPACT },
-  { id: "artificer", glyph: "✦", impact: ARTIFICER_IMPACT },
-  { id: "balanced", glyph: "=", impact: BALANCED_IMPACT },
-  { id: "emerging", glyph: "_", impact: EMERGING_IMPACT },
+  { id: "builder", glyph: "↗", scoring: BUILDER_SCORING },
+  { id: "guardian", glyph: "[✓]", scoring: GUARDIAN_SCORING },
+  { id: "marathoner", glyph: "∞", scoring: MARATHONER_SCORING },
+  { id: "polymath", glyph: "✳", scoring: POLYMATH_SCORING },
+  { id: "artificer", glyph: "✦", scoring: ARTIFICER_SCORING },
+  { id: "balanced", glyph: "=", scoring: BALANCED_SCORING },
+  { id: "emerging", glyph: "_", scoring: EMERGING_SCORING },
 ] as const;
+
+/** The one place a `ScoreViewModel` becomes an explorer-ready dimension map:
+ * core dimensions from `renderableScore`, plus report Craft's displayed point
+ * when a report has been scored (#1335 — v7.2's Craft channel is separate
+ * from the four core dimensions, unlike v6's `dimensions.craft`). */
+function explorerDimensions(scoring: ScoreViewModel): Partial<Record<(typeof DIMENSIONS)[number], number>> {
+  const drawn = renderableScore(scoring);
+  return {
+    ...drawn.dimensions,
+    ...(scoring.reportCraft?.status === "scored" ? { craft: scoring.reportCraft.report.result.point.displayValue } : {}),
+  };
+}
 const PLATFORMS = [
   { name: "GitHub", Icon: GitHubIcon },
   { name: "Bitbucket", Icon: BitbucketIcon },
@@ -44,8 +55,8 @@ const inner = "mx-auto max-w-7xl px-5 sm:px-8 lg:px-12";
 const MEDALS = ["bg-medal-gold", "bg-medal-silver", "bg-medal-bronze"];
 
 /** Static translated body; interactions and URL effects stay in small client leaves. */
-export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, demoScoring, topScored = [], t }: {
-  demoBadgeSvg: string; readmeBadgeSvg: string; demoImpact: ImpactV6Result; demoScoring?: ScoreViewModel; topScored?: LeaderboardPlace[]; t: TFunction;
+export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoScoring, topScored = [], t }: {
+  demoBadgeSvg: string; readmeBadgeSvg: string; demoScoring: ScoreViewModel; topScored?: LeaderboardPlace[]; t: TFunction;
 }) {
   const r = (key: string) => t(`landing.redesign.${key}`) as string;
   const navLinks = tArray<{ label: string; href: string }>(t, "landing.navLinks");
@@ -55,20 +66,20 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, demoS
   const agentTools = tObject<Record<string, string>>(t, "landing.agentTools");
   const goals = tObject<Record<(typeof SITE_TOOL_MAP)[number]["route"], string>>(t, "landing.redesign.goals");
   const steps = tArray<{ number: string; title: string; description: string }>(t, "landing.steps");
-  const drawn = demoScoring ? renderableScore(demoScoring) : null;
-  const headline = drawn ? drawn.composite : demoImpact.adjustedComposite;
-  const tier = drawn ? drawn.tier : demoImpact.tier;
-  const demoDimensions: Partial<Record<(typeof DIMENSIONS)[number], number>> = drawn ? {
-    ...drawn.dimensions,
-    ...(demoScoring?.reportCraft?.status === "scored" ? { craft: demoScoring.reportCraft.report.result.point.displayValue } : {}),
-  } : demoImpact.dimensions;
+  const drawn = renderableScore(demoScoring);
+  const headline = drawn.composite;
+  const tier = drawn.tier;
+  const demoDimensions = explorerDimensions(demoScoring);
   const tierLabel = tier ? t(`tiers.${tier.toLowerCase()}`) as string : "";
   const sampleAlt = interpolate(r("sampleAlt"), { score: String(headline), tier: tierLabel });
   const snippet = `![${t("landing.embed.altText") as string}](https://chapa.thecreativetoken.com/u/developer/badge.svg)`;
-  const explorerItems = EXAMPLES.map(({ id, glyph, impact }) => ({
-    id, glyph, label: t(`landing.archetypes.${id}`) as string, description: r(`archetypeDescriptions.${id}`),
-    dimensions: DIMENSIONS.flatMap((key, index) => impact.dimensions[key] === undefined ? [] : [{ label: dimensions[index]!.title, value: impact.dimensions[key]! }]),
-  }));
+  const explorerItems = EXAMPLES.map(({ id, glyph, scoring }) => {
+    const dims = explorerDimensions(scoring);
+    return {
+      id, glyph, label: t(`landing.archetypes.${id}`) as string, description: r(`archetypeDescriptions.${id}`),
+      dimensions: DIMENSIONS.flatMap((key, index) => dims[key] === undefined ? [] : [{ label: dimensions[index]!.title, value: dims[key]! }]),
+    };
+  });
   return <div className="min-h-screen bg-bg text-text-primary">
     <LandingUrlEffects /><NavbarClient navLinks={navLinks} />
     <main id="main-content" className="pt-[69px]">
@@ -89,7 +100,7 @@ export function LandingContent({ demoBadgeSvg, readmeBadgeSvg, demoImpact, demoS
             <span className="tracking-wider uppercase">{r("topScoresLabel")}</span>
             <ol className="flex flex-wrap items-center gap-x-4 gap-y-1">
               {topScored.map((place) => (
-                <li key={place.score} data-scoring-policy={place.policyVersion ?? "v6"} className="flex items-center gap-2">
+                <li key={place.score} data-scoring-policy={place.policyVersion} className="flex items-center gap-2">
                   <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-[2px] px-1 text-[10px] font-semibold text-forest ${MEDALS[place.rank - 1] ?? "bg-track"}`}>
                     {place.rank}
                   </span>

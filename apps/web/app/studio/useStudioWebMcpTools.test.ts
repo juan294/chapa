@@ -4,17 +4,15 @@ import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_BADGE_CONFIG,
-  TIER_THRESHOLDS,
   type BadgeConfig,
-  type CraftResult,
-  type ImpactV6Result,
-  type StatsData,
 } from "@chapa/shared";
 import type { CommandResult } from "@/components/terminal/command-registry";
-import { DEMO_IMPACT, DEMO_STATS } from "@/lib/render/demoData";
 import { WEBMCP_INVALID_INPUT_PREFIX } from "@/lib/webmcp/use-model-context-tools";
+import { OBSERVED_SIMULATE_SCORE_INPUT_SCHEMA } from "@/lib/webmcp/catalog";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
+import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 import type { StudioCommandAction } from "./useStudioCommands";
-import { computeImpactV6 } from "@/lib/impact/v6";
 import { useStudioWebMcpTools } from "./useStudioWebMcpTools";
 
 vi.mock("@/lib/env", () => ({
@@ -40,19 +38,6 @@ const READ_ONLY_TOOLS = [
   "suggest_improvements",
   "explain_dimension",
 ];
-
-const craftResult: CraftResult = {
-  tool: "claude-code",
-  dimensions: {
-    proficiency: 91,
-    effectiveness: 72,
-    sophistication: 83,
-  },
-  craftScore: 82,
-  tier: "Expert",
-  reportPeriod: { start: "2026-08-01", end: "2026-08-27" },
-  computedAt: "2026-08-27T00:00:00.000Z",
-};
 
 function line(text: string) {
   return { id: `line-${text}`, type: "success" as const, text };
@@ -91,25 +76,19 @@ function makeRunCommand() {
 }
 
 function setup(overrides?: {
-  scoring?: import("@/lib/profile/score-view-model").ScoreViewModel;
-  stats?: StatsData;
+  scoring?: ScoreViewModel;
   config?: BadgeConfig;
-  impact?: ImpactV6Result;
-  craftResult?: CraftResult | null;
   saveStatus?: "dirty" | "saving" | "saved" | "error";
   enabled?: boolean;
 }) {
   const runCommand = makeRunCommand();
   const proposeSave = vi.fn();
   const config = overrides?.config ?? { ...DEFAULT_BADGE_CONFIG };
-  const impact = overrides?.impact ?? DEMO_IMPACT;
+  const scoring = overrides?.scoring ?? makeScoring();
   const { result } = renderHook(() =>
     useStudioWebMcpTools({
       config,
-      stats: overrides?.stats ?? { ...DEMO_STATS, heatmapData: [] },
-      impact,
-      scoring: overrides?.scoring,
-      craftResult: overrides?.craftResult ?? null,
+      scoring,
       handle: "dev user",
       enabled: overrides?.enabled ?? true,
       saveStatus: overrides?.saveStatus ?? "dirty",
@@ -122,7 +101,7 @@ function setup(overrides?: {
     if (!tool) throw new Error(`Missing tool: ${name}`);
     return tool;
   };
-  return { tools: result.current, getTool, runCommand, proposeSave, config };
+  return { tools: result.current, getTool, runCommand, proposeSave, config, scoring };
 }
 
 async function execute(
@@ -152,8 +131,7 @@ describe("useStudioWebMcpTools", () => {
   it("returns a memoized catalog with the nine planned names and annotations", () => {
     const options = {
       config: { ...DEFAULT_BADGE_CONFIG },
-      stats: DEMO_STATS,
-      impact: DEMO_IMPACT,
+      scoring: makeScoring(),
       handle: "developer",
       enabled: true,
       saveStatus: "saved" as const,
@@ -233,25 +211,10 @@ describe("useStudioWebMcpTools", () => {
       required: ["name"],
       additionalProperties: false,
     });
-    const scoreProperty = { type: "number", minimum: 0, maximum: 100 };
-    expect(getTool("simulate_score").inputSchema).toEqual({
-      type: "object",
-      properties: {
-        dimensions: {
-          type: "object",
-          properties: {
-            delivery: scoreProperty,
-            quality: scoreProperty,
-            consistency: scoreProperty,
-            breadth: scoreProperty,
-            craft: scoreProperty,
-          },
-          additionalProperties: false,
-        },
-      },
-      required: ["dimensions"],
-      additionalProperties: false,
-    });
+    // #1335 — v7.2 is the one scoring policy; simulate_score always uses the
+    // evidence-count/dimension-scenario schema, never the retired
+    // direct-dimension-override v6 shape.
+    expect(getTool("simulate_score").inputSchema).toEqual(OBSERVED_SIMULATE_SCORE_INPUT_SCHEMA);
     expect(getTool("explain_dimension").inputSchema).toEqual({
       type: "object",
       properties: {
@@ -401,105 +364,57 @@ describe("useStudioWebMcpTools", () => {
     },
   );
 
-  it("simulates a fixed score from merged dimensions and current confidence", async () => {
+  it.each([
+    [90, "Elite"],
+    [75, "High"],
+    [40, "Solid"],
+    [10, "Emerging"],
+  ] as const)("simulates a dimension scenario and applies the current v7.2 tier boundary %i", async (score, tier) => {
+    // makeScoring()'s default composite is a 58-point baseline.
     const { getTool } = setup();
 
     const payload = JSON.parse(
       await execute(getTool("simulate_score"), {
-        dimensions: { delivery: 0 },
+        dimensions: { delivery: score, quality: score, consistency: score, breadth: score },
       }),
     );
 
-    expect(payload).toEqual({
-      hypothetical: true, policyVersion: "v6",
-      composite: 58,
-      adjusted: 57,
-      tier: "Solid",
-      deltaVsCurrent: -25,
+    expect(payload).toMatchObject({
+      hypothetical: true,
+      policyVersion: "v7.2",
+      scope: "dimension_scenario",
+      displayScore: score,
+      tier,
+      deltaVsCurrent: score - 58,
     });
   });
 
-  it.each([
-    [TIER_THRESHOLDS.S, "Elite"],
-    [TIER_THRESHOLDS.A, "High"],
-    [TIER_THRESHOLDS.C, "Solid"],
-    [TIER_THRESHOLDS.C - 1, "Emerging"],
-  ] as const)("uses shared tier boundary %i for %s", async (score, tier) => {
-    const impact: ImpactV6Result = {
-      ...DEMO_IMPACT,
-      confidence: 100,
-      dimensions: {
-        delivery: 0,
-        quality: 0,
-        consistency: 0,
-        breadth: 0,
-        craft: 0,
-      },
-      adjustedComposite: 0,
-    };
-    const { getTool } = setup({ impact });
+  it("safely rejects invalid simulate_score scenarios", async () => {
+    const { getTool } = setup();
 
-    const payload = JSON.parse(
-      await execute(getTool("simulate_score"), {
-        dimensions: {
-          delivery: score,
-          quality: score,
-          consistency: score,
-          breadth: score,
-          craft: score,
-        },
-      }),
-    );
-
-    expect(payload).toMatchObject({ composite: score, adjusted: score, tier });
-  });
-
-  it("uses solo dimension keys and safely rejects invalid score inputs", async () => {
-    const soloImpact: ImpactV6Result = {
-      ...DEMO_IMPACT,
-      profileType: "solo",
-      confidence: 100,
-      dimensions: {
-        delivery: 40,
-        quality: 100,
-        consistency: 40,
-        breadth: 40,
-      },
-      adjustedComposite: 40,
-    };
-    const { getTool } = setup({ impact: soloImpact });
-
-    const solo = JSON.parse(
-      await execute(getTool("simulate_score"), {
-        dimensions: { quality: 0 },
-      }),
-    );
-    expect(solo.composite).toBe(40);
-
-    for (const dimensions of [
-      { delivery: 101 },
-      { delivery: Number.NaN },
-      { unknown: 50 },
+    for (const inputs of [
+      { dimensions: { delivery: 101 } },
+      { dimensions: { delivery: Number.NaN } },
+      { dimensions: { unknown: 50 } },
     ]) {
       await expect(
-        execute(getTool("simulate_score"), { dimensions }),
+        execute(getTool("simulate_score"), inputs),
       ).resolves.toContain("Invalid input");
     }
   });
 
-  it("serializes grounded improvement suggestions", async () => {
+  it("serializes grounded improvement suggestions for the current v7.2 profile", async () => {
     const { getTool } = setup();
 
     const insights = JSON.parse(await execute(getTool("suggest_improvements")));
 
-    expect(insights).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: "next-tier", type: "next-tier" }),
-      ]),
-    );
+    expect(insights).toMatchObject({
+      policyVersion: "v7.2",
+      suggestions: expect.arrayContaining([expect.stringContaining("evidence")]),
+    });
   });
 
-  it("explains valid dimensions with translated copy and existing submetrics", async () => {
+  it("explains valid dimensions using the current v7.2 model", async () => {
     const { getTool } = setup();
 
     const explanation = JSON.parse(
@@ -507,88 +422,30 @@ describe("useStudioWebMcpTools", () => {
     );
 
     expect(explanation).toMatchObject({
+      policyVersion: "v7.2",
       dimension: "delivery",
-      score: DEMO_IMPACT.dimensions.delivery,
-      tip: expect.stringContaining("Measures shipping output"),
-      formula: expect.stringContaining("70% PR weight"),
+      weight: 0.25,
     });
-    expect(explanation.subMetrics.map((metric: { key: string }) => metric.key)).toEqual([
-      "prWeight",
-      "issues",
-      "commits",
-    ]);
 
     await expect(
       execute(getTool("explain_dimension"), { dimension: "unknown" }),
     ).resolves.toContain("Invalid input");
   });
 
-  it("explains Craft with the materialized non-zero submetrics", async () => {
-    const { getTool } = setup({ craftResult });
+  it("explains craft as not yet reported when no report exists", async () => {
+    const { getTool } = setup();
 
     const explanation = JSON.parse(
       await execute(getTool("explain_dimension"), { dimension: "craft" }),
     );
 
-    expect(
-      explanation.subMetrics.map(
-        (metric: { normalizedValue: number }) => metric.normalizedValue,
-      ),
-    ).toEqual([0.91, 0.72, 0.83]);
-    expect(explanation.subMetrics[0].rawLabel).toContain("91");
-  });
-
-  it("preserves a useful Craft explanation before Craft data exists", async () => {
-    const impact: ImpactV6Result = {
-      ...DEMO_IMPACT,
-      dimensions: {
-        delivery: 88,
-        quality: 72,
-        consistency: 80,
-        breadth: 65,
-      },
-    };
-    const { getTool } = setup({ impact, craftResult: null });
-
-    const explanation = JSON.parse(
-      await execute(getTool("explain_dimension"), { dimension: "craft" }),
-    );
-
-    expect(explanation.score).toBeNull();
-    expect(
-      explanation.subMetrics.map(
-        (metric: { normalizedValue: number }) => metric.normalizedValue,
-      ),
-    ).toEqual([0, 0, 0]);
+    expect(explanation).toMatchObject({ policyVersion: "v7.2", craft: { status: "no_report" } });
   });
 });
 
-
-describe("production recency simulation", () => {
-  afterEach(() => { cleanup(); vi.useRealTimers(); });
-  it.each(["2026-09-05", "2026-01-01"])("unchanged dimensions preserve the real score for activity on %s", async (date) => {
-    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
-    const stats = { ...DEMO_STATS, heatmapData: [{ date, count: 10 }] };
-    const impact = computeImpactV6(stats);
-    const { getTool } = setup({ stats, impact });
-    const payload = JSON.parse(await execute(getTool("simulate_score"), { dimensions: impact.dimensions }));
-    expect(payload.adjusted).toBe(impact.adjustedComposite);
-    expect(payload.tier).toBe(impact.tier);
-    expect(payload.deltaVsCurrent).toBe(0);
-  });
-  it("applies recent activity before confidence across the Elite boundary", async () => {
-    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-05T12:00:00Z"));
-    const stats = { ...DEMO_STATS, heatmapData: [{ date: "2026-09-05", count: 10 }] };
-    const { getTool } = setup({ stats, impact: { ...DEMO_IMPACT, confidence: 100 } });
-    const payload = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { delivery: 81, quality: 81, consistency: 81, breadth: 81, craft: 81 } }));
-    expect(payload).toMatchObject({ composite: 81, adjusted: 86, tier: "Elite" });
-  });
-});
-
-import { scoringConsistencyFixture } from "@/lib/profile/__fixtures__/scoring-consistency";
 it("Studio tools simulate and explain the selected receipt without legacy proficiency", async () => {
   const f = await scoringConsistencyFixture({ craft: 57 });
-  const { getTool } = setup({ impact: f.impact, stats: f.stats, scoring: f.model });
+  const { getTool } = setup({ scoring: f.model });
   const simulation = JSON.parse(await execute(getTool("simulate_score"), { dimensions: { craft: 0 } }));
   expect(simulation).toMatchObject({ hypothetical: true, policyVersion: "v7.2", displayScore: 46, baselineRevision: f.model.identity!.revisionId });
   expect(JSON.parse(await execute(getTool("simulate_score"), { counts: {} }))).toMatchObject({ scope: "evidence_counts", displayScore: 46 });

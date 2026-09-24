@@ -60,17 +60,10 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     registeredAt: "2025-01-01T00:00:00Z",
     lastSnapshotDate: "2025-04-01",
     fetchedAt: "2025-04-01T12:00:00Z",
-    commitsTotal: 142,
-    prsMergedCount: 18,
-    reviewsSubmittedCount: 31,
-    activeDays: 45,
-    reposContributed: 4,
-    totalStars: 25,
     archetype: "Builder",
     tier: "Solid",
     adjustedComposite: 72,
     rawScore: 70,
-    confidence: 85,
     ...overrides,
   };
 }
@@ -94,24 +87,11 @@ describe("AdminUserTable", () => {
     });
   });
 
-  describe("#519 — ARIA progressbar on confidence bar", () => {
-    it("confidence bar has role='progressbar', bound aria-valuenow, min/max, and label", () => {
-      render(
-        <AdminUserTable {...defaultTableProps} users={[makeUser({ confidence: 63 })]} />,
-      );
-      const progressbar = screen.getByRole("progressbar", { name: "Legacy confidence score" });
-      expect(progressbar.getAttribute("aria-valuenow")).toBe("63");
-      expect(progressbar.getAttribute("aria-valuemin")).toBe("0");
-      expect(progressbar.getAttribute("aria-valuemax")).toBe("100");
-    });
-  });
-
-  it("shows canonical current precision, exact value and nullable archetype without legacy confidence", () => {
-    render(<AdminUserTable {...defaultTableProps} users={[makeUser({ policyVersion: "v7.2", adjustedComposite: 69.99, rawScore: 69.99, exactScore: 69.998, archetype: null, confidence: null })]} />);
+  it("shows canonical current precision, exact value and nullable archetype", () => {
+    render(<AdminUserTable {...defaultTableProps} users={[makeUser({ policyVersion: "v7.2", adjustedComposite: 69.99, rawScore: 69.99, exactScore: 69.998, archetype: null })]} />);
     expect(screen.getByText("69.99")).toBeDefined();
     expect(screen.getByText("69.998")).toBeDefined();
     expect(screen.getByText("v7.2")).toBeDefined();
-    expect(screen.queryByRole("progressbar")).toBeNull();
     expect(screen.queryByText("Builder")).toBeNull();
   });
 
@@ -249,19 +229,6 @@ describe("AdminUserTable", () => {
     it("shows adjusted composite score when set", () => {
       render(<AdminUserTable {...defaultTableProps} users={[makeUser({ adjustedComposite: 88 })]} />);
       expect(screen.getByText("88")).toBeDefined();
-    });
-
-    it("shows confidence bar when confidence is set", () => {
-      render(<AdminUserTable {...defaultTableProps} users={[makeUser({ confidence: 75 })]} />);
-      const progressbar = screen.getByRole("progressbar");
-      expect(progressbar.getAttribute("aria-valuenow")).toBe("75");
-    });
-
-    it("shows em-dash when confidence is null", () => {
-      render(
-        <AdminUserTable {...defaultTableProps} users={[makeUser({ confidence: null })]} />,
-      );
-      expect(screen.queryByRole("progressbar")).toBeNull();
     });
   });
 });

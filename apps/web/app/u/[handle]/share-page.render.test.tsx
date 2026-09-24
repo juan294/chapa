@@ -1,13 +1,7 @@
-const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
-vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
-  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
-}));
-// #1335 phase 4 — defaults to `ready` so pre-existing tests (all v6 by
-// default anyway, which never calls this at all) keep their behavior.
-// #1335 phase 4 perf fix — `mockHasDrawableCurrentReceipt` defaults to
-// `false` so pre-existing tests keep calling `readScoringStatus` exactly as
-// before; tests proving the perf fix override it to `true`.
+// #1335 phase 4 — defaults to `ready` so pre-existing tests keep their
+// behavior. #1335 phase 4 perf fix — `mockHasDrawableCurrentReceipt`
+// defaults to `false` so pre-existing tests keep calling `readScoringStatus`
+// exactly as before; tests proving the perf fix override it to `true`.
 const { mockReadScoringStatus, mockHasDrawableCurrentReceipt, mockSharePageScoringStatusComponent } = vi.hoisted(() => ({
   mockReadScoringStatus: vi.fn(),
   mockHasDrawableCurrentReceipt: vi.fn(),
@@ -21,7 +15,6 @@ vi.mock("./SharePageScoringStatus", () => ({
   SharePageScoringStatus: mockSharePageScoringStatusComponent,
 }));
 beforeEach(() => {
-  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
   mockReadScoringStatus.mockResolvedValue({ kind: "ready", receiptDate: "2026-05-03", updating: false });
   mockHasDrawableCurrentReceipt.mockResolvedValue(false);
 });
@@ -36,11 +29,8 @@ import type { Translations } from "@/lib/i18n/types";
 
 const {
   mockMaterializePublicProfile,
-  mockGetPublicProfileVerification,
+  mockResolveBadgeVerification,
   mockRunPublicProfileSideEffects,
-  mockPersistProfileSnapshot,
-  mockDeferProfileCacheWork,
-  mockRedactImpactForVisitor,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -48,7 +38,6 @@ const {
   mockGetServerLocale,
   mockReadBadgeSvgCache,
   mockWriteBadgeSvgCache,
-  mockGetTrendData,
   mockHeaders,
   mockGetOptionalServerSessionFromHeaders,
   mockSharePageWebMcpToolsComponent,
@@ -57,11 +46,8 @@ const {
   mockDbGetLinkedPlatforms,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
+  mockResolveBadgeVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
-  mockPersistProfileSnapshot: vi.fn(),
-  mockDeferProfileCacheWork: vi.fn(),
-  mockRedactImpactForVisitor: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -69,7 +55,6 @@ const {
   mockGetServerLocale: vi.fn(),
   mockReadBadgeSvgCache: vi.fn(),
   mockWriteBadgeSvgCache: vi.fn(),
-  mockGetTrendData: vi.fn(),
   mockHeaders: vi.fn(),
   mockGetOptionalServerSessionFromHeaders: vi.fn(),
   mockSharePageWebMcpToolsComponent: vi.fn(),
@@ -114,16 +99,13 @@ vi.mock("@/lib/feature-flags", () => ({
 vi.mock("@/lib/profile/public-profile", () => ({
   materializePublicProfile: (...args: unknown[]) =>
     mockMaterializePublicProfile(...args),
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
-  persistProfileSnapshot: (...args: unknown[]) =>
-    mockPersistProfileSnapshot(...args),
-  deferProfileCacheWork: (...args: unknown[]) =>
-    mockDeferProfileCacheWork(...args),
-  redactImpactForVisitor: (...args: unknown[]) =>
-    mockRedactImpactForVisitor(...args),
+}));
+
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) =>
+    mockResolveBadgeVerification(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -171,10 +153,6 @@ vi.mock("@/lib/render/badge-svg-cache", () => ({
     `${date}-${revision === null ? "default" : `r${revision}`}`,
   readBadgeSvgCache: (...args: unknown[]) => mockReadBadgeSvgCache(...args),
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
-}));
-
-vi.mock("@/lib/history/get-trend-data", () => ({
-  getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
 }));
 
 vi.mock("@/components/CommandBarHint", () => ({
@@ -285,6 +263,9 @@ function findElementByType(
   return null;
 }
 
+// #1335 phase 5 — v7.2 is the one scoring policy this surface renders; no
+// `rawImpact`/`displayImpact`/`snapshot` legacy fields left on
+// `MaterializedProfile`.
 const FAKE_MATERIALIZED = {
   stats: {
     handle: "testuser",
@@ -296,30 +277,32 @@ const FAKE_MATERIALIZED = {
     reviewsSubmittedCount: 5,
     heatmapData: [],
   },
-  rawImpact: {
-    adjustedComposite: 73,
-    tier: "High",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  displayImpact: {
-    adjustedComposite: 65,
-    tier: "Solid",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  snapshot: { date: "2026-05-03", adjustedComposite: 65, tier: "Solid" },
+  craftResult: null,
+  statsComplete: true,
+  statsFreshness: "current",
+  statsCapturedAt: "2026-05-03T00:00:00Z",
   // #1331 — configCacheable now requires exactly freshness === "current"
   // (was `!== "unavailable"`, which `undefined` also satisfied).
   scoring: {
-    policyVersion: "v6",
+    policyVersion: "v7.2",
+    handle: "testuser",
+    identity: null,
+    window: null,
     freshness: "current",
     tier: "Solid",
+    archetype: "Builder",
     composite: { kind: "point", value: 65, display: 65 },
+    dimensions: {
+      delivery: { kind: "point", value: 70, display: 70 },
+      quality: { kind: "point", value: 60, display: 60 },
+      consistency: { kind: "point", value: 65, display: 65 },
+      breadth: { kind: "point", value: 55, display: 55 },
+    },
+    craft: null,
+    reportCraft: { status: "no_report", unlocked: false, report: null },
+    coverage: [],
+    exclusions: [],
+    limitations: [],
   },
 };
 
@@ -328,13 +311,11 @@ beforeEach(() => {
   mockIsValidHandle.mockReturnValue(true);
   mockIsWebmcpEnabled.mockResolvedValue(true);
   mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-  mockGetPublicProfileVerification.mockReturnValue({
+  mockResolveBadgeVerification.mockResolvedValue({
     hash: "abc12345",
     date: "2026-05-03",
   });
   mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
-  mockPersistProfileSnapshot.mockResolvedValue(true);
-  mockDeferProfileCacheWork.mockResolvedValue(undefined);
   mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
   mockRenderBadgeSvg.mockReturnValue(
     '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>',
@@ -347,15 +328,9 @@ beforeEach(() => {
     revision: 7,
     cacheable: true,
   });
-  mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
   mockHeaders.mockResolvedValue({ get: () => null });
   mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
   mockDbGetLinkedPlatforms.mockResolvedValue([]);
-  mockRedactImpactForVisitor.mockImplementation((impact: Record<string, unknown>) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { confidence: _confidence, confidencePenalties: _confidencePenalties, ...rest } = impact;
-    return rest;
-  });
 });
 
 describe("Phase 4d — Share page i18n", () => {
@@ -461,15 +436,7 @@ describe("Phase 4d — Share page i18n", () => {
   });
 
   describe("SharePageContent — en locale", () => {
-    it("mounts the public WebMCP host with the redacted server data", async () => {
-      const trend = { direction: "improving", avgDelta: 2 };
-      const diff = {
-        adjustedComposite: 3,
-        confidence: 4,
-        penaltyChanges: { added: [], removed: [] },
-      };
-      mockGetTrendData.mockResolvedValue({ trend, diff });
-
+    it("mounts the public WebMCP host with the server-resolved data", async () => {
       const result = await SharePageContent({ handle: "testuser", locale: "en" });
       const host = findElementByType(
         result,
@@ -481,16 +448,16 @@ describe("Phase 4d — Share page i18n", () => {
         handle: "testuser",
         stats: FAKE_MATERIALIZED.stats,
         verification: { hash: "abc12345", date: "2026-05-03" },
-        trend,
-        craftResult: null,
         embedMarkdown:
           "![Chapa Badge of testuser](https://chapa.thecreativetoken.com/u/testuser/badge.svg)",
         embedHtml:
           '<img src="https://chapa.thecreativetoken.com/u/testuser/badge.svg" alt="Chapa Badge of testuser" width="600" height="315" />',
       });
-      expect(host?.props.impact).not.toHaveProperty("confidence");
-      expect(host?.props.diff).not.toHaveProperty("confidence");
-      expect(host?.props.diff).not.toHaveProperty("penaltyChanges");
+      // #1335 phase 5 — the tool host no longer takes an `impact`/`diff`
+      // prop at all; confidence never crosses into this client tree because
+      // there is nothing legacy left to redact.
+      expect(host?.props).not.toHaveProperty("impact");
+      expect(host?.props).not.toHaveProperty("diff");
     });
 
     it("omits the public WebMCP host when the server kill-switch is off", async () => {
@@ -554,7 +521,6 @@ describe("Phase 4d — Share page i18n", () => {
 
         expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
           FAKE_MATERIALIZED.stats,
-          FAKE_MATERIALIZED.displayImpact,
           expect.objectContaining({ avatarDataUri: undefined }),
         );
         expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
@@ -579,7 +545,6 @@ describe("Phase 4d — Share page i18n", () => {
 
         expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
           FAKE_MATERIALIZED.stats,
-          FAKE_MATERIALIZED.displayImpact,
           expect.objectContaining({ avatarDataUri: "data:image/png;base64,fast" }),
         );
         expect(mockWriteBadgeSvgCache).toHaveBeenCalled();
@@ -589,14 +554,13 @@ describe("Phase 4d — Share page i18n", () => {
     });
 
     it("does not cache an unverified badge so a later complete fetch can heal", async () => {
-      mockGetPublicProfileVerification.mockReturnValue(null);
+      mockResolveBadgeVerification.mockResolvedValue(null);
 
       await SharePageContent({ handle: "testuser" });
       await flushAfterCallbacks();
 
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         FAKE_MATERIALIZED.stats,
-        FAKE_MATERIALIZED.displayImpact,
         expect.objectContaining({
           verificationHash: undefined,
           verificationDate: undefined,
@@ -628,13 +592,10 @@ describe("Phase 4d — Share page i18n", () => {
     // contains the string "renderJsonLd(personJsonLd)" (page.test.ts's
     // "JSON-LD security" describe block). That protects against someone
     // swapping out the escaping helper, but nothing fails if `confidence` or
-    // `confidencePenalties` were spread into `personJsonLd` itself — the
-    // CLAUDE.md acceptance criterion is that confidence data must be
-    // "excluded from public metadata (JSON-LD)". This test renders the real
-    // component tree (FAKE_MATERIALIZED.displayImpact carries
-    // `confidence: 85`, matching a real ImpactV6Result) and inspects the
-    // actual serialized JSON-LD payload — a behavioral assertion on output,
-    // not a source-text pattern match.
+    // `confidencePenalties` were spread into `personJsonLd` itself. This
+    // test renders the real component tree and inspects the actual
+    // serialized JSON-LD payload — a behavioral assertion on output, not a
+    // source-text pattern match.
     it("excludes confidence data from the rendered JSON-LD script (privacy boundary)", async () => {
       const result = await SharePageContent({ handle: "testuser" });
       const parsed = parseJsonLdScript(result);
@@ -659,7 +620,7 @@ describe("Phase 4d — Share page i18n", () => {
     });
 
     it("omits the badge verification action when no verification exists", async () => {
-      mockGetPublicProfileVerification.mockReturnValue(null);
+      mockResolveBadgeVerification.mockResolvedValue(null);
 
       const result = await SharePageContent({ handle: "testuser" });
       const parsed = parseJsonLdScript(result);
@@ -755,12 +716,10 @@ describe("Phase 4d — Share page i18n", () => {
     });
   });
 
-  // #1335 phase 4 — status gating, mirroring badge.svg/og-image's own tests.
+  // #1335 phase 4/5 — status gating, mirroring badge.svg/og-image's own
+  // tests. v7.2 is the one rendered policy now; the retired
+  // `scoring_v7_rendering` selector no longer gates any of this.
   describe("scoring status placeholder", () => {
-    beforeEach(() => {
-      mockReadScoringSelection.mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
-    });
-
     it("renders SharePageScoringStatus (not the normal pipeline) when collecting with no prior receipt", async () => {
       mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 42, sources: [], hasPriorReceipt: false });
       mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
@@ -792,20 +751,11 @@ describe("Phase 4d — Share page i18n", () => {
       expect(mockMaterializePublicProfile).toHaveBeenCalled();
     });
 
-    it("never gates on status under an explicit v6 selection", async () => {
-      mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-      mockReadScoringStatus.mockResolvedValue({ kind: "collecting", percent: 1, sources: [], hasPriorReceipt: false });
-      await SharePageContent({ handle: "testuser" });
-      expect(mockReadScoringStatus).not.toHaveBeenCalled();
-      expect(mockMaterializePublicProfile).toHaveBeenCalled();
-    });
-
     // #1335 phase 4 fix — a failed authority read must never fall through
     // to whatever the normal materialize pipeline's OWN receipt lookup
-    // produces when THAT also has no v7.2 receipt (this file's
-    // FAKE_MATERIALIZED.scoring.policyVersion is "v6"): rendering that would
-    // be exactly the legacy v6 fallback the plan's "failed authority reads
-    // are unavailable" invariant forbids. See badge.svg/og-image's
+    // produces when THAT also has no drawable v7.2 receipt: rendering that
+    // would be exactly the legacy fallback the plan's "failed authority
+    // reads are unavailable" invariant forbids. See badge.svg/og-image's
     // equivalent describe blocks for the full rationale.
     describe("authority read failure (scoringStatus === null)", () => {
       it("still runs materialize (to check for an independently-drawable receipt)", async () => {
@@ -817,6 +767,12 @@ describe("Phase 4d — Share page i18n", () => {
       it("renders SharePageScoringStatus with badgeState=unavailable, status=null when materialize also has no drawable v7.2 receipt", async () => {
         mockReadScoringStatus.mockRejectedValue(new Error("boom"));
         mockGetOptionalServerSessionFromHeaders.mockReturnValue({ login: "testuser" });
+        // No drawable receipt: the normal materialize pipeline's own
+        // independent lookup also found nothing.
+        mockMaterializePublicProfile.mockResolvedValue({
+          ...FAKE_MATERIALIZED,
+          scoring: undefined,
+        });
         const result = await SharePageContent({ handle: "testuser" });
         const found = findElementByType(result, mockSharePageScoringStatusComponent);
         expect(found).not.toBeNull();
@@ -825,20 +781,7 @@ describe("Phase 4d — Share page i18n", () => {
 
       it("renders normally (not the unavailable placeholder) when materialize independently finds a real v7.2 receipt", async () => {
         mockReadScoringStatus.mockResolvedValue(null);
-        mockMaterializePublicProfile.mockResolvedValue({
-          ...FAKE_MATERIALIZED,
-          scoring: { ...FAKE_MATERIALIZED.scoring, policyVersion: "v7.2" },
-        });
         const result = await SharePageContent({ handle: "testuser" });
-        expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
-        expect(mockMaterializePublicProfile).toHaveBeenCalled();
-      });
-
-      it("never fires for an explicit v6 selection", async () => {
-        mockReadScoringSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-        mockReadScoringStatus.mockResolvedValue(null);
-        const result = await SharePageContent({ handle: "testuser" });
-        expect(mockReadScoringStatus).not.toHaveBeenCalled();
         expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();
         expect(mockMaterializePublicProfile).toHaveBeenCalled();
       });
@@ -854,15 +797,8 @@ describe("Phase 4d — Share page i18n", () => {
     // #1335 phase 4 perf fix.
     it("never calls readScoringStatus when a drawable current receipt exists", async () => {
       mockHasDrawableCurrentReceipt.mockResolvedValue(true);
-      // Consistent with a drawable receipt existing: materialize's own
-      // independent lookup finds the same real v7.2 receipt (FAKE_MATERIALIZED
-      // defaults to "v6", which would otherwise trip needsUnavailablePlaceholder).
-      mockMaterializePublicProfile.mockResolvedValue({
-        ...FAKE_MATERIALIZED,
-        scoring: { ...FAKE_MATERIALIZED.scoring, policyVersion: "v7.2" as const },
-      });
       const result = await SharePageContent({ handle: "testuser" });
-      expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser", expect.objectContaining({ machinePolicy: "v7.2" }));
+      expect(mockHasDrawableCurrentReceipt).toHaveBeenCalledWith("testuser");
       expect(mockReadScoringStatus).not.toHaveBeenCalled();
       expect(mockMaterializePublicProfile).toHaveBeenCalled();
       expect(findElementByType(result, mockSharePageScoringStatusComponent)).toBeNull();

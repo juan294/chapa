@@ -361,11 +361,13 @@ Build:
    `useTrendData`) that only run under real network failure — and which today
    surface non-2xx fetches to **no** monitoring (§6.2).
 4. **Re-read Supabase at the end — the crux.** After the journey, query with the
-   service-role client and assert: the `metrics_snapshots` row exists for today
-   with the correct per-shape values (Craft populated for the craft profile, null
-   for the non-craft one — *this is exactly the NOT-NULL-forwarding drop from §1.1*),
-   the `studio_configs` row matches what was saved, and `user_platforms` reflects
-   any link. **This assertion is what a UI-only E2E omits and is exactly what
+   service-role client and assert the durable state a UI-only E2E would miss:
+   the current v7.2 receipt for today with the correct per-shape values (Craft
+   present for the craft profile, absent for the non-craft one — the v7.2
+   analog of the NOT-NULL-forwarding drop from §1.1, though `metrics_snapshots`
+   itself is retired along with v6, #1335 phase 5), the `studio_configs` row
+   matches what was saved, and `user_platforms` reflects any link. **This
+   assertion is what a UI-only E2E omits and is exactly what
    catches silent data loss.**
 5. **Realistic seed fixtures.** Seed data that mirrors what the real stats pipeline
    emits (all optional columns populated), not minimal fixtures — otherwise you

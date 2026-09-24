@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { setRedesignSession, redesignFixtureClient } from "./helpers/redesign-fixtures";
 import { assertScoringFixtureEnvironment, scoringReportHtml, enqueueGithubJob, seedFailedGithubJob } from "./helpers/scoring-point-fixtures";
-import { studioRoot, studioControl } from "./helpers/studio";
+import { studioRoot, studioControl, studioBadgePreview } from "./helpers/studio";
 
 const admitted = process.env.REDESIGN_DISPOSABLE_PROJECT === "chapa-redesign";
 if (process.env.RELEASE_VERIFICATION_MODE === "local-candidate" && !admitted) throw new Error("Local scoring qualification requires disposable fixtures");
@@ -134,10 +134,11 @@ async function upload(page: Page, point: 57 | 0, referenceTime: string) {
   return body;
 }
 
-test("real report57 then explicit correction0 preserves one core across surfaces, saves and rollback", async ({ page, context, baseURL }, testInfo) => {
+test("real report57 then explicit correction0 preserves one core across surfaces, saves and stays published", async ({ page, context, baseURL }, testInfo) => {
   // This is the longest browser contract: it publishes twice, saves and
-  // restores Studio state, verifies two locales, rolls the flag back and
-  // withdraws the receipt. Leave headroom when the full suite is concurrent.
+  // restores Studio state, verifies two locales and confirms the retired
+  // publication-withdrawal action leaves the receipt published.
+  // Leave headroom when the full suite is concurrent.
   test.setTimeout(240_000);
   assertScoringFixtureEnvironment(process.env);
   const owner = `chapa-score-${testInfo.project.name}`;
@@ -184,8 +185,8 @@ test("real report57 then explicit correction0 preserves one core across surfaces
   expect(configBefore.error).toBeNull();
   try {
     await page.goto("/studio?lang=en");
-    await expect(page.getByTestId("badge-preview").locator('[data-element="score"]')).toHaveText("46");
-    await expect(page.getByTestId("badge-preview").locator('[data-axis="craft"]')).toHaveAttribute("data-value", "0");
+    await expect(studioBadgePreview(page).locator('[data-element="score"]')).toHaveText("46");
+    await expect(studioBadgePreview(page).locator('[data-axis="craft"]')).toHaveAttribute("data-value", "0");
     const input = page.locator("#terminal-command-input");
     await input.fill("/set palette jade"); await input.press("Enter");
     const saved = page.waitForResponse(r => r.url().includes("/api/studio/config") && r.request().method() === "PUT");
@@ -212,25 +213,10 @@ test("real report57 then explicit correction0 preserves one core across surfaces
     expect((await servedImage(page)).digest).toBe(imageBeforePalette.digest);
   }
 
-  const verificationBeforeRollback = await verifyIdentity(page, zero);
-  try {
-    expect((await db.from("feature_flags").update({ enabled: false }).eq("key", "scoring_v7_rendering")).error).toBeNull();
-    await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 8_000 }).toBe("v6");
-    const legacy = await api(page, owner);
-    for (const locale of ["en", "es"]) {
-      const off = await page.request.get(`/u/${owner}/badge.svg?lang=${locale}`);
-      expect(off.status()).toBe(200);
-      const svg = await off.text();
-      expect(svg).toContain(`>${legacy.displayScore}</text>`);
-      expect(svg).not.toContain('data-axis="craft" data-value="0"');
-      await page.goto(`/u/${owner}?lang=${locale}`);
-      const image = await servedImage(page);
-      await testInfo.attach(`rollback-${locale}.png`, { body: image.bytes, contentType: "image/png" });
-    }
-    expect((await page.request.get(`/api${verificationBeforeRollback}`)).status()).toBe(200);
-
-  } finally { expect((await db.from("feature_flags").update({ enabled: true }).eq("key", "scoring_v7_rendering")).error).toBeNull(); }
-  await expect.poll(async () => (await api(page, owner)).policyVersion, { timeout: 8_000 }).toBe("v7.2");
+  // #1335 phase 5 — the `scoring_v7_rendering` selector this used to flip to
+  // roll back to a v6 render is retired; v7.2 is the one rendered policy
+  // unconditionally now, so there is no rollback path left to exercise here.
+  expect((await api(page, owner)).policyVersion).toBe("v7.2");
   expect((await api(page, owner)).identity.revisionId).toBe(zero.identity.revisionId);
   for (const locale of ["en", "es"]) {
     const svg = await page.request.get(`/u/${owner}/badge.svg?lang=${locale}`);
@@ -243,13 +229,20 @@ test("real report57 then explicit correction0 preserves one core across surfaces
   await page.goto(`/u/${owner}?lang=en`);
   const tokenLink = await page.locator(`a[href*="${tokenPath}"]`).first().getAttribute("href");
   expect(tokenLink).toBeTruthy();
-  await page.goto("/settings?lang=en");
-  const withdrawal = page.waitForResponse(r => r.url().endsWith("/api/evidence") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Withdraw publication", exact: true }).click();
-  expect((await withdrawal).status()).toBe(200);
-  expect((await page.request.get(`/api${new URL(tokenLink!, baseURL).pathname}`)).status()).toBe(410);
+  // Publication consent, and the "Withdraw publication" action that used to
+  // depend on it, are retired (#1335 phase 2 -- see the `withdraw` branch in
+  // apps/web/app/api/evidence/route.ts): every registered subject publishes
+  // with no opt-in, so there is no UI action left to withdraw it. `withdraw`
+  // stays a recognized command shape only so it answers a specific
+  // retired_action error instead of a generic parse failure; the receipt
+  // this test built stays published and its verify link stays resolvable.
+  const retiredWithdraw = await page.request.post("/api/evidence", { data: { action: "withdraw", owner } });
+  expect(retiredWithdraw.status()).toBe(400);
+  expect((await retiredWithdraw.json()).error).toBe("retired_action");
+  expect((await page.request.get(`/api${new URL(tokenLink!, baseURL).pathname}`)).status()).toBe(200);
   const remaining = await db.from("scoring_v7_receipts").select("id").eq("owner_handle", owner);
-  expect(remaining.error).toBeNull(); expect(remaining.data).toEqual([]);
+  expect(remaining.error).toBeNull();
+  expect(remaining.data!.length).toBeGreaterThan(0);
 });
 
 test("expired Craft retains five labels and boundary69.99 fits EN/ES narrow themes", async ({ page, context, baseURL }, testInfo) => {

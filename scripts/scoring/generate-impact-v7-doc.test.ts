@@ -38,7 +38,7 @@ describe("archived v7 methodology figures and current policy scope", () => {
 
   it("keeps v6 documented separately rather than rewriting it", () => {
     expect(flowed).toContain("impact-v6.md");
-    expect(flowed).toContain("rollout-off policy and an explicitly labelled fallback");
+    expect(flowed).toContain("is retired: its scoring code and stored data no longer");
     expect(flowed).toContain("original immutable receipts, range arithmetic and replay");
     expect(flowed).toContain("archived range policy, not current v7.2");
   });

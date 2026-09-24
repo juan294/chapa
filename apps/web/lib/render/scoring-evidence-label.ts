@@ -48,7 +48,6 @@ function describeObserved(model: ScoreViewModel, labels: ScoringEvidenceLabels):
  */
 export function describeScoringEvidence(model: ScoreViewModel | undefined, labels: ScoringEvidenceLabels = DEFAULT_OBSERVED_LABELS): string {
   if (!model) return "";
-  if (model.policyVersion === "v6") return " Legacy v6 aggregate score.";
   if (model.policyVersion === "v7.2") return describeObserved(model, labels);
 
   const parts: string[] = [];

@@ -3,7 +3,6 @@ import { createScoringWindow } from "@chapa/shared";
 import { materializeObservedScoreReceipt, type ObservedReceiptMaterializationOptions } from "./score-receipt-observed";
 import { dbReadReportCraft, dbPublishObservedReceiptWithReport } from "@/lib/db/report-craft";
 import { issueReceiptVerificationV7 } from "@/lib/verification/store";
-import { readScoringRenderSelection, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 /** The Craft reader and publication fence share one selected report generation. */
 export async function materializeCurrentObservedReceipt(handle: string, options: ObservedReceiptMaterializationOptions = {}) {
@@ -30,11 +29,12 @@ export async function materializeCurrentObservedReceipt(handle: string, options:
   });
 }
 
-/** A recorded preserve/storage reason narrows to these three (#1335 phase 4)
- * -- `no_receipt` is not a failure of issuance itself (there is nothing to
- * preserve or publish), so it is folded into `storage_error` below rather
- * than exposed as a fourth reason nothing else needs to handle. */
-export type ReceiptFailureReason = "storage_error" | "source_error" | "craft_error";
+/** A recorded preserve/storage reason narrows to these four (#1335 phase 4;
+ * `empty_evidence` added phase 5) -- `no_receipt` is not a failure of
+ * issuance itself (there is nothing to preserve or publish), so it is folded
+ * into `storage_error` below rather than exposed as a fifth reason nothing
+ * else needs to handle. */
+export type ReceiptFailureReason = "storage_error" | "source_error" | "craft_error" | "empty_evidence";
 
 /**
  * Every fan-in issuance outcome, with no silent skip (#1335 phase 4): a
@@ -63,6 +63,10 @@ export type ReceiptIssuanceOutcome =
  * exists. Every other non-`issued` outcome is an explicit `failed{reason}`,
  * because a durable write that fails but reports success is always a bug.
  *
+ * #1335 phase 5 — the render-half gate (the retired DB-backed render-selector
+ * selector) is gone: there is one policy now, and it always renders, so
+ * issuing was never inert to begin with.
+ *
  * A `failed` outcome is deliberately *not* captured here: the sole caller
  * (`lib/collection/fan-in.ts`) captures every `failed` outcome exactly once,
  * regardless of reason. Capturing here too used to double-report every
@@ -70,14 +74,8 @@ export type ReceiptIssuanceOutcome =
  */
 export async function issueScoreReceipt(
   handle: string,
-  options: { token?: string; referenceTime?: string; scoringSelection?: ScoringRenderSelection } = {},
+  options: { token?: string; referenceTime?: string } = {},
 ): Promise<ReceiptIssuanceOutcome> {
-  // Gated with the render half. Issuing while nothing renders a receipt would
-  // mint durable public artifacts no surface shows — and the warm-cache cron
-  // would mint a fresh `revision: 1` every hour, with no revision chain.
-  const selection = options.scoringSelection ?? await readScoringRenderSelection();
-  if (!selection.enabled) return { status: "unchanged" };
-
   try {
     const result = await materializeCurrentObservedReceipt(handle, { token: options.token, referenceTime: options.referenceTime ?? new Date().toISOString() });
     if (result.status === "issued" || result.status === "stored") {

@@ -586,7 +586,10 @@ function ControlsSection({
 export default function NumberCountersPage() {
   const [easing, setEasing] = useState("easeOut");
   const [duration, setDuration] = useState(2000);
-  const [target, setTarget] = useState(MOCK_IMPACT.adjustedComposite);
+  // MOCK_IMPACT.composite is always a "point" value (see mock-data.ts).
+  const [target, setTarget] = useState(
+    MOCK_IMPACT.composite.kind === "point" ? MOCK_IMPACT.composite.display : 0,
+  );
   const [replayKey, setReplayKey] = useState(0);
 
   const handleReplayAll = useCallback(() => {

@@ -44,7 +44,8 @@ export const TIERS: TierData[] = [
   },
   {
     tier: "Elite",
-    score: MOCK_IMPACT.adjustedComposite,
+    // MOCK_IMPACT.composite is always a "point" value (see mock-data.ts).
+    score: MOCK_IMPACT.composite.kind === "point" ? MOCK_IMPACT.composite.display : 0,
     handle: `@${MOCK_STATS.handle}`,
     stars: `${(MOCK_STATS.totalStars / 1000).toFixed(1)}k`,
     forks: MOCK_STATS.totalForks,

@@ -42,8 +42,6 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run check:circular
       - run: pnpm run validate:migrations
-      - name: Craft propagation guard (#680)
-        run: bash scripts/check-craft-propagation.sh
       - name: Vercel config location guard (#1052)
         id: vercel-config
         run: pnpm run check:vercel-config

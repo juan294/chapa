@@ -1,11 +1,3 @@
-const { mockReadScoringSelection } = vi.hoisted(() => ({ mockReadScoringSelection: vi.fn() }));
-vi.mock("@/lib/scoring-render-selection", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/scoring-render-selection")>(),
-  readScoringRenderSelection: (...args: unknown[]) => mockReadScoringSelection(...args),
-}));
-beforeEach(() => {
-  mockReadScoringSelection.mockImplementation(async () => ({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() }));
-});
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 /**
  * #720 — share page must try the badge SVG cache before re-rendering.
@@ -25,19 +17,46 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
  * been caught. Converted to invoke the real SharePageContent with mocked
  * dependencies, modeled on the existing mock harness in
  * share-page.render.test.tsx.
+ *
+ * #1335 phase 5 ("delete v6") — the retired `readScoringRenderSelection()`
+ * flag mock is gone: `SharePageContent` always takes the v7.2 status-gating
+ * branch now, so `hasDrawableCurrentReceipt` is mocked to resolve `true`
+ * (a drawable receipt) so the test exercises the normal materialize/render
+ * path this suite is actually about, not the collecting/unregistered
+ * placeholder.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockDbGetStudioConfig } = vi.hoisted(() => ({ mockDbGetStudioConfig: vi.fn() }));
 vi.mock("@/lib/db/studio", () => ({ dbGetStudioConfig: (...args: unknown[]) => mockDbGetStudioConfig(...args) }));
 
+const { mockHasDrawableCurrentReceipt, mockReadScoringStatus } = vi.hoisted(() => ({
+  mockHasDrawableCurrentReceipt: vi.fn(),
+  mockReadScoringStatus: vi.fn(),
+}));
+vi.mock("@/lib/collection/read-scoring-status", () => ({
+  hasDrawableCurrentReceipt: (...args: unknown[]) => mockHasDrawableCurrentReceipt(...args),
+  readScoringStatus: (...args: unknown[]) => mockReadScoringStatus(...args),
+}));
+
+// #1335 phase 5 — `resolveBadgeVerification` is a real, unmocked function
+// elsewhere in this file's fixture (`FAKE_MATERIALIZED.scoring.identity` is
+// `null` specifically so it short-circuits without a receipt-store read).
+// But `cacheEligible` in page.tsx requires `!!verification`, so leaving the
+// real function wired up meant every SVG cache write this suite asserts on
+// was silently skipped. This suite is about SVG cache behavior, not
+// verification content, so mock the resolver directly instead of fabricating
+// a full receipt-store round trip.
+const { mockResolveBadgeVerification } = vi.hoisted(() => ({
+  mockResolveBadgeVerification: vi.fn(),
+}));
+vi.mock("@/lib/profile/badge-verification", () => ({
+  resolveBadgeVerification: (...args: unknown[]) => mockResolveBadgeVerification(...args),
+}));
+
 const {
   mockMaterializePublicProfile,
-  mockGetPublicProfileVerification,
-  mockPersistProfileSnapshot,
-  mockDeferProfileCacheWork,
   mockRunPublicProfileSideEffects,
-  mockRedactImpactForVisitor,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
   mockAfter,
@@ -48,11 +67,7 @@ const {
   mockGetOptionalServerSessionFromHeaders,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
-  mockGetPublicProfileVerification: vi.fn(),
-  mockPersistProfileSnapshot: vi.fn(),
-  mockDeferProfileCacheWork: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
-  mockRedactImpactForVisitor: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockAfter: vi.fn(),
@@ -75,16 +90,8 @@ vi.mock("@/lib/auth/session", () => ({
 vi.mock("@/lib/profile/public-profile", () => ({
   materializePublicProfile: (...args: unknown[]) =>
     mockMaterializePublicProfile(...args),
-  getPublicProfileVerification: (...args: unknown[]) =>
-    mockGetPublicProfileVerification(...args),
-  persistProfileSnapshot: (...args: unknown[]) =>
-    mockPersistProfileSnapshot(...args),
-  deferProfileCacheWork: (...args: unknown[]) =>
-    mockDeferProfileCacheWork(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
-  redactImpactForVisitor: (...args: unknown[]) =>
-    mockRedactImpactForVisitor(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
@@ -98,6 +105,7 @@ vi.mock("@/lib/render/BadgeSvg", () => ({
 vi.mock("@/lib/render/badge-svg-cache", () => ({
   AVATAR_ABSENT_CACHE_TTL_SECONDS: 3600,
   buildBadgeSvgCacheKey: (h: string, d: string) => `badge:${h}:${d}`,
+  constantScoringSelection: (capturedAt: number) => ({ enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt }),
   readBadgeSvgCache: (...args: unknown[]) => mockReadBadgeSvgCache(...args),
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
 }));
@@ -139,43 +147,45 @@ const FAKE_MATERIALIZED = {
     reviewsSubmittedCount: 5,
     heatmapData: [],
   },
-  rawImpact: {
-    adjustedComposite: 73,
-    tier: "High",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  displayImpact: {
-    adjustedComposite: 65,
-    tier: "Solid",
-    confidence: 85,
-    archetype: "Builder",
-    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-    profileType: "collaborative",
-  },
-  snapshot: { date: "2026-05-03", adjustedComposite: 65, tier: "Solid" },
+  craftResult: null,
+  statsComplete: true,
+  statsFreshness: "current",
+  statsCapturedAt: "2026-05-03T00:00:00Z",
   // #1331 — configCacheable now requires exactly freshness === "current"
   // (was `!== "unavailable"`, which `undefined` also satisfied).
+  // #1335 phase 5 — no more v6 aggregate; `identity: null` keeps
+  // `resolveBadgeVerification` (a real, unmocked function here) from
+  // attempting a real receipt-store read, since this suite is about SVG
+  // cache behavior, not verification content.
   scoring: {
-    policyVersion: "v6",
+    policyVersion: "v7.2",
+    identity: null,
+    window: null,
     freshness: "current",
     tier: "Solid",
+    archetype: "Builder",
     composite: { kind: "point", value: 65, display: 65 },
+    dimensions: {
+      delivery: { kind: "point", value: 70, display: 70 },
+      quality: { kind: "point", value: 60, display: 60 },
+      consistency: { kind: "point", value: 65, display: 65 },
+      breadth: { kind: "point", value: 55, display: 55 },
+    },
+    craft: null,
+    reportCraft: null,
+    coverage: [],
+    exclusions: [],
+    limitations: [],
   },
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-    mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
+  mockDbGetStudioConfig.mockResolvedValue({ status: "not_found" });
+  mockHasDrawableCurrentReceipt.mockResolvedValue(true);
+  mockReadScoringStatus.mockResolvedValue(null);
+  mockResolveBadgeVerification.mockResolvedValue({ hash: "fixture-hash", date: "2026-05-03" });
   mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
-  mockGetPublicProfileVerification.mockReturnValue({
-    hash: "abc12345",
-    date: "2026-05-03",
-  });
-  mockPersistProfileSnapshot.mockResolvedValue(true);
-  mockDeferProfileCacheWork.mockResolvedValue(undefined);
   mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
   mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
   mockRenderBadgeSvg.mockReturnValue(
@@ -186,7 +196,6 @@ beforeEach(() => {
   mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
   mockHeaders.mockResolvedValue({ get: () => null });
   mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
-  mockRedactImpactForVisitor.mockImplementation((impact: unknown) => impact);
 });
 
 describe("share page (#720) cache-first SVG — real behavior", () => {
@@ -231,7 +240,7 @@ describe("share page (#720) cache-first SVG — real behavior", () => {
       "badge:testuser:2026-05-03",
       '<svg xmlns="http://www.w3.org/2000/svg">FRESH</svg>',
       "testuser",
-      expect.objectContaining({ scoringSelection: expect.objectContaining({ machinePolicy: "v6" }), receiptIdentity: null }),
+      expect.objectContaining({ receiptIdentity: null }),
     );
   });
 });

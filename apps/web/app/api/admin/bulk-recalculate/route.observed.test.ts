@@ -10,9 +10,7 @@ import { NextRequest } from "next/server";
  * never itself trigger a re-issue for an already-complete day.
  */
 const mocks = vi.hoisted(() => ({
-  selection: vi.fn(),
   materialize: vi.fn(),
-  persist: vi.fn(),
   invalidate: vi.fn(),
   listJobs: vi.fn(),
   maybeIssue: vi.fn(),
@@ -25,10 +23,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/admin", () => ({ verifyAdminSecret: () => null }));
 vi.mock("@/lib/cache/redis", () => ({ rateLimit: vi.fn().mockResolvedValue({ allowed: true }) }));
 vi.mock("@/lib/http/client-ip", () => ({ getClientIp: () => "127.0.0.1" }));
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: mocks.selection }));
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: mocks.materialize,
-  persistOrchestratedSnapshot: mocks.persist,
 }));
 vi.mock("@/lib/profile/post-write-invalidation", () => ({ invalidateProfileReadModels: mocks.invalidate }));
 vi.mock("@/lib/db/users", () => ({ dbGetUserHandlePage: mocks.dbGetUserHandlePage }));
@@ -43,8 +39,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { POST } from "./route";
 
-const selected = { enabled: true, machinePolicy: "v7.2" as const, cacheable: true, capturedAt: Date.parse("2026-09-23T10:00:00Z") };
-const materialized = { stats: { handle: "x" }, displayImpact: {}, rawImpact: {}, statsComplete: true, craftResult: null };
+const materialized = { stats: { handle: "x" }, statsComplete: true, craftResult: null };
 
 function job(state: string) {
   return { id: "j", ownerHandle: "x", provider: "github", referenceDate: "2026-09-23", referenceTime: "2026-09-23T10:00:00.000Z",
@@ -62,9 +57,7 @@ function makeRequest(handles: string[]): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.selection.mockResolvedValue(selected);
   mocks.materialize.mockResolvedValue(materialized);
-  mocks.persist.mockResolvedValue(true);
   mocks.invalidate.mockResolvedValue(undefined);
   mocks.maybeIssue.mockResolvedValue(undefined);
   mocks.enqueueCollection.mockResolvedValue([]);
@@ -118,16 +111,6 @@ describe("admin bulk-recalculate: fan-in direct issuance vs enqueue", () => {
     const body = await res.json();
 
     expect(body.publications).toEqual([{ handle: "alice", result: { kind: "ready", receiptDate: "2026-09-23", updating: false } }]);
-  });
-
-  it("does neither enqueue nor issue directly while v7.2 rendering is off", async () => {
-    mocks.selection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-
-    await POST(makeRequest(["alice"]));
-
-    expect(mocks.listJobs).not.toHaveBeenCalled();
-    expect(mocks.maybeIssue).not.toHaveBeenCalled();
-    expect(mocks.enqueueCollection).not.toHaveBeenCalled();
   });
 
   it("does not fail the batch when the job-completeness check itself throws", async () => {

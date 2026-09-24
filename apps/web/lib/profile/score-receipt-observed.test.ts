@@ -64,6 +64,25 @@ describe("observed receipt materialization", () => {
     expect(await materializeObservedScoreReceipt("alice", { referenceTime, readCraft })).toMatchObject({ status: "stored", snapshot: { receipt: previous }, freshness: "stale", reason: "source_error" });
     expect(dbPublishObservedReceipt).toHaveBeenCalledTimes(1);
   });
+  it("never regresses an established non-trivial core to empty evidence -- refuses instead of silently publishing zero", async () => {
+    vi.mocked(dbReadEngineeringEvidence).mockResolvedValueOnce(ledgerFixture());
+    await materializeObservedScoreReceipt("alice", { referenceTime, readCraft });
+    const established = saved!.envelope;
+    expect(established.receipt.core.composite.exact).toBeGreaterThan(0);
+    // A later report whose period extends past the established window (so the
+    // Craft-only short-circuit's exact-window match fails) falls through to a
+    // full recompute. The read-only source coordinator (#1335 phase 3) and an
+    // empty ledger both report cleanly -- no source is "unavailable" -- but
+    // nothing was actually collected. That must never overwrite an established,
+    // non-trivial receipt with a zero built from missing evidence.
+    const result = await materializeObservedScoreReceipt("alice", {
+      referenceTime: "2026-09-09T10:00:00.000Z",
+      reportUpdate: { endExclusive: "2026-09-09T09:00:00.000Z" },
+      readCraft,
+    });
+    expect(result).toMatchObject({ status: "stored", snapshot: { receipt: established }, freshness: "stale", reason: "empty_evidence" });
+    expect(saved!.envelope).toEqual(established);
+  });
   it("never guesses missing Craft authority", async () => {
     expect(await materializeObservedScoreReceipt("alice", { referenceTime })).toMatchObject({ status: "unavailable", reason: "craft_error" });
     expect(dbPublishObservedReceipt).not.toHaveBeenCalled();

@@ -5,7 +5,6 @@ import { dbIsScoringSubject } from "@/lib/db/scoring-subjects";
 import { dbReadObservedReceipt } from "@/lib/db/score-receipts-observed";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { readRenderableReceipt } from "@/lib/profile/score-model";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { deriveScoringStatus, type ReceiptSummary } from "./status";
 import type { ScoringStatus } from "./scoring-status";
 
@@ -23,9 +22,9 @@ import type { ScoringStatus } from "./scoring-status";
  * `readScoringStatus`. See badge.svg/og-image/the share page's status-
  * gating blocks for the call site.
  */
-export async function hasDrawableCurrentReceipt(handle: string, scoringSelection: ScoringRenderSelection): Promise<boolean> {
-  const receipt = await readRenderableReceipt(handle, scoringSelection);
-  return !!(receipt && "receipt" in receipt);
+export async function hasDrawableCurrentReceipt(handle: string): Promise<boolean> {
+  const receipt = await readRenderableReceipt(handle);
+  return receipt !== null;
 }
 
 /**

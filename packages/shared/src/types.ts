@@ -99,29 +99,6 @@ export interface ImpactV6Result {
   computedAt: string; // ISO timestamp
 }
 
-/**
- * `ImpactV6Result` without `confidence`/`confidencePenalties` — the shape
- * served into the client-serialized share-page payload for a non-owner
- * visitor (#1067). Confidence and its penalty flags are owner-only data
- * (see CLAUDE.md acceptance criteria); this projection keeps those two
- * fields out of the RSC payload entirely rather than merely hiding them in
- * the UI, so a visitor's view-source never contains them.
- */
-export type PublicImpactV6Result = Omit<
-  ImpactV6Result,
-  "confidence" | "confidencePenalties"
->;
-
-/**
- * The impact shape a share-page client component may receive: the full
- * `ImpactV6Result` for the owner, or the redacted `PublicImpactV6Result` for
- * a visitor (#1067). Every "use client" component downstream of the share
- * page that accepts `impact` as a prop but doesn't itself branch on
- * ownership should type that prop as `ClientImpactV6Result` — one named
- * alias instead of re-deriving the same union per file.
- */
-export type ClientImpactV6Result = ImpactV6Result | PublicImpactV6Result;
-
 /** Raw data shape returned by the GitHub GraphQL contribution query */
 export interface RawContributionData {
   login: string;
@@ -185,77 +162,6 @@ export interface SupplementalStats {
   sourceHandle: string; // EMU handle
   stats: StatsData;
   uploadedAt: string; // ISO timestamp
-}
-
-// ---------------------------------------------------------------------------
-// Lifetime history — Metrics snapshots
-// ---------------------------------------------------------------------------
-
-/** Compact penalty record — omits reason string (rehydratable from CONFIDENCE_REASONS). */
-export interface SnapshotPenalty {
-  flag: ConfidenceFlag;
-  penalty: number;
-}
-
-/**
- * Compact daily snapshot of a user's metrics + impact scores.
- *
- * Stored permanently in Supabase `metrics_snapshots` table (UNIQUE on handle+date).
- * ~300 bytes JSON — excludes heatmapData (7KB) and mutable display
- * fields (avatarUrl, displayName). Includes explanatory fields for
- * score change analysis.
- */
-export interface MetricsSnapshot {
-  /** YYYY-MM-DD — deduplication key (one snapshot per user per day) */
-  date: string;
-  /** ISO timestamp of when the snapshot was captured */
-  capturedAt: string;
-
-  // Key stats from StatsData
-  commitsTotal: number;
-  prsMergedCount: number;
-  prsMergedWeight: number;
-  reviewsSubmittedCount: number;
-  issuesClosedCount: number;
-  reposContributed: number;
-  activeDays: number;
-  linesAdded: number;
-  linesDeleted: number;
-  totalStars: number;
-  totalForks: number;
-  totalWatchers: number;
-  topRepoShare: number;
-
-  // Explanatory stats (for score change analysis)
-  maxCommitsIn10Min: number;
-  microCommitRatio?: number;
-  docsOnlyPrRatio?: number;
-  prDescriptionRate?: number;
-  featureBranchRate?: number;
-  issueLinkageRate?: number;
-
-  // Impact dimensions + classification
-  delivery: number;
-  quality: number;
-  consistency: number;
-  breadth: number;
-  craft?: number;
-  archetype: DeveloperArchetype;
-  profileType: ProfileType;
-  compositeScore: number;
-  /** EMA-smoothed composite, kept so the trend line stays continuous (#1001). */
-  adjustedComposite: number;
-  /**
-   * The number the badge drew for this capture — the fresh adjusted composite,
-   * before smoothing. Absent on rows written before it was recorded; a reader
-   * falls back to `adjustedComposite` rather than inventing one.
-   */
-  headlineScore?: number;
-  confidence: number;
-  tier: ImpactTier;
-
-  /** Active confidence penalties — omitted when empty to save bytes. */
-  confidencePenalties?: SnapshotPenalty[];
 }
 
 // ---------------------------------------------------------------------------

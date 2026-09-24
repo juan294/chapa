@@ -274,7 +274,7 @@ export function isValidStatsShape(value: unknown): boolean {
   if (!isRatio(obj.topRepoShare)) return false;
 
   // BE-M1 (#950): Numeric range caps — prevent arbitrarily large values from
-  // flowing into computeImpactV6 and snapshots.
+  // flowing into the scoring pipeline.
   if (typeof obj.commitsTotal === "number" && obj.commitsTotal > 100_000) return false;
   if (typeof obj.prsMergedCount === "number" && obj.prsMergedCount > 10_000) return false;
   if (typeof obj.prsMergedWeight === "number" && obj.prsMergedWeight > 10_000) return false;
@@ -301,8 +301,8 @@ export function isValidStatsShape(value: unknown): boolean {
     if (obj[key] !== undefined && !isRatio(obj[key])) return false;
   }
 
-  // #984: optional non-ratio numeric fields that also flow into computeImpactV6
-  // and persist into snapshots/history need non-negative + range guards.
+  // #984: optional non-ratio numeric fields that also flow into the scoring
+  // pipeline need non-negative + range guards.
   if (obj.medianPrLeadTimeHours !== undefined) {
     if (!isNonNegativeFiniteNumber(obj.medianPrLeadTimeHours) || obj.medianPrLeadTimeHours > 100_000) {
       return false;

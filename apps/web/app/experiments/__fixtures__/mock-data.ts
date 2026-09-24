@@ -1,4 +1,5 @@
-import type { StatsData, ImpactV6Result, HeatmapDay } from "@chapa/shared";
+import type { StatsData, HeatmapDay } from "@chapa/shared";
+import type { ScoreViewModel } from "@/lib/profile/score-view-model";
 
 // ---------------------------------------------------------------------------
 // Deterministic heatmap (91 days = 13 weeks × 7 days)
@@ -48,23 +49,30 @@ export const MOCK_STATS: StatsData = {
 };
 
 // ---------------------------------------------------------------------------
-// Shared mock impact
+// Shared mock scoring (#1335 — v7.2 is the one scoring policy; these
+// /experiments/* prototypes are flag-gated and illustrative only)
 // ---------------------------------------------------------------------------
 
-export const MOCK_IMPACT: ImpactV6Result = {
+const point = (value: number) => ({ kind: "point" as const, value, display: value });
+
+export const MOCK_IMPACT: ScoreViewModel = {
+  illustrative: true,
+  policyVersion: "v7.2",
   handle: "juan294",
-  profileType: "collaborative",
+  identity: null,
+  window: null,
   dimensions: {
-    delivery: 85,
-    quality: 72,
-    consistency: 91,
-    breadth: 68,
+    delivery: point(85),
+    quality: point(72),
+    consistency: point(91),
+    breadth: point(68),
   },
-  archetype: "Builder",
-  compositeScore: 79,
-  confidence: 92,
-  confidencePenalties: [],
-  adjustedComposite: 87,
+  composite: point(87),
   tier: "Elite",
-  computedAt: "2024-12-01T00:00:00Z",
+  archetype: "Builder",
+  craft: null,
+  reportCraft: { status: "no_report", unlocked: false, report: null },
+  coverage: [],
+  exclusions: [],
+  limitations: [],
 };

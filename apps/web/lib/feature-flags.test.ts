@@ -5,7 +5,6 @@ const cacheProducerRejections: unknown[] = [];
 // Mock the DB layer
 vi.mock("./db/feature-flags", () => ({
   dbGetFeatureFlag: vi.fn(),
-  dbReadScoringFlagDirect: vi.fn(),
 }));
 
 // `unstable_cache` requires a Next.js incremental cache that doesn't exist in
@@ -28,10 +27,9 @@ vi.mock("next/cache", () => ({
 }));
 
 import { unstable_cache } from "next/cache";
-import { dbGetFeatureFlag, dbReadScoringFlagDirect } from "./db/feature-flags";
+import { dbGetFeatureFlag } from "./db/feature-flags";
 import {
   isStudioEnabled,
-  isScoringV7RenderingEnabled,
   isStudioEnabledSync,
   isExperimentsEnabled,
   isAgentEnabled,
@@ -51,14 +49,6 @@ import {
   invalidateFeatureFlagCache,
   _resetFlagCache,
 } from "./feature-flags";
-
-it("uses the dedicated bounded selection for the scoring flag", async () => {
-  _resetFlagCache();
-  vi.mocked(dbReadScoringFlagDirect).mockResolvedValue(true);
-  vi.mocked(dbGetFeatureFlag).mockResolvedValue(makeFlag("scoring_v7_rendering", false));
-  expect(await isScoringV7RenderingEnabled()).toBe(true);
-  expect(dbReadScoringFlagDirect).toHaveBeenCalled();
-});
 
 // ---------------------------------------------------------------------------
 // Helper: make a mock FeatureFlag

@@ -23,9 +23,12 @@ This document explains Chapa's current scoring projection, security model, verif
 
 Chapa's current machine policy `v7.2` describes recorded engineering evidence
 within a declared 365-calendar-date source window. It is not a certification of
-ability or a percentile. `v6` remains the rollout-off policy and an explicitly
-labelled fallback where there is no current receipt. Unavailable authority is
-not replaced with a fabricated current score.
+ability or a percentile. It is the only rendered policy: every signed-up user
+(anyone who has signed in with GitHub) is scored under it, with no opt-in
+step and no legacy fallback. A subject with no current receipt yet is not "no
+score" — it is an explicit scoring status (collecting, action needed, or
+unregistered for a handle that never signed up). Unavailable authority is a
+distinct fifth case and is never replaced with a fabricated current score.
 
 ## Current Impact profile
 
@@ -59,11 +62,14 @@ when no definitive archetype exists the UI uses a neutral state.
 
 ## Historical policies
 
-[Impact v6](impact-v6.md) documents legacy aggregation, confidence and tool
-practice scores. The archived machine `v7` / algorithm `v7.1` uses
-completion-range arithmetic and its original Craft portfolio. Existing records
-retain those meanings. Neither is relabelled as current v7.2, and transitions
-are not reported as performance gains or losses.
+[Impact v6](impact-v6.md) is retired (2026-09-23): its scoring code and
+stored data no longer exist, and the document is historical reference only,
+describing the legacy aggregation, confidence and tool-practice scores it
+once computed. The archived machine `v7` / algorithm `v7.1` is different: it
+is not retired, it is frozen. It uses completion-range arithmetic and its
+original Craft portfolio, and its existing records remain independently
+replayable. Neither historical policy is relabelled as current v7.2, and
+transitions are not reported as performance gains or losses.
 
 ## Data Sources and Verification
 
@@ -253,10 +259,11 @@ When supplemental data exists, the merge is straightforward:
 
 ### Transparency
 
-For legacy v6, when supplemental data is included:
-1. The `hasSupplementalData` flag is set on the merged stats
-2. The confidence system applies a **-5 penalty** (`supplemental_unverified`)
-3. The share page shows the reason: "Includes activity from a linked account that cannot be independently verified"
+Historically, under the now-retired v6 system, including supplemental data set
+a `hasSupplementalData` flag on the merged stats and the confidence system
+applied a **-5 penalty** (`supplemental_unverified`), with the share page
+showing the reason: "Includes activity from a linked account that cannot be
+independently verified." That confidence system no longer exists.
 
 Current v7.2 has no confidence penalty; its declared source coverage and accepted
 aggregate evidence explain what contributes.
@@ -324,16 +331,18 @@ Since badges are embeddable SVGs, all user-controlled text (handles, display nam
 
 ## Lifetime Metrics & Score History
 
-Legacy daily `metrics_snapshots` remain explicitly v6. Current consented
-observations come from immutable v7.2 receipts and the final winning daily trend
-anchors. APIs and tools expose machine policy, exact/display values, receipt
-revision/content hash, window and optional Craft. Durable EMA remains separate
-from the badge headline and is not re-seeded when a date-filtered slice is read.
+The legacy daily `metrics_snapshots` table is retired along with v6; it no
+longer exists. Current history comes from immutable v7.2 receipts (observed
+history) and the final winning daily trend anchors. APIs and tools expose
+machine policy, exact/display values, receipt revision/content hash, window
+and optional Craft. Durable EMA remains separate from the badge headline and
+is not re-seeded when a date-filtered slice is read.
 
 `GET /api/history/:handle?from=YYYY-MM-DD&to=YYYY-MM-DD&include=snapshots,trend,diff`
-is rate-limited and no-store. A missing current segment may return explicitly
-labelled legacy history; a failed authority read is unavailable. Current public
-history contains only consented public aggregates. Withdrawal/deletion removes
+is rate-limited and no-store. The `include` keys are unchanged, but every one
+of them now reads observed v7.2 history, not legacy snapshots; a failed
+authority read is unavailable. Public history contains only public aggregates
+from every signed-up subject, with no opt-in step. Withdrawal/deletion removes
 public access according to the lifecycle policy; downloaded copies cannot be
 recalled.
 
@@ -348,15 +357,16 @@ campaign wording. Notification verification uses fixtures, never live sends.
 Public current receipts contain numeric aggregates, safe enums, coverage and
 opaque issuance identities. Private repository names/paths, tokens, raw report
 HTML, unknown report labels and raw-body digests are excluded. Evidence access
-is limited to connected, authorized sources and declared consent; public
-arithmetic replay does not independently establish private-source truth.
-Tokens stay on the authorized server/CLI path, never in public score payloads.
+is limited to connected, authorized sources; there is no separate publication
+opt-in — every signed-up subject's receipt is public. Public arithmetic replay
+does not independently establish private-source truth. Tokens stay on the
+authorized server/CLI path, never in public score payloads.
 
-Image caches use selected-policy namespaces and at most300 seconds response
+Image caches use the `v7.2` policy namespace and at most300 seconds response
 freshness, without stale-while-revalidate or stale-if-error. Flag authority lasts
 at most5 seconds. This gives the documented online≤305-second rollback bound;
 it cannot revoke independently downloaded artifacts or control proxies that
-ignore headers. Details: [transition runbook](runbooks/scoring-v7-transition.md).
+ignore headers. Details: [the collection queue runbook](runbooks/scoring-collection-queue.md).
 
 ## FAQ
 

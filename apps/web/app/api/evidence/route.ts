@@ -63,7 +63,7 @@ async function postEvidence(request: NextRequest) {
   }
   try {
     const result = await dbWriteEngineeringEvidence(auth.handle, command, referenceTime);
-    await invalidateProfileReadModels(command.owner, { stats: true, craft: true, snapshot: true, history: true, badgeSvg: true });
+    await invalidateProfileReadModels(command.owner, { stats: true, craft: true, badgeSvg: true });
     return json(result);
   } catch (error) { return failure(error); }
 }

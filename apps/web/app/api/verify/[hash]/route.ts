@@ -1,15 +1,22 @@
 import { canonicalJson, verifyScoreReceipt } from "@chapa/shared";
 import { type NextRequest, NextResponse } from "next/server";
-import { getReceiptVerificationV7, getVerificationRecord } from "@/lib/verification/store";
+import { getReceiptVerificationV7 } from "@/lib/verification/store";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { getBaseUrl } from "@/lib/env";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
-import { toPublicVerificationRecord } from "@/lib/verification/types";
 import { parseVerificationTokenV7, VERIFICATION_HASH_PATTERN } from "@/lib/verification/constants";
 
-// Legacy pre-v2 payload hashes remain valid through this 90-day deprecation window.
-export const LEGACY_PRE_V2_DEADLINE = "2026-07-19";
+/** #1335 phase 5 — v6 verification codes and `verification_records` are retired.
+ * A well-formed legacy hex code is terminal by design (410), not a lookup. */
+function retiredV6CodeResponse() {
+  return NextResponse.json(
+    {
+      status: "retired_v6_code",
+      message: "This is a retired v6 verification code. Current badges use v7.2 receipt codes.",
+    },
+    { status: 410, headers: { "Access-Control-Allow-Origin": "*" } },
+  );
+}
 
 export const GET = withErrorCapture("/api/verify/[hash]", async (
   request: NextRequest,
@@ -19,53 +26,16 @@ export const GET = withErrorCapture("/api/verify/[hash]", async (
 
   if (hash.startsWith("v7.")) return verifyV7(request, hash, false);
 
-  // Validate hash format. Legacy 32-char pre-v2 hashes remain accepted until
-  // LEGACY_PRE_V2_DEADLINE, after which the regex can be tightened in follow-up work.
+  // A legacy pre-v2/v2 hex code (8/16/32 chars) is recognized but retired.
+  // Anything else is simply malformed input, not a retired code.
   if (!VERIFICATION_HASH_PATTERN.test(hash)) {
     return NextResponse.json(
-      { error: "Invalid hash format. Expected 8, 16, or 32 hex characters." },
+      { error: "Invalid hash format. Expected a v7.<revision>.<signature> receipt token." },
       { status: 400, headers: { "Access-Control-Allow-Origin": "*" } },
     );
   }
 
-  // Rate limit: 30 requests per IP per 60 seconds
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:verify:${ip}`, 30, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "60", "Access-Control-Allow-Origin": "*" } },
-    );
-  }
-
-  // Look up record
-  const record = await getVerificationRecord(hash);
-  if (!record) {
-    return NextResponse.json(
-      { status: "not_found", hash, message: "No verification record found for this hash." },
-      { status: 404, headers: { "Access-Control-Allow-Origin": "*" } },
-    );
-  }
-
-  const baseUrl = getBaseUrl();
-
-  return NextResponse.json(
-    {
-      version: "v6",
-      status: "legacy_record",
-      arithmetic: "replay_unavailable",
-      hash,
-      data: toPublicVerificationRecord(record),
-      verifyUrl: `${baseUrl}/verify/${hash}`,
-      badgeUrl: `${baseUrl}/u/${record.handle}/badge.svg`,
-    },
-    {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
-      },
-    },
-  );
+  return retiredV6CodeResponse();
 });
 
 export async function OPTIONS() {

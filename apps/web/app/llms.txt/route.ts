@@ -12,7 +12,7 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 
 ## Key Concepts
 
-- **Policy identity**: Read the response's policyVersion. v6 remains the rollout-off policy; v7.2 is the new point policy when enabled and a receipt is available. The archived v7.1 algorithm (machine policy v7) retains its historical evidence-completion ranges and can still be replayed; it is not the current point policy.
+- **Policy identity**: Read the response's policyVersion. v7.2 is the one current policy; there is no legacy fallback. The archived v7.1 algorithm (machine policy v7) retains its historical evidence-completion ranges and can still be replayed; it is not the current point policy.
 - **Impact Profile**: v7.2 reports an observed engineering activity and practices index (0-100) over four equally weighted core dimensions — Delivery, Quality, Consistency, and Breadth — from the declared 365-calendar-date window. It measures recorded evidence, not personal ability. Coverage limits remain visible without replacing the current point with a range.
 - **Dimensions**: Delivery counts distinct project/day buckets containing accepted work. Quality counts demonstrated rationale, verification, review-or-correction and outcome follow-up. Consistency counts active ISO weeks. Breadth counts eligible projects and work categories. Each core dimension has weight 0.25.
 - **Craft**: A separate report-derived dimension, unlocked on the badge after the first valid Claude Code insights report, including a score of 0. Craft = 100 x (fully + 0.7 x mostly + 0.3 x partially) / total. Failed, unknown and unclassified outcomes earn no credit; unknown outcomes are not proven failures. Craft has zero core weight. Expiry retains the unlocked label with update guidance, never a fabricated zero.
@@ -48,7 +48,7 @@ Remote MCP endpoint: https://chapa.thecreativetoken.com/api/mcp — stateless St
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com
-2. Chapa computes your profile under the selected policy from public platform data (GitHub, Bitbucket, Codeberg, GitLab). The response and receipt identify that policy.
+2. Chapa computes your profile under the v7.2 policy from public platform data (GitHub, Bitbucket, Codeberg, GitLab). The response and receipt identify that policy.
 3. Embed the badge in your README, portfolio, resume, or LinkedIn:
 
 Markdown:

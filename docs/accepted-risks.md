@@ -259,35 +259,45 @@ or create a deployment to discover what happens. This note records a prior
 configuration and does not assert current remote state or authorize a change.
 
 
-## Profile type threshold boundary (0.15 review-to-PR ratio)
+## Public scores for every signed-up user, no opt-in (2026-09-23)
 
-> **Superseded for v7 (#1312).** v7 has no solo/collaborative switch: Quality
-> practices is one of four fixed dimensions at 0.25 each, counted from
-> demonstrated rationale, verification, review-or-correction and outcome
-> follow-up, and it is never excluded from the composite. This entry remains as
-> the accurate record of v6 behaviour, which v6 records still carry. See
-> `docs/impact-v7.md`.
-
-- **Risk:** A developer with exactly 15% review rate sits on the solo/collaborative boundary. Crossing the threshold changes which Quality formula is used and whether Quality is included in the composite.
-- **Mitigation:** The threshold is intentionally conservative (solo-favoring) because the collaborative path has a much stronger impact on scores. Edge cases near the boundary will see modest score changes when crossing. The threshold (0.15) is a shared constant (`SOLO_REVIEW_RATIO_THRESHOLD`) that can be tuned.
-- **Severity:** Low
-- **Accepted:** 2026-03-28
+- **Risk:** Every handle with a `user_platforms` row for `github` is scored
+  and published under v7.2, with no publication-consent step. Publication
+  consent (`scoring_v7_subjects.public_evidence_consent`) existed and was
+  removed; a user who signs in with GitHub gets a public badge immediately.
+- **Decision (owner, 2026-09-23):** intentional. Chapa has one user, and an
+  opt-in step that gates a private beta of one is not a privacy control, it
+  is a place for a silent failure to hide, which is exactly what happened in
+  production before this decision (see `docs/decisions/2026-09-23-universal-v72-no-consent.md`).
+  What was never public (raw evidence, report contents, reviewer rationale,
+  access-context credentials) stays private under the same rules regardless
+  of this decision.
+- **Mitigation:** None needed at this scale; revisit if the user base grows
+  beyond what a single-owner product needs. Withdrawal (deleting a subject's
+  evidence and receipts) remains available as a separate, unaffected
+  lifecycle action.
+- **Severity:** Low (single known user; no private data is exposed by this
+  decision, only the existence of a public score)
+- **Accepted:** 2026-09-23
 
 ---
 
-## Per-platform quality-signal availability
+## Retired v6 verification codes return HTTP 410 (2026-09-23)
 
-> **Superseded for v7 (#1312).** v7 does not silently absorb a source gap into
-> a lower score. A connected source that could not be fully read stays in scope
-> with its own incomplete coverage, and the affected dimensions publish an
-> evidence-completion range whose bounds contain every admissible completion.
-> The gap is disclosed in the receipt rather than mitigated by a panel note.
-> This entry remains as the accurate record of v6 behaviour.
-
-- **Risk:** PR-description, feature-branch, issue-linkage, batch-size, and lead-time signals are computed only from GitHub. GitLab, Bitbucket, and Codeberg do not expose them, so a profile whose merged work is mostly on those platforms has a Quality dimension based on limited data. For solo profiles, Quality is display-only and excluded from the composite.
-- **Mitigation:** The share-page "How is my score calculated" panel states this per platform. Quality is never counted in the solo composite, so the gap does not depress the headline score for solo developers.
-- **Severity:** Low
-- **Accepted:** 2026-06-24
+- **Risk:** `/api/verify/[hash]` and `/verify/[hash]` no longer look up a
+  well-formed legacy pre-v7 verification code (8/16/32-char hex). Every such
+  request returns HTTP 410 `retired_v6_code` instead of a database read,
+  because `verification_records` and the v6 HMAC path no longer exist
+  (`docs/decisions/2026-09-23-universal-v72-no-consent.md`).
+- **Why accepted:** This is terminal by design, not an outage: a fixed,
+  explained response is correct for a code that can never resolve again,
+  and returning 410 (not 404 or 500) tells a caller the resource is
+  deliberately gone rather than missing or broken.
+- **Mitigation:** None needed. `/verify/[hash]`'s page shows the explanation
+  inline; `VerifyPageWebMcpTools` and the MCP `verify_badge` tool answer the
+  same way.
+- **Severity:** None (documented, intentional terminal state)
+- **Accepted:** 2026-09-23
 
 ---
 
@@ -388,6 +398,50 @@ dynamically loaded, or a second chunk needs the same treatment — a second
 exception means the rule, not the chunk, is wrong.
 
 **Refs:** [#1319](https://github.com/juan294/chapa/issues/1319)
+
+---
+
+## A subject with zero collected evidence for a scoring day keeps its last non-zero receipt, stale-dated (2026-09-24)
+
+**Risk / trade-off:** phase 3 made the source coordinator read-only — collection
+happens exclusively in the durable queue worker now, and a full recompute can
+only read whatever it already durably observed. That recompute has no way to
+distinguish "nothing was collected" (a disconnected/unlinked source, or a
+collection round that completed but genuinely produced nothing to read) from
+real, complete evidence that happens to total zero events and zero
+assessments. `materializeObservedScoreReceipt` (`lib/profile/score-receipt-observed.ts`)
+therefore refuses to publish — reason `empty_evidence`, distinct from a real
+`source_error` — whenever that would replace an established, non-trivial
+receipt (`core.composite.exact > 0`) with one built from literally no
+evidence. The owner keeps seeing their last real, non-zero score, dated to
+when it was actually computed (`ScoringStatus.kind: "ready"` with the older
+`receiptDate`), not a fresh zero for today.
+
+**Why accepted:** the alternative is publishing zero over a real score on the
+same shape of failure the #1002/#1004 lineage already treats as unacceptable
+— a blinded or degraded fetch collapsing a real score. A subject that has
+*truly* gone to zero activity across an entire rolling 365-day window is
+exceedingly rare and not urgent to reflect same-day; a subject hitting this
+from a genuine collection defect is exactly the failure mode this guard
+exists to catch. A subject's first-ever issuance is unaffected — there is no
+established receipt yet to regress away from, so a genuine first zero is
+still recorded normally.
+
+**Mitigation:** every refusal is fully observable, never a silent skip: it is
+recorded as a `failed{reason: "empty_evidence"}` fan-in outcome, written to
+`scoring_issuance_attempts` (its `reason` CHECK constraint, migration `056`),
+emitted as a
+`scoring_issuance_outcome` event, and pages the `scoring_issuance_failed`
+operational alert exactly like any other fan-in failure. `runCollectionTick`'s
+retry sweep (`retryPendingFanIns`) picks the day back up on the next tick, so
+a transient defect self-heals once real evidence is collectable again.
+
+**Revisit if:** this reason starts firing routinely for real, especially-quiet
+subjects rather than rarely for degraded collection — that would mean the
+zero-evidence heuristic needs a softer signal (e.g. distinguishing "definitely
+zero" from "defect" some other way) rather than a blanket refusal.
+
+**Refs:** #1335
 
 ## Review schedule
 

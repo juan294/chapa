@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import dynamic from "next/dynamic";
 import { resolveDynamicLoader } from "@/lib/test-helpers/dynamic-mock";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 
 vi.mock("next/dynamic", () => ({
   default: vi.fn(
@@ -34,7 +35,7 @@ describe("SharePageOwnerContentLazy render", () => {
       <SharePageOwnerContentLazy
         handle="octocat"
         stats={null}
-        impact={null}
+        scoring={makeScoring()}
       />,
     );
 
@@ -58,7 +59,7 @@ describe("SharePageOwnerContentLazy render", () => {
       <SharePageOwnerContentLazy
         handle="octocat"
         stats={null}
-        impact={null}
+        scoring={makeScoring()}
       />,
     );
 

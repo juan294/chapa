@@ -13,26 +13,23 @@ afterEach(cleanup);
 const mockUsers = [
   {
     handle: "alice", displayName: "Alice", tier: "Elite", archetype: "Builder",
-    adjustedComposite: 90, rawScore: 85, confidence: 95,
+    adjustedComposite: 90, rawScore: 85,
     registeredAt: "2025-01-01T00:00:00Z", lastSnapshotDate: "2025-06-01",
-    fetchedAt: "2025-06-01T12:00:00Z", commitsTotal: 100, prsMergedCount: 20,
-    reviewsSubmittedCount: 15, activeDays: 180, reposContributed: 8, totalStars: 50,
+    fetchedAt: "2025-06-01T12:00:00Z",
     avatarUrl: null,
   },
   {
     handle: "bob", displayName: "Bob", tier: "High", archetype: "Marathoner",
-    adjustedComposite: 72, rawScore: 68, confidence: 80,
+    adjustedComposite: 72, rawScore: 68,
     registeredAt: "2025-02-01T00:00:00Z", lastSnapshotDate: "2025-05-15",
-    fetchedAt: "2025-05-15T12:00:00Z", commitsTotal: 80, prsMergedCount: 10,
-    reviewsSubmittedCount: 5, activeDays: 120, reposContributed: 4, totalStars: 20,
+    fetchedAt: "2025-05-15T12:00:00Z",
     avatarUrl: null,
   },
   {
     handle: "charlie", displayName: null, tier: "Solid", archetype: null,
-    adjustedComposite: 50, rawScore: 48, confidence: 70,
+    adjustedComposite: 50, rawScore: 48,
     registeredAt: "2025-03-01T00:00:00Z", lastSnapshotDate: null,
-    fetchedAt: null, commitsTotal: null, prsMergedCount: null,
-    reviewsSubmittedCount: null, activeDays: null, reposContributed: null, totalStars: null,
+    fetchedAt: null,
     avatarUrl: null,
   },
 ];
@@ -575,18 +572,16 @@ describe("useAdminDashboard", () => {
       const usersWithMissingTier = [
         {
           handle: "alice", displayName: "Alice", tier: "Elite", archetype: "Builder",
-          adjustedComposite: 90, rawScore: 85, confidence: 95,
+          adjustedComposite: 90, rawScore: 85,
           registeredAt: "2025-01-01T00:00:00Z", lastSnapshotDate: "2025-06-01",
-          fetchedAt: "2025-06-01T12:00:00Z", commitsTotal: 100, prsMergedCount: 20,
-          reviewsSubmittedCount: 15, activeDays: 180, reposContributed: 8, totalStars: 50,
+          fetchedAt: "2025-06-01T12:00:00Z",
           avatarUrl: null,
         },
         {
           handle: "norank", displayName: "No Rank", tier: null, archetype: null,
-          adjustedComposite: 10, rawScore: 5, confidence: 50,
+          adjustedComposite: 10, rawScore: 5,
           registeredAt: "2025-04-01T00:00:00Z", lastSnapshotDate: null,
-          fetchedAt: null, commitsTotal: null, prsMergedCount: null,
-          reviewsSubmittedCount: null, activeDays: null, reposContributed: null, totalStars: null,
+          fetchedAt: null,
           avatarUrl: null,
         },
       ];

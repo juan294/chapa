@@ -37,7 +37,7 @@ export async function renderObservedBadges(directory = "logs/v7-point/phase6-bad
     const fixture = await scoringConsistencyFixture(example);
     for (const locale of ["en", "es"] as const) {
       const name = `${example.name}-${locale}`;
-      const svg = renderBadgeSvg(fixture.stats, fixture.impact, {
+      const svg = renderBadgeSvg(fixture.stats, {
         scoring: fixture.model, demoMode: true, disableAnimation: true,
         strings: buildBadgeI18nStrings(key => resolveTranslation(key, locale === "en" ? en : es), fixture.model.tier),
       });

@@ -10,9 +10,7 @@ import {
 } from "react";
 import type {
   BadgeConfig,
-  CraftResult,
   StatsData,
-  ImpactV6Result,
 } from "@chapa/shared";
 import { useUnsavedNavigation } from "@/hooks/useUnsavedNavigation";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
@@ -53,10 +51,9 @@ import { getStudioCommandConfig } from "./studio-command-config";
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: StatsData;
-  impact: ImpactV6Result;
-  /** The model the public badge draws; forwarded to the preview (#1311). */
-  scoring?: ScoreViewModel;
-  craftResult?: CraftResult | null;
+  /** The one v7.2 model the public badge draws; forwarded to the preview
+   *  (#1311/#1335). */
+  scoring: ScoreViewModel;
   handle?: string;
   verification?: PreviewVerification | null;
   /**
@@ -198,9 +195,7 @@ function useReducedMotion(): boolean {
 export function StudioClient({
   initialConfig,
   stats,
-  impact,
   scoring,
-  craftResult = null,
   handle = "",
   verification = null,
   avatarDataUri,
@@ -577,10 +572,7 @@ export function StudioClient({
   const studioWebMcpTools = useStudioWebMcpTools({
     config,
     enabled: webmcpEnabled,
-    stats,
-    impact,
     scoring,
-    craftResult,
     handle,
     saveStatus: saveState.status,
     runCommand: handleSubmit,
@@ -781,7 +773,6 @@ export function StudioClient({
                 key={previewKey}
                 config={config}
                 stats={stats}
-                impact={impact}
                 scoring={scoring}
                 verification={verification}
                 avatarDataUri={avatarDataUri}

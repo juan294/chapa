@@ -1,4 +1,4 @@
-import { readScoringRenderSelection, sameScoringRenderSelection, scoringResponseMaxAge, type ScoringRenderSelection } from "@/lib/scoring-render-selection";
+import { SCORING_POLICY } from "@chapa/shared";
 import { type NextRequest, NextResponse } from "next/server";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { resolveBadgeConfigSnapshot } from "@/lib/render/badge-config";
@@ -14,6 +14,7 @@ import {
   buildOgImageCacheKey,
   isScoringImageReceiptCurrent,
   buildOgImageCacheVersion,
+  scoringResponseMaxAge,
 } from "@/lib/render/badge-svg-cache";
 import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
@@ -48,22 +49,22 @@ function isOgImageCacheEntry(value: unknown): value is OgImageCacheEntry {
   );
 }
 
-function ogImageCacheHeaders(handle: string, selection: ScoringRenderSelection) {
-  const age = scoringResponseMaxAge(selection);
-  if (age === 0) return ogImageNoStoreHeaders(selection);
+function ogImageCacheHeaders(handle: string, capturedAt: number) {
+  const age = scoringResponseMaxAge(capturedAt);
+  if (age === 0) return ogImageNoStoreHeaders();
   return {
     "Content-Type": "image/png",
-    "X-Scoring-Selection": selection.machinePolicy,
+    "X-Scoring-Selection": SCORING_POLICY,
     "Cache-Control": `public, max-age=${age}`,
     "Vercel-CDN-Cache-Control": `public, s-maxage=${age}`,
     "Vercel-Cache-Tag": `${ogImageEdgeCacheTag(handle)},${SCORING_IMAGES_EDGE_TAG}`,
   };
 }
 
-function ogImageNoStoreHeaders(selection: ScoringRenderSelection) {
+function ogImageNoStoreHeaders() {
   return {
     "Content-Type": "image/png",
-    "X-Scoring-Selection": selection.cacheable ? selection.machinePolicy : "unavailable",
+    "X-Scoring-Selection": SCORING_POLICY,
     "Cache-Control": "private, no-store, max-age=0",
     "Vercel-CDN-Cache-Control": "no-store",
   };
@@ -89,23 +90,23 @@ export async function GET(
     return new NextResponse("Invalid handle", { status: 400, headers: ERROR_CACHE_HEADERS });
   }
 
-  const scoringSelection = await readScoringRenderSelection();
-  const today = toDateString(new Date(scoringSelection.machinePolicy === "v7.2" ? scoringSelection.capturedAt : Date.now()));
+  // #1335 phase 5 — there is one policy now (`SCORING_POLICY`); `capturedAt`
+  // is captured once per request so every cache-header/key computation
+  // below agrees.
+  const capturedAt = Date.now();
+  const today = toDateString(new Date(capturedAt));
   // #1190 — the OG image is credential-less and publicly cacheable, exactly
   // like badge.svg, so locale comes from `?lang=` rather than the cookie
   // chain. It MUST be in the cache key: without it whichever locale rendered
   // first won the day's slot and every other locale was served that PNG.
   const lang = request.nextUrl.searchParams.get("lang");
   const locale: Locale = isSupportedLocale(lang) ? lang : DEFAULT_LOCALE;
-  const badgeLocale = resolveBadgeLocale(locale, scoringSelection.machinePolicy);
-  const ogCacheKey = buildOgImageCacheKey(handle, today, locale, scoringSelection.machinePolicy);
+  const badgeLocale = resolveBadgeLocale(locale);
+  const ogCacheKey = buildOgImageCacheKey(handle, today, locale);
   const configSnapshot = await resolveBadgeConfigSnapshot(handle);
 
-  // #1335 phase 4 — same status gating as badge.svg: under the v7.2
-  // selection, a handle with no ready receipt renders its scoring state
-  // instead of a legacy fallback or an empty materialize. Gated to v7.2 only;
-  // a null status (a failed authority read, or a v6 selection) leaves this
-  // route's existing behavior untouched.
+  // #1335 phase 4/5 — same status gating as badge.svg: a handle with no ready
+  // receipt renders its scoring state instead of an empty materialize.
   //
   // #1335 phase 4 perf fix — skip `readScoringStatus` (3 DB reads) whenever
   // `hasDrawableCurrentReceipt` (the same single receipt read the normal
@@ -113,7 +114,7 @@ export async function GET(
   // warm cache hit just below must not pay for it. See badge.svg's own
   // comment for the full rationale.
   let scoringStatus: ScoringStatus | null = null;
-  if (scoringSelection.machinePolicy === "v7.2" && !(await hasDrawableCurrentReceipt(handle, scoringSelection))) {
+  if (!(await hasDrawableCurrentReceipt(handle))) {
     try {
       scoringStatus = await readScoringStatus(handle);
     } catch (err) {
@@ -133,7 +134,7 @@ export async function GET(
         strings: buildBadgeStatusStrings((key) => t(key) as string, scoringStatus as NonReadyScoringStatus, interpolate),
       });
       const statusPng = await withTimeout(svgToPng(statusSvg, 1200), SVG_TO_PNG_TIMEOUT_MS, "svgToPng");
-      return new NextResponse(Buffer.from(statusPng), { headers: ogImageNoStoreHeaders(scoringSelection) });
+      return new NextResponse(Buffer.from(statusPng), { headers: ogImageNoStoreHeaders() });
     } catch (err) {
       console.error("[og-image] failed to render status placeholder:", err);
       // Fall through to the normal pipeline below rather than fail the whole
@@ -141,8 +142,8 @@ export async function GET(
     }
   }
 
-  const expectedVersion = configSnapshot.cacheable && scoringSelection.cacheable
-    ? buildOgImageCacheVersion(today, configSnapshot.revision, scoringSelection.machinePolicy)
+  const expectedVersion = configSnapshot.cacheable
+    ? buildOgImageCacheVersion(today, configSnapshot.revision)
     : null;
   const requestedVersion = request.nextUrl.searchParams.get("v");
   const publicationVersion =
@@ -161,7 +162,7 @@ export async function GET(
     ) {
       const pngBuffer = Buffer.from(cached.pngBase64, "base64");
       return new NextResponse(pngBuffer, {
-        headers: ogImageCacheHeaders(handle, scoringSelection),
+        headers: ogImageCacheHeaders(handle, capturedAt),
       });
     }
   } catch {
@@ -183,7 +184,7 @@ export async function GET(
   }
 
   try {
-    const materialized = await materializePublicProfile(handle, { scoringSelection });
+    const materialized = await materializePublicProfile(handle, {});
     // LE-8-2 — GitHub says nobody owns the handle; distinct body, same status.
     if (isGitHubUserNotFound(materialized)) {
       return new NextResponse("No GitHub user with this handle", { status: 404, headers: ERROR_CACHE_HEADERS });
@@ -201,7 +202,7 @@ export async function GET(
     // handle WITH a drawable receipt (found independently right here) still
     // rasterizes it normally below — reuses the exact same status-
     // placeholder path as `collecting`/`action_needed`/`unregistered`.
-    if (needsUnavailablePlaceholder(scoringSelection, scoringStatus, materialized.scoring?.policyVersion)) {
+    if (needsUnavailablePlaceholder(scoringStatus, materialized.scoring?.policyVersion)) {
       try {
         const t = getServerT(locale);
         const statusSvg = renderBadgeStatusSvg("unavailable", {
@@ -210,7 +211,7 @@ export async function GET(
           strings: buildBadgeUnavailableStrings((key) => t(key) as string),
         });
         const statusPng = await withTimeout(svgToPng(statusSvg, 1200), SVG_TO_PNG_TIMEOUT_MS, "svgToPng");
-        return new NextResponse(Buffer.from(statusPng), { headers: ogImageNoStoreHeaders(scoringSelection) });
+        return new NextResponse(Buffer.from(statusPng), { headers: ogImageNoStoreHeaders() });
       } catch (err) {
         console.error("[og-image] failed to render unavailable placeholder:", err);
         // Fall through to the normal pipeline below rather than fail the
@@ -224,8 +225,11 @@ export async function GET(
 
     const verification = await resolveBadgeVerification(materialized);
 
-    const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
-      scoring: materialized.scoring,
+    // #1335 phase 5 — reaching this render implies a drawable receipt already
+    // passed `needsUnavailablePlaceholder` above, so `materialized.scoring`
+    // is guaranteed non-null here even though its type stays optional.
+    const svg = renderBadgeSvg(materialized.stats, {
+      scoring: materialized.scoring!,
       avatarDataUri,
       config: configSnapshot.config,
       verificationHash: verification?.hash,
@@ -235,7 +239,7 @@ export async function GET(
       disableAnimation: true,
       // Same resolved bundle that produced ogCacheKey above, so the image and
       // the key it is stored under are always for the same locale (#1190).
-      strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? materialized.displayImpact.tier),
+      strings: badgeLocale.stringsFor(materialized.scoring?.tier ?? null),
     });
 
     const png = await withTimeout(
@@ -245,12 +249,11 @@ export async function GET(
     );
 
     const receiptIdentity = materialized.scoring?.policyVersion === "v7.2" ? materialized.scoring.identity : null;
-    const beforeWriteReceiptCurrent = await isScoringImageReceiptCurrent(handle, scoringSelection, receiptIdentity);
-    const beforeWriteSelection = await readScoringRenderSelection({ force: true });
+    const beforeWriteReceiptCurrent = await isScoringImageReceiptCurrent(handle, receiptIdentity);
     const beforeWriteConfig = await resolveBadgeConfigSnapshot(handle);
-    if (!beforeWriteReceiptCurrent || materialized.scoring?.freshness === "unavailable" || publicationVersion === null || !sameScoringRenderSelection(scoringSelection, beforeWriteSelection) || !beforeWriteConfig.cacheable || beforeWriteConfig.revision !== configSnapshot.revision) {
+    if (!beforeWriteReceiptCurrent || materialized.scoring?.freshness === "unavailable" || publicationVersion === null || !beforeWriteConfig.cacheable || beforeWriteConfig.revision !== configSnapshot.revision) {
       return new NextResponse(Buffer.from(png), {
-        headers: ogImageNoStoreHeaders(materialized.scoring?.freshness === "unavailable" ? { ...scoringSelection, cacheable: false } : scoringSelection),
+        headers: ogImageNoStoreHeaders(),
       });
     }
 
@@ -286,19 +289,18 @@ export async function GET(
     // metadata URL prevents stale values/responses from poisoning the new URL.
     const currentConfigSnapshot = await resolveBadgeConfigSnapshot(handle);
     const currentVersion = currentConfigSnapshot.cacheable
-      ? buildOgImageCacheVersion(today, currentConfigSnapshot.revision, scoringSelection.machinePolicy)
+      ? buildOgImageCacheVersion(today, currentConfigSnapshot.revision)
       : null;
-    const afterWriteSelection = await readScoringRenderSelection({ force: true });
-    const afterWriteReceiptCurrent = await isScoringImageReceiptCurrent(handle, scoringSelection, receiptIdentity);
-    if (!afterWriteReceiptCurrent || currentVersion !== publicationVersion || !sameScoringRenderSelection(scoringSelection, afterWriteSelection)) {
+    const afterWriteReceiptCurrent = await isScoringImageReceiptCurrent(handle, receiptIdentity);
+    if (!afterWriteReceiptCurrent || currentVersion !== publicationVersion) {
       if (cached) await cacheDel(ogCacheKey);
       return new NextResponse(Buffer.from(png), {
-        headers: ogImageNoStoreHeaders({ ...scoringSelection, cacheable: false }),
+        headers: ogImageNoStoreHeaders(),
       });
     }
 
     return new NextResponse(Buffer.from(png), {
-      headers: ogImageCacheHeaders(handle, scoringSelection),
+      headers: ogImageCacheHeaders(handle, capturedAt),
     });
   } catch (e) {
     if (e instanceof TimeoutError) {

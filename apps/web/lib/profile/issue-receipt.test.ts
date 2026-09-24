@@ -4,15 +4,12 @@ vi.mock("./score-receipt-observed", () => ({ materializeObservedScoreReceipt: vi
 vi.mock("@/lib/db/report-craft", () => ({ dbReadReportCraft: vi.fn(), dbPublishObservedReceiptWithReport: vi.fn() }));
 const issueReceiptVerificationV7 = vi.fn();
 vi.mock("@/lib/verification/store", () => ({ issueReceiptVerificationV7: (...a: unknown[]) => issueReceiptVerificationV7(...a) }));
-const readScoringRenderSelection = vi.fn();
-vi.mock("@/lib/scoring-render-selection", () => ({ readScoringRenderSelection: () => readScoringRenderSelection() }));
 
 import { materializeObservedScoreReceipt } from "./score-receipt-observed";
 import { issueScoreReceipt } from "./issue-receipt";
 
 beforeEach(() => {
   vi.mocked(materializeObservedScoreReceipt).mockReset();
-  readScoringRenderSelection.mockReset().mockResolvedValue({ enabled: true, machinePolicy: "v7.2", cacheable: true, capturedAt: Date.now() });
   issueReceiptVerificationV7.mockReset().mockResolvedValue("v7.token");
 });
 
@@ -34,7 +31,7 @@ describe("issueScoreReceipt", () => {
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
   });
 
-  it("folds a no_receipt reason into storage_error, since it is not one of the three recorded failure reasons", async () => {
+  it("folds a no_receipt reason into storage_error, since it is not one of the four recorded failure reasons", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "unavailable", reason: "no_receipt" });
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
   });
@@ -45,18 +42,15 @@ describe("issueScoreReceipt", () => {
     expect(issueReceiptVerificationV7).not.toHaveBeenCalled();
   });
 
+  it("reports empty_evidence distinctly from source_error when a recompute would have regressed an established receipt to zero", async () => {
+    vi.mocked(materializeObservedScoreReceipt).mockResolvedValue({ status: "stored", freshness: "stale", reason: "empty_evidence", snapshot: { receipt: {} } as never });
+    expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "empty_evidence" });
+    expect(issueReceiptVerificationV7).not.toHaveBeenCalled();
+  });
+
   it("never lets a thrown error escape into the caller's response", async () => {
     vi.mocked(materializeObservedScoreReceipt).mockRejectedValue(new Error("boom"));
     expect(await issueScoreReceipt("alice")).toEqual({ status: "failed", reason: "storage_error" });
-  });
-});
-
-describe("the scoring_v7_rendering gate", () => {
-  it("mints nothing while the flag is off, reported as unchanged", async () => {
-    readScoringRenderSelection.mockResolvedValue({ enabled: false, machinePolicy: "v6", cacheable: true, capturedAt: Date.now() });
-
-    expect(await issueScoreReceipt("alice")).toEqual({ status: "unchanged" });
-    expect(materializeObservedScoreReceipt).not.toHaveBeenCalled();
   });
 });
 

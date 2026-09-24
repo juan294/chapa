@@ -1,5 +1,14 @@
 # Impact V6 Scoring Specification
 
+> **Retired 2026-09-23. Historical reference only.** V6 is no longer a
+> rendered or selectable policy on any surface: its scoring code, its stored
+> data (`metrics_snapshots`, `verification_records`, v6 HMAC codes) and the
+> `scoring_v7_rendering` selector that once chose between it and v7.2 are all
+> deleted. The current spec is [Impact v7.2](impact-v7.md). See
+> `docs/decisions/2026-09-23-universal-v72-no-consent.md` for the reversal.
+> The text below describes what shipped and is kept for historical records
+> that still carry v6 semantics.
+
 > Source of truth for the V6 scoring system. Supersedes V5.
 
 ## Motivation

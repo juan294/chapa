@@ -63,19 +63,6 @@ function rowToFlag(row: FeatureFlagRow): FeatureFlag {
 // Queries
 // ---------------------------------------------------------------------------
 
-/** Authoritative scoring selection only. Never consult the hour-long Redis
- * flag cache, and distinguish a missing row from a failed database lookup.
- */
-export async function dbReadScoringFlagDirect(): Promise<boolean | null> {
-  const db = getSupabase();
-  if (!db) throw new Error("Scoring flag storage unavailable");
-  const { data, error } = await db.from("feature_flags").select("enabled").eq("key", "scoring_v7_rendering").maybeSingle();
-  if (error) throw new Error("Scoring flag lookup failed");
-  if (data === null) return null;
-  if (typeof data?.enabled !== "boolean") throw new Error("Invalid scoring flag row");
-  return data.enabled;
-}
-
 /**
  * Get all feature flags, ordered by key.
  * Checks Redis cache first; falls through to Supabase on cache miss.

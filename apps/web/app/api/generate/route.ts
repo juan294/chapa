@@ -1,11 +1,9 @@
 import { enqueueAndReportScoringStatus } from "@/lib/profile/post-write-score";
-import { readScoringRenderSelection } from "@/lib/scoring-render-selection";
 import { type NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { isGitHubUserNotFound } from "@/lib/github/not-found";
-import { computeImpactV6 } from "@/lib/impact/v6";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { captureServerError, captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
@@ -15,8 +13,8 @@ import { findUnusableSourceLinks } from "@/lib/platform/source-diagnostics";
  * POST /api/generate
  *
  * Warm the badge cache for the authenticated user by fetching their
- * GitHub stats and computing the Impact v6 profile. Called from the
- * /generating/:handle progress page after OAuth login.
+ * GitHub stats. Called from the /generating/:handle progress page after
+ * OAuth login.
  *
  * If the user's stats are already cached, getStats returns them
  * immediately — no redundant GitHub API calls.
@@ -107,16 +105,12 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
     );
   }
 
-  // Compute impact (also warms any downstream caches)
-  computeImpactV6(stats);
-
   // #1335 phase 4 — first badge generation is called moments after the OAuth
   // callback's own "signup" enqueue, so this reuses the same `signup` reason
   // (idempotent no-op against an already-queued/running/complete job) rather
   // than `refresh`, which would reset an already-complete day's collection
   // back to queued and discard evidence this route did nothing to change.
-  const scoringSelection = await readScoringRenderSelection();
-
+  //
   // LE-5-1 — the stats cache row is bound to the credential that fetched it
   // (source-context hashes the token into accessContextId), and the share
   // page materializes tokenless, as the server GITHUB_TOKEN. Warming only the
@@ -135,7 +129,7 @@ export const POST = withErrorCapture("/api/generate", async (request: NextReques
     });
   }
 
-  const scoringStatus = await enqueueAndReportScoringStatus(handle, "signup", scoringSelection);
+  const scoringStatus = await enqueueAndReportScoringStatus(handle, "signup");
 
-  return NextResponse.json({ success: true, handle, ...(scoringStatus ? { scoringStatus } : { policyVersion: "v6" }) });
+  return NextResponse.json({ success: true, handle, ...(scoringStatus ? { scoringStatus } : {}) });
 });

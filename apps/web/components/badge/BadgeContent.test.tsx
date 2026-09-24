@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { StatsData, ImpactV6Result } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { buildBadgeI18nStrings } from "@/lib/render/badge-i18n-strings";
 import { resolveTranslation } from "@/lib/i18n/resolve";
 import { __getFallbackDictionary } from "@/lib/i18n/fallback-dictionary";
+import { makeScoring } from "@/lib/test-helpers/fixtures";
 import { BadgeContent } from "./BadgeContent";
 
 afterEach(cleanup);
@@ -24,18 +25,21 @@ const stats = {
   linkedPlatforms: ["github"],
 } as unknown as StatsData;
 
-const impact = {
-  // The renderer projects this through the shared score view model, which
-  // identifies the subject — a fixture that casts the field away is lying
-  // about a value `ImpactV6Result` requires.
+// #1335 — the renderer projects this through the shared score view model,
+// which identifies the subject; a v7.2 ScoreViewModel fixture instead of the
+// retired ImpactV6Result shape.
+const scoring = makeScoring({
   handle: "testuser",
-  dimensions: { delivery: 72, quality: 64, consistency: 81, breadth: 58 },
-  archetype: "builder",
-  compositeScore: 65,
-  adjustedComposite: 65,
+  dimensions: {
+    delivery: { kind: "point", value: 72, display: 72 },
+    quality: { kind: "point", value: 64, display: 64 },
+    consistency: { kind: "point", value: 81, display: 81 },
+    breadth: { kind: "point", value: 58, display: 58 },
+  },
+  archetype: "Builder",
+  composite: { kind: "point", value: 65, display: 65 },
   tier: "Solid",
-  confidence: 90,
-} as unknown as ImpactV6Result;
+});
 
 const t = (key: string) => {
   const dictionary = __getFallbackDictionary();
@@ -49,24 +53,25 @@ const t = (key: string) => {
  * over `renderBadgeSvg`, so there is one badge implementation rather than two.
  *
  * Its only remaining callers are the flag-gated `/experiments/*` prototypes,
- * every one of which renders it as `<BadgeContent stats impact />`.
+ * every one of which renders it as `<BadgeContent stats scoring />`.
  */
 describe("BadgeContent wraps the one badge renderer (#1191)", () => {
   function expectedSvg() {
     const host = document.createElement("div");
-    host.innerHTML = renderBadgeSvg(stats, impact, {
-      strings: buildBadgeI18nStrings(t, impact.tier),
+    host.innerHTML = renderBadgeSvg(stats, {
+      scoring,
+      strings: buildBadgeI18nStrings(t, scoring.tier),
     });
     return host.innerHTML;
   }
 
   it("renders exactly what renderBadgeSvg produces", () => {
-    render(<BadgeContent stats={stats} impact={impact} />);
+    render(<BadgeContent stats={stats} scoring={scoring} />);
     expect(screen.getByTestId("badge-content").innerHTML).toBe(expectedSvg());
   });
 
   it("renders one SVG rather than a DOM lookalike", () => {
-    render(<BadgeContent stats={stats} impact={impact} />);
+    render(<BadgeContent stats={stats} scoring={scoring} />);
     const host = screen.getByTestId("badge-content");
     expect(host.children).toHaveLength(1);
     expect(host.firstElementChild?.tagName.toLowerCase()).toBe("svg");
@@ -76,7 +81,7 @@ describe("BadgeContent wraps the one badge renderer (#1191)", () => {
     render(
       <BadgeContent
         stats={stats}
-        impact={impact}
+        scoring={scoring}
         className="custom-class"
         style={{ opacity: 0.5 }}
       />,
@@ -90,7 +95,7 @@ describe("BadgeContent wraps the one badge renderer (#1191)", () => {
     render(
       <BadgeContent
         stats={{ ...stats, displayName: '<script>alert(1)</script>' } as StatsData}
-        impact={impact}
+        scoring={scoring}
       />,
     );
     const host = screen.getByTestId("badge-content");

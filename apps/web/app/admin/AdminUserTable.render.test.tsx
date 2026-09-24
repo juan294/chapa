@@ -46,17 +46,10 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     registeredAt: "2025-06-01T00:00:00Z",
     lastSnapshotDate: "2025-06-01",
     fetchedAt: new Date().toISOString(),
-    commitsTotal: 150,
-    prsMergedCount: 25,
-    reviewsSubmittedCount: 10,
-    activeDays: 200,
-    reposContributed: 5,
-    totalStars: 42,
     archetype: "Builder",
     tier: "High",
     adjustedComposite: 72,
     rawScore: 68,
-    confidence: 85,
     ...overrides,
   };
 }
@@ -186,13 +179,6 @@ describe("AdminUserTable — render tests", () => {
         />,
       );
       expect(screen.getByText("55")).toBeDefined();
-    });
-
-    it("displays the confidence value", () => {
-      render(
-        <AdminUserTable {...defaultProps} users={[makeUser({ confidence: 92 })]} />,
-      );
-      expect(screen.getByText("92")).toBeDefined();
     });
   });
 

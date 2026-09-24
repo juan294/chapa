@@ -17,8 +17,8 @@ vi.mock("./LandingUrlEffects", () => ({ LandingUrlEffects: () => null }));
 afterEach(cleanup);
 
 const TOP_SCORED: LeaderboardPlace[] = [
-  { rank: 1, score: 91, tier: "Elite", handles: ["juan294"] },
-  { rank: 2, score: 84, tier: "High", handles: ["cdnkr", "octocat"] },
+  { rank: 1, score: 91, tier: "Elite", handles: ["juan294"], policyVersion: "v7.2" },
+  { rank: 2, score: 84, tier: "High", handles: ["cdnkr", "octocat"], policyVersion: "v7.2" },
 ];
 
 function renderLanding() {
@@ -26,7 +26,7 @@ function renderLanding() {
     <LandingContent
       demoBadgeSvg="<svg></svg>"
       readmeBadgeSvg="<svg></svg>"
-      demoImpact={LANDING_IMPACT}
+      demoScoring={LANDING_IMPACT}
       topScored={TOP_SCORED}
       t={getServerT("en")}
     />,
@@ -54,7 +54,7 @@ describe("LandingContent — leaderboard links carry a 44px tap area (LE-8-3)", 
 });
 
 it("labels current standings with policy while preserving canonical boundary score", () => {
-  const { container } = render(<LandingContent demoBadgeSvg="<svg/>" readmeBadgeSvg="<svg/>" demoImpact={LANDING_IMPACT}
+  const { container } = render(<LandingContent demoBadgeSvg="<svg/>" readmeBadgeSvg="<svg/>" demoScoring={LANDING_IMPACT}
     topScored={[{ rank: 1, score: 69.99, tier: "Solid", handles: ["alice"], policyVersion: "v7.2" }]} t={getServerT("en")} />);
   const standing = container.querySelector('[data-scoring-policy="v7.2"]');
   expect(standing?.textContent).toContain("69.99");

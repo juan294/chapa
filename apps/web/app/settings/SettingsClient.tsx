@@ -21,7 +21,6 @@ interface SettingsClientProps {
   login: string;
   name: string | null;
   avatarUrl: string | null;
-  scoringPolicy?: "v6" | "v7.2";
 }
 
 const PLATFORM_META: Record<
@@ -110,12 +109,12 @@ function Section({
   );
 }
 
-export function SettingsClient({ login, name, avatarUrl, scoringPolicy = "v6" }: SettingsClientProps) {
+export function SettingsClient({ login, name, avatarUrl }: SettingsClientProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { insightsEnabled } = useClientFeatureFlags();
   const { connections, unlink } = usePlatformConnections();
-  const insights = useInsightsImport(login, scoringPolicy);
+  const insights = useInsightsImport(login);
   const [pendingUnlink, setPendingUnlink] = useState<PlatformId | null>(null);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
@@ -327,17 +326,11 @@ export function SettingsClient({ login, name, avatarUrl, scoringPolicy = "v6" }:
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              disabled={insights.cooldownActive || insights.processing}
-              title={insights.cooldownTooltip}
+              disabled={insights.processing}
               className="min-h-[44px] rounded-[3px] bg-action px-4 py-2 text-sm font-semibold text-action-text transition-colors hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("userMenu.importInsights") as string}
             </button>
-            {insights.cooldownTooltip && (
-              <p className="mt-3 text-xs text-text-secondary">
-                {insights.cooldownTooltip}
-              </p>
-            )}
             {insights.pendingConfirmation && (
               <div className="mt-4 border-t border-stroke pt-4" role="group" aria-labelledby="insights-confirm-title">
                 <h3 id="insights-confirm-title" className="font-heading text-sm text-balance text-text-primary">

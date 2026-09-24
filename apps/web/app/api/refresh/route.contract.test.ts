@@ -6,7 +6,7 @@ const {
   mockGetSessionGitHubToken,
   mockInvalidateProfileReadModels,
   mockMaterializeOrchestratedProfile,
-  mockPersistOrchestratedSnapshot,
+  mockEnqueueAndReportScoringStatus,
   mockRequireSession,
 } = vi.hoisted(() => ({
   mockCaptureServerError: vi.fn(),
@@ -14,23 +14,13 @@ const {
   mockInvalidateProfileReadModels: vi.fn(async () => undefined),
   mockMaterializeOrchestratedProfile: vi.fn(async () => ({
     craftResult: null,
-    // #1076: persistOrchestratedSnapshot now gates on statsComplete via the
-    // shared guardStatsComplete() — this fixture represents the happy path
-    // (complete stats), not the incomplete-stats case, so it must be true.
+    // #1076: the route gates on statsComplete before enqueueing — this
+    // fixture represents the happy path (complete stats), not the
+    // incomplete-stats case, so it must be true.
     statsComplete: true,
-    displayImpact: {
-      adjustedComposite: 70,
-      compositeScore: 72,
-      dimensions: { delivery: 75, quality: 65, consistency: 70, breadth: 60 },
-      archetype: "Builder",
-      tier: "Solid",
-      profileType: "collaborative",
-    },
-    rawImpact: { adjustedComposite: 73, compositeScore: 72 },
-    snapshot: { date: "2026-07-03", adjustedComposite: 70, tier: "Solid" },
     stats: { handle: "octocat", commitsTotal: 12 },
   })),
-  mockPersistOrchestratedSnapshot: vi.fn(async () => true),
+  mockEnqueueAndReportScoringStatus: vi.fn(async (): Promise<{ kind: string; receiptDate: string; updating: boolean } | null> => ({ kind: "ready", receiptDate: "2026-07-03", updating: false })),
   mockRequireSession: vi.fn(() => ({
     session: { login: "octocat", name: "Octocat", avatar_url: "" },
     error: null,
@@ -47,7 +37,10 @@ vi.mock("@/lib/auth/github-session-token", () => ({
 
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
   materializeOrchestratedProfile: mockMaterializeOrchestratedProfile,
-  persistOrchestratedSnapshot: mockPersistOrchestratedSnapshot,
+}));
+
+vi.mock("@/lib/profile/post-write-score", () => ({
+  enqueueAndReportScoringStatus: mockEnqueueAndReportScoringStatus,
 }));
 
 vi.mock("@/lib/profile/post-write-invalidation", () => ({
@@ -88,7 +81,7 @@ describe("POST /api/refresh contract", () => {
     }
   });
 
-  it("returns refreshed stats and impact only after durable snapshot persistence", async () => {
+  it("returns the resulting scoring status after enqueueing collection", async () => {
     const response = await invokeJson(POST, {
       method: "POST",
       path: "/api/refresh?handle=octocat",
@@ -96,25 +89,19 @@ describe("POST /api/refresh contract", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(bodyAsRecord(response).stats).toMatchObject({ handle: "octocat" });
+    expect(bodyAsRecord(response).success).toBe(true);
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("octocat", {
       token: "oauth-contract-token",
-      scoringSelection: expect.objectContaining({ enabled: false, machinePolicy: "v6" }),
     });
-    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("octocat", { badgeSvg: true });
+    expect(mockEnqueueAndReportScoringStatus).toHaveBeenCalledWith(
       "octocat",
-      expect.any(Object),
-      { mode: "replace" },
+      "refresh",
     );
-    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("octocat", {
-      badgeSvg: true,
-      snapshot: true,
-      history: true,
-    });
   });
 
-  it("fails closed and captures when the refreshed snapshot cannot be persisted", async () => {
-    mockPersistOrchestratedSnapshot.mockResolvedValueOnce(false);
+  it("fails closed when the scoring status authority read itself fails", async () => {
+    mockEnqueueAndReportScoringStatus.mockResolvedValueOnce(null);
 
     const response = await invokeJson(POST, {
       method: "POST",
@@ -122,10 +109,6 @@ describe("POST /api/refresh contract", () => {
       body: {},
     });
 
-    expect(response.status).toBe(500);
-    expect(bodyAsRecord(response).error).toMatch(/save refreshed profile/i);
-    expect(mockCaptureServerError).toHaveBeenCalledWith(
-      expect.objectContaining({ route: "/api/refresh", statusCode: 500 }),
-    );
+    expect(response.status).toBe(503);
   });
 });

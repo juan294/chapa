@@ -34,14 +34,6 @@ vi.mock("@/components/InfoTooltip", () => ({
   ),
 }));
 
-vi.mock("./DeltaIndicator", () => ({
-  DeltaIndicator: (props: { delta: number; size?: string }) => (
-    <span data-testid="delta-indicator" data-delta={props.delta}>
-      delta:{props.delta}
-    </span>
-  ),
-}));
-
 afterEach(cleanup);
 
 // ---------------------------------------------------------------------------
@@ -69,39 +61,6 @@ const mockStats: StatsData = {
   fetchedAt: "2026-02-28T00:00:00Z",
 };
 
-const mockDiff = {
-  direction: "improving" as const,
-  daysBetween: 7,
-  compositeScore: 3,
-  adjustedComposite: 2,
-  confidence: 1,
-  dimensions: {
-    delivery: 5,
-    quality: -2,
-    consistency: 0,
-    breadth: 1,
-  },
-  stats: {
-    commitsTotal: 50,
-    prsMergedCount: 10,
-    prsMergedWeight: 8,
-    reviewsSubmittedCount: 5,
-    issuesClosedCount: 3,
-    reposContributed: 2,
-    activeDays: 15,
-    linesAdded: 500,
-    linesDeleted: 200,
-    totalStars: 20,
-    totalForks: 0,
-    totalWatchers: 3,
-    topRepoShare: 0.05,
-  },
-  archetype: null,
-  tier: null,
-  profileType: null,
-  penaltyChanges: null,
-};
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -109,7 +68,7 @@ const mockDiff = {
 describe("StatsGrid", () => {
   // 1. Renders 8 stat cards with correct values
   it("renders 8 stat cards with correct values", () => {
-    render(<StatsGrid stats={mockStats} diff={null} />);
+    render(<StatsGrid stats={mockStats} />);
 
     // Verify all 8 formatted values are present (all unique to avoid getByText ambiguity)
     // totalStars: 1500 -> "1.5k"
@@ -140,36 +99,9 @@ describe("StatsGrid", () => {
     expect(screen.getByText("Repos")).toBeTruthy();
   });
 
-  // 2. Shows DeltaIndicator when diff data present and delta != 0
-  it("shows DeltaIndicator when diff data present and delta != 0", () => {
-    render(<StatsGrid stats={mockStats} diff={mockDiff} />);
-
-    const deltas = screen.getAllByTestId("delta-indicator");
-
-    // Non-zero deltas from mockDiff.stats:
-    // totalStars: 20, totalForks: 0 (excluded), totalWatchers: 3,
-    // activeDays: 15, commitsTotal: 50, prsMergedCount: 10,
-    // reviewsSubmittedCount: 5, reposContributed: 2
-    // totalForks is 0 so should be hidden -> 7 deltas
-    expect(deltas).toHaveLength(7);
-
-    // Verify one specific delta value
-    const starsDeltas = deltas.filter(
-      (el) => el.getAttribute("data-delta") === "20",
-    );
-    expect(starsDeltas).toHaveLength(1);
-  });
-
-  // 3. Hides DeltaIndicator when diff is null
-  it("hides DeltaIndicator when diff is null", () => {
-    render(<StatsGrid stats={mockStats} diff={null} />);
-
-    expect(screen.queryAllByTestId("delta-indicator")).toHaveLength(0);
-  });
-
-  // 4. Renders section header
+  // 2. Renders section header
   it("renders section header", () => {
-    render(<StatsGrid stats={mockStats} diff={null} />);
+    render(<StatsGrid stats={mockStats} />);
 
     expect(screen.getByText("Key Numbers")).toBeTruthy();
   });

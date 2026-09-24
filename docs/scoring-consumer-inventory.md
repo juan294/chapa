@@ -14,16 +14,20 @@ score has far more surfaces than a badge does.
 ## The contract
 
 - **One projection.** `apps/web/lib/profile/score-view-model.ts` turns an issued
-  v7.2 receipt (or an explicitly archived v7.1 / legacy v6 aggregate) into `ScoreViewModel`. A consumer reads
-  that model; it does not recompute a dimension, composite, tier or archetype.
+  v7.2 receipt (or an explicitly archived v7.1 receipt, replayable but never
+  current) into `ScoreViewModel`. A consumer reads that model; it does not
+  recompute a dimension, composite, tier or archetype. There is no legacy
+  aggregate (v6) projection any more (#1335 phase 5).
 - **One materializer.** `apps/web/lib/profile/score-receipt-observed.ts` captures the
   reference time once and issues one receipt per revision. A read-only caller
   observes durable state and publishes nothing. Archived issuance remains in
   `apps/web/lib/profile/score-receipt-v7.ts`.
 - **One what-if calculator.** `apps/web/lib/impact/simulate.ts`. A simulation
   surface calls it instead of restating the pipeline.
-- **`policyVersion` is load-bearing.** A `v6` model carries legacy aggregate
-  semantics and must never be labelled or explained as v7 arithmetic.
+- **`policyVersion` is load-bearing.** It is `"v7"` (archived) or `"v7.2"`
+  (current). An archived `"v7"` receipt carries different aggregate semantics
+  than the current policy and must never be labelled or explained as the
+  same arithmetic.
 
 ## Registered consumers
 
@@ -31,7 +35,6 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/lib/insights/use-insights-import.ts` | `apps/web/lib/insights/use-insights-import.test.tsx` |
 
 ### Creator Studio
 
@@ -56,8 +59,6 @@ score has far more surfaces than a badge does.
 | `apps/web/components/badge/BadgeContent.tsx` | `apps/web/lib/render/badge-view-model.test.tsx` |
 | `apps/web/lib/render/BadgeSvg.tsx` | `apps/web/lib/render/badge-observed.test.tsx` |
 | `apps/web/lib/render/archetypeDemoData.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
-| `apps/web/lib/render/demoData.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
-| `apps/web/lib/render/landing-demo-data.ts` | `apps/web/lib/render/badge-view-model.test.tsx` |
 | `apps/web/lib/render/observed-demo-data.ts` | `apps/web/lib/render/observed-demo-data.test.ts` |
 | `apps/web/lib/render/scoring-evidence-label.ts` | `apps/web/lib/render/scoring-evidence-label.test.ts` |
 
@@ -97,11 +98,14 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/app/verify/[hash]/page.tsx` | `apps/web/lib/verification/store.test.ts` |
-| `apps/web/lib/db/verification.ts` | `apps/web/lib/db/verification.test.ts` |
-| `apps/web/lib/verification/hmac-payload.ts` | `apps/web/lib/verification/hmac.test.ts` |
-| `apps/web/lib/verification/hmac.ts` | `apps/web/lib/verification/hmac.test.ts` |
-| `apps/web/lib/verification/types.ts` | `apps/web/lib/verification/store.test.ts` |
+
+<!-- #1335 phase 5 — `verification_records`, v6 HMAC (`hmac-payload.ts`) and the
+     legacy static-record verify page are retired. `/verify/[hash]` now
+     resolves every hash through `getReceiptVerificationV7` (a 410
+     `retired_v6_code` for anything else), which no longer names any
+     SCORED_SYMBOLS token in its own source — the v7.2 receipt read lives in
+     `lib/verification/store.ts`'s v7 half, already covered by
+     `lib/verification/store-v7.test.ts` and `v7.test.ts`. -->
 
 ### cron
 
@@ -113,29 +117,28 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/components/dashboard/CoachingInsights.tsx` | `apps/web/lib/dashboard/generate-insights.test.ts` |
-| `apps/web/components/dashboard/DimensionCardsRow.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
+| `apps/web/components/dashboard/DimensionCardsRow.tsx` | `apps/web/components/dashboard/DimensionCardsRow.test.tsx` |
 | `apps/web/components/dashboard/ImpactDashboard.tsx` | `apps/web/components/dashboard/ImpactDashboard.observed.test.tsx` |
-| `apps/web/components/dashboard/ScoreBoldNumber.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 | `apps/web/components/dashboard/ReceiptExplanationPanel.tsx` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
-| `apps/web/components/dashboard/ScoreExplanationPanel.tsx` | `apps/web/lib/dashboard/score-explanation.test.ts` |
-| `apps/web/lib/dashboard/generate-insights.ts` | `apps/web/lib/dashboard/generate-insights.test.ts` |
 | `apps/web/lib/dashboard/receipt-explanation.ts` | `apps/web/lib/dashboard/receipt-explanation.test.ts` |
-| `apps/web/lib/dashboard/score-explanation.ts` | `apps/web/lib/dashboard/score-explanation.test.ts` |
 
 ### email
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/lib/email/notifications.ts` | `apps/web/lib/email/notifications.test.ts` |
-| `apps/web/lib/email/score-bump.ts` | `apps/web/lib/email/score-bump.test.ts` |
+
+<!-- #1335 phase 5 — `notifyScoreBump` (the SnapshotDiff-based v6 notifier) is
+     retired along with `metrics_snapshots`. `score-bump.ts` now holds only
+     `notifyObservedScoreChange`, which reads a `ScoringComparison`, not a
+     SCORED_SYMBOLS token, so its own file text no longer matches; it is
+     covered by `apps/web/lib/email/score-bump.test.ts` and
+     `apps/web/lib/history/scoring-observations.test.ts`. -->
 
 ### experiments (flag-gated)
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/app/experiments/number-counters/page.tsx` | `apps/web/lib/profile/score-view-model.test.ts` |
-| `apps/web/app/experiments/tier-visuals/_components/tier-data.ts` | `apps/web/app/experiments/tier-visuals/_components/tier-data.test.ts` |
 
 ### feature flags
 
@@ -153,25 +156,26 @@ score has far more surfaces than a badge does.
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/lib/impact/simulate.ts` | `apps/web/lib/impact/simulate.test.ts` |
-| `apps/web/lib/impact/smoothing.ts` | `apps/web/lib/impact/smoothing.test.ts` |
-| `apps/web/lib/impact/v6.ts` | `apps/web/lib/impact/v6.test.ts` |
 
 ### lifetime history
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/lib/db/snapshots.ts` | `apps/web/lib/db/snapshots.test.ts` |
-| `apps/web/lib/history/diff.ts` | `apps/web/lib/history/diff.test.ts` |
-| `apps/web/lib/history/significant-change.ts` | `apps/web/lib/history/significant-change.test.ts` |
-| `apps/web/lib/history/snapshot.ts` | `apps/web/lib/history/snapshot.test.ts` |
-| `apps/web/lib/history/trend.ts` | `apps/web/lib/history/trend.test.ts` |
+| `apps/web/lib/history/get-trend-data.ts` | `apps/web/lib/history/get-trend-data.test.ts` |
+
+<!-- #1335 phase 5 — `metrics_snapshots` is retired. `lib/db/snapshots.ts`
+     (now the archived v7/v7.1 receipt-history RPC bridge only),
+     `lib/history/diff.ts` and `lib/history/trend.ts` (both deleted — the v6
+     SnapshotDiff comparator and computeTrend), `lib/history/significant-change.ts`
+     (`isSignificantScoringChange` takes a `ScoringComparison`, not a
+     SCORED_SYMBOLS token) and `lib/history/snapshot.ts` (`buildReceiptSnapshotV7`,
+     likewise) no longer read a score by this inventory's SCORED_SYMBOLS test,
+     even though the latter two remain genuine v7.2 consumers in spirit. -->
 
 ### maintenance scripts
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `scripts/backfill-parsers.ts` | `scripts/backfill-parsers.test.ts` |
-| `scripts/recalculate-handles.ts` | `scripts/recalculate-handles.test.ts` |
 
 ### collection (#1335 phase 4)
 
@@ -194,7 +198,13 @@ score has far more surfaces than a badge does.
 
 | Consumer | Shared-receipt regression |
 | --- | --- |
-| `apps/web/app/api/profile/[handle]/route.ts` | `apps/web/app/api/profile/[handle]/route.observed.test.ts` |
+
+<!-- #1335 phase 5 — `/api/profile/[handle]` now reads the current receipt
+     through `readPublicObservedScore` (`lib/profile/post-write-score.ts`),
+     not a SCORED_SYMBOLS token directly, so its own file text no longer
+     matches this inventory's scan. Covered by
+     `apps/web/app/api/profile/[handle]/route.test.ts` and
+     `route.observed.test.ts`. -->
 
 ### scoring view model
 
@@ -212,7 +222,6 @@ score has far more surfaces than a badge does.
 | Consumer | Shared-receipt regression |
 | --- | --- |
 | `apps/web/app/u/[handle]/page.tsx` | `apps/web/lib/render/badge-view-model.test.tsx` |
-| `apps/web/components/ImpactBreakdown.tsx` | `apps/web/lib/profile/score-view-model.test.ts` |
 | `apps/web/components/SharePageOwnerContent.tsx` | `apps/web/components/SharePageOwnerContent.render.test.tsx` |
 | `apps/web/components/SharePageOwnerContentLazy.tsx` | `apps/web/components/SharePageOwnerContentLazy.render.test.tsx` |
 
@@ -270,11 +279,12 @@ projection and history observation, comparing them with the sealed receipt.
 | Notification contents (mocked transport) | `apps/web/lib/email/notifications.test.ts` |
 | Offline receipt replay | `scripts/scoring/reference-calculator-v7-observed.test.ts` |
 
-Legacy calculators, archived receipt schemas, snapshot persistence and legacy
-explanation components remain explicitly v6 or archived v7.1; their tests prove
-those historical semantics, not current receipt presentation. Static experiments
+v6 calculators, snapshot persistence and legacy explanation components no
+longer exist (#1335 phase 5). What remains historical is the archived v7.1
+receipt schema and engine, explicitly labelled and never presented as current
+receipt arithmetic. Static experiments
 are visibly labelled illustrative fixtures. The command bar's `/sort score`
 alias selects the admin adapter's canonical projected score column; it does not
 calculate a separate number. Current demos use the pure policy calculator and
 carry illustrative=true with no issued identity. Infrastructure rows test
-publication, privacy, consent, selection and cache fences rather than rendering.
+publication, privacy, collection and cache fences rather than rendering.

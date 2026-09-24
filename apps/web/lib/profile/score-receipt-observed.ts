@@ -25,7 +25,7 @@ export interface ObservedReceiptMaterializationOptions extends ReceiptMaterializ
    * Absence/errors are unavailable, never inferred no_report consent. */
   readonly readCraft?: (owner: string, window: ScoringWindow) => Promise<PublicObservedCraft>;
 }
-type FailureReason = "no_receipt" | "storage_error" | "source_error" | "craft_error";
+type FailureReason = "no_receipt" | "storage_error" | "source_error" | "craft_error" | "empty_evidence";
 export type ObservedReceiptMaterialization =
   | { readonly status: "issued"; readonly snapshot: ObservedReceiptSnapshot; readonly publication: "inserted" | "duplicate"; readonly isCurrent: boolean; readonly freshness: "current" | "stale" }
   | { readonly status: "stored"; readonly snapshot: ObservedReceiptSnapshot; readonly freshness: "current" | "stale"; readonly reason?: FailureReason }
@@ -175,6 +175,19 @@ export async function materializeObservedScoreReceipt(owner: string, options: Ob
     const evidence: EngineeringEvidenceInput = canonicalizeReceiptEvidence({ schemaVersion: "v7", window,
       scope: { sources: [...sources, ...ledger.scope.sources], excludedSources: [...collected.excludedSources, ...ledger.scope.excludedSources], ledgerRevisionIds: ledger.scope.ledgerRevisionIds },
       events: [...collected.events, ...ledger.events], repositoryAliases: ledger.repositoryAliases, equivalentWorkItems: ledger.equivalentWorkItems, assessments: ledger.assessments });
+    // No connected/legacy source reported unavailable above, but "observed" and
+    // "unlinked" both pass that guard even when nothing was actually collected --
+    // a disconnected provider, or a completed-but-empty collection round, look
+    // identical to genuine zero activity. Publishing that over an established,
+    // non-trivial receipt would silently erase real evidence; refuse instead
+    // and let the current receipt stand. A distinct reason from source_error:
+    // that guard means a source is known-unreadable right now, this one means
+    // every source read cleanly and still produced nothing, which is a
+    // different failure an operator needs to be able to tell apart. A
+    // subject's own first-ever issuance is unaffected: there is no established
+    // receipt yet to regress away from, so a genuine zero is recorded normally.
+    if (previous.status === "found" && previous.envelope.receipt.action !== "retract"
+      && previous.envelope.receipt.core.composite.exact > 0 && evidence.events.length === 0 && evidence.assessments.length === 0) return preserve("empty_evidence");
     const core = computeObservedImpactV7(evidence);
     const projected = { ...projectReceiptEvidence(evidence.scope, []), criteria: resolvedCriteria(core.aggregation) };
     for (const criterion of qualityCriteria) {

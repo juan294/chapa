@@ -1,17 +1,10 @@
 import {
   DIMENSION_KEYS,
-  type ClientImpactV6Result,
-  type CraftResult,
-  type StatsData,
 } from "@chapa/shared";
-import {
-  buildDimensionExplanation,
-  getDimensionFormulaKey,
-} from "@/lib/dashboard/score-explanation";
-import type { DimensionKey } from "@/lib/dashboard/dimension-sub-metrics";
-import type { LanguageContextValue } from "@/lib/i18n";
-import { interpolate } from "@/lib/i18n/interpolate";
+import type { DimensionScores } from "@chapa/shared";
 import type { ScoreViewModel } from "@/lib/profile/score-view-model";
+
+type DimensionKey = keyof DimensionScores;
 import { publicScoreProjection } from "@/lib/profile/public-score-projection";
 import { calculateObservedCoreV7 } from "@/lib/impact/observed-v7";
 import { invalidInput } from "./errors";
@@ -37,14 +30,10 @@ export interface WebMcpTool {
   ): string | Promise<string>;
 }
 
-type Translate = LanguageContextValue["t"];
-
 interface ExplainDimensionToolOptions {
-  scoring?: ScoreViewModel | null;
-  impact: ClientImpactV6Result;
-  stats: StatsData;
-  craftResult?: CraftResult | null;
-  t: Translate;
+  /** #1335 — v7.2 is the one scoring policy Studio and the share page ever
+   * supply; there is no legacy fallback left to branch to. */
+  scoring: ScoreViewModel;
   /**
    * No default on purpose: the caller must state whether the page it's
    * rendering on shows trusted (Studio) or untrusted (public share page)
@@ -66,9 +55,7 @@ const MAX_AGENT_FREE_TEXT_LENGTH = 255;
  *
  * This is a projection for the WebMCP tool boundary ONLY. It must never be
  * applied to the SVG render path or the share-page HTML render path, which
- * correctly show the full, untruncated text (mirrors the `impactForClient`
- * confidence-redaction pattern at `app/u/[handle]/page.tsx`, which is also
- * scoped to the client/tool boundary and never touches the render paths).
+ * correctly show the full, untruncated text.
  */
 export function sanitizeFreeTextForAgent(
   value: string | undefined,
@@ -116,15 +103,9 @@ export function isWebMcpRecord(
 }
 
 export function createExplainDimensionTool({
-  impact,
   scoring,
-  stats,
-  craftResult = null,
-  t,
   annotations,
 }: ExplainDimensionToolOptions): WebMcpTool {
-  const text = (key: string) => t(key) as string;
-
   return {
     name: "explain_dimension",
     description: "Explain one impact dimension using the current profile and activity.",
@@ -140,31 +121,7 @@ export function createExplainDimensionTool({
       }
 
       const key = dimension as DimensionKey;
-      if (scoring?.policyVersion === "v7.2") return JSON.stringify(explainObservedDimension(scoring, key));
-      const dimensionExplanation = buildDimensionExplanation(
-        impact,
-        stats,
-        key,
-        craftResult,
-      );
-      const subMetrics = dimensionExplanation.subMetrics.map((metric) => ({
-        ...metric,
-        label: text(`scoreExplanation.subMetrics.${metric.key}`),
-        rawLabel: interpolate(
-          text(`scoreExplanation.rawLabels.${metric.rawLabelKey}`),
-          metric.rawLabelParams,
-        ),
-      }));
-      const tipKey = key === "quality" && impact.profileType === "solo"
-        ? "dimensions.quality.soloTip"
-        : `dimensions.${key}.tip`;
-      return JSON.stringify({
-        dimension: key,
-        score: impact.dimensions[key] ?? null,
-        tip: text(tipKey),
-        formula: text(getDimensionFormulaKey(dimensionExplanation)),
-        subMetrics,
-      });
+      return JSON.stringify(explainObservedDimension(scoring, key));
     },
   };
 }

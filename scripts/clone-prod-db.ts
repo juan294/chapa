@@ -149,28 +149,37 @@ export async function cloneProdDb(sourcePath: string, targetPath: string): Promi
     let from = 0;
     let copied = 0;
     let cleared = false;
-    for (;;) {
-      let rows: Record<string, unknown>[];
-      try {
-        rows = await readPage(source, table, from);
-      } catch (error) {
-        // A table that exists locally but not in production (a migration that
-        // has not shipped yet) is expected, not a failure.
-        console.log(`${table}: skipped (${String(error).slice(0, 120)})`);
-        break;
+    try {
+      for (;;) {
+        let rows: Record<string, unknown>[];
+        try {
+          rows = await readPage(source, table, from);
+        } catch (error) {
+          // A table that exists locally but not in production (a migration
+          // that has not shipped yet) is expected, not a failure.
+          console.log(`${table}: skipped (${String(error).slice(0, 120)})`);
+          break;
+        }
+        if (rows.length === 0) break;
+        if (!cleared) {
+          await truncate(target, table, deleteFilterColumn(rows));
+          cleared = true;
+        }
+        const payload = IDENTITY_ID_TABLES.has(table)
+          ? rows.map(({ id: _id, ...rest }) => rest)
+          : rows;
+        await writeRows(target, table, payload);
+        copied += rows.length;
+        if (rows.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
-      if (rows.length === 0) break;
-      if (!cleared) {
-        await truncate(target, table, deleteFilterColumn(rows));
-        cleared = true;
-      }
-      const payload = IDENTITY_ID_TABLES.has(table)
-        ? rows.map(({ id: _id, ...rest }) => rest)
-        : rows;
-      await writeRows(target, table, payload);
-      copied += rows.length;
-      if (rows.length < PAGE_SIZE) break;
-      from += PAGE_SIZE;
+    } catch (error) {
+      // #1335 — `metrics_snapshots` and `verification_records` are dropped by
+      // a held contract migration (057) not yet applied to either side. A
+      // table present in production but missing on this local target (already
+      // migrated ahead) must not abort every table after it in this loop.
+      console.log(`${table}: skipped, target write failed (${String(error).slice(0, 120)})`);
+      continue;
     }
     if (copied > 0) {
       console.log(`${table}: ${copied}`);

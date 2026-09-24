@@ -3,7 +3,6 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { badgeTheme } from "./theme";
 import { escapeXml } from "./escape";
 import type { ScoringStatus, ScoringStatusKind } from "@/lib/collection/scoring-status";
-import type { ScoringRenderSelection } from "@/lib/scoring-render-selection";
 
 /**
  * Badge/OG placeholder states (#1335 phase 4). A `ready` `ScoringStatus`
@@ -70,11 +69,10 @@ export function badgeStatusState(status: ScoringStatus | null): BadgeStatusState
  * previously three independently-drifting copies of the same condition.
  */
 export function needsUnavailablePlaceholder(
-  scoringSelection: Pick<ScoringRenderSelection, "machinePolicy">,
   scoringStatus: ScoringStatus | null,
   policyVersion: string | undefined,
 ): boolean {
-  return scoringSelection.machinePolicy === "v7.2" && scoringStatus === null && policyVersion !== "v7.2";
+  return scoringStatus === null && policyVersion !== "v7.2";
 }
 
 /**
