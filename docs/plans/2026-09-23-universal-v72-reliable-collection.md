@@ -59,8 +59,8 @@ render surfaces ◄── receipt (ready) | scoring status (collecting / failed 
 | 2 | [Remove publication consent](2026-09-23-universal-v72-reliable-collection-phases/phase-2.md) — [x] done | none | `[batch-eligible]` with 1 |
 | 3 | [Durable resumable collection](2026-09-23-universal-v72-reliable-collection-phases/phase-3.md) — [x] done | 1, 2 | no |
 | 4 | [Issuance fan-in, pending states and no silent failure](2026-09-23-universal-v72-reliable-collection-phases/phase-4.md) — [x] done | 3 | no |
-| 5 | [Delete v6](2026-09-23-universal-v72-reliable-collection-phases/phase-5.md) | 4 | no |
-| 6 | [Reverse the docs](2026-09-23-universal-v72-reliable-collection-phases/phase-6.md) | 5 | no |
+| 5 | [Delete v6](2026-09-23-universal-v72-reliable-collection-phases/phase-5.md) — [x] done | 4 | no |
+| 6 | [Reverse the docs](2026-09-23-universal-v72-reliable-collection-phases/phase-6.md) — [x] done | 5 | no |
 | 7 | [Production rollout (authorization-gated)](2026-09-23-universal-v72-reliable-collection-phases/phase-7.md) | 6 | no |
 
 **Migration numbers are fixed** so that phases 1 and 2 can run in parallel without colliding:
