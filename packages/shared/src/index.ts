@@ -9,8 +9,6 @@ export type {
   DimensionScores,
   DeveloperArchetype,
   ImpactV6Result,
-  PublicImpactV6Result,
-  ClientImpactV6Result,
   SupplementalStats,
   BadgeBackground,
   BadgeCardStyle,

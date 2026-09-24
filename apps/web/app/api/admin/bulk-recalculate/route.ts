@@ -132,7 +132,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
       // single batch, and scheduling a full tick after every one of them
       // would be redundant work for the same `after()` callback. v7.2 is
       // the one rendered policy, so this always runs (the retired
-      // retired DB-backed render-selector flag used to gate it).
+      // DB-backed render-selector flag used to gate it).
       if (recalculated > 0) scheduleCollectionAdvance();
       return NextResponse.json(
         {
