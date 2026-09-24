@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 import type { ScoringStatus, ProviderStatus, ProviderStatusReason } from "@/lib/collection/scoring-status";
@@ -32,19 +32,27 @@ const REASON_KEYS: Record<ProviderStatusReason, string> = {
   failed: "scoring.status.reasonFailed",
 };
 
-function formatResumeTime(iso: string): string {
+/**
+ * Resume times read in the viewer's own zone: "10:42 UTC" read as local time
+ * looked late to a viewer in UTC+2. The server has no viewer zone, so server
+ * HTML and the hydration pass use UTC, and the client re-renders in local time.
+ */
+function formatResumeTime(iso: string, locale: string | null): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
+  if (locale) return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZoneName: "short" }).format(date);
   return `${date.getUTCHours().toString().padStart(2, "0")}:${date.getUTCMinutes().toString().padStart(2, "0")} UTC`;
 }
 
-function providerRowState(t: (key: string) => string, source: ProviderStatus): string {
+const noopSubscribe = () => () => {};
+
+function providerRowState(t: (key: string) => string, source: ProviderStatus, locale: string | null): string {
   const key = STATE_KEYS[source.state];
   if (source.state === "waiting_rate_limit" && source.resumesAt) {
-    return interpolate(t(key), { time: formatResumeTime(source.resumesAt) });
+    return interpolate(t(key), { time: formatResumeTime(source.resumesAt, locale) });
   }
   if (source.state === "retrying" && source.resumesAt) {
-    return interpolate(t(key), { time: formatResumeTime(source.resumesAt), attempt: String(source.attempt ?? 1) });
+    return interpolate(t(key), { time: formatResumeTime(source.resumesAt, locale), attempt: String(source.attempt ?? 1) });
   }
   return t(key);
 }
@@ -65,7 +73,8 @@ interface ScoringStatusPanelProps {
  * owner section (#1335 phase 4) — one panel, not two copies of this markup.
  */
 export function ScoringStatusPanel({ initialStatus }: ScoringStatusPanelProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const timeLocale = useSyncExternalStore(noopSubscribe, () => locale, () => null);
   const [status, setStatus] = useState<ScoringStatus | null | undefined>(initialStatus);
   const [loading, setLoading] = useState(initialStatus === undefined);
   const [loadError, setLoadError] = useState(false);
@@ -155,7 +164,7 @@ export function ScoringStatusPanel({ initialStatus }: ScoringStatusPanelProps) {
                   className="flex flex-wrap items-center gap-3 rounded-[3px] border border-stroke bg-card px-4 py-3"
                 >
                   <span className="font-heading text-xs uppercase text-terminal-dim">{source.provider}</span>
-                  <span className="text-sm text-text-primary">{providerRowState((key) => t(key) as string, source)}</span>
+                  <span className="text-sm text-text-primary">{providerRowState((key) => t(key) as string, source, timeLocale)}</span>
                   {source.reason && (
                     <span className="text-xs text-text-secondary">{t(REASON_KEYS[source.reason]) as string}</span>
                   )}

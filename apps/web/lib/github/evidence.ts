@@ -96,8 +96,14 @@ const RATE_LIMIT_FLOOR = 200;
  * on every query stops the slice once `remaining` drops below 200, with
  * `retryAfterSeconds` computed from `resetAt`.
  */
+const COMMIT_HISTORY_SINCE_MARGIN_MS = 30 * 86_400_000;
+
 export const collectGitHubSlice: CollectSlice = async (input, credential, checkpoint, budget, stagedKeys) => {
   const window = validateSliceWindow(input);
+  // Commit history's `since` is a committed-date bound. Committed dates
+  // normally follow authored dates, so a margin before the window keeps every
+  // in-window authored commit; inWindow() stays the authored-date filter.
+  const commitHistorySince = new Date(Date.parse(`${window.startInclusive.slice(0, 10)}T00:00:00.000Z`) - COMMIT_HISTORY_SINCE_MARGIN_MS).toISOString();
   const login = input.requestedSource.login;
   if (!/^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i.test(login)) throw new RangeError("Invalid GitHub handle");
   const explicit = input.scope.discovery === "explicit_repositories";
@@ -364,7 +370,7 @@ export const collectGitHubSlice: CollectSlice = async (input, credential, checkp
     }
     if (op.key.startsWith("commits:")) {
       const repositoryId = op.key.slice("commits:".length);
-      const outcome = await runPagedList(op, "commits", { id: repositoryId, subjectId: subjectId() }, ["node", "defaultBranchRef", "target", "history"], (node) => {
+      const outcome = await runPagedList(op, "commits", { id: repositoryId, subjectId: subjectId(), since: commitHistorySince }, ["node", "defaultBranchRef", "target", "history"], (node) => {
         const authorId = string(at(node, "author", "user", "id"));
         if (!authorId) { reasons.add("attribution_unknown"); return; }
         if (authorId !== subjectId()) return;

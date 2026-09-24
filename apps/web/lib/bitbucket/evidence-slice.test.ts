@@ -64,6 +64,8 @@ function setupFetch(options: { readonly repos?: readonly string[]; readonly comm
       ], next: null }), { status: 200 });
     }
     if (path.endsWith("/activity")) {
+      // The real activity endpoint also caps pagelen at 50 (production, 2026-09-24).
+      if (Number(url.searchParams.get("pagelen") ?? "10") > 50) return new Response(JSON.stringify({ type: "error", error: { message: "Invalid pagelen" } }), { status: 400 });
       return new Response(JSON.stringify({ values: [
         { update: { state: "MERGED", date: "2026-01-05T00:00:00.000Z" } },
         { comment: { id: 55, user: { uuid: PROFILE.uuid }, created_on: "2026-01-04T00:00:00.000Z", deleted: false } },
@@ -116,6 +118,30 @@ describe("collectBitbucketSlice", () => {
     // so file measurements landed unknown/partial_files even though the data
     // was fully available. They must land complete here instead.
     expect(result.coverage?.reasonCodes).not.toContain("partial_files");
+  });
+
+  it("restarts a list from page 1 when a saved cursor carries a different page size (production 2026-09-24: pre-v4.0.1 cursors kept pagelen=100)", async () => {
+    const { fetcher } = setupFetch({ repos: [REPO_A] });
+    let checkpoint: CollectorCheckpoint = EMPTY_CHECKPOINT;
+    const stagedKeys = new Set<string>();
+    const prKey = `pullrequests:${REPO_A}`;
+    for (let i = 0; i < 50 && !checkpoint.operations.some((op) => op.key === prKey); i++) {
+      const result = await collectBitbucketSlice(explicitInput(REPO_A), credential, checkpoint, { maxRequests: 1, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+      for (const event of result.events) stagedKeys.add(engineeringEventKey(event));
+      checkpoint = result.checkpoint;
+    }
+    const stale = `/2.0/repositories/%7B%7D/${encodeURIComponent(REPO_A)}/pullrequests?pagelen=100&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&page=3`;
+    checkpoint = { ...checkpoint, operations: checkpoint.operations.map((op) => (op.key === prKey ? { ...op, done: false, cursor: stale } : op)) };
+    fetcher.mockClear();
+
+    const result = await collectBitbucketSlice(explicitInput(REPO_A), credential, checkpoint, { maxRequests: 50, deadlineAt: Date.now() + 60_000 }, stagedKeys);
+
+    const prUrls = fetcher.mock.calls.map(([u]) => new URL(String(u))).filter((u) => u.pathname.endsWith("/pullrequests"));
+    expect(prUrls).toHaveLength(1);
+    expect(prUrls[0]!.searchParams.get("pagelen")).toBe("50");
+    expect(prUrls[0]!.searchParams.get("page")).toBeNull();
+    expect(result.stop).toBeFalsy();
+    expect(result.events.filter((e) => e.kind === "accepted_change")).toHaveLength(1);
   });
 
   it("never stores an absolute (host-carrying) URL as a checkpoint cursor", async () => {

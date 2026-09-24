@@ -41,11 +41,13 @@ export const GITHUB_EVIDENCE_QUERIES = {
       ${pageInfo} nodes { id author { ... on User { id } } submittedAt state }
     } } }
   }`,
-  // Traverse author-filtered history rather than pretending the API's history
-  // timestamp filter is a proven authored-date filter. Budget truncation is explicit.
-  commits: `query V7Commits($id: ID!, $subjectId: ID!, $after: String) {
+  // `since` filters by committed date, not authored date, so the caller sets
+  // it a margin before the window and still filters each node by authoredDate.
+  // Unbounded history walked a repository's whole past and answered 502 on
+  // large histories; smaller pages keep each request well inside GitHub's timeout.
+  commits: `query V7Commits($id: ID!, $subjectId: ID!, $since: GitTimestamp!, $after: String) {
     node(id: $id) { ... on Repository { isEmpty defaultBranchRef { target { ... on Commit {
-      history(first: 100, after: $after, author: {id: $subjectId}) {
+      history(first: 50, after: $after, since: $since, author: {id: $subjectId}) {
         ${pageInfo} nodes { id oid author { user { id } } authoredDate additions deletions }
       }
     } } } } }

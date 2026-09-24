@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { ScoringStatusPanel } from "./ScoringStatusPanel";
 import type { ScoringStatus } from "@/lib/collection/scoring-status";
 
@@ -50,7 +51,14 @@ describe("ScoringStatusPanel", () => {
       render(<ScoringStatusPanel initialStatus={COLLECTING} />);
       expect(screen.getByText("Collecting evidence — 42% complete")).toBeDefined();
       expect(screen.getByTestId("scoring-status-source-github").textContent).toContain("Collecting");
-      expect(screen.getByTestId("scoring-status-source-bitbucket").textContent).toContain("14:30 UTC");
+      const localTime = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
+        .format(new Date("2026-09-23T14:30:00.000Z"));
+      expect(screen.getByTestId("scoring-status-source-bitbucket").textContent).toContain(localTime);
+    });
+
+    it("renders resume times in UTC on the server so hydration matches", () => {
+      const html = renderToString(<ScoringStatusPanel initialStatus={COLLECTING} />);
+      expect(html).toContain("14:30 UTC");
     });
 
     it("renders action_needed rows with a Reconnect link and a Retry button", () => {
