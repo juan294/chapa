@@ -109,12 +109,17 @@ interface GraphqlErrorShape {
   readonly code?: string;
   readonly extensions?: { readonly type?: string };
 }
+// GitHub's primary GraphQL limit answers HTTP 200 with type "RATE_LIMIT" and
+// code "graphql_rate_limit" (observed 2026-09-24); "RATE_LIMITED" is the
+// secondary-limit spelling.
+const RATE_LIMIT_MARKERS = new Set(["RATE_LIMITED", "RATE_LIMIT", "graphql_rate_limit"]);
+const isRateLimitMarker = (value: string | undefined): boolean => value !== undefined && RATE_LIMIT_MARKERS.has(value);
 function isRateLimitedGraphqlErrorEntry(entry: GraphqlErrorShape): boolean {
-  return entry.type === "RATE_LIMITED" || entry.code === "RATE_LIMITED" || entry.extensions?.type === "RATE_LIMITED";
+  return isRateLimitMarker(entry.type) || isRateLimitMarker(entry.code) || isRateLimitMarker(entry.extensions?.type);
 }
-/** True for a GraphQL `errors` array reporting a `RATE_LIMITED` error, in
- * any of the shapes providers use: a top-level `type`, a top-level `code`,
- * or `extensions.type`.
+/** True for a GraphQL `errors` array reporting a rate limit, in any of the
+ * shapes providers use: a top-level `type`, a top-level `code`, or
+ * `extensions.type`.
  */
 export function isGraphqlRateLimited(errors: unknown): boolean {
   return Array.isArray(errors) && errors.some((entry) => (
