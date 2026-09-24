@@ -3,6 +3,13 @@
 Updated 2026-09-08. This is the active packet for the observed-point policy;
 the September5 research and completed historical reports remain unchanged.
 
+> **Superseded in part, 2026-09-23.** Publication consent, the v6
+> selected-or-fallback framing and the flag-only transition runbook this
+> packet references are retired. See
+> `docs/decisions/2026-09-23-universal-v72-no-consent.md` for what changed
+> and why. The qualification procedure, evidence rules and empirical-pilot
+> limitation below are unaffected and remain current.
+
 **This packet authorizes nothing.** Implementation, local qualification,
 production release, production migration and production recompute are separate
 facts. Production remains untouched unless the owner explicitly authorizes the
@@ -73,6 +80,6 @@ or recompute is part of local qualification.
 
 - [Current scoring spec](../impact-v7.md) and [offline replay](../scoring-reproduction.md)
 - [Scored-consumer agreement](../scoring-consumer-inventory.md)
-- [Flag-only transition/rollback](../runbooks/scoring-v7-transition.md)
+- [The collection queue runbook](../runbooks/scoring-collection-queue.md)
 - [Release procedure](release-playbook.md)
 - [Historical empirical status](../research/scoring-v7-validation-results.md)

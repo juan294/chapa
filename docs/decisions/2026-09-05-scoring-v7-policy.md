@@ -8,6 +8,13 @@ The normative formulas, rubric, clock, missingness bounds, retention and validat
 
 ## Data and access boundary
 
+> **Superseded in part by 2026-09-23** (`docs/decisions/2026-09-23-universal-v72-no-consent.md`):
+> `scoring_v7_subjects`'s public-evidence consent column and the "public
+> consent" gate on the receipts API mentioned below are removed. Every
+> signed-up subject is scored and published with no opt-in step. Reviewer
+> consent (`scoring_v7_reviewer_grants`, a distinct concept from publication
+> consent) is unaffected.
+
 `scoring_v7_subjects` records the owner and explicit public-evidence consent. `scoring_v7_sources` identifies each connected subject and private access-context reference; `scoring_v7_source_observations` stores dated normalized events and field/discovery coverage. An access-context reference contains no credential and carries no completeness ranking.
 
 `scoring_v7_evidence` stores immutable claim revisions, separating core submissions from Craft. Its JSON payload retains the full typed claim or normalized evidence; indexed columns preserve ownership, identity, date, category and revision linkage. `scoring_v7_assessments` stores immutable criterion verdicts, accountable evaluators, private rationale, rubric version and evidence references. Database statuses map directly to the shared accepted/rejected/unassessed/retracted contract. Owner consent to a named reviewer lives in `scoring_v7_reviewer_grants`; no invitation message is sent automatically.

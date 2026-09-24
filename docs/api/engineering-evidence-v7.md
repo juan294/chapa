@@ -71,6 +71,15 @@ For optional Craft, submit `channel:"craft"`, then assess `framing`, `verificati
 
 Raw bodies expire within 30 days of receipt; current retention applies even to historical reads. Extracted claims, dated observations, assessment rationale, and durable backing references remain until withdrawal, so raw expiry does not erase established practice credit.
 
-Public aggregate consent is explicit: `{"action":"consent","owner":"your-handle","enabled":true,"publicationAcknowledged":true}`. This permits aggregate publication by the versioned scoring pipeline; it does not expose private claim text, rationale, URLs, or artifact bodies. Disabling consent performs withdrawal. Explicit withdrawal uses `{"action":"withdraw","owner":"your-handle","publicationAcknowledged":true}` and removes owned private evidence, reviewer grants, references/raw bodies and server-side receipts, retaining identifier-only revocation tombstones. It invalidates profile caches. Previously downloaded public artifacts cannot be recalled; acknowledgment is required for this reason.
+Aggregate publication has no consent action: every signed-up subject (a
+handle with a `user_platforms` row for `github`) is scored and published by
+the versioned scoring pipeline automatically, and public output never exposes
+private claim text, rationale, URLs, or artifact bodies regardless. The old
+`{"action":"consent",...}` shape is removed from the schema; sending it is a
+generic parse error, not a recognized retired action. `{"action":"withdraw","owner":"your-handle","publicationAcknowledged":true}`
+remains a recognized request shape, but now answers `400 retired_action` — it
+no longer removes evidence. Deleting a subject's own evidence and receipts is
+a separate lifecycle action outside this endpoint. Previously downloaded
+public artifacts cannot be recalled.
 
 Local contract fixtures cover these flows in `apps/web/app/api/evidence/route.contract.test.ts` and `apps/web/lib/db/engineering-evidence.contract.test.ts`. Run only against the repository's explicitly validated disposable local Supabase target, with verification coordinated with the integration owner.

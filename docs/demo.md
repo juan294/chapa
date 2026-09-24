@@ -1,5 +1,10 @@
 # Chapa Demo Script (2–3 minutes)
 
+> **Historical planning document**, written for an earlier Impact v6-era
+> demo. The current spec is `docs/impact-v7.md`; current goals are in
+> `CLAUDE.md`. Kept for its original talking-point structure, not as a
+> source of current behavior.
+
 ## Demo goal
 Show that Chapa turns GitHub, Bitbucket, and Codeberg activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact v6 Profile** (4–5 dimensions + archetype + tier) that updates automatically and is easy to share, plus a separate Creator Studio design playground with a live preview.
 
